@@ -70,8 +70,7 @@ router.get('/config', requireAuth, requirePermission('salary', 'view'), async (r
         console.error('Error fetching salary configs:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch salary configurations',
-            error: error.message
+            message: 'Failed to fetch salary configurations'
         });
     }
 });
@@ -109,8 +108,7 @@ router.get('/config/:id', requireAuth, requirePermission('salary', 'view'), asyn
         console.error('Error fetching salary config:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch salary configuration',
-            error: error.message
+            message: 'Failed to fetch salary configuration'
         });
     }
 });
@@ -194,8 +192,7 @@ router.post('/config', requireAuth, requirePermission('salary', 'manage'), async
         console.error('Error creating salary config:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to create salary configuration',
-            error: error.message
+            message: 'Failed to create salary configuration'
         });
     }
 });
@@ -246,8 +243,7 @@ router.put('/config/:id', requireAuth, requirePermission('salary', 'manage'), as
         console.error('Error updating salary config:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update salary configuration',
-            error: error.message
+            message: 'Failed to update salary configuration'
         });
     }
 });
@@ -257,40 +253,178 @@ router.put('/config/:id', requireAuth, requirePermission('salary', 'manage'), as
 // ========================================
 
 /**
+ * Calculate salary for a single user/month (inline logic)
+ */
+async function calculateSalaryForUser(userId, month, calculatedBy) {
+    const fromDate = `${month}-01`;
+    // Get last day of month
+    const toDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
+        .toISOString().split('T')[0];
+
+    // Get active salary config
+    const [configs] = await pool.query(
+        `SELECT * FROM staff_salary_config
+         WHERE user_id = ? AND is_active = 1
+           AND ? >= effective_from
+           AND (effective_until IS NULL OR ? <= effective_until)
+         LIMIT 1`,
+        [userId, fromDate, toDate]
+    );
+
+    if (configs.length === 0) {
+        throw new Error('No active salary configuration found for this user');
+    }
+
+    const config = configs[0];
+    const hourlyRate = parseFloat(config.monthly_salary) / 260; // 26 days * 10 hours
+    const overtimeMultiplier = parseFloat(config.overtime_multiplier);
+
+    // Get attendance data for the month
+    const [attendanceRows] = await pool.query(
+        `SELECT
+            COUNT(*) as total_days,
+            SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_days,
+            SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_days,
+            SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_days,
+            SUM(CASE WHEN status = 'on_leave' THEN 1 ELSE 0 END) as leaves,
+            SUM(CASE WHEN DAYOFWEEK(date) = 1 AND status = 'present' THEN 1 ELSE 0 END) as sundays_worked,
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status = 'present' AND total_working_minutes <= 600
+                THEN total_working_minutes ELSE 0 END) / 60, 0) as standard_hours,
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) = 1 AND status = 'present'
+                THEN total_working_minutes ELSE 0 END) / 60, 0) as sunday_hours,
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status = 'present' AND total_working_minutes > 600
+                THEN (total_working_minutes - 600) ELSE 0 END) / 60, 0) as overtime_hours,
+            COALESCE(SUM(CASE WHEN is_late = 1 THEN 1 ELSE 0 END), 0) as late_days
+         FROM staff_attendance
+         WHERE user_id = ? AND date BETWEEN ? AND ?`,
+        [userId, fromDate, toDate]
+    );
+
+    const att = attendanceRows[0];
+
+    // Calculate pay components
+    const standardHoursPay = parseFloat(att.standard_hours) * hourlyRate;
+    const sundayHoursPay = parseFloat(att.sunday_hours) * hourlyRate;
+    const overtimePay = parseFloat(att.overtime_hours) * hourlyRate * overtimeMultiplier;
+
+    // Allowances from config
+    const transportAllowance = parseFloat(config.transport_allowance) || 0;
+    const foodAllowance = parseFloat(config.food_allowance) || 0;
+    const otherAllowance = parseFloat(config.other_allowance) || 0;
+    const totalAllowances = transportAllowance + foodAllowance + otherAllowance;
+
+    // Deductions
+    let lateDeduction = 0;
+    if (config.enable_late_deduction && config.late_deduction_per_hour > 0) {
+        lateDeduction = parseInt(att.late_days) * parseFloat(config.late_deduction_per_hour);
+    }
+
+    let absenceDeduction = 0;
+    if (config.enable_absence_deduction && parseInt(att.absent_days) > 0) {
+        absenceDeduction = parseInt(att.absent_days) * hourlyRate * parseFloat(config.standard_daily_hours);
+    }
+
+    const totalDeductions = lateDeduction + absenceDeduction;
+
+    // Check if salary record exists
+    const [existing] = await pool.query(
+        'SELECT id FROM monthly_salaries WHERE user_id = ? AND salary_month = ?',
+        [userId, month]
+    );
+
+    let salaryId;
+    if (existing.length > 0) {
+        salaryId = existing[0].id;
+        await pool.query(
+            `UPDATE monthly_salaries SET
+                branch_id = ?, from_date = ?, to_date = ?, base_salary = ?,
+                total_working_days = ?, total_present_days = ?, total_absent_days = ?,
+                total_half_days = ?, total_sundays_worked = ?, total_leaves = ?,
+                total_standard_hours = ?, total_sunday_hours = ?, total_overtime_hours = ?,
+                total_worked_hours = ?,
+                standard_hours_pay = ?, sunday_hours_pay = ?, overtime_pay = ?,
+                transport_allowance = ?, food_allowance = ?, other_allowance = ?,
+                total_allowances = ?,
+                late_deduction = ?, absence_deduction = ?, total_deductions = ?,
+                status = 'calculated', calculation_date = NOW(), calculated_by = ?
+             WHERE id = ?`,
+            [
+                config.branch_id, fromDate, toDate, config.monthly_salary,
+                parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
+                parseInt(att.half_days), parseInt(att.sundays_worked), parseInt(att.leaves),
+                parseFloat(att.standard_hours), parseFloat(att.sunday_hours), parseFloat(att.overtime_hours),
+                parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours),
+                standardHoursPay, sundayHoursPay, overtimePay,
+                transportAllowance, foodAllowance, otherAllowance, totalAllowances,
+                lateDeduction, absenceDeduction, totalDeductions,
+                calculatedBy, salaryId
+            ]
+        );
+    } else {
+        const [result] = await pool.query(
+            `INSERT INTO monthly_salaries (
+                user_id, branch_id, salary_month, from_date, to_date, base_salary,
+                total_working_days, total_present_days, total_absent_days,
+                total_half_days, total_sundays_worked, total_leaves,
+                total_standard_hours, total_sunday_hours, total_overtime_hours, total_worked_hours,
+                standard_hours_pay, sunday_hours_pay, overtime_pay,
+                transport_allowance, food_allowance, other_allowance, total_allowances,
+                late_deduction, absence_deduction, total_deductions,
+                status, calculation_date, calculated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)`,
+            [
+                userId, config.branch_id, month, fromDate, toDate, config.monthly_salary,
+                parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
+                parseInt(att.half_days), parseInt(att.sundays_worked), parseInt(att.leaves),
+                parseFloat(att.standard_hours), parseFloat(att.sunday_hours), parseFloat(att.overtime_hours),
+                parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours),
+                standardHoursPay, sundayHoursPay, overtimePay,
+                transportAllowance, foodAllowance, otherAllowance, totalAllowances,
+                lateDeduction, absenceDeduction, totalDeductions,
+                calculatedBy
+            ]
+        );
+        salaryId = result.insertId;
+    }
+
+    return { salary_id: salaryId, message: 'Salary calculated successfully' };
+}
+
+/**
  * POST calculate monthly salary for a staff member
  */
 router.post('/calculate', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
     try {
         const { user_id, month } = req.body; // month format: YYYY-MM
-        
+
         if (!user_id || !month) {
             return res.status(400).json({
                 success: false,
                 message: 'Missing required fields: user_id, month'
             });
         }
-        
-        // Set current user ID for the procedure
-        await pool.query('SET @current_user_id = ?', [req.user.id]);
-        
-        // Call stored procedure
-        const [results] = await pool.query(
-            'CALL calculate_monthly_salary(?, ?)',
-            [user_id, month]
-        );
-        
+
+        if (!/^\d{4}-\d{2}$/.test(month)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Month must be in YYYY-MM format'
+            });
+        }
+
+        const result = await calculateSalaryForUser(user_id, month, req.user.id);
+
         res.json({
             success: true,
             message: 'Salary calculated successfully',
-            data: results[0][0]
+            data: result
         });
-        
+
     } catch (error) {
         console.error('Error calculating salary:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to calculate salary',
-            error: error.message
+            message: error.message === 'No active salary configuration found for this user'
+                ? error.message : 'Failed to calculate salary'
         });
     }
 });
@@ -301,65 +435,65 @@ router.post('/calculate', requireAuth, requirePermission('salary', 'manage'), as
 router.post('/calculate-all', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
     try {
         const { month, branch_id } = req.body;
-        
+
         if (!month) {
             return res.status(400).json({
                 success: false,
                 message: 'Missing required field: month'
             });
         }
-        
+
+        if (!/^\d{4}-\d{2}$/.test(month)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Month must be in YYYY-MM format'
+            });
+        }
+
         // Get all active staff
         let query = `
-            SELECT DISTINCT sc.user_id 
+            SELECT DISTINCT sc.user_id
             FROM staff_salary_config sc
             WHERE sc.is_active = 1
         `;
-        
+
         const params = [];
         if (branch_id) {
             query += ' AND sc.branch_id = ?';
             params.push(branch_id);
         }
-        
+
         const [staff] = await pool.query(query, params);
-        
-        // Set current user ID
-        await pool.query('SET @current_user_id = ?', [req.user.id]);
-        
+
         const results = [];
         for (const s of staff) {
             try {
-                const [result] = await pool.query(
-                    'CALL calculate_monthly_salary(?, ?)',
-                    [s.user_id, month]
-                );
+                const result = await calculateSalaryForUser(s.user_id, month, req.user.id);
                 results.push({
                     user_id: s.user_id,
                     success: true,
-                    data: result[0][0]
+                    data: result
                 });
-            } catch (error) {
+            } catch (err) {
                 results.push({
                     user_id: s.user_id,
                     success: false,
-                    error: error.message
+                    error: err.message
                 });
             }
         }
-        
+
         res.json({
             success: true,
             message: `Calculated salaries for ${results.length} staff members`,
             data: results
         });
-        
+
     } catch (error) {
         console.error('Error calculating all salaries:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to calculate salaries',
-            error: error.message
+            message: 'Failed to calculate salaries'
         });
     }
 });
@@ -427,8 +561,7 @@ router.get('/monthly', requireAuth, requirePermission('salary', 'view'), async (
         console.error('Error fetching monthly salaries:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch monthly salaries',
-            error: error.message
+            message: 'Failed to fetch monthly salaries'
         });
     }
 });
@@ -492,8 +625,7 @@ router.get('/monthly/:id', requireAuth, requirePermission('salary', 'view'), asy
         console.error('Error fetching monthly salary:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch monthly salary',
-            error: error.message
+            message: 'Failed to fetch monthly salary'
         });
     }
 });
@@ -523,8 +655,7 @@ router.put('/monthly/:id/approve', requireAuth, requirePermission('salary', 'app
         console.error('Error approving salary:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to approve salary',
-            error: error.message
+            message: 'Failed to approve salary'
         });
     }
 });
@@ -581,8 +712,7 @@ router.put('/monthly/:id/adjustments', requireAuth, requirePermission('salary', 
         console.error('Error updating adjustments:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update adjustments',
-            error: error.message
+            message: 'Failed to update adjustments'
         });
     }
 });
@@ -669,8 +799,7 @@ router.post('/payments', requireAuth, requirePermission('salary', 'manage'), asy
         console.error('Error recording payment:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to record payment',
-            error: error.message
+            message: 'Failed to record payment'
         });
     }
 });
@@ -728,8 +857,7 @@ router.get('/payments', requireAuth, requirePermission('salary', 'view'), async 
         console.error('Error fetching payments:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch payments',
-            error: error.message
+            message: 'Failed to fetch payments'
         });
     }
 });
@@ -816,8 +944,7 @@ router.get('/reports/summary', requireAuth, requirePermission('salary', 'view'),
         console.error('Error fetching salary summary:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch salary summary',
-            error: error.message
+            message: 'Failed to fetch salary summary'
         });
     }
 });

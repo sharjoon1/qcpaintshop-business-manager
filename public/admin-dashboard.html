@@ -1,16 +1,253 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0;url=/business-manager/dashboard.html">
-    <script>
-        window.location.href = '/business-manager/dashboard.html';
-    </script>
-    <title>Redirecting...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Admin Dashboard - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/business-manager/js/auth-helper.js"></script>
+    <style>
+        body { background: #f9fafb; }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 4px solid var(--accent, #7c3aed);
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-value { font-size: 1.75rem; font-weight: 800; color: #1f2937; }
+        .stat-label { font-size: 0.8rem; color: #6b7280; font-weight: 500; }
+        .stat-icon { font-size: 1.5rem; }
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #374151;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .quick-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            text-decoration: none;
+            color: #1f2937;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .quick-link:hover { transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .quick-link-icon { font-size: 1.25rem; }
+    </style>
 </head>
-<body>
-    <p>Redirecting to dashboard...</p>
-    <p>If not redirected, <a href="/business-manager/dashboard.html">click here</a>.</p>
+<body class="bg-gray-50">
+
+    <div class="container mx-auto p-4 md:p-6 max-w-6xl">
+        <!-- Page Header -->
+        <div class="mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+            <p class="text-gray-500 text-sm mt-1" id="greeting">Welcome back!</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+            <div class="stat-card" style="--accent: #7c3aed;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="stat-value" id="statUsers">-</div>
+                        <div class="stat-label">Active Staff</div>
+                    </div>
+                    <span class="stat-icon">👥</span>
+                </div>
+            </div>
+            <div class="stat-card" style="--accent: #2563eb;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="stat-value" id="statCustomers">-</div>
+                        <div class="stat-label">Customers</div>
+                    </div>
+                    <span class="stat-icon">🧑</span>
+                </div>
+            </div>
+            <div class="stat-card" style="--accent: #059669;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="stat-value" id="statProducts">-</div>
+                        <div class="stat-label">Products</div>
+                    </div>
+                    <span class="stat-icon">🎨</span>
+                </div>
+            </div>
+            <div class="stat-card" style="--accent: #d97706;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="stat-value" id="statEstimates">-</div>
+                        <div class="stat-label">Total Estimates</div>
+                    </div>
+                    <span class="stat-icon">📋</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Second Row Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+            <div class="stat-card" style="--accent: #10b981;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="stat-value" id="statAttendance">-</div>
+                        <div class="stat-label">Present Today</div>
+                    </div>
+                    <span class="stat-icon">🟢</span>
+                </div>
+            </div>
+            <div class="stat-card" style="--accent: #f59e0b;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="stat-value" id="statLeads">-</div>
+                        <div class="stat-label">Total Leads</div>
+                    </div>
+                    <span class="stat-icon">🎯</span>
+                </div>
+            </div>
+            <div class="stat-card" style="--accent: #ef4444;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="stat-value" id="statPendingTasks">-</div>
+                        <div class="stat-label">Pending Tasks</div>
+                    </div>
+                    <span class="stat-icon">📌</span>
+                </div>
+            </div>
+            <div class="stat-card" style="--accent: #dc2626;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="stat-value" id="statOverdue">-</div>
+                        <div class="stat-label">Overdue Tasks</div>
+                    </div>
+                    <span class="stat-icon">⚠️</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Summary -->
+        <div class="bg-white rounded-xl shadow-md p-5 mb-6">
+            <div class="section-title">This Month's Performance</div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div class="text-center p-3 bg-purple-50 rounded-lg">
+                    <div class="text-2xl font-bold text-purple-700" id="monthEstCount">-</div>
+                    <div class="text-xs text-gray-500">Estimates Created</div>
+                </div>
+                <div class="text-center p-3 bg-green-50 rounded-lg">
+                    <div class="text-2xl font-bold text-green-700" id="monthEstTotal">-</div>
+                    <div class="text-xs text-gray-500">Estimates Value</div>
+                </div>
+                <div class="text-center p-3 bg-blue-50 rounded-lg">
+                    <div class="text-2xl font-bold text-blue-700" id="monthNewLeads">-</div>
+                    <div class="text-xs text-gray-500">New Leads</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Grid -->
+        <div class="mb-6">
+            <div class="section-title">Quick Actions</div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <a href="/business-manager/estimate-create-new.html" class="quick-link">
+                    <span class="quick-link-icon">➕</span>
+                    <span>New Estimate</span>
+                </a>
+                <a href="/business-manager/admin-leads.html" class="quick-link">
+                    <span class="quick-link-icon">🎯</span>
+                    <span>Manage Leads</span>
+                </a>
+                <a href="/business-manager/admin-tasks.html" class="quick-link">
+                    <span class="quick-link-icon">📋</span>
+                    <span>Manage Tasks</span>
+                </a>
+                <a href="/business-manager/admin-staff.html" class="quick-link">
+                    <span class="quick-link-icon">👤</span>
+                    <span>Staff</span>
+                </a>
+                <a href="/business-manager/admin-customers.html" class="quick-link">
+                    <span class="quick-link-icon">👥</span>
+                    <span>Customers</span>
+                </a>
+                <a href="/business-manager/admin-products.html" class="quick-link">
+                    <span class="quick-link-icon">🎨</span>
+                    <span>Products</span>
+                </a>
+                <a href="/business-manager/admin-salary-monthly.html" class="quick-link">
+                    <span class="quick-link-icon">💵</span>
+                    <span>Salary</span>
+                </a>
+                <a href="/business-manager/admin-reports.html" class="quick-link">
+                    <span class="quick-link-icon">📊</span>
+                    <span>Reports</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // Check auth
+    if (!isAuthenticated()) {
+        window.location.href = '/business-manager/login.html';
+    }
+
+    // Set greeting
+    const user = getCurrentUser();
+    if (user) {
+        const hour = new Date().getHours();
+        let greeting = 'Good morning';
+        if (hour >= 12 && hour < 17) greeting = 'Good afternoon';
+        else if (hour >= 17) greeting = 'Good evening';
+        document.getElementById('greeting').textContent = `${greeting}, ${user.full_name || 'Admin'}!`;
+    }
+
+    // Load dashboard stats
+    async function loadDashboard() {
+        try {
+            const response = await fetch('/business-manager/api/dashboard/stats', {
+                headers: getAuthHeaders()
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                const d = result.data;
+                document.getElementById('statUsers').textContent = d.total_users || 0;
+                document.getElementById('statCustomers').textContent = d.total_customers || 0;
+                document.getElementById('statProducts').textContent = d.total_products || 0;
+                document.getElementById('statEstimates').textContent = d.total_estimates || 0;
+                document.getElementById('statAttendance').textContent = d.attendance_today || 0;
+                document.getElementById('statLeads').textContent = d.total_leads || 0;
+                document.getElementById('statPendingTasks').textContent = d.pending_tasks || 0;
+                document.getElementById('statOverdue').textContent = d.overdue_tasks || 0;
+                document.getElementById('monthEstCount').textContent = d.month_estimates_count || 0;
+                document.getElementById('monthNewLeads').textContent = d.new_leads || 0;
+
+                // Format currency
+                const total = parseFloat(d.month_estimates_total || 0);
+                if (total >= 100000) {
+                    document.getElementById('monthEstTotal').textContent = (total / 100000).toFixed(1) + 'L';
+                } else if (total >= 1000) {
+                    document.getElementById('monthEstTotal').textContent = (total / 1000).toFixed(1) + 'K';
+                } else {
+                    document.getElementById('monthEstTotal').textContent = total.toFixed(0);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load dashboard:', error);
+        }
+    }
+
+    loadDashboard();
+</script>
 </body>
 </html>

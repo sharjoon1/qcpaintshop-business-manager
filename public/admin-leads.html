@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Lead Management - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/business-manager/js/auth-helper.js"></script>
+    <style>
+        .status-new { background: #dbeafe; color: #1e40af; }
+        .status-contacted { background: #fef3c7; color: #92400e; }
+        .status-interested { background: #d1fae5; color: #065f46; }
+        .status-not_interested { background: #fee2e2; color: #991b1b; }
+        .status-follow_up { background: #fef9c3; color: #854d0e; }
+        .status-converted { background: #e9d5ff; color: #6b21a8; }
+        .status-lost { background: #fee2e2; color: #7f1d1d; }
+
+        .priority-low { border-left: 4px solid #9ca3af; }
+        .priority-medium { border-left: 4px solid #3b82f6; }
+        .priority-high { border-left: 4px solid #f59e0b; }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- Main Content -->
+    <div class="container mx-auto p-6">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-800">Lead Management</h2>
+                <p class="text-gray-600 mt-1">Track and manage sales leads</p>
+            </div>
+            <button onclick="openAddModal()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold shadow-lg">
+                + Add Lead
+            </button>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">Total Leads</p>
+                <p class="text-2xl font-bold text-gray-800" id="statTotal">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">New</p>
+                <p class="text-2xl font-bold text-blue-600" id="statNew">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">Contacted</p>
+                <p class="text-2xl font-bold text-yellow-600" id="statContacted">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">Interested</p>
+                <p class="text-2xl font-bold text-green-600" id="statInterested">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">Converted</p>
+                <p class="text-2xl font-bold text-purple-600" id="statConverted">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">Lost</p>
+                <p class="text-2xl font-bold text-red-600" id="statLost">0</p>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                    <select id="filterStatus" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                        <option value="">All Statuses</option>
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="interested">Interested</option>
+                        <option value="not_interested">Not Interested</option>
+                        <option value="follow_up">Follow Up</option>
+                        <option value="converted">Converted</option>
+                        <option value="lost">Lost</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Source</label>
+                    <select id="filterSource" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                        <option value="">All Sources</option>
+                        <option value="walk_in">Walk In</option>
+                        <option value="phone">Phone</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="website">Website</option>
+                        <option value="referral">Referral</option>
+                        <option value="social_media">Social Media</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Search</label>
+                    <input type="text" id="searchInput" placeholder="Name, phone, email..." class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="loadLeads()" class="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-semibold">
+                        Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leads Table -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-sm font-semibold">Lead #</th>
+                            <th class="px-6 py-4 text-left text-sm font-semibold">Name</th>
+                            <th class="px-6 py-4 text-left text-sm font-semibold">Phone</th>
+                            <th class="px-6 py-4 text-left text-sm font-semibold">Source</th>
+                            <th class="px-6 py-4 text-left text-sm font-semibold">Status</th>
+                            <th class="px-6 py-4 text-left text-sm font-semibold">Priority</th>
+                            <th class="px-6 py-4 text-left text-sm font-semibold">Assigned To</th>
+                            <th class="px-6 py-4 text-left text-sm font-semibold">Created</th>
+                            <th class="px-6 py-4 text-center text-sm font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leadsTableBody" class="divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="9" class="text-center py-8 text-gray-500">Loading leads...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="leadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 my-8">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="modalTitle" class="text-2xl font-bold text-gray-800">Add Lead</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
+
+            <form id="leadForm" onsubmit="saveLead(event)">
+                <input type="hidden" id="leadId">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Name *</label>
+                        <input type="text" id="leadName" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" placeholder="Lead name">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
+                        <input type="tel" id="leadPhone" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" placeholder="10-digit phone">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                        <input type="email" id="leadEmail" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" placeholder="email@example.com">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Source</label>
+                        <select id="leadSource" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                            <option value="walk_in">Walk In</option>
+                            <option value="phone">Phone</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="website">Website</option>
+                            <option value="referral">Referral</option>
+                            <option value="social_media">Social Media</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Priority</label>
+                        <select id="leadPriority" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Assign To</label>
+                        <select id="leadAssignedTo" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                            <option value="">-- Unassigned --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Branch</label>
+                        <select id="leadBranch" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                            <option value="">-- Select Branch --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">City</label>
+                        <input type="text" id="leadCity" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" placeholder="City">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Address</label>
+                    <textarea id="leadAddress" rows="2" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" placeholder="Full address..."></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
+                    <textarea id="leadNotes" rows="3" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" placeholder="Additional notes..."></textarea>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold">
+                        Save Lead
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Modal -->
+    <div id="viewModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 my-8">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">Lead Details</h3>
+                <button onclick="closeViewModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
+
+            <div id="viewModalContent">
+                <!-- Content will be dynamically loaded -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Followup Modal -->
+    <div id="followupModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 my-8">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">Add Followup</h3>
+                <button onclick="closeFollowupModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
+
+            <form id="followupForm" onsubmit="saveFollowup(event)">
+                <input type="hidden" id="followupLeadId">
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Followup Type *</label>
+                    <select id="followupType" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                        <option value="call">Call</option>
+                        <option value="visit">Visit</option>
+                        <option value="email">Email</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="sms">SMS</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Notes *</label>
+                    <textarea id="followupNotes" required rows="4" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" placeholder="Describe the followup..."></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Next Followup Date</label>
+                    <input type="date" id="followupNextDate" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeFollowupModal()" class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold">
+                        Add Followup
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/business-manager/api';
+        let leads = [];
+        let editingLeadId = null;
+        let users = [];
+        let branches = [];
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/leads/stats`, { headers: getAuthHeaders() });
+                const result = await response.json();
+                if (result.success) {
+                    const stats = result.data;
+                    document.getElementById('statTotal').textContent = stats.total || 0;
+                    document.getElementById('statNew').textContent = stats.new_leads || 0;
+                    document.getElementById('statContacted').textContent = stats.contacted || 0;
+                    document.getElementById('statInterested').textContent = stats.interested || 0;
+                    document.getElementById('statConverted').textContent = stats.won || 0;
+                    document.getElementById('statLost').textContent = stats.lost || 0;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load all leads
+        async function loadLeads() {
+            try {
+                const status = document.getElementById('filterStatus').value;
+                const source = document.getElementById('filterSource').value;
+                const search = document.getElementById('searchInput').value;
+
+                let url = `${API_BASE}/leads?limit=100`;
+                if (status) url += `&status=${status}`;
+                if (source) url += `&source=${source}`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
+
+                const response = await fetch(url, { headers: getAuthHeaders() });
+                const result = await response.json();
+
+                if (result.success) {
+                    leads = result.data;
+                    renderLeads();
+                }
+            } catch (error) {
+                console.error('Error loading leads:', error);
+                alert('Failed to load leads');
+            }
+        }
+
+        // Render leads table
+        function renderLeads() {
+            const tbody = document.getElementById('leadsTableBody');
+
+            if (leads.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-500">No leads found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = leads.map(lead => {
+                const statusClass = `status-${lead.status}`;
+                const priorityClass = `priority-${lead.priority}`;
+
+                return `
+                <tr class="hover:bg-gray-50 ${priorityClass}">
+                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">${lead.lead_number || '-'}</td>
+                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">${lead.name}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${lead.phone || '-'}</td>
+                    <td class="px-6 py-4 text-sm">
+                        <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">${formatSource(lead.source)}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-3 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                            ${formatStatus(lead.status)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-semibold ${getPriorityBadge(lead.priority)}">
+                            ${formatPriority(lead.priority)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${lead.assigned_to_name || 'Unassigned'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${formatDate(lead.created_at)}</td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap">
+                        <button onclick="viewLead(${lead.id})" class="text-blue-600 hover:text-blue-800 font-semibold text-sm mr-2">
+                            View
+                        </button>
+                        <button onclick="editLead(${lead.id})" class="text-green-600 hover:text-green-800 font-semibold text-sm mr-2">
+                            Edit
+                        </button>
+                        <button onclick="deleteLead(${lead.id})" class="text-red-600 hover:text-red-800 font-semibold text-sm">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `}).join('');
+        }
+
+        // View lead details
+        async function viewLead(id) {
+            try {
+                const response = await fetch(`${API_BASE}/leads/${id}`, { headers: getAuthHeaders() });
+                const result = await response.json();
+
+                if (result.success) {
+                    const lead = result.data;
+                    const content = `
+                        <div class="grid grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <h4 class="font-semibold text-gray-700 mb-2">Lead Information</h4>
+                                <div class="space-y-2">
+                                    <p><span class="font-semibold">Lead #:</span> ${lead.lead_number || '-'}</p>
+                                    <p><span class="font-semibold">Name:</span> ${lead.name}</p>
+                                    <p><span class="font-semibold">Phone:</span> ${lead.phone || '-'}</p>
+                                    <p><span class="font-semibold">Email:</span> ${lead.email || '-'}</p>
+                                    <p><span class="font-semibold">Source:</span> ${formatSource(lead.source)}</p>
+                                    <p><span class="font-semibold">Status:</span> <span class="px-3 py-1 text-xs font-semibold rounded-full status-${lead.status}">${formatStatus(lead.status)}</span></p>
+                                    <p><span class="font-semibold">Priority:</span> <span class="${getPriorityBadge(lead.priority)}">${formatPriority(lead.priority)}</span></p>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-700 mb-2">Assignment & Details</h4>
+                                <div class="space-y-2">
+                                    <p><span class="font-semibold">Assigned To:</span> ${lead.assigned_to_name || 'Unassigned'}</p>
+                                    <p><span class="font-semibold">Branch:</span> ${lead.branch_name || '-'}</p>
+                                    <p><span class="font-semibold">City:</span> ${lead.city || '-'}</p>
+                                    <p><span class="font-semibold">Address:</span> ${lead.address || '-'}</p>
+                                    <p><span class="font-semibold">Created:</span> ${formatDate(lead.created_at)}</p>
+                                    <p><span class="font-semibold">Created By:</span> ${lead.created_by_name || '-'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${lead.notes ? `<div class="mb-6">
+                            <h4 class="font-semibold text-gray-700 mb-2">Notes</h4>
+                            <p class="text-gray-700 bg-gray-50 p-3 rounded">${lead.notes}</p>
+                        </div>` : ''}
+
+                        <div class="border-t pt-4">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="font-semibold text-gray-700">Followup History</h4>
+                                <button onclick="openFollowupModal(${lead.id})" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold">
+                                    + Add Followup
+                                </button>
+                            </div>
+
+                            ${lead.followups && lead.followups.length > 0 ? `
+                                <div class="space-y-3">
+                                    ${lead.followups.map(f => `
+                                        <div class="bg-gray-50 p-4 rounded-lg">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <span class="font-semibold">${f.user_name || 'Unknown'}</span>
+                                                    <span class="text-sm text-gray-600 ml-2">${formatFollowupType(f.followup_type)}</span>
+                                                </div>
+                                                <span class="text-sm text-gray-500">${formatDate(f.created_at)}</span>
+                                            </div>
+                                            <p class="text-gray-700">${f.notes}</p>
+                                            ${f.next_followup_date ? `<p class="text-sm text-purple-600 mt-2">Next followup: ${formatDate(f.next_followup_date)}</p>` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : '<p class="text-gray-500 text-center py-4">No followups yet</p>'}
+                        </div>
+                    `;
+
+                    document.getElementById('viewModalContent').innerHTML = content;
+                    document.getElementById('viewModal').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error viewing lead:', error);
+                alert('Failed to load lead details');
+            }
+        }
+
+        // Open add modal
+        function openAddModal() {
+            editingLeadId = null;
+            document.getElementById('modalTitle').textContent = 'Add Lead';
+            document.getElementById('leadForm').reset();
+            document.getElementById('leadId').value = '';
+            document.getElementById('leadPriority').value = 'medium';
+            document.getElementById('leadSource').value = 'walk_in';
+            document.getElementById('leadModal').classList.remove('hidden');
+        }
+
+        // Edit lead
+        function editLead(id) {
+            const lead = leads.find(l => l.id === id);
+            if (!lead) return;
+
+            editingLeadId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Lead';
+            document.getElementById('leadId').value = lead.id;
+            document.getElementById('leadName').value = lead.name;
+            document.getElementById('leadPhone').value = lead.phone || '';
+            document.getElementById('leadEmail').value = lead.email || '';
+            document.getElementById('leadSource').value = lead.source || 'walk_in';
+            document.getElementById('leadPriority').value = lead.priority || 'medium';
+            document.getElementById('leadAssignedTo').value = lead.assigned_to || '';
+            document.getElementById('leadBranch').value = lead.branch_id || '';
+            document.getElementById('leadCity').value = lead.city || '';
+            document.getElementById('leadAddress').value = lead.address || '';
+            document.getElementById('leadNotes').value = lead.notes || '';
+            document.getElementById('leadModal').classList.remove('hidden');
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('leadModal').classList.add('hidden');
+            document.getElementById('leadForm').reset();
+            editingLeadId = null;
+        }
+
+        // Close view modal
+        function closeViewModal() {
+            document.getElementById('viewModal').classList.add('hidden');
+        }
+
+        // Save lead
+        async function saveLead(event) {
+            event.preventDefault();
+
+            const leadData = {
+                name: document.getElementById('leadName').value.trim(),
+                phone: document.getElementById('leadPhone').value.trim() || null,
+                email: document.getElementById('leadEmail').value.trim() || null,
+                source: document.getElementById('leadSource').value,
+                priority: document.getElementById('leadPriority').value,
+                assigned_to: document.getElementById('leadAssignedTo').value || null,
+                branch_id: document.getElementById('leadBranch').value || null,
+                city: document.getElementById('leadCity').value.trim() || null,
+                address: document.getElementById('leadAddress').value.trim() || null,
+                notes: document.getElementById('leadNotes').value.trim() || null
+            };
+
+            try {
+                let response;
+                if (editingLeadId) {
+                    response = await fetch(`${API_BASE}/leads/${editingLeadId}`, {
+                        method: 'PUT',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify(leadData)
+                    });
+                } else {
+                    response = await fetch(`${API_BASE}/leads`, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify(leadData)
+                    });
+                }
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(editingLeadId ? 'Lead updated successfully!' : 'Lead created successfully!');
+                    closeModal();
+                    loadLeads();
+                    loadStats();
+                } else {
+                    alert('Error: ' + (result.message || 'Failed to save lead'));
+                }
+            } catch (error) {
+                console.error('Error saving lead:', error);
+                alert('Failed to save lead. Please try again.');
+            }
+        }
+
+        // Delete lead
+        async function deleteLead(id) {
+            const lead = leads.find(l => l.id === id);
+            if (!lead) return;
+
+            if (!confirm(`Are you sure you want to delete lead "${lead.name}"?\n\nThis will mark the lead as inactive.`)) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/leads/${id}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Lead deleted successfully!');
+                    loadLeads();
+                    loadStats();
+                } else {
+                    alert('Failed to delete lead: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error deleting lead:', error);
+                alert('Failed to delete lead. Please try again.');
+            }
+        }
+
+        // Open followup modal
+        function openFollowupModal(leadId) {
+            document.getElementById('followupLeadId').value = leadId;
+            document.getElementById('followupForm').reset();
+            document.getElementById('followupModal').classList.remove('hidden');
+        }
+
+        // Close followup modal
+        function closeFollowupModal() {
+            document.getElementById('followupModal').classList.add('hidden');
+            document.getElementById('followupForm').reset();
+        }
+
+        // Save followup
+        async function saveFollowup(event) {
+            event.preventDefault();
+
+            const leadId = document.getElementById('followupLeadId').value;
+            const followupData = {
+                followup_type: document.getElementById('followupType').value,
+                notes: document.getElementById('followupNotes').value.trim(),
+                next_followup_date: document.getElementById('followupNextDate').value || null
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/leads/${leadId}/followup`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(followupData)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Followup added successfully!');
+                    closeFollowupModal();
+                    closeViewModal();
+                    viewLead(leadId);
+                } else {
+                    alert('Error: ' + (result.message || 'Failed to add followup'));
+                }
+            } catch (error) {
+                console.error('Error adding followup:', error);
+                alert('Failed to add followup. Please try again.');
+            }
+        }
+
+        // Load users for assignment dropdown
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/users?status=active`, { headers: getAuthHeaders() });
+                const result = await response.json();
+
+                if (result.success || Array.isArray(result)) {
+                    users = result.success ? result.data : result;
+                    const select = document.getElementById('leadAssignedTo');
+                    select.innerHTML = '<option value="">-- Unassigned --</option>' +
+                        users.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        // Load branches for dropdown
+        async function loadBranches() {
+            try {
+                const response = await fetch(`${API_BASE}/branches`, { headers: getAuthHeaders() });
+                const result = await response.json();
+
+                if (Array.isArray(result)) {
+                    branches = result;
+                    const select = document.getElementById('leadBranch');
+                    select.innerHTML = '<option value="">-- Select Branch --</option>' +
+                        branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading branches:', error);
+            }
+        }
+
+        // Utility functions
+        function formatStatus(status) {
+            const statusMap = {
+                'new': 'New',
+                'contacted': 'Contacted',
+                'interested': 'Interested',
+                'not_interested': 'Not Interested',
+                'follow_up': 'Follow Up',
+                'converted': 'Converted',
+                'lost': 'Lost'
+            };
+            return statusMap[status] || status;
+        }
+
+        function formatSource(source) {
+            const sourceMap = {
+                'walk_in': 'Walk In',
+                'phone': 'Phone',
+                'whatsapp': 'WhatsApp',
+                'website': 'Website',
+                'referral': 'Referral',
+                'social_media': 'Social Media',
+                'other': 'Other'
+            };
+            return sourceMap[source] || source;
+        }
+
+        function formatPriority(priority) {
+            const priorityMap = {
+                'low': 'Low',
+                'medium': 'Medium',
+                'high': 'High'
+            };
+            return priorityMap[priority] || priority;
+        }
+
+        function getPriorityBadge(priority) {
+            const badgeMap = {
+                'low': 'bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs',
+                'medium': 'bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs',
+                'high': 'bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs'
+            };
+            return badgeMap[priority] || 'bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs';
+        }
+
+        function formatFollowupType(type) {
+            const typeMap = {
+                'call': 'Call',
+                'visit': 'Visit',
+                'email': 'Email',
+                'whatsapp': 'WhatsApp',
+                'sms': 'SMS',
+                'meeting': 'Meeting',
+                'other': 'Other'
+            };
+            return typeMap[type] || type;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        // Initialize
+        loadStats();
+        loadLeads();
+        loadUsers();
+        loadBranches();
+    </script>
+</body>
+</html>

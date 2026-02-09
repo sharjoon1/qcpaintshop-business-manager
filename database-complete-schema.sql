@@ -711,6 +711,181 @@ CREATE TABLE IF NOT EXISTS task_updates (
 -- ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT NULL;
 
 -- ========================================
+-- 24. STAFF SALARY CONFIGURATION
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS staff_salary_config (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    branch_id INT NOT NULL,
+    monthly_salary DECIMAL(10,2) NOT NULL,
+    hourly_rate DECIMAL(10,2) GENERATED ALWAYS AS (monthly_salary / 260) STORED,
+    overtime_multiplier DECIMAL(3,2) DEFAULT 1.50,
+    standard_daily_hours DECIMAL(4,2) DEFAULT 10.00,
+    sunday_hours DECIMAL(4,2) DEFAULT 5.00,
+    enable_late_deduction BOOLEAN DEFAULT 1,
+    late_deduction_per_hour DECIMAL(10,2) DEFAULT 0,
+    enable_absence_deduction BOOLEAN DEFAULT 1,
+    transport_allowance DECIMAL(10,2) DEFAULT 0,
+    food_allowance DECIMAL(10,2) DEFAULT 0,
+    other_allowance DECIMAL(10,2) DEFAULT 0,
+    allowance_notes TEXT,
+    effective_from DATE NOT NULL,
+    effective_until DATE NULL,
+    is_active BOOLEAN DEFAULT 1,
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (branch_id) REFERENCES branches(id),
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    INDEX idx_user_active (user_id, is_active),
+    INDEX idx_branch (branch_id),
+    INDEX idx_effective_dates (effective_from, effective_until)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- 25. MONTHLY SALARY CALCULATIONS
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS monthly_salaries (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    branch_id INT NOT NULL,
+    salary_month VARCHAR(7) NOT NULL,
+    from_date DATE NOT NULL,
+    to_date DATE NOT NULL,
+    total_working_days INT DEFAULT 0,
+    total_present_days INT DEFAULT 0,
+    total_absent_days INT DEFAULT 0,
+    total_half_days INT DEFAULT 0,
+    total_sundays_worked INT DEFAULT 0,
+    total_leaves INT DEFAULT 0,
+    total_standard_hours DECIMAL(10,2) DEFAULT 0,
+    total_sunday_hours DECIMAL(10,2) DEFAULT 0,
+    total_overtime_hours DECIMAL(10,2) DEFAULT 0,
+    total_worked_hours DECIMAL(10,2) DEFAULT 0,
+    base_salary DECIMAL(10,2) NOT NULL,
+    standard_hours_pay DECIMAL(10,2) DEFAULT 0,
+    sunday_hours_pay DECIMAL(10,2) DEFAULT 0,
+    overtime_pay DECIMAL(10,2) DEFAULT 0,
+    transport_allowance DECIMAL(10,2) DEFAULT 0,
+    food_allowance DECIMAL(10,2) DEFAULT 0,
+    other_allowance DECIMAL(10,2) DEFAULT 0,
+    total_allowances DECIMAL(10,2) DEFAULT 0,
+    late_deduction DECIMAL(10,2) DEFAULT 0,
+    absence_deduction DECIMAL(10,2) DEFAULT 0,
+    other_deduction DECIMAL(10,2) DEFAULT 0,
+    deduction_notes TEXT,
+    total_deductions DECIMAL(10,2) DEFAULT 0,
+    gross_salary DECIMAL(10,2) GENERATED ALWAYS AS (
+        standard_hours_pay + sunday_hours_pay + overtime_pay + total_allowances
+    ) STORED,
+    net_salary DECIMAL(10,2) GENERATED ALWAYS AS (
+        standard_hours_pay + sunday_hours_pay + overtime_pay + total_allowances - total_deductions
+    ) STORED,
+    status ENUM('draft', 'calculated', 'approved', 'paid') DEFAULT 'draft',
+    calculation_date TIMESTAMP NULL,
+    approved_by INT NULL,
+    approved_at TIMESTAMP NULL,
+    payment_status ENUM('unpaid', 'partial', 'paid') DEFAULT 'unpaid',
+    paid_amount DECIMAL(10,2) DEFAULT 0,
+    payment_date DATE NULL,
+    payment_method VARCHAR(50) NULL,
+    payment_reference VARCHAR(100) NULL,
+    calculated_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    notes TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (branch_id) REFERENCES branches(id),
+    FOREIGN KEY (approved_by) REFERENCES users(id),
+    FOREIGN KEY (calculated_by) REFERENCES users(id),
+    UNIQUE KEY unique_user_month (user_id, salary_month),
+    INDEX idx_salary_month (salary_month),
+    INDEX idx_branch_month (branch_id, salary_month),
+    INDEX idx_status (status),
+    INDEX idx_payment_status (payment_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- 26. SALARY PAYMENTS
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS salary_payments (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    monthly_salary_id INT NOT NULL,
+    user_id INT NOT NULL,
+    payment_date DATE NOT NULL,
+    amount_paid DECIMAL(10,2) NOT NULL,
+    payment_method ENUM('cash', 'bank_transfer', 'upi', 'cheque', 'other') NOT NULL,
+    payment_reference VARCHAR(100),
+    bank_name VARCHAR(100),
+    account_number VARCHAR(50),
+    transaction_id VARCHAR(100),
+    receipt_number VARCHAR(50),
+    receipt_photo VARCHAR(500),
+    is_verified BOOLEAN DEFAULT 0,
+    verified_by INT NULL,
+    verified_at TIMESTAMP NULL,
+    paid_by INT NOT NULL,
+    paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    FOREIGN KEY (monthly_salary_id) REFERENCES monthly_salaries(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (paid_by) REFERENCES users(id),
+    FOREIGN KEY (verified_by) REFERENCES users(id),
+    INDEX idx_monthly_salary (monthly_salary_id),
+    INDEX idx_user (user_id),
+    INDEX idx_payment_date (payment_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- 27. SALARY ADJUSTMENTS
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS salary_adjustments (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    monthly_salary_id INT NOT NULL,
+    user_id INT NOT NULL,
+    adjustment_type ENUM('bonus', 'penalty', 'advance', 'loan_recovery', 'other') NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    description TEXT NOT NULL,
+    is_applied BOOLEAN DEFAULT 1,
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (monthly_salary_id) REFERENCES monthly_salaries(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    INDEX idx_monthly_salary_adj (monthly_salary_id),
+    INDEX idx_user_adj (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- 28. STAFF LEAVE BALANCE
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS staff_leave_balance (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    year INT NOT NULL,
+    total_annual_leaves INT DEFAULT 12,
+    total_sick_leaves INT DEFAULT 6,
+    total_casual_leaves INT DEFAULT 6,
+    used_annual_leaves INT DEFAULT 0,
+    used_sick_leaves INT DEFAULT 0,
+    used_casual_leaves INT DEFAULT 0,
+    remaining_annual_leaves INT GENERATED ALWAYS AS (total_annual_leaves - used_annual_leaves) STORED,
+    remaining_sick_leaves INT GENERATED ALWAYS AS (total_sick_leaves - used_sick_leaves) STORED,
+    remaining_casual_leaves INT GENERATED ALWAYS AS (total_casual_leaves - used_casual_leaves) STORED,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_year (user_id, year),
+    INDEX idx_year (year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
 -- SUCCESS MESSAGE
 -- ========================================
 SELECT 'Complete database schema created successfully!' as message;
