@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Tasks - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .task-card {
+            transition: all 0.3s ease;
+        }
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: -20px;
+            width: 2px;
+            background: #e5e7eb;
+        }
+        .timeline-item:last-child::before {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation will be loaded here -->
+    <div id="nav-placeholder"></div>
+
+    <div class="container mx-auto p-6">
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">My Tasks</h1>
+            <p class="text-gray-600 mt-1">View and update your assigned tasks</p>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">My Tasks</p>
+                        <p class="text-3xl font-bold text-gray-800" id="total-tasks">0</p>
+                    </div>
+                    <div class="bg-purple-100 rounded-full p-3">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">In Progress</p>
+                        <p class="text-3xl font-bold text-blue-600" id="in-progress-tasks">0</p>
+                    </div>
+                    <div class="bg-blue-100 rounded-full p-3">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Completed Today</p>
+                        <p class="text-3xl font-bold text-green-600" id="completed-today">0</p>
+                    </div>
+                    <div class="bg-green-100 rounded-full p-3">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Overdue</p>
+                        <p class="text-3xl font-bold text-red-600" id="overdue-tasks">0</p>
+                    </div>
+                    <div class="bg-red-100 rounded-full p-3">
+                        <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <select id="filter-status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                    <select id="filter-priority" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">All Priorities</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="loadTasks()" class="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors">
+                        Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks Grid -->
+        <div id="tasks-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Task cards will be loaded here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="text-center py-12 hidden">
+            <svg class="w-24 h-24 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+            </svg>
+            <p class="text-gray-500 text-lg">No tasks found</p>
+        </div>
+    </div>
+
+    <!-- Task Detail Modal -->
+    <div id="task-detail-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-lg">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <h2 id="detail-title" class="text-2xl font-bold mb-2"></h2>
+                        <div class="flex flex-wrap gap-2">
+                            <span id="detail-status-badge" class="px-3 py-1 rounded-full text-sm font-semibold"></span>
+                            <span id="detail-priority-badge" class="px-3 py-1 rounded-full text-sm font-semibold"></span>
+                        </div>
+                    </div>
+                    <button onclick="closeTaskDetailModal()" class="text-white hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-6">
+                <!-- Task Info -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">Task Details</h3>
+                    <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+                        <div>
+                            <span class="text-sm text-gray-500">Description:</span>
+                            <p id="detail-description" class="text-gray-800 mt-1"></p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <span class="text-sm text-gray-500">Due Date:</span>
+                                <p id="detail-due-date" class="text-gray-800 font-medium"></p>
+                            </div>
+                            <div>
+                                <span class="text-sm text-gray-500">Progress:</span>
+                                <p id="detail-progress" class="text-gray-800 font-medium"></p>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-500">Created By:</span>
+                            <p id="detail-created-by" class="text-gray-800"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-700">Task Progress</span>
+                        <span id="detail-progress-percent" class="text-sm font-semibold text-purple-600">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="detail-progress-bar" class="progress-bar bg-gradient-to-r from-purple-600 to-purple-700 h-3 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <button id="start-task-btn" onclick="updateTaskStatus('in_progress')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                        Start Working
+                    </button>
+                    <button id="complete-task-btn" onclick="updateTaskStatus('completed')" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors">
+                        Mark Complete
+                    </button>
+                    <button onclick="openAddUpdateModal()" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors">
+                        Add Update
+                    </button>
+                </div>
+
+                <!-- Update History Timeline -->
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Update History</h3>
+                    <div id="updates-timeline" class="space-y-4">
+                        <!-- Updates will be loaded here -->
+                    </div>
+                    <div id="no-updates" class="text-center text-gray-500 py-8 hidden">
+                        <p>No updates yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Update Modal -->
+    <div id="add-update-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+            <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-lg">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-bold">Add Task Update</h2>
+                    <button onclick="closeAddUpdateModal()" class="text-white hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <form id="update-form" class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Update / Comment</label>
+                    <textarea id="update-comment" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Describe your progress or any issues..." required></textarea>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Progress: <span id="progress-value" class="text-purple-600 font-semibold">0%</span>
+                    </label>
+                    <input type="range" id="update-progress" min="0" max="100" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" oninput="document.getElementById('progress-value').textContent = this.value + '%'">
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>0%</span>
+                        <span>50%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors">
+                        Submit Update
+                    </button>
+                    <button type="button" onclick="closeAddUpdateModal()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/business-manager/js/auth-helper.js"></script>
+    <script>
+        let allTasks = [];
+        let currentTaskId = null;
+
+        // Load tasks on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTasks();
+        });
+
+        // Load tasks from API
+        async function loadTasks() {
+            try {
+                const status = document.getElementById('filter-status').value;
+                const priority = document.getElementById('filter-priority').value;
+
+                let url = '/business-manager/api/tasks/my-tasks?';
+                if (status) url += `status=${status}&`;
+                if (priority) url += `priority=${priority}&`;
+
+                const response = await fetch(url, {
+                    headers: getAuthHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load tasks');
+                }
+
+                const data = await response.json();
+                allTasks = data.tasks || [];
+
+                displayTasks(allTasks);
+                updateSummary(allTasks);
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+                alert('Failed to load tasks. Please try again.');
+            }
+        }
+
+        // Display tasks in grid
+        function displayTasks(tasks) {
+            const container = document.getElementById('tasks-container');
+            const emptyState = document.getElementById('empty-state');
+
+            if (tasks.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = tasks.map(task => createTaskCard(task)).join('');
+        }
+
+        // Create task card HTML
+        function createTaskCard(task) {
+            const isOverdue = task.status !== 'completed' && new Date(task.due_date) < new Date();
+            const borderColor = isOverdue ? 'border-l-4 border-red-500' :
+                               task.status === 'completed' ? 'border-l-4 border-green-500' :
+                               'border-l-4 border-purple-500';
+
+            const statusColors = {
+                'pending': 'bg-yellow-100 text-yellow-800',
+                'in_progress': 'bg-blue-100 text-blue-800',
+                'completed': 'bg-green-100 text-green-800'
+            };
+
+            const priorityColors = {
+                'low': 'bg-gray-100 text-gray-800',
+                'medium': 'bg-blue-100 text-blue-800',
+                'high': 'bg-orange-100 text-orange-800',
+                'urgent': 'bg-red-100 text-red-800'
+            };
+
+            const dueDate = new Date(task.due_date).toLocaleDateString('en-IN', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+
+            const description = task.description && task.description.length > 100
+                ? task.description.substring(0, 100) + '...'
+                : task.description || 'No description';
+
+            return `
+                <div class="task-card bg-white rounded-lg shadow ${borderColor} p-5 cursor-pointer" onclick="openTaskDetail(${task.id})">
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 class="text-lg font-semibold text-gray-800 flex-1">${escapeHtml(task.title)}</h3>
+                        ${isOverdue ? '<span class="text-red-600 text-sm font-semibold ml-2">OVERDUE</span>' : ''}
+                    </div>
+
+                    <p class="text-gray-600 text-sm mb-4">${escapeHtml(description)}</p>
+
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <span class="px-2 py-1 rounded-full text-xs font-semibold ${statusColors[task.status]}">
+                            ${task.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                        <span class="px-2 py-1 rounded-full text-xs font-semibold ${priorityColors[task.priority]}">
+                            ${task.priority.toUpperCase()}
+                        </span>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-gray-500">Progress</span>
+                            <span class="text-xs font-semibold text-purple-600">${task.progress_percentage || 0}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="progress-bar bg-gradient-to-r from-purple-600 to-purple-700 h-2 rounded-full" style="width: ${task.progress_percentage || 0}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center text-sm text-gray-500">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            ${dueDate}
+                        </div>
+                        <button onclick="event.stopPropagation(); openTaskDetail(${task.id})" class="text-purple-600 hover:text-purple-700 font-medium">
+                            View Details →
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update summary cards
+        function updateSummary(tasks) {
+            const total = tasks.length;
+            const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const completedToday = tasks.filter(t => {
+                if (t.status !== 'completed' || !t.completed_at) return false;
+                const completedDate = new Date(t.completed_at);
+                completedDate.setHours(0, 0, 0, 0);
+                return completedDate.getTime() === today.getTime();
+            }).length;
+
+            const overdue = tasks.filter(t => {
+                return t.status !== 'completed' && new Date(t.due_date) < new Date();
+            }).length;
+
+            document.getElementById('total-tasks').textContent = total;
+            document.getElementById('in-progress-tasks').textContent = inProgress;
+            document.getElementById('completed-today').textContent = completedToday;
+            document.getElementById('overdue-tasks').textContent = overdue;
+        }
+
+        // Open task detail modal
+        async function openTaskDetail(taskId) {
+            currentTaskId = taskId;
+
+            try {
+                const response = await fetch(`/business-manager/api/tasks/${taskId}`, {
+                    headers: getAuthHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load task details');
+                }
+
+                const data = await response.json();
+                const task = data.task;
+
+                // Populate modal
+                document.getElementById('detail-title').textContent = task.title;
+                document.getElementById('detail-description').textContent = task.description || 'No description';
+
+                const dueDate = new Date(task.due_date).toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                document.getElementById('detail-due-date').textContent = dueDate;
+                document.getElementById('detail-progress').textContent = `${task.progress_percentage || 0}%`;
+                document.getElementById('detail-created-by').textContent = task.creator_name || 'Unknown';
+
+                // Status badge
+                const statusColors = {
+                    'pending': 'bg-yellow-100 text-yellow-800',
+                    'in_progress': 'bg-blue-100 text-blue-800',
+                    'completed': 'bg-green-100 text-green-800'
+                };
+                const statusBadge = document.getElementById('detail-status-badge');
+                statusBadge.textContent = task.status.replace('_', ' ').toUpperCase();
+                statusBadge.className = `px-3 py-1 rounded-full text-sm font-semibold ${statusColors[task.status]}`;
+
+                // Priority badge
+                const priorityColors = {
+                    'low': 'bg-gray-100 text-gray-800',
+                    'medium': 'bg-blue-100 text-blue-800',
+                    'high': 'bg-orange-100 text-orange-800',
+                    'urgent': 'bg-red-100 text-red-800'
+                };
+                const priorityBadge = document.getElementById('detail-priority-badge');
+                priorityBadge.textContent = task.priority.toUpperCase();
+                priorityBadge.className = `px-3 py-1 rounded-full text-sm font-semibold ${priorityColors[task.priority]}`;
+
+                // Progress bar
+                const progress = task.progress_percentage || 0;
+                document.getElementById('detail-progress-percent').textContent = `${progress}%`;
+                document.getElementById('detail-progress-bar').style.width = `${progress}%`;
+
+                // Show/hide action buttons based on status
+                const startBtn = document.getElementById('start-task-btn');
+                const completeBtn = document.getElementById('complete-task-btn');
+
+                if (task.status === 'completed') {
+                    startBtn.classList.add('hidden');
+                    completeBtn.classList.add('hidden');
+                } else if (task.status === 'in_progress') {
+                    startBtn.classList.add('hidden');
+                    completeBtn.classList.remove('hidden');
+                } else {
+                    startBtn.classList.remove('hidden');
+                    completeBtn.classList.remove('hidden');
+                }
+
+                // Load updates
+                displayUpdates(data.updates || []);
+
+                // Show modal
+                document.getElementById('task-detail-modal').classList.add('show');
+            } catch (error) {
+                console.error('Error loading task details:', error);
+                alert('Failed to load task details. Please try again.');
+            }
+        }
+
+        // Display updates timeline
+        function displayUpdates(updates) {
+            const timeline = document.getElementById('updates-timeline');
+            const noUpdates = document.getElementById('no-updates');
+
+            if (updates.length === 0) {
+                timeline.innerHTML = '';
+                noUpdates.classList.remove('hidden');
+                return;
+            }
+
+            noUpdates.classList.add('hidden');
+            timeline.innerHTML = updates.map(update => {
+                const date = new Date(update.created_at).toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                let content = '';
+                if (update.comment) {
+                    content = `<p class="text-gray-700">${escapeHtml(update.comment)}</p>`;
+                }
+                if (update.progress_percentage !== null && update.progress_percentage !== undefined) {
+                    content += `<p class="text-sm text-purple-600 font-medium mt-1">Progress updated to ${update.progress_percentage}%</p>`;
+                }
+
+                return `
+                    <div class="timeline-item relative pl-6 pb-4">
+                        <div class="absolute left-0 top-1 w-3 h-3 bg-purple-600 rounded-full"></div>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-medium text-gray-800">${escapeHtml(update.user_name || 'Unknown')}</span>
+                                <span class="text-xs text-gray-500">${date}</span>
+                            </div>
+                            ${content}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Close task detail modal
+        function closeTaskDetailModal() {
+            document.getElementById('task-detail-modal').classList.remove('show');
+            currentTaskId = null;
+        }
+
+        // Update task status
+        async function updateTaskStatus(newStatus) {
+            if (!currentTaskId) return;
+
+            const confirmMessages = {
+                'in_progress': 'Start working on this task?',
+                'completed': 'Mark this task as completed?'
+            };
+
+            if (!confirm(confirmMessages[newStatus])) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/business-manager/api/tasks/${currentTaskId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update status');
+                }
+
+                alert('Task status updated successfully!');
+                closeTaskDetailModal();
+                loadTasks();
+            } catch (error) {
+                console.error('Error updating status:', error);
+                alert('Failed to update task status. Please try again.');
+            }
+        }
+
+        // Open add update modal
+        function openAddUpdateModal() {
+            document.getElementById('update-comment').value = '';
+            document.getElementById('update-progress').value = '0';
+            document.getElementById('progress-value').textContent = '0%';
+            document.getElementById('add-update-modal').classList.add('show');
+        }
+
+        // Close add update modal
+        function closeAddUpdateModal() {
+            document.getElementById('add-update-modal').classList.remove('show');
+        }
+
+        // Handle update form submission
+        document.getElementById('update-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            if (!currentTaskId) return;
+
+            const comment = document.getElementById('update-comment').value.trim();
+            const progress = parseInt(document.getElementById('update-progress').value);
+
+            if (!comment && progress === 0) {
+                alert('Please enter a comment or update the progress');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/business-manager/api/tasks/${currentTaskId}/comments`, {
+                    method: 'POST',
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        comment: comment || null,
+                        progress_percentage: progress
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to add update');
+                }
+
+                alert('Update added successfully!');
+                closeAddUpdateModal();
+                openTaskDetail(currentTaskId); // Reload task details
+                loadTasks(); // Reload task list
+            } catch (error) {
+                console.error('Error adding update:', error);
+                alert('Failed to add update. Please try again.');
+            }
+        });
+
+        // Utility function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modals when clicking outside
+        window.addEventListener('click', function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>

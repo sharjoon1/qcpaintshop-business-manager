@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Management - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/business-manager/js/auth-helper.js"></script>
+    <style>
+        body { background: #f9fafb; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 1.5rem;
+            }
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1.25rem;
+            transition: all 0.3s;
+            border-top: 4px solid var(--border-color);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin: 0.5rem 0;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #7c3aed, #9333ea);
+            transition: width 0.3s;
+        }
+
+        .star-rating {
+            display: inline-flex;
+            gap: 0.25rem;
+        }
+
+        .star {
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #d1d5db;
+            transition: color 0.2s;
+        }
+
+        .star.active {
+            color: #fbbf24;
+        }
+
+        .star:hover,
+        .star:hover ~ .star {
+            color: #fbbf24;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover td {
+            background-color: #f9fafb;
+        }
+
+        .filter-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 1.5rem;
+        }
+
+        select, input {
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7c3aed, #9333ea);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #6d28d9, #7c3aed);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-pending { background: #f3f4f6; color: #6b7280; }
+        .badge-in_progress { background: #dbeafe; color: #1e40af; }
+        .badge-completed { background: #dcfce7; color: #166534; }
+        .badge-overdue { background: #fee2e2; color: #991b1b; }
+        .badge-cancelled { background: #f3f4f6; color: #6b7280; }
+
+        .badge-low { background: #f3f4f6; color: #6b7280; }
+        .badge-medium { background: #fef3c7; color: #92400e; }
+        .badge-high { background: #fed7aa; color: #9a3412; }
+        .badge-urgent { background: #fee2e2; color: #991b1b; }
+
+        .timeline-item {
+            padding: 1rem;
+            border-left: 3px solid #e5e7eb;
+            margin-left: 1rem;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -7px;
+            top: 1.25rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #7c3aed;
+            border: 2px solid white;
+        }
+
+        .action-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen" style="padding: 1rem 0 2rem;">
+        <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+
+            <!-- Header -->
+            <div class="mb-6 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1">Task Management</h1>
+                    <p class="text-sm sm:text-base text-gray-600">Manage and track all team tasks</p>
+                </div>
+                <button onclick="openCreateModal()" class="btn btn-primary">
+                    <span class="hidden sm:inline">+ Create Task</span>
+                    <span class="sm:hidden">+ New</span>
+                </button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid mb-6">
+                <div class="stat-card" style="--border-color: #7c3aed;">
+                    <div class="stat-label">Total Tasks</div>
+                    <div class="stat-value" id="statTotal">0</div>
+                </div>
+                <div class="stat-card" style="--border-color: #f59e0b;">
+                    <div class="stat-label">Pending</div>
+                    <div class="stat-value" id="statPending">0</div>
+                </div>
+                <div class="stat-card" style="--border-color: #3b82f6;">
+                    <div class="stat-label">In Progress</div>
+                    <div class="stat-value" id="statInProgress">0</div>
+                </div>
+                <div class="stat-card" style="--border-color: #10b981;">
+                    <div class="stat-label">Completed</div>
+                    <div class="stat-value" id="statCompleted">0</div>
+                </div>
+                <div class="stat-card" style="--border-color: #ef4444;">
+                    <div class="stat-label">Overdue</div>
+                    <div class="stat-value" id="statOverdue">0</div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-bar">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                        <select id="filterStatus" onchange="loadTasks()">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="overdue">Overdue</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Priority</label>
+                        <select id="filterPriority" onchange="loadTasks()">
+                            <option value="">All Priorities</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Assigned To</label>
+                        <select id="filterAssignedTo" onchange="loadTasks()">
+                            <option value="">All Users</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Search</label>
+                        <input type="text" id="filterSearch" placeholder="Search tasks..." onkeyup="loadTasks()" class="w-full">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tasks Table -->
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Task #</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Title</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Assigned To</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Priority</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Progress</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Due Date</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Rating</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasksTableBody" class="divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="9" class="px-4 py-8 text-center text-gray-500">
+                                    Loading tasks...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200">
+                    <div class="text-sm text-gray-700">
+                        Showing <span id="pageInfo">0-0 of 0</span> tasks
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="changePage(-1)" id="prevBtn" class="btn btn-secondary text-sm" disabled>Previous</button>
+                        <button onclick="changePage(1)" id="nextBtn" class="btn btn-secondary text-sm" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Create/Edit Task Modal -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-2xl">
+                <h2 class="text-2xl font-bold" id="modalTitle">Create New Task</h2>
+            </div>
+            <div class="p-6">
+                <form id="taskForm" onsubmit="saveTask(event)">
+                    <input type="hidden" id="taskId">
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Title *</label>
+                            <input type="text" id="taskTitle" required class="w-full" placeholder="Enter task title">
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                            <textarea id="taskDescription" rows="4" class="w-full" placeholder="Enter task description"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Assigned To *</label>
+                            <select id="taskAssignedTo" required class="w-full">
+                                <option value="">Select user...</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Priority *</label>
+                            <select id="taskPriority" required class="w-full">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Category *</label>
+                            <select id="taskCategory" required class="w-full">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="one_time" selected>One Time</option>
+                                <option value="recurring">Recurring</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Due Date *</label>
+                            <input type="date" id="taskDueDate" required class="w-full">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-4 border-t">
+                        <button type="button" onclick="closeModal('taskModal')" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Task Modal -->
+    <div id="viewTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-2xl">
+                <h2 class="text-2xl font-bold">Task Details</h2>
+            </div>
+            <div class="p-6">
+                <div id="taskDetails" class="mb-6">
+                    <!-- Task details will be loaded here -->
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-3">Update History</h3>
+                    <div id="taskUpdates" class="space-y-2">
+                        <!-- Updates will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t">
+                    <button onclick="closeModal('viewTaskModal')" class="btn btn-secondary">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rate Task Modal -->
+    <div id="rateTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-2xl">
+                <h2 class="text-2xl font-bold">Rate Task</h2>
+            </div>
+            <div class="p-6">
+                <form id="rateForm" onsubmit="submitRating(event)">
+                    <input type="hidden" id="rateTaskId">
+
+                    <div class="mb-6 text-center">
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">Rating</label>
+                        <div class="star-rating justify-center mb-2" id="starRating">
+                            <span class="star" data-value="1">★</span>
+                            <span class="star" data-value="2">★</span>
+                            <span class="star" data-value="3">★</span>
+                            <span class="star" data-value="4">★</span>
+                            <span class="star" data-value="5">★</span>
+                        </div>
+                        <div class="text-sm text-gray-600">Click to rate (1-5 stars)</div>
+                        <input type="hidden" id="ratingValue" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Notes (Optional)</label>
+                        <textarea id="ratingNotes" rows="4" class="w-full" placeholder="Add your feedback..."></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-4 border-t">
+                        <button type="button" onclick="closeModal('rateTaskModal')" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Submit Rating</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('navigationLoaded', initTasksPage);
+        setTimeout(initTasksPage, 1000);
+
+        let tasksInitialized = false;
+        let currentPage = 1;
+        let totalPages = 1;
+        let allUsers = [];
+
+        function initTasksPage() {
+            if (tasksInitialized) return;
+            tasksInitialized = true;
+            console.log('Initializing Tasks Management Page...');
+            loadUsers();
+            loadStats();
+            loadTasks();
+            initializeStarRating();
+        }
+
+        function getAuthHeaders() {
+            if (window.getAuthHeaders) {
+                return window.getAuthHeaders();
+            }
+            return {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/business-manager/api/users', {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    const users = await response.json();
+                    allUsers = users;
+
+                    const assignedToSelect = document.getElementById('taskAssignedTo');
+                    const filterAssignedTo = document.getElementById('filterAssignedTo');
+
+                    users.forEach(user => {
+                        const option1 = new Option(`${user.full_name} (${user.username})`, user.id);
+                        const option2 = new Option(`${user.full_name} (${user.username})`, user.id);
+                        assignedToSelect.add(option1);
+                        filterAssignedTo.add(option2);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/business-manager/api/tasks/stats', {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('statTotal').textContent = stats.total || 0;
+                    document.getElementById('statPending').textContent = stats.pending || 0;
+                    document.getElementById('statInProgress').textContent = stats.in_progress || 0;
+                    document.getElementById('statCompleted').textContent = stats.completed || 0;
+                    document.getElementById('statOverdue').textContent = stats.overdue || 0;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        async function loadTasks() {
+            try {
+                const status = document.getElementById('filterStatus').value;
+                const priority = document.getElementById('filterPriority').value;
+                const assignedTo = document.getElementById('filterAssignedTo').value;
+                const search = document.getElementById('filterSearch').value;
+
+                const params = new URLSearchParams({
+                    page: currentPage,
+                    limit: 20
+                });
+
+                if (status) params.append('status', status);
+                if (priority) params.append('priority', priority);
+                if (assignedTo) params.append('assigned_to', assignedTo);
+                if (search) params.append('search', search);
+
+                const response = await fetch(`/business-manager/api/tasks?${params}`, {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayTasks(data.tasks || []);
+                    updatePagination(data.pagination || {});
+                    loadStats(); // Refresh stats
+                } else {
+                    showError('Failed to load tasks');
+                }
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+                showError('Error loading tasks');
+            }
+        }
+
+        function displayTasks(tasks) {
+            const tbody = document.getElementById('tasksTableBody');
+
+            if (tasks.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">
+                            No tasks found. Create your first task!
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = tasks.map(task => {
+                const progress = task.progress_percentage || 0;
+                const dueDate = task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A';
+                const rating = task.rating ? '★'.repeat(task.rating) + '☆'.repeat(5 - task.rating) : 'Not rated';
+
+                return `
+                    <tr>
+                        <td class="px-4 py-3 text-sm font-semibold text-gray-900">#${task.id}</td>
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-gray-900">${escapeHtml(task.title)}</div>
+                            <div class="text-xs text-gray-500">${escapeHtml(task.category || '')}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${escapeHtml(task.assigned_to_name || 'Unassigned')}</td>
+                        <td class="px-4 py-3">
+                            <span class="badge badge-${task.priority}">${task.priority}</span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="badge badge-${task.status}">${task.status.replace('_', ' ')}</span>
+                        </td>
+                        <td class="px-4 py-3" style="min-width: 150px;">
+                            <div class="flex items-center gap-2">
+                                <div class="flex-1 progress-bar">
+                                    <div class="progress-fill" style="width: ${progress}%"></div>
+                                </div>
+                                <span class="text-xs font-semibold text-gray-700">${progress}%</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${dueDate}</td>
+                        <td class="px-4 py-3 text-sm" style="color: #fbbf24;">${rating}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex gap-1">
+                                <button onclick="viewTask(${task.id})" class="action-btn btn-secondary" title="View Details">👁️</button>
+                                <button onclick="editTask(${task.id})" class="action-btn btn-secondary" title="Edit">✏️</button>
+                                ${task.status === 'completed' && !task.rating ?
+                                    `<button onclick="openRateModal(${task.id})" class="action-btn btn-primary" title="Rate Task">⭐</button>` :
+                                    ''}
+                                <button onclick="deleteTask(${task.id})" class="action-btn" style="background: #fee2e2; color: #991b1b;" title="Delete">🗑️</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updatePagination(pagination) {
+            const { page = 1, totalPages: total = 1, totalTasks = 0, limit = 20 } = pagination;
+            currentPage = page;
+            totalPages = total;
+
+            const start = totalTasks > 0 ? ((page - 1) * limit) + 1 : 0;
+            const end = Math.min(page * limit, totalTasks);
+
+            document.getElementById('pageInfo').textContent = `${start}-${end} of ${totalTasks}`;
+            document.getElementById('prevBtn').disabled = page <= 1;
+            document.getElementById('nextBtn').disabled = page >= total;
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            if (currentPage < 1) currentPage = 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            loadTasks();
+        }
+
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'Create New Task';
+            document.getElementById('taskForm').reset();
+            document.getElementById('taskId').value = '';
+
+            // Set default due date to tomorrow
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('taskDueDate').value = tomorrow.toISOString().split('T')[0];
+
+            openModal('taskModal');
+        }
+
+        async function editTask(id) {
+            try {
+                const response = await fetch(`/business-manager/api/tasks/${id}`, {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    const task = await response.json();
+
+                    document.getElementById('modalTitle').textContent = 'Edit Task';
+                    document.getElementById('taskId').value = task.id;
+                    document.getElementById('taskTitle').value = task.title;
+                    document.getElementById('taskDescription').value = task.description || '';
+                    document.getElementById('taskAssignedTo').value = task.assigned_to;
+                    document.getElementById('taskPriority').value = task.priority;
+                    document.getElementById('taskCategory').value = task.category;
+                    document.getElementById('taskDueDate').value = task.due_date ? task.due_date.split('T')[0] : '';
+
+                    openModal('taskModal');
+                } else {
+                    showError('Failed to load task details');
+                }
+            } catch (error) {
+                console.error('Error loading task:', error);
+                showError('Error loading task details');
+            }
+        }
+
+        async function saveTask(event) {
+            event.preventDefault();
+
+            const taskId = document.getElementById('taskId').value;
+            const taskData = {
+                title: document.getElementById('taskTitle').value,
+                description: document.getElementById('taskDescription').value,
+                assigned_to: parseInt(document.getElementById('taskAssignedTo').value),
+                priority: document.getElementById('taskPriority').value,
+                category: document.getElementById('taskCategory').value,
+                due_date: document.getElementById('taskDueDate').value
+            };
+
+            try {
+                const url = taskId
+                    ? `/business-manager/api/tasks/${taskId}`
+                    : '/business-manager/api/tasks';
+
+                const method = taskId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(taskData)
+                });
+
+                if (response.ok) {
+                    showSuccess(taskId ? 'Task updated successfully' : 'Task created successfully');
+                    closeModal('taskModal');
+                    loadTasks();
+                } else {
+                    const error = await response.json();
+                    showError(error.error || 'Failed to save task');
+                }
+            } catch (error) {
+                console.error('Error saving task:', error);
+                showError('Error saving task');
+            }
+        }
+
+        async function viewTask(id) {
+            try {
+                const response = await fetch(`/business-manager/api/tasks/${id}`, {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    const task = await response.json();
+
+                    const dueDate = task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A';
+                    const createdDate = new Date(task.created_at).toLocaleDateString();
+                    const rating = task.rating ? '★'.repeat(task.rating) + '☆'.repeat(5 - task.rating) : 'Not rated';
+
+                    document.getElementById('taskDetails').innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <h3 class="text-2xl font-bold text-gray-900 mb-2">${escapeHtml(task.title)}</h3>
+                                <p class="text-gray-600 mb-4">${escapeHtml(task.description || 'No description')}</p>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="font-semibold text-gray-700">Status:</span>
+                                    <span class="badge badge-${task.status}">${task.status.replace('_', ' ')}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-semibold text-gray-700">Priority:</span>
+                                    <span class="badge badge-${task.priority}">${task.priority}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-semibold text-gray-700">Category:</span>
+                                    <span class="text-gray-900">${task.category}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-semibold text-gray-700">Assigned To:</span>
+                                    <span class="text-gray-900">${escapeHtml(task.assigned_to_name || 'Unassigned')}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-semibold text-gray-700">Created By:</span>
+                                    <span class="text-gray-900">${escapeHtml(task.created_by_name || 'N/A')}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-semibold text-gray-700">Due Date:</span>
+                                    <span class="text-gray-900">${dueDate}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-semibold text-gray-700">Created:</span>
+                                    <span class="text-gray-900">${createdDate}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-semibold text-gray-700">Progress:</span>
+                                    <span class="text-gray-900">${task.progress_percentage || 0}%</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="font-semibold text-gray-700">Rating:</span>
+                                    <span style="color: #fbbf24;">${rating}</span>
+                                </div>
+                                ${task.rating_notes ? `
+                                    <div class="col-span-2">
+                                        <span class="font-semibold text-gray-700">Rating Notes:</span>
+                                        <p class="text-gray-600 mt-1">${escapeHtml(task.rating_notes)}</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div class="progress-bar mb-2">
+                            <div class="progress-fill" style="width: ${task.progress_percentage || 0}%"></div>
+                        </div>
+                    `;
+
+                    // Display updates
+                    if (task.updates && task.updates.length > 0) {
+                        document.getElementById('taskUpdates').innerHTML = task.updates.map(update => `
+                            <div class="timeline-item">
+                                <div class="flex justify-between items-start mb-1">
+                                    <span class="font-semibold text-gray-900">${escapeHtml(update.updated_by_name || 'Unknown')}</span>
+                                    <span class="text-xs text-gray-500">${new Date(update.updated_at).toLocaleString()}</span>
+                                </div>
+                                <p class="text-gray-600 text-sm">${escapeHtml(update.comment || 'Status/Progress updated')}</p>
+                                ${update.progress_percentage !== null ?
+                                    `<span class="text-xs text-purple-600 font-semibold">Progress: ${update.progress_percentage}%</span>` :
+                                    ''}
+                            </div>
+                        `).join('');
+                    } else {
+                        document.getElementById('taskUpdates').innerHTML = '<p class="text-gray-500 text-sm">No updates yet</p>';
+                    }
+
+                    openModal('viewTaskModal');
+                } else {
+                    showError('Failed to load task details');
+                }
+            } catch (error) {
+                console.error('Error loading task details:', error);
+                showError('Error loading task details');
+            }
+        }
+
+        async function deleteTask(id) {
+            if (!confirm('Are you sure you want to delete this task?')) return;
+
+            try {
+                const response = await fetch(`/business-manager/api/tasks/${id}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    showSuccess('Task deleted successfully');
+                    loadTasks();
+                } else {
+                    const error = await response.json();
+                    showError(error.error || 'Failed to delete task');
+                }
+            } catch (error) {
+                console.error('Error deleting task:', error);
+                showError('Error deleting task');
+            }
+        }
+
+        function openRateModal(id) {
+            document.getElementById('rateTaskId').value = id;
+            document.getElementById('rateForm').reset();
+            document.getElementById('ratingValue').value = '';
+
+            // Reset stars
+            document.querySelectorAll('#starRating .star').forEach(star => {
+                star.classList.remove('active');
+            });
+
+            openModal('rateTaskModal');
+        }
+
+        function initializeStarRating() {
+            const stars = document.querySelectorAll('#starRating .star');
+
+            stars.forEach(star => {
+                star.addEventListener('click', function() {
+                    const value = parseInt(this.getAttribute('data-value'));
+                    document.getElementById('ratingValue').value = value;
+
+                    stars.forEach(s => {
+                        const starValue = parseInt(s.getAttribute('data-value'));
+                        if (starValue <= value) {
+                            s.classList.add('active');
+                        } else {
+                            s.classList.remove('active');
+                        }
+                    });
+                });
+            });
+        }
+
+        async function submitRating(event) {
+            event.preventDefault();
+
+            const taskId = document.getElementById('rateTaskId').value;
+            const rating = parseInt(document.getElementById('ratingValue').value);
+            const notes = document.getElementById('ratingNotes').value;
+
+            if (!rating) {
+                showError('Please select a rating');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/business-manager/api/tasks/${taskId}/rate`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        rating: rating,
+                        rating_notes: notes
+                    })
+                });
+
+                if (response.ok) {
+                    showSuccess('Task rated successfully');
+                    closeModal('rateTaskModal');
+                    loadTasks();
+                } else {
+                    const error = await response.json();
+                    showError(error.error || 'Failed to rate task');
+                }
+            } catch (error) {
+                console.error('Error rating task:', error);
+                showError('Error rating task');
+            }
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal when clicking outside
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeModal(this.id);
+                }
+            });
+        });
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text ? String(text).replace(/[&<>"']/g, m => map[m]) : '';
+        }
+
+        function showSuccess(message) {
+            alert('✓ ' + message);
+        }
+
+        function showError(message) {
+            alert('✗ ' + message);
+        }
+    </script>
+</body>
+</html>

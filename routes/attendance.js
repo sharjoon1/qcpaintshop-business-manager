@@ -44,16 +44,75 @@ function setPool(dbPool) {
 async function saveAttendancePhoto(buffer, userId, type) {
     const timestamp = Date.now();
     const filename = `${userId}_${type}_${timestamp}.jpg`;
+    const dir = path.join(__dirname, '..', 'uploads', 'attendance', type);
     const relativePath = `uploads/attendance/${type}/${filename}`;
-    const fullPath = path.join(__dirname, '..', relativePath);
-    
+    const fullPath = path.join(dir, filename);
+
+    // Ensure directory exists
+    await fs.mkdir(dir, { recursive: true });
+
     // Compress image to max 500KB
     await sharp(buffer)
         .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80, progressive: true })
         .toFile(fullPath);
-    
+
     return relativePath;
+}
+
+/**
+ * Validate GPS coordinates
+ */
+function validateGPS(latitude, longitude) {
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+    if (isNaN(lat) || isNaN(lng)) return false;
+    if (lat < -90 || lat > 90) return false;
+    if (lng < -180 || lng > 180) return false;
+    return true;
+}
+
+/**
+ * Calculate distance between two GPS points (Haversine formula)
+ * Returns distance in meters
+ */
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371000; // Earth radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+/**
+ * Check if user is within branch geo-fence
+ */
+async function checkGeoFence(branchId, latitude, longitude) {
+    const [branches] = await pool.query(
+        'SELECT latitude, longitude, geo_fence_radius FROM branches WHERE id = ?',
+        [branchId]
+    );
+
+    if (branches.length === 0 || !branches[0].latitude || !branches[0].longitude) {
+        // Branch has no geo-fence configured, allow
+        return { allowed: true, distance: null };
+    }
+
+    const branch = branches[0];
+    const radius = branch.geo_fence_radius || 500; // default 500m
+    const distance = calculateDistance(
+        parseFloat(latitude), parseFloat(longitude),
+        parseFloat(branch.latitude), parseFloat(branch.longitude)
+    );
+
+    return {
+        allowed: distance <= radius,
+        distance: Math.round(distance),
+        radius: radius
+    };
 }
 
 /**
@@ -132,16 +191,33 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
         }
         
         if (!latitude || !longitude) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'GPS location is required for clock in' 
+            return res.status(400).json({
+                success: false,
+                message: 'GPS location is required for clock in'
             });
         }
-        
+
+        if (!validateGPS(latitude, longitude)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid GPS coordinates'
+            });
+        }
+
         const branchId = branch_id || req.user.branch_id;
         const today = new Date().toISOString().split('T')[0];
         const now = new Date();
-        
+
+        // Check geo-fence
+        const geoCheck = await checkGeoFence(branchId, latitude, longitude);
+        if (!geoCheck.allowed) {
+            return res.status(400).json({
+                success: false,
+                message: `You are ${geoCheck.distance}m away from the branch. Must be within ${geoCheck.radius}m to clock in.`,
+                code: 'OUTSIDE_GEOFENCE'
+            });
+        }
+
         // Check if already clocked in today
         const [existing] = await pool.query(
             'SELECT id FROM staff_attendance WHERE user_id = ? AND date = ?',
@@ -254,12 +330,19 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
         }
         
         if (!latitude || !longitude) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'GPS location is required for clock out' 
+            return res.status(400).json({
+                success: false,
+                message: 'GPS location is required for clock out'
             });
         }
-        
+
+        if (!validateGPS(latitude, longitude)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid GPS coordinates'
+            });
+        }
+
         const today = new Date().toISOString().split('T')[0];
         const now = new Date();
         
@@ -956,7 +1039,6 @@ router.get('/photo/:id', requireAuth, async (req, res) => {
         }
         
         // Send file
-        const path = require('path');
         const filePath = path.join(__dirname, '..', photo.file_path);
         
         res.sendFile(filePath, (err) => {
@@ -1143,27 +1225,28 @@ router.post('/admin/mark', requirePermission('attendance', 'manage'), async (req
         
         if (existing.length > 0) {
             // Update existing
+            const adminNote = '\n[Admin override by ID ' + adminId + ']: ';
             await pool.query(
-                `UPDATE staff_attendance 
-                 SET status = ?, notes = CONCAT(COALESCE(notes, ''), '\n[Admin override by ID ${adminId}]: ', ?)
+                `UPDATE staff_attendance
+                 SET status = ?, notes = CONCAT(COALESCE(notes, ''), ?, ?)
                  WHERE id = ?`,
-                [status, notes || 'Status changed', existing[0].id]
+                [status, adminNote, notes || 'Status changed', existing[0].id]
             );
-            
+
             return res.json({
                 success: true,
                 message: 'Attendance updated successfully',
                 data: { attendance_id: existing[0].id }
             });
         }
-        
+
         // Create new record
+        const manualNote = 'Manually marked by admin (ID: ' + adminId + '). ' + (notes || '');
         const [result] = await pool.query(
-            `INSERT INTO staff_attendance 
-             (user_id, branch_id, date, status, expected_hours, notes) 
+            `INSERT INTO staff_attendance
+             (user_id, branch_id, date, status, expected_hours, notes)
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [user_id, branchId, date, status, shopHours.expected_hours, 
-             `Manually marked by admin (ID: ${adminId}). ${notes || ''}`]
+            [user_id, branchId, date, status, shopHours.expected_hours, manualNote]
         );
         
         res.json({

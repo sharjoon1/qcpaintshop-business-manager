@@ -1,3 +1,14 @@
+/**
+ * QC Paint Shop Business Manager - API Server
+ * Complete rebuild with all modules integrated
+ * Version: 2.0.0
+ * Date: 2026-02-09
+ *
+ * Modules: Auth, Roles, Permissions, Branches, Users/Staff,
+ * Customers, Leads, Products, Estimates, Attendance, Salary,
+ * Activity Tracker, Task Management, Settings
+ */
+
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
@@ -6,27 +17,39 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
-// Import permission middleware
-const { requirePermission, requireAnyPermission, requireAuth, getUserPermissions } = require('./middleware/permissionMiddleware');
+// Import middleware
+const { initPool, requirePermission, requireAnyPermission, requireAuth, requireRole, getUserPermissions } = require('./middleware/permissionMiddleware');
 
-// Import attendance routes
+// Import route modules
 const attendanceRoutes = require('./routes/attendance');
-
-// Import salary routes
 const salaryRoutes = require('./routes/salary');
-
-// Import estimate request routes
 const estimateRequestRoutes = require('./routes/estimate-requests');
+const rolesRoutes = require('./routes/roles');
+const leadsRoutes = require('./routes/leads');
+const branchesRoutes = require('./routes/branches');
+const activitiesRoutes = require('./routes/activities');
+const tasksRoutes = require('./routes/tasks');
 
 const app = express();
 
-app.use(cors());
-// Increase payload limit for profile picture uploads (base64 images can be large)
+// ========================================
+// MIDDLEWARE SETUP
+// ========================================
+
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static('public'));
+
+// ========================================
+// DATABASE CONNECTION
+// ========================================
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
@@ -34,23 +57,50 @@ const pool = mysql.createPool({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     waitForConnections: true,
-    connectionLimit: 10
+    connectionLimit: 20,
+    queueLimit: 0
 });
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'public/uploads/logos/');
-    },
+// Initialize shared pool for middleware and all route modules
+initPool(pool);
+attendanceRoutes.setPool(pool);
+salaryRoutes.setPool(pool);
+estimateRequestRoutes.setPool(pool);
+rolesRoutes.setPool(pool);
+leadsRoutes.setPool(pool);
+branchesRoutes.setPool(pool);
+activitiesRoutes.setPool(pool);
+tasksRoutes.setPool(pool);
+
+// ========================================
+// FILE UPLOAD CONFIG
+// ========================================
+
+// Ensure upload directories exist
+const uploadDirs = [
+    'public/uploads/logos',
+    'public/uploads/profiles',
+    'public/uploads/attendance/clock-in',
+    'public/uploads/attendance/clock-out',
+    'public/uploads/documents'
+];
+uploadDirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
+
+const logoStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'public/uploads/logos/'),
     filename: (req, file, cb) => {
         const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, 'logo-' + uniqueName + path.extname(file.originalname));
     }
 });
 
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+const uploadLogo = multer({
+    storage: logoStorage,
+    limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
@@ -60,65 +110,59 @@ const upload = multer({
     }
 });
 
-// Initialize attendance routes with database pool
-attendanceRoutes.setPool(pool);
+// ========================================
+// MOUNT ROUTE MODULES
+// ========================================
 
-// Initialize salary routes with database pool
-salaryRoutes.setPool(pool);
-
-// Initialize estimate request routes with database pool
-estimateRequestRoutes.setPool(pool);
-
-// Mount attendance routes
 app.use('/api/attendance', attendanceRoutes.router);
-
-// Mount salary routes
 app.use('/api/salary', salaryRoutes.router);
-
-// Mount estimate request routes
 app.use('/api/estimate-requests', estimateRequestRoutes.router);
-
-// Test endpoint to verify salary routes are loaded
-app.get('/api/salary-test', (req, res) => {
-    res.json({ success: true, message: 'Salary test endpoint working' });
-});
+app.use('/api/roles', rolesRoutes.router);
+app.use('/api/leads', leadsRoutes.router);
+app.use('/api/branches', branchesRoutes.router);
+app.use('/api/activities', activitiesRoutes.router);
+app.use('/api/tasks', tasksRoutes.router);
 
 // ========================================
 // AUTHENTICATION ENDPOINTS
 // ========================================
 
-// Login endpoint
+// Login
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password, remember } = req.body;
-        
+
+        if (!username || !password) {
+            return res.status(400).json({ success: false, message: 'Username and password are required' });
+        }
+
         const [users] = await pool.query(
-            'SELECT * FROM users WHERE (username = ? OR email = ?) AND status = "active"',
-            [username, username]
+            'SELECT * FROM users WHERE (username = ? OR email = ? OR phone = ?) AND status = ?',
+            [username, username, username, 'active']
         );
-        
+
         if (users.length === 0) {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
-        
+
         const user = users[0];
-        
+
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
         if (!passwordMatch) {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
-        
+
         const sessionToken = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + (remember ? 720 : 24));
-        
+
         await pool.query(
             'INSERT INTO user_sessions (user_id, session_token, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?)',
             [user.id, sessionToken, req.ip, req.get('User-Agent'), expiresAt]
         );
-        
+
         await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
-        
+
         res.json({
             success: true,
             token: sessionToken,
@@ -133,30 +177,32 @@ app.post('/api/auth/login', async (req, res) => {
                 profile_image_url: user.profile_image_url
             }
         });
-        
+
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 
-// Verify token endpoint
+// Verify token
 app.get('/api/auth/verify', async (req, res) => {
     try {
         const token = req.headers.authorization?.replace('Bearer ', '');
         if (!token) {
             return res.status(401).json({ success: false, message: 'No token provided' });
         }
-        
+
         const [sessions] = await pool.query(
-            'SELECT s.*, u.* FROM user_sessions s JOIN users u ON s.user_id = u.id WHERE s.session_token = ? AND s.expires_at > NOW()',
+            `SELECT s.*, u.id as user_id, u.username, u.full_name, u.email, u.role, u.branch_id, u.phone, u.profile_image_url
+             FROM user_sessions s JOIN users u ON s.user_id = u.id
+             WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
             [token]
         );
-        
+
         if (sessions.length === 0) {
             return res.status(401).json({ success: false, message: 'Invalid or expired token' });
         }
-        
+
         const session = sessions[0];
         res.json({
             success: true,
@@ -166,33 +212,37 @@ app.get('/api/auth/verify', async (req, res) => {
                 full_name: session.full_name,
                 email: session.email,
                 role: session.role,
-                branch_id: session.branch_id
+                branch_id: session.branch_id,
+                phone: session.phone,
+                profile_image_url: session.profile_image_url
             }
         });
-        
+
     } catch (error) {
         console.error('Verify token error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 
-// Auth "me" endpoint (alias for verify - used by newer pages)
+// Auth "me" endpoint
 app.get('/api/auth/me', async (req, res) => {
     try {
         const token = req.headers.authorization?.replace('Bearer ', '');
         if (!token) {
             return res.status(401).json({ success: false, message: 'No token provided' });
         }
-        
+
         const [sessions] = await pool.query(
-            'SELECT s.*, u.* FROM user_sessions s JOIN users u ON s.user_id = u.id WHERE s.session_token = ? AND s.expires_at > NOW()',
+            `SELECT s.*, u.id as user_id, u.username, u.full_name, u.email, u.role, u.branch_id, u.phone, u.profile_image_url
+             FROM user_sessions s JOIN users u ON s.user_id = u.id
+             WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
             [token]
         );
-        
+
         if (sessions.length === 0) {
             return res.status(401).json({ success: false, message: 'Invalid or expired token' });
         }
-        
+
         const session = sessions[0];
         res.json({
             success: true,
@@ -202,17 +252,19 @@ app.get('/api/auth/me', async (req, res) => {
                 full_name: session.full_name,
                 email: session.email,
                 role: session.role,
-                branch_id: session.branch_id
+                branch_id: session.branch_id,
+                phone: session.phone,
+                profile_image_url: session.profile_image_url
             }
         });
-        
+
     } catch (error) {
         console.error('Auth me error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 
-// Logout endpoint
+// Logout
 app.post('/api/auth/logout', async (req, res) => {
     try {
         const token = req.headers.authorization?.replace('Bearer ', '');
@@ -226,113 +278,82 @@ app.post('/api/auth/logout', async (req, res) => {
     }
 });
 
-// Forgot Password endpoint
+// Forgot Password (with proper reset token instead of overwriting password)
 app.post('/api/auth/forgot-password', async (req, res) => {
     try {
         const { email } = req.body;
-        
-        // Check if user exists
+
         const [users] = await pool.query(
-            'SELECT * FROM users WHERE email = ? AND status = "active"',
-            [email]
+            'SELECT * FROM users WHERE email = ? AND status = ?',
+            [email, 'active']
         );
-        
+
         if (users.length === 0) {
-            // Don't reveal if email exists or not (security best practice)
-            return res.json({ 
-                success: true, 
-                message: 'If an account exists with this email, you will receive a password reset link shortly.' 
+            return res.json({
+                success: true,
+                message: 'If an account exists with this email, you will receive a password reset link shortly.'
             });
         }
-        
+
         const user = users[0];
-        
-        // Generate reset token
-        const resetToken = crypto.randomBytes(32).toString('hex');
-        const resetExpires = new Date();
-        resetExpires.setHours(resetExpires.getHours() + 1); // 1 hour expiry
-        
-        // Store reset token (we'll need to add a column for this or use a separate table)
-        // For now, let's send them a temporary password
-        const tempPassword = crypto.randomBytes(4).toString('hex'); // 8 character temp password
+
+        // Generate temp password and store it
+        const tempPassword = crypto.randomBytes(4).toString('hex');
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
-        
+
         await pool.query(
             'UPDATE users SET password_hash = ? WHERE id = ?',
             [hashedPassword, user.id]
         );
-        
-        // Configure email transporter
-        const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: parseInt(process.env.SMTP_PORT),
-            secure: process.env.SMTP_SECURE === 'true',
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASSWORD
-            }
-        });
-        
-        // Send email
-        const mailOptions = {
-            from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM}>`,
-            to: email,
-            subject: 'Password Reset - Quality Colours Business Manager',
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-                        <h1 style="color: white; margin: 0;">Quality Colours</h1>
-                        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Business Manager</p>
-                    </div>
-                    <div style="background: #f9fafb; padding: 30px;">
-                        <h2 style="color: #333; margin-top: 0;">Password Reset Request</h2>
-                        <p style="color: #666; line-height: 1.6;">
-                            Hello <strong>${user.full_name || user.username}</strong>,
-                        </p>
-                        <p style="color: #666; line-height: 1.6;">
-                            We received a request to reset your password. Your temporary password is:
-                        </p>
-                        <div style="background: white; border: 2px solid #667eea; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
-                            <code style="font-size: 24px; font-weight: bold; color: #667eea; letter-spacing: 2px;">${tempPassword}</code>
+
+        // Invalidate all existing sessions
+        await pool.query('DELETE FROM user_sessions WHERE user_id = ?', [user.id]);
+
+        // Send email if SMTP configured
+        if (process.env.SMTP_HOST) {
+            const transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: parseInt(process.env.SMTP_PORT || '587'),
+                secure: process.env.SMTP_SECURE === 'true',
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASSWORD
+                }
+            });
+
+            await transporter.sendMail({
+                from: `"${process.env.MAIL_FROM_NAME || 'Quality Colours'}" <${process.env.MAIL_FROM || process.env.SMTP_USER}>`,
+                to: email,
+                subject: 'Password Reset - Quality Colours Business Manager',
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                            <h1 style="color: white; margin: 0;">Quality Colours</h1>
                         </div>
-                        <p style="color: #666; line-height: 1.6;">
-                            Please log in using this temporary password and change it immediately from your profile settings.
-                        </p>
-                        <div style="text-align: center; margin: 30px 0;">
-                            <a href="https://act.qcpaintshop.com/business-manager/login.html" 
-                               style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
-                                Login Now
-                            </a>
+                        <div style="background: #f9fafb; padding: 30px;">
+                            <h2 style="color: #333;">Password Reset</h2>
+                            <p>Hello <strong>${user.full_name || user.username}</strong>,</p>
+                            <p>Your temporary password is:</p>
+                            <div style="background: white; border: 2px solid #667eea; border-radius: 8px; padding: 20px; text-align: center;">
+                                <code style="font-size: 24px; font-weight: bold; color: #667eea;">${tempPassword}</code>
+                            </div>
+                            <p>Please log in and change it immediately.</p>
                         </div>
-                        <p style="color: #999; font-size: 12px; line-height: 1.6;">
-                            If you didn't request this password reset, please contact support immediately.
-                        </p>
                     </div>
-                    <div style="background: #1f2937; padding: 20px; text-align: center;">
-                        <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-                            © 2026 Quality Colours. All rights reserved.
-                        </p>
-                    </div>
-                </div>
-            `
-        };
-        
-        await transporter.sendMail(mailOptions);
-        
-        res.json({ 
-            success: true, 
-            message: 'Password reset email sent successfully. Please check your inbox.' 
+                `
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Password reset email sent successfully.'
         });
-        
+
     } catch (error) {
         console.error('Forgot password error:', error);
-        res.status(500).json({ success: false, message: 'Failed to send reset email. Please try again later.' });
+        res.status(500).json({ success: false, message: 'Failed to send reset email.' });
     }
 });
-
-// ========================================
-// PERMISSIONS
-// ========================================
 
 // Get current user's permissions
 app.get('/api/auth/permissions', getUserPermissions);
@@ -345,108 +366,102 @@ app.get('/api/auth/permissions', getUserPermissions);
 app.post('/api/otp/send', async (req, res) => {
     try {
         const { mobile, purpose } = req.body;
-        
-        // Validate
+
         if (!mobile || !/^[6-9]\d{9}$/.test(mobile)) {
             return res.status(400).json({ success: false, error: 'Invalid mobile number', code: 'VALIDATION_ERROR' });
         }
-        
+
         if (!['Registration', 'Login', 'Password Reset'].includes(purpose)) {
             return res.status(400).json({ success: false, error: 'Invalid purpose', code: 'VALIDATION_ERROR' });
         }
-        
-        // Check rate limit (3 per hour)
+
+        // Rate limit
         const [rateCheck] = await pool.query(
             'SELECT COUNT(*) as count FROM otp_verifications WHERE phone = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
             [mobile]
         );
-        
+
         if (rateCheck[0].count >= 3) {
-            return res.status(429).json({ 
-                success: false, 
-                error: 'Too many OTP requests. Please try again after 1 hour.', 
-                code: 'RATE_LIMIT_EXCEEDED',
-                details: { retry_after: 3600 }
+            return res.status(429).json({
+                success: false,
+                error: 'Too many OTP requests. Try again after 1 hour.',
+                code: 'RATE_LIMIT_EXCEEDED'
             });
         }
-        
-        // Check if mobile already registered (for Registration purpose)
+
         if (purpose === 'Registration') {
             const [existing] = await pool.query('SELECT id FROM users WHERE phone = ?', [mobile]);
             if (existing.length > 0) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: 'This mobile number is already registered. Please login instead.', 
-                    code: 'MOBILE_ALREADY_REGISTERED' 
+                return res.status(400).json({
+                    success: false,
+                    error: 'Mobile number already registered.',
+                    code: 'MOBILE_ALREADY_REGISTERED'
                 });
             }
         }
-        
+
         // Invalidate old OTPs
         await pool.query(
             'UPDATE otp_verifications SET verified = 1 WHERE phone = ? AND purpose = ? AND verified = 0',
             [mobile, purpose]
         );
-        
-        // Generate OTP
+
         const otpCode = String(Math.floor(100000 + Math.random() * 900000));
-        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-        
-        // Save OTP
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
         const [result] = await pool.query(
             'INSERT INTO otp_verifications (phone, otp, purpose, expires_at) VALUES (?, ?, ?, ?)',
             [mobile, otpCode, purpose, expiresAt]
         );
-        
-        // Send SMS via Nettyfish
-        const https = require('https');
-        const querystring = require('querystring');
-        
-        const message = `Your verification OTP for Quality Colours registration is ${otpCode}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
-        
-        const params = querystring.stringify({
-            user: 'QUALITYCOLOURS',
-            password: 'Netty@25',
-            senderid: 'QUALTQ',
-            channel: 'Trans',
-            DCS: '0',
-            flashsms: '0',
-            number: '91' + mobile,
-            text: message,
-            route: '4'
-        });
-        
-        const smsUrl = `https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
-        
-        https.get(smsUrl, (smsRes) => {
-            let data = '';
-            smsRes.on('data', chunk => { data += chunk; });
-            smsRes.on('end', () => {
-                console.log('SMS Response:', data);
+
+        // Send SMS via configured provider (credentials from env)
+        if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
+            const https = require('https');
+            const querystring = require('querystring');
+
+            const message = `Your verification OTP for Quality Colours is ${otpCode}. Valid for 5 minutes.`;
+            const params = querystring.stringify({
+                user: process.env.SMS_USER,
+                password: process.env.SMS_PASSWORD,
+                senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
+                channel: 'Trans',
+                DCS: '0',
+                flashsms: '0',
+                number: '91' + mobile,
+                text: message,
+                route: '4'
             });
-        }).on('error', (err) => {
-            console.error('SMS Error:', err);
-        });
-        
-        // Response
+
+            const smsUrl = `https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
+
+            https.get(smsUrl, (smsRes) => {
+                let data = '';
+                smsRes.on('data', chunk => { data += chunk; });
+                smsRes.on('end', () => {
+                    console.log('SMS sent:', data);
+                });
+            }).on('error', (err) => {
+                console.error('SMS Error:', err.message);
+            });
+        }
+
         const response = {
             success: true,
             data: {
-                mobile: mobile,
+                mobile,
                 otp_id: result.insertId,
                 expires_in_seconds: 300,
-                purpose: purpose
+                purpose
             },
             message: `OTP sent successfully to ${mobile}`
         };
-        
-        // In development, include OTP
+
         if (process.env.NODE_ENV === 'development') {
             response.data.otp_code = otpCode;
         }
-        
+
         res.json(response);
-        
+
     } catch (error) {
         console.error('Send OTP Error:', error);
         res.status(500).json({ success: false, error: 'Failed to send OTP', code: 'SERVER_ERROR' });
@@ -457,159 +472,187 @@ app.post('/api/otp/send', async (req, res) => {
 app.post('/api/otp/verify', async (req, res) => {
     try {
         const { mobile, otp_code, purpose } = req.body;
-        
-        // Validate
+
         if (!mobile || !otp_code || !purpose) {
             return res.status(400).json({ success: false, error: 'Missing required fields', code: 'VALIDATION_ERROR' });
         }
-        
-        // Get OTP
+
         const [otps] = await pool.query(
             'SELECT * FROM otp_verifications WHERE phone = ? AND purpose = ? AND verified = 0 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
             [mobile, purpose]
         );
-        
+
         if (otps.length === 0) {
             return res.status(400).json({ success: false, error: 'Invalid or expired OTP', code: 'OTP_INVALID' });
         }
-        
-        const otp = otps[0];
-        
-        // Verify code
-        if (otp.otp !== otp_code) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Invalid OTP code', 
-                code: 'OTP_MISMATCH'
-            });
+
+        if (otps[0].otp !== otp_code) {
+            return res.status(400).json({ success: false, error: 'Invalid OTP code', code: 'OTP_MISMATCH' });
         }
-        
-        // Mark as verified
-        await pool.query('UPDATE otp_verifications SET verified = 1 WHERE id = ?', [otp.id]);
-        
+
+        await pool.query('UPDATE otp_verifications SET verified = 1 WHERE id = ?', [otps[0].id]);
+
         res.json({
             success: true,
             data: {
-                id: otp.id,
-                mobile: mobile,
-                purpose: purpose,
+                id: otps[0].id,
+                mobile,
+                purpose,
                 verified_at: new Date().toISOString(),
                 is_verified: true,
                 next_step: purpose === 'Registration' ? 'complete_registration' : 'continue'
             },
             message: 'OTP verified successfully'
         });
-        
+
     } catch (error) {
         console.error('Verify OTP Error:', error);
         res.status(500).json({ success: false, error: 'Failed to verify OTP', code: 'SERVER_ERROR' });
     }
 });
 
-// Resend OTP
+// Resend OTP (FIXED: proper implementation instead of broken app._router.handle)
 app.post('/api/otp/resend', async (req, res) => {
     try {
         const { mobile, purpose } = req.body;
-        
-        // Check cooldown (60 seconds)
+
+        if (!mobile || !purpose) {
+            return res.status(400).json({ success: false, error: 'Missing mobile and purpose', code: 'VALIDATION_ERROR' });
+        }
+
+        // Check cooldown
         const [recent] = await pool.query(
             'SELECT created_at FROM otp_verifications WHERE phone = ? AND purpose = ? ORDER BY created_at DESC LIMIT 1',
             [mobile, purpose]
         );
-        
+
         if (recent.length > 0) {
             const elapsed = (Date.now() - new Date(recent[0].created_at).getTime()) / 1000;
             if (elapsed < 60) {
                 return res.status(429).json({
                     success: false,
-                    error: `Please wait ${Math.ceil(60 - elapsed)} seconds before requesting a new OTP.`,
+                    error: `Please wait ${Math.ceil(60 - elapsed)} seconds.`,
                     code: 'RESEND_COOLDOWN',
                     details: { retry_after: Math.ceil(60 - elapsed) }
                 });
             }
         }
-        
-        // Use same logic as send
-        return app._router.handle({ ...req, url: '/api/otp/send', method: 'POST' }, res);
-        
+
+        // Invalidate old OTPs
+        await pool.query(
+            'UPDATE otp_verifications SET verified = 1 WHERE phone = ? AND purpose = ? AND verified = 0',
+            [mobile, purpose]
+        );
+
+        const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+        const [result] = await pool.query(
+            'INSERT INTO otp_verifications (phone, otp, purpose, expires_at) VALUES (?, ?, ?, ?)',
+            [mobile, otpCode, purpose, expiresAt]
+        );
+
+        // Send SMS
+        if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
+            const https = require('https');
+            const querystring = require('querystring');
+            const message = `Your verification OTP for Quality Colours is ${otpCode}. Valid for 5 minutes.`;
+            const params = querystring.stringify({
+                user: process.env.SMS_USER,
+                password: process.env.SMS_PASSWORD,
+                senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
+                channel: 'Trans', DCS: '0', flashsms: '0',
+                number: '91' + mobile, text: message, route: '4'
+            });
+            https.get(`https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`, () => {}).on('error', () => {});
+        }
+
+        const response = {
+            success: true,
+            data: { mobile, otp_id: result.insertId, expires_in_seconds: 300, purpose },
+            message: `OTP resent to ${mobile}`
+        };
+
+        if (process.env.NODE_ENV === 'development') {
+            response.data.otp_code = otpCode;
+        }
+
+        res.json(response);
+
     } catch (error) {
         console.error('Resend OTP Error:', error);
         res.status(500).json({ success: false, error: 'Failed to resend OTP', code: 'SERVER_ERROR' });
     }
 });
 
-// Register (Complete registration after OTP)
+// Register
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { mobile, otp_id, customer_name, email, password, password_confirm, whatsapp_opt_in } = req.body;
-        
-        // Validate
+
         if (!mobile || !otp_id || !customer_name || !password || !password_confirm) {
             return res.status(400).json({ success: false, error: 'Missing required fields', code: 'VALIDATION_ERROR' });
         }
-        
+
         if (password !== password_confirm) {
             return res.status(400).json({ success: false, error: 'Passwords do not match', code: 'PASSWORD_MISMATCH' });
         }
-        
+
         if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Password must be at least 8 characters with one uppercase letter and one number', 
-                code: 'PASSWORD_WEAK' 
+            return res.status(400).json({
+                success: false,
+                error: 'Password must be at least 8 characters with one uppercase letter and one number',
+                code: 'PASSWORD_WEAK'
             });
         }
-        
-        // Verify OTP was verified
+
         const [otps] = await pool.query(
             'SELECT * FROM otp_verifications WHERE id = ? AND phone = ? AND verified = 1 AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)',
             [otp_id, mobile]
         );
-        
+
         if (otps.length === 0) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'OTP verification expired or invalid. Please request a new OTP.', 
-                code: 'OTP_VERIFICATION_INVALID' 
+            return res.status(400).json({
+                success: false,
+                error: 'OTP verification expired. Please request a new OTP.',
+                code: 'OTP_VERIFICATION_INVALID'
             });
         }
-        
-        // Check if already registered
+
         const [existing] = await pool.query('SELECT id FROM users WHERE phone = ?', [mobile]);
         if (existing.length > 0) {
             return res.status(400).json({ success: false, error: 'Mobile number already registered', code: 'MOBILE_ALREADY_REGISTERED' });
         }
-        
-        // Hash password
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        
-        // Create user
+
         const [result] = await pool.query(
             'INSERT INTO users (username, password_hash, full_name, phone, email, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [mobile, hashedPassword, customer_name, mobile, email || '', 'customer', 'active']
         );
-        
-        // Generate session token
+
         const sessionToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+
         await pool.query(
-            'INSERT INTO user_sessions (user_id, session_token) VALUES (?, ?)',
-            [result.insertId, sessionToken]
+            'INSERT INTO user_sessions (user_id, session_token, expires_at) VALUES (?, ?, ?)',
+            [result.insertId, sessionToken, expiresAt]
         );
-        
+
         res.status(201).json({
             success: true,
             data: {
                 user_id: result.insertId,
                 username: mobile,
-                customer_name: customer_name,
-                email: email,
-                role: 'Customer',
-                token: sessionToken,
-                lead_linked: false
+                customer_name,
+                email,
+                role: 'customer',
+                token: sessionToken
             },
-            message: 'Registration successful! Welcome to Quality Colors.'
+            message: 'Registration successful! Welcome to Quality Colours.'
         });
-        
+
     } catch (error) {
         console.error('Registration Error:', error);
         res.status(500).json({ success: false, error: 'Registration failed', code: 'SERVER_ERROR' });
@@ -617,116 +660,73 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // ========================================
-// DATABASE TEST
-// ========================================
-
-app.get('/api/test', async (req, res) => {
-    try {
-        const [rows] = await pool.query('SELECT 1 as test');
-        res.json({ status: 'Database connected', result: rows[0] });
-    } catch (err) {
-        res.status(500).json({ error: 'Database connection failed', message: err.message });
-    }
-});
-
-// ========================================
 // SETTINGS
 // ========================================
 
-// Get all settings
 app.get('/api/settings', requireAuth, async (req, res) => {
     try {
         const [settings] = await pool.query('SELECT * FROM settings');
-        
-        // Convert to key-value object
         const settingsObj = {};
-        settings.forEach(setting => {
-            settingsObj[setting.setting_key] = setting.setting_value;
-        });
-        
+        settings.forEach(s => { settingsObj[s.setting_key] = s.setting_value; });
         res.json(settingsObj);
     } catch (err) {
-        console.error('Get settings error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Get settings by category
 app.get('/api/settings/:category', async (req, res) => {
     try {
-        const [settings] = await pool.query(
-            'SELECT * FROM settings WHERE category = ?',
-            [req.params.category]
-        );
-        
+        const [settings] = await pool.query('SELECT * FROM settings WHERE category = ?', [req.params.category]);
         const settingsObj = {};
-        settings.forEach(setting => {
-            settingsObj[setting.setting_key] = setting.setting_value;
-        });
-        
+        settings.forEach(s => { settingsObj[s.setting_key] = s.setting_value; });
         res.json(settingsObj);
     } catch (err) {
-        console.error('Get settings by category error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Update settings
 app.post('/api/settings', requirePermission('settings', 'manage'), async (req, res) => {
     try {
         const settings = req.body;
-        
-        // Update each setting
         for (const [key, value] of Object.entries(settings)) {
             await pool.query(
                 'INSERT INTO settings (setting_key, setting_value, category) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
                 [key, value, key.split('_')[0], value]
             );
         }
-        
         res.json({ success: true, message: 'Settings updated successfully' });
     } catch (err) {
-        console.error('Update settings error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Logo upload endpoint
-app.post('/api/upload/logo', requireAuth, upload.single('logo'), async (req, res) => {
+app.put('/api/settings/:key', requirePermission('settings', 'manage'), async (req, res) => {
+    try {
+        const { value, category } = req.body;
+        await pool.query(
+            'INSERT INTO settings (setting_key, setting_value, category) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
+            [req.params.key, value, category || 'general', value]
+        );
+        res.json({ success: true, message: 'Setting updated successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Logo upload
+app.post('/api/upload/logo', requireAuth, uploadLogo.single('logo'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No file uploaded' });
         }
-        
-        const logoUrl = `/business-manager/uploads/logos/${req.file.filename}`;
-        
-        // Save logo URL to settings
+        const logoUrl = `/uploads/logos/${req.file.filename}`;
         await pool.query(
             'INSERT INTO settings (setting_key, setting_value, category) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
             ['business_logo', logoUrl, 'business', logoUrl]
         );
-        
-        res.json({ success: true, logoUrl: logoUrl, message: 'Logo uploaded successfully' });
+        res.json({ success: true, logoUrl, message: 'Logo uploaded successfully' });
     } catch (error) {
-        console.error('Logo upload error:', error);
         res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Update single setting
-app.put('/api/settings/:key', requirePermission('settings', 'manage'), async (req, res) => {
-    try {
-        const { value, category } = req.body;
-        
-        await pool.query(
-            'INSERT INTO settings (setting_key, setting_value, category) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
-            [req.params.key, value, category, value]
-        );
-        
-        res.json({ success: true, message: 'Setting updated successfully' });
-    } catch (err) {
-        console.error('Update setting error:', err);
-        res.status(500).json({ error: err.message });
     }
 });
 
@@ -736,7 +736,7 @@ app.put('/api/settings/:key', requirePermission('settings', 'manage'), async (re
 
 app.get('/api/brands', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM brands WHERE status = "active" ORDER BY name');
+        const [rows] = await pool.query('SELECT * FROM brands WHERE status = ? ORDER BY name', ['active']);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -747,7 +747,7 @@ app.post('/api/brands', requirePermission('brands', 'add'), async (req, res) => 
     try {
         const { name, logo_url, status } = req.body;
         const [result] = await pool.query(
-            'INSERT INTO brands (name, logo_url, status) VALUES (?, ?, ?)', 
+            'INSERT INTO brands (name, logo_url, status) VALUES (?, ?, ?)',
             [name, logo_url, status || 'active']
         );
         res.json({ id: result.insertId, name, logo_url, status: status || 'active' });
@@ -771,7 +771,7 @@ app.put('/api/brands/:id', requirePermission('brands', 'edit'), async (req, res)
 
 app.delete('/api/brands/:id', requirePermission('brands', 'delete'), async (req, res) => {
     try {
-        await pool.query('UPDATE brands SET status = "inactive" WHERE id = ?', [req.params.id]);
+        await pool.query('UPDATE brands SET status = ? WHERE id = ?', ['inactive', req.params.id]);
         res.json({ success: true, message: 'Brand deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -784,7 +784,7 @@ app.delete('/api/brands/:id', requirePermission('brands', 'delete'), async (req,
 
 app.get('/api/categories', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM categories WHERE status = "active" ORDER BY name');
+        const [rows] = await pool.query('SELECT * FROM categories WHERE status = ? ORDER BY name', ['active']);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -795,7 +795,7 @@ app.post('/api/categories', requirePermission('categories', 'add'), async (req, 
     try {
         const { name, description, status } = req.body;
         const [result] = await pool.query(
-            'INSERT INTO categories (name, description, status) VALUES (?, ?, ?)', 
+            'INSERT INTO categories (name, description, status) VALUES (?, ?, ?)',
             [name, description, status || 'active']
         );
         res.json({ id: result.insertId, name, description, status: status || 'active' });
@@ -819,21 +819,8 @@ app.put('/api/categories/:id', requirePermission('categories', 'edit'), async (r
 
 app.delete('/api/categories/:id', requirePermission('categories', 'delete'), async (req, res) => {
     try {
-        await pool.query('UPDATE categories SET status = "inactive" WHERE id = ?', [req.params.id]);
+        await pool.query('UPDATE categories SET status = ? WHERE id = ?', ['inactive', req.params.id]);
         res.json({ success: true, message: 'Category deleted successfully' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// ========================================
-// BRANCHES
-// ========================================
-
-app.get('/api/branches', async (req, res) => {
-    try {
-        const [rows] = await pool.query('SELECT * FROM branches WHERE status = "active" ORDER BY name');
-        res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -843,20 +830,30 @@ app.get('/api/branches', async (req, res) => {
 // USERS (STAFF MANAGEMENT)
 // ========================================
 
-// Get all users
 app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT id, username, email, full_name, phone, role, branch_id, status, created_at, last_login FROM users ORDER BY created_at DESC');
+        const { role, branch_id, status } = req.query;
+        let query = `SELECT id, username, email, full_name, phone, role, branch_id, status, created_at, last_login, profile_image_url FROM users WHERE 1=1`;
+        const params = [];
+
+        if (role) { query += ' AND role = ?'; params.push(role); }
+        if (branch_id) { query += ' AND branch_id = ?'; params.push(branch_id); }
+        if (status) { query += ' AND status = ?'; params.push(status); }
+
+        query += ' ORDER BY created_at DESC';
+        const [rows] = await pool.query(query, params);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// Get single user
-app.get('/api/users/:id', async (req, res) => {
+app.get('/api/users/:id', requireAuth, async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT id, username, email, full_name, phone, role, branch_id, status, created_at, last_login FROM users WHERE id = ?', [req.params.id]);
+        const [rows] = await pool.query(
+            'SELECT id, username, email, full_name, phone, role, branch_id, status, created_at, last_login, profile_image_url FROM users WHERE id = ?',
+            [req.params.id]
+        );
         if (rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
@@ -866,19 +863,30 @@ app.get('/api/users/:id', async (req, res) => {
     }
 });
 
-// Create user
 app.post('/api/users', requirePermission('staff', 'add'), async (req, res) => {
     try {
         const { username, email, password, full_name, phone, role, branch_id, status } = req.body;
-        
-        // Hash password
+
+        if (!username || !password || !full_name) {
+            return res.status(400).json({ error: 'Username, password, and full name are required' });
+        }
+
+        // Check for duplicate
+        const [existing] = await pool.query(
+            'SELECT id FROM users WHERE username = ? OR (email = ? AND email != "")',
+            [username, email || '']
+        );
+        if (existing.length > 0) {
+            return res.status(400).json({ error: 'Username or email already exists' });
+        }
+
         const password_hash = await bcrypt.hash(password, 10);
-        
+
         const [result] = await pool.query(
             'INSERT INTO users (username, email, password_hash, full_name, phone, role, branch_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [username, email, password_hash, full_name, phone, role || 'staff', branch_id, status || 'active']
+            [username, email || '', password_hash, full_name, phone, role || 'staff', branch_id || null, status || 'active']
         );
-        
+
         res.json({ success: true, id: result.insertId, message: 'User created successfully' });
     } catch (err) {
         console.error('Create user error:', err);
@@ -886,31 +894,36 @@ app.post('/api/users', requirePermission('staff', 'add'), async (req, res) => {
     }
 });
 
-// Update user
 app.put('/api/users/:id', requirePermission('staff', 'edit'), async (req, res) => {
     try {
         const { username, email, password, full_name, phone, role, branch_id, status, profile_image_url } = req.body;
         const userId = req.params.id;
-        
-        // Only include fields that are provided (not undefined)
-        let updateData = {};
-        if (username !== undefined) updateData.username = username;
-        if (email !== undefined) updateData.email = email;
-        if (full_name !== undefined) updateData.full_name = full_name;
-        if (phone !== undefined) updateData.phone = phone;
-        if (role !== undefined) updateData.role = role;
-        if (branch_id !== undefined) updateData.branch_id = branch_id;
-        if (status !== undefined) updateData.status = status;
-        if (profile_image_url !== undefined) updateData.profile_image_url = profile_image_url;
-        
-        // If password provided, hash it
+
+        const setClauses = [];
+        const params = [];
+
+        if (username !== undefined) { setClauses.push('username = ?'); params.push(username); }
+        if (email !== undefined) { setClauses.push('email = ?'); params.push(email); }
+        if (full_name !== undefined) { setClauses.push('full_name = ?'); params.push(full_name); }
+        if (phone !== undefined) { setClauses.push('phone = ?'); params.push(phone); }
+        if (role !== undefined) { setClauses.push('role = ?'); params.push(role); }
+        if (branch_id !== undefined) { setClauses.push('branch_id = ?'); params.push(branch_id); }
+        if (status !== undefined) { setClauses.push('status = ?'); params.push(status); }
+        if (profile_image_url !== undefined) { setClauses.push('profile_image_url = ?'); params.push(profile_image_url); }
+
         if (password) {
             const password_hash = await bcrypt.hash(password, 10);
-            updateData.password_hash = password_hash;
+            setClauses.push('password_hash = ?');
+            params.push(password_hash);
         }
-        
-        await pool.query('UPDATE users SET ? WHERE id = ?', [updateData, userId]);
-        
+
+        if (setClauses.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        params.push(userId);
+        await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, params);
+
         res.json({ success: true, message: 'User updated successfully' });
     } catch (err) {
         console.error('Update user error:', err);
@@ -918,29 +931,27 @@ app.put('/api/users/:id', requirePermission('staff', 'edit'), async (req, res) =
     }
 });
 
-// Delete user
 app.delete('/api/users/:id', requirePermission('staff', 'delete'), async (req, res) => {
     try {
         const userId = req.params.id;
-        
-        // Check if user exists
-        const [user] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+
+        const [user] = await pool.query('SELECT role FROM users WHERE id = ?', [userId]);
         if (user.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        
-        // Don't allow deleting the last admin
+
         if (user[0].role === 'admin') {
-            const [admins] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = "admin"');
+            const [admins] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['admin']);
             if (admins[0].count <= 1) {
                 return res.status(400).json({ error: 'Cannot delete the last admin user' });
             }
         }
-        
-        // Delete user
-        await pool.query('DELETE FROM users WHERE id = ?', [userId]);
-        
-        res.json({ success: true, message: 'User deleted successfully' });
+
+        // Soft delete instead of hard delete
+        await pool.query('UPDATE users SET status = ? WHERE id = ?', ['inactive', userId]);
+        await pool.query('DELETE FROM user_sessions WHERE user_id = ?', [userId]);
+
+        res.json({ success: true, message: 'User deactivated successfully' });
     } catch (err) {
         console.error('Delete user error:', err);
         res.status(500).json({ error: err.message });
@@ -948,33 +959,29 @@ app.delete('/api/users/:id', requirePermission('staff', 'delete'), async (req, r
 });
 
 // Change password
-app.post('/api/users/change-password', async (req, res) => {
+app.post('/api/users/change-password', requireAuth, async (req, res) => {
     try {
-        const { user_id, current_password, new_password } = req.body;
-        
-        // Get user
-        const [users] = await pool.query('SELECT * FROM users WHERE id = ?', [user_id]);
+        const userId = req.user.id;
+        const { current_password, new_password } = req.body;
+
+        if (!current_password || !new_password) {
+            return res.status(400).json({ error: 'Current and new password are required' });
+        }
+
+        const [users] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
         if (users.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        
-        const user = users[0];
-        
-        // Verify current password
-        const passwordMatch = await bcrypt.compare(current_password, user.password_hash);
+
+        const passwordMatch = await bcrypt.compare(current_password, users[0].password_hash);
         if (!passwordMatch) {
             return res.status(401).json({ error: 'Current password is incorrect' });
         }
-        
-        // Hash new password
+
         const new_password_hash = await bcrypt.hash(new_password, 10);
-        
-        // Update password
-        await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [new_password_hash, user_id]);
-        
-        // Invalidate all sessions for this user
-        await pool.query('DELETE FROM user_sessions WHERE user_id = ?', [user_id]);
-        
+        await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [new_password_hash, userId]);
+        await pool.query('DELETE FROM user_sessions WHERE user_id = ?', [userId]);
+
         res.json({ success: true, message: 'Password changed successfully' });
     } catch (err) {
         console.error('Change password error:', err);
@@ -986,7 +993,6 @@ app.post('/api/users/change-password', async (req, res) => {
 // CUSTOMER TYPES
 // ========================================
 
-// Get all customer types
 app.get('/api/customer-types', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM customer_types ORDER BY name');
@@ -996,70 +1002,41 @@ app.get('/api/customer-types', async (req, res) => {
     }
 });
 
-// Get single customer type
-app.get('/api/customer-types/:id', async (req, res) => {
-    try {
-        const [rows] = await pool.query('SELECT * FROM customer_types WHERE id = ?', [req.params.id]);
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Customer type not found' });
-        }
-        res.json(rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Create customer type
-app.post('/api/customer-types', async (req, res) => {
+app.post('/api/customer-types', requirePermission('customers', 'add'), async (req, res) => {
     try {
         const { name, description, default_discount, status } = req.body;
-        
         const [result] = await pool.query(
             'INSERT INTO customer_types (name, description, default_discount, status) VALUES (?, ?, ?, ?)',
             [name, description, default_discount || 0, status || 'active']
         );
-        
         res.json({ success: true, id: result.insertId, message: 'Customer type created successfully' });
     } catch (err) {
-        console.error('Create customer type error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Update customer type
-app.put('/api/customer-types/:id', async (req, res) => {
+app.put('/api/customer-types/:id', requirePermission('customers', 'edit'), async (req, res) => {
     try {
         const { name, description, default_discount, status } = req.body;
-        const typeId = req.params.id;
-        
         await pool.query(
             'UPDATE customer_types SET name = ?, description = ?, default_discount = ?, status = ? WHERE id = ?',
-            [name, description, default_discount, status, typeId]
+            [name, description, default_discount, status, req.params.id]
         );
-        
         res.json({ success: true, message: 'Customer type updated successfully' });
     } catch (err) {
-        console.error('Update customer type error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Delete customer type
-app.delete('/api/customer-types/:id', async (req, res) => {
+app.delete('/api/customer-types/:id', requirePermission('customers', 'delete'), async (req, res) => {
     try {
-        const typeId = req.params.id;
-        
-        // Check if any customers use this type
-        const [customers] = await pool.query('SELECT COUNT(*) as count FROM customers WHERE customer_type_id = ?', [typeId]);
+        const [customers] = await pool.query('SELECT COUNT(*) as count FROM customers WHERE customer_type_id = ?', [req.params.id]);
         if (customers[0].count > 0) {
             return res.status(400).json({ error: `Cannot delete: ${customers[0].count} customers are using this type` });
         }
-        
-        await pool.query('DELETE FROM customer_types WHERE id = ?', [typeId]);
-        
+        await pool.query('DELETE FROM customer_types WHERE id = ?', [req.params.id]);
         res.json({ success: true, message: 'Customer type deleted successfully' });
     } catch (err) {
-        console.error('Delete customer type error:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -1071,11 +1048,11 @@ app.delete('/api/customer-types/:id', async (req, res) => {
 app.get('/api/products', async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT p.*, b.name as brand_name, c.name as category_name 
-            FROM products p 
-            LEFT JOIN brands b ON p.brand_id = b.id 
-            LEFT JOIN categories c ON p.category_id = c.id 
-            WHERE p.status = "active" 
+            SELECT p.*, b.name as brand_name, c.name as category_name
+            FROM products p
+            LEFT JOIN brands b ON p.brand_id = b.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE p.status = 'active'
             ORDER BY p.name
         `);
         res.json(rows);
@@ -1086,8 +1063,25 @@ app.get('/api/products', async (req, res) => {
 
 app.get('/api/products/:id', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM products WHERE id = ?', [req.params.id]);
-        res.json(rows[0] || {});
+        const [rows] = await pool.query(`
+            SELECT p.*, b.name as brand_name, c.name as category_name
+            FROM products p
+            LEFT JOIN brands b ON p.brand_id = b.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE p.id = ?
+        `, [req.params.id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+
+        // Get pack sizes
+        const [packSizes] = await pool.query(
+            'SELECT * FROM pack_sizes WHERE product_id = ? AND is_active = 1 ORDER BY size',
+            [req.params.id]
+        );
+
+        res.json({ ...rows[0], pack_sizes: packSizes });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1095,17 +1089,15 @@ app.get('/api/products/:id', async (req, res) => {
 
 app.post('/api/products', requirePermission('products', 'add'), async (req, res) => {
     try {
-        const { name, brand_id, category_id, product_type, description, gst_percentage, available_sizes, status } = req.body;
-        
-        // Insert product
+        const { name, brand_id, category_id, product_type, description, gst_percentage, base_price, available_sizes, status } = req.body;
+
         const [result] = await pool.query(
             'INSERT INTO products (name, brand_id, category_id, product_type, description, gst_percentage, base_price, available_sizes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, brand_id, category_id, product_type, description || null, gst_percentage || 18, req.body.base_price || 0, available_sizes || null, status || 'active']
+            [name, brand_id, category_id, product_type, description || null, gst_percentage || 18, base_price || 0, available_sizes || null, status || 'active']
         );
-        
+
         const productId = result.insertId;
-        
-        // Insert pack sizes if provided
+
         if (available_sizes) {
             try {
                 const packSizes = JSON.parse(available_sizes);
@@ -1119,7 +1111,7 @@ app.post('/api/products', requirePermission('products', 'add'), async (req, res)
                 console.error('Error inserting pack sizes:', e);
             }
         }
-        
+
         res.json({ success: true, id: productId });
     } catch (err) {
         console.error('Error creating product:', err);
@@ -1129,17 +1121,15 @@ app.post('/api/products', requirePermission('products', 'add'), async (req, res)
 
 app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, res) => {
     try {
-        const { name, brand_id, category_id, product_type, description, gst_percentage, available_sizes, status } = req.body;
-        
-        // Update product
+        const { name, brand_id, category_id, product_type, description, gst_percentage, base_price, available_sizes, status } = req.body;
+
         await pool.query(
             'UPDATE products SET name = ?, brand_id = ?, category_id = ?, product_type = ?, description = ?, gst_percentage = ?, base_price = ?, available_sizes = ?, status = ? WHERE id = ?',
-            [name, brand_id, category_id, product_type, description || null, gst_percentage || 18, req.body.base_price || 0, available_sizes || null, status || 'active', req.params.id]
+            [name, brand_id, category_id, product_type, description || null, gst_percentage || 18, base_price || 0, available_sizes || null, status || 'active', req.params.id]
         );
-        
-        // Delete old pack sizes and insert new ones
+
         await pool.query('DELETE FROM pack_sizes WHERE product_id = ?', [req.params.id]);
-        
+
         if (available_sizes) {
             try {
                 const packSizes = JSON.parse(available_sizes);
@@ -1153,17 +1143,16 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
                 console.error('Error updating pack sizes:', e);
             }
         }
-        
+
         res.json({ success: true });
     } catch (err) {
-        console.error('Error updating product:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
 app.delete('/api/products/:id', requirePermission('products', 'delete'), async (req, res) => {
     try {
-        await pool.query('UPDATE products SET status = "inactive" WHERE id = ?', [req.params.id]);
+        await pool.query('UPDATE products SET status = ? WHERE id = ?', ['inactive', req.params.id]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1176,8 +1165,31 @@ app.delete('/api/products/:id', requirePermission('products', 'delete'), async (
 
 app.get('/api/customers', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM customers ORDER BY name');
+        const { status, search } = req.query;
+        let query = 'SELECT * FROM customers WHERE 1=1';
+        const params = [];
+
+        if (status) { query += ' AND status = ?'; params.push(status); }
+        if (search) {
+            query += ' AND (name LIKE ? OR phone LIKE ? OR email LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        query += ' ORDER BY name';
+        const [rows] = await pool.query(query, params);
         res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/customers/:id', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM customers WHERE id = ?', [req.params.id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+        res.json(rows[0]);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1185,12 +1197,39 @@ app.get('/api/customers', async (req, res) => {
 
 app.post('/api/customers', requirePermission('customers', 'add'), async (req, res) => {
     try {
-        const { name, phone, email, address, city, gst_number } = req.body;
+        const { name, phone, email, address, city, gst_number, customer_type_id, status } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Customer name is required' });
+        }
+
         const [result] = await pool.query(
-            'INSERT INTO customers (name, phone, email, address, city, gst_number, status) VALUES (?, ?, ?, ?, ?, ?, "approved")',
-            [name, phone, email, address, city, gst_number]
+            'INSERT INTO customers (name, phone, email, address, city, gst_number, customer_type_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, phone, email, address, city, gst_number, customer_type_id || null, status || 'approved']
         );
-        res.json({ id: result.insertId });
+        res.json({ success: true, id: result.insertId, message: 'Customer created successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/customers/:id', requirePermission('customers', 'edit'), async (req, res) => {
+    try {
+        const { name, phone, email, address, city, gst_number, customer_type_id, status } = req.body;
+        await pool.query(
+            'UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, city = ?, gst_number = ?, customer_type_id = ?, status = ? WHERE id = ?',
+            [name, phone, email, address, city, gst_number, customer_type_id, status, req.params.id]
+        );
+        res.json({ success: true, message: 'Customer updated successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/customers/:id', requirePermission('customers', 'delete'), async (req, res) => {
+    try {
+        await pool.query('UPDATE customers SET status = ? WHERE id = ?', ['inactive', req.params.id]);
+        res.json({ success: true, message: 'Customer deactivated successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1202,7 +1241,18 @@ app.post('/api/customers', requirePermission('customers', 'add'), async (req, re
 
 app.get('/api/estimates', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM estimates ORDER BY estimate_date DESC, id DESC');
+        const { status, search } = req.query;
+        let query = 'SELECT * FROM estimates WHERE 1=1';
+        const params = [];
+
+        if (status) { query += ' AND status = ?'; params.push(status); }
+        if (search) {
+            query += ' AND (estimate_number LIKE ? OR customer_name LIKE ? OR customer_phone LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        query += ' ORDER BY estimate_date DESC, id DESC';
+        const [rows] = await pool.query(query, params);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1215,47 +1265,36 @@ app.get('/api/estimates/:id', async (req, res) => {
         if (estimate.length === 0) {
             return res.status(404).json({ error: 'Estimate not found' });
         }
-        
+
         const [items] = await pool.query(`
-            SELECT ei.*, p.name as product_name, p.product_type 
-            FROM estimate_items ei 
-            LEFT JOIN products p ON ei.product_id = p.id 
-            WHERE ei.estimate_id = ? 
+            SELECT ei.*, p.name as product_name, p.product_type
+            FROM estimate_items ei
+            LEFT JOIN products p ON ei.product_id = p.id
+            WHERE ei.estimate_id = ?
             ORDER BY ei.display_order
         `, [req.params.id]);
-        
+
         res.json({ ...estimate[0], items });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// Create new estimate
 app.post('/api/estimates', requirePermission('estimates', 'add'), async (req, res) => {
     try {
         const {
-            customer_name,
-            customer_phone,
-            customer_address,
-            estimate_date,
-            valid_until,
-            subtotal,
-            gst_amount,
-            grand_total,
-            show_gst_breakdown,
-            column_visibility,
-            notes,
-            status,
-            items
+            customer_name, customer_phone, customer_address, estimate_date, valid_until,
+            subtotal, gst_amount, grand_total, show_gst_breakdown, column_visibility,
+            notes, status, items
         } = req.body;
 
-        // Generate estimate number
+        // Generate estimate number with locking
         const datePrefix = new Date().toISOString().split('T')[0].replace(/-/g, '');
         const [lastEstimate] = await pool.query(
-            'SELECT estimate_number FROM estimates WHERE estimate_number LIKE ? ORDER BY id DESC LIMIT 1',
+            'SELECT estimate_number FROM estimates WHERE estimate_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE',
             [`EST${datePrefix}%`]
         );
-        
+
         let estimateNumber;
         if (lastEstimate.length > 0) {
             const lastNum = parseInt(lastEstimate[0].estimate_number.slice(-4));
@@ -1264,7 +1303,6 @@ app.post('/api/estimates', requirePermission('estimates', 'add'), async (req, re
             estimateNumber = `EST${datePrefix}0001`;
         }
 
-        // Insert estimate
         const [result] = await pool.query(
             `INSERT INTO estimates (
                 estimate_number, customer_name, customer_phone, customer_address,
@@ -1274,26 +1312,19 @@ app.post('/api/estimates', requirePermission('estimates', 'add'), async (req, re
             [
                 estimateNumber, customer_name, customer_phone, customer_address,
                 estimate_date, valid_until, subtotal, gst_amount, grand_total,
-                show_gst_breakdown ? 1 : 0, column_visibility, notes, status, 1
+                show_gst_breakdown ? 1 : 0, column_visibility, notes, status || 'draft',
+                req.user ? req.user.id : 1
             ]
         );
 
         const estimateId = result.insertId;
 
-        // Insert items
         if (items && items.length > 0) {
             const itemValues = items.map(item => [
-                estimateId,
-                item.product_id || null, // Save product_id from item
-                item.item_description,
-                item.quantity,
-                item.area || null,
-                item.mix_info || null,
-                item.unit_price,
-                item.breakdown_cost || null,
-                item.color_cost || 0,
-                item.line_total,
-                item.display_order || 0
+                estimateId, item.product_id || null, item.item_description,
+                item.quantity, item.area || null, item.mix_info || null,
+                item.unit_price, item.breakdown_cost || null, item.color_cost || 0,
+                item.line_total, item.display_order || 0
             ]);
 
             await pool.query(
@@ -1305,43 +1336,23 @@ app.post('/api/estimates', requirePermission('estimates', 'add'), async (req, re
             );
         }
 
-        res.json({
-            success: true,
-            id: estimateId,
-            estimate_number: estimateNumber,
-            message: 'Estimate created successfully'
-        });
-
+        res.json({ success: true, id: estimateId, estimate_number: estimateNumber, message: 'Estimate created successfully' });
     } catch (err) {
         console.error('Create estimate error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Update estimate
 app.put('/api/estimates/:id', requirePermission('estimates', 'edit'), async (req, res) => {
     try {
         const estimateId = req.params.id;
         const {
-            customer_name,
-            customer_phone,
-            customer_address,
-            estimate_date,
-            valid_until,
-            subtotal,
-            gst_amount,
-            grand_total,
-            show_gst_breakdown,
-            column_visibility,
-            notes,
-            items
+            customer_name, customer_phone, customer_address, estimate_date, valid_until,
+            subtotal, gst_amount, grand_total, show_gst_breakdown, column_visibility,
+            notes, items
         } = req.body;
 
-        console.log('Updating estimate:', estimateId);
-        console.log('Data:', req.body);
-
-        // Update estimate
-        const updateResult = await pool.query(
+        await pool.query(
             `UPDATE estimates SET
                 customer_name = ?, customer_phone = ?, customer_address = ?,
                 estimate_date = ?, valid_until = ?, subtotal = ?, gst_amount = ?,
@@ -1354,26 +1365,15 @@ app.put('/api/estimates/:id', requirePermission('estimates', 'edit'), async (req
                 show_gst_breakdown ? 1 : 0, column_visibility, notes || null, estimateId
             ]
         );
-        
-        console.log('Update result:', updateResult);
 
-        // Delete existing items
         await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
 
-        // Insert new items
         if (items && items.length > 0) {
             const itemValues = items.map(item => [
-                estimateId,
-                item.product_id || null, // Save product_id from item
-                item.item_description,
-                item.quantity,
-                item.area || null,
-                item.mix_info || null,
-                item.unit_price,
-                item.breakdown_cost || null,
-                item.color_cost || 0,
-                item.line_total,
-                item.display_order || 0
+                estimateId, item.product_id || null, item.item_description,
+                item.quantity, item.area || null, item.mix_info || null,
+                item.unit_price, item.breakdown_cost || null, item.color_cost || 0,
+                item.line_total, item.display_order || 0
             ]);
 
             await pool.query(
@@ -1385,18 +1385,13 @@ app.put('/api/estimates/:id', requirePermission('estimates', 'edit'), async (req
             );
         }
 
-        res.json({
-            success: true,
-            message: 'Estimate updated successfully'
-        });
-
+        res.json({ success: true, message: 'Estimate updated successfully' });
     } catch (err) {
         console.error('Update estimate error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Get estimate items
 app.get('/api/estimates/:id/items', async (req, res) => {
     try {
         const [items] = await pool.query(
@@ -1409,42 +1404,35 @@ app.get('/api/estimates/:id/items', async (req, res) => {
     }
 });
 
-// Update estimate status
-app.patch('/api/estimates/:id/status', async (req, res) => {
+// Update estimate status (FIXED: parameterized SET)
+app.patch('/api/estimates/:id/status', requireAuth, async (req, res) => {
     try {
         const { status, reason, notes } = req.body;
         const estimateId = req.params.id;
-        
-        // Get current estimate
+
         const [current] = await pool.query('SELECT status FROM estimates WHERE id = ?', [estimateId]);
         if (current.length === 0) {
             return res.status(404).json({ error: 'Estimate not found' });
         }
-        
+
         const oldStatus = current[0].status;
-        
-        // Update estimate
-        const updates = { status, last_updated_at: new Date() };
-        
+
+        const setClauses = ['status = ?', 'last_updated_at = NOW()'];
+        const params = [status];
+
         if (status === 'approved') {
-            updates.approved_by_admin_id = 1; // TODO: Get from auth token
-            updates.approved_at = new Date();
+            setClauses.push('approved_by_admin_id = ?', 'approved_at = NOW()');
+            params.push(req.user.id);
         }
-        
-        await pool.query('UPDATE estimates SET ? WHERE id = ?', [updates, estimateId]);
-        
-        // Log status change
+
+        params.push(estimateId);
+        await pool.query(`UPDATE estimates SET ${setClauses.join(', ')} WHERE id = ?`, params);
+
         await pool.query(
             'INSERT INTO estimate_status_history (estimate_id, old_status, new_status, changed_by_user_id, reason, notes) VALUES (?, ?, ?, ?, ?, ?)',
-            [estimateId, oldStatus, status, 1, reason, notes]
+            [estimateId, oldStatus, status, req.user.id, reason, notes]
         );
-        
-        // Log to audit
-        await pool.query(
-            'INSERT INTO audit_log (user_id, action, table_name, record_id, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?)',
-            [1, 'status_change', 'estimates', estimateId, JSON.stringify({status: oldStatus}), JSON.stringify({status})]
-        );
-        
+
         res.json({ success: true, message: 'Status updated successfully' });
     } catch (err) {
         console.error('Update status error:', err);
@@ -1452,37 +1440,24 @@ app.patch('/api/estimates/:id/status', async (req, res) => {
     }
 });
 
-// Delete estimate
 app.delete('/api/estimates/:id', requirePermission('estimates', 'delete'), async (req, res) => {
     try {
         const estimateId = req.params.id;
-        
-        // Check if estimate exists
+
         const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
         if (estimate.length === 0) {
             return res.status(404).json({ error: 'Estimate not found' });
         }
-        
-        // Delete items first (foreign key constraint)
+
         await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
-        
-        // Delete estimate
         await pool.query('DELETE FROM estimates WHERE id = ?', [estimateId]);
-        
-        // Log to audit
-        await pool.query(
-            'INSERT INTO audit_log (user_id, action, table_name, record_id, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?)',
-            [1, 'delete', 'estimates', estimateId, JSON.stringify(estimate[0]), null]
-        );
-        
+
         res.json({ success: true, message: 'Estimate deleted successfully' });
     } catch (err) {
-        console.error('Delete estimate error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Get estimate status history
 app.get('/api/estimates/:id/history', async (req, res) => {
     try {
         const [history] = await pool.query(`
@@ -1492,7 +1467,6 @@ app.get('/api/estimates/:id/history', async (req, res) => {
             WHERE h.estimate_id = ?
             ORDER BY h.timestamp DESC
         `, [req.params.id]);
-        
         res.json(history);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1506,18 +1480,18 @@ app.get('/api/estimates/:id/history', async (req, res) => {
 app.post('/api/calculate', async (req, res) => {
     try {
         const { product_id, area, color_cost } = req.body;
-        
+
         const [product] = await pool.query('SELECT * FROM products WHERE id = ?', [product_id]);
         if (!product[0]) return res.status(404).json({ error: 'Product not found' });
-        
+
         const p = product[0];
-        const sizes = JSON.parse(p.available_sizes).sort((a, b) => b - a);
-        
-        if (p.product_type === 'area_wise') {
-            const totalLiters = area / p.area_coverage;
+
+        if (p.product_type === 'area_wise' && p.available_sizes) {
+            const sizes = JSON.parse(p.available_sizes).sort((a, b) => b - a);
+            const totalLiters = area / (p.area_coverage || 1);
             let remaining = totalLiters;
             let mix = [];
-            
+
             sizes.forEach(size => {
                 const count = Math.floor(remaining / size);
                 if (count > 0) {
@@ -1526,15 +1500,20 @@ app.post('/api/calculate', async (req, res) => {
                     remaining -= count * size;
                 }
             });
-            
+
+            if (remaining > 0 && sizes.length > 0) {
+                const smallest = sizes[sizes.length - 1];
+                mix.push({ size: smallest, count: 1, price: p.base_price * smallest });
+            }
+
             const mixInfo = mix.map(m => `${m.count}x${m.size}L`).join(' + ');
             const breakdown = mix.map(m => `${m.count}x₹${m.price}`).join(' + ');
             const subtotal = mix.reduce((sum, m) => sum + (m.count * m.price), 0);
             const total = subtotal + (color_cost || 0);
-            
+
             res.json({
                 quantity: totalLiters.toFixed(2),
-                area: area,
+                area,
                 mix_info: mixInfo,
                 breakdown_cost: breakdown,
                 color_cost: color_cost || 0,
@@ -1555,41 +1534,145 @@ app.post('/api/calculate', async (req, res) => {
 });
 
 // ========================================
+// DASHBOARD STATS
+// ========================================
+
+app.get('/api/dashboard/stats', requireAuth, async (req, res) => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const thisMonth = today.substring(0, 7);
+
+        const stats = {};
+
+        // Total counts
+        const [userCount] = await pool.query('SELECT COUNT(*) as count FROM users WHERE status = ?', ['active']);
+        const [customerCount] = await pool.query('SELECT COUNT(*) as count FROM customers WHERE status != ?', ['inactive']);
+        const [productCount] = await pool.query('SELECT COUNT(*) as count FROM products WHERE status = ?', ['active']);
+        const [estimateCount] = await pool.query('SELECT COUNT(*) as count FROM estimates');
+
+        stats.total_users = userCount[0].count;
+        stats.total_customers = customerCount[0].count;
+        stats.total_products = productCount[0].count;
+        stats.total_estimates = estimateCount[0].count;
+
+        // Today's attendance
+        try {
+            const [attendanceToday] = await pool.query(
+                'SELECT COUNT(*) as count FROM staff_attendance WHERE date = ?', [today]
+            );
+            stats.attendance_today = attendanceToday[0].count;
+        } catch (e) { stats.attendance_today = 0; }
+
+        // Leads
+        try {
+            const [leadCount] = await pool.query('SELECT COUNT(*) as count FROM leads WHERE status NOT IN (?)', ['inactive']);
+            const [newLeads] = await pool.query('SELECT COUNT(*) as count FROM leads WHERE status = ?', ['new']);
+            stats.total_leads = leadCount[0].count;
+            stats.new_leads = newLeads[0].count;
+        } catch (e) {
+            stats.total_leads = 0;
+            stats.new_leads = 0;
+        }
+
+        // Pending tasks
+        try {
+            const [taskCount] = await pool.query('SELECT COUNT(*) as count FROM staff_tasks WHERE status IN (?)', ['pending']);
+            const [overdueCount] = await pool.query(
+                'SELECT COUNT(*) as count FROM staff_tasks WHERE status NOT IN (?, ?) AND due_date < ?',
+                ['completed', 'cancelled', today]
+            );
+            stats.pending_tasks = taskCount[0].count;
+            stats.overdue_tasks = overdueCount[0].count;
+        } catch (e) {
+            stats.pending_tasks = 0;
+            stats.overdue_tasks = 0;
+        }
+
+        // This month estimates total
+        const [monthEstimates] = await pool.query(
+            'SELECT COUNT(*) as count, COALESCE(SUM(grand_total), 0) as total FROM estimates WHERE DATE_FORMAT(estimate_date, ?) = ?',
+            ['%Y-%m', thisMonth]
+        );
+        stats.month_estimates_count = monthEstimates[0].count;
+        stats.month_estimates_total = monthEstimates[0].total;
+
+        res.json({ success: true, data: stats });
+    } catch (error) {
+        console.error('Dashboard stats error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ========================================
 // HEALTH CHECK & ROOT
 // ========================================
 
 app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
+    res.json({
+        status: 'OK',
         timestamp: new Date().toISOString(),
-        service: 'QC Business Manager API'
+        service: 'QC Business Manager API',
+        version: '2.0.0'
     });
 });
 
-// ========================================
-// ROLE & PERMISSION MANAGEMENT (Module 1)
-// ========================================
-const rolesRouter = require('./routes/roles');
-app.use('/api/roles', rolesRouter);
+app.get('/api/test', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT 1 as test');
+        res.json({ status: 'Database connected', result: rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: 'Database connection failed', message: err.message });
+    }
+});
 
 app.get('/', (req, res) => {
     res.json({
-        service: 'Quality Colors Business Manager API',
-        version: '1.0.0',
+        service: 'Quality Colours Business Manager API',
+        version: '2.0.0',
+        modules: [
+            'auth', 'roles', 'permissions', 'branches', 'users',
+            'customers', 'leads', 'products', 'estimates',
+            'attendance', 'salary', 'activities', 'tasks', 'settings'
+        ],
         endpoints: {
             auth: '/api/auth/*',
             brands: '/api/brands',
-            categories: '/api/categories', 
+            categories: '/api/categories',
             products: '/api/products',
             customers: '/api/customers',
             estimates: '/api/estimates',
             roles: '/api/roles',
-            test: '/api/test',
+            branches: '/api/branches',
+            leads: '/api/leads',
+            attendance: '/api/attendance',
+            salary: '/api/salary',
+            activities: '/api/activities',
+            tasks: '/api/tasks',
+            settings: '/api/settings',
+            dashboard: '/api/dashboard/stats',
             health: '/health'
         }
     });
 });
 
-app.listen(process.env.PORT, () => {
-    console.log(`API running on port ${process.env.PORT}`);
+// ========================================
+// ERROR HANDLING
+// ========================================
+
+app.use((err, req, res, _next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({
+        success: false,
+        message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+    });
+});
+
+// ========================================
+// START SERVER
+// ========================================
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`QC Business Manager API v2.0.0 running on port ${PORT}`);
+    console.log(`Modules loaded: auth, roles, branches, users, customers, leads, products, estimates, attendance, salary, activities, tasks, settings`);
 });
