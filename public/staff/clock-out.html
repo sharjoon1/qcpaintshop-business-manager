@@ -387,7 +387,8 @@
 
                 // Show preview
                 const previewImage = document.getElementById('previewImage');
-                previewImage.src = URL.createObjectURL(blob);
+                previewImage.src = canvas.toDataURL('image/jpeg', 0.8);
+                console.log('Clock-out preview set with data URL');
                 
                 document.getElementById('cameraPreview').style.display = 'none';
                 document.getElementById('photoPreview').style.display = 'block';
