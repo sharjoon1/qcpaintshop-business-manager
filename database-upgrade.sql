@@ -1,443 +1,226 @@
 -- ========================================
--- COMPLETE DATABASE SCHEMA
+-- DATABASE UPGRADE SCRIPT
 -- Quality Colours Business Manager
--- Date: 2026-02-09
--- All modules: Auth, Roles, Permissions, Branches,
--- Customers, Leads, Products, Estimates, Attendance,
--- Salary, Activity Tracker, Task Management, Settings
+-- Run this on EXISTING databases to add
+-- missing columns and new tables.
+-- Safe to run multiple times (idempotent).
 -- ========================================
 
 USE qc_business_manager;
 
 -- ========================================
--- 1. BRANCHES TABLE
+-- HELPER: Procedure to safely add columns
 -- ========================================
-CREATE TABLE IF NOT EXISTS branches (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL,
-    code VARCHAR(20) UNIQUE,
-    address TEXT,
-    city VARCHAR(100),
-    state VARCHAR(100) DEFAULT 'Tamil Nadu',
-    pincode VARCHAR(10),
-    phone VARCHAR(20),
-    email VARCHAR(255),
-    manager_user_id INT NULL,
-    latitude DECIMAL(10,8) NULL,
-    longitude DECIMAL(11,8) NULL,
-    geo_fence_radius_meters INT DEFAULT 200,
-    open_time TIME DEFAULT '08:30:00',
-    close_time TIME DEFAULT '20:30:00',
-    status ENUM('active','inactive') DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_status (status),
-    INDEX idx_city (city)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+DROP PROCEDURE IF EXISTS safe_add_column;
+DELIMITER //
+CREATE PROCEDURE safe_add_column(
+    IN tbl VARCHAR(64),
+    IN col VARCHAR(64),
+    IN col_def VARCHAR(500)
+)
+BEGIN
+    SET @exists = 0;
+    SELECT COUNT(*) INTO @exists
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = tbl
+      AND COLUMN_NAME = col;
 
--- Insert default branch
-INSERT INTO branches (name, code, city, status) VALUES
-('Main Branch', 'MAIN', 'Chennai', 'active')
-ON DUPLICATE KEY UPDATE name = name;
+    IF @exists = 0 THEN
+        SET @sql = CONCAT('ALTER TABLE `', tbl, '` ADD COLUMN `', col, '` ', col_def);
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+        SELECT CONCAT('Added column: ', tbl, '.', col) AS upgrade_action;
+    END IF;
+END//
+DELIMITER ;
 
 -- ========================================
--- 2. ROLES TABLE
+-- 1. BRANCHES - Add missing columns
 -- ========================================
-CREATE TABLE IF NOT EXISTS roles (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(50) UNIQUE NOT NULL,
-    display_name VARCHAR(100) NOT NULL,
-    description TEXT,
-    user_type ENUM('staff','customer') NOT NULL DEFAULT 'staff',
-    is_system_role BOOLEAN DEFAULT FALSE,
-    price_markup_percent DECIMAL(5,2) DEFAULT 0,
-    default_discount_percent DECIMAL(5,2) DEFAULT 0,
-    status ENUM('active','inactive') DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_user_type (user_type),
-    INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Insert default roles
-INSERT INTO roles (name, display_name, description, user_type, is_system_role) VALUES
-('admin', 'Administrator', 'Full system access', 'staff', TRUE),
-('manager', 'Branch Manager', 'Branch-level management access', 'staff', TRUE),
-('staff', 'Staff', 'Standard staff access', 'staff', TRUE),
-('customer', 'Customer', 'Registered customer', 'customer', TRUE),
-('guest', 'Guest', 'Unregistered visitor', 'customer', TRUE),
-('dealer', 'Dealer', 'Paint dealer/distributor', 'customer', FALSE),
-('contractor', 'Contractor', 'Painting contractor', 'customer', FALSE)
-ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
+CALL safe_add_column('branches', 'latitude', 'DECIMAL(10,8) NULL');
+CALL safe_add_column('branches', 'longitude', 'DECIMAL(11,8) NULL');
+CALL safe_add_column('branches', 'geo_fence_radius_meters', 'INT DEFAULT 200');
+CALL safe_add_column('branches', 'open_time', "TIME DEFAULT '08:30:00'");
+CALL safe_add_column('branches', 'close_time', "TIME DEFAULT '20:30:00'");
 
 -- ========================================
--- 3. PERMISSIONS TABLE
+-- 2. ROLES - Add missing columns
 -- ========================================
-CREATE TABLE IF NOT EXISTS permissions (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    module VARCHAR(50) NOT NULL,
-    action VARCHAR(50) NOT NULL,
-    display_name VARCHAR(100),
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_module_action (module, action),
-    INDEX idx_module (module)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CALL safe_add_column('roles', 'user_type', "ENUM('staff','customer') NOT NULL DEFAULT 'staff'");
+CALL safe_add_column('roles', 'is_system_role', 'BOOLEAN DEFAULT FALSE');
+CALL safe_add_column('roles', 'price_markup_percent', 'DECIMAL(5,2) DEFAULT 0');
+CALL safe_add_column('roles', 'default_discount_percent', 'DECIMAL(5,2) DEFAULT 0');
 
--- Insert all permissions for every module
-INSERT INTO permissions (module, action, display_name) VALUES
--- Dashboard
+-- ========================================
+-- 3. SHOP HOURS CONFIG - Add missing columns
+-- ========================================
+CALL safe_add_column('shop_hours_config', 'is_open', 'BOOLEAN DEFAULT 1 AFTER day_of_week');
+
+-- ========================================
+-- 4. CUSTOMERS - Add missing columns
+-- ========================================
+CALL safe_add_column('customers', 'customer_type_id', 'INT NULL');
+CALL safe_add_column('customers', 'branch_id', 'INT NULL');
+CALL safe_add_column('customers', 'lead_id', 'INT NULL');
+CALL safe_add_column('customers', 'whatsapp_opt_in', 'BOOLEAN DEFAULT 0');
+CALL safe_add_column('customers', 'total_purchases', 'DECIMAL(12,2) DEFAULT 0');
+CALL safe_add_column('customers', 'notes', 'TEXT NULL');
+
+-- ========================================
+-- 5. STAFF ATTENDANCE - Add missing columns
+-- ========================================
+CALL safe_add_column('staff_attendance', 'clock_in_address', 'TEXT NULL');
+CALL safe_add_column('staff_attendance', 'clock_out_address', 'TEXT NULL');
+CALL safe_add_column('staff_attendance', 'geo_fence_status', "ENUM('inside','outside','not_checked') DEFAULT 'not_checked'");
+CALL safe_add_column('staff_attendance', 'geo_fence_distance', 'INT NULL');
+CALL safe_add_column('staff_attendance', 'expected_hours', 'DECIMAL(4,2) DEFAULT 10.00');
+CALL safe_add_column('staff_attendance', 'total_working_minutes', 'INT DEFAULT 0');
+CALL safe_add_column('staff_attendance', 'total_break_minutes', 'INT DEFAULT 0');
+CALL safe_add_column('staff_attendance', 'is_late', 'BOOLEAN DEFAULT 0');
+CALL safe_add_column('staff_attendance', 'late_minutes', 'INT DEFAULT 0');
+
+-- ========================================
+-- 6. PERMISSIONS - Insert new permissions
+-- ========================================
+INSERT IGNORE INTO permissions (module, action, display_name) VALUES
 ('dashboard', 'view', 'View Dashboard'),
 ('dashboard', 'view_analytics', 'View Analytics'),
--- Staff Management
-('staff', 'view', 'View Staff'),
-('staff', 'add', 'Add Staff'),
-('staff', 'edit', 'Edit Staff'),
-('staff', 'delete', 'Delete Staff'),
--- Customer Management
-('customers', 'view', 'View Customers'),
-('customers', 'add', 'Add Customer'),
-('customers', 'edit', 'Edit Customer'),
-('customers', 'delete', 'Delete Customer'),
--- Leads
 ('leads', 'view', 'View Leads'),
 ('leads', 'add', 'Add Lead'),
 ('leads', 'edit', 'Edit Lead'),
 ('leads', 'delete', 'Delete Lead'),
 ('leads', 'convert', 'Convert Lead to Customer'),
--- Branches
 ('branches', 'view', 'View Branches'),
 ('branches', 'add', 'Add Branch'),
 ('branches', 'edit', 'Edit Branch'),
 ('branches', 'delete', 'Delete Branch'),
--- Brands
-('brands', 'view', 'View Brands'),
-('brands', 'add', 'Add Brand'),
-('brands', 'edit', 'Edit Brand'),
-('brands', 'delete', 'Delete Brand'),
--- Categories
-('categories', 'view', 'View Categories'),
-('categories', 'add', 'Add Category'),
-('categories', 'edit', 'Edit Category'),
-('categories', 'delete', 'Delete Category'),
--- Products
-('products', 'view', 'View Products'),
-('products', 'add', 'Add Product'),
-('products', 'edit', 'Edit Product'),
-('products', 'delete', 'Delete Product'),
--- Estimates
-('estimates', 'view', 'View Estimates'),
-('estimates', 'add', 'Create Estimate'),
-('estimates', 'edit', 'Edit Estimate'),
-('estimates', 'delete', 'Delete Estimate'),
-('estimates', 'approve', 'Approve Estimate'),
--- Attendance
-('attendance', 'view', 'View Attendance'),
-('attendance', 'manage', 'Manage Attendance'),
-('attendance', 'approve', 'Approve Attendance Requests'),
--- Salary
 ('salary', 'view', 'View Salary'),
 ('salary', 'manage', 'Manage Salary'),
 ('salary', 'approve', 'Approve Salary'),
--- Activity Tracker
 ('activities', 'view', 'View Activities'),
 ('activities', 'add', 'Add Activity'),
 ('activities', 'manage', 'Manage Activities'),
--- Task Management
 ('tasks', 'view', 'View Tasks'),
 ('tasks', 'add', 'Create Tasks'),
 ('tasks', 'edit', 'Edit Tasks'),
 ('tasks', 'delete', 'Delete Tasks'),
-('tasks', 'assign', 'Assign Tasks'),
--- Roles & Permissions
+('tasks', 'manage', 'Manage All Tasks'),
 ('roles', 'view', 'View Roles'),
 ('roles', 'manage', 'Manage Roles'),
--- Settings
 ('settings', 'view', 'View Settings'),
-('settings', 'manage', 'Manage Settings'),
--- Reports
-('reports', 'view', 'View Reports'),
-('reports', 'export', 'Export Reports')
-ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
+('settings', 'manage', 'Manage Settings');
 
 -- ========================================
--- 4. ROLE PERMISSIONS TABLE
+-- 7. Grant admin role ALL permissions
 -- ========================================
-CREATE TABLE IF NOT EXISTS role_permissions (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    role_id INT NOT NULL,
-    permission_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
-    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_role_perm (role_id, permission_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Grant all permissions to admin role
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name = 'admin';
-
--- Grant manager permissions
-INSERT IGNORE INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-WHERE r.name = 'manager' AND p.module IN ('dashboard','staff','customers','leads','brands','categories','products','estimates','attendance','salary','activities','tasks','reports')
-AND p.action IN ('view','add','edit','approve');
-
--- Grant staff basic permissions
-INSERT IGNORE INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-WHERE r.name = 'staff' AND (
-    (p.module = 'dashboard' AND p.action = 'view') OR
-    (p.module = 'customers' AND p.action IN ('view','add')) OR
-    (p.module = 'products' AND p.action = 'view') OR
-    (p.module = 'estimates' AND p.action IN ('view','add','edit')) OR
-    (p.module = 'attendance' AND p.action = 'view') OR
-    (p.module = 'activities' AND p.action IN ('view','add')) OR
-    (p.module = 'tasks' AND p.action = 'view')
-);
+SELECT r.id, p.id
+FROM roles r
+CROSS JOIN permissions p
+WHERE r.name = 'admin';
 
 -- ========================================
--- 5. USERS TABLE (add branch FK if missing)
+-- 8. CREATE NEW TABLES (safe - IF NOT EXISTS)
 -- ========================================
--- Already created via database-updates-phase1.sql, just add FK
--- ALTER TABLE users ADD CONSTRAINT fk_users_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL;
 
--- ========================================
--- 6. OTP VERIFICATIONS TABLE
--- ========================================
-CREATE TABLE IF NOT EXISTS otp_verifications (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    phone VARCHAR(20) NOT NULL,
-    otp VARCHAR(10) NOT NULL,
-    purpose ENUM('Registration','Login','Password Reset') NOT NULL,
-    verified BOOLEAN DEFAULT 0,
-    expires_at DATETIME NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_phone_purpose (phone, purpose),
-    INDEX idx_expires (expires_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ========================================
--- 7. SETTINGS TABLE
--- ========================================
-CREATE TABLE IF NOT EXISTS settings (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    setting_key VARCHAR(100) UNIQUE NOT NULL,
-    setting_value TEXT,
-    category VARCHAR(50) DEFAULT 'general',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_category (category)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Default settings
-INSERT INTO settings (setting_key, setting_value, category) VALUES
-('business_name', 'Quality Colours', 'business'),
-('business_phone', '', 'business'),
-('business_email', '', 'business'),
-('business_address', '', 'business'),
-('business_gst', '', 'business'),
-('currency_symbol', '₹', 'general'),
-('date_format', 'DD/MM/YYYY', 'general'),
-('estimate_valid_days', '30', 'estimates'),
-('estimate_terms', 'This estimate is valid for 30 days from the date of issue.', 'estimates')
-ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
-
--- ========================================
--- 8. CUSTOMER TYPES TABLE
--- ========================================
+-- Customer Types
 CREATE TABLE IF NOT EXISTS customer_types (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    discount_percent DECIMAL(5,2) DEFAULT 0,
+    price_markup_percent DECIMAL(5,2) DEFAULT 0,
     description TEXT,
-    default_discount DECIMAL(5,2) DEFAULT 0,
     status ENUM('active','inactive') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO customer_types (name, description, default_discount) VALUES
-('Retail', 'Individual/retail customer', 0),
-('Dealer', 'Paint dealer', 5),
-('Contractor', 'Painting contractor', 10),
-('Wholesale', 'Bulk buyer', 15)
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+INSERT INTO customer_types (name, display_name, description) VALUES
+('retail', 'Retail Customer', 'Walk-in retail customers'),
+('dealer', 'Dealer', 'Paint dealers and distributors'),
+('contractor', 'Contractor', 'Painting contractors'),
+('architect', 'Architect', 'Architects and interior designers'),
+('builder', 'Builder', 'Construction builders')
+ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
--- ========================================
--- 9. PACK SIZES TABLE
--- ========================================
+-- Pack Sizes
 CREATE TABLE IF NOT EXISTS pack_sizes (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    product_id INT NOT NULL,
-    size DECIMAL(10,2) NOT NULL,
-    unit VARCHAR(10) DEFAULT 'L',
-    base_price DECIMAL(10,2) NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    volume_liters DECIMAL(10,3) NOT NULL,
+    sort_order INT DEFAULT 0,
     is_active BOOLEAN DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    INDEX idx_product (product_id)
+    UNIQUE KEY unique_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 10. LEADS TABLE
--- ========================================
+INSERT INTO pack_sizes (name, display_name, volume_liters, sort_order) VALUES
+('100ml', '100 ml', 0.1, 1),
+('200ml', '200 ml', 0.2, 2),
+('500ml', '500 ml', 0.5, 3),
+('1L', '1 Litre', 1.0, 4),
+('4L', '4 Litres', 4.0, 5),
+('10L', '10 Litres', 10.0, 6),
+('20L', '20 Litres', 20.0, 7)
+ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
+
+-- Leads
 CREATE TABLE IF NOT EXISTS leads (
     id INT PRIMARY KEY AUTO_INCREMENT,
     lead_number VARCHAR(50) UNIQUE,
-    name VARCHAR(255) NOT NULL,
-    phone VARCHAR(20),
+    full_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
     email VARCHAR(255),
-    company VARCHAR(255),
-    address TEXT,
-    city VARCHAR(100),
-    state VARCHAR(100),
-    pincode VARCHAR(10),
-
-    -- Lead Details
-    source ENUM('website','walk_in','referral','social_media','phone_call','advertisement','other') DEFAULT 'walk_in',
-    project_type ENUM('interior','exterior','both','commercial','industrial') DEFAULT 'interior',
-    property_type ENUM('house','apartment','villa','office','shop','factory','other') DEFAULT 'house',
-    estimated_area_sqft DECIMAL(10,2),
-    estimated_budget DECIMAL(12,2),
-    preferred_brand VARCHAR(100),
-    timeline VARCHAR(100),
-    notes TEXT,
-
-    -- Status & Assignment
+    company_name VARCHAR(255),
+    lead_source ENUM('walk_in','phone','website','referral','social_media','advertisement','other') DEFAULT 'walk_in',
+    lead_type ENUM('hot','warm','cold') DEFAULT 'warm',
     status ENUM('new','contacted','interested','quoted','negotiating','won','lost','inactive') DEFAULT 'new',
-    priority ENUM('low','medium','high','urgent') DEFAULT 'medium',
+    project_type VARCHAR(100),
+    property_type VARCHAR(100),
+    location TEXT,
+    area_sqft DECIMAL(10,2),
+    budget_range VARCHAR(100),
+    requirements TEXT,
+    notes TEXT,
     assigned_to INT NULL,
     branch_id INT NULL,
-
-    -- Conversion
-    customer_id INT NULL,
-    converted_at DATETIME NULL,
-    lost_reason TEXT NULL,
-
-    -- Tracking
-    last_contact_date DATE NULL,
+    converted_customer_id INT NULL,
     next_followup_date DATE NULL,
-    total_followups INT DEFAULT 0,
-
-    -- Metadata
-    created_by INT NULL,
+    last_contacted_at DATETIME NULL,
+    lost_reason TEXT,
+    created_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
-    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-
+    FOREIGN KEY (created_by) REFERENCES users(id),
     INDEX idx_status (status),
-    INDEX idx_priority (priority),
-    INDEX idx_assigned (assigned_to),
     INDEX idx_phone (phone),
+    INDEX idx_assigned (assigned_to),
+    INDEX idx_followup (next_followup_date),
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 11. LEAD FOLLOWUPS TABLE
--- ========================================
+-- Lead Followups
 CREATE TABLE IF NOT EXISTS lead_followups (
     id INT PRIMARY KEY AUTO_INCREMENT,
     lead_id INT NOT NULL,
     user_id INT NOT NULL,
-    followup_type ENUM('call','visit','email','whatsapp','sms','meeting','other') NOT NULL,
+    followup_type ENUM('call','visit','email','whatsapp','meeting','other') NOT NULL,
     notes TEXT NOT NULL,
-    outcome ENUM('interested','not_interested','callback','no_response','converted','other') DEFAULT 'callback',
     next_followup_date DATE NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
     INDEX idx_lead (lead_id),
-    INDEX idx_date (created_at)
+    INDEX idx_next_followup (next_followup_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 12. SHOP HOURS CONFIG TABLE
--- ========================================
-CREATE TABLE IF NOT EXISTS shop_hours_config (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    branch_id INT NOT NULL,
-    day_of_week ENUM('monday','tuesday','wednesday','thursday','friday','saturday','sunday') NOT NULL,
-    is_open BOOLEAN DEFAULT 1,
-    open_time TIME DEFAULT '08:30:00',
-    close_time TIME DEFAULT '20:30:00',
-    expected_hours DECIMAL(4,2) DEFAULT 10.00,
-    late_threshold_minutes INT DEFAULT 15,
-    break_min_minutes INT DEFAULT 60,
-    break_max_minutes INT DEFAULT 120,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_branch_day (branch_id, day_of_week)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Insert default shop hours for main branch
--- Note: is_open column omitted for compatibility with older table versions (defaults to 1)
-INSERT INTO shop_hours_config (branch_id, day_of_week, open_time, close_time, expected_hours, late_threshold_minutes, break_min_minutes, break_max_minutes)
-SELECT 1, day,
-    CASE WHEN day = 'sunday' THEN '09:00:00' ELSE '08:30:00' END,
-    CASE WHEN day = 'sunday' THEN '14:00:00' ELSE '20:30:00' END,
-    CASE WHEN day = 'sunday' THEN 5.00 ELSE 10.00 END,
-    15, 60, 120
-FROM (SELECT 'monday' AS day UNION SELECT 'tuesday' UNION SELECT 'wednesday' UNION SELECT 'thursday' UNION SELECT 'friday' UNION SELECT 'saturday' UNION SELECT 'sunday') days
-ON DUPLICATE KEY UPDATE open_time = VALUES(open_time);
-
--- ========================================
--- 13. STAFF ATTENDANCE TABLE
--- ========================================
-CREATE TABLE IF NOT EXISTS staff_attendance (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT NOT NULL,
-    branch_id INT NOT NULL,
-    date DATE NOT NULL,
-
-    -- Clock In
-    clock_in_time DATETIME NULL,
-    clock_in_photo VARCHAR(500) NULL,
-    clock_in_lat DECIMAL(10,8) NULL,
-    clock_in_lng DECIMAL(11,8) NULL,
-    clock_in_address TEXT NULL,
-
-    -- Clock Out
-    clock_out_time DATETIME NULL,
-    clock_out_photo VARCHAR(500) NULL,
-    clock_out_lat DECIMAL(10,8) NULL,
-    clock_out_lng DECIMAL(11,8) NULL,
-    clock_out_address TEXT NULL,
-
-    -- Break
-    break_start_time DATETIME NULL,
-    break_end_time DATETIME NULL,
-    break_duration_minutes INT DEFAULT 0,
-
-    -- Working Summary
-    total_working_minutes INT DEFAULT 0,
-    expected_hours DECIMAL(4,2) DEFAULT 10.00,
-    is_late BOOLEAN DEFAULT 0,
-    is_early_checkout BOOLEAN DEFAULT 0,
-    late_permission_id INT NULL,
-
-    -- Status
-    status ENUM('present','absent','half_day','on_leave','holiday','week_off') DEFAULT 'present',
-    notes TEXT NULL,
-
-    -- Metadata
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (branch_id) REFERENCES branches(id),
-
-    UNIQUE KEY unique_user_date (user_id, date),
-    INDEX idx_date (date),
-    INDEX idx_branch_date (branch_id, date),
-    INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ========================================
--- 14. ATTENDANCE PHOTOS TABLE
--- ========================================
+-- Attendance Photos
 CREATE TABLE IF NOT EXISTS attendance_photos (
     id INT PRIMARY KEY AUTO_INCREMENT,
     attendance_id INT NOT NULL,
@@ -459,9 +242,7 @@ CREATE TABLE IF NOT EXISTS attendance_photos (
     INDEX idx_delete_after (delete_after)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 15. ATTENDANCE PERMISSIONS TABLE
--- ========================================
+-- Attendance Permissions/Requests
 CREATE TABLE IF NOT EXISTS attendance_permissions (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
@@ -486,9 +267,7 @@ CREATE TABLE IF NOT EXISTS attendance_permissions (
     INDEX idx_date (request_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 16. ESTIMATE REQUESTS TABLE
--- ========================================
+-- Estimate Requests
 CREATE TABLE IF NOT EXISTS estimate_requests (
     id INT PRIMARY KEY AUTO_INCREMENT,
     request_number VARCHAR(50) UNIQUE NOT NULL,
@@ -506,34 +285,25 @@ CREATE TABLE IF NOT EXISTS estimate_requests (
     additional_notes TEXT,
     products_json JSON NULL,
     request_method VARCHAR(50) DEFAULT 'simple',
-
-    -- Status & Assignment
     status ENUM('new','contacted','quote_sent','accepted','rejected','converted','expired') DEFAULT 'new',
     priority ENUM('low','medium','high','urgent') DEFAULT 'medium',
     assigned_to_user_id INT NULL,
     assigned_at DATETIME NULL,
     estimate_id INT NULL,
-
-    -- Tracking
     contacted_at DATETIME NULL,
     quote_sent_at DATETIME NULL,
     source VARCHAR(50) DEFAULT 'website',
     ip_address VARCHAR(45),
     user_agent TEXT,
-
-    -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     FOREIGN KEY (assigned_to_user_id) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_status (status),
     INDEX idx_phone (phone),
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 17. ESTIMATE REQUEST PHOTOS TABLE
--- ========================================
+-- Estimate Request Photos
 CREATE TABLE IF NOT EXISTS estimate_request_photos (
     id INT PRIMARY KEY AUTO_INCREMENT,
     request_id INT NOT NULL,
@@ -545,9 +315,7 @@ CREATE TABLE IF NOT EXISTS estimate_request_photos (
     INDEX idx_request (request_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 18. ESTIMATE REQUEST PRODUCTS TABLE
--- ========================================
+-- Estimate Request Products
 CREATE TABLE IF NOT EXISTS estimate_request_products (
     id INT PRIMARY KEY AUTO_INCREMENT,
     request_id INT NOT NULL,
@@ -564,9 +332,7 @@ CREATE TABLE IF NOT EXISTS estimate_request_products (
     INDEX idx_request (request_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 19. ESTIMATE REQUEST ACTIVITY TABLE
--- ========================================
+-- Estimate Request Activity
 CREATE TABLE IF NOT EXISTS estimate_request_activity (
     id INT PRIMARY KEY AUTO_INCREMENT,
     request_id INT NOT NULL,
@@ -581,17 +347,13 @@ CREATE TABLE IF NOT EXISTS estimate_request_activity (
     INDEX idx_request (request_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 20. STAFF DAILY ACTIVITY TRACKER
--- ========================================
+-- Staff Daily Activities
 CREATE TABLE IF NOT EXISTS staff_activities (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
     branch_id INT NULL,
     activity_date DATE NOT NULL,
     activity_time TIME NOT NULL,
-
-    -- Activity Details
     activity_type ENUM('customer_visit','store_work','delivery','meeting','follow_up','admin_work','training','other') NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
@@ -600,80 +362,52 @@ CREATE TABLE IF NOT EXISTS staff_activities (
     location TEXT,
     latitude DECIMAL(10,8) NULL,
     longitude DECIMAL(11,8) NULL,
-
-    -- Duration
     start_time TIME NULL,
     end_time TIME NULL,
     duration_minutes INT NULL,
-
-    -- Outcome
     outcome TEXT,
     status ENUM('planned','in_progress','completed','cancelled') DEFAULT 'completed',
-
-    -- Photo/Document
     photo_url VARCHAR(500),
     document_url VARCHAR(500),
-
-    -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
-
     INDEX idx_user_date (user_id, activity_date),
     INDEX idx_branch_date (branch_id, activity_date),
     INDEX idx_type (activity_type),
     INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 21. STAFF TASK MANAGEMENT (Admin Controlled)
--- ========================================
+-- Staff Tasks
 CREATE TABLE IF NOT EXISTS staff_tasks (
     id INT PRIMARY KEY AUTO_INCREMENT,
     task_number VARCHAR(50) UNIQUE,
-
-    -- Task Details
     title VARCHAR(255) NOT NULL,
     description TEXT,
     task_type ENUM('daily','weekly','monthly','one_time','recurring') DEFAULT 'daily',
     priority ENUM('low','medium','high','urgent') DEFAULT 'medium',
     category VARCHAR(100),
-
-    -- Assignment
     assigned_to INT NOT NULL,
     assigned_by INT NOT NULL,
     branch_id INT NULL,
-
-    -- Schedule
     due_date DATE NOT NULL,
     due_time TIME NULL,
     start_date DATE NULL,
     estimated_hours DECIMAL(4,2) NULL,
-
-    -- Status
     status ENUM('pending','in_progress','completed','overdue','cancelled','on_hold') DEFAULT 'pending',
     completion_percentage INT DEFAULT 0,
     completed_at DATETIME NULL,
-
-    -- Tracking
     actual_hours DECIMAL(4,2) NULL,
     staff_notes TEXT,
     admin_notes TEXT,
-
-    -- Rating (admin rates after completion)
     rating INT NULL CHECK (rating BETWEEN 1 AND 5),
     rating_notes TEXT,
-
-    -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
     FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (assigned_by) REFERENCES users(id),
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
-
     INDEX idx_assigned_to (assigned_to),
     INDEX idx_assigned_by (assigned_by),
     INDEX idx_status (status),
@@ -681,9 +415,7 @@ CREATE TABLE IF NOT EXISTS staff_tasks (
     INDEX idx_priority (priority)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 22. TASK UPDATES/COMMENTS
--- ========================================
+-- Task Updates
 CREATE TABLE IF NOT EXISTS task_updates (
     id INT PRIMARY KEY AUTO_INCREMENT,
     task_id INT NOT NULL,
@@ -701,20 +433,7 @@ CREATE TABLE IF NOT EXISTS task_updates (
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 23. ADD customers.customer_type_id IF MISSING
--- ========================================
--- ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_type_id INT NULL AFTER gst_number;
--- ALTER TABLE customers ADD COLUMN IF NOT EXISTS branch_id INT NULL AFTER customer_type_id;
--- ALTER TABLE customers ADD COLUMN IF NOT EXISTS lead_id INT NULL AFTER branch_id;
--- ALTER TABLE customers ADD COLUMN IF NOT EXISTS whatsapp_opt_in BOOLEAN DEFAULT 0;
--- ALTER TABLE customers ADD COLUMN IF NOT EXISTS total_purchases DECIMAL(12,2) DEFAULT 0;
--- ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT NULL;
-
--- ========================================
--- 24. STAFF SALARY CONFIGURATION
--- ========================================
-
+-- Staff Salary Config
 CREATE TABLE IF NOT EXISTS staff_salary_config (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
@@ -745,10 +464,7 @@ CREATE TABLE IF NOT EXISTS staff_salary_config (
     INDEX idx_effective_dates (effective_from, effective_until)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 25. MONTHLY SALARY CALCULATIONS
--- ========================================
-
+-- Monthly Salaries
 CREATE TABLE IF NOT EXISTS monthly_salaries (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
@@ -809,10 +525,7 @@ CREATE TABLE IF NOT EXISTS monthly_salaries (
     INDEX idx_payment_status (payment_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 26. SALARY PAYMENTS
--- ========================================
-
+-- Salary Payments
 CREATE TABLE IF NOT EXISTS salary_payments (
     id INT PRIMARY KEY AUTO_INCREMENT,
     monthly_salary_id INT NOT NULL,
@@ -841,10 +554,7 @@ CREATE TABLE IF NOT EXISTS salary_payments (
     INDEX idx_payment_date (payment_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 27. SALARY ADJUSTMENTS
--- ========================================
-
+-- Salary Adjustments
 CREATE TABLE IF NOT EXISTS salary_adjustments (
     id INT PRIMARY KEY AUTO_INCREMENT,
     monthly_salary_id INT NOT NULL,
@@ -862,10 +572,7 @@ CREATE TABLE IF NOT EXISTS salary_adjustments (
     INDEX idx_user_adj (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- 28. STAFF LEAVE BALANCE
--- ========================================
-
+-- Staff Leave Balance
 CREATE TABLE IF NOT EXISTS staff_leave_balance (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
@@ -886,7 +593,63 @@ CREATE TABLE IF NOT EXISTS staff_leave_balance (
     INDEX idx_year (year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- OTP Verifications (if missing)
+CREATE TABLE IF NOT EXISTS otp_verifications (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    phone VARCHAR(20) NOT NULL,
+    otp_code VARCHAR(10) NOT NULL,
+    purpose ENUM('login','register','reset_password') DEFAULT 'login',
+    is_verified BOOLEAN DEFAULT FALSE,
+    attempts INT DEFAULT 0,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_phone (phone),
+    INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Settings (if missing)
+CREATE TABLE IF NOT EXISTS settings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    setting_key VARCHAR(100) UNIQUE NOT NULL,
+    setting_value TEXT,
+    setting_type ENUM('string','number','boolean','json') DEFAULT 'string',
+    description TEXT,
+    is_public BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ========================================
--- SUCCESS MESSAGE
+-- 9. INSERT DEFAULT DATA
 -- ========================================
-SELECT 'Complete database schema created successfully!' as message;
+
+-- Shop hours for branch 1 (safe - ON DUPLICATE KEY)
+INSERT INTO shop_hours_config (branch_id, day_of_week, is_open, open_time, close_time, expected_hours, late_threshold_minutes, break_min_minutes, break_max_minutes)
+SELECT 1, day, 1,
+    CASE WHEN day = 'sunday' THEN '09:00:00' ELSE '08:30:00' END,
+    CASE WHEN day = 'sunday' THEN '14:00:00' ELSE '20:30:00' END,
+    CASE WHEN day = 'sunday' THEN 5.00 ELSE 10.00 END,
+    15, 60, 120
+FROM (SELECT 'monday' AS day UNION SELECT 'tuesday' UNION SELECT 'wednesday' UNION SELECT 'thursday' UNION SELECT 'friday' UNION SELECT 'saturday' UNION SELECT 'sunday') days
+ON DUPLICATE KEY UPDATE open_time = VALUES(open_time);
+
+-- Default settings
+INSERT INTO settings (setting_key, setting_value, setting_type, description, is_public) VALUES
+('company_name', 'Quality Colours', 'string', 'Company display name', TRUE),
+('company_phone', '', 'string', 'Company contact phone', TRUE),
+('company_email', '', 'string', 'Company contact email', TRUE),
+('company_address', '', 'string', 'Company address', TRUE),
+('gst_number', '', 'string', 'GST registration number', FALSE),
+('estimate_prefix', 'QC', 'string', 'Estimate number prefix', FALSE),
+('estimate_validity_days', '30', 'number', 'Estimate validity in days', FALSE),
+('photo_retention_days', '40', 'number', 'Attendance photo retention days', FALSE),
+('geo_fence_enabled', 'true', 'boolean', 'Enable geo-fencing for attendance', FALSE),
+('default_geo_fence_radius', '200', 'number', 'Default geo-fence radius in meters', FALSE)
+ON DUPLICATE KEY UPDATE setting_key = setting_key;
+
+-- ========================================
+-- CLEANUP
+-- ========================================
+DROP PROCEDURE IF EXISTS safe_add_column;
+
+SELECT '✅ Database upgrade completed successfully!' AS result;
