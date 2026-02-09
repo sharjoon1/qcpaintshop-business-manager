@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body class="bg-gray-50">
+
+
+
+    <!-- Main Content -->
+    <div class="lg:ml-64 min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <div class="px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800">Dashboard</h2>
+                        <p class="text-gray-600 text-sm mt-1">Welcome back! Here's what's happening today.</p>
+                    </div>
+                    <a href="estimate-create-new.html" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition shadow-lg flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        New Estimate
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Content -->
+        <main class="p-4 sm:p-6 lg:p-8">
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Today's Revenue -->
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="bg-white/20 p-3 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-sm bg-white/20 px-2 py-1 rounded-full">Today</span>
+                    </div>
+                    <h3 class="text-3xl font-bold mb-1" id="todayRevenue">₹0</h3>
+                    <p class="text-purple-100 text-sm">Today's Revenue</p>
+                </div>
+
+                <!-- Pending Estimates -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="bg-yellow-100 p-3 rounded-lg">
+                            <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-gray-800" id="pendingCount">0</span>
+                    </div>
+                    <p class="text-gray-600">Pending Estimates</p>
+                    <div class="mt-2 flex items-center text-sm">
+                        <span class="text-yellow-600">⏳</span>
+                        <span class="ml-1 text-gray-500">Awaiting approval</span>
+                    </div>
+                </div>
+
+                <!-- Total Estimates -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="bg-blue-100 p-3 rounded-lg">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-gray-800" id="totalCount">0</span>
+                    </div>
+                    <p class="text-gray-600">Total Estimates</p>
+                    <div class="mt-2 flex items-center text-sm">
+                        <span class="text-green-600">↑</span>
+                        <span class="ml-1 text-gray-500">This month</span>
+                    </div>
+                </div>
+
+                <!-- Conversion Rate -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="bg-green-100 p-3 rounded-lg">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-gray-800" id="conversionRate">0%</span>
+                    </div>
+                    <p class="text-gray-600">Conversion Rate</p>
+                    <div class="mt-2 flex items-center text-sm">
+                        <span class="text-green-600">✓</span>
+                        <span class="ml-1 text-gray-500">Approved/Total</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Estimates -->
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-bold text-gray-800">Recent Estimates</h3>
+                        <a href="estimates.html" class="text-purple-600 hover:text-purple-700 text-sm font-semibold">
+                            View All →
+                        </a>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estimate #</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentEstimates" class="divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                    Loading...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Check authentication
+        const authToken = localStorage.getItem('auth_token');
+        if (!authToken) {
+            window.location.href = '/business-manager/login.html';
+        }
+
+        // Mobile menu toggle
+        document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+        });
+
+        // Logout function
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            window.location.href = '/business-manager/login.html';
+        }
+
+        // Load dashboard data
+        async function loadDashboard() {
+            try {
+                // Load estimates
+                const response = await fetch('/business-manager/api/estimates', { headers: getAuthHeaders() });
+                const estimates = await response.json();
+
+                // Calculate stats
+                const today = new Date().toISOString().split('T')[0];
+                const todayEstimates = estimates.filter(e => e.estimate_date === today);
+                const todayRevenue = todayEstimates.reduce((sum, e) => sum + parseFloat(e.grand_total || 0), 0);
+                const pendingEstimates = estimates.filter(e => e.status === 'draft' || e.status === 'pending_approval');
+                const approvedEstimates = estimates.filter(e => e.status === 'approved' || e.status === 'converted');
+                const conversionRate = estimates.length > 0 ? Math.round((approvedEstimates.length / estimates.length) * 100) : 0;
+
+                // Update stats
+                document.getElementById('todayRevenue').textContent = '₹' + todayRevenue.toLocaleString('en-IN');
+                document.getElementById('pendingCount').textContent = pendingEstimates.length;
+                document.getElementById('totalCount').textContent = estimates.length;
+                document.getElementById('conversionRate').textContent = conversionRate + '%';
+
+                // Load recent estimates
+                const recentEstimates = estimates.slice(0, 5);
+                const tbody = document.getElementById('recentEstimates');
+                tbody.innerHTML = recentEstimates.map(est => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${est.estimate_number}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${est.customer_name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹${parseFloat(est.grand_total).toLocaleString('en-IN')}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs rounded-full ${getStatusColor(est.status)}">
+                                ${getStatusText(est.status)}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(est.estimate_date).toLocaleDateString('en-IN')}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <button class="text-purple-600 hover:text-purple-900">View</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'draft': 'bg-gray-100 text-gray-800',
+                'sent': 'bg-blue-100 text-blue-800',
+                'pending_approval': 'bg-yellow-100 text-yellow-800',
+                'approved': 'bg-green-100 text-green-800',
+                'rejected': 'bg-red-100 text-red-800',
+                'converted': 'bg-purple-100 text-purple-800',
+                'expired': 'bg-orange-100 text-orange-800'
+            };
+            return colors[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                'draft': '🆕 Draft',
+                'sent': '📧 Sent',
+                'pending_approval': '⏳ Pending',
+                'approved': '✅ Approved',
+                'rejected': '❌ Rejected',
+                'converted': '📄 Converted',
+                'expired': '⌛ Expired'
+            };
+            return texts[status] || status;
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
+    </script>
+</body>
+</html>

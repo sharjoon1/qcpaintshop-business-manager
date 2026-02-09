@@ -1,0 +1,211 @@
+<!-- Staff Sidebar Navigation Component -->
+<style>
+    /* Sidebar Styles (same base as admin) */
+    .qc-sidebar { position: fixed; top: 0; left: -320px; width: 320px; height: 100vh; background: linear-gradient(180deg, #0891b2 0%, #06b6d4 100%); box-shadow: 4px 0 20px rgba(0,0,0,0.3); transition: left 0.3s; z-index: 1002; overflow-y: auto; display: flex; flex-direction: column; }
+    .qc-sidebar.open { left: 0; }
+    
+    .qc-sidebar-header { padding: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.15); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    .qc-sidebar-brand { color: white; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
+    .qc-sidebar-close { background: rgba(255,255,255,0.1); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; transition: all 0.2s; }
+    .qc-sidebar-close:hover { background: rgba(255,255,255,0.2); transform: rotate(90deg); }
+    
+    .qc-sidebar-user { padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.15); color: white; flex-shrink: 0; }
+    .qc-sidebar-user-info { display: flex; align-items: center; gap: 1rem; }
+    .qc-sidebar-user-avatar { width: 48px; height: 48px; border-radius: 50%; background: white; color: #0891b2; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.25rem; }
+    .qc-sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .qc-sidebar-user-details { flex: 1; }
+    .qc-sidebar-user-name { font-weight: 600; font-size: 0.95rem; }
+    .qc-sidebar-user-role { font-size: 0.75rem; opacity: 0.9; }
+    .qc-sidebar-user-branch { font-size: 0.7rem; opacity: 0.8; margin-top: 0.25rem; }
+    
+    .qc-sidebar-nav { padding: 1rem 0; flex: 1; overflow-y: auto; }
+    .qc-nav-section { margin-bottom: 1.5rem; }
+    .qc-nav-section-title { padding: 0.5rem 1.5rem; color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+    
+    .qc-nav-item { display: block; padding: 0.85rem 1.5rem; color: rgba(255,255,255,0.9); text-decoration: none; transition: all 0.2s; display: flex; align-items: center; gap: 0.75rem; font-weight: 500; font-size: 0.9rem; }
+    .qc-nav-item:hover { background: rgba(255,255,255,0.15); color: white; padding-left: 2rem; }
+    .qc-nav-item.active { background: rgba(255,255,255,0.2); color: white; border-left: 4px solid white; padding-left: calc(1.5rem - 4px); }
+    .qc-nav-item-icon { font-size: 1.1rem; width: 24px; text-align: center; }
+    
+    .qc-sidebar-footer { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
+    .qc-sidebar-logout { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; transition: all 0.2s; }
+    .qc-sidebar-logout:hover { background: rgba(239, 68, 68, 0.8); }
+    
+    .qc-sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1001; }
+    .qc-sidebar-overlay.show { display: block; }
+    
+    @media (max-width: 768px) { .qc-sidebar { width: 85%; max-width: 320px; } }
+</style>
+
+<!-- Overlay -->
+<div class="qc-sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- Sidebar -->
+<aside class="qc-sidebar" id="mainSidebar">
+    <!-- Header -->
+    <div class="qc-sidebar-header">
+        <div class="qc-sidebar-brand">
+            <span>👤</span>
+            <span>Staff Portal</span>
+        </div>
+        <button class="qc-sidebar-close" onclick="closeSidebar()">×</button>
+    </div>
+    
+    <!-- User Info -->
+    <div class="qc-sidebar-user">
+        <div class="qc-sidebar-user-info">
+            <div class="qc-sidebar-user-avatar" id="sidebarAvatar">
+                <span id="sidebarInitial">S</span>
+            </div>
+            <div class="qc-sidebar-user-details">
+                <div class="qc-sidebar-user-name" id="sidebarName">Staff Member</div>
+                <div class="qc-sidebar-user-role" id="sidebarRole">Employee</div>
+                <div class="qc-sidebar-user-branch" id="sidebarBranch">📍 Branch Name</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Navigation -->
+    <nav class="qc-sidebar-nav">
+        <!-- Main -->
+        <div class="qc-nav-section">
+            <a href="/business-manager/staff/dashboard.html" class="qc-nav-item" data-page="dashboard">
+                <span class="qc-nav-item-icon">🏠</span>
+                <span>My Dashboard</span>
+            </a>
+            <a href="/business-manager/dashboard.html" class="qc-nav-item" data-page="main-dashboard">
+                <span class="qc-nav-item-icon">📊</span>
+                <span>Main Dashboard</span>
+            </a>
+        </div>
+        
+        <!-- My Work -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">My Work</div>
+            <a href="/business-manager/staff-estimates.html" class="qc-nav-item" data-page="estimates">
+                <span class="qc-nav-item-icon">📋</span>
+                <span>My Estimates</span>
+            </a>
+            <a href="/business-manager/staff-requests.html" class="qc-nav-item" data-page="requests">
+                <span class="qc-nav-item-icon">📝</span>
+                <span>My Requests</span>
+            </a>
+        </div>
+        
+        <!-- Attendance -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">Attendance</div>
+            <a href="/business-manager/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
+                <span class="qc-nav-item-icon">🟢</span>
+                <span>Clock In</span>
+            </a>
+            <a href="/business-manager/staff/clock-out.html" class="qc-nav-item" data-page="clock-out">
+                <span class="qc-nav-item-icon">🔴</span>
+                <span>Clock Out</span>
+            </a>
+            <a href="/business-manager/staff/history.html" class="qc-nav-item" data-page="history">
+                <span class="qc-nav-item-icon">📜</span>
+                <span>My History</span>
+            </a>
+        </div>
+        
+        <!-- Permissions -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">Permissions</div>
+            <a href="/business-manager/staff/permission-request.html" class="qc-nav-item" data-page="permission">
+                <span class="qc-nav-item-icon">✋</span>
+                <span>Request Permission</span>
+            </a>
+        </div>
+        
+        <!-- Profile -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">Account</div>
+            <a href="/business-manager/admin-profile.html" class="qc-nav-item" data-page="profile">
+                <span class="qc-nav-item-icon">👤</span>
+                <span>My Profile</span>
+            </a>
+        </div>
+    </nav>
+    
+    <!-- Footer -->
+    <div class="qc-sidebar-footer">
+        <button class="qc-sidebar-logout" onclick="logoutUser()">
+            <span>🚪</span>
+            <span>Logout</span>
+        </button>
+    </div>
+</aside>
+
+<script>
+// Sidebar Controls
+function toggleSidebar() {
+    document.getElementById('mainSidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+
+function closeSidebar() {
+    document.getElementById('mainSidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// Load User Info into Sidebar
+function loadSidebarUserInfo() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    const nameEl = document.getElementById('sidebarName');
+    if (nameEl && user.full_name) {
+        nameEl.textContent = user.full_name;
+    }
+    
+    const roleEl = document.getElementById('sidebarRole');
+    if (roleEl && user.role) {
+        roleEl.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+    }
+    
+    const branchEl = document.getElementById('sidebarBranch');
+    if (branchEl && user.branch_name) {
+        branchEl.textContent = `📍 ${user.branch_name}`;
+    }
+    
+    const avatarEl = document.getElementById('sidebarAvatar');
+    const initialEl = document.getElementById('sidebarInitial');
+    
+    if (user.profile_image_url) {
+        avatarEl.innerHTML = `<img src="${user.profile_image_url}" alt="Profile">`;
+    } else if (user.full_name && initialEl) {
+        initialEl.textContent = user.full_name.charAt(0).toUpperCase();
+    }
+}
+
+// Highlight Active Page
+function highlightActiveSidebarPage() {
+    const path = window.location.pathname;
+    document.querySelectorAll('.qc-nav-item[data-page]').forEach(item => {
+        const page = item.getAttribute('data-page');
+        if (path.includes(page)) {
+            item.classList.add('active');
+        }
+    });
+}
+
+// Logout
+function logoutUser() {
+    if (confirm('Are you sure you want to logout?')) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        window.location.href = '/business-manager/login.html';
+    }
+}
+
+// Initialize on load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSidebarUserInfo();
+        highlightActiveSidebarPage();
+    });
+} else {
+    loadSidebarUserInfo();
+    highlightActiveSidebarPage();
+}
+</script>

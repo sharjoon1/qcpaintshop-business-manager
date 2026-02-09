@@ -1,0 +1,305 @@
+<!-- Complete Sidebar Navigation Component for Business Manager -->
+<style>
+    /* Sidebar Styles */
+    .qc-sidebar { position: fixed; top: 0; left: -320px; width: 320px; height: 100vh; background: linear-gradient(180deg, #1e3a8a 0%, #7c3aed 100%); box-shadow: 4px 0 20px rgba(0,0,0,0.3); transition: left 0.3s; z-index: 1002; overflow-y: auto; display: flex; flex-direction: column; }
+    .qc-sidebar.open { left: 0; }
+    
+    /* Sidebar Header */
+    .qc-sidebar-header { padding: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.15); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    .qc-sidebar-brand { color: white; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
+    .qc-sidebar-close { background: rgba(255,255,255,0.1); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; transition: all 0.2s; }
+    .qc-sidebar-close:hover { background: rgba(255,255,255,0.2); transform: rotate(90deg); }
+    
+    /* User Info */
+    .qc-sidebar-user { padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.15); color: white; flex-shrink: 0; }
+    .qc-sidebar-user-info { display: flex; align-items: center; gap: 1rem; }
+    .qc-sidebar-user-avatar { width: 48px; height: 48px; border-radius: 50%; background: white; color: #1e3a8a; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.25rem; }
+    .qc-sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .qc-sidebar-user-details { flex: 1; }
+    .qc-sidebar-user-name { font-weight: 600; font-size: 0.95rem; }
+    .qc-sidebar-user-role { font-size: 0.75rem; opacity: 0.9; }
+    .qc-sidebar-user-branch { font-size: 0.7rem; opacity: 0.8; margin-top: 0.25rem; }
+    
+    /* Navigation Menu */
+    .qc-sidebar-nav { padding: 1rem 0; flex: 1; overflow-y: auto; }
+    .qc-nav-section { margin-bottom: 1.5rem; }
+    .qc-nav-section-title { padding: 0.5rem 1.5rem; color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+    
+    .qc-nav-item { display: block; padding: 0.85rem 1.5rem; color: rgba(255,255,255,0.9); text-decoration: none; transition: all 0.2s; display: flex; align-items: center; gap: 0.75rem; font-weight: 500; font-size: 0.9rem; }
+    .qc-nav-item:hover { background: rgba(255,255,255,0.15); color: white; padding-left: 2rem; }
+    .qc-nav-item.active { background: rgba(255,255,255,0.2); color: white; border-left: 4px solid white; padding-left: calc(1.5rem - 4px); }
+    .qc-nav-item-icon { font-size: 1.1rem; width: 24px; text-align: center; }
+    
+    /* Submenu */
+    .qc-nav-submenu { max-height: 0; overflow: hidden; transition: max-height 0.3s; background: rgba(0,0,0,0.15); }
+    .qc-nav-submenu.open { max-height: 500px; }
+    .qc-nav-submenu-item { padding: 0.7rem 1.5rem 0.7rem 3.5rem; color: rgba(255,255,255,0.85); text-decoration: none; display: block; font-size: 0.85rem; transition: all 0.2s; }
+    .qc-nav-submenu-item:hover { background: rgba(255,255,255,0.1); color: white; }
+    .qc-nav-submenu-item.active { color: white; font-weight: 600; }
+    
+    /* Footer */
+    .qc-sidebar-footer { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
+    .qc-sidebar-logout { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; transition: all 0.2s; }
+    .qc-sidebar-logout:hover { background: rgba(239, 68, 68, 0.8); }
+    
+    /* Overlay */
+    .qc-sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1001; }
+    .qc-sidebar-overlay.show { display: block; }
+    
+    @media (max-width: 768px) { .qc-sidebar { width: 85%; max-width: 320px; } }
+</style>
+
+<!-- Overlay -->
+<div class="qc-sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- Sidebar -->
+<aside class="qc-sidebar" id="mainSidebar">
+    <!-- Header -->
+    <div class="qc-sidebar-header">
+        <div class="qc-sidebar-brand">
+            <span>🏢</span>
+            <span>Quality Colours</span>
+        </div>
+        <button class="qc-sidebar-close" onclick="closeSidebar()">×</button>
+    </div>
+    
+    <!-- User Info -->
+    <div class="qc-sidebar-user">
+        <div class="qc-sidebar-user-info">
+            <div class="qc-sidebar-user-avatar" id="sidebarAvatar">
+                <span id="sidebarInitial">A</span>
+            </div>
+            <div class="qc-sidebar-user-details">
+                <div class="qc-sidebar-user-name" id="sidebarName">Admin User</div>
+                <div class="qc-sidebar-user-role" id="sidebarRole">Administrator</div>
+                <div class="qc-sidebar-user-branch" id="sidebarBranch">📍 Branch Name</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Navigation -->
+    <nav class="qc-sidebar-nav">
+        <!-- Main -->
+        <div class="qc-nav-section">
+            <a href="/business-manager/dashboard.html" class="qc-nav-item" data-page="dashboard">
+                <span class="qc-nav-item-icon">🏠</span>
+                <span>Dashboard</span>
+            </a>
+        </div>
+        
+        <!-- Sales & Estimates -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">Sales & Estimates</div>
+            <a href="/business-manager/estimates.html" class="qc-nav-item" data-page="estimates">
+                <span class="qc-nav-item-icon">📋</span>
+                <span>All Estimates</span>
+            </a>
+            <a href="/business-manager/estimate-create-new.html" class="qc-nav-item" data-page="estimate-create">
+                <span class="qc-nav-item-icon">➕</span>
+                <span>Create New</span>
+            </a>
+            <a href="/business-manager/admin-estimate-requests.html" class="qc-nav-item" data-page="estimate-requests">
+                <span class="qc-nav-item-icon">📬</span>
+                <span>Estimate Requests</span>
+            </a>
+            <a href="/business-manager/estimate-settings.html" class="qc-nav-item" data-page="estimate-settings">
+                <span class="qc-nav-item-icon">⚙️</span>
+                <span>Estimate Settings</span>
+            </a>
+        </div>
+        
+        <!-- Products & Inventory -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">Products & Inventory</div>
+            <a href="/business-manager/admin-products.html" class="qc-nav-item" data-page="products">
+                <span class="qc-nav-item-icon">🎨</span>
+                <span>Products</span>
+            </a>
+            <a href="/business-manager/admin-categories.html" class="qc-nav-item" data-page="categories">
+                <span class="qc-nav-item-icon">🏷️</span>
+                <span>Categories</span>
+            </a>
+            <a href="/business-manager/admin-brands.html" class="qc-nav-item" data-page="brands">
+                <span class="qc-nav-item-icon">🔖</span>
+                <span>Brands</span>
+            </a>
+        </div>
+        
+        <!-- Customers -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">Customers</div>
+            <a href="/business-manager/admin-customers.html" class="qc-nav-item" data-page="customers">
+                <span class="qc-nav-item-icon">👥</span>
+                <span>Customer List</span>
+            </a>
+            <a href="/business-manager/admin-customer-types.html" class="qc-nav-item" data-page="customer-types">
+                <span class="qc-nav-item-icon">🏷️</span>
+                <span>Customer Types</span>
+            </a>
+        </div>
+        
+        <!-- Branches & Staff -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">Branches & Staff</div>
+            <a href="/business-manager/admin-branches.html" class="qc-nav-item" data-page="branches">
+                <span class="qc-nav-item-icon">🏪</span>
+                <span>Branches</span>
+            </a>
+            <a href="/business-manager/admin-staff.html" class="qc-nav-item" data-page="staff">
+                <span class="qc-nav-item-icon">👤</span>
+                <span>Staff Management</span>
+            </a>
+            <a href="/business-manager/admin-roles.html" class="qc-nav-item" data-page="roles">
+                <span class="qc-nav-item-icon">🔐</span>
+                <span>Roles</span>
+            </a>
+            <a href="/business-manager/admin-role-permissions.html" class="qc-nav-item" data-page="permissions">
+                <span class="qc-nav-item-icon">🛡️</span>
+                <span>Permissions</span>
+            </a>
+        </div>
+        
+        <!-- HR & Staff Management -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">HR & Staff Management</div>
+            
+            <!-- Attendance Section -->
+            <a href="/business-manager/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
+                <span class="qc-nav-item-icon">🟢</span>
+                <span>Clock In</span>
+            </a>
+            <a href="/business-manager/staff/clock-out.html" class="qc-nav-item" data-page="clock-out">
+                <span class="qc-nav-item-icon">🔴</span>
+                <span>Clock Out</span>
+            </a>
+            <a href="/business-manager/staff/history.html" class="qc-nav-item" data-page="attendance-history">
+                <span class="qc-nav-item-icon">📜</span>
+                <span>Attendance History</span>
+            </a>
+            <a href="/business-manager/staff/permission-request.html" class="qc-nav-item" data-page="permission-request">
+                <span class="qc-nav-item-icon">✋</span>
+                <span>Permission Requests</span>
+            </a>
+            
+            <!-- Salary Section -->
+            <a href="/business-manager/admin-salary-config.html" class="qc-nav-item" data-page="salary-config">
+                <span class="qc-nav-item-icon">💵</span>
+                <span>Salary Config</span>
+            </a>
+            <a href="/business-manager/admin-salary-monthly.html" class="qc-nav-item" data-page="salary-monthly">
+                <span class="qc-nav-item-icon">📅</span>
+                <span>Monthly Salary</span>
+            </a>
+            <a href="/business-manager/admin-salary-payments.html" class="qc-nav-item" data-page="salary-payments">
+                <span class="qc-nav-item-icon">💳</span>
+                <span>Salary Payments</span>
+            </a>
+            <a href="/business-manager/admin-salary-reports.html" class="qc-nav-item" data-page="salary-reports">
+                <span class="qc-nav-item-icon">📊</span>
+                <span>Salary Reports</span>
+            </a>
+        </div>
+        
+        <!-- Reports & Settings -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">System</div>
+            <a href="/business-manager/admin-reports.html" class="qc-nav-item" data-page="reports">
+                <span class="qc-nav-item-icon">📈</span>
+                <span>Reports</span>
+            </a>
+            <a href="/business-manager/admin-settings.html" class="qc-nav-item" data-page="settings">
+                <span class="qc-nav-item-icon">⚙️</span>
+                <span>Settings</span>
+            </a>
+            <a href="/business-manager/admin-profile.html" class="qc-nav-item" data-page="profile">
+                <span class="qc-nav-item-icon">👤</span>
+                <span>My Profile</span>
+            </a>
+        </div>
+    </nav>
+    
+    <!-- Footer -->
+    <div class="qc-sidebar-footer">
+        <button class="qc-sidebar-logout" onclick="logoutUser()">
+            <span>🚪</span>
+            <span>Logout</span>
+        </button>
+    </div>
+</aside>
+
+<script>
+// Sidebar Controls
+function toggleSidebar() {
+    document.getElementById('mainSidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+
+function closeSidebar() {
+    document.getElementById('mainSidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// Load User Info into Sidebar
+function loadSidebarUserInfo() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    // Set name
+    const nameEl = document.getElementById('sidebarName');
+    if (nameEl && user.full_name) {
+        nameEl.textContent = user.full_name;
+    }
+    
+    // Set role
+    const roleEl = document.getElementById('sidebarRole');
+    if (roleEl && user.role) {
+        roleEl.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+    }
+    
+    // Set branch
+    const branchEl = document.getElementById('sidebarBranch');
+    if (branchEl && user.branch_name) {
+        branchEl.textContent = `📍 ${user.branch_name}`;
+    }
+    
+    // Set avatar
+    const avatarEl = document.getElementById('sidebarAvatar');
+    const initialEl = document.getElementById('sidebarInitial');
+    
+    if (user.profile_image_url) {
+        avatarEl.innerHTML = `<img src="${user.profile_image_url}" alt="Profile">`;
+    } else if (user.full_name && initialEl) {
+        initialEl.textContent = user.full_name.charAt(0).toUpperCase();
+    }
+}
+
+// Highlight Active Page
+function highlightActiveSidebarPage() {
+    const path = window.location.pathname;
+    document.querySelectorAll('.qc-nav-item[data-page]').forEach(item => {
+        const page = item.getAttribute('data-page');
+        if (path.includes(page)) {
+            item.classList.add('active');
+        }
+    });
+}
+
+// Logout
+function logoutUser() {
+    if (confirm('Are you sure you want to logout?')) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        window.location.href = '/business-manager/login.html';
+    }
+}
+
+// Initialize on load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSidebarUserInfo();
+        highlightActiveSidebarPage();
+    });
+} else {
+    loadSidebarUserInfo();
+    highlightActiveSidebarPage();
+}
+</script>

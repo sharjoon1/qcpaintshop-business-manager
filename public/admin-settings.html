@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body class="bg-gray-50">
+
+
+
+    <div class="max-w-6xl mx-auto p-4 sm:p-6">
+        <!-- Settings Tabs -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <!-- Tab Navigation -->
+            <div class="border-b border-gray-200 bg-gray-50">
+                <div class="flex overflow-x-auto">
+                    <button onclick="showTab('business')" id="tab-business" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-purple-600 text-purple-600">
+                        🏢 Business Info
+                    </button>
+                    <button onclick="showTab('tax')" id="tab-tax" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
+                        💰 Tax & GST
+                    </button>
+                    <button onclick="showTab('estimate')" id="tab-estimate" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
+                        📋 Estimate Settings
+                    </button>
+                    <button onclick="showTab('sms')" id="tab-sms" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
+                        📱 SMS/Notifications
+                    </button>
+                    <button onclick="showTab('system')" id="tab-system" class="tab-button px-6 py-4 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900">
+                        🔧 System
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="p-6">
+                <!-- Business Info Tab -->
+                <div id="content-business" class="tab-content">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6">Business Information</h2>
+                    
+                    <form id="businessForm" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Business Name *</label>
+                                <input type="text" id="businessName" value="Quality Colours (குவாலிட்டி கலர்ஸ்)" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Business Type</label>
+                                <select id="businessType" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                    <option value="retail">Retail Store</option>
+                                    <option value="wholesale">Wholesale</option>
+                                    <option value="both" selected>Retail & Wholesale</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Business Address</label>
+                            <textarea id="businessAddress" rows="3" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">Ramanathapuram, Tamil Nadu, India</textarea>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                                <input type="tel" id="businessPhone" value="+91 7418831122" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                                <input type="email" id="businessEmail" value="info@qcpaintshop.com" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Business Logo</label>
+                            <div class="flex items-center space-x-4">
+                                <div class="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                                    <img id="logoPreview" src="" alt="Logo" class="w-full h-full object-contain hidden">
+                                    <span id="logoPlaceholder" class="text-gray-400 text-xs">No logo</span>
+                                </div>
+                                <label class="cursor-pointer bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold">
+                                    Upload Logo
+                                    <input type="file" id="businessLogo" accept="image/*" class="hidden" onchange="handleLogoUpload(event)">
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t">
+                            <button type="submit" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                                💾 Save Business Information
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tax & GST Tab -->
+                <div id="content-tax" class="tab-content hidden">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6">Tax & GST Settings</h2>
+                    
+                    <form id="taxForm" class="space-y-6">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <p class="text-sm text-blue-800">
+                                <strong>Note:</strong> Configure your tax settings for accurate invoices and estimates.
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">GST Number (GSTIN)</label>
+                                <input type="text" id="gstNumber" placeholder="33XXXXX1234X1ZX" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">PAN Number</label>
+                                <input type="text" id="panNumber" placeholder="ABCDE1234F" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="enableGST" checked class="w-5 h-5 text-purple-600 rounded">
+                                <span class="text-sm font-semibold text-gray-700">Enable GST in Estimates</span>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">CGST Rate (%)</label>
+                                <input type="number" id="cgstRate" value="9" step="0.1" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">SGST Rate (%)</label>
+                                <input type="number" id="sgstRate" value="9" step="0.1" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">IGST Rate (%)</label>
+                                <input type="number" id="igstRate" value="18" step="0.1" 
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t">
+                            <button type="submit" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                                💾 Save Tax Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Estimate Settings Tab -->
+                <div id="content-estimate" class="tab-content hidden">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6">Estimate Settings</h2>
+                    
+                    <form id="estimateForm" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Estimate Prefix</label>
+                            <input type="text" id="estimatePrefix" value="QC-EST-" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <p class="text-xs text-gray-500 mt-1">Example: QC-EST-0001, QC-EST-0002</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Estimate Validity (Days)</label>
+                            <input type="number" id="estimateValidity" value="30" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Terms & Conditions</label>
+                            <textarea id="termsConditions" rows="6" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">1. All prices are subject to change without prior notice.
+2. This estimate is valid for 30 days from the date of issue.
+3. Payment terms: As per agreement.
+4. Delivery time: As per discussion.
+5. For any queries, please contact us.</textarea>
+                        </div>
+
+                        <div>
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="showBrandLogo" checked class="w-5 h-5 text-purple-600 rounded">
+                                <span class="text-sm font-semibold text-gray-700">Show Brand Logos in Estimates</span>
+                            </label>
+                        </div>
+
+                        <div class="pt-4 border-t">
+                            <button type="submit" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                                💾 Save Estimate Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- SMS/Notifications Tab -->
+                <div id="content-sms" class="tab-content hidden">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6">SMS & Notifications Settings</h2>
+                    
+                    <form id="smsForm" class="space-y-6">
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                            <p class="text-sm text-yellow-800">
+                                <strong>Coming Soon:</strong> SMS integration for estimate notifications to customers.
+                            </p>
+                        </div>
+
+                        <div>
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="enableSMS" class="w-5 h-5 text-purple-600 rounded">
+                                <span class="text-sm font-semibold text-gray-700">Enable SMS Notifications</span>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">SMS API Provider</label>
+                            <select id="smsProvider" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" disabled>
+                                <option value="">Select Provider</option>
+                                <option value="twilio">Twilio</option>
+                                <option value="msg91">MSG91</option>
+                                <option value="textlocal">TextLocal</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">API Key</label>
+                            <input type="password" id="smsApiKey" placeholder="Your API Key" disabled
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-gray-100">
+                        </div>
+
+                        <div class="pt-4 border-t">
+                            <button type="button" class="bg-gray-400 text-white px-6 py-3 rounded-lg font-semibold cursor-not-allowed" disabled>
+                                💾 Save SMS Settings (Coming Soon)
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- System Tab -->
+                <div id="content-system" class="tab-content hidden">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6">System Settings</h2>
+                    
+                    <div class="space-y-6">
+                        <!-- System Info -->
+                        <div class="bg-gray-50 rounded-lg p-6">
+                            <h3 class="font-bold text-gray-800 mb-4">System Information</h3>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span class="text-gray-600">Version:</span>
+                                    <span class="font-semibold ml-2">v1.0.0</span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600">Database:</span>
+                                    <span class="font-semibold ml-2 text-green-600">● Connected</span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600">API Status:</span>
+                                    <span class="font-semibold ml-2 text-green-600">● Online</span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600">Total Branches:</span>
+                                    <span class="font-semibold ml-2">5 Active</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Backup & Maintenance -->
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <h3 class="font-bold text-gray-800 mb-4">Backup & Maintenance</h3>
+                            <div class="space-y-3">
+                                <button class="w-full md:w-auto bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                                    💾 Backup Database
+                                </button>
+                                <button class="w-full md:w-auto bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 font-semibold ml-0 md:ml-3">
+                                    🔄 Clear Cache
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Danger Zone -->
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-6">
+                            <h3 class="font-bold text-red-800 mb-4">⚠️ Danger Zone</h3>
+                            <p class="text-sm text-red-700 mb-4">These actions are irreversible. Use with extreme caution.</p>
+                            <button class="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 font-semibold">
+                                🗑️ Reset All Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get auth token (try both possible keys)
+        function getAuthToken() {
+            return localStorage.getItem('token') || localStorage.getItem('auth_token');
+        }
+
+        // Tab switching
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // Remove active state from all buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('border-purple-600', 'text-purple-600');
+                button.classList.add('border-transparent', 'text-gray-600');
+            });
+            
+            // Show selected tab
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            
+            // Add active state to selected button
+            const activeButton = document.getElementById(`tab-${tabName}`);
+            activeButton.classList.remove('border-transparent', 'text-gray-600');
+            activeButton.classList.add('border-purple-600', 'text-purple-600');
+        }
+
+        // Handle logo upload
+        async function handleLogoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.startsWith('image/')) {
+                alert('❌ Please select an image file');
+                return;
+            }
+            
+            // Show preview immediately (temporary)
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('logoPreview').src = e.target.result;
+                document.getElementById('logoPreview').classList.remove('hidden');
+                document.getElementById('logoPlaceholder').classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+            
+            // Upload file to server
+            const formData = new FormData();
+            formData.append('logo', file);
+            
+            try {
+                const token = getAuthToken();
+                const response = await fetch('/business-manager/api/upload/logo', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                console.log('Logo upload response:', data);
+                
+                if (response.ok && data.success) {
+                    // Update preview with server URL
+                    const logoPreview = document.getElementById('logoPreview');
+                    logoPreview.src = data.logoUrl;
+                    logoPreview.dataset.logoUrl = data.logoUrl;
+                    logoPreview.classList.remove('hidden');
+                    document.getElementById('logoPlaceholder').classList.add('hidden');
+                    
+                    console.log('Logo saved to:', data.logoUrl);
+                    alert('✅ Logo uploaded successfully!');
+                } else {
+                    alert(`❌ Failed to upload logo: ${data.error || 'Unknown error'}`);
+                    console.error('Logo upload failed:', data);
+                }
+            } catch (error) {
+                console.error('Logo upload error:', error);
+                alert('❌ Error uploading logo. Please try again.');
+            }
+        }
+
+        // Load settings on page load
+        async function loadSettings() {
+            try {
+                const token = getAuthToken();
+                const response = await fetch('/business-manager/api/settings', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const settings = await response.json();
+                
+                console.log('Loaded settings:', settings);
+                
+                // Populate business info
+                if (settings.business_name) document.getElementById('businessName').value = settings.business_name;
+                if (settings.business_type) document.getElementById('businessType').value = settings.business_type;
+                if (settings.business_address) document.getElementById('businessAddress').value = settings.business_address;
+                if (settings.business_phone) document.getElementById('businessPhone').value = settings.business_phone;
+                if (settings.business_email) document.getElementById('businessEmail').value = settings.business_email;
+                
+                // Load logo if exists
+                if (settings.business_logo) {
+                    const logoPreview = document.getElementById('logoPreview');
+                    logoPreview.src = settings.business_logo;
+                    logoPreview.dataset.logoUrl = settings.business_logo; // Store the server path
+                    logoPreview.classList.remove('hidden');
+                    document.getElementById('logoPlaceholder').classList.add('hidden');
+                    console.log('Logo loaded from settings:', settings.business_logo);
+                } else {
+                    console.log('No logo found in settings');
+                }
+                
+                // Populate tax settings
+                if (settings.gst_number) document.getElementById('gstNumber').value = settings.gst_number;
+                if (settings.pan_number) document.getElementById('panNumber').value = settings.pan_number;
+                if (settings.enable_gst) document.getElementById('enableGST').checked = settings.enable_gst === 'true';
+                if (settings.cgst_rate) document.getElementById('cgstRate').value = settings.cgst_rate;
+                if (settings.sgst_rate) document.getElementById('sgstRate').value = settings.sgst_rate;
+                if (settings.igst_rate) document.getElementById('igstRate').value = settings.igst_rate;
+                
+                // Populate estimate settings
+                if (settings.estimate_prefix) document.getElementById('estimatePrefix').value = settings.estimate_prefix;
+                if (settings.estimate_validity) document.getElementById('estimateValidity').value = settings.estimate_validity;
+                if (settings.estimate_terms) document.getElementById('termsConditions').value = settings.estimate_terms;
+                if (settings.show_brand_logo) document.getElementById('showBrandLogo').checked = settings.show_brand_logo === 'true';
+                
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        // Form submissions
+        document.getElementById('businessForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const logoPreview = document.getElementById('logoPreview');
+            // ONLY use dataset.logoUrl (server path), never use data URL
+            const logoUrl = logoPreview.dataset.logoUrl || null;
+            
+            const businessData = {
+                business_name: document.getElementById('businessName').value,
+                business_type: document.getElementById('businessType').value,
+                business_address: document.getElementById('businessAddress').value,
+                business_phone: document.getElementById('businessPhone').value,
+                business_email: document.getElementById('businessEmail').value,
+                business_logo: logoUrl
+            };
+            
+            console.log('Saving business data:', businessData);
+            console.log('Logo URL being saved:', logoUrl);
+            
+            try {
+                const token = getAuthToken();
+                const response = await fetch('/business-manager/api/settings', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(businessData)
+                });
+                
+                const result = await response.json();
+                console.log('Save response:', result);
+                
+                if (response.ok && result.success) {
+                    alert('✅ Business information saved successfully!');
+                    // Reload settings to show saved data
+                    await loadSettings();
+                } else {
+                    alert(`❌ Failed to save business information: ${result.error || result.message}`);
+                }
+            } catch (error) {
+                console.error('Error saving business info:', error);
+                alert('❌ Error saving business information');
+            }
+        });
+
+        document.getElementById('taxForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const taxData = {
+                gst_number: document.getElementById('gstNumber').value,
+                pan_number: document.getElementById('panNumber').value,
+                enable_gst: document.getElementById('enableGST').checked ? 'true' : 'false',
+                cgst_rate: document.getElementById('cgstRate').value,
+                sgst_rate: document.getElementById('sgstRate').value,
+                igst_rate: document.getElementById('igstRate').value
+            };
+            
+            try {
+                const response = await fetch('/business-manager/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(taxData)
+                });
+                
+                if (response.ok) {
+                    alert('✅ Tax settings saved successfully!');
+                } else {
+                    alert('❌ Failed to save tax settings');
+                }
+            } catch (error) {
+                console.error('Error saving tax settings:', error);
+                alert('❌ Error saving tax settings');
+            }
+        });
+
+        document.getElementById('estimateForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const estimateData = {
+                estimate_prefix: document.getElementById('estimatePrefix').value,
+                estimate_validity: document.getElementById('estimateValidity').value,
+                estimate_terms: document.getElementById('termsConditions').value,
+                show_brand_logo: document.getElementById('showBrandLogo').checked ? 'true' : 'false'
+            };
+            
+            try {
+                const response = await fetch('/business-manager/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(estimateData)
+                });
+                
+                if (response.ok) {
+                    alert('✅ Estimate settings saved successfully!');
+                } else {
+                    alert('❌ Failed to save estimate settings');
+                }
+            } catch (error) {
+                console.error('Error saving estimate settings:', error);
+                alert('❌ Error saving estimate settings');
+            }
+        });
+
+        // Check authentication
+        if (!localStorage.getItem('auth_token')) {
+            window.location.href = '/business-manager/login.html';
+        }
+        
+        // Load settings on page load
+        loadSettings();
+    </script>
+    <script src="/business-manager/components/logo-loader.js"></script>
+</body>
+</html>

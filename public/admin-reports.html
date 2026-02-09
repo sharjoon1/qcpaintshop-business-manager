@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Reports - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body class="bg-gray-50">
+
+
+
+    <!-- Main Content -->
+    <div class="min-h-screen">
+        <!-- Page Header -->
+        <div class="bg-white shadow-sm px-4 sm:px-6 lg:px-8 py-6">
+            <h2 class="text-2xl font-bold text-gray-800">📈 Business Reports</h2>
+            <p class="text-gray-600 text-sm mt-1">View analytics and reports for your business</p>
+        </div>
+                
+        <!-- Reports Content -->
+        <div class="p-4 sm:p-6 lg:px-8 py-8">
+            <!-- Report Categories -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <!-- Sales Reports -->
+                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition cursor-pointer">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-green-100 p-3 rounded-lg">
+                            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-gray-800">Sales Reports</h3>
+                            <p class="text-sm text-gray-600">Revenue & sales analytics</p>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <ul class="space-y-2">
+                            <li>• Daily Sales Summary</li>
+                            <li>• Branch-wise Revenue</li>
+                            <li>• Product Performance</li>
+                            <li>• Customer Insights</li>
+                        </ul>
+                    </div>
+                    <button class="mt-4 w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
+                        View Reports
+                    </button>
+                </div>
+
+                <!-- Estimate Reports -->
+                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition cursor-pointer">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-blue-100 p-3 rounded-lg">
+                            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-gray-800">Estimate Reports</h3>
+                            <p class="text-sm text-gray-600">Quotes & conversion tracking</p>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <ul class="space-y-2">
+                            <li>• Estimate Status Overview</li>
+                            <li>• Conversion Rate Analysis</li>
+                            <li>• Pending Estimates</li>
+                            <li>• Monthly Trends</li>
+                        </ul>
+                    </div>
+                    <button class="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                        View Reports
+                    </button>
+                </div>
+
+                <!-- Inventory Reports -->
+                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition cursor-pointer">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-purple-100 p-3 rounded-lg">
+                            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-gray-800">Inventory Reports</h3>
+                            <p class="text-sm text-gray-600">Stock & products</p>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <ul class="space-y-2">
+                            <li>• Stock Levels</li>
+                            <li>• Low Stock Alerts</li>
+                            <li>• Product Movement</li>
+                            <li>• Reorder Suggestions</li>
+                        </ul>
+                    </div>
+                    <button class="mt-4 w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition">
+                        View Reports
+                    </button>
+                </div>
+
+                <!-- Customer Reports -->
+                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition cursor-pointer">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-orange-100 p-3 rounded-lg">
+                            <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-gray-800">Customer Reports</h3>
+                            <p class="text-sm text-gray-600">Customer analytics</p>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <ul class="space-y-2">
+                            <li>• New Customers</li>
+                            <li>• Top Customers</li>
+                            <li>• Customer Lifetime Value</li>
+                            <li>• Branch-wise Customers</li>
+                        </ul>
+                    </div>
+                    <button class="mt-4 w-full bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 transition">
+                        View Reports
+                    </button>
+                </div>
+
+                <!-- Branch Reports -->
+                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition cursor-pointer">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-indigo-100 p-3 rounded-lg">
+                            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-gray-800">Branch Reports</h3>
+                            <p class="text-sm text-gray-600">Performance by location</p>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <ul class="space-y-2">
+                            <li>• Branch Performance</li>
+                            <li>• Staff Productivity</li>
+                            <li>• Revenue Comparison</li>
+                            <li>• Resource Allocation</li>
+                        </ul>
+                    </div>
+                    <button class="mt-4 w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition">
+                        View Reports
+                    </button>
+                </div>
+
+                <!-- Financial Reports -->
+                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition cursor-pointer">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-pink-100 p-3 rounded-lg">
+                            <svg class="w-8 h-8 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-bold text-gray-800">Financial Reports</h3>
+                            <p class="text-sm text-gray-600">Accounting & finance</p>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <ul class="space-y-2">
+                            <li>• Profit & Loss</li>
+                            <li>• Cash Flow Analysis</li>
+                            <li>• Expense Tracking</li>
+                            <li>• Tax Reports</li>
+                        </ul>
+                    </div>
+                    <button class="mt-4 w-full bg-pink-600 text-white py-2 rounded-lg hover:bg-pink-700 transition">
+                        View Reports
+                    </button>
+                </div>
+            </div>
+
+            <!-- Coming Soon Notice -->
+            <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg p-8 text-white text-center">
+                <h3 class="text-2xl font-bold mb-4">🚀 Detailed Reports Coming Soon!</h3>
+                <p class="text-purple-100 mb-4">We're working on comprehensive reporting features for your business. These reports will help you make data-driven decisions and track your business performance effectively.</p>
+                <p class="text-sm text-purple-200">Stay tuned for updates!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication
+        if (!localStorage.getItem('auth_token')) {
+            window.location.href = '/business-manager/login.html';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!-- Staff Dashboard Quick Actions Component -->
+<style>
+    .qc-quick-actions { padding: 2rem 0; }
+    .qc-quick-actions-title { font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 1.5rem; }
+    .qc-quick-actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
+    
+    .qc-action-card-large { background: white; border-radius: 20px; padding: 3rem; box-shadow: 0 8px 20px rgba(0,0,0,0.12); transition: all 0.3s; cursor: pointer; text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 220px; position: relative; overflow: hidden; }
+    .qc-action-card-large::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--card-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%)); opacity: 0.05; }
+    .qc-action-card-large:hover { transform: translateY(-12px); box-shadow: 0 16px 32px rgba(0,0,0,0.2); }
+    
+    .qc-action-icon-large { font-size: 4rem; margin-bottom: 1.5rem; }
+    .qc-action-title-large { font-size: 1.75rem; font-weight: 700; color: #1f2937; margin-bottom: 0.75rem; }
+    .qc-action-desc-large { font-size: 1rem; color: #6b7280; }
+    
+    /* Color variants for staff */
+    .qc-action-card-large.clockin { --card-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%); border-top: 6px solid #10b981; }
+    .qc-action-card-large.clockin:hover .qc-action-icon-large { color: #10b981; }
+    
+    .qc-action-card-large.clockout { --card-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-top: 6px solid #ef4444; }
+    .qc-action-card-large.clockout:hover .qc-action-icon-large { color: #ef4444; }
+    
+    .qc-action-card-small { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: all 0.3s; cursor: pointer; text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 160px; }
+    .qc-action-card-small:hover { transform: translateY(-8px); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
+    
+    .qc-action-icon-small { font-size: 2.5rem; margin-bottom: 1rem; }
+    .qc-action-title-small { font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem; }
+    .qc-action-desc-small { font-size: 0.875rem; color: #6b7280; }
+    
+    .qc-action-card-small.history { border-top: 4px solid #3b82f6; }
+    .qc-action-card-small.history:hover .qc-action-icon-small { color: #3b82f6; }
+    
+    .qc-action-card-small.permission { border-top: 4px solid #f59e0b; }
+    .qc-action-card-small.permission:hover .qc-action-icon-small { color: #f59e0b; }
+    
+    @media (max-width: 768px) {
+        .qc-quick-actions-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+        .qc-action-card-large { min-height: 180px; padding: 2rem; }
+    }
+</style>
+
+<div class="qc-quick-actions">
+    <h2 class="qc-quick-actions-title">⚡ Quick Actions</h2>
+    
+    <!-- Primary Actions (Clock In/Out) -->
+    <div class="qc-quick-actions-grid" style="margin-bottom: 2rem;">
+        <!-- Clock In -->
+        <a href="/business-manager/staff/clock-in.html" class="qc-action-card-large clockin">
+            <div class="qc-action-icon-large">🟢</div>
+            <div class="qc-action-title-large">Clock In</div>
+            <div class="qc-action-desc-large">Start your work day</div>
+        </a>
+        
+        <!-- Clock Out -->
+        <a href="/business-manager/staff/clock-out.html" class="qc-action-card-large clockout">
+            <div class="qc-action-icon-large">🔴</div>
+            <div class="qc-action-title-large">Clock Out</div>
+            <div class="qc-action-desc-large">End your work day</div>
+        </a>
+    </div>
+    
+    <!-- Secondary Actions -->
+    <div class="qc-quick-actions-grid">
+        <!-- My History -->
+        <a href="/business-manager/staff/history.html" class="qc-action-card-small history">
+            <div class="qc-action-icon-small">📜</div>
+            <div class="qc-action-title-small">My Attendance</div>
+            <div class="qc-action-desc-small">View attendance history</div>
+        </a>
+        
+        <!-- Request Permission -->
+        <a href="/business-manager/staff/permission-request.html" class="qc-action-card-small permission">
+            <div class="qc-action-icon-small">✋</div>
+            <div class="qc-action-title-small">Request Leave</div>
+            <div class="qc-action-desc-small">Submit permission request</div>
+        </a>
+    </div>
+</div>

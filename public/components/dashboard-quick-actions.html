@@ -1,0 +1,90 @@
+<!-- Dashboard Quick Actions Component -->
+<style>
+    .qc-quick-actions { padding: 2rem 0; }
+    .qc-quick-actions-title { font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 1.5rem; }
+    .qc-quick-actions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    
+    .qc-action-card { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: all 0.3s; cursor: pointer; text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 180px; position: relative; overflow: hidden; }
+    .qc-action-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--card-color, #667eea); }
+    .qc-action-card:hover { transform: translateY(-8px); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
+    
+    .qc-action-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .qc-action-title { font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem; }
+    .qc-action-desc { font-size: 0.875rem; color: #6b7280; }
+    
+    /* Color variants */
+    .qc-action-card.primary { --card-color: #667eea; }
+    .qc-action-card.primary:hover .qc-action-icon { color: #667eea; }
+    
+    .qc-action-card.success { --card-color: #10b981; }
+    .qc-action-card.success:hover .qc-action-icon { color: #10b981; }
+    
+    .qc-action-card.info { --card-color: #0ea5e9; }
+    .qc-action-card.info:hover .qc-action-icon { color: #0ea5e9; }
+    
+    .qc-action-card.warning { --card-color: #f59e0b; }
+    .qc-action-card.warning:hover .qc-action-icon { color: #f59e0b; }
+    
+    .qc-action-card.danger { --card-color: #ef4444; }
+    .qc-action-card.danger:hover .qc-action-icon { color: #ef4444; }
+    
+    .qc-action-card.purple { --card-color: #a855f7; }
+    .qc-action-card.purple:hover .qc-action-icon { color: #a855f7; }
+    
+    @media (max-width: 1024px) {
+        .qc-quick-actions-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    
+    @media (max-width: 640px) {
+        .qc-quick-actions-grid { grid-template-columns: 1fr; }
+        .qc-action-card { min-height: 140px; padding: 1.5rem; }
+    }
+</style>
+
+<div class="qc-quick-actions">
+    <h2 class="qc-quick-actions-title">⚡ Quick Actions</h2>
+    
+    <div class="qc-quick-actions-grid">
+        <!-- New Estimate -->
+        <a href="/business-manager/estimate-create-new.html" class="qc-action-card primary">
+            <div class="qc-action-icon">📝</div>
+            <div class="qc-action-title">Create Estimate</div>
+            <div class="qc-action-desc">New quotation or estimate</div>
+        </a>
+        
+        <!-- Add Product -->
+        <a href="/business-manager/admin-products.html" class="qc-action-card success">
+            <div class="qc-action-icon">🎨</div>
+            <div class="qc-action-title">Manage Products</div>
+            <div class="qc-action-desc">Add or edit products</div>
+        </a>
+        
+        <!-- Add Customer -->
+        <a href="/business-manager/admin-customers.html" class="qc-action-card info">
+            <div class="qc-action-icon">👥</div>
+            <div class="qc-action-title">Customers</div>
+            <div class="qc-action-desc">Manage customer database</div>
+        </a>
+        
+        <!-- View Estimates -->
+        <a href="/business-manager/estimates.html" class="qc-action-card warning">
+            <div class="qc-action-icon">📋</div>
+            <div class="qc-action-title">All Estimates</div>
+            <div class="qc-action-desc">View all quotations</div>
+        </a>
+        
+        <!-- Staff Management -->
+        <a href="/business-manager/admin-staff.html" class="qc-action-card purple">
+            <div class="qc-action-icon">👨‍💼</div>
+            <div class="qc-action-title">Staff</div>
+            <div class="qc-action-desc">Manage employees</div>
+        </a>
+        
+        <!-- Reports -->
+        <a href="/business-manager/admin-reports.html" class="qc-action-card danger">
+            <div class="qc-action-icon">📈</div>
+            <div class="qc-action-title">Reports</div>
+            <div class="qc-action-desc">View analytics & reports</div>
+        </a>
+    </div>
+</div>

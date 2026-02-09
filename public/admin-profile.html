@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Profile - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body class="bg-gray-50">
+
+
+
+    <!-- Page Header -->
+    <div class="bg-white shadow-sm px-4 sm:px-6 lg:px-8 py-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">👤 Edit Profile</h2>
+                <p class="text-gray-600 text-sm mt-1">Update your personal information and settings</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto p-4 sm:p-6">
+        <!-- Profile Header Card -->
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg p-8 mb-6 text-white">
+            <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
+                <div class="relative">
+                    <div class="w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-xl">
+                        <img id="profilePreview" src="" alt="Profile" class="w-full h-full rounded-full object-cover hidden">
+                        <span id="profileInitial" class="text-purple-600 text-4xl font-bold">S</span>
+                    </div>
+                    <label class="absolute bottom-0 right-0 bg-white text-purple-600 rounded-full p-2 shadow-lg cursor-pointer hover:bg-gray-100 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <input type="file" id="profilePicture" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                    </label>
+                </div>
+                <div class="text-center md:text-left">
+                    <h2 class="text-2xl font-bold mb-1" id="displayName">Loading...</h2>
+                    <p class="text-purple-200 mb-2" id="displayRole">Administrator</p>
+                    <p class="text-sm text-purple-100" id="displayEmail">Loading...</p>
+                    <p class="text-xs text-purple-200 mt-2">Member since: <span id="memberSince">2024</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Edit Form -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-6">📝 Personal Information</h3>
+            
+            <form id="profileForm" class="space-y-6">
+                <input type="hidden" id="userId">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                        <input type="text" id="fullName" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Username *</label>
+                        <input type="text" id="username" required disabled class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed">
+                        <p class="text-xs text-gray-500 mt-1">Username cannot be changed</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
+                        <input type="email" id="email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                        <input type="tel" id="phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Role</label>
+                    <input type="text" id="role" disabled class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed">
+                    <p class="text-xs text-gray-500 mt-1">Role is managed by system administrator</p>
+                </div>
+                
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="history.back()" class="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Change Password Card -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-6">🔒 Change Password</h3>
+            
+            <form id="passwordForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Current Password *</label>
+                    <input type="password" id="currentPassword" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">New Password *</label>
+                        <input type="password" id="newPassword" required minlength="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        <p class="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Confirm New Password *</label>
+                        <input type="password" id="confirmPassword" required minlength="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                    </div>
+                </div>
+                
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p class="text-sm text-yellow-800">
+                        <strong>⚠️ Important:</strong> After changing your password, you'll need to login again with your new credentials.
+                    </p>
+                </div>
+                
+                <button type="submit" class="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition">
+                    Update Password
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let profileImageBase64 = null;
+
+        // Load current user profile
+        async function loadProfile() {
+            try {
+                // Check authentication
+                const authToken = localStorage.getItem('auth_token');
+                if (!authToken) {
+                    window.location.href = '/business-manager/login.html';
+                    return;
+                }
+
+                // Get user from localStorage (set during login)
+                const storedUser = localStorage.getItem('user');
+                if (!storedUser) {
+                    window.location.href = '/business-manager/login.html';
+                    return;
+                }
+                
+                currentUser = JSON.parse(storedUser);
+                console.log('Loaded user:', currentUser);
+
+                // Populate form (handle both 'name' and 'full_name' fields)
+                document.getElementById('userId').value = currentUser.id || 1;
+                document.getElementById('fullName').value = currentUser.full_name || currentUser.name || '';
+                document.getElementById('username').value = currentUser.username || 'sharjoon';
+                document.getElementById('email').value = currentUser.email || '';
+                document.getElementById('phone').value = currentUser.phone || '';
+                document.getElementById('role').value = currentUser.role || 'Administrator';
+                
+                // Update header display
+                const displayName = currentUser.full_name || currentUser.name || currentUser.username || 'User';
+                document.getElementById('displayName').textContent = displayName;
+                document.getElementById('displayRole').textContent = (currentUser.role || 'Administrator').charAt(0).toUpperCase() + (currentUser.role || 'Administrator').slice(1);
+                document.getElementById('displayEmail').textContent = currentUser.email || '';
+                
+                // Set initial
+                const initial = (currentUser.full_name || currentUser.name || currentUser.username || 'S').charAt(0).toUpperCase();
+                document.getElementById('profileInitial').textContent = initial;
+                
+                // Set member since
+                const createdDate = currentUser.created_at ? new Date(currentUser.created_at) : new Date('2024-01-01');
+                document.getElementById('memberSince').textContent = createdDate.toLocaleDateString('en-IN', { year: 'numeric', month: 'long' });
+                
+                // Load profile image if exists
+                if (currentUser.profile_image_url) {
+                    document.getElementById('profilePreview').src = currentUser.profile_image_url;
+                    document.getElementById('profilePreview').classList.remove('hidden');
+                    document.getElementById('profileInitial').classList.add('hidden');
+                }
+                
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                alert('Failed to load profile');
+            }
+        }
+
+        // Handle image upload
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+            
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Image size should be less than 5MB');
+                return;
+            }
+            
+            // Read and compress image
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Create canvas for resizing
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Max dimensions for profile picture (smaller = better performance)
+                    const MAX_WIDTH = 300;
+                    const MAX_HEIGHT = 300;
+                    
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // Calculate new dimensions (maintain aspect ratio)
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // Draw and compress
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Convert to base64 with compression (0.7 quality for smaller size)
+                    profileImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    // Show preview
+                    document.getElementById('profilePreview').src = profileImageBase64;
+                    document.getElementById('profilePreview').classList.remove('hidden');
+                    document.getElementById('profileInitial').classList.add('hidden');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Save profile changes
+        document.getElementById('profileForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const userId = document.getElementById('userId').value;
+            const profileData = {
+                username: document.getElementById('username').value, // Required field
+                full_name: document.getElementById('fullName').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value || null
+            };
+            
+            // Add profile image if uploaded
+            if (profileImageBase64) {
+                profileData.profile_image_url = profileImageBase64;
+            }
+            
+            try {
+                const response = await fetch(`/business-manager/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(profileData)
+                });
+                
+                if (response.ok) {
+                    // Update localStorage with new data
+                    const updatedUser = {
+                        ...currentUser,
+                        full_name: profileData.full_name,
+                        email: profileData.email,
+                        phone: profileData.phone
+                    };
+                    
+                    // Add profile image if it was uploaded
+                    if (profileData.profile_image_url) {
+                        updatedUser.profile_image_url = profileData.profile_image_url;
+                    }
+                    
+                    localStorage.setItem('user', JSON.stringify(updatedUser));
+                    
+                    alert('✅ Profile updated successfully!');
+                    loadProfile(); // Reload to show changes
+                } else {
+                    const error = await response.json();
+                    alert('❌ Failed to update profile: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                alert('❌ Error updating profile. Check console for details.');
+            }
+        });
+
+        // Change password
+        document.getElementById('passwordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            // Validate passwords match
+            if (newPassword !== confirmPassword) {
+                alert('❌ New passwords do not match!');
+                return;
+            }
+            
+            // Validate password length
+            if (newPassword.length < 6) {
+                alert('❌ Password must be at least 6 characters long');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/business-manager/api/users/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        current_password: currentPassword,
+                        new_password: newPassword
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('✅ Password changed successfully! Please login again.');
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/business-manager/login.html';
+                } else {
+                    const error = await response.json();
+                    alert('❌ Failed to change password: ' + (error.error || 'Incorrect current password'));
+                }
+            } catch (error) {
+                console.error('Error changing password:', error);
+                alert('❌ Error changing password. Check console for details.');
+            }
+        });
+
+        // Initialize
+        loadProfile();
+    </script>
+    <script src="/business-manager/components/logo-loader.js"></script>
+</body>
+</html>

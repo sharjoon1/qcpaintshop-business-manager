@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Estimate - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            @page {
+                size: A4;
+                margin: 10mm;
+            }
+            .no-print { display: none !important; }
+            body { 
+                background: white; 
+                margin: 0;
+                padding: 0;
+            }
+            .print-container {
+                width: 100%;
+                max-width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            table {
+                font-size: 9px !important;
+                page-break-inside: avoid;
+            }
+            thead {
+                display: table-header-group;
+            }
+            tr {
+                page-break-inside: avoid;
+            }
+            .company-logo {
+                max-height: 50px !important;
+            }
+            h1 {
+                font-size: 18px !important;
+            }
+            h2 {
+                font-size: 16px !important;
+            }
+        }
+
+        .company-logo {
+            max-height: 80px;
+            max-width: 200px;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Action Bar (No Print) -->
+    <div class="no-print fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b">
+        <div class="px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+            <button onclick="history.back()" class="flex items-center text-gray-600 hover:text-gray-900">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back
+            </button>
+            
+            <div class="flex flex-wrap gap-2">
+                <button onclick="toggleColumn('qty')" id="btn-qty" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Qty/Area</button>
+                <button onclick="toggleColumn('mix')" id="btn-mix" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Mix</button>
+                <button onclick="toggleColumn('price')" id="btn-price" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Price</button>
+                <button onclick="toggleColumn('breakdown')" id="btn-breakdown" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Breakdown</button>
+                <button onclick="toggleColumn('color')" id="btn-color" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Color</button>
+                <button onclick="toggleColumn('total')" id="btn-total" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Total</button>
+                <button onclick="toggleSummary()" id="btn-summary" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Summary</button>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="editEstimate()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                    ✏️ Edit
+                </button>
+                <button onclick="window.print()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm">
+                    🖨️ Print
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="flex items-center justify-center py-20 mt-20">
+        <svg class="w-12 h-12 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+
+    <!-- Estimate Document -->
+    <div id="mainContent" class="hidden print-container max-w-4xl mx-auto mt-20 no-print:mt-20 p-4 no-print:p-4 print:p-0 print:mt-0">
+        <div class="bg-white shadow-2xl rounded-lg print:shadow-none print:rounded-none overflow-hidden">
+            
+            <!-- Header -->
+            <div class="border-b-4 border-purple-600 p-6 print:p-4 bg-gradient-to-r from-purple-50 to-indigo-50 print:bg-white">
+                <div class="flex items-start justify-between">
+                    <!-- Company Info with Logo -->
+                    <div class="flex items-start gap-4">
+                        <img src="/logo.png" alt="Quality Colours" class="company-logo" onerror="this.style.display='none'">
+                        <div>
+                            <h1 class="text-3xl print:text-xl font-bold text-purple-900">Quality Colours</h1>
+                            <p class="text-sm print:text-xs text-gray-600">குவாலிட்டி கலர்ஸ்</p>
+                            <p class="text-sm print:text-xs text-gray-600 mt-2">
+                                Ramanathapuram<br>
+                                Phone: +91 7418831122<br>
+                                Email: info@qcpaintshop.com<br>
+                                GST: 33EMXPS2411G1ZT
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Estimate Info -->
+                    <div class="text-right">
+                        <h2 class="text-4xl print:text-2xl font-bold text-orange-600 mb-2">ESTIMATE</h2>
+                        <p class="text-sm print:text-xs"><strong>Date:</strong> <span id="estimateDate"></span></p>
+                        <p class="text-sm print:text-xs"><strong>Ref #:</strong> <span id="estimateNumber"></span></p>
+                        <div id="statusBadge" class="mt-2 inline-block no-print"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer Info -->
+            <div class="p-6 print:p-4 border-b">
+                <h3 class="font-bold text-gray-700 mb-2 text-sm print:text-xs">BILL TO:</h3>
+                <p class="text-lg print:text-sm font-bold" id="customerName"></p>
+                <p class="text-sm print:text-xs" id="customerPhone"></p>
+                <p class="text-sm print:text-xs" id="customerAddress"></p>
+            </div>
+
+            <!-- Items Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm print:text-xs" id="itemsTable">
+                    <thead class="bg-gray-800 text-white">
+                        <tr>
+                            <th class="px-3 py-2 print:px-2 print:py-1 text-left" style="width: 30px;">#</th>
+                            <th class="px-3 py-2 print:px-2 print:py-1 text-left">ITEM DETAILS</th>
+                            <th class="px-3 py-2 print:px-2 print:py-1 text-left col-qty" data-col="qty">QTY/AREA</th>
+                            <th class="px-3 py-2 print:px-2 print:py-1 text-left col-mix" data-col="mix">MIX INFO</th>
+                            <th class="px-3 py-2 print:px-2 print:py-1 text-right col-price" data-col="price">PRICE</th>
+                            <th class="px-3 py-2 print:px-2 print:py-1 text-left col-breakdown" data-col="breakdown">BREAKDOWN</th>
+                            <th class="px-3 py-2 print:px-2 print:py-1 text-right col-color" data-col="color">COLOR</th>
+                            <th class="px-3 py-2 print:px-2 print:py-1 text-right col-total" data-col="total">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody" class="divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="8" class="text-center py-8 text-gray-500">Loading items...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Summary Section -->
+            <div id="summarySection" class="p-6 print:p-4 bg-gray-50 print:bg-white">
+                <div class="flex justify-end">
+                    <div class="w-full max-w-sm">
+                        <div class="flex justify-between py-2 border-b text-sm print:text-xs" id="gstBreakdown" style="display: none;">
+                            <span class="font-semibold">Subtotal (excl. GST):</span>
+                            <span id="subtotalAmount"></span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b text-sm print:text-xs" id="gstAmount" style="display: none;">
+                            <span class="font-semibold">GST @18%:</span>
+                            <span id="gstValue"></span>
+                        </div>
+                        <div class="flex justify-between py-3 text-xl print:text-base font-bold border-t-2 border-gray-300">
+                            <span>Grand Total:</span>
+                            <span class="text-purple-600">₹ <span id="grandTotal"></span></span>
+                        </div>
+                        <p class="text-xs print:text-[10px] text-gray-600 mt-2" id="amountInWords"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div id="notesSection" class="p-6 print:p-4 border-t" style="display: none;">
+                <h3 class="font-bold text-gray-700 mb-2 text-sm print:text-xs">Notes:</h3>
+                <p id="notesContent" class="text-sm print:text-xs text-gray-600"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const estimateId = urlParams.get('id');
+        
+        let columnVisibility = {
+            qty: true,
+            mix: true,
+            price: true,
+            breakdown: true,
+            color: true,
+            total: true
+        };
+
+        let showSummarySection = true;
+
+        if (!estimateId) {
+            alert('No estimate ID provided');
+            window.location.href = 'estimates.html';
+        }
+
+        // Toggle column visibility
+        function toggleColumn(col) {
+            columnVisibility[col] = !columnVisibility[col];
+            applyColumnVisibility();
+            updateButtonStates();
+        }
+
+        function toggleSummary() {
+            showSummarySection = !showSummarySection;
+            document.getElementById('summarySection').style.display = showSummarySection ? 'block' : 'none';
+            updateButtonStates();
+        }
+
+        function applyColumnVisibility() {
+            Object.keys(columnVisibility).forEach(col => {
+                const show = columnVisibility[col];
+                const elements = document.querySelectorAll(`.col-${col}, [data-col="${col}"]`);
+                elements.forEach(el => {
+                    el.style.display = show ? '' : 'none';
+                });
+            });
+        }
+
+        function updateButtonStates() {
+            Object.keys(columnVisibility).forEach(col => {
+                const btn = document.getElementById(`btn-${col}`);
+                if (btn) {
+                    if (columnVisibility[col]) {
+                        btn.classList.add('bg-green-100', 'border-green-500', 'text-green-800');
+                        btn.classList.remove('bg-gray-100', 'border-gray-300', 'text-gray-600');
+                    } else {
+                        btn.classList.remove('bg-green-100', 'border-green-500', 'text-green-800');
+                        btn.classList.add('bg-gray-100', 'border-gray-300', 'text-gray-600');
+                    }
+                }
+            });
+
+            const summaryBtn = document.getElementById('btn-summary');
+            if (summaryBtn) {
+                if (showSummarySection) {
+                    summaryBtn.classList.add('bg-green-100', 'border-green-500', 'text-green-800');
+                    summaryBtn.classList.remove('bg-gray-100', 'border-gray-300', 'text-gray-600');
+                } else {
+                    summaryBtn.classList.remove('bg-green-100', 'border-green-500', 'text-green-800');
+                    summaryBtn.classList.add('bg-gray-100', 'border-gray-300', 'text-gray-600');
+                }
+            }
+        }
+
+        // Load estimate
+        async function loadEstimate() {
+            try {
+                const response = await fetch(`/business-manager/api/estimates/${estimateId}`);
+                const data = await response.json();
+                
+                if (!data || !data.estimate_number) {
+                    throw new Error('Estimate not found');
+                }
+                
+                // Header info
+                document.getElementById('estimateNumber').textContent = data.estimate_number;
+                document.getElementById('estimateDate').textContent = formatDate(data.estimate_date);
+                document.getElementById('statusBadge').innerHTML = getStatusBadge(data.status);
+                
+                // Customer info
+                document.getElementById('customerName').textContent = data.customer_name || '';
+                document.getElementById('customerPhone').textContent = data.customer_phone || '';
+                document.getElementById('customerAddress').textContent = data.customer_address || '';
+                
+                // Grand total
+                document.getElementById('grandTotal').textContent = parseFloat(data.grand_total).toLocaleString('en-IN', {minimumFractionDigits: 2});
+                
+                // GST breakdown
+                if (data.show_gst_breakdown) {
+                    const subtotal = parseFloat(data.subtotal);
+                    const gst = parseFloat(data.gst_amount);
+                    
+                    document.getElementById('subtotalAmount').textContent = '₹' + subtotal.toLocaleString('en-IN', {minimumFractionDigits: 2});
+                    document.getElementById('gstValue').textContent = '₹' + gst.toLocaleString('en-IN', {minimumFractionDigits: 2});
+                    document.getElementById('gstBreakdown').style.display = 'flex';
+                    document.getElementById('gstAmount').style.display = 'flex';
+                }
+                
+                // Amount in words
+                document.getElementById('amountInWords').textContent = 'Amount in Words: Rupees ' + Math.floor(parseFloat(data.grand_total)).toLocaleString('en-IN') + ' Only';
+                
+                // Notes
+                if (data.notes && data.notes.trim()) {
+                    document.getElementById('notesContent').textContent = data.notes;
+                    document.getElementById('notesSection').style.display = 'block';
+                }
+
+                // Load column visibility from database
+                if (data.column_visibility) {
+                    try {
+                        const savedSettings = JSON.parse(data.column_visibility);
+                        if (savedSettings.show_qty !== undefined) columnVisibility.qty = savedSettings.show_qty;
+                        if (savedSettings.show_mix !== undefined) columnVisibility.mix = savedSettings.show_mix;
+                        if (savedSettings.show_price !== undefined) columnVisibility.price = savedSettings.show_price;
+                        if (savedSettings.show_color !== undefined) columnVisibility.color = savedSettings.show_color;
+                        if (savedSettings.show_total !== undefined) columnVisibility.total = savedSettings.show_total;
+                    } catch (e) {
+                        console.error('Error parsing column visibility:', e);
+                    }
+                }
+                
+                // Load items
+                await loadItems(data.items || []);
+                
+                // Apply visibility
+                applyColumnVisibility();
+                updateButtonStates();
+                
+                // Show content
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('mainContent').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error loading estimate:', error);
+                alert('Failed to load estimate: ' + error.message);
+                window.location.href = 'estimates.html';
+            }
+        }
+
+        async function loadItems(items) {
+            const tbody = document.getElementById('itemsBody');
+            
+            if (!items || items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">No items found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = items.map((item, index) => `
+                <tr class="print:text-xs">
+                    <td class="px-3 py-2 print:px-2 print:py-1 text-center">${index + 1}</td>
+                    <td class="px-3 py-2 print:px-2 print:py-1">
+                        <div class="font-semibold">${item.item_description || item.product_name || ''}</div>
+                    </td>
+                    <td class="px-3 py-2 print:px-2 print:py-1 col-qty" data-col="qty">
+                        ${item.quantity}${item.area ? ` (${item.area} sqft)` : ''}
+                    </td>
+                    <td class="px-3 py-2 print:px-2 print:py-1 col-mix" data-col="mix">${item.mix_info || '-'}</td>
+                    <td class="px-3 py-2 print:px-2 print:py-1 text-right col-price" data-col="price">
+                        ₹${parseFloat(item.unit_price).toFixed(2)}
+                    </td>
+                    <td class="px-3 py-2 print:px-2 print:py-1 col-breakdown" data-col="breakdown">${item.breakdown_cost || '-'}</td>
+                    <td class="px-3 py-2 print:px-2 print:py-1 text-right col-color" data-col="color">
+                        ₹${parseFloat(item.color_cost || 0).toFixed(2)}
+                    </td>
+                    <td class="px-3 py-2 print:px-2 print:py-1 text-right font-bold col-total" data-col="total">
+                        ₹${parseFloat(item.line_total).toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                'draft': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-gray-500 text-white">🆕 Draft</span>',
+                'sent': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-500 text-white">📧 Sent</span>',
+                'pending_approval': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-500 text-white">⏳ Pending</span>',
+                'approved': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-500 text-white">✅ Approved</span>',
+                'rejected': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-500 text-white">❌ Rejected</span>',
+                'converted': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-purple-500 text-white">📄 Converted</span>',
+                'expired': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-orange-500 text-white">⌛ Expired</span>'
+            };
+            return badges[status] || badges['draft'];
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-IN', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            });
+        }
+
+        function editEstimate() {
+            window.location.href = `estimate-edit.html?id=${estimateId}`;
+        }
+
+        // Initialize
+        loadEstimate();
+    </script>
+</body>
+</html>

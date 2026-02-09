@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Tracking - Quality Colours</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #FF6B35;
+            color: white;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .form-group select,
+        .form-group input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-left: 4px solid #FF6B35;
+        }
+
+        .summary-card.green {
+            border-left-color: #4CAF50;
+        }
+
+        .summary-card.blue {
+            border-left-color: #2196F3;
+        }
+
+        .summary-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .table-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8f9fa;
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .money {
+            font-weight: 600;
+            color: #28a745;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: white;
+            color: #FF6B35;
+            border-bottom: 3px solid #FF6B35;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1><i class="fas fa-money-check-alt"></i> Payment Tracking</h1>
+                <p style="color: #666; margin-top: 5px;">Track salary payments and pending amounts</p>
+            </div>
+            <button class="btn btn-secondary" onclick="window.location.href='admin-salary-monthly.html'">
+                <i class="fas fa-arrow-left"></i> Back to Salaries
+            </button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('history')">
+                <i class="fas fa-history"></i> Payment History
+            </button>
+            <button class="tab" onclick="switchTab('pending')">
+                <i class="fas fa-exclamation-triangle"></i> Pending Payments
+            </button>
+        </div>
+
+        <!-- Payment History Tab -->
+        <div id="historyTab" class="tab-content active">
+            <div class="summary-cards">
+                <div class="summary-card green">
+                    <h3>Total Payments Made</h3>
+                    <div class="value" id="totalPayments">0</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Total Amount Paid</h3>
+                    <div class="value" id="totalAmountPaid">₹0</div>
+                </div>
+                <div class="summary-card blue">
+                    <h3>This Month Payments</h3>
+                    <div class="value" id="thisMonthPayments">₹0</div>
+                </div>
+            </div>
+
+            <div class="filters">
+                <div class="filter-row">
+                    <div class="form-group">
+                        <label>Month</label>
+                        <input type="month" id="filterMonth" onchange="loadPayments()">
+                    </div>
+                    <div class="form-group">
+                        <label>Staff Member</label>
+                        <select id="filterUser" onchange="loadPayments()">
+                            <option value="">All Staff</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Method</label>
+                        <select id="filterMethod" onchange="loadPayments()">
+                            <option value="">All Methods</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="upi">UPI</option>
+                            <option value="cheque">Cheque</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-secondary" onclick="loadPayments()">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div id="loadingHistory" class="loading">
+                    <i class="fas fa-spinner fa-spin"></i> Loading payment history...
+                </div>
+                <div id="emptyHistory" class="empty-state" style="display: none;">
+                    <i class="fas fa-inbox"></i>
+                    <h3>No payment records found</h3>
+                </div>
+                <div id="historyTable" style="display: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Staff Name</th>
+                                <th>Month</th>
+                                <th>Amount Paid</th>
+                                <th>Method</th>
+                                <th>Reference</th>
+                                <th>Paid By</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Payments Tab -->
+        <div id="pendingTab" class="tab-content">
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <h3>Pending Staff</h3>
+                    <div class="value" id="pendingStaffCount">0</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Total Pending Amount</h3>
+                    <div class="value" id="totalPendingAmount">₹0</div>
+                </div>
+            </div>
+
+            <div class="filters">
+                <div class="filter-row">
+                    <div class="form-group">
+                        <label>Month</label>
+                        <input type="month" id="pendingMonth" onchange="loadPendingPayments()">
+                    </div>
+                    <div class="form-group">
+                        <label>Branch</label>
+                        <select id="pendingBranch" onchange="loadPendingPayments()">
+                            <option value="">All Branches</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-secondary" onclick="loadPendingPayments()">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div id="loadingPending" class="loading">
+                    <i class="fas fa-spinner fa-spin"></i> Loading pending payments...
+                </div>
+                <div id="emptyPending" class="empty-state" style="display: none;">
+                    <i class="fas fa-check-circle"></i>
+                    <h3>All payments completed!</h3>
+                    <p>No pending payments for the selected period</p>
+                </div>
+                <div id="pendingTable" style="display: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Staff Name</th>
+                                <th>Branch</th>
+                                <th>Month</th>
+                                <th>Net Salary</th>
+                                <th>Paid Amount</th>
+                                <th>Pending Amount</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let currentUser = null;
+
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) throw new Error('Unauthorized');
+                
+                currentUser = await response.json();
+                return true;
+            } catch (error) {
+                localStorage.removeItem('auth_token');
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        // Load staff users
+        async function loadStaff() {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/users?role=staff`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            
+            const select = document.getElementById('filterUser');
+            select.innerHTML = '<option value="">All Staff</option>';
+            data.forEach(user => {
+                select.innerHTML += `<option value="${user.id}">${user.full_name}</option>`;
+            });
+        }
+
+        // Load branches
+        async function loadBranches() {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/branches`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            
+            const select = document.getElementById('pendingBranch');
+            select.innerHTML = '<option value="">All Branches</option>';
+            data.forEach(branch => {
+                select.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+            });
+        }
+
+        // Set default month
+        function setDefaultMonth() {
+            const now = new Date();
+            const monthStr = now.toISOString().substring(0, 7);
+            document.getElementById('filterMonth').value = monthStr;
+            document.getElementById('pendingMonth').value = monthStr;
+        }
+
+        // Switch tabs
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'history') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('historyTab').classList.add('active');
+                loadPayments();
+            } else {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('pendingTab').classList.add('active');
+                loadPendingPayments();
+            }
+        }
+
+        // Load payment history
+        async function loadPayments() {
+            const token = localStorage.getItem('auth_token');
+            const month = document.getElementById('filterMonth').value;
+            const userId = document.getElementById('filterUser').value;
+            const method = document.getElementById('filterMethod').value;
+            
+            document.getElementById('loadingHistory').style.display = 'block';
+            document.getElementById('historyTable').style.display = 'none';
+            document.getElementById('emptyHistory').style.display = 'none';
+            
+            let url = `${API_BASE}/api/salary/payments?`;
+            if (month) url += `month=${month}&`;
+            if (userId) url += `user_id=${userId}&`;
+            if (method) url += `payment_method=${method}&`;
+            
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const result = await response.json();
+            
+            document.getElementById('loadingHistory').style.display = 'none';
+            
+            if (result.success && result.data.length > 0) {
+                renderPaymentHistory(result.data);
+                updateHistorySummary(result.data);
+                document.getElementById('historyTable').style.display = 'block';
+            } else {
+                document.getElementById('emptyHistory').style.display = 'block';
+                updateHistorySummary([]);
+            }
+        }
+
+        // Update history summary
+        function updateHistorySummary(payments) {
+            const now = new Date();
+            const currentMonth = now.toISOString().substring(0, 7);
+            
+            const totalPayments = payments.length;
+            const totalAmount = payments.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0);
+            const thisMonthAmount = payments
+                .filter(p => p.payment_date && p.payment_date.startsWith(currentMonth))
+                .reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0);
+            
+            document.getElementById('totalPayments').textContent = totalPayments;
+            document.getElementById('totalAmountPaid').textContent = '₹' + totalAmount.toLocaleString('en-IN', {minimumFractionDigits: 2});
+            document.getElementById('thisMonthPayments').textContent = '₹' + thisMonthAmount.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        }
+
+        // Render payment history
+        function renderPaymentHistory(payments) {
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = payments.map(p => `
+                <tr>
+                    <td>${new Date(p.payment_date).toLocaleDateString('en-IN')}</td>
+                    <td>${p.staff_name}</td>
+                    <td>${p.salary_month}</td>
+                    <td class="money">₹${parseFloat(p.amount_paid).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td>
+                        <span class="badge badge-info">
+                            ${p.payment_method.replace('_', ' ').toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${p.payment_reference || '-'}</td>
+                    <td>${p.paid_by_name || '-'}</td>
+                    <td>
+                        <span class="badge ${p.is_verified ? 'badge-success' : 'badge-warning'}">
+                            ${p.is_verified ? 'Verified' : 'Pending'}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Load pending payments
+        async function loadPendingPayments() {
+            const token = localStorage.getItem('auth_token');
+            const month = document.getElementById('pendingMonth').value;
+            const branchId = document.getElementById('pendingBranch').value;
+            
+            if (!month) {
+                alert('Please select a month');
+                return;
+            }
+            
+            document.getElementById('loadingPending').style.display = 'block';
+            document.getElementById('pendingTable').style.display = 'none';
+            document.getElementById('emptyPending').style.display = 'none';
+            
+            let url = `${API_BASE}/api/salary/monthly?month=${month}&payment_status=unpaid`;
+            if (branchId) url += `&branch_id=${branchId}`;
+            
+            // Also get partial payments
+            let partialUrl = `${API_BASE}/api/salary/monthly?month=${month}&payment_status=partial`;
+            if (branchId) partialUrl += `&branch_id=${branchId}`;
+            
+            const [unpaidResponse, partialResponse] = await Promise.all([
+                fetch(url, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(partialUrl, { headers: { 'Authorization': `Bearer ${token}` } })
+            ]);
+            
+            const unpaidResult = await unpaidResponse.json();
+            const partialResult = await partialResponse.json();
+            
+            const allPending = [...(unpaidResult.data || []), ...(partialResult.data || [])];
+            
+            document.getElementById('loadingPending').style.display = 'none';
+            
+            if (allPending.length > 0) {
+                renderPendingPayments(allPending);
+                updatePendingSummary(allPending);
+                document.getElementById('pendingTable').style.display = 'block';
+            } else {
+                document.getElementById('emptyPending').style.display = 'block';
+                updatePendingSummary([]);
+            }
+        }
+
+        // Update pending summary
+        function updatePendingSummary(salaries) {
+            const totalPending = salaries.reduce((sum, s) => {
+                return sum + (parseFloat(s.net_salary || 0) - parseFloat(s.paid_amount || 0));
+            }, 0);
+            
+            document.getElementById('pendingStaffCount').textContent = salaries.length;
+            document.getElementById('totalPendingAmount').textContent = '₹' + totalPending.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        }
+
+        // Render pending payments
+        function renderPendingPayments(salaries) {
+            const tbody = document.getElementById('pendingTableBody');
+            tbody.innerHTML = salaries.map(s => {
+                const netSalary = parseFloat(s.net_salary || 0);
+                const paidAmount = parseFloat(s.paid_amount || 0);
+                const pending = netSalary - paidAmount;
+                
+                return `
+                    <tr>
+                        <td>${s.staff_name}</td>
+                        <td>${s.branch_name}</td>
+                        <td>${s.salary_month}</td>
+                        <td class="money">₹${netSalary.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                        <td class="money">${paidAmount > 0 ? '₹' + paidAmount.toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
+                        <td class="money" style="color: #dc3545; font-weight: bold;">₹${pending.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                        <td>
+                            <span class="badge badge-${s.payment_status === 'unpaid' ? 'warning' : 'info'}">
+                                ${s.payment_status}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn btn-success btn-sm" onclick="goToPayment(${s.id})">
+                                <i class="fas fa-money-bill"></i> Pay Now
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Go to payment
+        function goToPayment(salaryId) {
+            window.location.href = `admin-salary-monthly.html?viewSalary=${salaryId}`;
+        }
+
+        // Initialize
+        (async () => {
+            if (await checkAuth()) {
+                loadStaff();
+                loadBranches();
+                setDefaultMonth();
+                loadPayments();
+            }
+        })();
+    </script>
+</body>
+</html>

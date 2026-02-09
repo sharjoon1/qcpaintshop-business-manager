@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Admin Dashboard - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body class="bg-gray-50">
+
+
+
+    <!-- Main Content -->
+    <div class="lg:ml-64 min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <div class="px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800">Estimates Management</h2>
+                        <p class="text-gray-600 text-sm mt-1">Manage all your estimates in one place</p>
+                    </div>
+                    <button onclick="createNewEstimate()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition shadow-lg flex items-center w-full sm:w-auto justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        New Estimate
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Filters & Search -->
+        <div class="p-4 sm:p-6 lg:p-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <!-- Search Bar -->
+                <div class="mb-4">
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="searchInput"
+                            placeholder="Search by estimate #, customer name, or phone..."
+                            class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                        >
+                        <svg class="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Status Filters -->
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="filterByStatus('all')" class="status-filter active px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="all">
+                        All <span id="count-all" class="ml-1 bg-white/20 px-2 py-0.5 rounded-full text-xs">0</span>
+                    </button>
+                    <button onclick="filterByStatus('draft')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="draft">
+                        🆕 Draft <span id="count-draft" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('sent')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="sent">
+                        📧 Sent <span id="count-sent" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('pending_approval')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="pending_approval">
+                        ⏳ Pending <span id="count-pending_approval" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('approved')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="approved">
+                        ✅ Approved <span id="count-approved" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('rejected')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="rejected">
+                        ❌ Rejected <span id="count-rejected" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('converted')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="converted">
+                        📄 Converted <span id="count-converted" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('expired')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="expired">
+                        ⌛ Expired <span id="count-expired" class="ml-1">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Estimates Grid (Mobile: Cards, Desktop: Table) -->
+            <div id="estimatesContainer">
+                <!-- Loading state -->
+                <div id="loadingState" class="text-center py-12">
+                    <svg class="inline w-12 h-12 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="mt-4 text-gray-600">Loading estimates...</p>
+                </div>
+
+                <!-- Empty state -->
+                <div id="emptyState" class="hidden text-center py-12 bg-white rounded-xl">
+                    <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">No estimates found</h3>
+                    <p class="text-gray-600 mb-4">Create your first estimate to get started</p>
+                    <button onclick="createNewEstimate()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition">
+                        Create Estimate
+                    </button>
+                </div>
+
+                <!-- Desktop Table -->
+                <div id="desktopTable" class="hidden lg:block bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-max">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estimate #</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="desktopTableBody" class="divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                    </div> <!-- Close overflow-x-auto -->
+                </div> <!-- Close desktopTable -->
+
+                <!-- Mobile Cards -->
+                <div id="mobileCards" class="lg:hidden space-y-4">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions Menu Modal -->
+    <div id="actionsModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeActionsModal()"></div>
+            
+            <!-- Modal content -->
+            <div class="inline-block align-bottom bg-white rounded-t-2xl sm:rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-bold" id="actionsModalTitle">Estimate Actions</h3>
+                        <button onclick="closeActionsModal()" class="text-white hover:text-gray-200">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Actions List -->
+                <div id="actionsModalBody" class="divide-y divide-gray-200">
+                    <!-- Actions will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="estimates.js"></script>
+</body>
+</html>

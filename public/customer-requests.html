@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Requests - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .status-new { background: #dbeafe; color: #1e40af; }
+        .status-contacted { background: #fef3c7; color: #92400e; }
+        .status-quote_sent { background: #ddd6fe; color: #5b21b6; }
+        .status-accepted { background: #d1fae5; color: #065f46; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+        .status-completed { background: #e0e7ff; color: #3730a3; }
+        .request-card {
+            transition: all 0.3s;
+        }
+        .request-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <img id="headerLogo" src="https://qcpaintshop.com/assets/images/logo.png" alt="Quality Colours" class="h-[60px] max-w-[200px] object-contain">
+                </div>
+
+                <nav class="hidden md:flex items-center space-x-4">
+                    <a href="customer-dashboard.html" class="px-4 py-2 rounded-md hover:bg-white/10 text-sm font-medium">Dashboard</a>
+                    <a href="customer-requests.html" class="px-4 py-2 rounded-md bg-white/20 text-sm font-medium">My Requests</a>
+                    <a href="request-estimate.html" class="px-4 py-2 rounded-md hover:bg-white/10 text-sm font-medium">New Request</a>
+                </nav>
+
+                <div class="relative">
+                    <button id="profileBtn" class="flex items-center space-x-3 p-2 rounded-md hover:bg-white/10">
+                        <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold" id="profileInitial">C</div>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                        <a href="admin-profile.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</a>
+                        <a href="customer-login.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="md:hidden pb-3">
+                <nav class="flex space-x-2">
+                    <a href="customer-dashboard.html" class="flex-1 px-3 py-2 rounded-md hover:bg-white/10 text-xs font-medium text-center">Dashboard</a>
+                    <a href="customer-requests.html" class="flex-1 px-3 py-2 rounded-md bg-white/20 text-xs font-medium text-center">Requests</a>
+                    <a href="request-estimate.html" class="flex-1 px-3 py-2 rounded-md hover:bg-white/10 text-xs font-medium text-center">New</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Page Header -->
+    <div class="bg-white shadow-sm">
+        <div class="px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">📋 My Estimate Requests</h1>
+                    <p class="text-gray-600 mt-1">Track the status of your painting project requests</p>
+                </div>
+                <a href="request-estimate.html" class="mt-4 sm:mt-0 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 shadow-lg inline-block text-center">
+                    ➕ New Request
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
+        <!-- Filter Tabs -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex flex-wrap gap-2">
+                <button onclick="filterRequests('all')" id="filterAll" class="filter-btn px-4 py-2 rounded-lg font-medium bg-purple-600 text-white">
+                    All (<span id="countAll">0</span>)
+                </button>
+                <button onclick="filterRequests('new')" id="filterNew" class="filter-btn px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    New (<span id="countNew">0</span>)
+                </button>
+                <button onclick="filterRequests('contacted')" id="filterContacted" class="filter-btn px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    Under Review (<span id="countContacted">0</span>)
+                </button>
+                <button onclick="filterRequests('quote_sent')" id="filterQuoteSent" class="filter-btn px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    Quote Received (<span id="countQuoteSent">0</span>)
+                </button>
+                <button onclick="filterRequests('accepted')" id="filterAccepted" class="filter-btn px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    Accepted (<span id="countAccepted">0</span>)
+                </button>
+            </div>
+        </div>
+
+        <!-- Requests Grid -->
+        <div id="requestsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="col-span-full text-center py-12 text-gray-400">
+                <div class="text-5xl mb-3">⏳</div>
+                <p>Loading your requests...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Request Detail Modal -->
+    <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 py-8">
+            <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full my-8">
+                <div class="gradient-bg text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
+                    <h3 class="text-xl font-bold" id="modalTitle">Request Details</h3>
+                    <button onclick="closeModal()" class="text-white hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="modalContent" class="p-6 max-h-[70vh] overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-12">
+        <div class="px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-gray-400 text-sm">© 2026 Quality Colours. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE = '/business-manager/api';
+        let customerPhone = null;
+        let allRequests = [];
+        let currentFilter = 'all';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCustomerInfo();
+            loadRequests();
+
+            document.getElementById('profileBtn').addEventListener('click', function() {
+                document.getElementById('profileDropdown').classList.toggle('hidden');
+            });
+        });
+
+        function loadCustomerInfo() {
+            customerPhone = localStorage.getItem('customer_phone') || '7418831122';
+            const customerName = localStorage.getItem('customer_name') || 'Customer';
+            document.getElementById('profileInitial').textContent = customerName.charAt(0).toUpperCase();
+        }
+
+        async function loadRequests() {
+            const container = document.getElementById('requestsContainer');
+            container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-400"><div class="text-5xl mb-3">⏳</div><p>Loading...</p></div>';
+
+            try {
+                if (!customerPhone) {
+                    container.innerHTML = `
+                        <div class="col-span-full text-center py-12">
+                            <p class="text-gray-600 mb-4">Please login to view your requests</p>
+                            <a href="login.html" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700">Login</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const response = await fetch(`${API_BASE}/estimate-requests?search=${customerPhone}`);
+                const result = await response.json();
+
+                if (!result.success || result.data.length === 0) {
+                    container.innerHTML = `
+                        <div class="col-span-full text-center py-12">
+                            <div class="text-6xl mb-4">📭</div>
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">No requests yet</h3>
+                            <p class="text-gray-600 mb-6">Start by submitting your first estimate request</p>
+                            <a href="request-estimate.html" class="inline-block bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                                Submit New Request
+                            </a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                allRequests = result.data;
+                updateCounts();
+                displayRequests();
+
+            } catch (error) {
+                console.error('Load requests error:', error);
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12 text-red-600">
+                        <div class="text-5xl mb-3">❌</div>
+                        <p>Failed to load requests. Please try again.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function updateCounts() {
+            document.getElementById('countAll').textContent = allRequests.length;
+            document.getElementById('countNew').textContent = allRequests.filter(r => r.status === 'new').length;
+            document.getElementById('countContacted').textContent = allRequests.filter(r => r.status === 'contacted').length;
+            document.getElementById('countQuoteSent').textContent = allRequests.filter(r => r.status === 'quote_sent').length;
+            document.getElementById('countAccepted').textContent = allRequests.filter(r => r.status === 'accepted').length;
+        }
+
+        function filterRequests(status) {
+            currentFilter = status;
+            
+            // Update button styles
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('bg-purple-600', 'text-white');
+                btn.classList.add('bg-gray-100', 'text-gray-700');
+            });
+            document.getElementById('filter' + status.charAt(0).toUpperCase() + status.slice(1)).classList.remove('bg-gray-100', 'text-gray-700');
+            document.getElementById('filter' + status.charAt(0).toUpperCase() + status.slice(1)).classList.add('bg-purple-600', 'text-white');
+            
+            displayRequests();
+        }
+
+        function displayRequests() {
+            const container = document.getElementById('requestsContainer');
+            let filtered = currentFilter === 'all' ? allRequests : allRequests.filter(r => r.status === currentFilter);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12 text-gray-400">
+                        <div class="text-5xl mb-3">📭</div>
+                        <p>No requests with this status</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(request => `
+                <div class="request-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer" onclick="viewRequest(${request.id})">
+                    <div class="p-6">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex-1">
+                                <h3 class="text-lg font-bold text-gray-800 mb-1">${request.request_number}</h3>
+                                <p class="text-sm text-gray-600">${formatProjectType(request.project_type)}</p>
+                            </div>
+                            <span class="status-badge status-${request.status} px-3 py-1 rounded-full text-xs font-semibold">
+                                ${formatStatus(request.status)}
+                            </span>
+                        </div>
+
+                        <div class="space-y-2 mb-4">
+                            <div class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                ${formatPropertyType(request.property_type)}
+                            </div>
+                            <div class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                </svg>
+                                ${request.area_sqft} sq.ft
+                            </div>
+                            <div class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                ${formatDate(request.created_at)}
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t flex items-center justify-between">
+                            <span class="text-xs text-gray-500">${formatTimeAgo(request.created_at)}</span>
+                            <button class="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-200">
+                                View Details →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function viewRequest(id) {
+            try {
+                const response = await fetch(`${API_BASE}/estimate-requests/${id}`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    alert('Failed to load request details');
+                    return;
+                }
+
+                const req = result.data;
+
+                document.getElementById('modalTitle').textContent = req.request_number;
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="space-y-6">
+                        <!-- Status Badge -->
+                        <div class="text-center pb-4 border-b">
+                            <span class="status-badge status-${req.status} px-6 py-2 rounded-full text-sm font-semibold inline-block">
+                                ${formatStatus(req.status)}
+                            </span>
+                        </div>
+
+                        <!-- Project Details -->
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-800 mb-3">🏠 Project Details</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+                                <p><span class="text-gray-600">Project Type:</span> <strong>${formatProjectType(req.project_type)}</strong></p>
+                                <p><span class="text-gray-600">Property Type:</span> <strong>${formatPropertyType(req.property_type)}</strong></p>
+                                <p><span class="text-gray-600">Area:</span> <strong>${req.area_sqft} sq.ft</strong></p>
+                                ${req.rooms ? `<p><span class="text-gray-600">Rooms:</span> <strong>${req.rooms}</strong></p>` : ''}
+                                <p><span class="text-gray-600">Location:</span> ${req.location}</p>
+                            </div>
+                        </div>
+
+                        ${req.preferred_brand || req.timeline || req.budget_range ? `
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-800 mb-3">💡 Your Preferences</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+                                ${req.preferred_brand ? `<p><span class="text-gray-600">Preferred Brand:</span> <strong>${req.preferred_brand}</strong></p>` : ''}
+                                ${req.timeline ? `<p><span class="text-gray-600">Timeline:</span> <strong>${req.timeline}</strong></p>` : ''}
+                                ${req.budget_range ? `<p><span class="text-gray-600">Budget Range:</span> <strong>${req.budget_range}</strong></p>` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        ${req.additional_notes ? `
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-800 mb-3">📝 Additional Notes</h4>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <p class="text-gray-700">${req.additional_notes}</p>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- Status Timeline -->
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-800 mb-3">📅 Request Timeline</h4>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <p class="text-sm text-gray-600">Submitted on ${formatDate(req.created_at)}</p>
+                                ${req.contacted_at ? `<p class="text-sm text-gray-600 mt-1">Contacted on ${formatDate(req.contacted_at)}</p>` : ''}
+                                ${req.quote_sent_at ? `<p class="text-sm text-gray-600 mt-1">Quote sent on ${formatDate(req.quote_sent_at)}</p>` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Contact Info -->
+                        <div class="bg-gradient-to-r from-purple-100 to-purple-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-2">📞 Need Help?</h4>
+                            <p class="text-sm text-gray-700 mb-3">Our team is ready to assist you</p>
+                            <div class="flex gap-2">
+                                <a href="tel:+919876543210" class="flex-1 bg-green-600 text-white py-2 rounded-lg text-center hover:bg-green-700 font-semibold">
+                                    Call Us
+                                </a>
+                                <a href="https://wa.me/919876543210" target="_blank" class="flex-1 bg-emerald-600 text-white py-2 rounded-lg text-center hover:bg-emerald-700 font-semibold">
+                                    WhatsApp
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('detailModal').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('View request error:', error);
+                alert('Failed to load request details');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+        }
+
+        function formatStatus(status) {
+            const map = {
+                'new': '🆕 New',
+                'contacted': '👀 Under Review',
+                'quote_sent': '📧 Quote Sent',
+                'accepted': '✅ Accepted',
+                'rejected': '❌ Declined',
+                'completed': '🎉 Completed'
+            };
+            return map[status] || status;
+        }
+
+        function formatProjectType(type) {
+            const map = {
+                'interior': 'Interior Painting',
+                'exterior': 'Exterior Painting',
+                'both': 'Interior & Exterior',
+                'commercial': 'Commercial Project',
+                'renovation': 'Renovation Work',
+                'new_construction': 'New Construction'
+            };
+            return map[type] || type;
+        }
+
+        function formatPropertyType(type) {
+            const map = {
+                'house': 'Independent House',
+                'apartment': 'Apartment',
+                'villa': 'Villa',
+                'office': 'Office Space',
+                'shop': 'Shop/Showroom',
+                'warehouse': 'Warehouse',
+                'other': 'Other'
+            };
+            return map[type] || type;
+        }
+
+        function formatDate(dateStr) {
+            return new Date(dateStr).toLocaleDateString('en-IN', { 
+                day: 'numeric', 
+                month: 'short', 
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatTimeAgo(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            const hours = Math.floor(diff / 3600000);
+            
+            if (hours < 1) return 'Just now';
+            if (hours < 24) return `${hours} hours ago`;
+            const days = Math.floor(hours / 24);
+            if (days === 1) return 'Yesterday';
+            if (days < 7) return `${days} days ago`;
+            return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        }
+
+        document.getElementById('detailModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+    </script>
+    <script src="/business-manager/components/logo-loader.js"></script>
+</body>
+</html>

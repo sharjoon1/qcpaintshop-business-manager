@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Types - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Unified Header Component -->
+    <div id="header-container"></div>
+    
+    <script src="/business-manager/public/header-loader.js"></script>
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div class="px-4 py-3 flex items-center justify-between">
+            <button onclick="history.back()" class="flex items-center text-gray-600 hover:text-gray-900">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back to Dashboard
+            </button>
+            <h1 class="text-xl font-bold text-gray-800">🎯 Customer Types & Roles</h1>
+            <button onclick="openAddModal()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold">
+                + Add Type
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto p-4 sm:p-6">
+        <!-- Info Card -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 class="font-semibold text-blue-900 mb-2">📋 About Customer Types</h3>
+            <p class="text-sm text-blue-800">
+                Customer types help categorize your customers and apply automatic discounts based on their type. 
+                For example, contractors might get 5% discount, dealers 10%, etc.
+            </p>
+        </div>
+
+        <!-- Customer Types List -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">All Customer Types</h2>
+            
+            <!-- Loading State -->
+            <div id="loadingState" class="text-center py-8">
+                <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+
+            <!-- Types Grid -->
+            <div id="typesGrid" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="typeModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeModal()"></div>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form id="typeForm" onsubmit="saveType(event)">
+                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white">
+                        <h3 class="text-lg font-bold" id="modalTitle">Add New Customer Type</h3>
+                    </div>
+                    
+                    <div class="px-6 py-4 space-y-4">
+                        <input type="hidden" id="typeId">
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Type Name *</label>
+                            <input type="text" id="typeName" required placeholder="e.g., Retail, Contractor, Dealer" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                            <textarea id="description" rows="3" placeholder="Brief description of this customer type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Default Discount (%)</label>
+                            <input type="number" id="defaultDiscount" min="0" max="100" step="0.01" value="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">Automatic discount applied to this customer type</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Status *</label>
+                            <select id="status" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-6 py-4 flex gap-3">
+                        <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100">
+                            Cancel
+                        </button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">
+                            Save Type
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allTypes = [];
+        let editingTypeId = null;
+
+        async function loadTypes() {
+            try {
+                const response = await fetch('/business-manager/api/customer-types');
+                allTypes = await response.json();
+                
+                renderTypesGrid();
+                
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('typesGrid').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error loading types:', error);
+                document.getElementById('loadingState').innerHTML = '<p class="text-red-600">Failed to load customer types</p>';
+            }
+        }
+
+        function renderTypesGrid() {
+            const grid = document.getElementById('typesGrid');
+            
+            if (allTypes.length === 0) {
+                grid.innerHTML = '<p class="col-span-2 text-center py-8 text-gray-500">No customer types found</p>';
+                return;
+            }
+            
+            grid.innerHTML = allTypes.map(type => `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition ${type.status === 'inactive' ? 'bg-gray-50' : 'bg-white'}">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-900">${type.name}</h3>
+                            <p class="text-sm text-gray-600 mt-1">${type.description || 'No description'}</p>
+                        </div>
+                        <span class="px-2 py-1 text-xs rounded-full ${type.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'}">
+                            ${type.status === 'active' ? '✅ Active' : '⏸️ Inactive'}
+                        </span>
+                    </div>
+                    
+                    <div class="bg-purple-50 rounded-lg p-3 mb-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600">Default Discount:</span>
+                            <span class="text-xl font-bold text-purple-600">${parseFloat(type.default_discount).toFixed(1)}%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button onclick="editType(${type.id})" class="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-semibold">
+                            ✏️ Edit
+                        </button>
+                        <button onclick="deleteType(${type.id})" class="flex-1 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-semibold">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openAddModal() {
+            editingTypeId = null;
+            document.getElementById('modalTitle').textContent = 'Add New Customer Type';
+            document.getElementById('typeForm').reset();
+            document.getElementById('typeId').value = '';
+            document.getElementById('typeModal').classList.remove('hidden');
+        }
+
+        function editType(id) {
+            const type = allTypes.find(t => t.id == id);
+            if (!type) return;
+            
+            editingTypeId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Customer Type';
+            document.getElementById('typeId').value = type.id;
+            document.getElementById('typeName').value = type.name;
+            document.getElementById('description').value = type.description || '';
+            document.getElementById('defaultDiscount').value = parseFloat(type.default_discount);
+            document.getElementById('status').value = type.status;
+            
+            document.getElementById('typeModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('typeModal').classList.add('hidden');
+        }
+
+        async function saveType(event) {
+            event.preventDefault();
+            
+            const typeData = {
+                name: document.getElementById('typeName').value,
+                description: document.getElementById('description').value || null,
+                default_discount: document.getElementById('defaultDiscount').value,
+                status: document.getElementById('status').value
+            };
+            
+            try {
+                const url = editingTypeId 
+                    ? `/business-manager/api/customer-types/${editingTypeId}`
+                    : '/business-manager/api/customer-types';
+                    
+                const method = editingTypeId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(typeData)
+                });
+                
+                if (response.ok) {
+                    alert(editingTypeId ? 'Customer type updated successfully!' : 'Customer type added successfully!');
+                    closeModal();
+                    loadTypes();
+                } else {
+                    const error = await response.json();
+                    alert('Failed to save customer type: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error saving type:', error);
+                alert('Error saving customer type');
+            }
+        }
+
+        async function deleteType(id) {
+            const type = allTypes.find(t => t.id == id);
+            if (!type) return;
+            
+            if (!confirm(`Are you sure you want to delete "${type.name}"?\n\nThis action cannot be undone!`)) return;
+            
+            try {
+                const response = await fetch(`/business-manager/api/customer-types/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Customer type deleted successfully!');
+                    loadTypes();
+                } else {
+                    alert('Failed to delete customer type');
+                }
+            } catch (error) {
+                console.error('Error deleting type:', error);
+                alert('Error deleting customer type');
+            }
+        }
+
+        // Initialize
+        loadTypes();
+    </script>
+</body>
+</html>

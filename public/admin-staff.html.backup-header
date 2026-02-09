@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Management - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div class="px-4 py-3 flex items-center justify-between">
+            <button onclick="history.back()" class="flex items-center text-gray-600 hover:text-gray-900">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back to Dashboard
+            </button>
+            <h1 class="text-xl font-bold text-gray-800">👥 Staff Management</h1>
+            <button onclick="openAddModal()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold">
+                + Add Staff
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto p-4 sm:p-6">
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-sm text-gray-600">Total Staff</div>
+                <div class="text-2xl font-bold text-gray-900" id="totalStaff">0</div>
+            </div>
+            <div class="bg-green-50 rounded-lg shadow p-4">
+                <div class="text-sm text-green-600">Active</div>
+                <div class="text-2xl font-bold text-green-700" id="activeStaff">0</div>
+            </div>
+            <div class="bg-yellow-50 rounded-lg shadow p-4">
+                <div class="text-sm text-yellow-600">Pending Approval</div>
+                <div class="text-2xl font-bold text-yellow-700" id="pendingStaff">0</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg shadow p-4">
+                <div class="text-sm text-gray-600">Inactive</div>
+                <div class="text-2xl font-bold text-gray-700" id="inactiveStaff">0</div>
+            </div>
+        </div>
+
+        <!-- Staff List -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">All Staff Members</h2>
+            
+            <!-- Loading State -->
+            <div id="loadingState" class="text-center py-8">
+                <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+
+            <!-- Staff Table -->
+            <div id="staffTable" class="hidden overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b-2 border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">ID</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Username</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Phone</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Branch</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staffTableBody" class="divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Staff Modal -->
+    <div id="staffModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeModal()"></div>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form id="staffForm" onsubmit="saveStaff(event)">
+                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white">
+                        <h3 class="text-lg font-bold" id="modalTitle">Add New Staff</h3>
+                    </div>
+                    
+                    <div class="px-6 py-4 space-y-4">
+                        <input type="hidden" id="staffId">
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                            <input type="text" id="fullName" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Username *</label>
+                            <input type="text" id="username" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
+                            <input type="email" id="email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div id="passwordField">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Password *</label>
+                            <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">Leave blank to keep current password (when editing)</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
+                            <input type="tel" id="phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Branch *</label>
+                            <select id="branchId" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                                <option value="">-- Select Branch --</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Status *</label>
+                            <select id="status" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="pending_approval">Pending Approval</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-6 py-4 flex gap-3">
+                        <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100">
+                            Cancel
+                        </button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">
+                            Save Staff
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allStaff = [];
+        let branches = [];
+        let editingStaffId = null;
+
+        // Load initial data
+        async function loadData() {
+            try {
+                // Load branches
+                const branchRes = await fetch('/business-manager/api/branches');
+                branches = await branchRes.json();
+                
+                const branchSelect = document.getElementById('branchId');
+                branchSelect.innerHTML = '<option value="">-- Select Branch --</option>' +
+                    branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+                
+                // Load staff (users with role='staff' or 'admin')
+                await loadStaff();
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Failed to load data');
+            }
+        }
+
+        async function loadStaff() {
+            try {
+                const response = await fetch('/business-manager/api/users');
+                const users = await response.json();
+                
+                // Filter only staff and admin
+                allStaff = users.filter(u => u.role === 'staff' || u.role === 'admin');
+                
+                // Update stats
+                updateStats();
+                
+                // Render table
+                renderStaffTable();
+                
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('staffTable').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error loading staff:', error);
+                document.getElementById('loadingState').innerHTML = '<p class="text-red-600">Failed to load staff</p>';
+            }
+        }
+
+        function updateStats() {
+            const total = allStaff.length;
+            const active = allStaff.filter(s => s.status === 'active').length;
+            const pending = allStaff.filter(s => s.status === 'pending_approval').length;
+            const inactive = allStaff.filter(s => s.status === 'inactive').length;
+            
+            document.getElementById('totalStaff').textContent = total;
+            document.getElementById('activeStaff').textContent = active;
+            document.getElementById('pendingStaff').textContent = pending;
+            document.getElementById('inactiveStaff').textContent = inactive;
+        }
+
+        function renderStaffTable() {
+            const tbody = document.getElementById('staffTableBody');
+            
+            if (allStaff.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No staff members found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = allStaff.map(staff => {
+                const branch = branches.find(b => b.id == staff.branch_id);
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm">${staff.id}</td>
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-gray-900">${staff.full_name || 'N/A'}</div>
+                            <div class="text-xs text-gray-500">${staff.email}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${staff.username}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${staff.phone || '-'}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${branch ? branch.name : 'N/A'}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 text-xs rounded-full ${getStatusClass(staff.status)}">
+                                ${getStatusText(staff.status)}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-center space-x-2">
+                            <button onclick="editStaff(${staff.id})" class="text-blue-600 hover:text-blue-900 font-semibold text-sm">
+                                Edit
+                            </button>
+                            <button onclick="deleteStaff(${staff.id})" class="text-red-600 hover:text-red-900 font-semibold text-sm">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getStatusClass(status) {
+            const classes = {
+                'active': 'bg-green-100 text-green-800',
+                'inactive': 'bg-gray-100 text-gray-800',
+                'pending_approval': 'bg-yellow-100 text-yellow-800'
+            };
+            return classes[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                'active': '✅ Active',
+                'inactive': '⏸️ Inactive',
+                'pending_approval': '⏳ Pending'
+            };
+            return texts[status] || status;
+        }
+
+        function openAddModal() {
+            editingStaffId = null;
+            document.getElementById('modalTitle').textContent = 'Add New Staff';
+            document.getElementById('staffForm').reset();
+            document.getElementById('staffId').value = '';
+            document.getElementById('password').required = true;
+            document.getElementById('staffModal').classList.remove('hidden');
+        }
+
+        function editStaff(id) {
+            const staff = allStaff.find(s => s.id == id);
+            if (!staff) return;
+            
+            editingStaffId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Staff';
+            document.getElementById('staffId').value = staff.id;
+            document.getElementById('fullName').value = staff.full_name || '';
+            document.getElementById('username').value = staff.username;
+            document.getElementById('email').value = staff.email;
+            document.getElementById('phone').value = staff.phone || '';
+            document.getElementById('branchId').value = staff.branch_id || '';
+            document.getElementById('status').value = staff.status;
+            document.getElementById('password').required = false;
+            document.getElementById('password').value = '';
+            
+            document.getElementById('staffModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('staffModal').classList.add('hidden');
+        }
+
+        async function saveStaff(event) {
+            event.preventDefault();
+            
+            const staffData = {
+                full_name: document.getElementById('fullName').value,
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value || null,
+                branch_id: document.getElementById('branchId').value,
+                status: document.getElementById('status').value,
+                role: 'staff'
+            };
+            
+            const password = document.getElementById('password').value;
+            if (password) {
+                staffData.password = password;
+            }
+            
+            try {
+                const url = editingStaffId 
+                    ? `/business-manager/api/users/${editingStaffId}`
+                    : '/business-manager/api/users';
+                    
+                const method = editingStaffId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(staffData)
+                });
+                
+                if (response.ok) {
+                    alert(editingStaffId ? 'Staff updated successfully!' : 'Staff added successfully!');
+                    closeModal();
+                    loadStaff();
+                } else {
+                    const error = await response.json();
+                    alert('Failed to save staff: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error saving staff:', error);
+                alert('Error saving staff');
+            }
+        }
+
+        async function deleteStaff(id) {
+            const staff = allStaff.find(s => s.id == id);
+            if (!staff) return;
+            
+            if (!confirm(`Are you sure you want to delete ${staff.full_name}?\n\nThis action cannot be undone!`)) return;
+            
+            try {
+                const response = await fetch(`/business-manager/api/users/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Staff deleted successfully!');
+                    loadStaff();
+                } else {
+                    alert('Failed to delete staff');
+                }
+            } catch (error) {
+                console.error('Error deleting staff:', error);
+                alert('Error deleting staff');
+            }
+        }
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+</html>

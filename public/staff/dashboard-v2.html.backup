@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Dashboard - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body class="bg-gray-50">
+    
+    <!-- Main Content -->
+    <div class="min-h-screen" style="padding-top: 1rem;">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            <!-- Page Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900">👋 Welcome Back!</h1>
+                <p class="text-gray-600 mt-2" id="welcomeMessage">Have a great day at work</p>
+            </div>
+            
+            <!-- Clock Status Card -->
+            <div class="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-lg p-8 text-white mb-8">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">Current Status</h2>
+                        <p class="text-lg" id="clockStatus">Loading...</p>
+                        <p class="text-sm mt-2 opacity-90" id="clockTime"></p>
+                    </div>
+                    <div class="text-6xl">
+                        <span id="statusIcon">⏰</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div style="padding: 2rem 0;">
+                <h2 style="font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 1.5rem;">⚡ Quick Actions</h2>
+                
+                <!-- Primary Actions (Clock In/Out) - 2 per row -->
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem; margin-bottom: 2rem;">
+                    <a href="/business-manager/staff/clock-in.html" style="background: white; border-radius: 20px; padding: 3rem; box-shadow: 0 8px 20px rgba(0,0,0,0.12); text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 220px; border-top: 6px solid #10b981;">
+                        <div style="font-size: 4rem; margin-bottom: 1.5rem;">🟢</div>
+                        <div style="font-size: 1.75rem; font-weight: 700; color: #1f2937; margin-bottom: 0.75rem;">Clock In</div>
+                        <div style="font-size: 1rem; color: #6b7280;">Start your work day</div>
+                    </a>
+                    <a href="/business-manager/staff/clock-out.html" style="background: white; border-radius: 20px; padding: 3rem; box-shadow: 0 8px 20px rgba(0,0,0,0.12); text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 220px; border-top: 6px solid #ef4444;">
+                        <div style="font-size: 4rem; margin-bottom: 1.5rem;">🔴</div>
+                        <div style="font-size: 1.75rem; font-weight: 700; color: #1f2937; margin-bottom: 0.75rem;">Clock Out</div>
+                        <div style="font-size: 1rem; color: #6b7280;">End your work day</div>
+                    </a>
+                </div>
+                
+                <!-- Secondary Actions - 2 per row -->
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem;">
+                    <a href="/business-manager/staff/history.html" style="background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 160px; border-top: 4px solid #3b82f6;">
+                        <div style="font-size: 2.5rem; margin-bottom: 1rem;">📜</div>
+                        <div style="font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">My Attendance</div>
+                        <div style="font-size: 0.875rem; color: #6b7280;">View attendance history</div>
+                    </a>
+                    <a href="/business-manager/staff/permission-request.html" style="background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 160px; border-top: 4px solid #f59e0b;">
+                        <div style="font-size: 2.5rem; margin-bottom: 1rem;">✋</div>
+                        <div style="font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">Request Leave</div>
+                        <div style="font-size: 0.875rem; color: #6b7280;">Submit permission request</div>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Today's Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 mb-8">
+                <!-- Working Hours Today -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="bg-green-100 p-3 rounded-lg">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900" id="todayHours">0h 0m</h3>
+                    <p class="text-sm mt-1 text-gray-600">Working Hours Today</p>
+                </div>
+
+                <!-- This Month -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="bg-blue-100 p-3 rounded-lg">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900" id="monthDays">0</h3>
+                    <p class="text-sm mt-1 text-gray-600">Days This Month</p>
+                </div>
+
+                <!-- Pending Permissions -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="bg-orange-100 p-3 rounded-lg">
+                            <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900" id="pendingPermissions">0</h3>
+                    <p class="text-sm mt-1 text-gray-600">Pending Permissions</p>
+                </div>
+            </div>
+
+            <!-- Recent Attendance -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">Recent Attendance</h2>
+                <div id="recentAttendance" class="space-y-3">
+                    <p class="text-gray-500 text-center py-8">Loading attendance history...</p>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        // Helper function for authenticated API requests
+        function getAuthHeaders() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                window.location.href = '/business-manager/login.html';
+                return {};
+            }
+            return {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // Load Dashboard Data
+        async function loadDashboardData() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            // Set welcome message
+            if (user.full_name) {
+                document.getElementById('welcomeMessage').textContent = `Have a great day, ${user.full_name}!`;
+            }
+
+            try {
+                // Load clock status
+                const clockRes = await fetch('/business-manager/api/attendance/today', {
+                    headers: getAuthHeaders()
+                });
+                if (clockRes.ok) {
+                    const clockData = await clockRes.json();
+                    updateClockStatus(clockData);
+                }
+
+                // Load attendance history
+                const historyRes = await fetch('/business-manager/api/attendance/my-history?limit=5', {
+                    headers: getAuthHeaders()
+                });
+                if (historyRes.ok) {
+                    const history = await historyRes.json();
+                    displayRecentAttendance(history);
+                }
+
+                // Load pending permissions
+                const permissionsRes = await fetch('/business-manager/api/attendance/permission/my-requests', {
+                    headers: getAuthHeaders()
+                });
+                if (permissionsRes.ok) {
+                    const permissions = await permissionsRes.json();
+                    const pending = permissions.filter(p => p.status === 'pending');
+                    document.getElementById('pendingPermissions').textContent = pending.length;
+                }
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            }
+        }
+
+        function updateClockStatus(data) {
+            const statusEl = document.getElementById('clockStatus');
+            const timeEl = document.getElementById('clockTime');
+            const iconEl = document.getElementById('statusIcon');
+
+            if (data.clocked_in_at && !data.clocked_out_at) {
+                statusEl.textContent = 'Currently Working';
+                statusEl.className = 'text-lg font-semibold text-green-200';
+                timeEl.textContent = `Clocked in at ${new Date(data.clocked_in_at).toLocaleTimeString()}`;
+                iconEl.textContent = '🟢';
+                document.getElementById('todayHours').textContent = calculateWorkingHours(data.clocked_in_at, new Date());
+            } else if (data.clocked_out_at) {
+                statusEl.textContent = 'Work Day Complete';
+                statusEl.className = 'text-lg font-semibold';
+                timeEl.textContent = `Clocked out at ${new Date(data.clocked_out_at).toLocaleTimeString()}`;
+                iconEl.textContent = '✅';
+                document.getElementById('todayHours').textContent = calculateWorkingHours(data.clocked_in_at, data.clocked_out_at);
+            } else {
+                statusEl.textContent = 'Not Clocked In';
+                statusEl.className = 'text-lg';
+                timeEl.textContent = 'Ready to start your day?';
+                iconEl.textContent = '⏰';
+            }
+        }
+
+        function calculateWorkingHours(startTime, endTime) {
+            const start = new Date(startTime);
+            const end = new Date(endTime);
+            const diff = Math.abs(end - start);
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            return `${hours}h ${minutes}m`;
+        }
+
+        function displayRecentAttendance(records) {
+            const container = document.getElementById('recentAttendance');
+            if (!records || records.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No attendance records yet</p>';
+                return;
+            }
+
+            container.innerHTML = records.map(record => `
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-gray-900">${new Date(record.date).toLocaleDateString()}</h4>
+                        <p class="text-sm text-gray-600">
+                            In: ${record.clocked_in_at ? new Date(record.clocked_in_at).toLocaleTimeString() : '--'}
+                            | Out: ${record.clocked_out_at ? new Date(record.clocked_out_at).toLocaleTimeString() : '--'}
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-gray-900">${calculateWorkingHours(record.clocked_in_at, record.clocked_out_at || new Date())}</p>
+                        <span class="text-xs px-2 py-1 rounded-full ${record.status === 'present' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                            ${record.status || 'present'}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>

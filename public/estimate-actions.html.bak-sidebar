@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Admin Dashboard - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Unified Header Component (Embedded) -->
+<!-- Unified Business Manager Header Component -->
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }
+    
+    .qc-unified-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 1000; }
+    .qc-header-content { max-width: 1400px; margin: 0 auto; padding: 0.75rem 1.5rem; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; }
+    .qc-left-section { display: flex; align-items: center; justify-content: flex-start; }
+    .qc-logo-section { display: flex; align-items: center; justify-content: center; gap: 1rem; }
+    .qc-right-section { display: flex; align-items: center; justify-content: flex-end; }
+    .qc-logo-img { height: 50px; width: auto; max-width: 200px; object-fit: contain; }
+    .qc-brand-info { display: flex; flex-direction: column; }
+    .qc-brand-title { color: white; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+    .qc-brand-tagline { color: rgba(255, 255, 255, 0.9); font-size: 0.75rem; font-weight: 500; }
+    
+    /* Hamburger Button */
+    .qc-hamburger { display: flex; flex-direction: column; gap: 4px; background: rgba(255, 255, 255, 0.15); border: 2px solid rgba(255, 255, 255, 0.3); padding: 8px; border-radius: 8px; cursor: pointer; width: 36px; height: 36px; justify-content: center; align-items: center; }
+    .qc-hamburger:hover { background: rgba(255, 255, 255, 0.25); }
+    .qc-hamburger span { width: 20px; height: 2.5px; background: white; border-radius: 2px; transition: all 0.3s; }
+    .qc-hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+    .qc-hamburger.active span:nth-child(2) { opacity: 0; }
+    .qc-hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(6px, -6px); }
+    
+    /* Mobile Nav Drawer */
+    .qc-nav-mobile { position: fixed; top: 0; left: -280px; width: 280px; height: 100vh; background: linear-gradient(180deg, #667eea 0%, #764ba2 100%); box-shadow: 2px 0 10px rgba(0,0,0,0.3); transition: left 0.3s; z-index: 1001; padding: 1.5rem; overflow-y: auto; }
+    .qc-nav-mobile.open { left: 0; }
+    .qc-nav-mobile-header { display: flex; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.2); }
+    .qc-nav-mobile-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; }
+    .qc-nav-mobile-menu { display: flex; flex-direction: column; gap: 0.5rem; }
+    .qc-nav-mobile-link { padding: 1rem; color: white; text-decoration: none; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 1rem; background: rgba(255,255,255,0.1); transition: all 0.3s; }
+    .qc-nav-mobile-link:hover, .qc-nav-mobile-link.active { background: rgba(255,255,255,0.2); transform: translateX(5px); }
+    
+    /* Overlay */
+    .qc-nav-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1000; }
+    .qc-nav-overlay.show { display: block; }
+    
+    /* Profile Section */
+    .qc-profile-section { position: relative; }
+    .qc-profile-button { background: transparent; border: none; padding: 0; border-radius: 50%; cursor: pointer; display: flex; align-items: center; }
+    .qc-profile-pic { width: 48px; height: 48px; border-radius: 50%; border: none; object-fit: cover; }
+    .qc-profile-initial { width: 48px; height: 48px; border-radius: 50%; background: white; color: #667eea; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.125rem; border: none; }
+    .qc-profile-info { text-align: right; }
+    .qc-profile-name { color: white; font-weight: 600; font-size: 0.875rem; }
+    .qc-profile-role { color: rgba(255,255,255,0.9); font-size: 0.75rem; }
+    
+    /* Dropdown */
+    .qc-profile-dropdown { display: none; position: absolute; right: 0; top: calc(100% + 0.5rem); background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); min-width: 220px; }
+    .qc-profile-dropdown.show { display: block; }
+    .qc-dropdown-item { padding: 0.75rem 1.25rem; color: #333; text-decoration: none; display: flex; align-items: center; gap: 0.75rem; }
+    .qc-dropdown-item:hover { background: #f7fafc; color: #667eea; }
+    .qc-dropdown-divider { height: 1px; background: #e2e8f0; margin: 0.5rem 0; }
+    .qc-dropdown-item.logout { color: #e74c3c; }
+    
+    @media (max-width: 640px) { .qc-brand-title { font-size: 1.125rem; } .qc-brand-tagline { display: none; } .qc-logo-img { height: 40px; } .qc-profile-info { display: none; } }
+</style>
+
+<header class="qc-unified-header">
+    <div class="qc-header-content">
+        <!-- Left: Hamburger -->
+        <div class="qc-left-section">
+            <button class="qc-hamburger" onclick="toggleMobileNav()" id="hamburgerBtn">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+        
+        <!-- Center: Logo -->
+        <div class="qc-logo-section">
+            <img id="headerLogo" src="/company-logo.png" alt="Quality Colours" class="qc-logo-img">
+        </div>
+        
+        <!-- Right: Profile -->
+        <div class="qc-right-section">
+            <div class="qc-profile-section">
+            <button class="qc-profile-button" onclick="toggleProfileDropdown()">
+                <img id="headerProfilePic" src="" alt="Profile" class="qc-profile-pic" style="display:none;">
+                <div id="headerProfileInitial" class="qc-profile-initial">A</div>
+            </button>
+            
+            <div class="qc-profile-dropdown" id="profileDropdown">
+                <a href="/business-manager/admin-profile.html" class="qc-dropdown-item">👤 Edit Profile</a>
+                <a href="/business-manager/admin-settings.html" class="qc-dropdown-item">⚙️ Settings</a>
+                <div class="qc-dropdown-divider"></div>
+                <a href="#" onclick="headerLogout(); return false;" class="qc-dropdown-item logout">🚪 Logout</a>
+            </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="qc-nav-overlay" id="navOverlay" onclick="closeMobileNav()"></div>
+<nav class="qc-nav-mobile" id="mobileNav">
+    <div class="qc-nav-mobile-header">
+        <div class="qc-brand-title" style="font-size:1.25rem;">Quality Colours</div>
+        <button class="qc-nav-mobile-close" onclick="closeMobileNav()">×</button>
+    </div>
+    <div class="qc-nav-mobile-menu">
+        <a href="/business-manager/admin-dashboard.html" class="qc-nav-mobile-link">📊 Dashboard</a>
+        <a href="/business-manager/estimates.html" class="qc-nav-mobile-link">📝 Estimates</a>
+        <a href="/business-manager/admin-customers.html" class="qc-nav-mobile-link">👥 Customers</a>
+        <a href="/business-manager/admin-products.html" class="qc-nav-mobile-link">🎨 Products</a>
+        <a href="/business-manager/admin-branches.html" class="qc-nav-mobile-link">🏪 Branches</a>
+        <a href="/business-manager/admin-staff.html" class="qc-nav-mobile-link">👨‍💼 Staff</a>
+        <a href="/business-manager/admin-reports.html" class="qc-nav-mobile-link">📈 Reports</a>
+        <a href="/business-manager/admin-settings.html" class="qc-nav-mobile-link">⚙️ Settings</a>
+    </div>
+</nav>
+
+<script>
+function toggleMobileNav() { document.getElementById('mobileNav').classList.toggle('open'); document.getElementById('navOverlay').classList.toggle('show'); document.getElementById('hamburgerBtn').classList.toggle('active'); }
+function closeMobileNav() { document.getElementById('mobileNav').classList.remove('open'); document.getElementById('navOverlay').classList.remove('show'); document.getElementById('hamburgerBtn').classList.remove('active'); }
+function toggleProfileDropdown() { document.getElementById('profileDropdown').classList.toggle('show'); }
+document.addEventListener('click', function(e) { const profile = document.querySelector('.qc-profile-section'); if (!profile.contains(e.target)) document.getElementById('profileDropdown').classList.remove('show'); });
+function headerLogout() { if (confirm('Are you sure you want to logout?')) { localStorage.removeItem('auth_token'); localStorage.removeItem('user'); window.location.href = '/business-manager/login.html'; } }
+
+async function loadHeaderInfo() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    // Set profile picture or initial
+    if (user.profile_image_url) {
+        const pic = document.getElementById('headerProfilePic');
+        const initial = document.getElementById('headerProfileInitial');
+        pic.src = user.profile_image_url;
+        pic.style.display = 'block';
+        if (initial) initial.style.display = 'none';
+    } else if (user.full_name || user.name) {
+        const name = user.full_name || user.name;
+        const initial = document.getElementById('headerProfileInitial');
+        if (initial) initial.textContent = name.charAt(0).toUpperCase();
+    }
+}
+
+function highlightActivePage() {
+    const path = window.location.pathname;
+    document.querySelectorAll('.qc-nav-link, .qc-nav-mobile-link').forEach(link => {
+        if (path.includes(link.getAttribute('data-page') || link.href)) link.classList.add('active');
+    });
+}
+
+loadHeaderInfo();
+highlightActivePage();
+</script>
+
+
+    <!-- Sidebar (HIDDEN - using header navigation instead) -->
+    <div id="sidebar" class="hidden fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-purple-600 to-indigo-700 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 z-40">
+        <div class="flex flex-col h-full">
+            <!-- Logo -->
+            <div class="p-6 border-b border-purple-500">
+                <div class="flex items-center">
+                    <div class="bg-white w-10 h-10 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h1 class="text-white font-bold">Quality Colours</h1>
+                        <p class="text-purple-200 text-xs">Admin Panel</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+                <a href="/business-manager/admin-dashboard.html" class="flex items-center px-4 py-3 text-white bg-white/20 rounded-lg">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="/business-manager/estimates.html" class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/10 rounded-lg transition">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Estimates
+                </a>
+                <a href="/business-manager/admin-brands.html" class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/10 rounded-lg transition">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                    </svg>
+                    Brands
+                </a>
+                <a href="/business-manager/admin-categories.html" class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/10 rounded-lg transition">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    Categories
+                </a>
+                <a href="/business-manager/admin-products.html" class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/10 rounded-lg transition">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                    Products
+                </a>
+                <a href="/business-manager/admin-staff.html" class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/10 rounded-lg transition">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                    Staff
+                </a>
+                <a href="/business-manager/admin-customers.html" class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/10 rounded-lg transition">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    Customers
+                </a>
+                <a href="/business-manager/admin-customer-types.html" class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/10 rounded-lg transition">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                    Customer Types
+                </a>
+                <a href="/business-manager/admin-branches.html" class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/10 rounded-lg transition">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                    Branches
+                </a>
+                <a href="/business-manager/admin-settings.html" class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/10 rounded-lg transition">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Settings
+                </a>
+            </nav>
+
+            <!-- User Profile section moved to top-right header -->
+        </div>
+    </div>
+
+            <div class="p-4 border-t border-purple-500">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+                            <span class="text-purple-600 font-bold">S</span>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-white text-sm font-semibold">Sharjoon</p>
+                            <p class="text-purple-200 text-xs">Administrator</p>
+                        </div>
+                    </div>
+                    <button onclick="logout()" class="text-purple-200 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="lg:ml-64 min-h-screen p-4 sm:p-6 lg:p-8">
+        <!-- Back Button -->
+        <button onclick="history.back()" class="mb-6 flex items-center text-gray-600 hover:text-gray-900">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+            Back to Estimate
+        </button>
+
+        <!-- Estimate Info Card -->
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800" id="estimateTitle">Estimate #</h2>
+                        <p class="text-gray-600" id="customerName"></p>
+                    </div>
+                    <div id="currentStatus"></div>
+                </div>
+
+                <!-- Action Buttons Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Approve -->
+                    <button onclick="changeStatus('approved')" class="flex items-center justify-center bg-green-600 text-white px-6 py-4 rounded-lg hover:bg-green-700 transition shadow-lg" id="btnApprove">
+                        <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="font-semibold">Approve</span>
+                    </button>
+
+                    <!-- Reject -->
+                    <button onclick="changeStatus('rejected')" class="flex items-center justify-center bg-red-600 text-white px-6 py-4 rounded-lg hover:bg-red-700 transition shadow-lg" id="btnReject">
+                        <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="font-semibold">Reject</span>
+                    </button>
+
+                    <!-- Mark as Sent -->
+                    <button onclick="changeStatus('sent')" class="flex items-center justify-center bg-blue-600 text-white px-6 py-4 rounded-lg hover:bg-blue-700 transition shadow-lg">
+                        <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="font-semibold">Mark as Sent</span>
+                    </button>
+
+                    <!-- Convert to Invoice -->
+                    <button onclick="convertToInvoice()" class="flex items-center justify-center bg-purple-600 text-white px-6 py-4 rounded-lg hover:bg-purple-700 transition shadow-lg">
+                        <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span class="font-semibold">Convert to Invoice</span>
+                    </button>
+
+                    <!-- Download PDF -->
+                    <button onclick="downloadPDF()" class="flex items-center justify-center bg-gray-700 text-white px-6 py-4 rounded-lg hover:bg-gray-800 transition shadow-lg">
+                        <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span class="font-semibold">Download PDF</span>
+                    </button>
+
+                    <!-- Duplicate -->
+                    <button onclick="duplicate()" class="flex items-center justify-center bg-indigo-600 text-white px-6 py-4 rounded-lg hover:bg-indigo-700 transition shadow-lg">
+                        <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="font-semibold">Duplicate</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status History -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Status History</h3>
+                <div id="historyContainer" class="space-y-3">
+                    <div class="text-center py-8 text-gray-500">Loading history...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Change Modal -->
+    <div id="statusModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 class="text-xl font-bold mb-4" id="modalTitle">Change Status</h3>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Reason (optional)</label>
+                <input type="text" id="statusReason" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="Why are you changing the status?">
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Notes (optional)</label>
+                <textarea id="statusNotes" rows="3" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="Additional notes..."></textarea>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="closeModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button onclick="confirmStatusChange()" id="confirmBtn" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const estimateId = urlParams.get('id');
+        let currentNewStatus = '';
+
+        // Mobile menu
+        document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+        });
+
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            window.location.href = '/business-manager/login.html';
+        }
+
+        // Load estimate info
+        async function loadEstimate() {
+            try {
+                const response = await fetch(`/business-manager/api/estimates/${estimateId}`);
+                const data = await response.json();
+                
+                document.getElementById('estimateTitle').textContent = `Estimate #${data.estimate_number}`;
+                document.getElementById('customerName').textContent = data.customer_name;
+                document.getElementById('currentStatus').innerHTML = getStatusBadge(data.status);
+                
+                // Hide buttons based on current status
+                if (data.status === 'approved') {
+                    document.getElementById('btnApprove').classList.add('hidden');
+                } else if (data.status === 'rejected') {
+                    document.getElementById('btnReject').classList.add('hidden');
+                }
+                
+                loadHistory();
+            } catch (error) {
+                console.error('Error loading estimate:', error);
+            }
+        }
+
+        // Load status history
+        async function loadHistory() {
+            try {
+                const response = await fetch(`/business-manager/api/estimates/${estimateId}/history`);
+                const history = await response.json();
+                
+                const container = document.getElementById('historyContainer');
+                
+                if (history.length === 0) {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-500">No status changes yet</div>';
+                    return;
+                }
+                
+                container.innerHTML = history.map(h => `
+                    <div class="flex items-start border-l-4 ${getStatusColor(h.new_status)} pl-4 py-2">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                ${getStatusBadge(h.new_status)}
+                                ${h.old_status ? `<span class="text-sm text-gray-500">from ${h.old_status}</span>` : ''}
+                            </div>
+                            ${h.reason ? `<p class="text-sm text-gray-700 mb-1"><strong>Reason:</strong> ${h.reason}</p>` : ''}
+                            ${h.notes ? `<p class="text-sm text-gray-600 mb-1">${h.notes}</p>` : ''}
+                            <p class="text-xs text-gray-500">
+                                By ${h.changed_by_name || 'System'} • ${formatDate(h.timestamp)}
+                            </p>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                'draft': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">🆕 Draft</span>',
+                'sent': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">📧 Sent</span>',
+                'pending_approval': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">⏳ Pending</span>',
+                'approved': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">✅ Approved</span>',
+                'rejected': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">❌ Rejected</span>',
+                'converted': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">📄 Converted</span>',
+                'expired': '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">⌛ Expired</span>'
+            };
+            return badges[status] || badges['draft'];
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'approved': 'border-green-500',
+                'rejected': 'border-red-500',
+                'sent': 'border-blue-500',
+                'pending_approval': 'border-yellow-500',
+                'converted': 'border-purple-500',
+                'draft': 'border-gray-500',
+                'expired': 'border-orange-500'
+            };
+            return colors[status] || 'border-gray-500';
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('en-IN');
+        }
+
+        // Change status
+        function changeStatus(newStatus) {
+            currentNewStatus = newStatus;
+            const titles = {
+                'approved': 'Approve Estimate',
+                'rejected': 'Reject Estimate',
+                'sent': 'Mark as Sent',
+                'pending_approval': 'Mark as Pending Approval'
+            };
+            document.getElementById('modalTitle').textContent = titles[newStatus] || 'Change Status';
+            document.getElementById('statusModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('statusModal').classList.add('hidden');
+            document.getElementById('statusReason').value = '';
+            document.getElementById('statusNotes').value = '';
+        }
+
+        async function confirmStatusChange() {
+            const reason = document.getElementById('statusReason').value;
+            const notes = document.getElementById('statusNotes').value;
+            
+            try {
+                const response = await fetch(`/business-manager/api/estimates/${estimateId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: currentNewStatus, reason, notes })
+                });
+                
+                if (response.ok) {
+                    closeModal();
+                    loadEstimate();
+                    alert('Status updated successfully!');
+                } else {
+                    alert('Failed to update status');
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                alert('Error updating status');
+            }
+        }
+
+        // Other actions
+        function convertToInvoice() {
+            if (confirm('Convert this estimate to invoice in Zoho Books?')) {
+                alert('Zoho integration coming soon!');
+            }
+        }
+
+        function downloadPDF() {
+            window.open(`estimate-view.html?id=${estimateId}`, '_blank');
+            setTimeout(() => window.print(), 500);
+        }
+
+        function duplicate() {
+            if (confirm('Create a duplicate of this estimate?')) {
+                alert('Duplicate feature coming in next update!');
+            }
+        }
+
+        // Load on page load
+        if (!estimateId) {
+            alert('No estimate ID');
+            window.location.href = 'estimates.html';
+        } else {
+            loadEstimate();
+        }
+    </script>
+</body>
+</html>

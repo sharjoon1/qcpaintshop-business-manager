@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Permission Request - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .btn {
+            width: 100%;
+            padding: 18px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .request-item {
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border-left: 4px solid #e5e7eb;
+        }
+        .request-item.pending {
+            border-left-color: #f59e0b;
+        }
+        .request-item.approved {
+            border-left-color: #10b981;
+        }
+        .request-item.rejected {
+            border-left-color: #ef4444;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-approved { background: #d1fae5; color: #065f46; }
+        .badge-rejected { background: #fee2e2; color: #991b1b; }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            background: #f9fafb;
+            padding: 4px;
+            border-radius: 12px;
+        }
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #6b7280;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .loader {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            text-decoration: none;
+            color: #6b7280;
+            font-size: 12px;
+        }
+        .nav-item.active {
+            color: #667eea;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .success-msg {
+            background: #d1fae5;
+            border: 2px solid #10b981;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="card" style="margin-top: 16px;">
+            <button onclick="goBack()" style="background: none; border: none; color: #6b7280; display: flex; align-items: center; gap: 8px; margin-bottom: 16px; cursor: pointer;">
+                <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Back
+            </button>
+            <h1 style="font-size: 28px; font-weight: 700; color: #1f2937; margin-bottom: 8px;">Permission Request</h1>
+            <p style="color: #6b7280;">Request permission for late arrival or early checkout</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="card">
+            <div class="tabs">
+                <div class="tab active" id="newRequestTab" onclick="switchTab('new')">New Request</div>
+                <div class="tab" id="myRequestsTab" onclick="switchTab('my')">My Requests</div>
+            </div>
+        </div>
+
+        <!-- New Request Form -->
+        <div class="card" id="newRequestCard">
+            <div id="successMessage" style="display: none;" class="success-msg">
+                <div style="font-size: 40px; margin-bottom: 8px;">✓</div>
+                <div style="font-weight: 600; color: #065f46;">Request Submitted!</div>
+                <div style="font-size: 14px; color: #065f46; margin-top: 4px;">Your permission request has been sent for approval</div>
+            </div>
+
+            <form id="requestForm" onsubmit="submitRequest(event)">
+                <div class="form-group">
+                    <label class="form-label">Request Type *</label>
+                    <select class="form-select" id="requestType" required>
+                        <option value="">Select type</option>
+                        <option value="late_arrival">Late Arrival</option>
+                        <option value="early_checkout">Early Checkout</option>
+                        <option value="extended_break">Extended Break</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Date *</label>
+                    <input type="date" class="form-input" id="requestDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Time (Optional)</label>
+                    <input type="time" class="form-input" id="requestTime">
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                        Specify the time for early checkout
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Duration (Minutes)</label>
+                    <input type="number" class="form-input" id="duration" min="1" placeholder="e.g., 30">
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                        How many minutes late/early?
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Reason *</label>
+                    <textarea class="form-textarea" id="reason" required placeholder="Please provide a detailed reason for your request..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    <span id="submitBtnText">Submit Request</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- My Requests List -->
+        <div id="myRequestsCard" style="display: none;">
+            <!-- Loading -->
+            <div class="card" id="requestsLoading">
+                <div class="loader"></div>
+                <p style="text-align: center; color: #6b7280; margin-top: 16px;">Loading requests...</p>
+            </div>
+
+            <!-- Empty -->
+            <div class="card" id="requestsEmpty" style="display: none;">
+                <div class="empty-state">
+                    <div style="font-size: 64px; margin-bottom: 16px;">📝</div>
+                    <h3 style="font-size: 18px; font-weight: 600; color: #1f2937; margin-bottom: 8px;">No Requests</h3>
+                    <p style="color: #6b7280;">You haven't submitted any permission requests yet</p>
+                </div>
+            </div>
+
+            <!-- List -->
+            <div id="requestsList"></div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <a href="dashboard.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"></path>
+            </svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="history.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"></path>
+            </svg>
+            <span>History</span>
+        </a>
+        <a href="permission-request.html" class="nav-item active">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path>
+            </svg>
+            <span>Requests</span>
+        </a>
+    </div>
+
+    <script>
+        let requests = [];
+        let currentTab = 'new';
+
+        // Initialize
+        async function init() {
+            // Set today's date as default
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('requestDate').value = today;
+        }
+
+        // Switch tabs
+        function switchTab(tab) {
+            currentTab = tab;
+
+            if (tab === 'new') {
+                document.getElementById('newRequestTab').classList.add('active');
+                document.getElementById('myRequestsTab').classList.remove('active');
+                document.getElementById('newRequestCard').style.display = 'block';
+                document.getElementById('myRequestsCard').style.display = 'none';
+            } else {
+                document.getElementById('newRequestTab').classList.remove('active');
+                document.getElementById('myRequestsTab').classList.add('active');
+                document.getElementById('newRequestCard').style.display = 'none';
+                document.getElementById('myRequestsCard').style.display = 'block';
+                loadMyRequests();
+            }
+        }
+
+        // Submit request
+        async function submitRequest(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const submitBtnText = document.getElementById('submitBtnText');
+            submitBtn.disabled = true;
+            submitBtnText.textContent = 'Submitting...';
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    window.location.href = '/business-manager/login.html';
+                    return;
+                }
+
+                const requestData = {
+                    request_type: document.getElementById('requestType').value,
+                    request_date: document.getElementById('requestDate').value,
+                    request_time: document.getElementById('requestTime').value || null,
+                    duration_minutes: parseInt(document.getElementById('duration').value) || null,
+                    reason: document.getElementById('reason').value
+                };
+
+                const response = await fetch('/business-manager/api/attendance/permission/request', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Show success message
+                    document.getElementById('successMessage').style.display = 'block';
+                    document.getElementById('requestForm').style.display = 'none';
+
+                    // Reset after 3 seconds
+                    setTimeout(() => {
+                        document.getElementById('successMessage').style.display = 'none';
+                        document.getElementById('requestForm').style.display = 'block';
+                        document.getElementById('requestForm').reset();
+                        document.getElementById('requestDate').value = new Date().toISOString().split('T')[0];
+                        
+                        submitBtn.disabled = false;
+                        submitBtnText.textContent = 'Submit Request';
+                    }, 3000);
+
+                } else {
+                    alert(data.message || 'Failed to submit request');
+                    submitBtn.disabled = false;
+                    submitBtnText.textContent = 'Submit Request';
+                }
+
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('Network error. Please try again.');
+                submitBtn.disabled = false;
+                submitBtnText.textContent = 'Submit Request';
+            }
+        }
+
+        // Load my requests
+        async function loadMyRequests() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    window.location.href = '/business-manager/login.html';
+                    return;
+                }
+
+                document.getElementById('requestsLoading').style.display = 'block';
+                document.getElementById('requestsEmpty').style.display = 'none';
+
+                const response = await fetch('/business-manager/api/attendance/permission/my-requests?limit=50', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                requests = data.data || [];
+
+                document.getElementById('requestsLoading').style.display = 'none';
+
+                if (requests.length === 0) {
+                    document.getElementById('requestsEmpty').style.display = 'block';
+                    document.getElementById('requestsList').innerHTML = '';
+                } else {
+                    document.getElementById('requestsEmpty').style.display = 'none';
+                    displayRequests();
+                }
+
+            } catch (error) {
+                console.error('Load requests error:', error);
+                document.getElementById('requestsLoading').innerHTML = `
+                    <div class="empty-state">
+                        <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                        <p style="color: #ef4444; font-weight: 600; margin-bottom: 16px;">Failed to load requests</p>
+                        <button onclick="loadMyRequests()" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Display requests
+        function displayRequests() {
+            const listHtml = requests.map(req => {
+                const date = new Date(req.request_date);
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                
+                const requestedAt = new Date(req.requested_at);
+                const requestedStr = requestedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                let statusBadge = '';
+                let statusClass = req.status;
+                
+                if (req.status === 'pending') {
+                    statusBadge = '<span class="badge badge-pending">⏳ Pending</span>';
+                } else if (req.status === 'approved') {
+                    statusBadge = '<span class="badge badge-approved">✓ Approved</span>';
+                } else if (req.status === 'rejected') {
+                    statusBadge = '<span class="badge badge-rejected">✗ Rejected</span>';
+                }
+
+                const typeLabels = {
+                    'late_arrival': 'Late Arrival',
+                    'early_checkout': 'Early Checkout',
+                    'extended_break': 'Extended Break'
+                };
+
+                let reviewSection = '';
+                if (req.status !== 'pending') {
+                    const reviewedAt = new Date(req.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    reviewSection = `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                            <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">
+                                Reviewed by ${req.reviewed_by_name || 'Admin'} on ${reviewedAt}
+                            </div>
+                            ${req.review_notes ? `<div style="font-size: 13px; color: #1f2937; font-style: italic;">"${req.review_notes}"</div>` : ''}
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="request-item ${statusClass}">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                            <div>
+                                <div style="font-size: 16px; font-weight: 700; color: #1f2937;">${typeLabels[req.request_type] || req.request_type}</div>
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">For ${dateStr}</div>
+                            </div>
+                            ${statusBadge}
+                        </div>
+
+                        ${req.duration_minutes ? `
+                            <div style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">
+                                Duration: <strong>${req.duration_minutes} minutes</strong>
+                            </div>
+                        ` : ''}
+
+                        <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Reason:</div>
+                            <div style="font-size: 13px; color: #1f2937;">${req.reason}</div>
+                        </div>
+
+                        <div style="font-size: 11px; color: #9ca3af;">
+                            Requested on ${requestedStr}
+                        </div>
+
+                        ${reviewSection}
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('requestsList').innerHTML = `
+                <div class="card">
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1f2937;">
+                        All Requests (${requests.length})
+                    </h3>
+                    ${listHtml}
+                </div>
+            `;
+        }
+
+        // Go back
+        function goBack() {
+            window.location.href = 'dashboard.html';
+        }
+
+        // Init on load
+        init();
+    </script>
+</body>
+</html>

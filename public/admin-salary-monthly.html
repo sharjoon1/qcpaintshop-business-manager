@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Salaries - Quality Colours</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            color: white;
+        }
+
+        .summary-card.green {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        }
+
+        .summary-card.orange {
+            background: linear-gradient(135deg, #FF6B35 0%, #ff5722 100%);
+        }
+
+        .summary-card.blue {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+        }
+
+        .summary-card h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #FF6B35;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #ff5722;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #FFA726;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .form-group select,
+        .form-group input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .table-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8f9fa;
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+            font-size: 13px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .badge-secondary {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        .modal-header h2 {
+            color: #333;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            border-top: 2px solid #eee;
+            padding-top: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .money {
+            font-weight: 600;
+            color: #28a745;
+        }
+
+        .money.negative {
+            color: #dc3545;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .detail-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .detail-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-row.total {
+            font-weight: bold;
+            font-size: 16px;
+            color: #333;
+            margin-top: 10px;
+            padding-top: 15px;
+            border-top: 2px solid #333;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+    </style>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div>
+                    <h1><i class="fas fa-calendar-alt"></i> Monthly Salaries</h1>
+                    <p style="color: #666; margin-top: 5px;">Calculate and manage monthly staff salaries</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-warning" onclick="showCalculateModal()">
+                        <i class="fas fa-calculator"></i> Calculate Salaries
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.location.href='admin-salary-config.html'">
+                        <i class="fas fa-cog"></i> Salary Config
+                    </button>
+                </div>
+            </div>
+            
+            <div class="summary-cards" id="summaryCards">
+                <div class="summary-card">
+                    <h3>Total Staff</h3>
+                    <div class="value" id="totalStaff">0</div>
+                </div>
+                <div class="summary-card green">
+                    <h3>Total Gross Salary</h3>
+                    <div class="value" id="totalGross">₹0</div>
+                </div>
+                <div class="summary-card orange">
+                    <h3>Total Paid</h3>
+                    <div class="value" id="totalPaid">₹0</div>
+                </div>
+                <div class="summary-card blue">
+                    <h3>Pending Payments</h3>
+                    <div class="value" id="totalPending">₹0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="filters">
+            <div class="filter-row">
+                <div class="form-group">
+                    <label>Month *</label>
+                    <input type="month" id="filterMonth" onchange="loadSalaries()">
+                </div>
+                <div class="form-group">
+                    <label>Branch</label>
+                    <select id="filterBranch" onchange="loadSalaries()">
+                        <option value="">All Branches</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="filterStatus" onchange="loadSalaries()">
+                        <option value="">All</option>
+                        <option value="draft">Draft</option>
+                        <option value="calculated">Calculated</option>
+                        <option value="approved">Approved</option>
+                        <option value="paid">Paid</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Payment Status</label>
+                    <select id="filterPaymentStatus" onchange="loadSalaries()">
+                        <option value="">All</option>
+                        <option value="unpaid">Unpaid</option>
+                        <option value="partial">Partial</option>
+                        <option value="paid">Paid</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-secondary" onclick="loadSalaries()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div id="loading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> Loading salaries...
+            </div>
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <h3>No salaries found</h3>
+                <p>Select a month and click "Calculate Salaries" to begin</p>
+            </div>
+            <div id="tableContent" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Staff</th>
+                            <th>Branch</th>
+                            <th>Days</th>
+                            <th>Hours</th>
+                            <th>OT Hours</th>
+                            <th>Base</th>
+                            <th>Gross</th>
+                            <th>Deductions</th>
+                            <th>Net Salary</th>
+                            <th>Paid</th>
+                            <th>Status</th>
+                            <th>Payment</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="salaryTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calculate Modal -->
+    <div id="calculateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Calculate Monthly Salaries</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Month *</label>
+                    <input type="month" id="calculateMonth" required>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>Branch (optional)</label>
+                    <select id="calculateBranch">
+                        <option value="">All Branches</option>
+                    </select>
+                </div>
+                <p style="margin-top: 20px; color: #666;">
+                    <i class="fas fa-info-circle"></i> This will calculate salaries for all staff based on their attendance records.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCalculateModal()">Cancel</button>
+                <button class="btn btn-success" onclick="calculateSalaries()">
+                    <i class="fas fa-calculator"></i> Calculate Now
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="detailStaffName">Salary Details</h2>
+                <p id="detailPeriod" style="color: #666; margin-top: 5px;"></p>
+            </div>
+            <div class="modal-body" id="detailContent">
+                <!-- Will be populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDetailModal()">Close</button>
+                <button class="btn btn-warning" id="approveBtn" onclick="approveSalary()" style="display: none;">
+                    <i class="fas fa-check"></i> Approve
+                </button>
+                <button class="btn btn-success" id="payBtn" onclick="showPaymentForm()" style="display: none;">
+                    <i class="fas fa-money-bill"></i> Record Payment
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Record Payment</h2>
+            </div>
+            <div class="modal-body">
+                <form id="paymentForm">
+                    <input type="hidden" id="paymentSalaryId">
+                    <input type="hidden" id="paymentUserId">
+                    
+                    <div class="form-group">
+                        <label>Amount to Pay (₹) *</label>
+                        <input type="number" id="paymentAmount" step="0.01" required>
+                        <small id="remainingAmount" style="color: #666;"></small>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Payment Date *</label>
+                        <input type="date" id="paymentDate" required>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Payment Method *</label>
+                        <select id="paymentMethod" required>
+                            <option value="">Select Method</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="upi">UPI</option>
+                            <option value="cheque">Cheque</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Reference/Transaction ID</label>
+                        <input type="text" id="paymentReference">
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Notes</label>
+                        <textarea id="paymentNotes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
+                <button class="btn btn-success" onclick="recordPayment()">
+                    <i class="fas fa-save"></i> Record Payment
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let currentUser = null;
+        let currentSalaryDetails = null;
+
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) throw new Error('Unauthorized');
+                
+                currentUser = await response.json();
+                return true;
+            } catch (error) {
+                localStorage.removeItem('auth_token');
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        // Load branches
+        async function loadBranches() {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/branches`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            
+            const selects = ['filterBranch', 'calculateBranch'];
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                select.innerHTML = selectId === 'filterBranch' ? '<option value="">All Branches</option>' : '<option value="">All Branches</option>';
+                data.forEach(branch => {
+                    select.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+                });
+            });
+        }
+
+        // Set default month to current month
+        function setDefaultMonth() {
+            const now = new Date();
+            const monthStr = now.toISOString().substring(0, 7);
+            document.getElementById('filterMonth').value = monthStr;
+            document.getElementById('calculateMonth').value = monthStr;
+        }
+
+        // Load salaries
+        async function loadSalaries() {
+            const token = localStorage.getItem('auth_token');
+            const month = document.getElementById('filterMonth').value;
+            
+            if (!month) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+                return;
+            }
+            
+            const branchId = document.getElementById('filterBranch').value;
+            const status = document.getElementById('filterStatus').value;
+            const paymentStatus = document.getElementById('filterPaymentStatus').value;
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('tableContent').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'none';
+            
+            let url = `${API_BASE}/api/salary/monthly?month=${month}`;
+            if (branchId) url += `&branch_id=${branchId}`;
+            if (status) url += `&status=${status}`;
+            if (paymentStatus) url += `&payment_status=${paymentStatus}`;
+            
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const result = await response.json();
+            
+            document.getElementById('loading').style.display = 'none';
+            
+            if (result.success && result.data.length > 0) {
+                renderSalaries(result.data);
+                updateSummary(result.data);
+                document.getElementById('tableContent').style.display = 'block';
+            } else {
+                document.getElementById('emptyState').style.display = 'block';
+                updateSummary([]);
+            }
+        }
+
+        // Update summary cards
+        function updateSummary(salaries) {
+            const totalStaff = salaries.length;
+            const totalGross = salaries.reduce((sum, s) => sum + parseFloat(s.gross_salary || 0), 0);
+            const totalPaid = salaries.reduce((sum, s) => sum + parseFloat(s.paid_amount || 0), 0);
+            const totalPending = totalGross - totalPaid;
+            
+            document.getElementById('totalStaff').textContent = totalStaff;
+            document.getElementById('totalGross').textContent = '₹' + totalGross.toLocaleString('en-IN', {minimumFractionDigits: 2});
+            document.getElementById('totalPaid').textContent = '₹' + totalPaid.toLocaleString('en-IN', {minimumFractionDigits: 2});
+            document.getElementById('totalPending').textContent = '₹' + totalPending.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        }
+
+        // Render salaries
+        function renderSalaries(salaries) {
+            const tbody = document.getElementById('salaryTableBody');
+            tbody.innerHTML = salaries.map(s => {
+                const netSalary = parseFloat(s.net_salary || 0);
+                const paidAmount = parseFloat(s.paid_amount || 0);
+                const pending = netSalary - paidAmount;
+                
+                return `
+                    <tr>
+                        <td>${s.staff_name}</td>
+                        <td>${s.branch_name}</td>
+                        <td>${s.total_present_days || 0}</td>
+                        <td>${parseFloat(s.total_standard_hours || 0).toFixed(1)}</td>
+                        <td>${parseFloat(s.total_overtime_hours || 0).toFixed(1)}</td>
+                        <td class="money">₹${parseFloat(s.base_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                        <td class="money">₹${parseFloat(s.gross_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                        <td class="money negative">₹${parseFloat(s.total_deductions || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                        <td class="money">₹${netSalary.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                        <td class="money">${paidAmount > 0 ? '₹' + paidAmount.toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
+                        <td>
+                            <span class="badge badge-${getStatusColor(s.status)}">
+                                ${s.status}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-${getPaymentStatusColor(s.payment_status)}">
+                                ${s.payment_status}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-primary btn-sm" onclick="viewDetails(${s.id})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'draft': 'secondary',
+                'calculated': 'info',
+                'approved': 'warning',
+                'paid': 'success'
+            };
+            return colors[status] || 'secondary';
+        }
+
+        function getPaymentStatusColor(status) {
+            const colors = {
+                'unpaid': 'danger',
+                'partial': 'warning',
+                'paid': 'success'
+            };
+            return colors[status] || 'secondary';
+        }
+
+        // View salary details
+        async function viewDetails(salaryId) {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/salary/monthly/${salaryId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                currentSalaryDetails = result.data;
+                renderSalaryDetails(result.data);
+                document.getElementById('detailModal').classList.add('active');
+            }
+        }
+
+        // Render salary details
+        function renderSalaryDetails(data) {
+            const s = data.salary;
+            
+            document.getElementById('detailStaffName').textContent = s.staff_name + ' - Salary Details';
+            document.getElementById('detailPeriod').textContent = `${s.salary_month} (${new Date(s.from_date).toLocaleDateString('en-IN')} - ${new Date(s.to_date).toLocaleDateString('en-IN')})`;
+            
+            const netSalary = parseFloat(s.net_salary || 0);
+            const paidAmount = parseFloat(s.paid_amount || 0);
+            const pending = netSalary - paidAmount;
+            
+            document.getElementById('detailContent').innerHTML = `
+                <div class="detail-grid">
+                    <div class="detail-section">
+                        <h3><i class="fas fa-calendar-check"></i> Attendance Summary</h3>
+                        <div class="detail-row">
+                            <span>Present Days:</span>
+                            <strong>${s.total_present_days || 0}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Absent Days:</span>
+                            <strong>${s.total_absent_days || 0}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Half Days:</span>
+                            <strong>${s.total_half_days || 0}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Sundays Worked:</span>
+                            <strong>${s.total_sundays_worked || 0}</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3><i class="fas fa-clock"></i> Hours Summary</h3>
+                        <div class="detail-row">
+                            <span>Standard Hours:</span>
+                            <strong>${parseFloat(s.total_standard_hours || 0).toFixed(2)} hrs</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Sunday Hours:</span>
+                            <strong>${parseFloat(s.total_sunday_hours || 0).toFixed(2)} hrs</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Overtime Hours:</span>
+                            <strong>${parseFloat(s.total_overtime_hours || 0).toFixed(2)} hrs</strong>
+                        </div>
+                        <div class="detail-row total">
+                            <span>Total Hours:</span>
+                            <strong>${parseFloat(s.total_worked_hours || 0).toFixed(2)} hrs</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3><i class="fas fa-calculator"></i> Earnings</h3>
+                        <div class="detail-row">
+                            <span>Base Salary:</span>
+                            <strong class="money">₹${parseFloat(s.base_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Standard Hours Pay:</span>
+                            <strong class="money">₹${parseFloat(s.standard_hours_pay || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Sunday Hours Pay:</span>
+                            <strong class="money">₹${parseFloat(s.sunday_hours_pay || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Overtime Pay:</span>
+                            <strong class="money">₹${parseFloat(s.overtime_pay || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Allowances:</span>
+                            <strong class="money">₹${parseFloat(s.total_allowances || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                        <div class="detail-row total">
+                            <span>Gross Salary:</span>
+                            <strong class="money">₹${parseFloat(s.gross_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3><i class="fas fa-minus-circle"></i> Deductions</h3>
+                        <div class="detail-row">
+                            <span>Late Deduction:</span>
+                            <strong class="money negative">₹${parseFloat(s.late_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Absence Deduction:</span>
+                            <strong class="money negative">₹${parseFloat(s.absence_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Other Deduction:</span>
+                            <strong class="money negative">₹${parseFloat(s.other_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                        <div class="detail-row total">
+                            <span>Total Deductions:</span>
+                            <strong class="money negative">₹${parseFloat(s.total_deductions || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="detail-section" style="margin-top: 20px; background: #fff3cd;">
+                    <h3 style="margin-bottom: 15px;"><i class="fas fa-money-bill-wave"></i> Payment Summary</h3>
+                    <div class="detail-row" style="font-size: 18px;">
+                        <span>Net Salary:</span>
+                        <strong class="money" style="font-size: 20px;">₹${netSalary.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                    </div>
+                    <div class="detail-row">
+                        <span>Paid Amount:</span>
+                        <strong class="money">₹${paidAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                    </div>
+                    <div class="detail-row total" style="color: ${pending > 0 ? '#dc3545' : '#28a745'};">
+                        <span>Pending Payment:</span>
+                        <strong>₹${pending.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                    </div>
+                </div>
+                
+                ${s.notes ? `<div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                    <strong>Notes:</strong> ${s.notes}
+                </div>` : ''}
+            `;
+            
+            // Show/hide action buttons based on status
+            document.getElementById('approveBtn').style.display = s.status === 'calculated' ? 'inline-block' : 'none';
+            document.getElementById('payBtn').style.display = (s.status === 'approved' || s.status === 'paid') && pending > 0 ? 'inline-block' : 'none';
+        }
+
+        // Show calculate modal
+        function showCalculateModal() {
+            document.getElementById('calculateModal').classList.add('active');
+        }
+
+        function closeCalculateModal() {
+            document.getElementById('calculateModal').classList.remove('active');
+        }
+
+        // Calculate salaries
+        async function calculateSalaries() {
+            const token = localStorage.getItem('auth_token');
+            const month = document.getElementById('calculateMonth').value;
+            const branchId = document.getElementById('calculateBranch').value;
+            
+            if (!month) {
+                alert('Please select a month');
+                return;
+            }
+            
+            if (!confirm('Calculate salaries for ' + month + '?')) return;
+            
+            const data = { month };
+            if (branchId) data.branch_id = branchId;
+            
+            const response = await fetch(`${API_BASE}/api/salary/calculate-all`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(result.message);
+                closeCalculateModal();
+                document.getElementById('filterMonth').value = month;
+                loadSalaries();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        // Approve salary
+        async function approveSalary() {
+            if (!currentSalaryDetails) return;
+            
+            const token = localStorage.getItem('auth_token');
+            const salaryId = currentSalaryDetails.salary.id;
+            
+            if (!confirm('Approve this salary?')) return;
+            
+            const response = await fetch(`${API_BASE}/api/salary/monthly/${salaryId}/approve`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ notes: 'Approved' })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('Salary approved successfully!');
+                closeDetailModal();
+                loadSalaries();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        // Show payment form
+        function showPaymentForm() {
+            if (!currentSalaryDetails) return;
+            
+            const s = currentSalaryDetails.salary;
+            const pending = parseFloat(s.net_salary) - parseFloat(s.paid_amount);
+            
+            document.getElementById('paymentSalaryId').value = s.id;
+            document.getElementById('paymentUserId').value = s.user_id;
+            document.getElementById('paymentAmount').value = pending.toFixed(2);
+            document.getElementById('paymentAmount').max = pending.toFixed(2);
+            document.getElementById('remainingAmount').textContent = `Remaining: ₹${pending.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+            document.getElementById('paymentDate').valueAsDate = new Date();
+            
+            document.getElementById('paymentModal').classList.add('active');
+        }
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').classList.remove('active');
+            document.getElementById('paymentForm').reset();
+        }
+
+        // Record payment
+        async function recordPayment() {
+            const token = localStorage.getItem('auth_token');
+            
+            const data = {
+                monthly_salary_id: parseInt(document.getElementById('paymentSalaryId').value),
+                user_id: parseInt(document.getElementById('paymentUserId').value),
+                amount_paid: parseFloat(document.getElementById('paymentAmount').value),
+                payment_date: document.getElementById('paymentDate').value,
+                payment_method: document.getElementById('paymentMethod').value,
+                payment_reference: document.getElementById('paymentReference').value,
+                notes: document.getElementById('paymentNotes').value
+            };
+            
+            if (!data.payment_method) {
+                alert('Please select payment method');
+                return;
+            }
+            
+            const response = await fetch(`${API_BASE}/api/salary/payments`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('Payment recorded successfully!');
+                closePaymentModal();
+                closeDetailModal();
+                loadSalaries();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('active');
+            currentSalaryDetails = null;
+        }
+
+        // Initialize
+        (async () => {
+            if (await checkAuth()) {
+                loadBranches();
+                setDefaultMonth();
+                loadSalaries();
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Estimate - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .input-focus:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .file-upload-container {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s;
+        }
+        .file-upload-container:hover {
+            border-color: #667eea;
+            background-color: #f7fafc;
+        }
+        .file-preview {
+            position: relative;
+            display: inline-block;
+        }
+        .remove-file {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="gradient-bg text-white py-6 shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold">Quality Colours</h1>
+                    <p class="text-sm opacity-90">குவாலிட்டி கலர்ஸ் - Paint Experts</p>
+                </div>
+                <a href="/business-manager/login.html" class="bg-white text-purple-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition">
+                    Login
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8 max-w-2xl">
+        <div class="bg-white rounded-xl shadow-lg p-6 md:p-8">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">Request Free Estimate</h2>
+                <p class="text-gray-600">இலவச மதிப்பீடு கோரிக்கை - Get instant quote for your painting needs</p>
+            </div>
+
+            <!-- Success Message (hidden by default) -->
+            <div id="successMessage" class="hidden bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-green-800">Request Submitted Successfully!</p>
+                        <p class="text-sm text-green-700">Your estimate request #<span id="requestNumber"></span> has been received. We'll contact you within 24 hours.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Message (hidden by default) -->
+            <div id="errorMessage" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-red-800">Error</p>
+                        <p class="text-sm text-red-700" id="errorText"></p>
+                    </div>
+                </div>
+            </div>
+
+            <form id="estimateForm" class="space-y-6">
+                <!-- Contact Information -->
+                <div class="border-b pb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">📞 Contact Information</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                            <input type="text" id="customerName" name="customerName" required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition"
+                                placeholder="Your full name">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Mobile Number *</label>
+                            <input type="tel" id="phone" name="phone" required pattern="[6-9][0-9]{9}"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition"
+                                placeholder="10-digit mobile number">
+                            <p class="text-xs text-gray-500 mt-1">Example: 9876543210</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email (Optional)</label>
+                            <input type="email" id="email" name="email"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition"
+                                placeholder="your@email.com">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project Details -->
+                <div class="border-b pb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">🏠 Project Details</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Project Type *</label>
+                            <select id="projectType" name="projectType" required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition">
+                                <option value="">Select project type</option>
+                                <option value="interior">Interior Painting - உட்புற</option>
+                                <option value="exterior">Exterior Painting - வெளிப்புற</option>
+                                <option value="both">Both Interior & Exterior - இரண்டும்</option>
+                                <option value="commercial">Commercial Project - வணிக</option>
+                                <option value="renovation">Renovation - புதுப்பித்தல்</option>
+                                <option value="new_construction">New Construction - புதிய கட்டுமானம்</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Property Type *</label>
+                            <select id="propertyType" name="propertyType" required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition">
+                                <option value="">Select property type</option>
+                                <option value="house">Independent House - தனி வீடு</option>
+                                <option value="apartment">Apartment - குடியிருப்பு</option>
+                                <option value="villa">Villa - மாளிகை</option>
+                                <option value="office">Office - அலுவலகம்</option>
+                                <option value="shop">Shop/Showroom - கடை</option>
+                                <option value="warehouse">Warehouse - கிடங்கு</option>
+                                <option value="other">Other - மற்றவை</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Project Location *</label>
+                            <textarea id="location" name="location" required rows="2"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition"
+                                placeholder="Enter full address: House/Building name, Street, Area, City"></textarea>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Area (Sq.Ft) *</label>
+                                <input type="number" id="area" name="area" required min="100"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition"
+                                    placeholder="1000">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Number of Rooms</label>
+                                <input type="number" id="rooms" name="rooms" min="1"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition"
+                                    placeholder="3">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Details -->
+                <div class="border-b pb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">📝 Additional Details</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preferred Brand (Optional)</label>
+                            <select id="preferredBrand" name="preferredBrand"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition">
+                                <option value="">Any brand - எந்த பிராண்ட்</option>
+                                <option value="asian_paints">Asian Paints</option>
+                                <option value="berger">Berger Paints</option>
+                                <option value="birla_opus">Birla Opus</option>
+                                <option value="nerolac">Nerolac</option>
+                                <option value="kansai_nerolac">Kansai Nerolac</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Expected Timeline</label>
+                            <select id="timeline" name="timeline"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition">
+                                <option value="">Select timeline</option>
+                                <option value="urgent">Urgent (Within 1 week)</option>
+                                <option value="1-2_weeks">1-2 Weeks</option>
+                                <option value="2-4_weeks">2-4 Weeks</option>
+                                <option value="1-2_months">1-2 Months</option>
+                                <option value="flexible">Flexible</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Budget Range (Optional)</label>
+                            <select id="budgetRange" name="budgetRange"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition">
+                                <option value="">Select budget range</option>
+                                <option value="below_25k">Below ₹25,000</option>
+                                <option value="25k-50k">₹25,000 - ₹50,000</option>
+                                <option value="50k-1L">₹50,000 - ₹1,00,000</option>
+                                <option value="1L-2L">₹1,00,000 - ₹2,00,000</option>
+                                <option value="2L-5L">₹2,00,000 - ₹5,00,000</option>
+                                <option value="above_5L">Above ₹5,00,000</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Additional Requirements</label>
+                            <textarea id="additionalNotes" name="additionalNotes" rows="4"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition"
+                                placeholder="Any specific colors, textures, or special requirements..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Photo Upload -->
+                <div class="pb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">📷 Upload Photos (Optional)</h3>
+                    <p class="text-sm text-gray-600 mb-4">Upload photos of your property to help us provide accurate estimates</p>
+                    
+                    <div class="file-upload-container rounded-lg p-6 text-center">
+                        <input type="file" id="photoUpload" accept="image/*" multiple class="hidden">
+                        <label for="photoUpload" class="cursor-pointer">
+                            <svg class="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <p class="text-gray-600 font-medium">Click to upload photos</p>
+                            <p class="text-sm text-gray-500 mt-1">JPG, PNG up to 5MB each (Max 5 photos)</p>
+                        </label>
+                    </div>
+
+                    <!-- Photo Previews -->
+                    <div id="photoPreview" class="mt-4 grid grid-cols-3 gap-3 hidden"></div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-4">
+                    <button type="submit" id="submitBtn"
+                        class="w-full gradient-bg text-white font-semibold py-4 rounded-lg hover:opacity-90 transition shadow-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span id="submitText">Submit Estimate Request</span>
+                    </button>
+                    <p class="text-center text-sm text-gray-500 mt-3">✅ Free estimate • ✅ No obligation • ✅ Quick response</p>
+                </div>
+            </form>
+        </div>
+
+        <!-- Features -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+            <div class="bg-white rounded-lg p-4 shadow text-center">
+                <div class="text-3xl mb-2">⚡</div>
+                <h4 class="font-semibold text-gray-800">24-Hour Response</h4>
+                <p class="text-sm text-gray-600">Quick estimate delivery</p>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow text-center">
+                <div class="text-3xl mb-2">🎨</div>
+                <h4 class="font-semibold text-gray-800">Premium Brands</h4>
+                <p class="text-sm text-gray-600">Asian Paints, Berger & more</p>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow text-center">
+                <div class="text-3xl mb-2">💯</div>
+                <h4 class="font-semibold text-gray-800">Quality Service</h4>
+                <p class="text-sm text-gray-600">Trusted by 1000+ customers</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <h3 class="text-xl font-bold mb-2">Quality Colours - குவாலிட்டி கலர்ஸ்</h3>
+            <p class="text-gray-400 mb-4">Your Trusted Paint Partner in Ramanathapuram District</p>
+            <div class="flex flex-wrap justify-center gap-4 text-sm text-gray-400">
+                <span>📍 Ramanathapuram</span>
+                <span>📍 Thangachimadam</span>
+                <span>📍 Paramakudi</span>
+                <span>📍 Rameswaram</span>
+                <span>📍 Pamban</span>
+            </div>
+            <p class="text-gray-500 text-sm mt-4">© 2026 Quality Colours. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE = '/business-manager/api';
+        let uploadedFiles = [];
+
+        // Photo upload handling
+        document.getElementById('photoUpload').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            const maxFiles = 5;
+            const maxSize = 5 * 1024 * 1024; // 5MB
+
+            if (uploadedFiles.length + files.length > maxFiles) {
+                showError(`Maximum ${maxFiles} photos allowed`);
+                return;
+            }
+
+            files.forEach(file => {
+                if (file.size > maxSize) {
+                    showError(`${file.name} is too large. Maximum 5MB per photo.`);
+                    return;
+                }
+
+                if (!file.type.startsWith('image/')) {
+                    showError(`${file.name} is not an image file.`);
+                    return;
+                }
+
+                uploadedFiles.push(file);
+            });
+
+            renderPhotoPreview();
+        });
+
+        function renderPhotoPreview() {
+            const preview = document.getElementById('photoPreview');
+            if (uploadedFiles.length === 0) {
+                preview.classList.add('hidden');
+                return;
+            }
+
+            preview.classList.remove('hidden');
+            preview.innerHTML = '';
+
+            uploadedFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.className = 'file-preview';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" class="w-full h-24 object-cover rounded-lg">
+                        <div class="remove-file" onclick="removeFile(${index})">×</div>
+                    `;
+                    preview.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            renderPhotoPreview();
+        }
+
+        // Form submission
+        document.getElementById('estimateForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const submitText = document.getElementById('submitText');
+            const originalText = submitText.textContent;
+
+            // Disable button and show loading
+            submitBtn.disabled = true;
+            submitText.textContent = 'Submitting...';
+            hideMessages();
+
+            try {
+                // Prepare form data
+                const formData = {
+                    customer_name: document.getElementById('customerName').value,
+                    phone: document.getElementById('phone').value,
+                    email: document.getElementById('email').value || null,
+                    project_type: document.getElementById('projectType').value,
+                    property_type: document.getElementById('propertyType').value,
+                    location: document.getElementById('location').value,
+                    area_sqft: parseInt(document.getElementById('area').value),
+                    rooms: parseInt(document.getElementById('rooms').value) || null,
+                    preferred_brand: document.getElementById('preferredBrand').value || null,
+                    timeline: document.getElementById('timeline').value || null,
+                    budget_range: document.getElementById('budgetRange').value || null,
+                    additional_notes: document.getElementById('additionalNotes').value || null,
+                    status: 'new'
+                };
+
+                // Submit estimate request
+                const response = await fetch(`${API_BASE}/estimate-requests`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || result.message || 'Failed to submit request');
+                }
+
+                // Show success message
+                document.getElementById('requestNumber').textContent = result.request_number;
+                showSuccess();
+
+                // Reset form
+                document.getElementById('estimateForm').reset();
+                uploadedFiles = [];
+                renderPhotoPreview();
+
+                // Scroll to success message
+                document.getElementById('successMessage').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            } catch (error) {
+                console.error('Submit error:', error);
+                showError(error.message || 'Failed to submit request. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitText.textContent = originalText;
+            }
+        });
+
+        function showSuccess() {
+            document.getElementById('successMessage').classList.remove('hidden');
+            document.getElementById('errorMessage').classList.add('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').classList.remove('hidden');
+            document.getElementById('successMessage').classList.add('hidden');
+        }
+
+        function hideMessages() {
+            document.getElementById('successMessage').classList.add('hidden');
+            document.getElementById('errorMessage').classList.add('hidden');
+        }
+
+        // Phone validation
+        document.getElementById('phone').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+        });
+
+        // Area validation
+        document.getElementById('area').addEventListener('input', function(e) {
+            if (this.value < 0) this.value = 0;
+        });
+    </script>
+</body>
+</html>

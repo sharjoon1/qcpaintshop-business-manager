@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Clock Out - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .btn {
+            width: 100%;
+            padding: 18px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #1f2937;
+        }
+        .camera-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        video, canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .camera-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            z-index: 10;
+        }
+        .capture-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: white;
+            border: 6px solid #10b981;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .capture-btn:active {
+            transform: scale(0.9);
+        }
+        .flip-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.9);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .loader {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+        .step-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            margin-right: 16px;
+        }
+        .step.complete .step-number {
+            background: #10b981;
+        }
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #d1fae5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+        }
+    </style>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="card" style="margin-top: 16px;">
+            <button onclick="goBack()" style="background: none; border: none; color: #6b7280; display: flex; align-items: center; gap: 8px; margin-bottom: 16px; cursor: pointer;">
+                <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Back
+            </button>
+            <h1 style="font-size: 28px; font-weight: 700; color: #1f2937; margin-bottom: 8px;">Clock Out</h1>
+            <p style="color: #6b7280;">Take a selfie and enable location to clock out</p>
+        </div>
+
+        <!-- Steps -->
+        <div class="card">
+            <div class="step" id="step1">
+                <div class="step-number">1</div>
+                <div>
+                    <div style="font-weight: 600; color: #1f2937;">Enable Location</div>
+                    <div style="font-size: 14px; color: #6b7280;" id="step1Status">Waiting...</div>
+                </div>
+            </div>
+
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <div>
+                    <div style="font-weight: 600; color: #1f2937;">Take Selfie</div>
+                    <div style="font-size: 14px; color: #6b7280;" id="step2Status">Waiting...</div>
+                </div>
+            </div>
+
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <div>
+                    <div style="font-weight: 600; color: #1f2937;">Confirm & Submit</div>
+                    <div style="font-size: 14px; color: #6b7280;" id="step3Status">Waiting...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Location -->
+        <div class="card" id="locationCard">
+            <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #1f2937;">📍 Your Location</h3>
+            <div id="locationLoading" style="text-align: center; padding: 20px;">
+                <div class="loader"></div>
+                <p style="color: #6b7280; margin-top: 16px;">Getting your location...</p>
+            </div>
+
+            <div id="locationSuccess" style="display: none;">
+                <div style="background: #d1fae5; padding: 16px; border-radius: 12px; margin-bottom: 16px;">
+                    <div style="font-weight: 600; color: #065f46; margin-bottom: 4px;">✓ Location Acquired</div>
+                    <div style="font-size: 14px; color: #065f46;" id="locationAddress">Loading address...</div>
+                </div>
+                <div style="font-size: 12px; color: #6b7280;">
+                    <div>Latitude: <span id="latitude">--</span></div>
+                    <div>Longitude: <span id="longitude">--</span></div>
+                </div>
+            </div>
+
+            <div id="locationError" style="display: none;">
+                <div style="background: #fee2e2; padding: 16px; border-radius: 12px; margin-bottom: 16px;">
+                    <div style="font-weight: 600; color: #991b1b; margin-bottom: 8px;">⚠️ Location Required</div>
+                    <div style="font-size: 14px; color: #991b1b; margin-bottom: 16px;" id="locationErrorMsg">Please enable location access</div>
+                    <button class="btn btn-secondary" onclick="requestLocation()">Retry</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera -->
+        <div class="card" id="cameraCard" style="display: none;">
+            <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #1f2937;">📷 Take Your Selfie</h3>
+            
+            <div class="camera-container" id="cameraPreview">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas" style="display: none;"></canvas>
+                <div class="camera-controls">
+                    <button class="flip-btn" onclick="flipCamera()" id="flipBtn">
+                        <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20 5h-3.17L15 3H9L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-10 1c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 12l2.5-3.21L13.78 18H6.22z"></path>
+                        </svg>
+                    </button>
+                    <button class="capture-btn" onclick="capturePhoto()"></button>
+                </div>
+            </div>
+
+            <div id="photoPreview" style="display: none; margin-top: 16px;">
+                <img id="previewImage" style="width: 100%; border-radius: 12px; margin-bottom: 16px;">
+                <button class="btn btn-secondary" onclick="retakePhoto()">Retake Photo</button>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="card" id="submitCard" style="display: none;">
+            <button class="btn btn-primary" onclick="submitClockIn()" id="submitBtn">
+                <span id="submitBtnText">✓ Clock Out Now</span>
+            </button>
+        </div>
+
+        <!-- Success -->
+        <div class="card" id="successCard" style="display: none; text-align: center;">
+            <div class="success-icon">✓</div>
+            <h2 style="font-size: 24px; font-weight: 700; color: #1f2937; margin-bottom: 8px;">Successfully Clocked Out!</h2>
+            <p style="color: #6b7280; margin-bottom: 24px;" id="successMessage">You clocked in at --:--</p>
+            <button class="btn btn-primary" onclick="goToDashboard()">Go to Dashboard</button>
+        </div>
+    </div>
+
+    <script>
+        let latitude = null;
+        let longitude = null;
+        let address = '';
+        let photoBlob = null;
+        let videoStream = null;
+        let currentFacingMode = 'user'; // Start with front camera
+
+        // Initialize
+        async function init() {
+            await requestLocation();
+        }
+
+        // Request location
+        async function requestLocation() {
+            document.getElementById('locationLoading').style.display = 'block';
+            document.getElementById('locationError').style.display = 'none';
+            document.getElementById('locationSuccess').style.display = 'none';
+
+            if (!navigator.geolocation) {
+                showLocationError('Geolocation is not supported by your device');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    latitude = position.coords.latitude;
+                    longitude = position.coords.longitude;
+
+                    document.getElementById('latitude').textContent = latitude.toFixed(6);
+                    document.getElementById('longitude').textContent = longitude.toFixed(6);
+
+                    // Reverse geocode
+                    try {
+                        address = await reverseGeocode(latitude, longitude);
+                        document.getElementById('locationAddress').textContent = address;
+                    } catch (e) {
+                        address = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                        document.getElementById('locationAddress').textContent = address;
+                    }
+
+                    document.getElementById('locationLoading').style.display = 'none';
+                    document.getElementById('locationSuccess').style.display = 'block';
+                    
+                    // Mark step 1 complete
+                    document.getElementById('step1').classList.add('complete');
+                    document.getElementById('step1Status').textContent = 'Complete';
+
+                    // Show camera
+                    setTimeout(() => {
+                        document.getElementById('cameraCard').style.display = 'block';
+                        startCamera();
+                    }, 500);
+                },
+                (error) => {
+                    let message = 'Unable to get your location';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        message = 'Location permission denied. Please enable location access in your browser settings.';
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        message = 'Location information unavailable. Please check your device settings.';
+                    } else if (error.code === error.TIMEOUT) {
+                        message = 'Location request timed out. Please try again.';
+                    }
+                    showLocationError(message);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        function showLocationError(message) {
+            document.getElementById('locationLoading').style.display = 'none';
+            document.getElementById('locationError').style.display = 'block';
+            document.getElementById('locationErrorMsg').textContent = message;
+        }
+
+        // Reverse geocode (simplified - you can use Google Maps API if available)
+        async function reverseGeocode(lat, lng) {
+            // For now, just return coordinates
+            // In production, use Google Maps Geocoding API
+            return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        }
+
+        // Start camera
+        async function startCamera() {
+            try {
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                }
+
+                const video = document.getElementById('video');
+                const constraints = {
+                    video: {
+                        facingMode: currentFacingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 1280 }
+                    },
+                    audio: false
+                };
+
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = videoStream;
+            } catch (error) {
+                console.error('Camera error:', error);
+                alert('Unable to access camera. Please grant camera permission and try again.');
+            }
+        }
+
+        // Flip camera
+        async function flipCamera() {
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            await startCamera();
+        }
+
+        // Capture photo
+        function capturePhoto() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            // Set canvas size to video size
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // Draw video frame to canvas
+            context.drawImage(video, 0, 0);
+
+            // Convert to blob
+            canvas.toBlob((blob) => {
+                photoBlob = blob;
+
+                // Show preview
+                const previewImage = document.getElementById('previewImage');
+                previewImage.src = URL.createObjectURL(blob);
+                
+                document.getElementById('cameraPreview').style.display = 'none';
+                document.getElementById('photoPreview').style.display = 'block';
+
+                // Mark step 2 complete
+                document.getElementById('step2').classList.add('complete');
+                document.getElementById('step2Status').textContent = 'Complete';
+
+                // Show submit button
+                document.getElementById('submitCard').style.display = 'block';
+
+                // Stop camera
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                }
+            }, 'image/jpeg', 0.8);
+        }
+
+        // Retake photo
+        function retakePhoto() {
+            photoBlob = null;
+            document.getElementById('cameraPreview').style.display = 'block';
+            document.getElementById('photoPreview').style.display = 'none';
+            document.getElementById('step2').classList.remove('complete');
+            document.getElementById('step2Status').textContent = 'Waiting...';
+            document.getElementById('submitCard').style.display = 'none';
+            startCamera();
+        }
+
+        // Submit clock in
+        async function submitClockIn() {
+            if (!latitude || !longitude) {
+                alert('Location is required. Please enable location access.');
+                return;
+            }
+
+            if (!photoBlob) {
+                alert('Photo is required. Please take a selfie.');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            const submitBtnText = document.getElementById('submitBtnText');
+            submitBtn.disabled = true;
+            submitBtnText.textContent = 'Submitting...';
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    window.location.href = '/business-manager/login.html';
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('photo', photoBlob, 'clock-out.jpg');
+                formData.append('latitude', latitude);
+                formData.append('longitude', longitude);
+                formData.append('address', address);
+
+                const response = await fetch('/business-manager/api/attendance/clock-out', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Mark step 3 complete
+                    document.getElementById('step3').classList.add('complete');
+                    document.getElementById('step3Status').textContent = 'Complete';
+
+                    // Show success
+                    const clockOutTime = new Date(data.data.clock_out_time);
+                    const timeStr = clockOutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    
+                    let message = `You clocked out at ${timeStr}. `;
+                    message += `Total working hours: ${data.data.total_working_hours} hours. `;
+                    
+                    if (data.data.is_complete) {
+                        message += '✓ Complete day!';
+                    } else {
+                        message += `Shortage: ${Math.floor(data.data.shortage_minutes / 60)}h ${data.data.shortage_minutes % 60}m`;
+                    }
+
+                    document.getElementById('successMessage').textContent = message;
+                    
+                    // Hide all cards
+                    document.getElementById('locationCard').style.display = 'none';
+                    document.getElementById('cameraCard').style.display = 'none';
+                    document.getElementById('submitCard').style.display = 'none';
+
+                    // Show success
+                    document.getElementById('successCard').style.display = 'block';
+
+                } else {
+                    alert(data.message || 'Failed to clock out. Please try again.');
+                    submitBtn.disabled = false;
+                    submitBtnText.textContent = '✓ Clock Out Now';
+                }
+
+            } catch (error) {
+                console.error('Clock out error:', error);
+                alert('Network error. Please check your connection and try again.');
+                submitBtn.disabled = false;
+                submitBtnText.textContent = '✓ Clock Out Now';
+            }
+        }
+
+        // Navigation
+        function goBack() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+            }
+            window.location.href = 'dashboard.html';
+        }
+
+        function goToDashboard() {
+            window.location.href = 'dashboard.html';
+        }
+
+        // Init on load
+        init();
+    </script>
+</body>
+</html>

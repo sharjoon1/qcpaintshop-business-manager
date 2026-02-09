@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Estimate - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div class="px-4 py-3 flex items-center justify-between">
+            <button onclick="history.back()" class="flex items-center text-gray-600 hover:text-gray-900">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back
+            </button>
+            <h1 class="text-xl font-bold text-gray-800">Create New Estimate</h1>
+            <div class="w-20"></div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto p-4">
+        <!-- Form Section -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Customer Details</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Customer Name *</label>
+                    <input type="text" id="customerName" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                    <input type="tel" id="customerPhone" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Address</label>
+                    <textarea id="customerAddress" rows="2" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Estimate Date *</label>
+                    <input type="date" id="estimateDate" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Valid Until</label>
+                    <input type="date" id="validUntil" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Column Visibility Settings -->
+            <div class="mb-6 p-4 bg-purple-50 rounded-lg">
+                <h3 class="text-sm font-bold text-gray-800 mb-3">Display Settings</h3>
+                <div class="flex flex-wrap gap-2">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="showQty" class="mr-2" checked>
+                        <span class="text-sm">Show Qty/Area</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="showMix" class="mr-2" checked>
+                        <span class="text-sm">Show Mix Info</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="showPrice" class="mr-2" checked>
+                        <span class="text-sm">Show Price</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="showColor" class="mr-2" checked>
+                        <span class="text-sm">Show Color Cost</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="showAmount" class="mr-2" checked>
+                        <span class="text-sm">Show Amount</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="showTotal" class="mr-2" checked>
+                        <span class="text-sm">Show Total</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="showGstBreakdown" class="mr-2" checked>
+                        <span class="text-sm">Show GST Breakdown</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Items Section -->
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Items</h3>
+            
+            <!-- Add Item Form -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <!-- Product Selection -->
+                <div class="mb-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Select Product (or enter manually below)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="productSearch" placeholder="Search products..." class="flex-1 px-3 py-2 border-2 border-purple-300 rounded-lg text-sm focus:border-purple-600 focus:outline-none">
+                        <select id="productSelect" class="flex-1 px-3 py-2 border-2 border-purple-300 rounded-lg text-sm focus:border-purple-600 focus:outline-none">
+                            <option value="">-- Select Product --</option>
+                        </select>
+                        <button onclick="loadProductToForm()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm">Use Product</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                    <input type="text" id="itemDescription" placeholder="Item Description" class="px-3 py-2 border rounded-lg text-sm">
+                    <select id="packSizeSelect" class="px-3 py-2 border rounded-lg text-sm hidden">
+                        <option value="">-- Select Pack Size --</option>
+                    </select>
+                    <input type="number" id="itemQuantity" placeholder="Quantity" step="0.01" class="px-3 py-2 border rounded-lg text-sm">
+                    <input type="number" id="itemArea" placeholder="Area (sq.ft)" step="0.01" class="px-3 py-2 border rounded-lg text-sm">
+                    <input type="text" id="itemMixInfo" placeholder="Mix Info (e.g. 5×20L)" class="px-3 py-2 border rounded-lg text-sm">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <input type="number" id="itemPrice" placeholder="Unit Price" step="0.01" class="px-3 py-2 border rounded-lg text-sm">
+                    <input type="text" id="itemBreakdown" placeholder="Price Breakdown" class="px-3 py-2 border rounded-lg text-sm">
+                    <input type="number" id="itemColorCost" placeholder="Color Cost" step="0.01" value="0" class="px-3 py-2 border rounded-lg text-sm">
+                    <button onclick="addItem()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold text-sm">+ Add Item</button>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="overflow-x-auto mb-6">
+                <table class="w-full text-sm" id="itemsTable">
+                    <thead class="bg-gray-800 text-white">
+                        <tr>
+                            <th class="px-3 py-2 text-left">#</th>
+                            <th class="px-3 py-2 text-left">Description</th>
+                            <th class="px-3 py-2 text-left col-qty">Qty</th>
+                            <th class="px-3 py-2 text-left col-area">Area</th>
+                            <th class="px-3 py-2 text-left col-mix">Mix</th>
+                            <th class="px-3 py-2 text-right col-price">Price</th>
+                            <th class="px-3 py-2 text-left col-breakdown">Breakdown</th>
+                            <th class="px-3 py-2 text-right col-color">Color</th>
+                            <th class="px-3 py-2 text-right col-total">Total</th>
+                            <th class="px-3 py-2 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody" class="divide-y">
+                        <tr>
+                            <td colspan="10" class="text-center py-8 text-gray-500">No items added yet</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Summary -->
+            <div class="flex justify-end">
+                <div class="w-full md:w-96 bg-purple-50 rounded-lg p-4">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-semibold">Subtotal:</span>
+                        <span id="subtotalDisplay">₹0.00</span>
+                    </div>
+                    <div class="flex justify-between mb-2" id="gstRow">
+                        <span class="font-semibold">GST @ 18%:</span>
+                        <span id="gstDisplay">₹0.00</span>
+                    </div>
+                    <div class="flex justify-between text-xl font-bold text-purple-600 pt-2 border-t-2">
+                        <span>Grand Total:</span>
+                        <span id="grandTotalDisplay">₹0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="mt-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Notes (Optional)</label>
+                <textarea id="notes" rows="3" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-3 mt-6">
+                <button onclick="saveEstimate('draft')" class="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 font-semibold">
+                    💾 Save as Draft
+                </button>
+                <button onclick="saveEstimate('sent')" class="flex-1 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                    ✉️ Save & Send
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let items = [];
+        let itemCounter = 0;
+        let allProducts = [];
+
+        // Set today's date
+        document.getElementById('estimateDate').valueAsDate = new Date();
+
+        // Load products from API
+        async function loadProducts() {
+            try {
+                const response = await fetch('/business-manager/api/products');
+                allProducts = await response.json();
+                
+                const select = document.getElementById('productSelect');
+                select.innerHTML = '<option value="">-- Select Product --</option>';
+                
+                allProducts.forEach(product => {
+                    const option = document.createElement('option');
+                    option.value = product.id;
+                    option.textContent = `${product.name} (${product.brand_name || 'No Brand'})`;
+                    option.dataset.product = JSON.stringify(product);
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading products:', error);
+            }
+        }
+
+        // Search products
+        document.getElementById('productSearch').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const select = document.getElementById('productSelect');
+            
+            select.innerHTML = '<option value="">-- Select Product --</option>';
+            
+            const filtered = allProducts.filter(p => 
+                p.name.toLowerCase().includes(searchTerm) ||
+                (p.brand_name && p.brand_name.toLowerCase().includes(searchTerm)) ||
+                (p.description && p.description.toLowerCase().includes(searchTerm))
+            );
+            
+            filtered.forEach(product => {
+                const option = document.createElement('option');
+                option.value = product.id;
+                option.textContent = `${product.name} (${product.brand_name || 'No Brand'})`;
+                option.dataset.product = JSON.stringify(product);
+                select.appendChild(option);
+            });
+        });
+
+        // Load selected product to form
+        function loadProductToForm() {
+            const select = document.getElementById('productSelect');
+            const selectedOption = select.options[select.selectedIndex];
+            
+            if (!selectedOption.value) {
+                alert('Please select a product first');
+                return;
+            }
+            
+            const product = JSON.parse(selectedOption.dataset.product);
+            
+            // Parse pack sizes
+            let packSizes = [];
+            try {
+                if (product.available_sizes) {
+                    packSizes = JSON.parse(product.available_sizes);
+                    if (!Array.isArray(packSizes)) packSizes = [];
+                }
+            } catch (e) {
+                packSizes = [];
+            }
+            
+            // Show/hide pack size dropdown
+            const packSizeSelect = document.getElementById('packSizeSelect');
+            if (packSizes.length > 0 && typeof packSizes[0] === 'object') {
+                // New format with sizes and prices
+                packSizeSelect.classList.remove('hidden');
+                packSizeSelect.innerHTML = '<option value="">-- Select Pack Size --</option>';
+                
+                packSizes.forEach((ps, idx) => {
+                    const option = document.createElement('option');
+                    option.value = idx;
+                    option.textContent = `${ps.size}L - ₹${parseFloat(ps.price).toFixed(2)}`;
+                    option.dataset.size = ps.size;
+                    option.dataset.price = ps.price;
+                    packSizeSelect.appendChild(option);
+                });
+                
+                // Select first pack size by default
+                packSizeSelect.value = '0';
+                document.getElementById('itemDescription').value = `${product.name} (${packSizes[0].size}L)`;
+                document.getElementById('itemPrice').value = parseFloat(packSizes[0].price).toFixed(2);
+                
+                // Update price when pack size changes
+                packSizeSelect.onchange = function() {
+                    const selectedIdx = this.value;
+                    if (selectedIdx !== '') {
+                        const ps = packSizes[selectedIdx];
+                        document.getElementById('itemDescription').value = `${product.name} (${ps.size}L)`;
+                        document.getElementById('itemPrice').value = parseFloat(ps.price).toFixed(2);
+                    }
+                };
+            } else {
+                // Old format or no pack sizes
+                packSizeSelect.classList.add('hidden');
+                document.getElementById('itemDescription').value = product.name;
+                document.getElementById('itemPrice').value = parseFloat(product.base_price || 0).toFixed(2);
+            }
+            
+            // Auto-fill quantity if unit_wise
+            if (product.product_type === 'unit_wise') {
+                document.getElementById('itemQuantity').value = '1';
+            }
+            
+            // Focus on quantity field
+            document.getElementById('itemQuantity').focus();
+        }
+
+        // Initialize
+        loadProducts();
+
+        // Column visibility toggles
+        const toggles = ['showQty', 'showMix', 'showPrice', 'showColor', 'showAmount', 'showTotal'];
+        toggles.forEach(id => {
+            document.getElementById(id).addEventListener('change', updateColumnVisibility);
+        });
+
+        document.getElementById('showGstBreakdown').addEventListener('change', () => {
+            document.getElementById('gstRow').style.display = 
+                document.getElementById('showGstBreakdown').checked ? 'flex' : 'none';
+        });
+
+        function updateColumnVisibility() {
+            const settings = {
+                qty: document.getElementById('showQty').checked,
+                area: document.getElementById('showQty').checked,
+                mix: document.getElementById('showMix').checked,
+                price: document.getElementById('showPrice').checked || document.getElementById('showAmount').checked,
+                breakdown: document.getElementById('showPrice').checked,
+                color: document.getElementById('showColor').checked,
+                total: document.getElementById('showTotal').checked
+            };
+
+            Object.keys(settings).forEach(col => {
+                const display = settings[col] ? 'table-cell' : 'none';
+                document.querySelectorAll(`.col-${col}`).forEach(el => el.style.display = display);
+            });
+        }
+
+        function addItem() {
+            const description = document.getElementById('itemDescription').value.trim();
+            const quantity = parseFloat(document.getElementById('itemQuantity').value) || 0;
+            const area = parseFloat(document.getElementById('itemArea').value) || 0;
+            const mixInfo = document.getElementById('itemMixInfo').value.trim();
+            const price = parseFloat(document.getElementById('itemPrice').value) || 0;
+            const breakdown = document.getElementById('itemBreakdown').value.trim();
+            const colorCost = parseFloat(document.getElementById('itemColorCost').value) || 0;
+
+            if (!description || quantity <= 0 || price <= 0) {
+                alert('Please fill in Item Description, Quantity, and Unit Price');
+                return;
+            }
+
+            const lineTotal = (quantity * price) + colorCost;
+            
+            items.push({
+                id: ++itemCounter,
+                description,
+                quantity,
+                area,
+                mixInfo,
+                price,
+                breakdown,
+                colorCost,
+                lineTotal
+            });
+
+            // Clear form
+            document.getElementById('itemDescription').value = '';
+            document.getElementById('itemQuantity').value = '';
+            document.getElementById('itemArea').value = '';
+            document.getElementById('itemMixInfo').value = '';
+            document.getElementById('itemPrice').value = '';
+            document.getElementById('itemBreakdown').value = '';
+            document.getElementById('itemColorCost').value = '0';
+
+            renderItems();
+            calculateTotals();
+        }
+
+        function removeItem(id) {
+            items = items.filter(item => item.id !== id);
+            renderItems();
+            calculateTotals();
+        }
+
+        function renderItems() {
+            const tbody = document.getElementById('itemsBody');
+            
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-500">No items added yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = items.map((item, idx) => `
+                <tr>
+                    <td class="px-3 py-2">${idx + 1}</td>
+                    <td class="px-3 py-2">${item.description}</td>
+                    <td class="px-3 py-2 col-qty">${item.quantity}</td>
+                    <td class="px-3 py-2 col-area">${item.area || '-'}</td>
+                    <td class="px-3 py-2 col-mix">${item.mixInfo || '-'}</td>
+                    <td class="px-3 py-2 text-right col-price">₹${item.price.toFixed(2)}</td>
+                    <td class="px-3 py-2 col-breakdown">${item.breakdown || '-'}</td>
+                    <td class="px-3 py-2 text-right col-color">₹${item.colorCost.toFixed(2)}</td>
+                    <td class="px-3 py-2 text-right font-bold col-total">₹${item.lineTotal.toFixed(2)}</td>
+                    <td class="px-3 py-2 text-center">
+                        <button onclick="removeItem(${item.id})" class="text-red-600 hover:text-red-800">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            updateColumnVisibility();
+        }
+
+        function calculateTotals() {
+            const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+            const gstAmount = subtotal * 0.18;
+            const grandTotal = subtotal + gstAmount;
+
+            document.getElementById('subtotalDisplay').textContent = `₹${subtotal.toFixed(2)}`;
+            document.getElementById('gstDisplay').textContent = `₹${gstAmount.toFixed(2)}`;
+            document.getElementById('grandTotalDisplay').textContent = `₹${grandTotal.toFixed(2)}`;
+        }
+
+        async function saveEstimate(status) {
+            const customerName = document.getElementById('customerName').value.trim();
+            const estimateDate = document.getElementById('estimateDate').value;
+
+            if (!customerName || !estimateDate) {
+                alert('Please fill in Customer Name and Estimate Date');
+                return;
+            }
+
+            if (items.length === 0) {
+                alert('Please add at least one item');
+                return;
+            }
+
+            const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+            const gstAmount = subtotal * 0.18;
+            const grandTotal = subtotal + gstAmount;
+
+            const columnVisibility = {
+                show_qty: document.getElementById('showQty').checked,
+                show_mix: document.getElementById('showMix').checked,
+                show_price: document.getElementById('showPrice').checked,
+                show_color: document.getElementById('showColor').checked,
+                show_amount: document.getElementById('showAmount').checked,
+                show_total: document.getElementById('showTotal').checked
+            };
+
+            const estimateData = {
+                customer_name: customerName,
+                customer_phone: document.getElementById('customerPhone').value.trim(),
+                customer_address: document.getElementById('customerAddress').value.trim(),
+                estimate_date: estimateDate,
+                valid_until: document.getElementById('validUntil').value || null,
+                subtotal: subtotal,
+                gst_amount: gstAmount,
+                grand_total: grandTotal,
+                show_gst_breakdown: document.getElementById('showGstBreakdown').checked,
+                column_visibility: JSON.stringify(columnVisibility),
+                notes: document.getElementById('notes').value.trim(),
+                status: status,
+                items: items.map((item, idx) => ({
+                    item_description: item.description,
+                    quantity: item.quantity,
+                    area: item.area,
+                    mix_info: item.mixInfo,
+                    unit_price: item.price,
+                    breakdown_cost: item.breakdown,
+                    color_cost: item.colorCost,
+                    line_total: item.lineTotal,
+                    display_order: idx + 1
+                }))
+            };
+
+            try {
+                const response = await fetch('/business-manager/api/estimates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(estimateData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(`Estimate ${status === 'draft' ? 'saved as draft' : 'saved and sent'}!`);
+                    window.location.href = `estimate-view.html?id=${result.id}`;
+                } else {
+                    alert('Error: ' + (result.message || 'Failed to save estimate'));
+                }
+            } catch (error) {
+                console.error('Error saving estimate:', error);
+                alert('Failed to save estimate. Please try again.');
+            }
+        }
+    </script>
+</body>
+</html>

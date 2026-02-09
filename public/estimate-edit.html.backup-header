@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Edit Estimate - Quality Colors</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div class="px-4 py-3 flex items-center justify-between">
+            <button onclick="history.back()" class="flex items-center text-gray-600 hover:text-gray-900">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back
+            </button>
+            <h1 class="text-xl font-bold text-gray-800">Edit Estimate <span id="estimateNumber"></span></h1>
+            <div class="w-20"></div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto p-4">
+        <!-- Step 1: Customer Selection -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Step 1: Select Customer</h2>
+            
+            <div class="flex gap-3 mb-4">
+                <select id="customerSelect" class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                    <option value="">-- Select Customer --</option>
+                </select>
+                <button onclick="openNewCustomerModal()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                    + New Customer
+                </button>
+            </div>
+
+            <!-- Customer Details Display -->
+            <div id="customerDetails" class="hidden p-4 bg-gray-50 rounded-lg">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                    <div><strong>Name:</strong> <span id="custName"></span></div>
+                    <div><strong>Phone:</strong> <span id="custPhone"></span></div>
+                    <div><strong>Email:</strong> <span id="custEmail"></span></div>
+                    <div class="md:col-span-3"><strong>Address:</strong> <span id="custAddress"></span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Add Products -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Step 2: Add Products</h2>
+            
+            <!-- Brand → Category → Product Selection -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Brand *</label>
+                    <select id="brandSelect" onchange="loadCategories()" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                        <option value="">-- Select Brand --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Category *</label>
+                    <select id="categorySelect" onchange="loadProducts()" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                        <option value="">-- Select Category --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Product *</label>
+                    <select id="productSelect" onchange="loadProductDetails()" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                        <option value="">-- Select Product --</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Product Type Selection -->
+            <div id="productTypeSection" class="hidden mb-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Product Type *</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio" name="productType" value="unit" checked onchange="switchProductType()" class="mr-2">
+                        <span class="font-semibold">Unit Type (Pack Size)</span>
+                    </label>
+                    <label id="areaTypeOption" class="flex items-center cursor-pointer hidden">
+                        <input type="radio" name="productType" value="area" onchange="switchProductType()" class="mr-2">
+                        <span class="font-semibold">Area Type (Square Feet)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Unit Type Inputs -->
+            <div id="unitTypeInputs" class="hidden grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Pack Size *</label>
+                    <select id="packSizeSelect" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                        <option value="">-- Select Pack Size --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Quantity *</label>
+                    <input type="number" id="unitQuantity" min="1" value="1" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Area Type Inputs -->
+            <div id="areaTypeInputs" class="hidden grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Square Feet Required *</label>
+                    <input type="number" id="squareFeet" min="1" step="0.01" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" oninput="calculateAreaWise()">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Number of Coats *</label>
+                    <input type="number" id="coatsNumber" min="1" value="2" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" oninput="calculateAreaWise()">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Coverage (sq.ft/L)</label>
+                    <input type="number" id="areaCoverage" disabled class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg bg-gray-100">
+                </div>
+            </div>
+
+            <!-- Area Calculation Result -->
+            <div id="areaCalculation" class="hidden p-4 bg-blue-50 rounded-lg mb-4">
+                <h3 class="font-bold text-blue-900 mb-2">Calculation Result:</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                    <div><strong>Total Liters Needed:</strong> <span id="totalLiters" class="text-blue-600"></span></div>
+                    <div><strong>Pack Combination:</strong> <span id="packCombo" class="text-blue-600"></span></div>
+                    <div><strong>Total Price:</strong> <span id="areaPrice" class="text-blue-600 text-lg font-bold"></span></div>
+                </div>
+            </div>
+
+            <button onclick="addProductToEstimate()" class="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                + Add Product to Estimate
+            </button>
+        </div>
+
+        <!-- Products Table -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Estimate Items</h2>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-800 text-white">
+                        <tr>
+                            <th class="px-4 py-3 text-left">#</th>
+                            <th class="px-4 py-3 text-left">Product</th>
+                            <th class="px-4 py-3 text-left">Type</th>
+                            <th class="px-4 py-3 text-left">Details</th>
+                            <th class="px-4 py-3 text-right">Quantity</th>
+                            <th class="px-4 py-3 text-right">Unit Price</th>
+                            <th class="px-4 py-3 text-right">Total</th>
+                            <th class="px-4 py-3 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody">
+                        <tr>
+                            <td colspan="8" class="text-center py-8 text-gray-500">No items added yet</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Total Section -->
+            <div class="mt-6 border-t pt-4">
+                <div class="flex justify-end">
+                    <div class="w-64 space-y-2">
+                        <div class="flex justify-between">
+                            <span class="font-semibold">Subtotal:</span>
+                            <span id="subtotal">₹0.00</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-semibold">GST (18%):</span>
+                            <span id="gstAmount">₹0.00</span>
+                        </div>
+                        <div class="flex justify-between text-lg font-bold border-t pt-2">
+                            <span>Grand Total:</span>
+                            <span id="grandTotal">₹0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Estimate -->
+        <div class="flex gap-3">
+            <button onclick="history.back()" class="flex-1 px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
+                Cancel
+            </button>
+            <button onclick="saveEstimate()" class="flex-1 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                Save Estimate
+            </button>
+        </div>
+    </div>
+
+    <!-- New Customer Modal -->
+    <div id="newCustomerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Add New Customer</h3>
+                <button onclick="closeNewCustomerModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
+            <form onsubmit="createCustomer(event)">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Name *</label>
+                        <input type="text" id="newCustName" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Phone *</label>
+                        <input type="tel" id="newCustPhone" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Email</label>
+                        <input type="email" id="newCustEmail" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Branch *</label>
+                        <select id="newCustBranch" required class="w-full px-3 py-2 border rounded-lg">
+                            <option value="">-- Select --</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-semibold mb-1">Address</label>
+                        <textarea id="newCustAddress" rows="2" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeNewCustomerModal()" class="flex-1 px-4 py-2 border rounded-lg">Cancel</button>
+                    <button type="submit" class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Create Customer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let customers = [];
+        let brands = [];
+        let categories = [];
+        let products = [];
+        let allProducts = [];
+        let selectedCustomer = null;
+        let selectedProduct = null;
+        let estimateItems = [];
+        let itemIdCounter = 1;
+        let originalEstimate = null;
+
+        // Load initial data
+        async function loadInitialData() {
+            try {
+                // Load customers
+                const custRes = await fetch('/business-manager/api/customers');
+                customers = await custRes.json();
+                const customerSelect = document.getElementById('customerSelect');
+                customerSelect.innerHTML = '<option value="">-- Select Customer --</option>' +
+                    customers.map(c => `<option value="${c.id}" data-customer='${JSON.stringify(c)}'>${c.name} (${c.phone || 'No phone'})</option>`).join('');
+
+                // Load branches for new customer modal
+                const branchRes = await fetch('/business-manager/api/branches');
+                const branches = await branchRes.json();
+                document.getElementById('newCustBranch').innerHTML = '<option value="">-- Select --</option>' +
+                    branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+                // Load brands
+                const brandRes = await fetch('/business-manager/api/brands');
+                brands = await brandRes.json();
+                document.getElementById('brandSelect').innerHTML = '<option value="">-- Select Brand --</option>' +
+                    brands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+                // Load all products for filtering
+                const prodRes = await fetch('/business-manager/api/products');
+                allProducts = await prodRes.json();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Failed to load data');
+            }
+        }
+
+        // Customer selection
+        document.getElementById('customerSelect').addEventListener('change', function() {
+            const selected = this.options[this.selectedIndex];
+            if (selected.value) {
+                selectedCustomer = JSON.parse(selected.dataset.customer);
+                document.getElementById('custName').textContent = selectedCustomer.name;
+                document.getElementById('custPhone').textContent = selectedCustomer.phone || '-';
+                document.getElementById('custEmail').textContent = selectedCustomer.email || '-';
+                document.getElementById('custAddress').textContent = selectedCustomer.address || '-';
+                document.getElementById('customerDetails').classList.remove('hidden');
+            } else {
+                selectedCustomer = null;
+                document.getElementById('customerDetails').classList.add('hidden');
+            }
+        });
+
+        // Load categories based on brand
+        function loadCategories() {
+            const brandId = document.getElementById('brandSelect').value;
+            if (!brandId) {
+                document.getElementById('categorySelect').innerHTML = '<option value="">-- Select Category --</option>';
+                return;
+            }
+
+            // For now, show all categories (can filter by brand later)
+            fetch('/business-manager/api/categories')
+                .then(res => res.json())
+                .then(data => {
+                    categories = data;
+                    document.getElementById('categorySelect').innerHTML = '<option value="">-- Select Category --</option>' +
+                        categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                });
+        }
+
+        // Load products based on brand + category
+        function loadProducts() {
+            const brandId = document.getElementById('brandSelect').value;
+            const categoryId = document.getElementById('categorySelect').value;
+            
+            if (!brandId || !categoryId) {
+                document.getElementById('productSelect').innerHTML = '<option value="">-- Select Product --</option>';
+                return;
+            }
+
+            // Filter products
+            products = allProducts.filter(p => 
+                p.brand_id == brandId && p.category_id == categoryId
+            );
+
+            document.getElementById('productSelect').innerHTML = '<option value="">-- Select Product --</option>' +
+                products.map(p => `<option value="${p.id}" data-product='${JSON.stringify(p).replace(/'/g, "&apos;")}'>${p.name}</option>`).join('');
+        }
+
+        // Load product details
+        function loadProductDetails() {
+            const selected = document.getElementById('productSelect').options[document.getElementById('productSelect').selectedIndex];
+            if (!selected.value) {
+                document.getElementById('productTypeSection').classList.add('hidden');
+                return;
+            }
+
+            selectedProduct = JSON.parse(selected.dataset.product);
+            
+            // Show product type section
+            document.getElementById('productTypeSection').classList.remove('hidden');
+            
+            // Show/hide area type option based on product type
+            if (selectedProduct.product_type === 'area_wise' && selectedProduct.area_coverage > 0) {
+                document.getElementById('areaTypeOption').classList.remove('hidden');
+            } else {
+                document.getElementById('areaTypeOption').classList.add('hidden');
+                document.querySelector('input[name="productType"][value="unit"]').checked = true;
+            }
+
+            switchProductType();
+        }
+
+        // Switch between unit and area type
+        function switchProductType() {
+            const type = document.querySelector('input[name="productType"]:checked').value;
+            
+            if (type === 'unit') {
+                document.getElementById('unitTypeInputs').classList.remove('hidden');
+                document.getElementById('areaTypeInputs').classList.add('hidden');
+                document.getElementById('areaCalculation').classList.add('hidden');
+                loadPackSizes();
+            } else {
+                document.getElementById('unitTypeInputs').classList.add('hidden');
+                document.getElementById('areaTypeInputs').classList.remove('hidden');
+                document.getElementById('areaCoverage').value = selectedProduct.area_coverage || 0;
+                calculateAreaWise();
+            }
+        }
+
+        // Load pack sizes
+        function loadPackSizes() {
+            if (!selectedProduct || !selectedProduct.available_sizes) return;
+            
+            try {
+                const packSizes = JSON.parse(selectedProduct.available_sizes);
+                document.getElementById('packSizeSelect').innerHTML = '<option value="">-- Select Pack Size --</option>' +
+                    packSizes.map((ps, idx) => 
+                        `<option value="${idx}" data-pack='${JSON.stringify(ps)}'>${ps.size}L - ₹${parseFloat(ps.price).toFixed(2)}</option>`
+                    ).join('');
+            } catch (e) {
+                console.error('Error parsing pack sizes:', e);
+            }
+        }
+
+        // Calculate area-wise requirement
+        function calculateAreaWise() {
+            const squareFeet = parseFloat(document.getElementById('squareFeet').value) || 0;
+            const coats = parseFloat(document.getElementById('coatsNumber').value) || 1;
+            const coverage = parseFloat(selectedProduct.area_coverage) || 0;
+
+            if (squareFeet <= 0 || coverage <= 0) {
+                document.getElementById('areaCalculation').classList.add('hidden');
+                return;
+            }
+
+            // Calculate total liters needed
+            const totalLiters = (squareFeet * coats) / coverage;
+
+            // Get pack sizes
+            const packSizes = JSON.parse(selectedProduct.available_sizes || '[]');
+            if (packSizes.length === 0) return;
+
+            // Find optimal pack combination
+            const result = findOptimalPackCombination(totalLiters, packSizes);
+
+            // Display result
+            document.getElementById('totalLiters').textContent = totalLiters.toFixed(2) + 'L';
+            document.getElementById('packCombo').textContent = result.breakdown;
+            document.getElementById('areaPrice').textContent = '₹' + result.totalPrice.toFixed(2);
+            document.getElementById('areaCalculation').classList.remove('hidden');
+        }
+
+        // Find optimal pack combination
+        function findOptimalPackCombination(litersNeeded, packSizes) {
+            // Sort pack sizes descending
+            const sorted = packSizes.sort((a, b) => b.size - a.size);
+            
+            let remaining = litersNeeded;
+            let combination = [];
+            let totalPrice = 0;
+
+            for (let pack of sorted) {
+                if (remaining >= pack.size) {
+                    const quantity = Math.floor(remaining / pack.size);
+                    combination.push({
+                        size: pack.size,
+                        quantity: quantity,
+                        price: pack.price
+                    });
+                    totalPrice += quantity * pack.price;
+                    remaining = remaining - (quantity * pack.size);
+                }
+            }
+
+            // Handle remaining with smallest pack
+            if (remaining > 0) {
+                const smallestPack = sorted[sorted.length - 1];
+                const additionalPacks = Math.ceil(remaining / smallestPack.size);
+                combination.push({
+                    size: smallestPack.size,
+                    quantity: additionalPacks,
+                    price: smallestPack.price
+                });
+                totalPrice += additionalPacks * smallestPack.price;
+            }
+
+            const breakdown = combination.map(c => `${c.quantity}×${c.size}L`).join(' + ');
+            
+            return {
+                combination: combination,
+                breakdown: breakdown,
+                totalPrice: totalPrice
+            };
+        }
+
+        // Add product to estimate
+        function addProductToEstimate() {
+            if (!selectedCustomer) {
+                alert('Please select a customer first');
+                return;
+            }
+
+            if (!selectedProduct) {
+                alert('Please select a product');
+                return;
+            }
+
+            const type = document.querySelector('input[name="productType"]:checked').value;
+            let item = {
+                id: itemIdCounter++,
+                product_id: selectedProduct.id,
+                product_name: selectedProduct.name,
+                type: type
+            };
+
+            if (type === 'unit') {
+                const packIdx = document.getElementById('packSizeSelect').value;
+                const quantity = parseFloat(document.getElementById('unitQuantity').value) || 1;
+                
+                if (!packIdx) {
+                    alert('Please select pack size');
+                    return;
+                }
+
+                const packSizes = JSON.parse(selectedProduct.available_sizes);
+                const pack = packSizes[packIdx];
+
+                item.details = `${pack.size}L pack`;
+                item.quantity = quantity;
+                item.unit_price = pack.price;
+                item.total = quantity * pack.price;
+            } else {
+                const squareFeet = parseFloat(document.getElementById('squareFeet').value);
+                const coats = parseFloat(document.getElementById('coatsNumber').value);
+                const totalLiters = parseFloat(document.getElementById('totalLiters').textContent);
+                const packCombo = document.getElementById('packCombo').textContent;
+                const totalPrice = parseFloat(document.getElementById('areaPrice').textContent.replace('₹', '').replace(',', ''));
+
+                item.details = `${squareFeet} sq.ft × ${coats} coats = ${totalLiters}L (${packCombo})`;
+                item.quantity = totalLiters;
+                item.unit_price = totalPrice / totalLiters;
+                item.total = totalPrice;
+            }
+
+            estimateItems.push(item);
+            renderEstimateTable();
+            
+            // Reset form
+            document.getElementById('productSelect').value = '';
+            document.getElementById('productTypeSection').classList.add('hidden');
+        }
+
+        // Render estimate table
+        function renderEstimateTable() {
+            const tbody = document.getElementById('itemsTableBody');
+            
+            if (estimateItems.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">No items added yet</td></tr>';
+                updateTotals();
+                return;
+            }
+
+            tbody.innerHTML = estimateItems.map((item, idx) => `
+                <tr>
+                    <td class="px-4 py-3">${idx + 1}</td>
+                    <td class="px-4 py-3 font-semibold">${item.product_name}</td>
+                    <td class="px-4 py-3">${item.type === 'unit' ? 'Unit' : 'Area'}</td>
+                    <td class="px-4 py-3 text-sm">${item.details}</td>
+                    <td class="px-4 py-3 text-right">${item.quantity.toFixed(2)}</td>
+                    <td class="px-4 py-3 text-right">₹${item.unit_price.toFixed(2)}</td>
+                    <td class="px-4 py-3 text-right font-semibold">₹${item.total.toFixed(2)}</td>
+                    <td class="px-4 py-3 text-center">
+                        <button onclick="removeItem(${item.id})" class="text-red-600 hover:text-red-800">Remove</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            updateTotals();
+        }
+
+        // Remove item
+        function removeItem(itemId) {
+            estimateItems = estimateItems.filter(item => item.id !== itemId);
+            renderEstimateTable();
+        }
+
+        // Update totals
+        function updateTotals() {
+            const subtotal = estimateItems.reduce((sum, item) => sum + item.total, 0);
+            const gst = subtotal * 0.18;
+            const grandTotal = subtotal + gst;
+
+            document.getElementById('subtotal').textContent = '₹' + subtotal.toFixed(2);
+            document.getElementById('gstAmount').textContent = '₹' + gst.toFixed(2);
+            document.getElementById('grandTotal').textContent = '₹' + grandTotal.toFixed(2);
+        }
+
+        // Save estimate
+        async function saveEstimate() {
+            if (!selectedCustomer) {
+                alert('Please select a customer');
+                return;
+            }
+
+            if (estimateItems.length === 0) {
+                alert('Please add at least one product');
+                return;
+            }
+
+            const subtotal = estimateItems.reduce((sum, item) => sum + item.total, 0);
+            const gst = subtotal * 0.18;
+            const grandTotal = subtotal + gst;
+
+            // Convert items to API format
+            const apiItems = estimateItems.map((item, idx) => ({
+                product_id: item.product_id,
+                item_description: item.product_name,
+                quantity: item.quantity,
+                area: item.type === 'area' ? item.quantity : null,
+                mix_info: item.details,
+                unit_price: item.unit_price,
+                price_breakdown: item.type,
+                color_cost: 0,
+                line_total: item.total,
+                display_order: idx + 1
+            }));
+
+            // Format dates properly (YYYY-MM-DD only, no timestamps)
+            const formatDate = (dateStr) => {
+                if (!dateStr) return null;
+                const d = new Date(dateStr);
+                return d.toISOString().split('T')[0];
+            };
+
+            const estimateData = {
+                customer_name: selectedCustomer.name,
+                customer_phone: selectedCustomer.phone,
+                customer_address: selectedCustomer.address,
+                estimate_date: formatDate(originalEstimate ? originalEstimate.estimate_date : new Date()),
+                valid_until: formatDate(originalEstimate ? originalEstimate.valid_until : null),
+                subtotal: subtotal,
+                gst_amount: gst,
+                grand_total: grandTotal,
+                show_gst_breakdown: originalEstimate ? originalEstimate.show_gst_breakdown : true,
+                column_visibility: originalEstimate ? originalEstimate.column_visibility : null,
+                notes: originalEstimate ? (originalEstimate.notes || '') : '',
+                status: originalEstimate ? originalEstimate.status : 'draft',
+                items: apiItems
+            };
+
+            try {
+                console.log('Saving estimate ID:', estimateId);
+                console.log('Estimate data:', estimateData);
+                
+                const response = await fetch(`/business-manager/api/estimates/${estimateId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(estimateData)
+                });
+
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Success result:', result);
+                    alert('Estimate updated successfully!');
+                    window.location.href = 'estimates.html';
+                } else {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    alert('Failed to update estimate: ' + errorText);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error updating estimate: ' + error.message);
+            }
+        }
+
+        // New customer modal
+        function openNewCustomerModal() {
+            document.getElementById('newCustomerModal').classList.remove('hidden');
+        }
+
+        function closeNewCustomerModal() {
+            document.getElementById('newCustomerModal').classList.add('hidden');
+        }
+
+        async function createCustomer(event) {
+            event.preventDefault();
+            
+            const customerData = {
+                name: document.getElementById('newCustName').value,
+                phone: document.getElementById('newCustPhone').value,
+                email: document.getElementById('newCustEmail').value || null,
+                address: document.getElementById('newCustAddress').value || null,
+                branch_id: document.getElementById('newCustBranch').value,
+                status: 'approved'
+            };
+
+            try {
+                const response = await fetch('/business-manager/api/customers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(customerData)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert('Customer created successfully!');
+                    closeNewCustomerModal();
+                    loadInitialData(); // Reload customers
+                } else {
+                    alert('Failed to create customer');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error creating customer');
+            }
+        }
+
+        // Get estimate ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const estimateId = urlParams.get('id');
+        
+        if (!estimateId) {
+            alert('No estimate ID provided');
+            window.location.href = 'estimates.html';
+        }
+
+        // Load estimate data
+        async function loadEstimateData() {
+            try {
+                console.log('Loading estimate ID:', estimateId);
+                const response = await fetch(`/business-manager/api/estimates/${estimateId}`);
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const estimate = await response.json();
+                console.log('Loaded estimate:', estimate);
+
+                if (!estimate || !estimate.estimate_number) {
+                    alert('Estimate not found');
+                    window.location.href = 'estimates.html';
+                    return;
+                }
+
+                // Store original estimate
+                originalEstimate = estimate;
+
+                // Set estimate number in header
+                document.getElementById('estimateNumber').textContent = '#' + estimate.estimate_number;
+
+                // Set customer object
+                selectedCustomer = {
+                    name: estimate.customer_name,
+                    phone: estimate.customer_phone,
+                    email: estimate.customer_email || '',
+                    address: estimate.customer_address || ''
+                };
+
+                // Set customer (create option if not exists)
+                const customerSelect = document.getElementById('customerSelect');
+                const customerOption = new Option(estimate.customer_name, 'custom', true, true);
+                customerSelect.innerHTML = ''; // Clear first
+                customerSelect.add(customerOption);
+                
+                // Show customer details
+                document.getElementById('custName').textContent = estimate.customer_name || 'N/A';
+                document.getElementById('custPhone').textContent = estimate.customer_phone || 'N/A';
+                document.getElementById('custEmail').textContent = estimate.customer_email || 'N/A';
+                document.getElementById('custAddress').textContent = estimate.customer_address || 'N/A';
+                document.getElementById('customerDetails').classList.remove('hidden');
+
+                // Load items
+                if (estimate.items && estimate.items.length > 0) {
+                    estimateItems = estimate.items.map((item, index) => ({
+                        id: index + 1,
+                        product_id: item.product_id,
+                        product_name: item.product_name || item.item_description,
+                        type: item.product_type === 'area_wise' ? 'area' : 'unit', // Map product_type to type
+                        details: item.mix_info || item.item_description,
+                        quantity: parseFloat(item.quantity || 1),
+                        unit_price: parseFloat(item.unit_price || 0),
+                        total: parseFloat(item.line_total || 0)
+                    }));
+                    renderEstimateTable();
+                }
+
+            } catch (error) {
+                console.error('Error loading estimate:', error);
+                alert('Failed to load estimate data');
+            }
+        }
+
+        // Initialize - load data sequentially
+        (async function() {
+            await loadInitialData();
+            await loadEstimateData();
+        })();
+    </script>
+</body>
+</html>

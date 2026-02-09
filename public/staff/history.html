@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Attendance History - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .month-selector {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .month-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .month-btn:active {
+            transform: scale(0.9);
+        }
+        .attendance-item {
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border-left: 4px solid #e5e7eb;
+        }
+        .attendance-item.complete {
+            border-left-color: #10b981;
+        }
+        .attendance-item.incomplete {
+            border-left-color: #f59e0b;
+        }
+        .attendance-item.late {
+            border-left-color: #ef4444;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #f9fafb;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .loader {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            text-decoration: none;
+            color: #6b7280;
+            font-size: 12px;
+        }
+        .nav-item.active {
+            color: #667eea;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+    </style>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="card" style="margin-top: 16px;">
+            <button onclick="goBack()" style="background: none; border: none; color: #6b7280; display: flex; align-items: center; gap: 8px; margin-bottom: 16px; cursor: pointer;">
+                <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Back
+            </button>
+            <h1 style="font-size: 28px; font-weight: 700; color: #1f2937; margin-bottom: 8px;">Attendance History</h1>
+            <p style="color: #6b7280;">View your past attendance records</p>
+        </div>
+
+        <!-- Month Selector -->
+        <div class="card">
+            <div class="month-selector">
+                <button class="month-btn" onclick="changeMonth(-1)">
+                    <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                </button>
+                <div style="text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: #1f2937;" id="currentMonth">February 2026</div>
+                    <div style="font-size: 12px; color: #6b7280;" id="recordCount">Loading...</div>
+                </div>
+                <button class="month-btn" onclick="changeMonth(1)">
+                    <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Monthly Summary -->
+        <div class="card" id="summaryCard" style="display: none;">
+            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1f2937;">Monthly Summary</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #667eea;" id="totalDays">0</div>
+                    <div class="stat-label">Total Days</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #10b981;" id="presentDays">0</div>
+                    <div class="stat-label">Present</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #f59e0b;" id="lateDays">0</div>
+                    <div class="stat-label">Late Arrivals</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #667eea;" id="totalHours">0h</div>
+                    <div class="stat-label">Total Hours</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div class="card" id="loadingState">
+            <div class="loader"></div>
+            <p style="text-align: center; color: #6b7280; margin-top: 16px;">Loading attendance records...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div class="card" id="emptyState" style="display: none;">
+            <div class="empty-state">
+                <div style="font-size: 64px; margin-bottom: 16px;">📅</div>
+                <h3 style="font-size: 18px; font-weight: 600; color: #1f2937; margin-bottom: 8px;">No Records Found</h3>
+                <p style="color: #6b7280;">No attendance records for this month</p>
+            </div>
+        </div>
+
+        <!-- Attendance List -->
+        <div id="attendanceList"></div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <a href="dashboard.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"></path>
+            </svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="history.html" class="nav-item active">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"></path>
+            </svg>
+            <span>History</span>
+        </a>
+        <a href="permission-request.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path>
+            </svg>
+            <span>Requests</span>
+        </a>
+    </div>
+
+    <script>
+        let currentDate = new Date();
+        let attendanceData = [];
+
+        // Initialize
+        async function init() {
+            await loadAttendance();
+        }
+
+        // Load attendance for current month
+        async function loadAttendance() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    window.location.href = '/business-manager/login.html';
+                    return;
+                }
+
+                const month = currentDate.getMonth() + 1;
+                const year = currentDate.getFullYear();
+
+                const response = await fetch(`/business-manager/api/attendance/my-history?month=${month}&year=${year}&limit=100`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                attendanceData = data.data || [];
+
+                // Update UI
+                updateMonthDisplay();
+                
+                document.getElementById('loadingState').style.display = 'none';
+
+                if (attendanceData.length === 0) {
+                    document.getElementById('emptyState').style.display = 'block';
+                    document.getElementById('summaryCard').style.display = 'none';
+                } else {
+                    document.getElementById('emptyState').style.display = 'none';
+                    displaySummary();
+                    displayAttendance();
+                }
+
+            } catch (error) {
+                console.error('Load attendance error:', error);
+                document.getElementById('loadingState').innerHTML = `
+                    <div class="empty-state">
+                        <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                        <p style="color: #ef4444; font-weight: 600; margin-bottom: 16px;">Failed to load records</p>
+                        <button onclick="location.reload()" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Update month display
+        function updateMonthDisplay() {
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            const monthName = monthNames[currentDate.getMonth()];
+            const year = currentDate.getFullYear();
+            
+            document.getElementById('currentMonth').textContent = `${monthName} ${year}`;
+            document.getElementById('recordCount').textContent = `${attendanceData.length} records`;
+        }
+
+        // Display monthly summary
+        function displaySummary() {
+            const presentDays = attendanceData.filter(a => a.status === 'present').length;
+            const lateDays = attendanceData.filter(a => a.is_late).length;
+            const totalMinutes = attendanceData.reduce((sum, a) => sum + (a.total_working_minutes || 0), 0);
+            const totalHours = (totalMinutes / 60).toFixed(1);
+
+            document.getElementById('totalDays').textContent = attendanceData.length;
+            document.getElementById('presentDays').textContent = presentDays;
+            document.getElementById('lateDays').textContent = lateDays;
+            document.getElementById('totalHours').textContent = `${totalHours}h`;
+
+            document.getElementById('summaryCard').style.display = 'block';
+        }
+
+        // Display attendance list
+        function displayAttendance() {
+            const listHtml = attendanceData.map(record => {
+                const date = new Date(record.date);
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                const clockInTime = record.clock_in_time ? new Date(record.clock_in_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+                const clockOutTime = record.clock_out_time ? new Date(record.clock_out_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+                
+                const workingHours = record.total_working_minutes ? (record.total_working_minutes / 60).toFixed(2) : '0.00';
+                const expectedHours = record.expected_hours || 10;
+                
+                let statusClass = 'incomplete';
+                let statusBadge = '';
+                
+                if (!record.clock_out_time) {
+                    statusClass = 'late';
+                    statusBadge = '<span class="badge badge-warning">Ongoing</span>';
+                } else if (record.total_working_minutes >= (expectedHours * 60)) {
+                    statusClass = 'complete';
+                    statusBadge = '<span class="badge badge-success">Complete</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-warning">Incomplete</span>';
+                }
+
+                const lateBadge = record.is_late ? '<span class="badge badge-danger" style="margin-left: 8px;">Late</span>' : '';
+                const earlyBadge = record.is_early_checkout ? '<span class="badge badge-info" style="margin-left: 8px;">Early</span>' : '';
+
+                return `
+                    <div class="attendance-item ${statusClass}">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                            <div>
+                                <div style="font-size: 18px; font-weight: 700; color: #1f2937;">${dayName}, ${dateStr}</div>
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">${record.branch_name || 'Branch'}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                ${statusBadge}
+                                ${lateBadge}
+                                ${earlyBadge}
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+                            <div>
+                                <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">Clock In</div>
+                                <div style="font-size: 16px; font-weight: 600; color: #10b981;">${clockInTime}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">Clock Out</div>
+                                <div style="font-size: 16px; font-weight: 600; color: #ef4444;">${clockOutTime}</div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: white; padding: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-size: 12px; color: #6b7280;">Working Hours:</span>
+                                <span style="font-size: 16px; font-weight: 700; color: #667eea; margin-left: 8px;">${workingHours}h</span>
+                            </div>
+                            <div style="font-size: 12px; color: #6b7280;">
+                                Expected: ${expectedHours}h
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('attendanceList').innerHTML = `
+                <div class="card">
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1f2937;">Daily Records</h3>
+                    ${listHtml}
+                </div>
+            `;
+        }
+
+        // Change month
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            
+            // Don't allow future months
+            const now = new Date();
+            if (currentDate > now) {
+                currentDate = now;
+                return;
+            }
+
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('summaryCard').style.display = 'none';
+            document.getElementById('attendanceList').innerHTML = '';
+
+            loadAttendance();
+        }
+
+        // Go back
+        function goBack() {
+            window.location.href = 'dashboard.html';
+        }
+
+        // Init on load
+        init();
+    </script>
+</body>
+</html>

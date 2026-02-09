@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Quality Colours Business Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 450px;
+            padding: 40px 30px;
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #667eea;
+            font-size: 28px;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .step-indicator::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #e0e0e0;
+            z-index: 0;
+        }
+
+        .step {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s;
+        }
+
+        .step.active {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .step.completed {
+            background: #4caf50;
+            color: white;
+        }
+
+        .form-section {
+            display: none;
+        }
+
+        .form-section.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        input:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        .otp-inputs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .otp-input {
+            width: 50px;
+            height: 60px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .otp-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        button:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #f5f5f5;
+            box-shadow: none;
+        }
+
+        .timer {
+            text-align: center;
+            color: #666;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .alert {
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .password-requirements {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            padding-left: 5px;
+            line-height: 1.6;
+        }
+
+        .password-requirements li {
+            margin-bottom: 4px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: #4caf50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+            animation: scaleIn 0.5s ease;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mobile-display {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            font-weight: 600;
+            color: #667eea;
+            margin: 0 4px;
+        }
+
+        .section-title {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .section-description {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .input-icon {
+            position: relative;
+        }
+
+        .input-icon input {
+            padding-left: 45px;
+        }
+
+        .input-icon::before {
+            content: '📱';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            .logo h1 {
+                font-size: 24px;
+            }
+
+            .otp-input {
+                width: 45px;
+                height: 55px;
+                font-size: 20px;
+            }
+
+            .step {
+                width: 40px;
+                height: 40px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>Quality Colours</h1>
+            <p>குவாலிட்டி கலர்ஸ் - Guest Registration</p>
+        </div>
+
+        <div class="step-indicator">
+            <div class="step active" id="step1">1</div>
+            <div class="step" id="step2">2</div>
+            <div class="step" id="step3">3</div>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <!-- Step 1: Enter Mobile Number -->
+        <div class="form-section active" id="section1">
+            <h2 class="section-title">Enter Mobile Number</h2>
+            <p class="section-description">
+                We'll send you a verification code (OTP) via SMS
+            </p>
+
+            <div class="form-group">
+                <label for="mobile">Mobile Number *</label>
+                <div class="input-icon">
+                    <input 
+                        type="tel" 
+                        id="mobile" 
+                        placeholder="7418831122" 
+                        maxlength="10"
+                        pattern="[6-9][0-9]{9}"
+                        autocomplete="tel"
+                    >
+                </div>
+                <small style="color: #999; font-size: 12px; margin-top: 5px; display: block;">
+                    10-digit number without country code
+                </small>
+            </div>
+
+            <button onclick="sendOTP()" id="sendOtpBtn">
+                Send OTP
+            </button>
+        </div>
+
+        <!-- Step 2: Verify OTP -->
+        <div class="form-section" id="section2">
+            <h2 class="section-title">Verify OTP</h2>
+            <p class="section-description">
+                Enter the 6-digit code sent to 
+                <span class="mobile-display" id="mobileDisplay"></span>
+            </p>
+
+            <div class="form-group">
+                <div class="otp-inputs">
+                    <input type="text" class="otp-input" maxlength="1" id="otp1" oninput="moveToNext(this, 'otp2')" onkeydown="handleBackspace(event, this, null)">
+                    <input type="text" class="otp-input" maxlength="1" id="otp2" oninput="moveToNext(this, 'otp3')" onkeydown="handleBackspace(event, this, 'otp1')">
+                    <input type="text" class="otp-input" maxlength="1" id="otp3" oninput="moveToNext(this, 'otp4')" onkeydown="handleBackspace(event, this, 'otp2')">
+                    <input type="text" class="otp-input" maxlength="1" id="otp4" oninput="moveToNext(this, 'otp5')" onkeydown="handleBackspace(event, this, 'otp3')">
+                    <input type="text" class="otp-input" maxlength="1" id="otp5" oninput="moveToNext(this, 'otp6')" onkeydown="handleBackspace(event, this, 'otp4')">
+                    <input type="text" class="otp-input" maxlength="1" id="otp6" onkeydown="handleBackspace(event, this, 'otp5')">
+                </div>
+            </div>
+
+            <button onclick="verifyOTP()" id="verifyOtpBtn">
+                Verify OTP
+            </button>
+
+            <div class="timer" id="timer">
+                Resend OTP in <span id="countdown">60</span> seconds
+            </div>
+
+            <button class="btn-secondary hidden" id="resendBtn" onclick="resendOTP()">
+                Resend OTP
+            </button>
+
+            <button class="btn-secondary" onclick="goToStep(1)" style="margin-top: 10px;">
+                Change Mobile Number
+            </button>
+        </div>
+
+        <!-- Step 3: Complete Registration -->
+        <div class="form-section" id="section3">
+            <h2 class="section-title">Complete Registration</h2>
+            <p class="section-description">
+                Fill in your details
+            </p>
+
+            <div class="form-group">
+                <label for="customerName">Full Name *</label>
+                <input type="text" id="customerName" placeholder="Your full name" required autocomplete="name">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address (Optional)</label>
+                <input type="email" id="email" placeholder="your@email.com" autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password *</label>
+                <input type="password" id="password" placeholder="Create password" required autocomplete="new-password">
+                <ul class="password-requirements">
+                    <li>✓ At least 8 characters</li>
+                    <li>✓ One uppercase letter</li>
+                    <li>✓ One number</li>
+                </ul>
+            </div>
+
+            <div class="form-group">
+                <label for="passwordConfirm">Confirm Password *</label>
+                <input type="password" id="passwordConfirm" placeholder="Re-enter password" required autocomplete="new-password">
+            </div>
+
+            <button onclick="completeRegistration()" id="registerBtn">
+                Create Account
+            </button>
+        </div>
+
+        <!-- Step 4: Success -->
+        <div class="form-section" id="section4">
+            <div class="success-icon">✓</div>
+            <h2 class="text-center" style="color: #4caf50; margin-bottom: 10px;">
+                Registration Successful!
+            </h2>
+            <p class="text-center" style="color: #666; margin-bottom: 20px; line-height: 1.6;">
+                Your account has been created. Welcome to Quality Colours!
+            </p>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                <p style="font-size: 14px; color: #555; text-align: center;">
+                    <strong>Mobile:</strong> <span id="successMobile"></span><br>
+                    <strong>User ID:</strong> <span id="successUserId"></span>
+                </p>
+            </div>
+            <button onclick="window.location.href='login.html'">
+                Go to Login
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration - Using relative path for same domain
+        const API_BASE = 'https://act.qcpaintshop.com/api';
+        
+        let currentMobile = '';
+        let otpId = null;
+        let countdownInterval = null;
+
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => { alertContainer.innerHTML = ''; }, 5000);
+        }
+
+        function moveToNext(current, nextId) {
+            if (current.value.length === 1) {
+                if (nextId) {
+                    document.getElementById(nextId).focus();
+                } else {
+                    setTimeout(() => verifyOTP(), 100);
+                }
+            }
+        }
+
+        function handleBackspace(event, current, prevId) {
+            if (event.key === 'Backspace' && current.value === '' && prevId) {
+                document.getElementById(prevId).focus();
+            }
+        }
+
+        function getOTPValue() {
+            let otp = '';
+            for (let i = 1; i <= 6; i++) {
+                otp += document.getElementById('otp' + i).value;
+            }
+            return otp;
+        }
+
+        function clearOTPInputs() {
+            for (let i = 1; i <= 6; i++) {
+                document.getElementById('otp' + i).value = '';
+            }
+            document.getElementById('otp1').focus();
+        }
+
+        async function sendOTP() {
+            const mobile = document.getElementById('mobile').value.trim();
+            
+            if (!/^[6-9]\d{9}$/.test(mobile)) {
+                showAlert('Enter valid 10-digit mobile number', 'error');
+                return;
+            }
+
+            currentMobile = mobile;
+            const btn = document.getElementById('sendOtpBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>Sending OTP...';
+
+            try {
+                const response = await fetch(`${API_BASE}/otp/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mobile: mobile, purpose: 'Registration' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    otpId = data.data.otp_id;
+                    showAlert('✓ OTP sent! Check your SMS.', 'success');
+                    setTimeout(() => {
+                        goToStep(2);
+                        document.getElementById('mobileDisplay').textContent = mobile;
+                        startCountdown();
+                        document.getElementById('otp1').focus();
+                    }, 500);
+                } else {
+                    showAlert(data.error || 'Failed to send OTP', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error. Try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Send OTP';
+            }
+        }
+
+        function startCountdown() {
+            let seconds = 60;
+            const countdownEl = document.getElementById('countdown');
+            const timerEl = document.getElementById('timer');
+            const resendBtn = document.getElementById('resendBtn');
+
+            timerEl.classList.remove('hidden');
+            resendBtn.classList.add('hidden');
+
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            countdownInterval = setInterval(() => {
+                seconds--;
+                countdownEl.textContent = seconds;
+                if (seconds <= 0) {
+                    clearInterval(countdownInterval);
+                    timerEl.classList.add('hidden');
+                    resendBtn.classList.remove('hidden');
+                }
+            }, 1000);
+        }
+
+        async function verifyOTP() {
+            const otp = getOTPValue();
+            
+            if (otp.length !== 6) {
+                showAlert('Enter complete 6-digit OTP', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('verifyOtpBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>Verifying...';
+
+            try {
+                const response = await fetch(`${API_BASE}/otp/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mobile: currentMobile, otp_code: otp, purpose: 'Registration' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('✓ OTP verified!', 'success');
+                    if (countdownInterval) clearInterval(countdownInterval);
+                    setTimeout(() => {
+                        goToStep(3);
+                        document.getElementById('customerName').focus();
+                    }, 1000);
+                } else {
+                    showAlert(data.error || 'Invalid OTP', 'error');
+                    clearOTPInputs();
+                }
+            } catch (error) {
+                showAlert('Network error. Try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Verify OTP';
+            }
+        }
+
+        async function resendOTP() {
+            const btn = document.getElementById('resendBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>Resending...';
+
+            try {
+                const response = await fetch(`${API_BASE}/otp/resend`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mobile: currentMobile, purpose: 'Registration' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    otpId = data.data.otp_id;
+                    showAlert('✓ New OTP sent!', 'success');
+                    clearOTPInputs();
+                    startCountdown();
+                } else {
+                    showAlert(data.error || 'Failed to resend', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error. Try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Resend OTP';
+            }
+        }
+
+        async function completeRegistration() {
+            const name = document.getElementById('customerName').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const passwordConfirm = document.getElementById('passwordConfirm').value;
+
+            if (!name || name.length < 3) {
+                showAlert('Enter full name (min 3 chars)', 'error');
+                return;
+            }
+
+            if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+                showAlert('Password: 8+ chars, uppercase, number', 'error');
+                return;
+            }
+
+            if (password !== passwordConfirm) {
+                showAlert('Passwords do not match', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('registerBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>Creating...';
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mobile: currentMobile,
+                        otp_id: otpId,
+                        customer_name: name,
+                        email: email || null,
+                        password: password,
+                        password_confirm: passwordConfirm,
+                        whatsapp_opt_in: true
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    localStorage.setItem('auth_token', data.data.token);
+                    localStorage.setItem('user_id', data.data.user_id);
+                    document.getElementById('successMobile').textContent = currentMobile;
+                    document.getElementById('successUserId').textContent = data.data.user_id;
+                    goToStep(4);
+                } else {
+                    showAlert(data.error || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error. Try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Create Account';
+            }
+        }
+
+        function goToStep(stepNumber) {
+            document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('section' + stepNumber).classList.add('active');
+            
+            for (let i = 1; i <= 3; i++) {
+                const step = document.getElementById('step' + i);
+                if (i < stepNumber) {
+                    step.classList.add('completed');
+                    step.classList.remove('active');
+                } else if (i === stepNumber) {
+                    step.classList.add('active');
+                    step.classList.remove('completed');
+                } else {
+                    step.classList.remove('active', 'completed');
+                }
+            }
+        }
+
+        document.getElementById('mobile').addEventListener('keypress', e => {
+            if (e.key === 'Enter') sendOTP();
+        });
+
+        document.getElementById('otp6').addEventListener('input', function() {
+            if (this.value.length === 1 && getOTPValue().length === 6) {
+                setTimeout(() => verifyOTP(), 100);
+            }
+        });
+
+        document.querySelectorAll('.otp-input').forEach((input, index) => {
+            input.addEventListener('paste', function(e) {
+                e.preventDefault();
+                const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                if (pastedData.length === 6) {
+                    for (let i = 0; i < 6; i++) {
+                        document.getElementById('otp' + (i + 1)).value = pastedData[i] || '';
+                    }
+                    document.getElementById('otp6').focus();
+                    setTimeout(() => verifyOTP(), 100);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

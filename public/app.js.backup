@@ -1,0 +1,416 @@
+const { useState, useEffect } = React;
+const API_URL = window.location.origin;
+
+function App() {
+    const [view, setView] = useState('estimates');
+    const [products, setProducts] = useState([]);
+    const [customers, setCustomers] = useState([]);
+    const [estimates, setEstimates] = useState([]);
+    const [currentEstimate, setCurrentEstimate] = useState({
+        customer_name: '',
+        customer_phone: '',
+        customer_address: '',
+        items: [],
+        notes: '',
+        show_gst_breakdown: true
+    });
+
+    useEffect(() => {
+        loadProducts();
+        loadCustomers();
+        loadEstimates();
+    }, []);
+
+    const loadProducts = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/products`);
+            const data = await res.json();
+            setProducts(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Failed to load products:', err);
+            setProducts([]);
+        }
+    };
+
+    const loadCustomers = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/customers`);
+            const data = await res.json();
+            setCustomers(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Failed to load customers:', err);
+            setCustomers([]);
+        }
+    };
+
+    const loadEstimates = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/estimates`);
+            const data = await res.json();
+            setEstimates(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Failed to load estimates:', err);
+            setEstimates([]);
+        }
+    };
+
+    const addItemToEstimate = async (productId, area, colorCost) => {
+        try {
+            const res = await fetch(`${API_URL}/api/calculate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    product_id: parseInt(productId),
+                    area: parseFloat(area),
+                    color_cost: parseFloat(colorCost) || 0
+                })
+            });
+            const calc = await res.json();
+            
+            if (res.ok) {
+                const product = products.find(p => p.id === parseInt(productId));
+                setCurrentEstimate(prev => ({
+                    ...prev,
+                    items: [...prev.items, {
+                        product_id: parseInt(productId),
+                        item_description: product.name,
+                        ...calc
+                    }]
+                }));
+            } else {
+                alert('Error calculating item: ' + calc.error);
+            }
+        } catch (err) {
+            alert('Error adding item: ' + err.message);
+        }
+    };
+
+    const saveEstimate = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/estimates`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentEstimate)
+            });
+            const data = await res.json();
+            
+            if (res.ok) {
+                alert(`Estimate created: ${data.estimate_number}`);
+                setCurrentEstimate({
+                    customer_name: '',
+                    customer_phone: '',
+                    customer_address: '',
+                    items: [],
+                    notes: '',
+                    show_gst_breakdown: true
+                });
+                loadEstimates();
+            } else {
+                alert('Error saving estimate: ' + data.error);
+            }
+        } catch (err) {
+            alert('Error saving estimate: ' + err.message);
+        }
+    };
+
+    return (
+        <div className="min-h-screen">
+            <nav className="bg-purple-700 text-white p-4">
+                <div className="container mx-auto flex justify-between items-center">
+                    <h1 className="text-2xl font-bold">Quality Colours Manager <span className="text-sm Tamil">குவாலிட்டி கலர்ஸ்</span></h1>
+                    <div className="space-x-4">
+                        <button 
+                            onClick={() => setView('estimates')}
+                            className={`px-4 py-2 rounded ${view === 'estimates' ? 'bg-purple-900' : 'hover:bg-purple-600'}`}
+                        >
+                            Estimates
+                        </button>
+                        <button 
+                            onClick={() => setView('products')}
+                            className={`px-4 py-2 rounded ${view === 'products' ? 'bg-purple-900' : 'hover:bg-purple-600'}`}
+                        >
+                            Products
+                        </button>
+                        <button 
+                            onClick={() => setView('customers')}
+                            className={`px-4 py-2 rounded ${view === 'customers' ? 'bg-purple-900' : 'hover:bg-purple-600'}`}
+                        >
+                            Customers
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <div className="container mx-auto p-4">
+                {view === 'estimates' && (
+                    <EstimatesView 
+                        estimates={estimates}
+                        currentEstimate={currentEstimate}
+                        setCurrentEstimate={setCurrentEstimate}
+                        products={products}
+                        customers={customers}
+                        addItemToEstimate={addItemToEstimate}
+                        saveEstimate={saveEstimate}
+                    />
+                )}
+                {view === 'products' && <ProductsView products={products} reload={loadProducts} />}
+                {view === 'customers' && <CustomersView customers={customers} reload={loadCustomers} />}
+            </div>
+        </div>
+    );
+}
+
+function EstimatesView({ estimates, currentEstimate, setCurrentEstimate, products, customers, addItemToEstimate, saveEstimate }) {
+    const [showForm, setShowForm] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState('');
+    const [area, setArea] = useState('');
+    const [colorCost, setColorCost] = useState('0');
+
+    const removeItem = (index) => {
+        setCurrentEstimate(prev => ({
+            ...prev,
+            items: prev.items.filter((_, i) => i !== index)
+        }));
+    };
+
+    const totalAmount = currentEstimate.items.reduce((sum, item) => sum + parseFloat(item.line_total || 0), 0);
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-bold">Estimates</h2>
+                <button 
+                    onClick={() => setShowForm(!showForm)}
+                    className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
+                >
+                    {showForm ? 'View List' : 'New Estimate'}
+                </button>
+            </div>
+
+            {showForm ? (
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                    <h3 className="text-xl font-bold mb-4">Create Estimate</h3>
+                    
+                    <div className="grid md:grid-cols-3 gap-4 mb-6">
+                        <input
+                            placeholder="Customer Name"
+                            className="border-2 p-2 rounded"
+                            value={currentEstimate.customer_name}
+                            onChange={e => setCurrentEstimate({...currentEstimate, customer_name: e.target.value})}
+                        />
+                        <input
+                            placeholder="Phone"
+                            className="border-2 p-2 rounded"
+                            value={currentEstimate.customer_phone}
+                            onChange={e => setCurrentEstimate({...currentEstimate, customer_phone: e.target.value})}
+                        />
+                        <input
+                            placeholder="Address"
+                            className="border-2 p-2 rounded"
+                            value={currentEstimate.customer_address}
+                            onChange={e => setCurrentEstimate({...currentEstimate, customer_address: e.target.value})}
+                        />
+                    </div>
+
+                    <div className="border-t pt-4 mb-4">
+                        <h4 className="font-bold mb-2">Add Item</h4>
+                        <div className="grid md:grid-cols-4 gap-4">
+                            <select
+                                className="border-2 p-2 rounded"
+                                value={selectedProduct}
+                                onChange={e => setSelectedProduct(e.target.value)}
+                            >
+                                <option value="">Select Product</option>
+                                {products.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name} ({p.product_type})
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                type="number"
+                                placeholder="Area (sqft)"
+                                className="border-2 p-2 rounded"
+                                value={area}
+                                onChange={e => setArea(e.target.value)}
+                            />
+                            <input
+                                type="number"
+                                placeholder="Color Cost"
+                                className="border-2 p-2 rounded"
+                                value={colorCost}
+                                onChange={e => setColorCost(e.target.value)}
+                            />
+                            <button
+                                onClick={() => {
+                                    if (selectedProduct) {
+                                        addItemToEstimate(parseInt(selectedProduct), area, colorCost);
+                                        setSelectedProduct('');
+                                        setArea('');
+                                        setColorCost('0');
+                                    }
+                                }}
+                                className="bg-green-600 text-white rounded hover:bg-green-700"
+                            >
+                                Add Item
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto mb-4">
+                        <table className="w-full border">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="p-2 border">#</th>
+                                    <th className="p-2 border">Item</th>
+                                    <th className="p-2 border">Qty</th>
+                                    <th className="p-2 border">Mix</th>
+                                    <th className="p-2 border">Breakdown</th>
+                                    <th className="p-2 border">Color</th>
+                                    <th className="p-2 border">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {currentEstimate.items.map((item, idx) => (
+                                    <tr key={idx}>
+                                        <td className="p-2 border">{idx + 1}</td>
+                                        <td className="p-2 border">{item.item_description}</td>
+                                        <td className="p-2 border">{item.quantity}</td>
+                                        <td className="p-2 border">{item.mix_info}</td>
+                                        <td className="p-2 border text-sm">{item.breakdown_cost}</td>
+                                        <td className="p-2 border">₹{item.color_cost}</td>
+                                        <td className="p-2 border font-bold">₹{item.line_total.toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                                {currentEstimate.items.length === 0 && (
+                                    <tr>
+                                        <td colSpan="7" className="p-4 text-center text-gray-500">
+                                            No items added yet
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                            <tfoot>
+                                <tr className="bg-purple-50 font-bold">
+                                    <td colSpan="6" className="p-2 border text-right">Grand Total:</td>
+                                    <td className="p-2 border">₹{currentEstimate.items.reduce((sum, item) => sum + item.line_total, 0).toFixed(2)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div className="mb-4">
+                        <textarea
+                            placeholder="Notes"
+                            value={currentEstimate.notes}
+                            onChange={(e) => setCurrentEstimate({...currentEstimate, notes: e.target.value})}
+                            className="w-full border-2 p-2 rounded"
+                            rows="3"
+                        />
+                    </div>
+
+                    <button
+                        onClick={saveEstimate}
+                        className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 font-bold"
+                    >
+                        Save Estimate
+                    </button>
+                </div>
+            ) : (
+                <div className="grid gap-4">
+                    {estimates.length === 0 ? (
+                        <div className="bg-white rounded-lg shadow p-6 text-center text-gray-500">
+                            <p>No estimates found. Create your first estimate!</p>
+                        </div>
+                    ) : (
+                        estimates.map(est => (
+                            <div key={est.id} className="bg-white rounded-lg shadow p-4 hover:shadow-lg transition">
+                                <div className="flex justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-lg">{est.estimate_number}</h3>
+                                        <p className="text-gray-600">{est.customer_name} - {est.customer_phone}</p>
+                                        <p className="text-sm text-gray-500">{est.estimate_date}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-2xl font-bold text-purple-600">₹{parseFloat(est.grand_total).toFixed(2)}</p>
+                                        <span className={`px-3 py-1 rounded-full text-sm ${
+                                            est.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                                        }`}>
+                                            {est.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function ProductsView({ products, reload }) {
+    return (
+        <div>
+            <h2 className="text-3xl font-bold mb-6">Products</h2>
+            <div className="grid md:grid-cols-3 gap-4">
+                {products.length === 0 ? (
+                    <div className="col-span-3 bg-white rounded-lg shadow p-6 text-center text-gray-500">
+                        <p>No products found</p>
+                    </div>
+                ) : (
+                    products.map(p => (
+                        <div key={p.id} className="bg-white rounded-lg shadow p-4">
+                            <h3 className="font-bold">{p.name}</h3>
+                            <p className="text-sm text-gray-600">{p.brand_name} - {p.category_name}</p>
+                            <p className="text-sm text-gray-500">{p.product_type}</p>
+                            <p className="text-lg font-bold text-purple-600 mt-2">₹{p.base_price}</p>
+                            {p.product_type === 'area_wise' && (
+                                <p className="text-xs text-gray-500">Coverage: {p.area_coverage} sqft/L</p>
+                            )}
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
+
+function CustomersView({ customers, reload }) {
+    return (
+        <div>
+            <h2 className="text-3xl font-bold mb-6">Customers</h2>
+            <div className="grid gap-4">
+                {customers.length === 0 ? (
+                    <div className="bg-white rounded-lg shadow p-6 text-center text-gray-500">
+                        <p>No customers found</p>
+                    </div>
+                ) : (
+                    customers.map(c => (
+                        <div key={c.id} className="bg-white rounded-lg shadow p-4">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h3 className="font-bold text-lg">{c.name}</h3>
+                                    <p className="text-gray-600">{c.phone} - {c.email}</p>
+                                    <p className="text-sm text-gray-500">{c.address}, {c.city}</p>
+                                    {c.gst_number && <p className="text-xs text-gray-500">GST: {c.gst_number}</p>}
+                                </div>
+                                <div className="text-right">
+                                    <span className={`px-3 py-1 rounded-full text-sm ${
+                                        c.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                        c.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-red-100 text-red-800'
+                                    }`}>
+                                        {c.status}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
+
+ReactDOM.render(<App />, document.getElementById('root'));

@@ -1,0 +1,645 @@
+const express = require('express');
+const mysql = require('mysql2/promise');
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+require('dotenv').config();
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+const pool = mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 10
+});
+
+// ========================================
+// AUTHENTICATION ENDPOINTS
+// ========================================
+
+// Login endpoint
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { username, password, remember } = req.body;
+        
+        const [users] = await pool.query(
+            'SELECT * FROM users WHERE (username = ? OR email = ?) AND status = "active"',
+            [username, username]
+        );
+        
+        if (users.length === 0) {
+            return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        }
+        
+        const user = users[0];
+        
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+        if (!passwordMatch) {
+            return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        }
+        
+        const sessionToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + (remember ? 720 : 24));
+        
+        await pool.query(
+            'INSERT INTO user_sessions (user_id, session_token, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?)',
+            [user.id, sessionToken, req.ip, req.get('User-Agent'), expiresAt]
+        );
+        
+        await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+        
+        res.json({
+            success: true,
+            token: sessionToken,
+            user: {
+                id: user.id,
+                username: user.username,
+                full_name: user.full_name,
+                email: user.email,
+                role: user.role,
+                branch_id: user.branch_id
+            }
+        });
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Verify token endpoint
+app.get('/api/auth/verify', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        if (!token) {
+            return res.status(401).json({ success: false, message: 'No token provided' });
+        }
+        
+        const [sessions] = await pool.query(
+            'SELECT s.*, u.* FROM user_sessions s JOIN users u ON s.user_id = u.id WHERE s.session_token = ? AND s.expires_at > NOW()',
+            [token]
+        );
+        
+        if (sessions.length === 0) {
+            return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+        }
+        
+        const session = sessions[0];
+        res.json({
+            success: true,
+            user: {
+                id: session.user_id,
+                username: session.username,
+                full_name: session.full_name,
+                email: session.email,
+                role: session.role,
+                branch_id: session.branch_id
+            }
+        });
+        
+    } catch (error) {
+        console.error('Verify token error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        if (token) {
+            await pool.query('DELETE FROM user_sessions WHERE session_token = ?', [token]);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// ========================================
+// DATABASE TEST
+// ========================================
+
+app.get('/api/test', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT 1 as test');
+        res.json({ status: 'Database connected', result: rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: 'Database connection failed', message: err.message });
+    }
+});
+
+// ========================================
+// BRANDS
+// ========================================
+
+app.get('/api/brands', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM brands WHERE status = "active" ORDER BY name');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/brands', async (req, res) => {
+    try {
+        const { name, logo_url, status } = req.body;
+        const [result] = await pool.query(
+            'INSERT INTO brands (name, logo_url, status) VALUES (?, ?, ?)', 
+            [name, logo_url, status || 'active']
+        );
+        res.json({ id: result.insertId, name, logo_url, status: status || 'active' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/brands/:id', async (req, res) => {
+    try {
+        const { name, logo_url, status } = req.body;
+        await pool.query(
+            'UPDATE brands SET name = ?, logo_url = ?, status = ? WHERE id = ?',
+            [name, logo_url, status, req.params.id]
+        );
+        res.json({ success: true, message: 'Brand updated successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/brands/:id', async (req, res) => {
+    try {
+        await pool.query('UPDATE brands SET status = "inactive" WHERE id = ?', [req.params.id]);
+        res.json({ success: true, message: 'Brand deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// CATEGORIES
+// ========================================
+
+app.get('/api/categories', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM categories WHERE status = "active" ORDER BY name');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/categories', async (req, res) => {
+    try {
+        const { name, description, status } = req.body;
+        const [result] = await pool.query(
+            'INSERT INTO categories (name, description, status) VALUES (?, ?, ?)', 
+            [name, description, status || 'active']
+        );
+        res.json({ id: result.insertId, name, description, status: status || 'active' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/categories/:id', async (req, res) => {
+    try {
+        const { name, description, status } = req.body;
+        await pool.query(
+            'UPDATE categories SET name = ?, description = ?, status = ? WHERE id = ?',
+            [name, description, status, req.params.id]
+        );
+        res.json({ success: true, message: 'Category updated successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/categories/:id', async (req, res) => {
+    try {
+        await pool.query('UPDATE categories SET status = "inactive" WHERE id = ?', [req.params.id]);
+        res.json({ success: true, message: 'Category deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// PRODUCTS
+// ========================================
+
+app.get('/api/products', async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT p.*, b.name as brand_name, c.name as category_name 
+            FROM products p 
+            LEFT JOIN brands b ON p.brand_id = b.id 
+            LEFT JOIN categories c ON p.category_id = c.id 
+            WHERE p.status = "active" 
+            ORDER BY p.name
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/products/:id', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM products WHERE id = ?', [req.params.id]);
+        res.json(rows[0] || {});
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// CUSTOMERS
+// ========================================
+
+app.get('/api/customers', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM customers ORDER BY name');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/customers', async (req, res) => {
+    try {
+        const { name, phone, email, address, city, gst_number } = req.body;
+        const [result] = await pool.query(
+            'INSERT INTO customers (name, phone, email, address, city, gst_number, status) VALUES (?, ?, ?, ?, ?, ?, "approved")',
+            [name, phone, email, address, city, gst_number]
+        );
+        res.json({ id: result.insertId });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// ESTIMATES
+// ========================================
+
+app.get('/api/estimates', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM estimates ORDER BY estimate_date DESC, id DESC');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/estimates/:id', async (req, res) => {
+    try {
+        const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
+        if (estimate.length === 0) {
+            return res.status(404).json({ error: 'Estimate not found' });
+        }
+        
+        const [items] = await pool.query(`
+            SELECT ei.*, p.name as product_name, p.product_type 
+            FROM estimate_items ei 
+            LEFT JOIN products p ON ei.product_id = p.id 
+            WHERE ei.estimate_id = ? 
+            ORDER BY ei.display_order
+        `, [req.params.id]);
+        
+        res.json({ ...estimate[0], items });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Create new estimate
+app.post('/api/estimates', async (req, res) => {
+    try {
+        const {
+            customer_name,
+            customer_phone,
+            customer_address,
+            estimate_date,
+            valid_until,
+            subtotal,
+            gst_amount,
+            grand_total,
+            show_gst_breakdown,
+            column_visibility,
+            notes,
+            status,
+            items
+        } = req.body;
+
+        // Generate estimate number
+        const datePrefix = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const [lastEstimate] = await pool.query(
+            'SELECT estimate_number FROM estimates WHERE estimate_number LIKE ? ORDER BY id DESC LIMIT 1',
+            [`EST${datePrefix}%`]
+        );
+        
+        let estimateNumber;
+        if (lastEstimate.length > 0) {
+            const lastNum = parseInt(lastEstimate[0].estimate_number.slice(-4));
+            estimateNumber = `EST${datePrefix}${String(lastNum + 1).padStart(4, '0')}`;
+        } else {
+            estimateNumber = `EST${datePrefix}0001`;
+        }
+
+        // Insert estimate
+        const [result] = await pool.query(
+            `INSERT INTO estimates (
+                estimate_number, customer_name, customer_phone, customer_address,
+                estimate_date, valid_until, subtotal, gst_amount, grand_total,
+                show_gst_breakdown, column_visibility, notes, status, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                estimateNumber, customer_name, customer_phone, customer_address,
+                estimate_date, valid_until, subtotal, gst_amount, grand_total,
+                show_gst_breakdown ? 1 : 0, column_visibility, notes, status, 1
+            ]
+        );
+
+        const estimateId = result.insertId;
+
+        // Insert items
+        if (items && items.length > 0) {
+            const itemValues = items.map(item => [
+                estimateId,
+                null, // product_id (null for now)
+                item.item_description,
+                item.quantity,
+                item.area || null,
+                item.mix_info || null,
+                item.unit_price,
+                item.breakdown_cost || null,
+                item.color_cost || 0,
+                item.line_total,
+                item.display_order || 0
+            ]);
+
+            await pool.query(
+                `INSERT INTO estimate_items (
+                    estimate_id, product_id, item_description, quantity, area, mix_info,
+                    unit_price, breakdown_cost, color_cost, line_total, display_order
+                ) VALUES ?`,
+                [itemValues]
+            );
+        }
+
+        res.json({
+            success: true,
+            id: estimateId,
+            estimate_number: estimateNumber,
+            message: 'Estimate created successfully'
+        });
+
+    } catch (err) {
+        console.error('Create estimate error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update estimate
+app.put('/api/estimates/:id', async (req, res) => {
+    try {
+        const estimateId = req.params.id;
+        const {
+            customer_name,
+            customer_phone,
+            customer_address,
+            estimate_date,
+            valid_until,
+            subtotal,
+            gst_amount,
+            grand_total,
+            show_gst_breakdown,
+            column_visibility,
+            notes,
+            items
+        } = req.body;
+
+        // Update estimate
+        await pool.query(
+            `UPDATE estimates SET
+                customer_name = ?, customer_phone = ?, customer_address = ?,
+                estimate_date = ?, valid_until = ?, subtotal = ?, gst_amount = ?,
+                grand_total = ?, show_gst_breakdown = ?, column_visibility = ?, notes = ?
+            WHERE id = ?`,
+            [
+                customer_name, customer_phone, customer_address,
+                estimate_date, valid_until, subtotal, gst_amount, grand_total,
+                show_gst_breakdown ? 1 : 0, column_visibility, notes, estimateId
+            ]
+        );
+
+        // Delete existing items
+        await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
+
+        // Insert new items
+        if (items && items.length > 0) {
+            const itemValues = items.map(item => [
+                estimateId,
+                null,
+                item.item_description,
+                item.quantity,
+                item.area || null,
+                item.mix_info || null,
+                item.unit_price,
+                item.breakdown_cost || null,
+                item.color_cost || 0,
+                item.line_total,
+                item.display_order || 0
+            ]);
+
+            await pool.query(
+                `INSERT INTO estimate_items (
+                    estimate_id, product_id, item_description, quantity, area, mix_info,
+                    unit_price, breakdown_cost, color_cost, line_total, display_order
+                ) VALUES ?`,
+                [itemValues]
+            );
+        }
+
+        res.json({
+            success: true,
+            message: 'Estimate updated successfully'
+        });
+
+    } catch (err) {
+        console.error('Update estimate error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get estimate items
+app.get('/api/estimates/:id/items', async (req, res) => {
+    try {
+        const [items] = await pool.query(
+            'SELECT * FROM estimate_items WHERE estimate_id = ? ORDER BY display_order',
+            [req.params.id]
+        );
+        res.json(items);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update estimate status
+app.patch('/api/estimates/:id/status', async (req, res) => {
+    try {
+        const { status, reason, notes } = req.body;
+        const estimateId = req.params.id;
+        
+        // Get current estimate
+        const [current] = await pool.query('SELECT status FROM estimates WHERE id = ?', [estimateId]);
+        if (current.length === 0) {
+            return res.status(404).json({ error: 'Estimate not found' });
+        }
+        
+        const oldStatus = current[0].status;
+        
+        // Update estimate
+        const updates = { status, last_updated_at: new Date() };
+        
+        if (status === 'approved') {
+            updates.approved_by_admin_id = 1; // TODO: Get from auth token
+            updates.approved_at = new Date();
+        }
+        
+        await pool.query('UPDATE estimates SET ? WHERE id = ?', [updates, estimateId]);
+        
+        // Log status change
+        await pool.query(
+            'INSERT INTO estimate_status_history (estimate_id, old_status, new_status, changed_by_user_id, reason, notes) VALUES (?, ?, ?, ?, ?, ?)',
+            [estimateId, oldStatus, status, 1, reason, notes]
+        );
+        
+        // Log to audit
+        await pool.query(
+            'INSERT INTO audit_log (user_id, action, table_name, record_id, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?)',
+            [1, 'status_change', 'estimates', estimateId, JSON.stringify({status: oldStatus}), JSON.stringify({status})]
+        );
+        
+        res.json({ success: true, message: 'Status updated successfully' });
+    } catch (err) {
+        console.error('Update status error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get estimate status history
+app.get('/api/estimates/:id/history', async (req, res) => {
+    try {
+        const [history] = await pool.query(`
+            SELECT h.*, u.full_name as changed_by_name
+            FROM estimate_status_history h
+            LEFT JOIN users u ON h.changed_by_user_id = u.id
+            WHERE h.estimate_id = ?
+            ORDER BY h.timestamp DESC
+        `, [req.params.id]);
+        
+        res.json(history);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// CALCULATE ESTIMATE
+// ========================================
+
+app.post('/api/calculate', async (req, res) => {
+    try {
+        const { product_id, area, color_cost } = req.body;
+        
+        const [product] = await pool.query('SELECT * FROM products WHERE id = ?', [product_id]);
+        if (!product[0]) return res.status(404).json({ error: 'Product not found' });
+        
+        const p = product[0];
+        const sizes = JSON.parse(p.available_sizes).sort((a, b) => b - a);
+        
+        if (p.product_type === 'area_wise') {
+            const totalLiters = area / p.area_coverage;
+            let remaining = totalLiters;
+            let mix = [];
+            
+            sizes.forEach(size => {
+                const count = Math.floor(remaining / size);
+                if (count > 0) {
+                    const pricePerUnit = p.base_price * size;
+                    mix.push({ size, count, price: pricePerUnit });
+                    remaining -= count * size;
+                }
+            });
+            
+            const mixInfo = mix.map(m => `${m.count}x${m.size}L`).join(' + ');
+            const breakdown = mix.map(m => `${m.count}x₹${m.price}`).join(' + ');
+            const subtotal = mix.reduce((sum, m) => sum + (m.count * m.price), 0);
+            const total = subtotal + (color_cost || 0);
+            
+            res.json({
+                quantity: totalLiters.toFixed(2),
+                area: area,
+                mix_info: mixInfo,
+                breakdown_cost: breakdown,
+                color_cost: color_cost || 0,
+                line_total: total
+            });
+        } else {
+            res.json({
+                quantity: 1,
+                mix_info: '1 Nos',
+                breakdown_cost: `₹${p.base_price} x 1`,
+                color_cost: 0,
+                line_total: p.base_price
+            });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// HEALTH CHECK & ROOT
+// ========================================
+
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        service: 'QC Business Manager API'
+    });
+});
+
+app.get('/', (req, res) => {
+    res.json({
+        service: 'Quality Colors Business Manager API',
+        version: '1.0.0',
+        endpoints: {
+            auth: '/api/auth/*',
+            brands: '/api/brands',
+            categories: '/api/categories', 
+            products: '/api/products',
+            customers: '/api/customers',
+            estimates: '/api/estimates',
+            test: '/api/test',
+            health: '/health'
+        }
+    });
+});
+
+app.listen(process.env.PORT, () => {
+    console.log(`API running on port ${process.env.PORT}`);
+});

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>My Attendance - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        .status-card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            margin: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .action-btn {
+            width: 100%;
+            padding: 20px;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+        .clock-in-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+        .clock-out-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+        .break-btn {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            text-decoration: none;
+            color: #6b7280;
+            font-size: 12px;
+        }
+        .nav-item.active {
+            color: #667eea;
+        }
+        .loader {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .timer {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1f2937;
+            text-align: center;
+            margin: 16px 0;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <div class="status-card" style="margin-top: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <div>
+                <h1 style="font-size: 24px; font-weight: 700; color: #1f2937;">My Attendance</h1>
+                <p style="color: #6b7280; font-size: 14px;" id="currentDate">Loading...</p>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 28px; font-weight: 700; color: #667eea;" id="currentTime">--:--</div>
+                <div style="font-size: 12px; color: #6b7280;" id="currentDay">---</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="status-card">
+        <div class="loader"></div>
+        <p style="text-align: center; color: #6b7280; margin-top: 16px;">Loading your attendance...</p>
+    </div>
+
+    <!-- Not Clocked In State -->
+    <div id="notClockedInState" class="status-card" style="display: none;">
+        <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 64px; margin-bottom: 16px;">📍</div>
+            <h2 style="font-size: 20px; font-weight: 600; color: #1f2937; margin-bottom: 8px;">Ready to Start Your Day?</h2>
+            <p style="color: #6b7280; margin-bottom: 24px;">Clock in to begin tracking your attendance</p>
+            
+            <div style="background: #f9fafb; padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+                <div class="info-row">
+                    <span style="color: #6b7280;">Shop Opens</span>
+                    <span style="font-weight: 600;" id="shopOpenTime">08:30 AM</span>
+                </div>
+                <div class="info-row">
+                    <span style="color: #6b7280;">Expected Hours</span>
+                    <span style="font-weight: 600;" id="expectedHours">10 hours</span>
+                </div>
+            </div>
+
+            <button class="action-btn clock-in-btn" onclick="goToClockIn()">
+                <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Clock In Now
+            </button>
+        </div>
+    </div>
+
+    <!-- Clocked In State -->
+    <div id="clockedInState" class="status-card" style="display: none;">
+        <!-- Status Badge -->
+        <div style="text-align: center; margin-bottom: 20px;">
+            <span class="badge badge-success" id="statusBadge">✓ Clocked In</span>
+        </div>
+
+        <!-- Timer -->
+        <div class="timer" id="workingTimer">00:00:00</div>
+        <p style="text-align: center; color: #6b7280; margin-bottom: 24px;">Time at work today</p>
+
+        <!-- Stats -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px;">
+            <div style="background: #f9fafb; padding: 16px; border-radius: 12px; text-align: center;">
+                <div style="font-size: 24px; font-weight: 700; color: #10b981;" id="clockInTime">--:--</div>
+                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Clock In</div>
+            </div>
+            <div style="background: #f9fafb; padding: 16px; border-radius: 12px; text-align: center;">
+                <div style="font-size: 24px; font-weight: 700; color: #667eea;" id="expectedHoursDisplay">10h</div>
+                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Expected</div>
+            </div>
+        </div>
+
+        <!-- Warnings -->
+        <div id="lateWarning" style="display: none; background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+            <div style="font-weight: 600; color: #92400e; margin-bottom: 4px;">⚠️ Late Arrival</div>
+            <div style="font-size: 14px; color: #92400e;">Permission request created automatically</div>
+        </div>
+
+        <!-- Actions -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <button class="action-btn break-btn" id="breakBtn" onclick="toggleBreak()">
+                <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span id="breakBtnText">Start Break</span>
+            </button>
+
+            <button class="action-btn clock-out-btn" onclick="goToClockOut()">
+                <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                </svg>
+                Clock Out
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="status-card">
+        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1f2937;">Quick Actions</h3>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <a href="history.html" style="padding: 16px; background: #f9fafb; border-radius: 12px; text-decoration: none; color: #1f2937; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; background: #667eea; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">📅</div>
+                    <div>
+                        <div style="font-weight: 600;">Attendance History</div>
+                        <div style="font-size: 12px; color: #6b7280;">View past records</div>
+                    </div>
+                </div>
+                <svg style="width: 20px; height: 20px; color: #9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </a>
+
+            <a href="permission-request.html" style="padding: 16px; background: #f9fafb; border-radius: 12px; text-decoration: none; color: #1f2937; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">📝</div>
+                    <div>
+                        <div style="font-weight: 600;">Request Permission</div>
+                        <div style="font-size: 12px; color: #6b7280;">Late arrival or early checkout</div>
+                    </div>
+                </div>
+                <svg style="width: 20px; height: 20px; color: #9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </a>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <a href="dashboard.html" class="nav-item active">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"></path>
+            </svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="history.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"></path>
+            </svg>
+            <span>History</span>
+        </a>
+        <a href="permission-request.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path>
+            </svg>
+            <span>Requests</span>
+        </a>
+    </div>
+
+    <script>
+        let attendanceData = null;
+        let timerInterval = null;
+        let breakStartTime = null;
+
+        // Initialize
+        async function init() {
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            await loadTodayAttendance();
+        }
+
+        // Update date and time
+        function updateDateTime() {
+            const now = new Date();
+            
+            // Date
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
+            document.getElementById('currentDay').textContent = now.toLocaleDateString('en-US', { weekday: 'long' });
+            
+            // Time
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+            document.getElementById('currentTime').textContent = `${hours}:${minutes}`;
+        }
+
+        // Load today's attendance
+        async function loadTodayAttendance() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    window.location.href = '/business-manager/login.html';
+                    return;
+                }
+
+                const response = await fetch('/business-manager/api/attendance/today', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                attendanceData = data;
+
+                document.getElementById('loadingState').style.display = 'none';
+
+                if (data.has_clocked_in) {
+                    showClockedInState(data.data);
+                } else {
+                    showNotClockedInState(data.shop_hours);
+                }
+
+            } catch (error) {
+                console.error('Load attendance error:', error);
+                document.getElementById('loadingState').innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                        <p style="color: #ef4444; font-weight: 600; margin-bottom: 8px;">Failed to load attendance</p>
+                        <button onclick="location.reload()" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Show not clocked in state
+        function showNotClockedInState(shopHours) {
+            document.getElementById('notClockedInState').style.display = 'block';
+            
+            if (shopHours) {
+                document.getElementById('shopOpenTime').textContent = formatTime(shopHours.open_time);
+                document.getElementById('expectedHours').textContent = `${shopHours.expected_hours} hours`;
+            }
+        }
+
+        // Show clocked in state
+        function showClockedInState(data) {
+            document.getElementById('clockedInState').style.display = 'block';
+            
+            // Clock in time
+            const clockInTime = new Date(data.clock_in_time);
+            document.getElementById('clockInTime').textContent = clockInTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            
+            // Expected hours
+            document.getElementById('expectedHoursDisplay').textContent = `${data.expected_hours}h`;
+            
+            // Late warning
+            if (data.is_late) {
+                document.getElementById('lateWarning').style.display = 'block';
+            }
+            
+            // Start timer
+            startTimer(data.clock_in_time, data.break_duration_minutes || 0);
+            
+            // Break button
+            if (data.break_start_time && !data.break_end_time) {
+                document.getElementById('breakBtnText').textContent = 'End Break';
+                breakStartTime = data.break_start_time;
+            }
+        }
+
+        // Start working timer
+        function startTimer(clockInTime, breakMinutes) {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const clockIn = new Date(clockInTime);
+                const diffMs = now - clockIn;
+                const diffMinutes = Math.floor(diffMs / 1000 / 60);
+                const workingMinutes = diffMinutes - breakMinutes;
+                
+                const hours = Math.floor(workingMinutes / 60);
+                const minutes = workingMinutes % 60;
+                const seconds = Math.floor((diffMs / 1000) % 60);
+                
+                document.getElementById('workingTimer').textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        // Format time
+        function formatTime(timeString) {
+            if (!timeString) return '--:--';
+            const [hours, minutes] = timeString.split(':');
+            const h = parseInt(hours);
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const displayHours = h % 12 || 12;
+            return `${displayHours}:${minutes} ${ampm}`;
+        }
+
+        // Toggle break
+        async function toggleBreak() {
+            const token = localStorage.getItem('auth_token');
+            const isBreakStarted = document.getElementById('breakBtnText').textContent === 'End Break';
+            
+            const endpoint = isBreakStarted ? 'break-end' : 'break-start';
+            
+            try {
+                const response = await fetch(`/business-manager/api/attendance/${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (isBreakStarted) {
+                        alert(`Break ended! Duration: ${data.data.break_duration_minutes} minutes`);
+                        document.getElementById('breakBtnText').textContent = 'Start Break';
+                    } else {
+                        document.getElementById('breakBtnText').textContent = 'End Break';
+                        alert('Break started! Don\'t forget to end it when you return.');
+                    }
+                    
+                    // Reload
+                    loadTodayAttendance();
+                } else {
+                    alert(data.message || 'Operation failed');
+                }
+            } catch (error) {
+                console.error('Break toggle error:', error);
+                alert('Failed to process request. Please try again.');
+            }
+        }
+
+        // Navigation
+        function goToClockIn() {
+            window.location.href = 'clock-in.html';
+        }
+
+        function goToClockOut() {
+            window.location.href = 'clock-out.html';
+        }
+
+        // Init on load
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salary Configuration - Quality Colours</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #FF6B35;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #ff5722;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .form-group select,
+        .form-group input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .table-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8f9fa;
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-secondary {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            color: #333;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-row.full {
+            grid-template-columns: 1fr;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .money {
+            font-weight: 600;
+            color: #28a745;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+    </style>
+    <script src="/business-manager/universal-nav-loader.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1><i class="fas fa-money-bill-wave"></i> Salary Configuration</h1>
+                <p style="color: #666; margin-top: 5px;">Manage employee salary settings</p>
+            </div>
+            <button class="btn btn-primary" onclick="showAddModal()">
+                <i class="fas fa-plus"></i> Add Salary Config
+            </button>
+        </div>
+
+        <div class="filters">
+            <div class="filter-row">
+                <div class="form-group">
+                    <label>Branch</label>
+                    <select id="filterBranch" onchange="loadConfigs()">
+                        <option value="">All Branches</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="filterStatus" onchange="loadConfigs()">
+                        <option value="">All</option>
+                        <option value="true" selected>Active Only</option>
+                        <option value="false">Inactive Only</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-secondary" onclick="loadConfigs()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div id="loading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> Loading configurations...
+            </div>
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <h3>No salary configurations found</h3>
+                <p>Click "Add Salary Config" to create one</p>
+            </div>
+            <div id="tableContent" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Staff Name</th>
+                            <th>Branch</th>
+                            <th>Monthly Salary</th>
+                            <th>Hourly Rate</th>
+                            <th>OT Multiplier</th>
+                            <th>Allowances</th>
+                            <th>Effective From</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="configTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add Salary Configuration</h2>
+            </div>
+            <div class="modal-body">
+                <form id="configForm">
+                    <input type="hidden" id="configId">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Staff Member *</label>
+                            <select id="userId" required>
+                                <option value="">Select Staff</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Branch *</label>
+                            <select id="branchId" required>
+                                <option value="">Select Branch</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Monthly Salary (₹) *</label>
+                            <input type="number" id="monthlySalary" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Overtime Multiplier</label>
+                            <input type="number" id="overtimeMultiplier" step="0.01" value="1.50">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Standard Daily Hours</label>
+                            <input type="number" id="standardDailyHours" step="0.5" value="10.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Sunday Hours</label>
+                            <input type="number" id="sundayHours" step="0.5" value="5.00">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Transport Allowance (₹)</label>
+                            <input type="number" id="transportAllowance" step="0.01" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Food Allowance (₹)</label>
+                            <input type="number" id="foodAllowance" step="0.01" value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Other Allowance (₹)</label>
+                            <input type="number" id="otherAllowance" step="0.01" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Effective From *</label>
+                            <input type="date" id="effectiveFrom" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row full">
+                        <div class="form-group">
+                            <label>Allowance Notes</label>
+                            <textarea id="allowanceNotes" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enableLateDeduction" checked>
+                            <label>Enable Late Deduction</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enableAbsenceDeduction" checked>
+                            <label>Enable Absence Deduction</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-success" onclick="saveConfig()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let currentUser = null;
+
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Unauthorized');
+                }
+                
+                currentUser = await response.json();
+                return true;
+            } catch (error) {
+                localStorage.removeItem('auth_token');
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        // Load branches
+        async function loadBranches() {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/branches`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            
+            const selects = ['filterBranch', 'branchId'];
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                select.innerHTML = selectId === 'filterBranch' ? '<option value="">All Branches</option>' : '<option value="">Select Branch</option>';
+                data.forEach(branch => {
+                    select.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+                });
+            });
+        }
+
+        // Load staff
+        async function loadStaff() {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/users?role=staff`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            
+            const select = document.getElementById('userId');
+            select.innerHTML = '<option value="">Select Staff</option>';
+            data.forEach(user => {
+                select.innerHTML += `<option value="${user.id}">${user.full_name} - ${user.email}</option>`;
+            });
+        }
+
+        // Load salary configurations
+        async function loadConfigs() {
+            const token = localStorage.getItem('auth_token');
+            const branchId = document.getElementById('filterBranch').value;
+            const isActive = document.getElementById('filterStatus').value;
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('tableContent').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'none';
+            
+            let url = `${API_BASE}/api/salary/config?`;
+            if (branchId) url += `branch_id=${branchId}&`;
+            if (isActive) url += `is_active=${isActive}&`;
+            
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const result = await response.json();
+            
+            document.getElementById('loading').style.display = 'none';
+            
+            if (result.success && result.data.length > 0) {
+                renderConfigs(result.data);
+                document.getElementById('tableContent').style.display = 'block';
+            } else {
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        }
+
+        // Render configurations
+        function renderConfigs(configs) {
+            const tbody = document.getElementById('configTableBody');
+            tbody.innerHTML = configs.map(config => `
+                <tr>
+                    <td>${config.staff_name}</td>
+                    <td>${config.branch_name}</td>
+                    <td class="money">₹${parseFloat(config.monthly_salary).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td class="money">₹${parseFloat(config.hourly_rate).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td>${config.overtime_multiplier}x</td>
+                    <td class="money">₹${(parseFloat(config.transport_allowance) + parseFloat(config.food_allowance) + parseFloat(config.other_allowance)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td>${new Date(config.effective_from).toLocaleDateString('en-IN')}</td>
+                    <td>
+                        <span class="badge ${config.is_active ? 'badge-success' : 'badge-secondary'}">
+                            ${config.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;" onclick="editConfig(${config.id})">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Show add modal
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = 'Add Salary Configuration';
+            document.getElementById('configForm').reset();
+            document.getElementById('configId').value = '';
+            document.getElementById('effectiveFrom').valueAsDate = new Date();
+            document.getElementById('configModal').classList.add('active');
+        }
+
+        // Edit configuration
+        async function editConfig(id) {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/salary/config/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                const config = result.data;
+                document.getElementById('modalTitle').textContent = 'Edit Salary Configuration';
+                document.getElementById('configId').value = config.id;
+                document.getElementById('userId').value = config.user_id;
+                document.getElementById('userId').disabled = true;
+                document.getElementById('branchId').value = config.branch_id;
+                document.getElementById('monthlySalary').value = config.monthly_salary;
+                document.getElementById('overtimeMultiplier').value = config.overtime_multiplier;
+                document.getElementById('standardDailyHours').value = config.standard_daily_hours;
+                document.getElementById('sundayHours').value = config.sunday_hours;
+                document.getElementById('transportAllowance').value = config.transport_allowance;
+                document.getElementById('foodAllowance').value = config.food_allowance;
+                document.getElementById('otherAllowance').value = config.other_allowance;
+                document.getElementById('allowanceNotes').value = config.allowance_notes || '';
+                document.getElementById('effectiveFrom').value = config.effective_from.split('T')[0];
+                document.getElementById('enableLateDeduction').checked = config.enable_late_deduction;
+                document.getElementById('enableAbsenceDeduction').checked = config.enable_absence_deduction;
+                
+                document.getElementById('configModal').classList.add('active');
+            }
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('configModal').classList.remove('active');
+            document.getElementById('userId').disabled = false;
+        }
+
+        // Save configuration
+        async function saveConfig() {
+            const token = localStorage.getItem('auth_token');
+            const id = document.getElementById('configId').value;
+            
+            const data = {
+                user_id: parseInt(document.getElementById('userId').value),
+                branch_id: parseInt(document.getElementById('branchId').value),
+                monthly_salary: parseFloat(document.getElementById('monthlySalary').value),
+                overtime_multiplier: parseFloat(document.getElementById('overtimeMultiplier').value),
+                standard_daily_hours: parseFloat(document.getElementById('standardDailyHours').value),
+                sunday_hours: parseFloat(document.getElementById('sundayHours').value),
+                transport_allowance: parseFloat(document.getElementById('transportAllowance').value),
+                food_allowance: parseFloat(document.getElementById('foodAllowance').value),
+                other_allowance: parseFloat(document.getElementById('otherAllowance').value),
+                allowance_notes: document.getElementById('allowanceNotes').value,
+                effective_from: document.getElementById('effectiveFrom').value,
+                enable_late_deduction: document.getElementById('enableLateDeduction').checked ? 1 : 0,
+                enable_absence_deduction: document.getElementById('enableAbsenceDeduction').checked ? 1 : 0
+            };
+            
+            const url = id ? `${API_BASE}/api/salary/config/${id}` : `${API_BASE}/api/salary/config`;
+            const method = id ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('Salary configuration saved successfully!');
+                closeModal();
+                loadConfigs();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        // Initialize
+        (async () => {
+            if (await checkAuth()) {
+                loadBranches();
+                loadStaff();
+                loadConfigs();
+            }
+        })();
+    </script>
+</body>
+</html>

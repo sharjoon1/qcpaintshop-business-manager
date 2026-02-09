@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Login - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex items-center justify-center px-4 py-12">
+        <div class="max-w-md w-full">
+            <!-- Logo -->
+            <div class="text-center mb-8">
+                <img id="headerLogo" src="https://qcpaintshop.com/assets/images/logo.png" alt="Quality Colours" class="h-20 mx-auto mb-4">
+                <h2 class="text-3xl font-bold text-gray-800">Customer Portal</h2>
+                <p class="text-gray-600 mt-2">Track your estimate requests</p>
+            </div>
+
+            <!-- Login Card -->
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-6">Login with Phone Number</h3>
+                
+                <form id="loginForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
+                        <input type="tel" id="phone" required pattern="[6-9][0-9]{9}" maxlength="10"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            placeholder="Enter 10-digit mobile number">
+                        <p class="text-xs text-gray-500 mt-1">Use the same number you used for estimate request</p>
+                    </div>
+
+                    <button type="submit" id="loginBtn"
+                        class="w-full gradient-bg text-white font-semibold py-3 rounded-lg hover:opacity-90 transition">
+                        Continue
+                    </button>
+                </form>
+
+                <div class="mt-6 text-center text-sm text-gray-600">
+                    <p>Don't have a request yet?</p>
+                    <a href="request-estimate.html" class="text-purple-600 hover:text-purple-700 font-medium">
+                        Submit New Request →
+                    </a>
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="mt-6 text-center text-sm text-gray-500">
+                <p>Need help? Call us at <a href="tel:+919876543210" class="text-purple-600 hover:text-purple-700">98765 43210</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const phone = document.getElementById('phone').value;
+            
+            if (!/^[6-9]\d{9}$/.test(phone)) {
+                alert('Please enter a valid 10-digit mobile number');
+                return;
+            }
+
+            // Store in localStorage (in real app, would verify OTP first)
+            localStorage.setItem('customer_phone', phone);
+            localStorage.setItem('customer_name', 'Customer'); // Would come from database
+            localStorage.setItem('customer_logged_in', 'true');
+            
+            // Redirect to dashboard
+            window.location.href = 'customer-dashboard.html';
+        });
+
+        // Phone input validation
+        document.getElementById('phone').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+        });
+    </script>
+    <script src="/business-manager/components/logo-loader.js"></script>
+</body>
+</html>

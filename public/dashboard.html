@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader-v3.js"></script>
+    <style>
+        body { background: #f9fafb; }
+        
+        .dashboard-section { margin: 1.5rem 0; }
+        
+        .section-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        /* MOBILE FIRST: Quick Actions - 3 small squares per row */
+        .quick-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+        
+        .quick-action-btn {
+            aspect-ratio: 1 / 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 0.75rem;
+            transition: all 0.3s;
+            position: relative;
+            border: 2px solid transparent;
+        }
+        
+        .quick-action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--btn-color, #667eea);
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .quick-action-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .quick-action-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+            line-height: 1.2;
+        }
+        
+        .quick-action-desc {
+            font-size: 0.65rem;
+            color: #6b7280;
+            line-height: 1.2;
+        }
+        
+        .quick-action-btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+        }
+        
+        /* MOBILE FIRST: Dashboard Cards - 2 squares per row */
+        .data-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+        
+        .data-card {
+            aspect-ratio: 1 / 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .data-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+            border-color: var(--card-color);
+        }
+        
+        .data-card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+        
+        .data-card-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin: 0.75rem 0;
+            line-height: 1;
+        }
+        
+        .data-card-label {
+            font-size: 0.7rem;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            line-height: 1.2;
+        }
+        
+        /* DESKTOP: 768px+ overrides */
+        @media (min-width: 768px) {
+            .dashboard-section { margin: 2.5rem 0; }
+            
+            .section-title {
+                font-size: 1.75rem;
+                margin-bottom: 1.5rem;
+                gap: 0.75rem;
+            }
+            
+            /* DESKTOP: 5 buttons per row (professional standard) */
+            .quick-actions-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 1.5rem;
+            }
+            
+            .quick-action-btn {
+                border-radius: 16px;
+                padding: 1.75rem;
+            }
+            
+            .quick-action-btn::before { height: 5px; }
+            
+            .quick-action-icon {
+                font-size: 3.25rem;
+                margin-bottom: 1rem;
+            }
+            
+            .quick-action-title {
+                font-size: 1.125rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .quick-action-desc { font-size: 0.875rem; }
+            
+            .quick-action-btn:hover {
+                transform: translateY(-10px) scale(1.02);
+                box-shadow: 0 16px 28px rgba(0,0,0,0.15);
+            }
+            
+            /* DESKTOP: 4 cards per row (industry standard) */
+            .data-cards-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 1.5rem;
+            }
+            
+            .data-card {
+                border-radius: 16px;
+                padding: 2rem;
+            }
+            
+            .data-card-icon {
+                width: 52px;
+                height: 52px;
+                font-size: 1.75rem;
+            }
+            
+            .data-card-value {
+                font-size: 2.75rem;
+                margin: 1.25rem 0;
+            }
+            
+            .data-card-label { font-size: 0.875rem; }
+            
+            .data-card:hover {
+                transform: translateY(-8px);
+                box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+            }
+        }
+        
+        /* TABLET: 640px-767px */
+        @media (min-width: 640px) and (max-width: 767px) {
+            .quick-actions-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 1.25rem;
+            }
+            
+            .data-cards-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1.25rem;
+            }
+            
+            .quick-action-btn { padding: 1.25rem; }
+            .quick-action-icon { font-size: 2.5rem; }
+            .data-card { padding: 1.5rem; }
+        }
+        
+        .recent-activity {
+            margin: 2rem 0;
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1.25rem;
+        }
+        
+        @media (min-width: 768px) {
+            .recent-activity {
+                border-radius: 18px;
+                padding: 2rem;
+            }
+        }
+        
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #f3f4f6;
+        }
+        
+        .activity-item {
+            padding: 1rem;
+            border-radius: 10px;
+            transition: all 0.2s;
+            margin-bottom: 0.65rem;
+        }
+        
+        .activity-item:hover { background: #f9fafb; }
+        
+        @media (min-width: 768px) {
+            .activity-item {
+                padding: 1.25rem;
+                border-radius: 12px;
+            }
+            
+            .activity-item:hover {
+                transform: translateX(8px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen" style="padding: 1rem 0 2rem;">
+        <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+            
+            <div class="mb-6 sm:mb-8 lg:mb-10">
+                <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">Dashboard</h1>
+                <p class="text-sm sm:text-base lg:text-lg text-gray-600">Welcome back! Here's your business overview.</p>
+            </div>
+            
+            <div class="dashboard-section">
+                <h2 class="section-title"><span>⚡</span><span>Quick Actions</span></h2>
+                
+                <div class="quick-actions-grid">
+                    <a href="/business-manager/estimate-create-new.html" class="quick-action-btn" style="--btn-color: #667eea;">
+                        <div class="quick-action-icon">📝</div>
+                        <div class="quick-action-title">Create Estimate</div>
+                        <div class="quick-action-desc">New quote</div>
+                    </a>
+                    
+                    <a href="/business-manager/admin-products.html" class="quick-action-btn" style="--btn-color: #10b981;">
+                        <div class="quick-action-icon">🎨</div>
+                        <div class="quick-action-title">Products</div>
+                        <div class="quick-action-desc">Manage</div>
+                    </a>
+                    
+                    <a href="/business-manager/admin-customers.html" class="quick-action-btn" style="--btn-color: #0ea5e9;">
+                        <div class="quick-action-icon">👥</div>
+                        <div class="quick-action-title">Customers</div>
+                        <div class="quick-action-desc">Database</div>
+                    </a>
+                    
+                    <a href="/business-manager/staff/clock-in.html" class="quick-action-btn" style="--btn-color: #10b981;">
+                        <div class="quick-action-icon">🟢</div>
+                        <div class="quick-action-title">Clock In</div>
+                        <div class="quick-action-desc">Start day</div>
+                    </a>
+                    
+                    <a href="/business-manager/staff/clock-out.html" class="quick-action-btn" style="--btn-color: #ef4444;">
+                        <div class="quick-action-icon">🔴</div>
+                        <div class="quick-action-title">Clock Out</div>
+                        <div class="quick-action-desc">End day</div>
+                    </a>
+                    
+                    <a href="/business-manager/admin-reports.html" class="quick-action-btn" style="--btn-color: #f59e0b;">
+                        <div class="quick-action-icon">📈</div>
+                        <div class="quick-action-title">Reports</div>
+                        <div class="quick-action-desc">Analytics</div>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="dashboard-section">
+                <h2 class="section-title"><span>📊</span><span>Key Metrics</span></h2>
+                
+                <div class="data-cards-grid">
+                    <div class="data-card" style="--card-color: #7c3aed;">
+                        <div class="data-card-icon" style="background: #ede9fe; color: #7c3aed;">📋</div>
+                        <div>
+                            <div class="data-card-value" id="totalEstimates">0</div>
+                            <div class="data-card-label">Estimates</div>
+                        </div>
+                    </div>
+                    
+                    <div class="data-card" style="--card-color: #16a34a;">
+                        <div class="data-card-icon" style="background: #dcfce7; color: #16a34a;">🎨</div>
+                        <div>
+                            <div class="data-card-value" id="totalProducts">0</div>
+                            <div class="data-card-label">Products</div>
+                        </div>
+                    </div>
+                    
+                    <div class="data-card" style="--card-color: #2563eb;">
+                        <div class="data-card-icon" style="background: #dbeafe; color: #2563eb;">👥</div>
+                        <div>
+                            <div class="data-card-value" id="totalCustomers">0</div>
+                            <div class="data-card-label">Customers</div>
+                        </div>
+                    </div>
+                    
+                    <div class="data-card" style="--card-color: #d97706;">
+                        <div class="data-card-icon" style="background: #fef3c7; color: #d97706;">💰</div>
+                        <div>
+                            <div class="data-card-value" id="todayRevenue">₹0.00</div>
+                            <div class="data-card-label">Revenue</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="recent-activity">
+                <div class="activity-header">
+                    <h2 class="section-title" style="margin: 0;"><span>📌</span><span>Recent Estimates</span></h2>
+                    <a href="/business-manager/estimates.html" class="text-blue-600 hover:text-blue-800 font-semibold text-sm sm:text-base">View All →</a>
+                </div>
+                <div id="recentEstimates">
+                    <p class="text-center text-gray-500 py-6 text-sm sm:text-base">Loading recent estimates...</p>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('navigationLoaded', initDashboard);
+        setTimeout(initDashboard, 1000);
+        
+        let dashboardInitialized = false;
+        
+        function initDashboard() {
+            if (dashboardInitialized) return;
+            dashboardInitialized = true;
+            console.log('🎯 Initializing mobile-first dashboard...');
+            loadDashboardData();
+        }
+        
+        async function loadDashboardData() {
+            try {
+                const headers = window.getAuthHeaders ? window.getAuthHeaders() : {
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                    'Content-Type': 'application/json'
+                };
+                
+                try {
+                    const estimatesRes = await fetch('/business-manager/api/estimates', { headers });
+                    if (estimatesRes.ok) {
+                        const estimates = await estimatesRes.json();
+                        document.getElementById('totalEstimates').textContent = estimates.length || 0;
+                        displayRecentEstimates(estimates.slice(0, 5));
+                    }
+                } catch (e) { console.error('Error loading estimates:', e); }
+                
+                try {
+                    const productsRes = await fetch('/business-manager/api/products', { headers });
+                    if (productsRes.ok) {
+                        const products = await productsRes.json();
+                        document.getElementById('totalProducts').textContent = products.length || 0;
+                    }
+                } catch (e) { console.error('Error loading products:', e); }
+                
+                try {
+                    const customersRes = await fetch('/business-manager/api/customers', { headers });
+                    if (customersRes.ok) {
+                        const customers = await customersRes.json();
+                        document.getElementById('totalCustomers').textContent = customers.length || 0;
+                    }
+                } catch (e) { console.error('Error loading customers:', e); }
+                
+                console.log('✅ Dashboard data loaded');
+            } catch (error) {
+                console.error('❌ Error loading dashboard data:', error);
+            }
+        }
+        
+        function displayRecentEstimates(estimates) {
+            const container = document.getElementById('recentEstimates');
+            
+            if (!estimates || estimates.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-6 text-sm sm:text-base">No estimates yet. Create your first estimate!</p>';
+                return;
+            }
+            
+            container.innerHTML = estimates.map(est => `
+                <div class="activity-item flex items-center justify-between flex-wrap sm:flex-nowrap gap-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-gray-900 text-sm sm:text-base truncate">${est.customer_name || 'Unknown Customer'}</div>
+                        <div class="text-xs sm:text-sm text-gray-600 mt-0.5">Estimate #${est.estimate_number || est.id}</div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <div class="text-base sm:text-lg font-bold text-gray-900">₹${est.total_amount || '0.00'}</div>
+                        <span class="inline-block mt-0.5 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                            est.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                        }">${est.status || 'pending'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>

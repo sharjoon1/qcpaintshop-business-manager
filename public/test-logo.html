@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logo Test - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-8">
+        <h1 class="text-3xl font-bold mb-6">🔍 Logo Upload Debug Tool</h1>
+        
+        <div class="space-y-6">
+            <!-- Current Settings -->
+            <div class="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                <h2 class="text-xl font-bold mb-3">📋 Current Settings from Database</h2>
+                <div id="currentSettings" class="font-mono text-sm">Loading...</div>
+            </div>
+            
+            <!-- Logo Display Test -->
+            <div class="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+                <h2 class="text-xl font-bold mb-3">🖼️ Logo Display Test</h2>
+                <div id="logoDisplay">
+                    <p class="text-gray-600 mb-3">If logo is saved, it should appear below:</p>
+                    <img id="logoImage" src="" alt="Logo" class="max-w-xs border-2 border-gray-300 rounded hidden">
+                    <p id="logoError" class="text-red-600 hidden"></p>
+                </div>
+            </div>
+            
+            <!-- Uploaded Files -->
+            <div class="border-2 border-purple-200 rounded-lg p-4 bg-purple-50">
+                <h2 class="text-xl font-bold mb-3">📁 Uploaded Logo Files</h2>
+                <div id="uploadedFiles" class="font-mono text-sm">Loading...</div>
+            </div>
+            
+            <!-- LocalStorage Check -->
+            <div class="border-2 border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                <h2 class="text-xl font-bold mb-3">🔑 Auth Token Status</h2>
+                <div id="authStatus" class="font-mono text-sm"></div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex gap-4">
+                <button onclick="testUpload()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+                    🔄 Refresh Test
+                </button>
+                <a href="admin-settings.html" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700">
+                    ← Back to Settings
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function loadTest() {
+            // Check auth
+            const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+            document.getElementById('authStatus').innerHTML = token 
+                ? `✅ Token exists: ${token.substring(0, 20)}...`
+                : `❌ No auth token found`;
+            
+            try {
+                // Get settings with auth
+                const response = await fetch('/business-manager/api/settings', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const settings = await response.json();
+                console.log('Settings response:', settings);
+                
+                // Display all settings
+                document.getElementById('currentSettings').innerHTML = `
+                    <strong>business_logo:</strong> ${settings.business_logo || '(not set)'}<br>
+                    <strong>business_name:</strong> ${settings.business_name || '(not set)'}<br>
+                    <strong>business_email:</strong> ${settings.business_email || '(not set)'}<br>
+                    <strong>business_phone:</strong> ${settings.business_phone || '(not set)'}
+                `;
+                
+                // Try to display logo
+                if (settings.business_logo) {
+                    const logoImg = document.getElementById('logoImage');
+                    logoImg.src = settings.business_logo;
+                    logoImg.classList.remove('hidden');
+                    
+                    // Test if image loads
+                    logoImg.onerror = function() {
+                        document.getElementById('logoError').textContent = 
+                            `❌ Failed to load image from: ${settings.business_logo}`;
+                        document.getElementById('logoError').classList.remove('hidden');
+                    };
+                    
+                    logoImg.onload = function() {
+                        document.getElementById('logoError').textContent = 
+                            `✅ Logo loaded successfully! (${logoImg.naturalWidth}x${logoImg.naturalHeight})`;
+                        document.getElementById('logoError').classList.remove('hidden');
+                        document.getElementById('logoError').classList.remove('text-red-600');
+                        document.getElementById('logoError').classList.add('text-green-600');
+                    };
+                } else {
+                    document.getElementById('logoError').textContent = 
+                        `⚠️ No logo URL found in settings database`;
+                    document.getElementById('logoError').classList.remove('hidden');
+                    document.getElementById('logoError').classList.add('text-orange-600');
+                }
+                
+                // Get uploaded files (mock - would need API endpoint)
+                document.getElementById('uploadedFiles').innerHTML = `
+                    Files in /uploads/logos/ directory<br>
+                    <small class="text-gray-600">Check server logs or file manager for actual files</small>
+                `;
+                
+            } catch (error) {
+                document.getElementById('currentSettings').innerHTML = 
+                    `<span class="text-red-600">❌ Error: ${error.message}</span>`;
+                console.error('Test error:', error);
+            }
+        }
+        
+        function testUpload() {
+            loadTest();
+        }
+        
+        // Run on load
+        loadTest();
+    </script>
+</body>
+</html>

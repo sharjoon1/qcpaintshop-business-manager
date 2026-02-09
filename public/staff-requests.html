@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Requests - Staff Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .status-new { background: #dbeafe; color: #1e40af; }
+        .status-contacted { background: #fef3c7; color: #92400e; }
+        .status-quote_sent { background: #ddd6fe; color: #5b21b6; }
+        .status-accepted { background: #d1fae5; color: #065f46; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+        .request-card {
+            transition: all 0.3s;
+        }
+        .request-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg sticky top-0 z-50">
+        <div class="px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <button id="mobileMenuBtn" class="lg:hidden p-2 rounded-md hover:bg-white/10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+
+                <div class="flex items-center justify-center flex-1 lg:flex-initial">
+                    <img id="headerLogo" src="https://qcpaintshop.com/assets/images/logo.png" alt="Quality Colours" class="h-[60px] max-w-[200px] object-contain">
+                </div>
+
+                <nav class="hidden lg:flex items-center space-x-1 mx-8 flex-1">
+                    <a href="staff-dashboard.html" class="px-4 py-2 rounded-md hover:bg-white/10 text-sm font-medium">Dashboard</a>
+                    <a href="staff-requests.html" class="px-4 py-2 rounded-md bg-white/20 text-sm font-medium">My Requests</a>
+                    <a href="staff-estimates.html" class="px-4 py-2 rounded-md hover:bg-white/10 text-sm font-medium">Estimates</a>
+                </nav>
+
+                <div class="relative">
+                    <button id="profileBtn" class="flex items-center space-x-3 p-2 rounded-md hover:bg-white/10">
+                        <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold">S</div>
+                    </button>
+                    <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1">
+                        <a href="staff-profile.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
+                        <a href="login.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="mobileMenu" class="hidden lg:hidden border-t border-white/10">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="staff-dashboard.html" class="block px-3 py-2 rounded-md hover:bg-white/10 text-sm font-medium">Dashboard</a>
+                <a href="staff-requests.html" class="block px-3 py-2 rounded-md bg-white/20 text-sm font-medium">My Requests</a>
+                <a href="staff-estimates.html" class="block px-3 py-2 rounded-md hover:bg-white/10 text-sm font-medium">Estimates</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Page Header -->
+    <div class="bg-white shadow-sm">
+        <div class="px-4 sm:px-6 lg:px-8 py-6">
+            <h1 class="text-3xl font-bold text-gray-800">📋 My Assigned Requests</h1>
+            <p class="text-gray-600 mt-1">Estimate requests assigned to you</p>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="px-4 sm:px-6 lg:px-8 py-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+                <p class="text-sm text-gray-600">Total</p>
+                <p class="text-2xl font-bold text-gray-800" id="statTotal">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <p class="text-sm text-gray-600">New</p>
+                <p class="text-2xl font-bold text-blue-600" id="statNew">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <p class="text-sm text-gray-600">In Progress</p>
+                <p class="text-2xl font-bold text-yellow-600" id="statProgress">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <p class="text-sm text-gray-600">Completed</p>
+                <p class="text-2xl font-bold text-green-600" id="statCompleted">0</p>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <select id="filterStatus" class="px-3 py-2 border border-gray-300 rounded-lg">
+                    <option value="">All Status</option>
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="quote_sent">Quote Sent</option>
+                    <option value="accepted">Accepted</option>
+                </select>
+                <input type="text" id="searchInput" placeholder="Search name or phone..." class="px-3 py-2 border border-gray-300 rounded-lg">
+                <button onclick="loadRequests()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+
+        <!-- Requests Grid -->
+        <div id="requestsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="col-span-full text-center py-12 text-gray-400">
+                <div class="text-5xl mb-3">⏳</div>
+                <p>Loading requests...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Request Detail Modal -->
+    <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 py-8">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
+                <div class="gradient-bg text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
+                    <h3 class="text-xl font-bold" id="modalTitle">Request Details</h3>
+                    <button onclick="closeModal()" class="text-white hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="modalContent" class="p-6 max-h-[70vh] overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/business-manager/api';
+        const STAFF_ID = 1; // TODO: Get from session
+        let currentRequest = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRequests();
+
+            document.getElementById('mobileMenuBtn').addEventListener('click', function() {
+                document.getElementById('mobileMenu').classList.toggle('hidden');
+            });
+
+            document.getElementById('profileBtn').addEventListener('click', function() {
+                document.getElementById('profileDropdown').classList.toggle('hidden');
+            });
+
+            // Auto-refresh
+            setInterval(loadRequests, 60000);
+        });
+
+        async function loadRequests() {
+            const container = document.getElementById('requestsContainer');
+            container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-400"><div class="text-5xl mb-3">⏳</div><p>Loading...</p></div>';
+
+            try {
+                const status = document.getElementById('filterStatus').value;
+                const search = document.getElementById('searchInput').value;
+
+                let url = `${API_BASE}/estimate-requests?assigned_to=${STAFF_ID}`;
+                if (status) url += `&status=${status}`;
+                if (search) url += `&search=${search}`;
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                // Update stats
+                if (result.success) {
+                    const requests = result.data;
+                    document.getElementById('statTotal').textContent = requests.length;
+                    document.getElementById('statNew').textContent = requests.filter(r => r.status === 'new').length;
+                    document.getElementById('statProgress').textContent = requests.filter(r => r.status === 'contacted' || r.status === 'quote_sent').length;
+                    document.getElementById('statCompleted').textContent = requests.filter(r => r.status === 'accepted' || r.status === 'completed').length;
+                }
+
+                if (!result.success || result.data.length === 0) {
+                    container.innerHTML = `
+                        <div class="col-span-full text-center py-12 text-gray-400">
+                            <div class="text-5xl mb-3">📭</div>
+                            <p class="text-lg font-semibold">No requests assigned</p>
+                            <p class="text-sm mt-2">Check back later for new assignments</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = result.data.map(request => `
+                    <div class="request-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer" onclick="viewRequest(${request.id})">
+                        <div class="p-5">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-bold text-gray-800">${request.customer_name}</h3>
+                                    <p class="text-sm text-gray-600">${request.request_number}</p>
+                                </div>
+                                <span class="status-badge status-${request.status} px-3 py-1 rounded-full text-xs font-semibold">
+                                    ${formatStatus(request.status)}
+                                </span>
+                            </div>
+
+                            <div class="space-y-2 mb-4">
+                                <div class="flex items-center text-sm text-gray-600">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                                    </svg>
+                                    ${formatProjectType(request.project_type)}
+                                </div>
+                                <div class="flex items-center text-sm text-gray-600">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                    ${request.area_sqft} sq.ft
+                                </div>
+                                <div class="flex items-center text-sm text-gray-600">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                                    </svg>
+                                    ${request.phone}
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-3 border-t">
+                                <span class="text-xs text-gray-500">${formatTimeAgo(request.created_at)}</span>
+                                <div class="flex gap-2">
+                                    <a href="tel:${request.phone}" class="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-semibold hover:bg-green-200" onclick="event.stopPropagation()">
+                                        Call
+                                    </a>
+                                    <button class="bg-purple-100 text-purple-700 px-3 py-1 rounded text-xs font-semibold hover:bg-purple-200">
+                                        View
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Load requests error:', error);
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12 text-red-600">
+                        <div class="text-5xl mb-3">❌</div>
+                        <p>Failed to load requests</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function viewRequest(id) {
+            try {
+                const response = await fetch(`${API_BASE}/estimate-requests/${id}`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    alert('Failed to load request details');
+                    return;
+                }
+
+                currentRequest = result.data;
+                const req = result.data;
+
+                document.getElementById('modalTitle').textContent = req.request_number;
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-3">Customer Information</h4>
+                            <div class="space-y-2">
+                                <p><span class="text-gray-600">Name:</span> <strong>${req.customer_name}</strong></p>
+                                <p><span class="text-gray-600">Phone:</span> <strong>${req.phone}</strong></p>
+                                <p><span class="text-gray-600">Email:</span> ${req.email || 'Not provided'}</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-3">Project Details</h4>
+                            <div class="space-y-2">
+                                <p><span class="text-gray-600">Type:</span> ${formatProjectType(req.project_type)}</p>
+                                <p><span class="text-gray-600">Property:</span> ${formatPropertyType(req.property_type)}</p>
+                                <p><span class="text-gray-600">Area:</span> ${req.area_sqft} sq.ft</p>
+                                <p><span class="text-gray-600">Rooms:</span> ${req.rooms || 'Not specified'}</p>
+                                <p><span class="text-gray-600">Location:</span> ${req.location}</p>
+                            </div>
+                        </div>
+
+                        ${req.preferred_brand || req.timeline || req.budget_range ? `
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-3">Preferences</h4>
+                            <div class="space-y-2">
+                                ${req.preferred_brand ? `<p><span class="text-gray-600">Brand:</span> ${req.preferred_brand}</p>` : ''}
+                                ${req.timeline ? `<p><span class="text-gray-600">Timeline:</span> ${req.timeline}</p>` : ''}
+                                ${req.budget_range ? `<p><span class="text-gray-600">Budget:</span> ${req.budget_range}</p>` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        ${req.additional_notes ? `
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-3">Notes</h4>
+                            <p class="text-gray-700">${req.additional_notes}</p>
+                        </div>
+                        ` : ''}
+
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-3">Update Status</h4>
+                            <select id="newStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3">
+                                <option value="new" ${req.status === 'new' ? 'selected' : ''}>New</option>
+                                <option value="contacted" ${req.status === 'contacted' ? 'selected' : ''}>Contacted</option>
+                                <option value="quote_sent" ${req.status === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
+                                <option value="accepted" ${req.status === 'accepted' ? 'selected' : ''}>Accepted</option>
+                                <option value="rejected" ${req.status === 'rejected' ? 'selected' : ''}>Rejected</option>
+                            </select>
+                            <button onclick="updateStatus()" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                                Update Status
+                            </button>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <a href="tel:${req.phone}" class="flex-1 bg-green-600 text-white py-3 rounded-lg text-center hover:bg-green-700 font-semibold">
+                                📞 Call Customer
+                            </a>
+                            <a href="estimate-create-new.html?from_request=${req.id}" class="flex-1 bg-purple-600 text-white py-3 rounded-lg text-center hover:bg-purple-700 font-semibold">
+                                📝 Create Quote
+                            </a>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('detailModal').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('View request error:', error);
+                alert('Failed to load request details');
+            }
+        }
+
+        async function updateStatus() {
+            const newStatus = document.getElementById('newStatus').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/estimate-requests/${currentRequest.id}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus, user_id: STAFF_ID })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Status updated successfully!');
+                    closeModal();
+                    loadRequests();
+                } else {
+                    alert('Failed to update status');
+                }
+
+            } catch (error) {
+                console.error('Update status error:', error);
+                alert('Failed to update status');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+            currentRequest = null;
+        }
+
+        function formatStatus(status) {
+            const map = { 'new': 'New', 'contacted': 'Contacted', 'quote_sent': 'Quote Sent', 'accepted': 'Accepted', 'rejected': 'Rejected' };
+            return map[status] || status;
+        }
+
+        function formatProjectType(type) {
+            const map = { 'interior': 'Interior', 'exterior': 'Exterior', 'both': 'Interior & Exterior', 'commercial': 'Commercial', 'renovation': 'Renovation', 'new_construction': 'New Construction' };
+            return map[type] || type;
+        }
+
+        function formatPropertyType(type) {
+            const map = { 'house': 'House', 'apartment': 'Apartment', 'villa': 'Villa', 'office': 'Office', 'shop': 'Shop/Showroom', 'warehouse': 'Warehouse', 'other': 'Other' };
+            return map[type] || type;
+        }
+
+        function formatTimeAgo(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            const hours = Math.floor(diff / 3600000);
+            
+            if (hours < 1) return 'Just now';
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            if (days === 1) return 'Yesterday';
+            if (days < 7) return `${days}d ago`;
+            return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        }
+
+        document.getElementById('detailModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+    </script>
+    <script src="/business-manager/components/logo-loader.js"></script>
+</body>
+</html>

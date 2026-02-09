@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Admin Dashboard - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Unified Header Component (Embedded) -->
+<!-- Unified Business Manager Header Component -->
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }
+    
+    .qc-unified-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 1000; }
+    .qc-header-content { max-width: 1400px; margin: 0 auto; padding: 0.75rem 1.5rem; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; }
+    .qc-left-section { display: flex; align-items: center; justify-content: flex-start; }
+    .qc-logo-section { display: flex; align-items: center; justify-content: center; gap: 1rem; }
+    .qc-right-section { display: flex; align-items: center; justify-content: flex-end; }
+    .qc-logo-img { height: 70px; width: auto; max-width: 250px; object-fit: contain; }
+    .qc-brand-info { display: flex; flex-direction: column; }
+    .qc-brand-title { color: white; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+    .qc-brand-tagline { color: rgba(255, 255, 255, 0.9); font-size: 0.75rem; font-weight: 500; }
+    
+    /* Hamburger Button */
+    .qc-hamburger { display: flex; flex-direction: column; gap: 4px; background: rgba(255, 255, 255, 0.15); border: 2px solid rgba(255, 255, 255, 0.3); padding: 8px; border-radius: 8px; cursor: pointer; width: 36px; height: 36px; justify-content: center; align-items: center; }
+    .qc-hamburger:hover { background: rgba(255, 255, 255, 0.25); }
+    .qc-hamburger span { width: 20px; height: 2.5px; background: white; border-radius: 2px; transition: all 0.3s; }
+    .qc-hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+    .qc-hamburger.active span:nth-child(2) { opacity: 0; }
+    .qc-hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(6px, -6px); }
+    
+    /* Mobile Nav Drawer */
+    .qc-nav-mobile { position: fixed; top: 0; left: -280px; width: 280px; height: 100vh; background: linear-gradient(180deg, #667eea 0%, #764ba2 100%); box-shadow: 2px 0 10px rgba(0,0,0,0.3); transition: left 0.3s; z-index: 1001; padding: 1.5rem; overflow-y: auto; }
+    .qc-nav-mobile.open { left: 0; }
+    .qc-nav-mobile-header { display: flex; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.2); }
+    .qc-nav-mobile-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; }
+    .qc-nav-mobile-menu { display: flex; flex-direction: column; gap: 0.5rem; }
+    .qc-nav-mobile-link { padding: 1rem; color: white; text-decoration: none; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 1rem; background: rgba(255,255,255,0.1); transition: all 0.3s; }
+    .qc-nav-mobile-link:hover, .qc-nav-mobile-link.active { background: rgba(255,255,255,0.2); transform: translateX(5px); }
+    
+    /* Overlay */
+    .qc-nav-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1000; }
+    .qc-nav-overlay.show { display: block; }
+    
+    /* Profile Section */
+    .qc-profile-section { position: relative; }
+    .qc-profile-button { background: transparent; border: none; padding: 0; border-radius: 50%; cursor: pointer; display: flex; align-items: center; }
+    .qc-profile-pic { width: 48px; height: 48px; border-radius: 50%; border: none; object-fit: cover; }
+    .qc-profile-initial { width: 48px; height: 48px; border-radius: 50%; background: white; color: #667eea; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.125rem; border: none; }
+    .qc-profile-info { text-align: right; }
+    .qc-profile-name { color: white; font-weight: 600; font-size: 0.875rem; }
+    .qc-profile-role { color: rgba(255,255,255,0.9); font-size: 0.75rem; }
+    
+    /* Dropdown */
+    .qc-profile-dropdown { display: none; position: absolute; right: 0; top: calc(100% + 0.5rem); background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); min-width: 220px; }
+    .qc-profile-dropdown.show { display: block; }
+    .qc-dropdown-item { padding: 0.75rem 1.25rem; color: #333; text-decoration: none; display: flex; align-items: center; gap: 0.75rem; }
+    .qc-dropdown-item:hover { background: #f7fafc; color: #667eea; }
+    .qc-dropdown-divider { height: 1px; background: #e2e8f0; margin: 0.5rem 0; }
+    .qc-dropdown-item.logout { color: #e74c3c; }
+    
+    @media (max-width: 640px) { .qc-brand-title { font-size: 1.125rem; } .qc-brand-tagline { display: none; } .qc-logo-img { height: 50px; } .qc-profile-info { display: none; } }
+</style>
+
+<header class="qc-unified-header">
+    <div class="qc-header-content">
+        <!-- Left: Hamburger -->
+        <div class="qc-left-section">
+            <button class="qc-hamburger" onclick="toggleMobileNav()" id="hamburgerBtn">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+        
+        <!-- Center: Logo -->
+        <div class="qc-logo-section">
+            <img id="headerLogo" src="/company-logo.png" alt="Quality Colours" class="qc-logo-img">
+        </div>
+        
+        <!-- Right: Profile -->
+        <div class="qc-right-section">
+            <div class="qc-profile-section">
+            <button class="qc-profile-button" onclick="toggleProfileDropdown()">
+                <img id="headerProfilePic" src="" alt="Profile" class="qc-profile-pic" style="display:none;">
+                <div id="headerProfileInitial" class="qc-profile-initial">A</div>
+            </button>
+            
+            <div class="qc-profile-dropdown" id="profileDropdown">
+                <a href="/business-manager/admin-profile.html" class="qc-dropdown-item">👤 Edit Profile</a>
+                <a href="/business-manager/admin-settings.html" class="qc-dropdown-item">⚙️ Settings</a>
+                <div class="qc-dropdown-divider"></div>
+                <a href="#" onclick="headerLogout(); return false;" class="qc-dropdown-item logout">🚪 Logout</a>
+            </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="qc-nav-overlay" id="navOverlay" onclick="closeMobileNav()"></div>
+<nav class="qc-nav-mobile" id="mobileNav">
+    <div class="qc-nav-mobile-header">
+        <div class="qc-brand-title" style="font-size:1.25rem;">Quality Colours</div>
+        <button class="qc-nav-mobile-close" onclick="closeMobileNav()">×</button>
+    </div>
+    <div class="qc-nav-mobile-menu">
+        <a href="/business-manager/admin-dashboard.html" class="qc-nav-mobile-link">📊 Dashboard</a>
+        <a href="/business-manager/estimates.html" class="qc-nav-mobile-link">📝 Estimates</a>
+        <a href="/business-manager/admin-customers.html" class="qc-nav-mobile-link">👥 Customers</a>
+        <a href="/business-manager/admin-products.html" class="qc-nav-mobile-link">🎨 Products</a>
+        <a href="/business-manager/admin-branches.html" class="qc-nav-mobile-link">🏪 Branches</a>
+        <a href="/business-manager/admin-staff.html" class="qc-nav-mobile-link">👨‍💼 Staff</a>
+        <a href="/business-manager/admin-reports.html" class="qc-nav-mobile-link">📈 Reports</a>
+        <a href="/business-manager/admin-settings.html" class="qc-nav-mobile-link">⚙️ Settings</a>
+    </div>
+</nav>
+
+<script>
+function toggleMobileNav() { document.getElementById('mobileNav').classList.toggle('open'); document.getElementById('navOverlay').classList.toggle('show'); document.getElementById('hamburgerBtn').classList.toggle('active'); }
+function closeMobileNav() { document.getElementById('mobileNav').classList.remove('open'); document.getElementById('navOverlay').classList.remove('show'); document.getElementById('hamburgerBtn').classList.remove('active'); }
+function toggleProfileDropdown() { document.getElementById('profileDropdown').classList.toggle('show'); }
+document.addEventListener('click', function(e) { const profile = document.querySelector('.qc-profile-section'); if (!profile.contains(e.target)) document.getElementById('profileDropdown').classList.remove('show'); });
+function headerLogout() { if (confirm('Are you sure you want to logout?')) { localStorage.removeItem('auth_token'); localStorage.removeItem('user'); window.location.href = '/business-manager/login.html'; } }
+
+async function loadHeaderInfo() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    // Set profile picture or initial
+    if (user.profile_image_url) {
+        const pic = document.getElementById('headerProfilePic');
+        const initial = document.getElementById('headerProfileInitial');
+        pic.src = user.profile_image_url;
+        pic.style.display = 'block';
+        if (initial) initial.style.display = 'none';
+    } else if (user.full_name || user.name) {
+        const name = user.full_name || user.name;
+        const initial = document.getElementById('headerProfileInitial');
+        if (initial) initial.textContent = name.charAt(0).toUpperCase();
+    }
+}
+
+function highlightActivePage() {
+    const path = window.location.pathname;
+    document.querySelectorAll('.qc-nav-link, .qc-nav-mobile-link').forEach(link => {
+        if (path.includes(link.getAttribute('data-page') || link.href)) link.classList.add('active');
+    });
+}
+
+loadHeaderInfo();
+// Add this to estimates.html after the loadHeaderInfo function
+
+let estimates = [];
+let filteredEstimates = [];
+
+async function loadEstimates() {
+    try {
+        const response = await fetch('/business-manager/api/estimates', { 
+            headers: getAuthHeaders() 
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        estimates = await response.json();
+        filteredEstimates = estimates;
+        
+        renderEstimates();
+        updateStatusCounts();
+        
+        console.log('✅ Loaded', estimates.length, 'estimates');
+    } catch (error) {
+        console.error('❌ Error loading estimates:', error);
+        alert('Failed to load estimates: ' + error.message);
+    }
+}
+
+function renderEstimates() {
+    const tbody = document.getElementById('desktopTableBody');
+    const mobileContainer = document.getElementById('mobileCards');
+    
+    if (!tbody || !mobileContainer) return;
+    
+    if (filteredEstimates.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No estimates found</td></tr>';
+        mobileContainer.innerHTML = '<div class="text-center py-8 text-gray-500">No estimates found</div>';
+        return;
+    }
+    
+    // Desktop table
+    tbody.innerHTML = filteredEstimates.map(est => `
+        <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4">#${est.id}</td>
+            <td class="px-6 py-4">${est.customer_name || 'Unknown'}</td>
+            <td class="px-6 py-4">₹${parseFloat(est.grand_total || 0).toLocaleString('en-IN')}</td>
+            <td class="px-6 py-4">
+                <span class="px-2 py-1 text-xs rounded-full ${getStatusClass(est.status)}">
+                    ${est.status || 'draft'}
+                </span>
+            </td>
+            <td class="px-6 py-4">${new Date(est.estimate_date).toLocaleDateString('en-IN')}</td>
+            <td class="px-6 py-4">
+                <button onclick="viewEstimate(${est.id})" class="text-blue-600 hover:underline">View</button>
+            </td>
+        </tr>
+    `).join('');
+    
+    // Mobile cards
+    mobileContainer.innerHTML = filteredEstimates.map(est => `
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="flex justify-between items-start mb-2">
+                <span class="font-semibold">#${est.id}</span>
+                <span class="px-2 py-1 text-xs rounded-full ${getStatusClass(est.status)}">
+                    ${est.status || 'draft'}
+                </span>
+            </div>
+            <div class="text-sm text-gray-600 mb-2">${est.customer_name || 'Unknown'}</div>
+            <div class="flex justify-between items-center">
+                <span class="font-bold text-purple-600">₹${parseFloat(est.grand_total || 0).toLocaleString('en-IN')}</span>
+                <button onclick="viewEstimate(${est.id})" class="text-blue-600 text-sm">View</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getStatusClass(status) {
+    const classes = {
+        'draft': 'bg-gray-200 text-gray-700',
+        'sent': 'bg-blue-200 text-blue-700',
+        'approved': 'bg-green-200 text-green-700',
+        'rejected': 'bg-red-200 text-red-700',
+        'pending_approval': 'bg-yellow-200 text-yellow-700'
+    };
+    return classes[status] || 'bg-gray-200 text-gray-700';
+}
+
+function updateStatusCounts() {
+    const counts = {
+        all: estimates.length,
+        draft: 0,
+        sent: 0,
+        pending_approval: 0,
+        approved: 0,
+        rejected: 0,
+        converted: 0,
+        expired: 0
+    };
+    
+    estimates.forEach(est => {
+        if (counts[est.status] !== undefined) {
+            counts[est.status]++;
+        }
+    });
+    
+    Object.keys(counts).forEach(status => {
+        const el = document.getElementById(`count-${status}`);
+        if (el) el.textContent = counts[status];
+    });
+}
+
+function filterByStatus(status) {
+    if (status === 'all') {
+        filteredEstimates = estimates;
+    } else {
+        filteredEstimates = estimates.filter(e => e.status === status);
+    }
+    
+    // Update active filter button
+    document.querySelectorAll('.status-filter').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-status="${status}"]`)?.classList.add('active');
+    
+    renderEstimates();
+}
+
+function viewEstimate(id) {
+    window.location.href = `/business-manager/estimate-view.html?id=${id}`;
+}
+
+function createNewEstimate() {
+    window.location.href = '/business-manager/estimate-create-new.html';
+}
+
+// Call on page load
+loadEstimates();
+highlightActivePage();
+</script>
+
+
+
+    <!-- Main Content -->
+    <div class="lg:ml-64 min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <div class="px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800">Estimates Management</h2>
+                        <p class="text-gray-600 text-sm mt-1">Manage all your estimates in one place</p>
+                    </div>
+                    <button onclick="createNewEstimate()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition shadow-lg flex items-center w-full sm:w-auto justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        New Estimate
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Filters & Search -->
+        <div class="p-4 sm:p-6 lg:p-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <!-- Search Bar -->
+                <div class="mb-4">
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="searchInput"
+                            placeholder="Search by estimate #, customer name, or phone..."
+                            class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                        >
+                        <svg class="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Status Filters -->
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="filterByStatus('all')" class="status-filter active px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="all">
+                        All <span id="count-all" class="ml-1 bg-white/20 px-2 py-0.5 rounded-full text-xs">0</span>
+                    </button>
+                    <button onclick="filterByStatus('draft')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="draft">
+                        🆕 Draft <span id="count-draft" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('sent')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="sent">
+                        📧 Sent <span id="count-sent" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('pending_approval')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="pending_approval">
+                        ⏳ Pending <span id="count-pending_approval" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('approved')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="approved">
+                        ✅ Approved <span id="count-approved" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('rejected')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="rejected">
+                        ❌ Rejected <span id="count-rejected" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('converted')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="converted">
+                        📄 Converted <span id="count-converted" class="ml-1">0</span>
+                    </button>
+                    <button onclick="filterByStatus('expired')" class="status-filter px-4 py-2 rounded-lg text-sm font-semibold transition" data-status="expired">
+                        ⌛ Expired <span id="count-expired" class="ml-1">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Estimates Grid (Mobile: Cards, Desktop: Table) -->
+            <div id="estimatesContainer">
+                <!-- Loading state -->
+                <div id="loadingState" class="text-center py-12">
+                    <svg class="inline w-12 h-12 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="mt-4 text-gray-600">Loading estimates...</p>
+                </div>
+
+                <!-- Empty state -->
+                <div id="emptyState" class="hidden text-center py-12 bg-white rounded-xl">
+                    <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">No estimates found</h3>
+                    <p class="text-gray-600 mb-4">Create your first estimate to get started</p>
+                    <button onclick="createNewEstimate()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition">
+                        Create Estimate
+                    </button>
+                </div>
+
+                <!-- Desktop Table -->
+                <div id="desktopTable" class="hidden lg:block bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-max">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estimate #</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="desktopTableBody" class="divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                    </div> <!-- Close overflow-x-auto -->
+                </div> <!-- Close desktopTable -->
+
+                <!-- Mobile Cards -->
+                <div id="mobileCards" class="lg:hidden space-y-4">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions Menu Modal -->
+    <div id="actionsModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeActionsModal()"></div>
+            
+            <!-- Modal content -->
+            <div class="inline-block align-bottom bg-white rounded-t-2xl sm:rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-bold" id="actionsModalTitle">Estimate Actions</h3>
+                        <button onclick="closeActionsModal()" class="text-white hover:text-gray-200">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Actions List -->
+                <div id="actionsModalBody" class="divide-y divide-gray-200">
+                    <!-- Actions will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="estimates.js"></script>
+</body>
+</html>

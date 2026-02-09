@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/business-manager/universal-nav-loader-v3.js"></script>
+    <style>
+        /* Perfect Square Quick Action Buttons - 3 per row */
+        .quick-actions-section {
+            margin: 2.5rem 0;
+        }
+        
+        .section-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .quick-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.75rem;
+        }
+        
+        .quick-action-btn {
+            aspect-ratio: 1 / 1; /* Perfect square */
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid transparent;
+        }
+        
+        .quick-action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: var(--btn-color, #667eea);
+            border-radius: 18px 18px 0 0;
+        }
+        
+        .quick-action-btn:hover {
+            transform: translateY(-12px) scale(1.02);
+            box-shadow: 0 20px 32px rgba(0,0,0,0.18);
+            border-color: var(--btn-color, #667eea);
+        }
+        
+        .quick-action-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1.25rem;
+            transition: transform 0.3s;
+        }
+        
+        .quick-action-btn:hover .quick-action-icon {
+            transform: scale(1.15);
+        }
+        
+        .quick-action-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.65rem;
+        }
+        
+        .quick-action-desc {
+            font-size: 0.9rem;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        /* Data Cards - 2 per row, perfect squares */
+        .data-cards-section {
+            margin: 3rem 0;
+        }
+        
+        .data-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.75rem;
+        }
+        
+        .data-card {
+            aspect-ratio: 1 / 1; /* Perfect square */
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .data-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 32px rgba(0,0,0,0.15);
+            border-color: var(--card-color);
+        }
+        
+        .data-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .data-card-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            transition: transform 0.3s;
+        }
+        
+        .data-card:hover .data-card-icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+        
+        .data-card-value {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin: 1.5rem 0;
+            line-height: 1;
+        }
+        
+        .data-card-label {
+            font-size: 1rem;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Recent Activity Section */
+        .recent-activity {
+            margin: 3rem 0;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            padding: 2rem;
+        }
+        
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #f3f4f6;
+        }
+        
+        .activity-item {
+            padding: 1.25rem;
+            border-radius: 12px;
+            transition: all 0.2s;
+            margin-bottom: 0.75rem;
+        }
+        
+        .activity-item:hover {
+            background: #f9fafb;
+            transform: translateX(8px);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .quick-actions-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .quick-actions-grid,
+            .data-cards-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .section-title {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    
+    <!-- Main Content Wrapper -->
+    <div class="min-h-screen" style="padding-top: 1.5rem; padding-bottom: 3rem;">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            <!-- Page Header -->
+            <div class="mb-10">
+                <h1 class="text-4xl font-bold text-gray-900 mb-2">Dashboard</h1>
+                <p class="text-lg text-gray-600">Welcome back! Here's your business overview.</p>
+            </div>
+            
+            <!-- Quick Actions Section - 3 Perfect Squares per Row -->
+            <div class="quick-actions-section">
+                <h2 class="section-title">
+                    <span>⚡</span>
+                    <span>Quick Actions</span>
+                </h2>
+                
+                <div class="quick-actions-grid">
+                    <!-- Create Estimate -->
+                    <a href="/business-manager/estimate-create-new.html" class="quick-action-btn" style="--btn-color: #667eea;">
+                        <div class="quick-action-icon">📝</div>
+                        <div class="quick-action-title">Create Estimate</div>
+                        <div class="quick-action-desc">New quotation</div>
+                    </a>
+                    
+                    <!-- Manage Products -->
+                    <a href="/business-manager/admin-products.html" class="quick-action-btn" style="--btn-color: #10b981;">
+                        <div class="quick-action-icon">🎨</div>
+                        <div class="quick-action-title">Manage Products</div>
+                        <div class="quick-action-desc">Add or edit</div>
+                    </a>
+                    
+                    <!-- Customers -->
+                    <a href="/business-manager/admin-customers.html" class="quick-action-btn" style="--btn-color: #0ea5e9;">
+                        <div class="quick-action-icon">👥</div>
+                        <div class="quick-action-title">Customers</div>
+                        <div class="quick-action-desc">Manage database</div>
+                    </a>
+                    
+                    <!-- Clock In -->
+                    <a href="/business-manager/staff/clock-in.html" class="quick-action-btn" style="--btn-color: #10b981;">
+                        <div class="quick-action-icon">🟢</div>
+                        <div class="quick-action-title">Clock In</div>
+                        <div class="quick-action-desc">Start work day</div>
+                    </a>
+                    
+                    <!-- Clock Out -->
+                    <a href="/business-manager/staff/clock-out.html" class="quick-action-btn" style="--btn-color: #ef4444;">
+                        <div class="quick-action-icon">🔴</div>
+                        <div class="quick-action-title">Clock Out</div>
+                        <div class="quick-action-desc">End work day</div>
+                    </a>
+                    
+                    <!-- Reports -->
+                    <a href="/business-manager/admin-reports.html" class="quick-action-btn" style="--btn-color: #f59e0b;">
+                        <div class="quick-action-icon">📈</div>
+                        <div class="quick-action-title">Reports</div>
+                        <div class="quick-action-desc">View analytics</div>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Dashboard Data Cards - 2 Perfect Squares per Row -->
+            <div class="data-cards-section">
+                <h2 class="section-title">
+                    <span>📊</span>
+                    <span>Key Metrics</span>
+                </h2>
+                
+                <div class="data-cards-grid">
+                    <!-- Total Estimates -->
+                    <div class="data-card" style="--card-color: #7c3aed;">
+                        <div class="data-card-header">
+                            <div class="data-card-icon" style="background: #ede9fe; color: #7c3aed;">
+                                📋
+                            </div>
+                        </div>
+                        <div>
+                            <div class="data-card-value" id="totalEstimates">0</div>
+                            <div class="data-card-label">Total Estimates</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Total Products -->
+                    <div class="data-card" style="--card-color: #16a34a;">
+                        <div class="data-card-header">
+                            <div class="data-card-icon" style="background: #dcfce7; color: #16a34a;">
+                                🎨
+                            </div>
+                        </div>
+                        <div>
+                            <div class="data-card-value" id="totalProducts">0</div>
+                            <div class="data-card-label">Products</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Total Customers -->
+                    <div class="data-card" style="--card-color: #2563eb;">
+                        <div class="data-card-header">
+                            <div class="data-card-icon" style="background: #dbeafe; color: #2563eb;">
+                                👥
+                            </div>
+                        </div>
+                        <div>
+                            <div class="data-card-value" id="totalCustomers">0</div>
+                            <div class="data-card-label">Customers</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Today's Revenue -->
+                    <div class="data-card" style="--card-color: #d97706;">
+                        <div class="data-card-header">
+                            <div class="data-card-icon" style="background: #fef3c7; color: #d97706;">
+                                💰
+                            </div>
+                        </div>
+                        <div>
+                            <div class="data-card-value" id="todayRevenue">₹0.00</div>
+                            <div class="data-card-label">Today's Revenue</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="recent-activity">
+                <div class="activity-header">
+                    <h2 class="section-title" style="margin: 0;">
+                        <span>📌</span>
+                        <span>Recent Estimates</span>
+                    </h2>
+                    <a href="/business-manager/estimates.html" class="text-blue-600 hover:text-blue-800 font-semibold">
+                        View All →
+                    </a>
+                </div>
+                
+                <div id="recentEstimates">
+                    <p class="text-center text-gray-500 py-8">Loading recent estimates...</p>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        // Wait for navigation to load
+        document.addEventListener('navigationLoaded', initDashboard);
+        
+        // Fallback: init after delay if event doesn't fire
+        setTimeout(initDashboard, 1000);
+        
+        let dashboardInitialized = false;
+        
+        function initDashboard() {
+            if (dashboardInitialized) return;
+            dashboardInitialized = true;
+            
+            console.log('🎯 Initializing dashboard...');
+            loadDashboardData();
+        }
+        
+        // Load Dashboard Data
+        async function loadDashboardData() {
+            try {
+                const headers = window.getAuthHeaders ? window.getAuthHeaders() : {
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                    'Content-Type': 'application/json'
+                };
+                
+                // Load estimates
+                try {
+                    const estimatesRes = await fetch('/business-manager/api/estimates', { headers });
+                    if (estimatesRes.ok) {
+                        const estimates = await estimatesRes.json();
+                        document.getElementById('totalEstimates').textContent = estimates.length || 0;
+                        displayRecentEstimates(estimates.slice(0, 5));
+                    }
+                } catch (e) {
+                    console.error('Error loading estimates:', e);
+                }
+                
+                // Load products
+                try {
+                    const productsRes = await fetch('/business-manager/api/products', { headers });
+                    if (productsRes.ok) {
+                        const products = await productsRes.json();
+                        document.getElementById('totalProducts').textContent = products.length || 0;
+                    }
+                } catch (e) {
+                    console.error('Error loading products:', e);
+                }
+                
+                // Load customers
+                try {
+                    const customersRes = await fetch('/business-manager/api/customers', { headers });
+                    if (customersRes.ok) {
+                        const customers = await customersRes.json();
+                        document.getElementById('totalCustomers').textContent = customers.length || 0;
+                    }
+                } catch (e) {
+                    console.error('Error loading customers:', e);
+                }
+                
+                console.log('✅ Dashboard data loaded');
+                
+            } catch (error) {
+                console.error('❌ Error loading dashboard data:', error);
+            }
+        }
+        
+        function displayRecentEstimates(estimates) {
+            const container = document.getElementById('recentEstimates');
+            
+            if (!estimates || estimates.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">No estimates yet. Create your first estimate!</p>';
+                return;
+            }
+            
+            container.innerHTML = estimates.map(est => `
+                <div class="activity-item flex items-center justify-between">
+                    <div class="flex-1">
+                        <div class="font-semibold text-gray-900 text-lg">${est.customer_name || 'Unknown Customer'}</div>
+                        <div class="text-sm text-gray-600 mt-1">Estimate #${est.estimate_number || est.id}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xl font-bold text-gray-900">₹${est.total_amount || '0.00'}</div>
+                        <span class="inline-block mt-1 px-3 py-1 text-xs font-semibold rounded-full ${
+                            est.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                        }">
+                            ${est.status || 'pending'}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>

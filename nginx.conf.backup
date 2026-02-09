@@ -1,0 +1,120 @@
+server
+{
+    listen 80;
+    listen 443 ssl http2;
+    listen 443 quic;
+    server_name act.qcpaintshop.com;
+    index index.php index.html index.htm default.php default.htm default.html;
+    root /www/wwwroot/act.qcpaintshop.com/public;
+    include /www/server/panel/vhost/nginx/extension/act.qcpaintshop.com/*.conf;
+
+    # GZIP compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
+    gzip_comp_level 6;
+    gzip_buffers 16 8k;
+    gzip_http_version 1.1;
+
+    # Browser cache for static assets (exclude business-manager)
+    location ~* ^(?!/business-manager).*\.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # CUSTOMER-PORTAL: Allow PHP access
+    location ~* ^/customer-portal/.+\.php$ {
+        allow all;
+        include enable-php-81.conf;
+        try_files $uri =404;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # CUSTOMER-PORTAL: Main routing
+    location /customer-portal {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        try_files $uri $uri/ /customer-portal/index.php?$query_string;
+        index index.php index.html;
+    }
+
+    # BUSINESS-MANAGER: Serve static files directly, proxy API only
+    location /business-manager/ {
+        alias /www/wwwroot/act.qcpaintshop.com/publicbusiness-manager/public/;
+        try_files $uri $uri/ /business-manager/index.html;
+        
+        location ~ ^/business-manager/api/ {
+            proxy_pass http://localhost:3001;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+    }
+
+    # SECURITY: Deny direct PHP access
+    location ~* \.php$ {
+        deny all;
+        return 404;
+    }
+    
+    location ~* ^/(index|api|webhook)\.php$ {
+        allow all;
+        include enable-php-81.conf;
+    }
+
+    # SECURITY: Deny access to sensitive directories
+    location ~* /(config|app|storage|vendor|tests)/ {
+        deny all;
+        return 404;
+    }
+
+    # Main location block
+    location / {
+        try_files $uri /index.php?$query_string;
+    }
+    
+    # SECURITY: Force HTTPS
+    if ($scheme = http) {
+        return 301 https://$server_name$request_uri;
+    }
+
+    #CERT-APPLY-CHECK--START
+    include /www/server/panel/vhost/nginx/well-known/act.qcpaintshop.com.conf;
+    #CERT-APPLY-CHECK--END
+
+    #SSL-START
+    ssl_certificate    /www/server/panel/vhost/cert/act.qcpaintshop.com/fullchain.pem;
+    ssl_certificate_key    /www/server/panel/vhost/cert/act.qcpaintshop.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384;
+    ssl_prefer_server_ciphers on;
+    ssl_session_tickets on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header Alt-Svc 'quic=":443"; h3=":443"; h3-29=":443"';
+    error_page 497  https://$host$request_uri;
+
+    # SECURITY: Add security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;" always;
+    #SSL-END
+
+    #PHP-INFO-START
+    include enable-php-81.conf;
+    #PHP-INFO-END
+
+    access_log  /www/wwwlogs/act.qcpaintshop.com.log;
+    error_log  /www/wwwlogs/act.qcpaintshop.com.error.log;
+}

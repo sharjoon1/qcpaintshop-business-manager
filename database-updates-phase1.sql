@@ -1,0 +1,249 @@
+-- ========================================
+-- PHASE 1: DATABASE SCHEMA UPDATES
+-- Quality Colours Business Manager
+-- Date: 2026-02-07
+-- ========================================
+
+USE qc_business_manager;
+
+-- ========================================
+-- 1. CREATE USERS TABLE (Authentication)
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(255),
+    phone VARCHAR(20),
+    role ENUM('admin', 'staff', 'customer', 'guest') DEFAULT 'guest',
+    branch_id INT NULL,
+    status ENUM('active', 'inactive', 'pending_approval') DEFAULT 'pending_approval',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_login DATETIME NULL,
+    profile_image_url VARCHAR(500) NULL,
+    -- FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,  -- Will add later when branches table exists
+    INDEX idx_role (role),
+    INDEX idx_status (status),
+    INDEX idx_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- 2. ENHANCE ESTIMATES TABLE
+-- ========================================
+
+-- Add status management
+ALTER TABLE estimates 
+ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'draft' AFTER grand_total;
+
+-- Add assignment & approval tracking
+ALTER TABLE estimates
+ADD COLUMN IF NOT EXISTS created_by_user_id INT NULL AFTER status,
+ADD COLUMN IF NOT EXISTS assigned_to_staff_id INT NULL AFTER created_by_user_id,
+ADD COLUMN IF NOT EXISTS approved_by_admin_id INT NULL AFTER assigned_to_staff_id,
+ADD COLUMN IF NOT EXISTS approved_at DATETIME NULL AFTER approved_by_admin_id;
+
+-- Add Zoho integration tracking
+ALTER TABLE estimates
+ADD COLUMN IF NOT EXISTS converted_invoice_id VARCHAR(100) NULL AFTER approved_at,
+ADD COLUMN IF NOT EXISTS converted_at DATETIME NULL AFTER converted_invoice_id;
+
+-- Add validity & expiry
+ALTER TABLE estimates
+ADD COLUMN IF NOT EXISTS valid_until DATE NULL AFTER converted_at,
+ADD COLUMN IF NOT EXISTS is_expired BOOLEAN DEFAULT 0 AFTER valid_until;
+
+-- Add column visibility settings (JSON)
+ALTER TABLE estimates
+ADD COLUMN IF NOT EXISTS column_visibility JSON NULL AFTER is_expired;
+
+-- Add update tracking
+ALTER TABLE estimates
+ADD COLUMN IF NOT EXISTS last_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER column_visibility;
+
+-- Add foreign keys for new columns
+ALTER TABLE estimates
+ADD FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+ADD FOREIGN KEY (assigned_to_staff_id) REFERENCES users(id) ON DELETE SET NULL,
+ADD FOREIGN KEY (approved_by_admin_id) REFERENCES users(id) ON DELETE SET NULL;
+
+-- Add indexes for performance
+ALTER TABLE estimates
+ADD INDEX idx_status (status),
+ADD INDEX idx_created_by (created_by_user_id),
+ADD INDEX idx_assigned_to (assigned_to_staff_id),
+ADD INDEX idx_estimate_date (estimate_date),
+ADD INDEX idx_grand_total (grand_total);
+
+-- ========================================
+-- 3. CREATE ESTIMATE STATUS HISTORY TABLE
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS estimate_status_history (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    estimate_id INT NOT NULL,
+    old_status VARCHAR(50) NULL,
+    new_status VARCHAR(50) NOT NULL,
+    changed_by_user_id INT NOT NULL,
+    reason TEXT NULL,
+    notes TEXT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (estimate_id) REFERENCES estimates(id) ON DELETE CASCADE,
+    FOREIGN KEY (changed_by_user_id) REFERENCES users(id),
+    INDEX idx_estimate_id (estimate_id),
+    INDEX idx_timestamp (timestamp)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- 4. CREATE USER SESSIONS TABLE
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    session_token VARCHAR(255) UNIQUE NOT NULL,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    last_activity DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_session_token (session_token),
+    INDEX idx_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- 5. CREATE ADMIN USER (Sharjoon)
+-- ========================================
+
+-- Password: admin123 (CHANGE THIS AFTER FIRST LOGIN!)
+-- BCrypt hash for 'admin123'
+INSERT INTO users (username, email, password_hash, full_name, phone, role, status, last_login)
+VALUES (
+    'sharjoon',
+    'sharjoon@qcpaintshop.com',
+    '$2b$10$YourBcryptHashHere',  -- Will be generated by Node.js
+    'Sharjoon',
+    '+917418831122',
+    'admin',
+    'active',
+    NULL
+) ON DUPLICATE KEY UPDATE
+    role = 'admin',
+    status = 'active';
+
+-- ========================================
+-- 6. UPDATE EXISTING ESTIMATES
+-- ========================================
+
+-- Set default column visibility for existing estimates
+UPDATE estimates
+SET column_visibility = JSON_OBJECT(
+    'mix_info', true,
+    'breakdown', true,
+    'color_cost', true,
+    'qty_area', true
+)
+WHERE column_visibility IS NULL;
+
+-- Set valid_until to 30 days from estimate_date for existing estimates
+UPDATE estimates
+SET valid_until = DATE_ADD(estimate_date, INTERVAL 30 DAY)
+WHERE valid_until IS NULL;
+
+-- Mark old estimates as expired (>30 days)
+UPDATE estimates
+SET is_expired = 1,
+    status = 'expired'
+WHERE estimate_date < DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+  AND status = 'draft';
+
+-- ========================================
+-- 7. CREATE ESTIMATE SETTINGS TABLE
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS estimate_settings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    default_column_visibility JSON,
+    default_show_gst_breakdown BOOLEAN DEFAULT 0,
+    default_valid_days INT DEFAULT 30,
+    auto_assign_to_creator BOOLEAN DEFAULT 1,
+    email_template TEXT,
+    whatsapp_template TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_settings (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- 8. INSERT DEFAULT ADMIN SETTINGS
+-- ========================================
+
+INSERT INTO estimate_settings (user_id, default_column_visibility, default_show_gst_breakdown, default_valid_days)
+SELECT id, JSON_OBJECT('mix_info', true, 'breakdown', true, 'color_cost', true, 'qty_area', true), 0, 30
+FROM users WHERE role = 'admin'
+ON DUPLICATE KEY UPDATE
+    default_column_visibility = JSON_OBJECT('mix_info', true, 'breakdown', true, 'color_cost', true, 'qty_area', true);
+
+-- ========================================
+-- 9. CREATE AUDIT LOG TABLE
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT,
+    action VARCHAR(100) NOT NULL,
+    table_name VARCHAR(50),
+    record_id INT,
+    old_value JSON,
+    new_value JSON,
+    ip_address VARCHAR(45),
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_user_id (user_id),
+    INDEX idx_action (action),
+    INDEX idx_timestamp (timestamp),
+    INDEX idx_table_record (table_name, record_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- 10. GRANT PERMISSIONS
+-- ========================================
+
+-- Ensure qc_admin has all necessary permissions
+GRANT ALL PRIVILEGES ON qc_business_manager.* TO 'qc_admin'@'localhost';
+FLUSH PRIVILEGES;
+
+-- ========================================
+-- VERIFICATION QUERIES
+-- ========================================
+
+-- Check if all tables created
+SELECT 
+    'users' as table_name,
+    COUNT(*) as row_count
+FROM users
+UNION ALL
+SELECT 'estimate_status_history', COUNT(*) FROM estimate_status_history
+UNION ALL
+SELECT 'user_sessions', COUNT(*) FROM user_sessions
+UNION ALL
+SELECT 'estimate_settings', COUNT(*) FROM estimate_settings
+UNION ALL
+SELECT 'audit_log', COUNT(*) FROM audit_log;
+
+-- Check estimates table structure
+DESCRIBE estimates;
+
+-- Check admin user exists
+SELECT id, username, email, role, status FROM users WHERE role = 'admin';
+
+-- ========================================
+-- SUCCESS MESSAGE
+-- ========================================
+
+SELECT '✅ Phase 1 Database Setup Complete!' as message,
+       'Admin user created: sharjoon' as admin_user,
+       'Next: Build authentication system' as next_step;
