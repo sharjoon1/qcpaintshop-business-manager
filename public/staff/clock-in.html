@@ -401,20 +401,10 @@
 
             photoBlob = blob;
 
-            // Show preview
+            // Show preview using data URL (no CSP issues)
             const previewImage = document.getElementById('previewImage');
-            const previewUrl = URL.createObjectURL(blob);
-            previewImage.src = previewUrl;
-
-            // Ensure image loads properly
-            previewImage.onload = function() {
-                console.log('Preview image loaded successfully');
-            };
-
-            previewImage.onerror = function() {
-                alert('Failed to display photo preview. Please try again.');
-                console.error('Preview image failed to load');
-            };
+            previewImage.src = canvas.toDataURL('image/jpeg', 0.8);
+            console.log('Preview set with data URL');
 
             document.getElementById('cameraPreview').style.display = 'none';
             document.getElementById('photoPreview').style.display = 'block';
