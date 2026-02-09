@@ -36,7 +36,7 @@ function requirePermission(module, action) {
 
             // Get user from session
             const [sessions] = await pool.query(
-                `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email
+                `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
                  FROM user_sessions s 
                  JOIN users u ON s.user_id = u.id 
                  WHERE s.session_token = ? AND s.expires_at > NOW()`,
@@ -137,7 +137,7 @@ function requireAnyPermission(permissions) {
             }
 
             const [sessions] = await pool.query(
-                `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email
+                `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
                  FROM user_sessions s 
                  JOIN users u ON s.user_id = u.id 
                  WHERE s.session_token = ? AND s.expires_at > NOW()`,
@@ -241,7 +241,7 @@ async function requireAuth(req, res, next) {
         }
 
         const [sessions] = await pool.query(
-            `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email
+            `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name, u.email, u.branch_id
              FROM user_sessions s 
              JOIN users u ON s.user_id = u.id 
              WHERE s.session_token = ? AND s.expires_at > NOW()`,
@@ -261,6 +261,7 @@ async function requireAuth(req, res, next) {
             id: user.user_id,
             username: user.username,
             role: user.role,
+            branch_id: user.branch_id || null,
             full_name: user.full_name,
             email: user.email
         };
