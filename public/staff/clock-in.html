@@ -370,53 +370,96 @@
 
         // Capture photo
         function capturePhoto() {
-            const video = document.getElementById('video');
-            const canvas = document.getElementById('canvas');
-            const context = canvas.getContext('2d');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
 
-            // Set canvas size to video size
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+    // Validate video is ready
+    if (!video.videoWidth || !video.videoHeight) {
+        alert('Camera is not ready yet. Please wait a moment and try again.');
+        console.error('Video dimensions not available:', video.videoWidth, video.videoHeight);
+        return;
+    }
 
-            // Draw video frame to canvas
-            context.drawImage(video, 0, 0);
+    try {
+        // Set canvas size to video size
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-            // Convert to blob
-            canvas.toBlob((blob) => {
-                photoBlob = blob;
+        // Draw video frame to canvas
+        context.drawImage(video, 0, 0);
 
-                // Show preview
-                const previewImage = document.getElementById('previewImage');
-                previewImage.src = URL.createObjectURL(blob);
-                
-                document.getElementById('cameraPreview').style.display = 'none';
-                document.getElementById('photoPreview').style.display = 'block';
+        // Convert to blob with error handling
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                alert('Failed to capture photo. Please try again.');
+                console.error('Blob creation failed');
+                return;
+            }
 
-                // Mark step 2 complete
-                document.getElementById('step2').classList.add('complete');
-                document.getElementById('step2Status').textContent = 'Complete';
+            photoBlob = blob;
 
-                // Show submit button
-                document.getElementById('submitCard').style.display = 'block';
+            // Show preview
+            const previewImage = document.getElementById('previewImage');
+            const previewUrl = URL.createObjectURL(blob);
+            previewImage.src = previewUrl;
 
-                // Stop camera
-                if (videoStream) {
-                    videoStream.getTracks().forEach(track => track.stop());
-                }
-            }, 'image/jpeg', 0.8);
-        }
+            // Ensure image loads properly
+            previewImage.onload = function() {
+                console.log('Preview image loaded successfully');
+            };
 
+            previewImage.onerror = function() {
+                alert('Failed to display photo preview. Please try again.');
+                console.error('Preview image failed to load');
+            };
+
+            document.getElementById('cameraPreview').style.display = 'none';
+            document.getElementById('photoPreview').style.display = 'block';
+
+            // Mark step 2 complete
+            document.getElementById('step2').classList.add('complete');
+            document.getElementById('step2Status').textContent = 'Complete';
+
+            // Show submit button
+            document.getElementById('submitCard').style.display = 'block';
+
+            // Stop camera
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+            }
+
+            console.log('Photo captured successfully, blob size:', blob.size);
+        }, 'image/jpeg', 0.8);
+
+    } catch (error) {
+        alert('Error capturing photo: ' + error.message);
+        console.error('capturePhoto error:', error);
+    }
+}
         // Retake photo
         function retakePhoto() {
-            photoBlob = null;
-            document.getElementById('cameraPreview').style.display = 'block';
-            document.getElementById('photoPreview').style.display = 'none';
-            document.getElementById('step2').classList.remove('complete');
-            document.getElementById('step2Status').textContent = 'Waiting...';
-            document.getElementById('submitCard').style.display = 'none';
-            startCamera();
-        }
+    photoBlob = null;
 
+    // Clean up old preview URL to prevent memory leaks
+    const previewImage = document.getElementById('previewImage');
+    if (previewImage.src) {
+        URL.revokeObjectURL(previewImage.src);
+        previewImage.src = '';
+    }
+
+    document.getElementById('photoPreview').style.display = 'none';
+    document.getElementById('cameraPreview').style.display = 'block';
+    document.getElementById('submitCard').style.display = 'none';
+
+    document.getElementById('step2').classList.remove('complete');
+    document.getElementById('step2Status').textContent = 'Pending';
+
+    // Restart camera
+    startCamera();
+
+    console.log('Photo retake initiated');
+}
         // Submit clock in
         async function submitClockIn() {
             if (!latitude || !longitude) {
