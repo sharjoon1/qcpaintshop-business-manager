@@ -59,7 +59,8 @@ function requirePermission(module, action) {
                 username: user.username,
                 role: user.role,
                 full_name: user.full_name,
-                email: user.email
+                email: user.email,
+                branch_id: user.branch_id || null
             };
 
             // Admin role has all permissions

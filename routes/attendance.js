@@ -923,8 +923,7 @@ router.get('/photo/:id', requireAuth, async (req, res) => {
     try {
         const photoId = req.params.id;
         const userId = req.user.id;
-        const userRole = req.user.role_name;
-        
+        const userRole = req.user.role;        
         // Get photo record
         const [photos] = await pool.query(
             'SELECT * FROM attendance_photos WHERE id = ?',
