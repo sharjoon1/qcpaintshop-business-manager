@@ -277,9 +277,12 @@
 
         // Initialize
         async function init() {
-            updateDateTime();
-            setInterval(updateDateTime, 1000);
             await loadTodayAttendance();
+            
+            // Auto-refresh every 30 seconds to detect clock-out
+            setInterval(() => {
+                loadTodayAttendance();
+            }, 30000);
         }
 
         // Update date and time
@@ -318,7 +321,10 @@
 
                 document.getElementById('loadingState').style.display = 'none';
 
-                if (data.has_clocked_in) {
+                // Check if already clocked out today
+                if (data.data && data.data.clock_out_time) {
+                    showClockedOutState(data.data);
+                } else if (data.has_clocked_in) {
                     showClockedInState(data.data);
                 } else {
                     showNotClockedInState(data.shop_hours);
@@ -346,6 +352,41 @@
                 document.getElementById('shopOpenTime').textContent = formatTime(shopHours.open_time);
                 document.getElementById('expectedHours').textContent = `${shopHours.expected_hours} hours`;
             }
+        }
+
+
+        // Show clocked out state
+        function showClockedOutState(data) {
+            // Stop timer if running
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
+            // Hide other states
+            document.getElementById('clockedInState').style.display = 'none';
+            document.getElementById('notClockedInState').style.display = 'none';
+            
+            // Show completion message
+            document.getElementById('loadingState').innerHTML = `
+                <div style="text-align: center; padding: 40px; max-width: 400px; margin: 0 auto;">
+                    <div style="font-size: 64px; margin-bottom: 24px;">✅</div>
+                    <h2 style="color: #10b981; margin-bottom: 16px; font-size: 24px; font-weight: 700;">Day Complete!</h2>
+                    <p style="color: #6b7280; margin-bottom: 24px;">You clocked out at ${new Date(data.clock_out_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <div style="background: #f3f4f6; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <span style="color: #6b7280;">Clock In:</span>
+                            <span style="font-weight: 600;">${new Date(data.clock_in_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #6b7280;">Clock Out:</span>
+                            <span style="font-weight: 600;">${new Date(data.clock_out_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    </div>
+                    <p style="color: #6b7280; font-size: 14px;">See you tomorrow! 👋</p>
+                </div>
+            `;
+            document.getElementById('loadingState').style.display = 'block';
         }
 
         // Show clocked in state
