@@ -70,7 +70,6 @@ function requirePermission(module, action) {
 
             // Staff role: check if they have permission via role_permissions table
             if (user.role === 'staff') {
-                // Try to get role_id from roles table if it exists
                 const [roleInfo] = await pool.query(
                     `SELECT id FROM roles WHERE name = 'staff' LIMIT 1`
                 );
