@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Permission Request - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -170,7 +172,7 @@
             text-align: center;
         }
     </style>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body>
     <div class="container">
@@ -330,7 +332,7 @@
             try {
                 const token = localStorage.getItem('auth_token');
                 if (!token) {
-                    window.location.href = '/business-manager/login.html';
+                    window.location.href = '/login.html';
                     return;
                 }
 
@@ -342,7 +344,7 @@
                     reason: document.getElementById('reason').value
                 };
 
-                const response = await fetch('/business-manager/api/attendance/permission/request', {
+                const response = await fetch('/api/attendance/permission/request', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -388,14 +390,14 @@
             try {
                 const token = localStorage.getItem('auth_token');
                 if (!token) {
-                    window.location.href = '/business-manager/login.html';
+                    window.location.href = '/login.html';
                     return;
                 }
 
                 document.getElementById('requestsLoading').style.display = 'block';
                 document.getElementById('requestsEmpty').style.display = 'none';
 
-                const response = await fetch('/business-manager/api/attendance/permission/my-requests?limit=50', {
+                const response = await fetch('/api/attendance/permission/my-requests?limit=50', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }

@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Profile - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
 
@@ -142,14 +144,14 @@
                 // Check authentication
                 const authToken = localStorage.getItem('auth_token');
                 if (!authToken) {
-                    window.location.href = '/business-manager/login.html';
+                    window.location.href = '/login.html';
                     return;
                 }
 
                 // Get user from localStorage (set during login)
                 const storedUser = localStorage.getItem('user');
                 if (!storedUser) {
-                    window.location.href = '/business-manager/login.html';
+                    window.location.href = '/login.html';
                     return;
                 }
                 
@@ -274,7 +276,7 @@
             }
             
             try {
-                const response = await fetch(`/business-manager/api/users/${userId}`, {
+                const response = await fetch(`/api/users/${userId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(profileData)
@@ -329,7 +331,7 @@
             }
             
             try {
-                const response = await fetch('/business-manager/api/users/change-password', {
+                const response = await fetch('/api/users/change-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -343,7 +345,7 @@
                     alert('✅ Password changed successfully! Please login again.');
                     localStorage.removeItem('auth_token');
                     localStorage.removeItem('user');
-                    window.location.href = '/business-manager/login.html';
+                    window.location.href = '/login.html';
                 } else {
                     const error = await response.json();
                     alert('❌ Failed to change password: ' + (error.error || 'Incorrect current password'));
@@ -357,6 +359,6 @@
         // Initialize
         loadProfile();
     </script>
-    <script src="/business-manager/components/logo-loader.js"></script>
+    <script src="/components/logo-loader.js"></script>
 </body>
 </html>

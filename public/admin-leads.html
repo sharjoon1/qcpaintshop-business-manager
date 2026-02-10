@@ -8,8 +8,9 @@
     <meta http-equiv="Expires" content="0">
     <title>Lead Management - Quality Colours Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
-    <script src="/business-manager/js/auth-helper.js"></script>
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <style>
         .status-new { background: #dbeafe; color: #1e40af; }
         .status-contacted { background: #fef3c7; color: #92400e; }
@@ -287,7 +288,7 @@
     </div>
 
     <script>
-        const API_BASE = '/business-manager/api';
+        const API_BASE = '/api';
         let leads = [];
         let editingLeadId = null;
         let users = [];

@@ -11,7 +11,7 @@ function getAuthHeaders() {
     const token = localStorage.getItem('auth_token');
     if (!token) {
         console.warn('⚠️ No auth token found - redirecting to login');
-        window.location.href = '/business-manager/login.html';
+        window.location.href = '/login.html';
         return {};
     }
     return {
@@ -49,7 +49,7 @@ function getCurrentUser() {
 function logout() {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
-    window.location.href = '/business-manager/login.html';
+    window.location.href = '/login.html';
 }
 
 /**
@@ -89,11 +89,24 @@ async function apiRequest(url, options = {}) {
     }
 }
 
+/**
+ * Check authentication and redirect to login if not authenticated.
+ * Call this at the top of every protected page.
+ */
+function checkAuthOrRedirect() {
+    if (!isAuthenticated()) {
+        window.location.href = '/login.html';
+        return false;
+    }
+    return true;
+}
+
 // Expose functions globally
 window.getAuthHeaders = getAuthHeaders;
 window.isAuthenticated = isAuthenticated;
 window.getCurrentUser = getCurrentUser;
 window.logout = logout;
 window.apiRequest = apiRequest;
+window.checkAuthOrRedirect = checkAuthOrRedirect;
 
 console.log('✅ Auth helper loaded');

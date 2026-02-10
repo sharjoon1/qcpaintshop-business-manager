@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - Quality Colours Business Manager</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
 
@@ -354,7 +356,7 @@
             
             try {
                 const token = getAuthToken();
-                const response = await fetch('/business-manager/api/upload/logo', {
+                const response = await fetch('/api/upload/logo', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -389,7 +391,7 @@
         async function loadSettings() {
             try {
                 const token = getAuthToken();
-                const response = await fetch('/business-manager/api/settings', {
+                const response = await fetch('/api/settings', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -458,7 +460,7 @@
             
             try {
                 const token = getAuthToken();
-                const response = await fetch('/business-manager/api/settings', {
+                const response = await fetch('/api/settings', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -496,7 +498,7 @@
             };
             
             try {
-                const response = await fetch('/business-manager/api/settings', {
+                const response = await fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(taxData)
@@ -524,7 +526,7 @@
             };
             
             try {
-                const response = await fetch('/business-manager/api/settings', {
+                const response = await fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(estimateData)
@@ -543,12 +545,12 @@
 
         // Check authentication
         if (!localStorage.getItem('auth_token')) {
-            window.location.href = '/business-manager/login.html';
+            window.location.href = '/login.html';
         }
         
         // Load settings on page load
         loadSettings();
     </script>
-    <script src="/business-manager/components/logo-loader.js"></script>
+    <script src="/components/logo-loader.js"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@ console.log('🔄 Header loader starting...');
     }
     
     console.log('📥 Fetching header component...');
-    fetch('/business-manager/public/components/header.html?v=' + Date.now())
+    fetch('/public/components/header.html?v=' + Date.now())
         .then(r => {
             if (!r.ok) throw new Error('Header load failed: ' + r.status);
             return r.text();

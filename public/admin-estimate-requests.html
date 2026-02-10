@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estimate Requests - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .gradient-bg {
@@ -267,7 +269,7 @@
     </div>
 
     <script>
-        const API_BASE = '/business-manager/api';
+        const API_BASE = '/api';
         let currentRequest = null;
 
         // Load stats
@@ -688,6 +690,6 @@
             loadRequests();
         }, 30000);
     </script>
-    <script src="/business-manager/components/logo-loader.js"></script>
+    <script src="/components/logo-loader.js"></script>
 </body>
 </html>

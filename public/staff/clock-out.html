@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Clock Out - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -141,7 +143,7 @@
             font-size: 40px;
         }
     </style>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body>
     <div class="container">
@@ -438,7 +440,7 @@
             try {
                 const token = localStorage.getItem('auth_token');
                 if (!token) {
-                    window.location.href = '/business-manager/login.html';
+                    window.location.href = '/login.html';
                     return;
                 }
 
@@ -448,7 +450,7 @@
                 formData.append('longitude', longitude);
                 formData.append('address', address);
 
-                const response = await fetch('/business-manager/api/attendance/clock-out', {
+                const response = await fetch('/api/attendance/clock-out', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`

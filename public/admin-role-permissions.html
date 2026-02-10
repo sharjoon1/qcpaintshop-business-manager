@@ -7,8 +7,10 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Role Permissions - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
     <!-- Simplified Header for this page -->
@@ -16,7 +18,7 @@
         <div class="max-w-7xl mx-auto px-4 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-4">
-                    <a href="/business-manager/admin-roles.html" class="text-white hover:text-purple-200 transition">
+                    <a href="/admin-roles.html" class="text-white hover:text-purple-200 transition">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                         </svg>
@@ -80,7 +82,7 @@ const roleId = urlParams.get('role_id') || urlParams.get('role');
 
 if (!roleId) {
     alert('❌ No role specified');
-    window.location.href = '/business-manager/admin-roles.html';
+    window.location.href = '/admin-roles.html';
     throw new Error('No role ID provided');
 }
 
@@ -108,7 +110,7 @@ const moduleIcons = {
 // Load role details and permissions
 async function loadRoleDetails() {
     try {
-        const response = await fetch(`/business-manager/api/roles/${roleId}`);
+        const response = await fetch(`/api/roles/${roleId}`);
         const data = await response.json();
         
         if (data.success) {
@@ -131,7 +133,7 @@ async function loadRoleDetails() {
 // Load all permissions
 async function loadAllPermissions() {
     try {
-        const response = await fetch('/business-manager/api/roles/permissions/by-module');
+        const response = await fetch('/api/roles/permissions/by-module');
         const data = await response.json();
         
         if (data.success) {
@@ -302,7 +304,7 @@ async function savePermissions() {
     saveButton.disabled = true;
     
     try {
-        const response = await fetch(`/business-manager/api/roles/${roleId}/permissions`, {
+        const response = await fetch(`/api/roles/${roleId}/permissions`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ permission_ids: permissionIds })
@@ -315,7 +317,7 @@ async function savePermissions() {
             
             // Redirect back after 1.5 seconds
             setTimeout(() => {
-                window.location.href = '/business-manager/admin-roles.html';
+                window.location.href = '/admin-roles.html';
             }, 1500);
         } else {
             showNotification(result.error || 'Failed to save permissions', 'error');

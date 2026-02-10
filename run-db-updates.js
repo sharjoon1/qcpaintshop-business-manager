@@ -5,9 +5,9 @@ require('dotenv').config();
 async function runUpdates() {
     const connection = await mysql.createConnection({
         host: process.env.DB_HOST || 'localhost',
-        user: 'root',
-        password: '4f3903c763f18938',
-        database: 'qc_business_manager',
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME || 'qc_business_manager',
         multipleStatements: true
     });
     

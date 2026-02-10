@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>View Estimate - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @media print {
@@ -50,7 +52,7 @@
             object-fit: contain;
         }
     </style>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
 
@@ -258,7 +260,7 @@
         // Load estimate
         async function loadEstimate() {
             try {
-                const response = await fetch(`/business-manager/api/estimates/${estimateId}`);
+                const response = await fetch(`/api/estimates/${estimateId}`);
                 const data = await response.json();
                 
                 if (!data || !data.estimate_number) {
@@ -391,6 +393,6 @@
         // Initialize
         loadEstimate();
     </script>
-    <script src="/business-manager/components/logo-loader.js"></script>
+    <script src="/components/logo-loader.js"></script>
 </body>
 </html>

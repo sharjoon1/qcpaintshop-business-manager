@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Role Management - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
     
@@ -125,7 +127,7 @@
         // Load roles
         async function loadRoles() {
             try {
-                const response = await fetch('/business-manager/api/roles');
+                const response = await fetch('/api/roles');
                 const data = await response.json();
                 
                 if (data.success) {
@@ -238,7 +240,7 @@
             
             try {
                 const token = localStorage.getItem('auth_token');
-                const url = roleId ? `/business-manager/api/roles/${roleId}` : '/business-manager/api/roles';
+                const url = roleId ? `/api/roles/${roleId}` : '/api/roles';
                 const method = roleId ? 'PUT' : 'POST';
                 
                 const response = await fetch(url, {
@@ -267,7 +269,7 @@
 
         // View permissions
         function viewPermissions(roleId) {
-            window.location.href = `/business-manager/admin-role-permissions.html?role_id=${roleId}`;
+            window.location.href = `/admin-role-permissions.html?role_id=${roleId}`;
         }
 
         // Load roles on page load

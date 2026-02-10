@@ -18,10 +18,10 @@
     }
     
     // Component paths
-    const HEADER_PATH = '/business-manager/components/header-v2.html';
+    const HEADER_PATH = '/components/header-v2.html';
     const SIDEBAR_PATH = isStaffPage 
-        ? '/business-manager/components/staff-sidebar.html'
-        : '/business-manager/components/sidebar-complete.html';
+        ? '/components/staff-sidebar.html'
+        : '/components/sidebar-complete.html';
     
     /**
      * Load a component and inject it into the page
