@@ -7,8 +7,10 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Edit Estimate - Quality Colors</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
 
@@ -239,26 +241,26 @@
         async function loadInitialData() {
             try {
                 // Load customers
-                const custRes = await fetch('/business-manager/api/customers');
+                const custRes = await fetch('/api/customers');
                 customers = await custRes.json();
                 const customerSelect = document.getElementById('customerSelect');
                 customerSelect.innerHTML = '<option value="">-- Select Customer --</option>' +
                     customers.map(c => `<option value="${c.id}" data-customer='${JSON.stringify(c)}'>${c.name} (${c.phone || 'No phone'})</option>`).join('');
 
                 // Load branches for new customer modal
-                const branchRes = await fetch('/business-manager/api/branches');
+                const branchRes = await fetch('/api/branches');
                 const branches = await branchRes.json();
                 document.getElementById('newCustBranch').innerHTML = '<option value="">-- Select --</option>' +
                     branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
 
                 // Load brands
-                const brandRes = await fetch('/business-manager/api/brands');
+                const brandRes = await fetch('/api/brands');
                 brands = await brandRes.json();
                 document.getElementById('brandSelect').innerHTML = '<option value="">-- Select Brand --</option>' +
                     brands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
 
                 // Load all products for filtering
-                const prodRes = await fetch('/business-manager/api/products');
+                const prodRes = await fetch('/api/products');
                 allProducts = await prodRes.json();
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -291,7 +293,7 @@
             }
 
             // For now, show all categories (can filter by brand later)
-            fetch('/business-manager/api/categories')
+            fetch('/api/categories')
                 .then(res => res.json())
                 .then(data => {
                     categories = data;
@@ -605,7 +607,7 @@
                 console.log('Saving estimate ID:', estimateId);
                 console.log('Estimate data:', estimateData);
                 
-                const response = await fetch(`/business-manager/api/estimates/${estimateId}`, {
+                const response = await fetch(`/api/estimates/${estimateId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(estimateData)
@@ -651,7 +653,7 @@
             };
 
             try {
-                const response = await fetch('/business-manager/api/customers', {
+                const response = await fetch('/api/customers', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(customerData)
@@ -684,7 +686,7 @@
         async function loadEstimateData() {
             try {
                 console.log('Loading estimate ID:', estimateId);
-                const response = await fetch(`/business-manager/api/estimates/${estimateId}`);
+                const response = await fetch(`/api/estimates/${estimateId}`);
                 console.log('Response status:', response.status);
                 
                 if (!response.ok) {

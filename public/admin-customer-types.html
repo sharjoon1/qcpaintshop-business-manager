@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Types - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
 
@@ -130,7 +132,7 @@
 
         async function loadTypes() {
             try {
-                const response = await fetch('/business-manager/api/customer-types', { headers: getAuthHeaders() });
+                const response = await fetch('/api/customer-types', { headers: getAuthHeaders() });
                 allTypes = await response.json();
                 
                 renderTypesGrid();
@@ -228,8 +230,8 @@
             
             try {
                 const url = editingTypeId 
-                    ? `/business-manager/api/customer-types/${editingTypeId}`
-                    : '/business-manager/api/customer-types';
+                    ? `/api/customer-types/${editingTypeId}`
+                    : '/api/customer-types';
                     
                 const method = editingTypeId ? 'PUT' : 'POST';
                 
@@ -260,7 +262,7 @@
             if (!confirm(`Are you sure you want to delete "${type.name}"?\n\nThis action cannot be undone!`)) return;
             
             try {
-                const response = await fetch(`/business-manager/api/customer-types/${id}`, {
+                const response = await fetch(`/api/customer-types/${id}`, {
                     method: 'DELETE'
                 });
                 

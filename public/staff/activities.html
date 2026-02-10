@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Activities - QC Paint Shop Business Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
-    <script src="/business-manager/js/auth-helper.js"></script>
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
 </head>
 <body class="bg-gray-50">
 
@@ -195,10 +196,11 @@
         </div>
     </div>
 
-    <script src="/business-manager/universal-nav-loader.js"></script>
-    <script src="/business-manager/js/auth-helper.js"></script>
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script>
-        const API_BASE = '/business-manager/api';
+        const API_BASE = '/api';
         let selectedDate = new Date().toISOString().split('T')[0];
         let activityToDelete = null;
         let currentUser = null;
@@ -207,7 +209,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // Check authentication
             if (!isAuthenticated()) {
-                window.location.href = '/business-manager/login.html';
+                window.location.href = '/login.html';
                 return;
             }
 

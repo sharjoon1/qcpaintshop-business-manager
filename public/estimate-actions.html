@@ -7,8 +7,10 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Admin Dashboard - Quality Colours Manager</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
 
@@ -136,13 +138,13 @@
         function logout() {
             localStorage.removeItem('auth_token');
             localStorage.removeItem('user');
-            window.location.href = '/business-manager/login.html';
+            window.location.href = '/login.html';
         }
 
         // Load estimate info
         async function loadEstimate() {
             try {
-                const response = await fetch(`/business-manager/api/estimates/${estimateId}`);
+                const response = await fetch(`/api/estimates/${estimateId}`);
                 const data = await response.json();
                 
                 document.getElementById('estimateTitle').textContent = `Estimate #${data.estimate_number}`;
@@ -165,7 +167,7 @@
         // Load status history
         async function loadHistory() {
             try {
-                const response = await fetch(`/business-manager/api/estimates/${estimateId}/history`);
+                const response = await fetch(`/api/estimates/${estimateId}/history`);
                 const history = await response.json();
                 
                 const container = document.getElementById('historyContainer');
@@ -251,7 +253,7 @@
             const notes = document.getElementById('statusNotes').value;
             
             try {
-                const response = await fetch(`/business-manager/api/estimates/${estimateId}/status`, {
+                const response = await fetch(`/api/estimates/${estimateId}/status`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: currentNewStatus, reason, notes })

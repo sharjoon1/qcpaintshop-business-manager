@@ -39,6 +39,16 @@
     .qc-dropdown-item.logout { color: #e74c3c; }
     
     @media (max-width: 640px) { .qc-brand-title { font-size: 1.125rem; } .qc-brand-tagline { display: none; } .qc-logo-img { height: 50px; } .qc-profile-info { display: none; } }
+
+    /* DESKTOP ≥ 768px: Hamburger hidden (sidebar is pinned), header adapts */
+    @media (min-width: 768px) {
+        .qc-hamburger { display: none; }
+        .qc-left-section { min-width: 0; }
+        .qc-header-content { grid-template-columns: 1fr auto; max-width: none; }
+        .qc-logo-section { justify-content: flex-start; }
+        .qc-profile-info { display: block; }
+        .qc-profile-button { gap: 0.75rem; }
+    }
 </style>
 
 <header class="qc-unified-header">
@@ -64,8 +74,8 @@
                 </button>
                 
                 <div class="qc-profile-dropdown" id="profileDropdown">
-                    <a href="/business-manager/admin-profile.html" class="qc-dropdown-item">👤 Edit Profile</a>
-                    <a href="/business-manager/admin-settings.html" class="qc-dropdown-item">⚙️ Settings</a>
+                    <a href="/admin-profile.html" class="qc-dropdown-item">👤 Edit Profile</a>
+                    <a href="/admin-settings.html" class="qc-dropdown-item">⚙️ Settings</a>
                     <div class="qc-dropdown-divider"></div>
                     <a href="#" onclick="headerLogout(); return false;" class="qc-dropdown-item logout">🚪 Logout</a>
                 </div>
@@ -79,7 +89,7 @@
 function getAuthHeaders() {
     const token = localStorage.getItem('auth_token');
     if (!token) {
-        window.location.href = '/business-manager/login.html';
+        window.location.href = '/login.html';
         return {};
     }
     return {
@@ -103,7 +113,7 @@ function headerLogout() {
     if (confirm('Are you sure you want to logout?')) { 
         localStorage.removeItem('auth_token'); 
         localStorage.removeItem('user'); 
-        window.location.href = '/business-manager/login.html'; 
+        window.location.href = '/login.html'; 
     } 
 }
 
@@ -132,7 +142,7 @@ async function loadBusinessLogo() {
         const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
         if (!token) return;
         
-        const response = await fetch('/business-manager/api/settings', {
+        const response = await fetch('/api/settings', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         

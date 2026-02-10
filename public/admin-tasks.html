@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Task Management - Quality Colours Business Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
-    <script src="/business-manager/js/auth-helper.js"></script>
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
 
@@ -505,7 +506,7 @@
 
         async function loadUsers() {
             try {
-                const response = await fetch('/business-manager/api/users', {
+                const response = await fetch('/api/users', {
                     headers: getAuthHeaders()
                 });
 
@@ -530,7 +531,7 @@
 
         async function loadStats() {
             try {
-                const response = await fetch('/business-manager/api/tasks/stats', {
+                const response = await fetch('/api/tasks/stats', {
                     headers: getAuthHeaders()
                 });
 
@@ -564,7 +565,7 @@
                 if (assignedTo) params.append('assigned_to', assignedTo);
                 if (search) params.append('search', search);
 
-                const response = await fetch(`/business-manager/api/tasks?${params}`, {
+                const response = await fetch(`/api/tasks?${params}`, {
                     headers: getAuthHeaders()
                 });
 
@@ -675,7 +676,7 @@
 
         async function editTask(id) {
             try {
-                const response = await fetch(`/business-manager/api/tasks/${id}`, {
+                const response = await fetch(`/api/tasks/${id}`, {
                     headers: getAuthHeaders()
                 });
 
@@ -716,8 +717,8 @@
 
             try {
                 const url = taskId
-                    ? `/business-manager/api/tasks/${taskId}`
-                    : '/business-manager/api/tasks';
+                    ? `/api/tasks/${taskId}`
+                    : '/api/tasks';
 
                 const method = taskId ? 'PUT' : 'POST';
 
@@ -743,7 +744,7 @@
 
         async function viewTask(id) {
             try {
-                const response = await fetch(`/business-manager/api/tasks/${id}`, {
+                const response = await fetch(`/api/tasks/${id}`, {
                     headers: getAuthHeaders()
                 });
 
@@ -842,7 +843,7 @@
             if (!confirm('Are you sure you want to delete this task?')) return;
 
             try {
-                const response = await fetch(`/business-manager/api/tasks/${id}`, {
+                const response = await fetch(`/api/tasks/${id}`, {
                     method: 'DELETE',
                     headers: getAuthHeaders()
                 });
@@ -906,7 +907,7 @@
             }
 
             try {
-                const response = await fetch(`/business-manager/api/tasks/${taskId}/rate`, {
+                const response = await fetch(`/api/tasks/${taskId}/rate`, {
                     method: 'PUT',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({

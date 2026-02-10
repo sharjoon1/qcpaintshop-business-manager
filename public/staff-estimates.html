@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Estimates - Staff Portal</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .gradient-bg {
@@ -74,6 +76,6 @@
             document.getElementById('profileDropdown').classList.toggle('hidden');
         });
     </script>
-    <script src="/business-manager/components/logo-loader.js"></script>
+    <script src="/components/logo-loader.js"></script>
 </body>
 </html>

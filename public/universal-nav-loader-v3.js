@@ -8,8 +8,8 @@
     
     // Configuration
     const CONFIG = {
-        HEADER_PATH: '/business-manager/components/header-v2.html',
-        SIDEBAR_PATH: '/business-manager/components/sidebar-complete.html',
+        HEADER_PATH: '/components/header-v2.html',
+        SIDEBAR_PATH: '/components/sidebar-complete.html',
         RETRY_ATTEMPTS: 3,
         RETRY_DELAY: 1000
     };

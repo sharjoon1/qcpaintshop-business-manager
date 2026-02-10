@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Category Management - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
 
@@ -121,7 +123,7 @@
         // Load categories
         async function loadCategorys() {
             try {
-                const response = await fetch('/business-manager/api/categories', { headers: getAuthHeaders() });
+                const response = await fetch('/api/categories', { headers: getAuthHeaders() });
                 categories = await response.json();
                 
                 document.getElementById('loadingState').classList.add('hidden');
@@ -212,7 +214,7 @@
             const token = localStorage.getItem('auth_token');
             if (!token) {
                 alert('❌ Not authenticated. Please login again.');
-                window.location.href = '/business-manager/login.html';
+                window.location.href = '/login.html';
                 return;
             }
 
@@ -226,7 +228,7 @@
                 let response;
                 if (editingCategoryId) {
                     // Update
-                    response = await fetch(`/business-manager/api/categories/${editingCategoryId}`, {
+                    response = await fetch(`/api/categories/${editingCategoryId}`, {
                         method: 'PUT',
                         headers: { 
                             'Content-Type': 'application/json',
@@ -236,7 +238,7 @@
                     });
                 } else {
                     // Create
-                    response = await fetch('/business-manager/api/categories', {
+                    response = await fetch('/api/categories', {
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
@@ -269,7 +271,7 @@
 
             try {
                 const token = localStorage.getItem('auth_token');
-                const response = await fetch(`/business-manager/api/categories/${id}`, {
+                const response = await fetch(`/api/categories/${id}`, {
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -293,6 +295,6 @@
         // Initialize
         loadCategorys();
     </script>
-    <script src="/business-manager/components/logo-loader.js"></script>
+    <script src="/components/logo-loader.js"></script>
 </body>
 </html>

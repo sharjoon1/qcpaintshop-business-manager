@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { requireAuth } = require('../middleware/permissionMiddleware');
 
 let pool;
 
@@ -35,7 +36,7 @@ async function generateRequestNumber() {
  * GET /api/estimate-requests
  * Get all estimate requests (with filters)
  */
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
     try {
         const { status, priority, assigned_to, search, limit = 50, offset = 0 } = req.query;
         
@@ -108,7 +109,7 @@ router.get('/', async (req, res) => {
  * GET /api/estimate-requests/:id
  * Get single estimate request with full details
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
     try {
         const requestId = req.params.id;
         
@@ -297,7 +298,7 @@ router.post('/', async (req, res) => {
  * PATCH /api/estimate-requests/:id/status
  * Update request status
  */
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', requireAuth, async (req, res) => {
     try {
         const requestId = req.params.id;
         const { status, notes, user_id } = req.body;
@@ -343,7 +344,7 @@ router.patch('/:id/status', async (req, res) => {
  * PATCH /api/estimate-requests/:id/assign
  * Assign request to staff member
  */
-router.patch('/:id/assign', async (req, res) => {
+router.patch('/:id/assign', requireAuth, async (req, res) => {
     try {
         const requestId = req.params.id;
         const { assigned_to_user_id, notes, user_id } = req.body;
@@ -373,7 +374,7 @@ router.patch('/:id/assign', async (req, res) => {
  * PATCH /api/estimate-requests/:id
  * Update request (general - for converting to estimate)
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAuth, async (req, res) => {
     try {
         const requestId = req.params.id;
         const { status, estimate_id } = req.body;
@@ -412,7 +413,7 @@ router.patch('/:id', async (req, res) => {
  * POST /api/estimate-requests/:id/notes
  * Add note to request
  */
-router.post('/:id/notes', async (req, res) => {
+router.post('/:id/notes', requireAuth, async (req, res) => {
     try {
         const requestId = req.params.id;
         const { notes, user_id } = req.body;
@@ -439,7 +440,7 @@ router.post('/:id/notes', async (req, res) => {
  * GET /api/estimate-requests/stats/summary
  * Get dashboard statistics
  */
-router.get('/stats/summary', async (req, res) => {
+router.get('/stats/summary', requireAuth, async (req, res) => {
     try {
         const [stats] = await pool.query(`
             SELECT 

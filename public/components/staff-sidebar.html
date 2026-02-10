@@ -69,11 +69,11 @@
     <nav class="qc-sidebar-nav">
         <!-- Main -->
         <div class="qc-nav-section">
-            <a href="/business-manager/staff/dashboard.html" class="qc-nav-item" data-page="dashboard">
+            <a href="/staff/dashboard.html" class="qc-nav-item" data-page="dashboard">
                 <span class="qc-nav-item-icon">🏠</span>
                 <span>My Dashboard</span>
             </a>
-            <a href="/business-manager/dashboard.html" class="qc-nav-item" data-page="main-dashboard">
+            <a href="/dashboard.html" class="qc-nav-item" data-page="main-dashboard">
                 <span class="qc-nav-item-icon">📊</span>
                 <span>Main Dashboard</span>
             </a>
@@ -82,11 +82,11 @@
         <!-- My Work -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">My Work</div>
-            <a href="/business-manager/staff-estimates.html" class="qc-nav-item" data-page="estimates">
+            <a href="/staff-estimates.html" class="qc-nav-item" data-page="estimates">
                 <span class="qc-nav-item-icon">📋</span>
                 <span>My Estimates</span>
             </a>
-            <a href="/business-manager/staff-requests.html" class="qc-nav-item" data-page="requests">
+            <a href="/staff-requests.html" class="qc-nav-item" data-page="requests">
                 <span class="qc-nav-item-icon">📝</span>
                 <span>My Requests</span>
             </a>
@@ -95,15 +95,15 @@
         <!-- Attendance -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Attendance</div>
-            <a href="/business-manager/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
+            <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
                 <span class="qc-nav-item-icon">🟢</span>
                 <span>Clock In</span>
             </a>
-            <a href="/business-manager/staff/clock-out.html" class="qc-nav-item" data-page="clock-out">
+            <a href="/staff/clock-out.html" class="qc-nav-item" data-page="clock-out">
                 <span class="qc-nav-item-icon">🔴</span>
                 <span>Clock Out</span>
             </a>
-            <a href="/business-manager/staff/history.html" class="qc-nav-item" data-page="history">
+            <a href="/staff/history.html" class="qc-nav-item" data-page="history">
                 <span class="qc-nav-item-icon">📜</span>
                 <span>My History</span>
             </a>
@@ -112,7 +112,7 @@
         <!-- Permissions -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Permissions</div>
-            <a href="/business-manager/staff/permission-request.html" class="qc-nav-item" data-page="permission">
+            <a href="/staff/permission-request.html" class="qc-nav-item" data-page="permission">
                 <span class="qc-nav-item-icon">✋</span>
                 <span>Request Permission</span>
             </a>
@@ -121,7 +121,7 @@
         <!-- Profile -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Account</div>
-            <a href="/business-manager/admin-profile.html" class="qc-nav-item" data-page="profile">
+            <a href="/admin-profile.html" class="qc-nav-item" data-page="profile">
                 <span class="qc-nav-item-icon">👤</span>
                 <span>My Profile</span>
             </a>
@@ -194,7 +194,7 @@ function logoutUser() {
     if (confirm('Are you sure you want to logout?')) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
-        window.location.href = '/business-manager/login.html';
+        window.location.href = '/login.html';
     }
 }
 

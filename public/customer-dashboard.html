@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Dashboard - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .gradient-bg {
@@ -247,7 +249,7 @@
     </footer>
 
     <script>
-        const API_BASE = '/business-manager/api';
+        const API_BASE = '/api';
         let customerPhone = null;
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -400,6 +402,6 @@
             return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
         }
     </script>
-    <script src="/business-manager/components/logo-loader.js"></script>
+    <script src="/components/logo-loader.js"></script>
 </body>
 </html>

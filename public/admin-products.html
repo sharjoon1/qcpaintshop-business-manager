@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Product Management - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/permissions.js"></script>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
 
@@ -192,15 +194,15 @@
         async function loadData() {
             try {
                 // Load products
-                const productsRes = await fetch('/business-manager/api/products', { headers: getAuthHeaders() });
+                const productsRes = await fetch('/api/products', { headers: getAuthHeaders() });
                 products = await productsRes.json();
 
                 // Load brands
-                const brandsRes = await fetch('/business-manager/api/brands', { headers: getAuthHeaders() });
+                const brandsRes = await fetch('/api/brands', { headers: getAuthHeaders() });
                 brands = await brandsRes.json();
 
                 // Load categories
-                const categoriesRes = await fetch('/business-manager/api/categories', { headers: getAuthHeaders() });
+                const categoriesRes = await fetch('/api/categories', { headers: getAuthHeaders() });
                 categories = await categoriesRes.json();
 
                 // Populate dropdowns
@@ -461,13 +463,13 @@
             try {
                 let response;
                 if (editingProductId) {
-                    response = await fetch(`/business-manager/api/products/${editingProductId}`, {
+                    response = await fetch(`/api/products/${editingProductId}`, {
                         method: 'PUT',
                         headers: getAuthHeaders(),
                         body: JSON.stringify(productData)
                     });
                 } else {
-                    response = await fetch('/business-manager/api/products', {
+                    response = await fetch('/api/products', {
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify(productData)
@@ -493,7 +495,7 @@
             if (!confirm('Are you sure you want to delete this product?')) return;
 
             try {
-                const response = await fetch(`/business-manager/api/products/${id}`, {
+                const response = await fetch(`/api/products/${id}`, {
                     method: 'DELETE',
                     headers: getAuthHeaders()
                 });

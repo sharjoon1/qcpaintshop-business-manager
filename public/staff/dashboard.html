@@ -6,6 +6,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>My Attendance - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -119,7 +121,7 @@
             font-family: 'Courier New', monospace;
         }
     </style>
-    <script src="/business-manager/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js"></script>
 </head>
 <body>
     <!-- Header -->
@@ -306,11 +308,11 @@
             try {
                 const token = localStorage.getItem('auth_token');
                 if (!token) {
-                    window.location.href = '/business-manager/login.html';
+                    window.location.href = '/login.html';
                     return;
                 }
 
-                const response = await fetch('/business-manager/api/attendance/today', {
+                const response = await fetch('/api/attendance/today', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -453,7 +455,7 @@
             const endpoint = isBreakStarted ? 'break-end' : 'break-start';
             
             try {
-                const response = await fetch(`/business-manager/api/attendance/${endpoint}`, {
+                const response = await fetch(`/api/attendance/${endpoint}`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,

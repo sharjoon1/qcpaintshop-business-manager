@@ -3,21 +3,21 @@
 // Check authentication (DISABLED for now)
 // const authToken = localStorage.getItem('auth_token');
 // if (!authToken) {
-//     window.location.href = '/business-manager/login.html';
+//     window.location.href = '/login.html';
 // }
 
 // Logout function
 function logout() {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
-    window.location.href = '/business-manager/login.html';
+    window.location.href = '/login.html';
 }
 
 // Helper function for authenticated requests
 function getAuthHeaders() {
     const token = localStorage.getItem('auth_token');
     if (!token) {
-        window.location.href = '/business-manager/login.html';
+        window.location.href = '/login.html';
         return {};
     }
     return {
@@ -35,7 +35,7 @@ let currentFilter = 'all';
 async function loadEstimates() {
     console.log('🔄 Loading estimates...');
     try {
-        const response = await fetch('/business-manager/api/estimates', { headers: getAuthHeaders() });
+        const response = await fetch('/api/estimates', { headers: getAuthHeaders() });
         console.log('📡 API Response:', response.status);
         
         if (!response.ok) {
@@ -311,17 +311,17 @@ function showError(message) {
 
 // View estimate
 function viewEstimate(id) {
-    window.location.href = `/business-manager/estimate-view.html?id=${id}`;
+    window.location.href = `/estimate-view.html?id=${id}`;
 }
 
 // Edit estimate
 function editEstimate(id) {
-    window.location.href = `/business-manager/estimate-edit.html?id=${id}`;
+    window.location.href = `/estimate-edit.html?id=${id}`;
 }
 
 // Create new estimate
 function createNewEstimate() {
-    window.location.href = '/business-manager/estimate-create-new.html';
+    window.location.href = '/estimate-create-new.html';
 }
 
 // Store current estimate ID for actions
@@ -417,7 +417,7 @@ function sendEstimate(id) {
 
 function downloadPDF(id) {
     // Open estimate in new tab for printing/PDF
-    window.open(`/business-manager/estimate-view.html?id=${id}`, '_blank');
+    window.open(`/estimate-view.html?id=${id}`, '_blank');
 }
 
 async function changeStatus(id, newStatus) {
@@ -430,7 +430,7 @@ async function changeStatus(id, newStatus) {
     if (!confirm(`Mark this estimate as ${statusNames[newStatus]}?`)) return;
     
     try {
-        const response = await fetch(`/business-manager/api/estimates/${id}/status`, {
+        const response = await fetch(`/api/estimates/${id}/status`, {
             method: 'PATCH',
             headers: getAuthHeaders(),
             body: JSON.stringify({ 
@@ -461,7 +461,7 @@ async function duplicateEstimate(id) {
     
     try {
         // Load the original estimate
-        const response = await fetch(`/business-manager/api/estimates/${id}`, { headers: getAuthHeaders() });
+        const response = await fetch(`/api/estimates/${id}`, { headers: getAuthHeaders() });
         const original = await response.json();
         
         if (!original) {
@@ -497,7 +497,7 @@ async function duplicateEstimate(id) {
             }))
         };
         
-        const createResponse = await fetch('/business-manager/api/estimates', {
+        const createResponse = await fetch('/api/estimates', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(newEstimate)
@@ -523,7 +523,7 @@ async function deleteEstimate(id) {
     if (!confirm(`🗑️ Are you sure you want to delete estimate ${estimate.estimate_number}?\n\nThis action cannot be undone!`)) return;
     
     try {
-        const response = await fetch(`/business-manager/api/estimates/${id}`, {
+        const response = await fetch(`/api/estimates/${id}`, {
             method: 'DELETE',
             headers: getAuthHeaders()
         });

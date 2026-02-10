@@ -11,7 +11,7 @@
             const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
             
             // Fetch settings
-            const response = await fetch('/business-manager/api/settings', {
+            const response = await fetch('/api/settings', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }

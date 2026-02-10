@@ -289,8 +289,9 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/business-manager/universal-nav-loader.js"></script>
-    <script src="/business-manager/js/auth-helper.js"></script>
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <script>
         let allTasks = [];
         let currentTaskId = null;
@@ -306,7 +307,7 @@
                 const status = document.getElementById('filter-status').value;
                 const priority = document.getElementById('filter-priority').value;
 
-                let url = '/business-manager/api/tasks/my-tasks?';
+                let url = '/api/tasks/my-tasks?';
                 if (status) url += `status=${status}&`;
                 if (priority) url += `priority=${priority}&`;
 
@@ -446,7 +447,7 @@
             currentTaskId = taskId;
 
             try {
-                const response = await fetch(`/business-manager/api/tasks/${taskId}`, {
+                const response = await fetch(`/api/tasks/${taskId}`, {
                     headers: getAuthHeaders()
                 });
 
@@ -586,7 +587,7 @@
             }
 
             try {
-                const response = await fetch(`/business-manager/api/tasks/${currentTaskId}/status`, {
+                const response = await fetch(`/api/tasks/${currentTaskId}/status`, {
                     method: 'PUT',
                     headers: {
                         ...getAuthHeaders(),
@@ -636,7 +637,7 @@
             }
 
             try {
-                const response = await fetch(`/business-manager/api/tasks/${currentTaskId}/comments`, {
+                const response = await fetch(`/api/tasks/${currentTaskId}/comments`, {
                     method: 'POST',
                     headers: {
                         ...getAuthHeaders(),

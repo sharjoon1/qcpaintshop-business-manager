@@ -46,7 +46,52 @@
     .qc-sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1001; }
     .qc-sidebar-overlay.show { display: block; }
     
-    @media (max-width: 768px) { .qc-sidebar { width: 85%; max-width: 320px; } }
+    /* MOBILE: narrower sidebar */
+    @media (max-width: 767px) {
+        .qc-sidebar { width: 85%; max-width: 320px; }
+    }
+
+    /* ─── DESKTOP ≥ 768px: Pin sidebar permanently ─── */
+    @media (min-width: 768px) {
+        .qc-sidebar {
+            left: 0 !important;
+            width: 260px;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+        }
+        .qc-sidebar-close { display: none; }
+        .qc-sidebar-overlay { display: none !important; }
+
+        /* Push page content right of the pinned sidebar */
+        body { margin-left: 260px; }
+
+        /* Header: stretch to full viewport width but pad past sidebar */
+        .qc-unified-header {
+            margin-left: -260px;
+            padding-left: calc(260px + 1.5rem);
+        }
+
+        /* Compact sidebar spacing for desktop */
+        .qc-sidebar-header { padding: 1rem 1.25rem; }
+        .qc-sidebar-user { padding: 0.75rem 1.25rem; }
+        .qc-sidebar-user-avatar { width: 40px; height: 40px; font-size: 1rem; }
+        .qc-sidebar-user-name { font-size: 0.85rem; }
+        .qc-nav-item { padding: 0.65rem 1.25rem; font-size: 0.85rem; gap: 0.6rem; }
+        .qc-nav-item-icon { font-size: 1rem; width: 22px; }
+        .qc-nav-section { margin-bottom: 1rem; }
+        .qc-nav-section-title { padding: 0.4rem 1.25rem; font-size: 0.65rem; }
+        .qc-sidebar-footer { padding: 0.75rem 1.25rem; }
+        .qc-sidebar-logout { padding: 0.65rem 0.85rem; font-size: 0.85rem; }
+    }
+
+    /* ─── LARGE DESKTOP ≥ 1280px: Wider sidebar ─── */
+    @media (min-width: 1280px) {
+        .qc-sidebar { width: 280px; }
+        body { margin-left: 280px; }
+        .qc-unified-header {
+            margin-left: -280px;
+            padding-left: calc(280px + 1.5rem);
+        }
+    }
 </style>
 
 <!-- Overlay -->
@@ -81,7 +126,7 @@
     <nav class="qc-sidebar-nav">
         <!-- Main -->
         <div class="qc-nav-section">
-            <a href="/business-manager/dashboard.html" class="qc-nav-item" data-page="dashboard">
+            <a href="/dashboard.html" class="qc-nav-item" data-page="dashboard">
                 <span class="qc-nav-item-icon">🏠</span>
                 <span>Dashboard</span>
             </a>
@@ -90,19 +135,19 @@
         <!-- Sales & Estimates -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Sales & Estimates</div>
-            <a href="/business-manager/estimates.html" class="qc-nav-item" data-page="estimates">
+            <a href="/estimates.html" class="qc-nav-item" data-page="estimates">
                 <span class="qc-nav-item-icon">📋</span>
                 <span>All Estimates</span>
             </a>
-            <a href="/business-manager/estimate-create-new.html" class="qc-nav-item" data-page="estimate-create">
+            <a href="/estimate-create-new.html" class="qc-nav-item" data-page="estimate-create">
                 <span class="qc-nav-item-icon">➕</span>
                 <span>Create New</span>
             </a>
-            <a href="/business-manager/admin-estimate-requests.html" class="qc-nav-item" data-page="estimate-requests">
+            <a href="/admin-estimate-requests.html" class="qc-nav-item" data-page="estimate-requests">
                 <span class="qc-nav-item-icon">📬</span>
                 <span>Estimate Requests</span>
             </a>
-            <a href="/business-manager/estimate-settings.html" class="qc-nav-item" data-page="estimate-settings">
+            <a href="/estimate-settings.html" class="qc-nav-item" data-page="estimate-settings">
                 <span class="qc-nav-item-icon">⚙️</span>
                 <span>Estimate Settings</span>
             </a>
@@ -111,15 +156,15 @@
         <!-- Products & Inventory -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Products & Inventory</div>
-            <a href="/business-manager/admin-products.html" class="qc-nav-item" data-page="products">
+            <a href="/admin-products.html" class="qc-nav-item" data-page="products">
                 <span class="qc-nav-item-icon">🎨</span>
                 <span>Products</span>
             </a>
-            <a href="/business-manager/admin-categories.html" class="qc-nav-item" data-page="categories">
+            <a href="/admin-categories.html" class="qc-nav-item" data-page="categories">
                 <span class="qc-nav-item-icon">🏷️</span>
                 <span>Categories</span>
             </a>
-            <a href="/business-manager/admin-brands.html" class="qc-nav-item" data-page="brands">
+            <a href="/admin-brands.html" class="qc-nav-item" data-page="brands">
                 <span class="qc-nav-item-icon">🔖</span>
                 <span>Brands</span>
             </a>
@@ -128,11 +173,11 @@
         <!-- Customers -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Customers</div>
-            <a href="/business-manager/admin-customers.html" class="qc-nav-item" data-page="customers">
+            <a href="/admin-customers.html" class="qc-nav-item" data-page="customers">
                 <span class="qc-nav-item-icon">👥</span>
                 <span>Customer List</span>
             </a>
-            <a href="/business-manager/admin-customer-types.html" class="qc-nav-item" data-page="customer-types">
+            <a href="/admin-customer-types.html" class="qc-nav-item" data-page="customer-types">
                 <span class="qc-nav-item-icon">🏷️</span>
                 <span>Customer Types</span>
             </a>
@@ -141,7 +186,7 @@
         <!-- Leads -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Leads & CRM</div>
-            <a href="/business-manager/admin-leads.html" class="qc-nav-item" data-page="leads">
+            <a href="/admin-leads.html" class="qc-nav-item" data-page="leads">
                 <span class="qc-nav-item-icon">🎯</span>
                 <span>Lead Management</span>
             </a>
@@ -150,19 +195,19 @@
         <!-- Branches & Staff -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Branches & Staff</div>
-            <a href="/business-manager/admin-branches.html" class="qc-nav-item" data-page="branches">
+            <a href="/admin-branches.html" class="qc-nav-item" data-page="branches">
                 <span class="qc-nav-item-icon">🏪</span>
                 <span>Branches</span>
             </a>
-            <a href="/business-manager/admin-staff.html" class="qc-nav-item" data-page="staff">
+            <a href="/admin-staff.html" class="qc-nav-item" data-page="staff">
                 <span class="qc-nav-item-icon">👤</span>
                 <span>Staff Management</span>
             </a>
-            <a href="/business-manager/admin-roles.html" class="qc-nav-item" data-page="roles">
+            <a href="/admin-roles.html" class="qc-nav-item" data-page="roles">
                 <span class="qc-nav-item-icon">🔐</span>
                 <span>Roles</span>
             </a>
-            <a href="/business-manager/admin-role-permissions.html" class="qc-nav-item" data-page="permissions">
+            <a href="/admin-role-permissions.html" class="qc-nav-item" data-page="permissions">
                 <span class="qc-nav-item-icon">🛡️</span>
                 <span>Permissions</span>
             </a>
@@ -173,49 +218,49 @@
             <div class="qc-nav-section-title">HR & Staff Management</div>
             
             <!-- Attendance Section -->
-            <a href="/business-manager/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
+            <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
                 <span class="qc-nav-item-icon">🟢</span>
                 <span>Clock In</span>
             </a>
-            <a href="/business-manager/staff/clock-out.html" class="qc-nav-item" data-page="clock-out">
+            <a href="/staff/clock-out.html" class="qc-nav-item" data-page="clock-out">
                 <span class="qc-nav-item-icon">🔴</span>
                 <span>Clock Out</span>
             </a>
-            <a href="/business-manager/staff/history.html" class="qc-nav-item" data-page="attendance-history">
+            <a href="/staff/history.html" class="qc-nav-item" data-page="attendance-history">
                 <span class="qc-nav-item-icon">📜</span>
                 <span>Attendance History</span>
             </a>
-            <a href="/business-manager/staff/permission-request.html" class="qc-nav-item" data-page="permission-request">
+            <a href="/staff/permission-request.html" class="qc-nav-item" data-page="permission-request">
                 <span class="qc-nav-item-icon">✋</span>
                 <span>Permission Requests</span>
             </a>
-            <a href="/business-manager/staff/activities.html" class="qc-nav-item" data-page="activities">
+            <a href="/staff/activities.html" class="qc-nav-item" data-page="activities">
                 <span class="qc-nav-item-icon">📝</span>
                 <span>Daily Activities</span>
             </a>
-            <a href="/business-manager/staff/tasks.html" class="qc-nav-item" data-page="my-tasks">
+            <a href="/staff/tasks.html" class="qc-nav-item" data-page="my-tasks">
                 <span class="qc-nav-item-icon">✅</span>
                 <span>My Tasks</span>
             </a>
-            <a href="/business-manager/admin-tasks.html" class="qc-nav-item" data-page="admin-tasks">
+            <a href="/admin-tasks.html" class="qc-nav-item" data-page="admin-tasks">
                 <span class="qc-nav-item-icon">📋</span>
                 <span>Task Management</span>
             </a>
 
             <!-- Salary Section -->
-            <a href="/business-manager/admin-salary-config.html" class="qc-nav-item" data-page="salary-config">
+            <a href="/admin-salary-config.html" class="qc-nav-item" data-page="salary-config">
                 <span class="qc-nav-item-icon">💵</span>
                 <span>Salary Config</span>
             </a>
-            <a href="/business-manager/admin-salary-monthly.html" class="qc-nav-item" data-page="salary-monthly">
+            <a href="/admin-salary-monthly.html" class="qc-nav-item" data-page="salary-monthly">
                 <span class="qc-nav-item-icon">📅</span>
                 <span>Monthly Salary</span>
             </a>
-            <a href="/business-manager/admin-salary-payments.html" class="qc-nav-item" data-page="salary-payments">
+            <a href="/admin-salary-payments.html" class="qc-nav-item" data-page="salary-payments">
                 <span class="qc-nav-item-icon">💳</span>
                 <span>Salary Payments</span>
             </a>
-            <a href="/business-manager/admin-salary-reports.html" class="qc-nav-item" data-page="salary-reports">
+            <a href="/admin-salary-reports.html" class="qc-nav-item" data-page="salary-reports">
                 <span class="qc-nav-item-icon">📊</span>
                 <span>Salary Reports</span>
             </a>
@@ -224,15 +269,15 @@
         <!-- Reports & Settings -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">System</div>
-            <a href="/business-manager/admin-reports.html" class="qc-nav-item" data-page="reports">
+            <a href="/admin-reports.html" class="qc-nav-item" data-page="reports">
                 <span class="qc-nav-item-icon">📈</span>
                 <span>Reports</span>
             </a>
-            <a href="/business-manager/admin-settings.html" class="qc-nav-item" data-page="settings">
+            <a href="/admin-settings.html" class="qc-nav-item" data-page="settings">
                 <span class="qc-nav-item-icon">⚙️</span>
                 <span>Settings</span>
             </a>
-            <a href="/business-manager/admin-profile.html" class="qc-nav-item" data-page="profile">
+            <a href="/admin-profile.html" class="qc-nav-item" data-page="profile">
                 <span class="qc-nav-item-icon">👤</span>
                 <span>My Profile</span>
             </a>
@@ -309,7 +354,7 @@ function logoutUser() {
     if (confirm('Are you sure you want to logout?')) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
-        window.location.href = '/business-manager/login.html';
+        window.location.href = '/login.html';
     }
 }
 

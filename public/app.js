@@ -1,5 +1,5 @@
 const { useState, useEffect } = React;
-const API_URL = window.location.origin + '/business-manager';
+const API_URL = window.location.origin;
 
 function App() {
     const [view, setView] = useState('estimates');
