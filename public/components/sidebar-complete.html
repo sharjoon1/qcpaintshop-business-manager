@@ -1,95 +1,461 @@
-<!-- Complete Sidebar Navigation Component for Business Manager -->
+<!-- Premium Sidebar Navigation v3 - Clean Light Design with Icon Rail -->
 <style>
-    /* Sidebar Styles */
-    .qc-sidebar { position: fixed; top: 0; left: -320px; width: 320px; height: 100vh; background: linear-gradient(180deg, #1e3a8a 0%, #7c3aed 100%); box-shadow: 4px 0 20px rgba(0,0,0,0.3); transition: left 0.3s; z-index: 1002; overflow-y: auto; display: flex; flex-direction: column; }
+    /* ═══════════════════════════════════════════════
+       PREMIUM SIDEBAR - Light/White with Icon Rail
+       ═══════════════════════════════════════════════ */
+
+    /* Custom scrollbar */
+    .qc-sidebar::-webkit-scrollbar { width: 3px; }
+    .qc-sidebar::-webkit-scrollbar-track { background: transparent; }
+    .qc-sidebar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 3px; }
+    .qc-sidebar::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.14); }
+
+    /* Sidebar Base */
+    .qc-sidebar {
+        position: fixed;
+        top: 0;
+        left: -320px;
+        width: 320px;
+        height: 100vh;
+        background: #ffffff;
+        border-right: 1px solid #e8ecf1;
+        transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                    width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1002;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
     .qc-sidebar.open { left: 0; }
-    
-    /* Sidebar Header */
-    .qc-sidebar-header { padding: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.15); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-    .qc-sidebar-brand { color: white; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
-    .qc-sidebar-close { background: rgba(255,255,255,0.1); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; transition: all 0.2s; }
-    .qc-sidebar-close:hover { background: rgba(255,255,255,0.2); transform: rotate(90deg); }
-    
-    /* User Info */
-    .qc-sidebar-user { padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.15); color: white; flex-shrink: 0; }
-    .qc-sidebar-user-info { display: flex; align-items: center; gap: 1rem; }
-    .qc-sidebar-user-avatar { width: 48px; height: 48px; border-radius: 50%; background: white; color: #1e3a8a; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.25rem; }
-    .qc-sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-    .qc-sidebar-user-details { flex: 1; }
-    .qc-sidebar-user-name { font-weight: 600; font-size: 0.95rem; }
-    .qc-sidebar-user-role { font-size: 0.75rem; opacity: 0.9; }
-    .qc-sidebar-user-branch { font-size: 0.7rem; opacity: 0.8; margin-top: 0.25rem; }
-    
-    /* Navigation Menu */
-    .qc-sidebar-nav { padding: 1rem 0; flex: 1; overflow-y: auto; }
-    .qc-nav-section { margin-bottom: 1.5rem; }
-    .qc-nav-section-title { padding: 0.5rem 1.5rem; color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-    
-    .qc-nav-item { display: block; padding: 0.85rem 1.5rem; color: rgba(255,255,255,0.9); text-decoration: none; transition: all 0.2s; display: flex; align-items: center; gap: 0.75rem; font-weight: 500; font-size: 0.9rem; }
-    .qc-nav-item:hover { background: rgba(255,255,255,0.15); color: white; padding-left: 2rem; }
-    .qc-nav-item.active { background: rgba(255,255,255,0.2); color: white; border-left: 4px solid white; padding-left: calc(1.5rem - 4px); }
-    .qc-nav-item-icon { font-size: 1.1rem; width: 24px; text-align: center; }
-    
+
+    /* Sidebar Header / Brand */
+    .qc-sidebar-header {
+        padding: 1rem 1.25rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+        border-bottom: 1px solid #f1f5f9;
+        min-height: 56px;
+    }
+    .qc-sidebar-brand {
+        color: #1e293b;
+        font-size: 0.9375rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .qc-sidebar-brand-icon {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+    .qc-sidebar-brand-text {
+        transition: opacity 0.25s ease, width 0.25s ease;
+    }
+    .qc-sidebar-close {
+        background: transparent;
+        border: 1px solid #e2e8f0;
+        color: #94a3b8;
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        border-radius: 6px;
+        font-size: 1.125rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+    .qc-sidebar-close:hover {
+        background: #f8fafc;
+        color: #64748b;
+        border-color: #cbd5e1;
+    }
+
+    /* Sidebar hamburger toggle (desktop only — sits inside sidebar header) */
+    .qc-sidebar-toggle {
+        display: none;             /* hidden on mobile */
+        flex-direction: column;
+        gap: 4px;
+        background: transparent;
+        border: 1px solid #e2e8f0;
+        padding: 7px;
+        border-radius: 7px;
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.25s ease;
+    }
+    .qc-sidebar-toggle:hover {
+        background: #f0f4ff;
+        border-color: #93b4fd;
+    }
+    .qc-sidebar-toggle span {
+        width: 16px;
+        height: 2px;
+        background: #64748b;
+        border-radius: 1px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .qc-sidebar-toggle:hover span { background: #3b82f6; }
+
+    /* Navigation Container */
+    .qc-sidebar-nav {
+        padding: 0.5rem 0;
+        flex: 1;
+    }
+
+    /* Section Titles */
+    .qc-nav-section { margin-bottom: 0.125rem; }
+    .qc-nav-section-title {
+        padding: 0.75rem 1.25rem 0.3rem;
+        color: #94a3b8;
+        font-size: 0.625rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        white-space: nowrap;
+        overflow: hidden;
+        transition: opacity 0.25s ease;
+    }
+
+    /* Navigation Items */
+    .qc-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 1rem;
+        margin: 1px 0.5rem;
+        color: #64748b;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.8125rem;
+        border-radius: 8px;
+        transition: all 0.18s ease;
+        position: relative;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .qc-nav-item:hover {
+        background: #f8fafc;
+        color: #334155;
+    }
+    .qc-nav-item.active {
+        background: #eff6ff;
+        color: #2563eb;
+        font-weight: 600;
+    }
+    .qc-nav-item.active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 18px;
+        background: #3b82f6;
+        border-radius: 0 3px 3px 0;
+    }
+
+    /* Nav Item Icons */
+    .qc-nav-item-icon {
+        font-size: 1rem;
+        width: 20px;
+        min-width: 20px;
+        text-align: center;
+        flex-shrink: 0;
+        line-height: 1;
+    }
+    .qc-nav-item-icon svg {
+        width: 17px;
+        height: 17px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    /* Nav item text */
+    .qc-nav-item-text {
+        transition: opacity 0.25s ease;
+    }
+
     /* Submenu */
-    .qc-nav-submenu { max-height: 0; overflow: hidden; transition: max-height 0.3s; background: rgba(0,0,0,0.15); }
+    .qc-nav-submenu {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: #f8fafc;
+        border-radius: 0 0 8px 8px;
+        margin: 0 0.5rem;
+    }
     .qc-nav-submenu.open { max-height: 500px; }
-    .qc-nav-submenu-item { padding: 0.7rem 1.5rem 0.7rem 3.5rem; color: rgba(255,255,255,0.85); text-decoration: none; display: block; font-size: 0.85rem; transition: all 0.2s; }
-    .qc-nav-submenu-item:hover { background: rgba(255,255,255,0.1); color: white; }
-    .qc-nav-submenu-item.active { color: white; font-weight: 600; }
-    
+    .qc-nav-submenu-item {
+        padding: 0.5rem 1rem 0.5rem 3rem;
+        color: #94a3b8;
+        text-decoration: none;
+        display: block;
+        font-size: 0.775rem;
+        transition: all 0.15s;
+        font-weight: 500;
+    }
+    .qc-nav-submenu-item:hover { color: #334155; background: #f1f5f9; }
+    .qc-nav-submenu-item.active { color: #2563eb; font-weight: 600; }
+
+    /* Section Divider */
+    .qc-nav-divider {
+        height: 1px;
+        background: #f1f5f9;
+        margin: 0.375rem 1rem;
+    }
+
     /* Footer */
-    .qc-sidebar-footer { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
-    .qc-sidebar-logout { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; transition: all 0.2s; }
-    .qc-sidebar-logout:hover { background: rgba(239, 68, 68, 0.8); }
-    
+    .qc-sidebar-footer {
+        padding: 0.625rem 0.75rem;
+        border-top: 1px solid #f1f5f9;
+        flex-shrink: 0;
+    }
+    .qc-sidebar-logout {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        border-radius: 8px;
+        cursor: pointer;
+        width: 100%;
+        font-weight: 600;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+        font-family: inherit;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .qc-sidebar-logout:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
+    }
+    .qc-sidebar-logout svg {
+        width: 17px;
+        height: 17px;
+        min-width: 17px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+    }
+    .qc-sidebar-logout-text {
+        transition: opacity 0.25s ease;
+    }
+
     /* Overlay */
-    .qc-sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1001; }
+    .qc-sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background: rgba(0,0,0,0.3);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 1001;
+        transition: opacity 0.3s;
+    }
     .qc-sidebar-overlay.show { display: block; }
-    
-    /* MOBILE: narrower sidebar */
+
+    /* App Version */
+    .qc-sidebar-version {
+        padding: 0.375rem 1rem 0.5rem;
+        text-align: center;
+        font-size: 0.5625rem;
+        color: #cbd5e1;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    /* Tooltip for collapsed icon rail */
+    .qc-nav-tooltip {
+        display: none;
+    }
+
+    /* ─── MOBILE ─── */
     @media (max-width: 767px) {
         .qc-sidebar { width: 85%; max-width: 320px; }
     }
 
-    /* ─── DESKTOP ≥ 768px: Pin sidebar permanently ─── */
+    /* ─── DESKTOP ≥ 768px: Sidebar with icon-rail collapsed state ─── */
     @media (min-width: 768px) {
         .qc-sidebar {
-            left: 0 !important;
-            width: 260px;
-            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            left: 0;
+            width: 256px;
+            box-shadow: none;
+            transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        /* COLLAPSED = icon rail (not hidden) */
+        .qc-sidebar.collapsed {
+            width: 60px;
+            left: 0;
+        }
+
+        /* Show the sidebar toggle on desktop */
+        .qc-sidebar-toggle { display: flex; }
+
+        /* Hide text elements when collapsed */
+        .qc-sidebar.collapsed .qc-sidebar-brand-text,
+        .qc-sidebar.collapsed .qc-nav-section-title,
+        .qc-sidebar.collapsed .qc-nav-item-text,
+        .qc-sidebar.collapsed .qc-sidebar-logout-text,
+        .qc-sidebar.collapsed .qc-sidebar-version,
+        .qc-sidebar.collapsed .qc-sidebar-close {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        /* Adjust spacing for collapsed */
+        .qc-sidebar.collapsed .qc-sidebar-header {
+            padding: 0.75rem 0;
+            justify-content: center;
+            border-bottom-color: transparent;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-brand {
+            display: none;
+        }
+        /* When collapsed, center the toggle in the header */
+        .qc-sidebar.collapsed .qc-sidebar-toggle {
+            margin: 0 auto;
+        }
+        .qc-sidebar.collapsed .qc-nav-item {
+            padding: 0.5rem;
+            margin: 2px 0.375rem;
+            justify-content: center;
+            gap: 0;
+            border-radius: 8px;
+        }
+        .qc-sidebar.collapsed .qc-nav-item-icon {
+            width: 22px;
+        }
+        .qc-sidebar.collapsed .qc-nav-item.active::before {
+            height: 14px;
+            width: 2px;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-footer {
+            padding: 0.5rem 0.375rem;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-logout {
+            padding: 0.5rem;
+            justify-content: center;
+            gap: 0;
+        }
+        .qc-sidebar.collapsed .qc-nav-divider {
+            margin: 0.25rem 0.5rem;
+        }
+        .qc-sidebar.collapsed .qc-nav-section {
+            margin-bottom: 0;
+        }
+
+        /* Tooltip on hover for collapsed items */
+        .qc-sidebar.collapsed .qc-nav-item {
+            position: relative;
+        }
+        .qc-sidebar.collapsed .qc-nav-tooltip {
+            display: none;
+            position: absolute;
+            left: calc(100% + 8px);
+            top: 50%;
+            transform: translateY(-50%);
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 0.375rem 0.625rem;
+            border-radius: 6px;
+            font-size: 0.725rem;
+            font-weight: 500;
+            white-space: nowrap;
+            z-index: 1100;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .qc-sidebar.collapsed .qc-nav-item:hover .qc-nav-tooltip {
+            display: block;
+        }
+
+        /* Hide the × close on desktop (toggle replaces it) */
         .qc-sidebar-close { display: none; }
+
+        /* Overlay hidden on desktop */
         .qc-sidebar-overlay { display: none !important; }
 
-        /* Push page content right of the pinned sidebar */
-        body { margin-left: 260px; }
-
-        /* Header: stretch to full viewport width but pad past sidebar */
-        .qc-unified-header {
-            margin-left: -260px;
-            padding-left: calc(260px + 1.5rem);
+        /* Push page content */
+        body {
+            margin-left: 256px;
+            transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body.sidebar-collapsed {
+            margin-left: 60px;
         }
 
-        /* Compact sidebar spacing for desktop */
-        .qc-sidebar-header { padding: 1rem 1.25rem; }
-        .qc-sidebar-user { padding: 0.75rem 1.25rem; }
-        .qc-sidebar-user-avatar { width: 40px; height: 40px; font-size: 1rem; }
-        .qc-sidebar-user-name { font-size: 0.85rem; }
-        .qc-nav-item { padding: 0.65rem 1.25rem; font-size: 0.85rem; gap: 0.6rem; }
-        .qc-nav-item-icon { font-size: 1rem; width: 22px; }
-        .qc-nav-section { margin-bottom: 1rem; }
-        .qc-nav-section-title { padding: 0.4rem 1.25rem; font-size: 0.65rem; }
-        .qc-sidebar-footer { padding: 0.75rem 1.25rem; }
-        .qc-sidebar-logout { padding: 0.65rem 0.85rem; font-size: 0.85rem; }
+        /* Header adjustments */
+        .qc-unified-header {
+            margin-left: -256px;
+            padding-left: calc(256px);
+            transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                        padding-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body.sidebar-collapsed .qc-unified-header {
+            margin-left: -60px;
+            padding-left: 60px;
+        }
+
+        /* Compact desktop sizing */
+        .qc-sidebar-header { padding: 0.875rem 1rem; }
+        .qc-sidebar-brand { font-size: 0.875rem; }
+        .qc-sidebar-brand-icon { width: 30px; height: 30px; min-width: 30px; font-size: 0.875rem; border-radius: 7px; }
+        .qc-nav-item { padding: 0.45rem 0.875rem; margin: 1px 0.375rem; font-size: 0.775rem; gap: 0.625rem; border-radius: 7px; }
+        .qc-nav-item-icon { font-size: 0.9rem; width: 20px; min-width: 20px; }
+        .qc-nav-item-icon svg { width: 16px; height: 16px; }
+        .qc-nav-section-title { padding: 0.625rem 1rem 0.25rem; font-size: 0.575rem; }
+        .qc-sidebar-footer { padding: 0.5rem 0.75rem; }
+        .qc-sidebar-logout { padding: 0.45rem 0.625rem; font-size: 0.775rem; border-radius: 7px; }
+        .qc-sidebar-logout svg { width: 16px; height: 16px; min-width: 16px; }
     }
 
-    /* ─── LARGE DESKTOP ≥ 1280px: Wider sidebar ─── */
+    /* ─── LARGE DESKTOP ≥ 1280px ─── */
     @media (min-width: 1280px) {
-        .qc-sidebar { width: 280px; }
-        body { margin-left: 280px; }
+        .qc-sidebar { width: 268px; }
+        .qc-sidebar.collapsed { width: 64px; }
+        body { margin-left: 268px; }
+        body.sidebar-collapsed { margin-left: 64px; }
         .qc-unified-header {
-            margin-left: -280px;
-            padding-left: calc(280px + 1.5rem);
+            margin-left: -268px;
+            padding-left: 268px;
+        }
+        body.sidebar-collapsed .qc-unified-header {
+            margin-left: -64px;
+            padding-left: 64px;
         }
     }
 </style>
@@ -102,93 +468,99 @@
     <!-- Header -->
     <div class="qc-sidebar-header">
         <div class="qc-sidebar-brand">
-            <span>🏢</span>
-            <span>Quality Colours</span>
-        </div>
-        <button class="qc-sidebar-close" onclick="closeSidebar()">×</button>
-    </div>
-    
-    <!-- User Info -->
-    <div class="qc-sidebar-user">
-        <div class="qc-sidebar-user-info">
-            <div class="qc-sidebar-user-avatar" id="sidebarAvatar">
-                <span id="sidebarInitial">A</span>
+            <div class="qc-sidebar-brand-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             </div>
-            <div class="qc-sidebar-user-details">
-                <div class="qc-sidebar-user-name" id="sidebarName">Admin User</div>
-                <div class="qc-sidebar-user-role" id="sidebarRole">Administrator</div>
-                <div class="qc-sidebar-user-branch" id="sidebarBranch">📍 Branch Name</div>
-            </div>
+            <span class="qc-sidebar-brand-text">Quality Colours</span>
         </div>
+        <!-- Desktop: 3-dash toggle (pin / unpin) -->
+        <button class="qc-sidebar-toggle" id="sidebarToggleBtn" title="Toggle menu">
+            <span></span><span></span><span></span>
+        </button>
+        <!-- Mobile: × close button -->
+        <button class="qc-sidebar-close" onclick="closeSidebar()" title="Close menu">&times;</button>
     </div>
-    
+
     <!-- Navigation -->
     <nav class="qc-sidebar-nav">
-        <!-- Main -->
+        <!-- Dashboard -->
         <div class="qc-nav-section">
             <a href="/dashboard.html" class="qc-nav-item" data-page="dashboard">
-                <span class="qc-nav-item-icon">🏠</span>
-                <span>Dashboard</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+                <span class="qc-nav-item-text">Dashboard</span>
+                <span class="qc-nav-tooltip">Dashboard</span>
             </a>
         </div>
-        
+
+        <div class="qc-nav-divider"></div>
+
         <!-- Sales & Estimates -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Sales & Estimates</div>
             <a href="/estimates.html" class="qc-nav-item" data-page="estimates">
-                <span class="qc-nav-item-icon">📋</span>
-                <span>All Estimates</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+                <span class="qc-nav-item-text">All Estimates</span>
+                <span class="qc-nav-tooltip">All Estimates</span>
             </a>
             <a href="/estimate-create-new.html" class="qc-nav-item" data-page="estimate-create">
-                <span class="qc-nav-item-icon">➕</span>
-                <span>Create New</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>
+                <span class="qc-nav-item-text">Create New</span>
+                <span class="qc-nav-tooltip">Create New</span>
             </a>
             <a href="/admin-estimate-requests.html" class="qc-nav-item" data-page="estimate-requests">
-                <span class="qc-nav-item-icon">📬</span>
-                <span>Estimate Requests</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
+                <span class="qc-nav-item-text">Estimate Requests</span>
+                <span class="qc-nav-tooltip">Estimate Requests</span>
             </a>
             <a href="/estimate-settings.html" class="qc-nav-item" data-page="estimate-settings">
-                <span class="qc-nav-item-icon">⚙️</span>
-                <span>Estimate Settings</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+                <span class="qc-nav-item-text">Estimate Settings</span>
+                <span class="qc-nav-tooltip">Estimate Settings</span>
             </a>
         </div>
-        
+
         <!-- Products & Inventory -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Products & Inventory</div>
             <a href="/admin-products.html" class="qc-nav-item" data-page="products">
-                <span class="qc-nav-item-icon">🎨</span>
-                <span>Products</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
+                <span class="qc-nav-item-text">Products</span>
+                <span class="qc-nav-tooltip">Products</span>
             </a>
             <a href="/admin-categories.html" class="qc-nav-item" data-page="categories">
-                <span class="qc-nav-item-icon">🏷️</span>
-                <span>Categories</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="qc-nav-item-text">Categories</span>
+                <span class="qc-nav-tooltip">Categories</span>
             </a>
             <a href="/admin-brands.html" class="qc-nav-item" data-page="brands">
-                <span class="qc-nav-item-icon">🔖</span>
-                <span>Brands</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
+                <span class="qc-nav-item-text">Brands</span>
+                <span class="qc-nav-tooltip">Brands</span>
             </a>
         </div>
-        
+
         <!-- Customers -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Customers</div>
             <a href="/admin-customers.html" class="qc-nav-item" data-page="customers">
-                <span class="qc-nav-item-icon">👥</span>
-                <span>Customer List</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                <span class="qc-nav-item-text">Customer List</span>
+                <span class="qc-nav-tooltip">Customer List</span>
             </a>
             <a href="/admin-customer-types.html" class="qc-nav-item" data-page="customer-types">
-                <span class="qc-nav-item-icon">🏷️</span>
-                <span>Customer Types</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
+                <span class="qc-nav-item-text">Customer Types</span>
+                <span class="qc-nav-tooltip">Customer Types</span>
             </a>
         </div>
-        
+
         <!-- Leads -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Leads & CRM</div>
             <a href="/admin-leads.html" class="qc-nav-item" data-page="leads">
-                <span class="qc-nav-item-icon">🎯</span>
-                <span>Lead Management</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+                <span class="qc-nav-item-text">Lead Management</span>
+                <span class="qc-nav-tooltip">Lead Management</span>
             </a>
         </div>
 
@@ -196,160 +568,325 @@
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Branches & Staff</div>
             <a href="/admin-branches.html" class="qc-nav-item" data-page="branches">
-                <span class="qc-nav-item-icon">🏪</span>
-                <span>Branches</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+                <span class="qc-nav-item-text">Branches</span>
+                <span class="qc-nav-tooltip">Branches</span>
             </a>
             <a href="/admin-staff.html" class="qc-nav-item" data-page="staff">
-                <span class="qc-nav-item-icon">👤</span>
-                <span>Staff Management</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <span class="qc-nav-item-text">Staff Management</span>
+                <span class="qc-nav-tooltip">Staff Management</span>
             </a>
             <a href="/admin-roles.html" class="qc-nav-item" data-page="roles">
-                <span class="qc-nav-item-icon">🔐</span>
-                <span>Roles</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                <span class="qc-nav-item-text">Roles</span>
+                <span class="qc-nav-tooltip">Roles</span>
             </a>
             <a href="/admin-role-permissions.html" class="qc-nav-item" data-page="permissions">
-                <span class="qc-nav-item-icon">🛡️</span>
-                <span>Permissions</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                <span class="qc-nav-item-text">Permissions</span>
+                <span class="qc-nav-tooltip">Permissions</span>
             </a>
         </div>
-        
-        <!-- HR & Staff Management -->
+
+        <!-- HR & Attendance -->
         <div class="qc-nav-section">
-            <div class="qc-nav-section-title">HR & Staff Management</div>
-            
-            <!-- Attendance Section -->
+            <div class="qc-nav-section-title">HR & Attendance</div>
             <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
-                <span class="qc-nav-item-icon">🟢</span>
-                <span>Clock In</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+                <span class="qc-nav-item-text">Clock In</span>
+                <span class="qc-nav-tooltip">Clock In</span>
             </a>
             <a href="/staff/clock-out.html" class="qc-nav-item" data-page="clock-out">
-                <span class="qc-nav-item-icon">🔴</span>
-                <span>Clock Out</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                <span class="qc-nav-item-text">Clock Out</span>
+                <span class="qc-nav-tooltip">Clock Out</span>
             </a>
             <a href="/staff/history.html" class="qc-nav-item" data-page="attendance-history">
-                <span class="qc-nav-item-icon">📜</span>
-                <span>Attendance History</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                <span class="qc-nav-item-text">Attendance History</span>
+                <span class="qc-nav-tooltip">Attendance History</span>
             </a>
             <a href="/staff/permission-request.html" class="qc-nav-item" data-page="permission-request">
-                <span class="qc-nav-item-icon">✋</span>
-                <span>Permission Requests</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span>
+                <span class="qc-nav-item-text">Permission Requests</span>
+                <span class="qc-nav-tooltip">Permission Requests</span>
             </a>
             <a href="/staff/activities.html" class="qc-nav-item" data-page="activities">
-                <span class="qc-nav-item-icon">📝</span>
-                <span>Daily Activities</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+                <span class="qc-nav-item-text">Daily Activities</span>
+                <span class="qc-nav-tooltip">Daily Activities</span>
             </a>
             <a href="/staff/tasks.html" class="qc-nav-item" data-page="my-tasks">
-                <span class="qc-nav-item-icon">✅</span>
-                <span>My Tasks</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+                <span class="qc-nav-item-text">My Tasks</span>
+                <span class="qc-nav-tooltip">My Tasks</span>
             </a>
             <a href="/admin-tasks.html" class="qc-nav-item" data-page="admin-tasks">
-                <span class="qc-nav-item-icon">📋</span>
-                <span>Task Management</span>
-            </a>
-
-            <!-- Salary Section -->
-            <a href="/admin-salary-config.html" class="qc-nav-item" data-page="salary-config">
-                <span class="qc-nav-item-icon">💵</span>
-                <span>Salary Config</span>
-            </a>
-            <a href="/admin-salary-monthly.html" class="qc-nav-item" data-page="salary-monthly">
-                <span class="qc-nav-item-icon">📅</span>
-                <span>Monthly Salary</span>
-            </a>
-            <a href="/admin-salary-payments.html" class="qc-nav-item" data-page="salary-payments">
-                <span class="qc-nav-item-icon">💳</span>
-                <span>Salary Payments</span>
-            </a>
-            <a href="/admin-salary-reports.html" class="qc-nav-item" data-page="salary-reports">
-                <span class="qc-nav-item-icon">📊</span>
-                <span>Salary Reports</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
+                <span class="qc-nav-item-text">Task Management</span>
+                <span class="qc-nav-tooltip">Task Management</span>
             </a>
         </div>
-        
-        <!-- Reports & Settings -->
+
+        <!-- Salary -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">Salary & Payroll</div>
+            <a href="/admin-salary-config.html" class="qc-nav-item" data-page="salary-config">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                <span class="qc-nav-item-text">Salary Config</span>
+                <span class="qc-nav-tooltip">Salary Config</span>
+            </a>
+            <a href="/admin-salary-monthly.html" class="qc-nav-item" data-page="salary-monthly">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                <span class="qc-nav-item-text">Monthly Salary</span>
+                <span class="qc-nav-tooltip">Monthly Salary</span>
+            </a>
+            <a href="/admin-salary-payments.html" class="qc-nav-item" data-page="salary-payments">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+                <span class="qc-nav-item-text">Salary Payments</span>
+                <span class="qc-nav-tooltip">Salary Payments</span>
+            </a>
+            <a href="/admin-salary-reports.html" class="qc-nav-item" data-page="salary-reports">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <span class="qc-nav-item-text">Salary Reports</span>
+                <span class="qc-nav-tooltip">Salary Reports</span>
+            </a>
+        </div>
+
+        <div class="qc-nav-divider"></div>
+
+        <!-- System -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">System</div>
             <a href="/admin-reports.html" class="qc-nav-item" data-page="reports">
-                <span class="qc-nav-item-icon">📈</span>
-                <span>Reports</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>
+                <span class="qc-nav-item-text">Reports</span>
+                <span class="qc-nav-tooltip">Reports</span>
             </a>
             <a href="/admin-settings.html" class="qc-nav-item" data-page="settings">
-                <span class="qc-nav-item-icon">⚙️</span>
-                <span>Settings</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+                <span class="qc-nav-item-text">Settings</span>
+                <span class="qc-nav-tooltip">Settings</span>
             </a>
             <a href="/admin-profile.html" class="qc-nav-item" data-page="profile">
-                <span class="qc-nav-item-icon">👤</span>
-                <span>My Profile</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <span class="qc-nav-item-text">My Profile</span>
+                <span class="qc-nav-tooltip">My Profile</span>
             </a>
         </div>
     </nav>
-    
+
     <!-- Footer -->
     <div class="qc-sidebar-footer">
         <button class="qc-sidebar-logout" onclick="logoutUser()">
-            <span>🚪</span>
-            <span>Logout</span>
+            <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span class="qc-sidebar-logout-text">Logout</span>
         </button>
     </div>
+
+    <!-- Version -->
+    <div class="qc-sidebar-version">QC Business Manager v2.0</div>
 </aside>
 
 <script>
-// Sidebar Controls
+// ═══════════════════════════════════════════════════════════════
+// SIDEBAR CONTROLS  –  Hover-to-preview  +  Click-to-pin
+//
+// DESKTOP (≥ 768 px):
+//   • Sidebar starts as a collapsed 60 px icon rail.
+//   • Hovering ANYWHERE on the rail (top to bottom) auto-expands
+//     the sidebar to full width.  It stays open while the cursor
+//     is inside the sidebar area.
+//   • Moving the cursor out collapses it back (after a short
+//     debounce to avoid flicker).
+//   • Clicking the 3-dash toggle button inside the sidebar header
+//     PINS the sidebar open.  It stays expanded until:
+//       – the user clicks the toggle again, OR
+//       – the user clicks anywhere on the dashboard area.
+//   • The 3-dash toggle replaces the old header hamburger on
+//     desktop.  It lives inside the sidebar itself.
+//
+// MOBILE (< 768 px):
+//   • Header hamburger opens / closes the slide-in sidebar +
+//     overlay (unchanged).
+// ═══════════════════════════════════════════════════════════════
+
+let sidebarPinned  = false;   // true = click-locked open
+let hoverActive    = false;   // true = expanded via hover
+let hoverLeaveTimer = null;
+const HOVER_DELAY  = 200;     // ms debounce before collapsing
+
+// ── helpers ──
+
+function expandSidebar() {
+    const s = document.getElementById('mainSidebar');
+    s.classList.remove('collapsed');
+    document.body.classList.remove('sidebar-collapsed');
+}
+
+function collapseSidebar() {
+    const s = document.getElementById('mainSidebar');
+    s.classList.add('collapsed');
+    document.body.classList.add('sidebar-collapsed');
+}
+
+// ── toggle (click the 3-dash button inside sidebar) ──
+
 function toggleSidebar() {
-    document.getElementById('mainSidebar').classList.toggle('open');
-    document.getElementById('sidebarOverlay').classList.toggle('show');
+    const sidebar  = document.getElementById('mainSidebar');
+    const overlay  = document.getElementById('sidebarOverlay');
+    const isDesktop = window.innerWidth >= 768;
+
+    if (isDesktop) {
+        if (sidebarPinned) {
+            // unpin → collapse
+            sidebarPinned = false;
+            hoverActive   = false;
+            collapseSidebar();
+            localStorage.setItem('sidebarCollapsed', 'true');
+            document.removeEventListener('click', handleClickOutside, true);
+        } else {
+            // pin open
+            clearTimeout(hoverLeaveTimer);
+            sidebarPinned = true;
+            hoverActive   = false;
+            expandSidebar();
+            localStorage.setItem('sidebarCollapsed', 'false');
+            setTimeout(() => {
+                document.addEventListener('click', handleClickOutside, true);
+            }, 60);
+        }
+    } else {
+        // mobile slide-in toggle
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('show');
+    }
 }
 
 function closeSidebar() {
-    document.getElementById('mainSidebar').classList.remove('open');
-    document.getElementById('sidebarOverlay').classList.remove('show');
-}
+    const sidebar = document.getElementById('mainSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const isDesktop = window.innerWidth >= 768;
 
-// Load User Info into Sidebar
-function loadSidebarUserInfo() {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    
-    // Set name
-    const nameEl = document.getElementById('sidebarName');
-    if (nameEl && user.full_name) {
-        nameEl.textContent = user.full_name;
-    }
-    
-    // Set role
-    const roleEl = document.getElementById('sidebarRole');
-    if (roleEl && user.role) {
-        roleEl.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
-    }
-    
-    // Set branch
-    const branchEl = document.getElementById('sidebarBranch');
-    if (branchEl && user.branch_name) {
-        branchEl.textContent = `📍 ${user.branch_name}`;
-    }
-    
-    // Set avatar
-    const avatarEl = document.getElementById('sidebarAvatar');
-    const initialEl = document.getElementById('sidebarInitial');
-    
-    if (user.profile_image_url) {
-        avatarEl.innerHTML = `<img src="${user.profile_image_url}" alt="Profile">`;
-    } else if (user.full_name && initialEl) {
-        initialEl.textContent = user.full_name.charAt(0).toUpperCase();
+    if (isDesktop) {
+        sidebarPinned = false;
+        hoverActive   = false;
+        collapseSidebar();
+        localStorage.setItem('sidebarCollapsed', 'true');
+        document.removeEventListener('click', handleClickOutside, true);
+    } else {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
     }
 }
 
-// Highlight Active Page
+// ── click-outside (active only when pinned) ──
+
+function handleClickOutside(e) {
+    const sidebar = document.getElementById('mainSidebar');
+    if (!sidebar || window.innerWidth < 768) return;
+
+    if (sidebar.classList.contains('collapsed')) {
+        sidebarPinned = false;
+        document.removeEventListener('click', handleClickOutside, true);
+        return;
+    }
+
+    // click inside sidebar → ignore
+    if (sidebar.contains(e.target)) return;
+
+    // click on mobile hamburger in header → let toggleSidebar handle it
+    const headerHamburger = document.getElementById('hamburgerBtn');
+    if (headerHamburger && headerHamburger.contains(e.target)) return;
+
+    // click on dashboard → unpin & collapse
+    closeSidebar();
+}
+
+// ── hover on the sidebar rail (desktop) ──
+
+function onSidebarMouseEnter() {
+    if (window.innerWidth < 768 || sidebarPinned) return;
+    clearTimeout(hoverLeaveTimer);
+    hoverActive = true;
+    expandSidebar();
+}
+
+function onSidebarMouseLeave() {
+    if (window.innerWidth < 768 || sidebarPinned) return;
+
+    hoverLeaveTimer = setTimeout(() => {
+        if (!sidebarPinned && hoverActive) {
+            hoverActive = false;
+            collapseSidebar();
+        }
+    }, HOVER_DELAY);
+}
+
+// ── wire up all listeners ──
+
+function attachSidebarListeners() {
+    const sidebar       = document.getElementById('mainSidebar');
+    const toggleBtn     = document.getElementById('sidebarToggleBtn');
+    const headerHamburger = document.getElementById('hamburgerBtn');
+
+    if (!sidebar) return;
+
+    // Sidebar toggle button (inside sidebar header) – click to pin/unpin
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleSidebar();
+        });
+    }
+
+    // Header hamburger (mobile fallback) – click to open/close
+    if (headerHamburger) {
+        headerHamburger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleSidebar();
+        });
+    }
+
+    // Hover on the ENTIRE sidebar (whether collapsed rail or expanded)
+    sidebar.addEventListener('mouseenter', onSidebarMouseEnter);
+    sidebar.addEventListener('mouseleave', onSidebarMouseLeave);
+}
+
+// ── restore persisted state ──
+
+function restoreSidebarState() {
+    if (window.innerWidth < 768) return;
+
+    const saved = localStorage.getItem('sidebarCollapsed');
+    const shouldCollapse = saved !== 'false';   // default = collapsed
+
+    if (shouldCollapse) {
+        collapseSidebar();
+        sidebarPinned = false;
+    } else {
+        expandSidebar();
+        sidebarPinned = true;
+        setTimeout(() => {
+            document.addEventListener('click', handleClickOutside, true);
+        }, 100);
+    }
+}
+
+// ── highlight active page ──
+
 function highlightActiveSidebarPage() {
     const path = window.location.pathname;
     document.querySelectorAll('.qc-nav-item[data-page]').forEach(item => {
-        const page = item.getAttribute('data-page');
-        if (path.includes(page)) {
+        if (path.includes(item.getAttribute('data-page'))) {
             item.classList.add('active');
         }
     });
 }
 
-// Logout
+// ── logout ──
+
 function logoutUser() {
     if (confirm('Are you sure you want to logout?')) {
         localStorage.removeItem('auth_token');
@@ -358,14 +895,37 @@ function logoutUser() {
     }
 }
 
-// Initialize on load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        loadSidebarUserInfo();
-        highlightActiveSidebarPage();
-    });
-} else {
-    loadSidebarUserInfo();
+// ── responsive resize ──
+
+window.addEventListener('resize', function() {
+    const sidebar = document.getElementById('mainSidebar');
+    const isDesktop = window.innerWidth >= 768;
+
+    if (!isDesktop) {
+        document.removeEventListener('click', handleClickOutside, true);
+        sidebar.classList.remove('collapsed');
+        document.body.classList.remove('sidebar-collapsed');
+        sidebarPinned = false;
+        hoverActive   = false;
+        clearTimeout(hoverLeaveTimer);
+    } else {
+        sidebar.classList.remove('open');
+        document.getElementById('sidebarOverlay').classList.remove('show');
+        restoreSidebarState();
+    }
+});
+
+// ── init ──
+
+function initSidebar() {
+    restoreSidebarState();
     highlightActiveSidebarPage();
+    attachSidebarListeners();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSidebar);
+} else {
+    initSidebar();
 }
 </script>

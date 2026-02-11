@@ -1,10 +1,11 @@
 -- ========================================
 -- COMPLETE DATABASE SCHEMA
 -- Quality Colours Business Manager
--- Date: 2026-02-09
+-- Date: 2026-02-10 (Updated)
 -- All modules: Auth, Roles, Permissions, Branches,
 -- Customers, Leads, Products, Estimates, Attendance,
 -- Salary, Activity Tracker, Task Management, Settings
+-- Updated with attendance fixes and missing columns
 -- ========================================
 
 USE qc_business_manager;
@@ -15,30 +16,32 @@ USE qc_business_manager;
 CREATE TABLE IF NOT EXISTS branches (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL,
-    code VARCHAR(20) UNIQUE,
+    code VARCHAR(50) UNIQUE,
     address TEXT,
     city VARCHAR(100),
     state VARCHAR(100) DEFAULT 'Tamil Nadu',
-    pincode VARCHAR(10),
+    pincode VARCHAR(20),
+    country VARCHAR(100) DEFAULT 'India',
     phone VARCHAR(20),
     email VARCHAR(255),
-    manager_user_id INT NULL,
+    manager_id INT NULL,
     latitude DECIMAL(10,8) NULL,
     longitude DECIMAL(11,8) NULL,
-    geo_fence_radius_meters INT DEFAULT 200,
-    open_time TIME DEFAULT '08:30:00',
-    close_time TIME DEFAULT '20:30:00',
-    status ENUM('active','inactive') DEFAULT 'active',
+    geo_fence_radius INT DEFAULT 500 COMMENT 'Radius in meters',
+    is_active BOOLEAN DEFAULT TRUE,
+    opening_time TIME DEFAULT '09:00:00',
+    closing_time TIME DEFAULT '18:00:00',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_status (status),
-    INDEX idx_city (city)
+    INDEX idx_code (code),
+    INDEX idx_manager (manager_id),
+    INDEX idx_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert default branch
-INSERT INTO branches (name, code, city, status) VALUES
-('Main Branch', 'MAIN', 'Chennai', 'active')
-ON DUPLICATE KEY UPDATE name = name;
+INSERT INTO branches (name, code, address, city, state, pincode, phone, email, geo_fence_radius) VALUES
+('Quality Colours - Main Branch', 'QC-MAIN', 'Ramanathapuram', 'Ramanathapuram', 'Tamil Nadu', '623501', '+91 7418831122', 'info@qcpaintshop.com', 500)
+ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 -- ========================================
 -- 2. ROLES TABLE
@@ -222,25 +225,36 @@ CREATE TABLE IF NOT EXISTS otp_verifications (
 -- ========================================
 CREATE TABLE IF NOT EXISTS settings (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    setting_key VARCHAR(100) UNIQUE NOT NULL,
+    setting_key VARCHAR(100) NOT NULL UNIQUE,
     setting_value TEXT,
     category VARCHAR(50) DEFAULT 'general',
+    description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_key (setting_key),
     INDEX idx_category (category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Default settings
-INSERT INTO settings (setting_key, setting_value, category) VALUES
-('business_name', 'Quality Colours', 'business'),
-('business_phone', '', 'business'),
-('business_email', '', 'business'),
-('business_address', '', 'business'),
-('business_gst', '', 'business'),
-('currency_symbol', '₹', 'general'),
-('date_format', 'DD/MM/YYYY', 'general'),
-('estimate_valid_days', '30', 'estimates'),
-('estimate_terms', 'This estimate is valid for 30 days from the date of issue.', 'estimates')
+INSERT INTO settings (setting_key, setting_value, category, description) VALUES
+('business_name', 'Quality Colours (குவாலிட்டி கலர்ஸ்)', 'business', 'Business name'),
+('business_type', 'both', 'business', 'Business type: retail, wholesale, or both'),
+('business_address', 'Ramanathapuram, Tamil Nadu, India', 'business', 'Business address'),
+('business_phone', '+91 7418831122', 'business', 'Business phone number'),
+('business_email', 'info@qcpaintshop.com', 'business', 'Business email'),
+('business_logo', NULL, 'business', 'Business logo URL'),
+('gst_number', NULL, 'tax', 'GST Number (GSTIN)'),
+('pan_number', NULL, 'tax', 'PAN Number'),
+('enable_gst', 'true', 'tax', 'Enable GST in estimates'),
+('cgst_rate', '9', 'tax', 'CGST rate percentage'),
+('sgst_rate', '9', 'tax', 'SGST rate percentage'),
+('igst_rate', '18', 'tax', 'IGST rate percentage'),
+('estimate_prefix', 'EST', 'estimate', 'Estimate number prefix'),
+('estimate_validity', '30', 'estimate', 'Estimate validity in days'),
+('estimate_terms', '1. All prices are subject to change without prior notice.\n2. This estimate is valid for 30 days from the date of issue.\n3. Payment terms: As per agreement.\n4. Delivery time: As per discussion.\n5. For any queries, please contact us.', 'estimate', 'Terms and conditions'),
+('show_brand_logo', 'true', 'estimate', 'Show brand logos in estimates'),
+('currency_symbol', '₹', 'general', 'Currency symbol'),
+('date_format', 'DD/MM/YYYY', 'general', 'Date format')
 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
 
 -- ========================================
@@ -356,31 +370,37 @@ CREATE TABLE IF NOT EXISTS lead_followups (
 
 -- ========================================
 -- 12. SHOP HOURS CONFIG TABLE
+-- CRITICAL: day_of_week must be TINYINT (0-6) not ENUM!
+-- This enables DAYOFWEEK(date) - 1 matching in attendance queries
 -- ========================================
 CREATE TABLE IF NOT EXISTS shop_hours_config (
     id INT PRIMARY KEY AUTO_INCREMENT,
     branch_id INT NOT NULL,
-    day_of_week ENUM('monday','tuesday','wednesday','thursday','friday','saturday','sunday') NOT NULL,
-    is_open BOOLEAN DEFAULT 1,
-    open_time TIME DEFAULT '08:30:00',
-    close_time TIME DEFAULT '20:30:00',
-    expected_hours DECIMAL(4,2) DEFAULT 10.00,
+    day_of_week TINYINT NOT NULL COMMENT '0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday',
+    is_working_day BOOLEAN DEFAULT TRUE,
+    open_time TIME NOT NULL,
+    close_time TIME NOT NULL,
+    expected_hours DECIMAL(4,2) DEFAULT 8.00,
     late_threshold_minutes INT DEFAULT 15,
-    break_min_minutes INT DEFAULT 60,
-    break_max_minutes INT DEFAULT 120,
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_branch_day (branch_id, day_of_week)
+    early_leave_threshold_minutes INT DEFAULT 15,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_branch_day (branch_id, day_of_week),
+    INDEX idx_branch (branch_id),
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert default shop hours for main branch
--- Note: is_open column omitted for compatibility with older table versions (defaults to 1)
-INSERT INTO shop_hours_config (branch_id, day_of_week, open_time, close_time, expected_hours, late_threshold_minutes, break_min_minutes, break_max_minutes)
-SELECT 1, day,
-    CASE WHEN day = 'sunday' THEN '09:00:00' ELSE '08:30:00' END,
-    CASE WHEN day = 'sunday' THEN '14:00:00' ELSE '20:30:00' END,
-    CASE WHEN day = 'sunday' THEN 5.00 ELSE 10.00 END,
-    15, 60, 120
-FROM (SELECT 'monday' AS day UNION SELECT 'tuesday' UNION SELECT 'wednesday' UNION SELECT 'thursday' UNION SELECT 'friday' UNION SELECT 'saturday' UNION SELECT 'sunday') days
+-- Monday-Saturday (days 1-6): 9 AM - 6 PM
+INSERT INTO shop_hours_config (branch_id, day_of_week, is_working_day, open_time, close_time, expected_hours, late_threshold_minutes)
+VALUES
+(1, 1, TRUE, '09:00:00', '18:00:00', 8.00, 15),  -- Monday
+(1, 2, TRUE, '09:00:00', '18:00:00', 8.00, 15),  -- Tuesday
+(1, 3, TRUE, '09:00:00', '18:00:00', 8.00, 15),  -- Wednesday
+(1, 4, TRUE, '09:00:00', '18:00:00', 8.00, 15),  -- Thursday
+(1, 5, TRUE, '09:00:00', '18:00:00', 8.00, 15),  -- Friday
+(1, 6, TRUE, '09:00:00', '18:00:00', 8.00, 15),  -- Saturday
+(1, 0, FALSE, '09:00:00', '18:00:00', 0, 15)     -- Sunday (closed)
 ON DUPLICATE KEY UPDATE open_time = VALUES(open_time);
 
 -- ========================================

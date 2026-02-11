@@ -3,7 +3,20 @@
     "allow": [
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(node -e:*)",
+      "Bash(node fix-attendance-tables.js:*)",
+      "Bash(node verify-attendance-setup.js:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(cmd /c \"mysql -u root -p qc_business_manager < scripts/migrate-fix-schema.sql\")",
+      "Bash(cmd /c \"mysql -u root -pShar@7427462 qc_business_manager < scripts\\\\migrate-fix-schema.sql\")",
+      "Bash(mysql:*)",
+      "Bash(where.exe:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(ssh -o ConnectTimeout=10 root@161.97.114.189 \"echo ''=== Running Node/PM2 processes ==='' && pm2 list 2>/dev/null || echo ''PM2 not running'' && echo '''' && echo ''=== Project directories ==='' && ls -la /var/www/ 2>/dev/null || ls -la /root/ 2>/dev/null && echo '''' && echo ''=== Nginx sites ==='' && ls /etc/nginx/sites-enabled/ 2>/dev/null || echo ''No nginx sites'' && echo '''' && echo ''=== Docker containers ==='' && docker ps 2>/dev/null || echo ''No docker''\")"
     ]
   }
 }

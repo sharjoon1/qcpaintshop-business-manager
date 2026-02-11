@@ -139,34 +139,40 @@ document.getElementById('searchInput').addEventListener('input', () => {
 // Display estimates
 function displayEstimates() {
     console.log('📊 displayEstimates called, filteredEstimates:', filteredEstimates.length);
-    
+
     const loadingState = document.getElementById('loadingState');
     const emptyState = document.getElementById('emptyState');
     const desktopTable = document.getElementById('desktopTable');
     const mobileCards = document.getElementById('mobileCards');
-    
+
     // Hide loading
     if (loadingState) loadingState.classList.add('hidden');
-    
+
     // Check if empty
     if (filteredEstimates.length === 0) {
-        console.log('📭 No estimates to display');
+        console.log('No estimates to display');
         if (emptyState) emptyState.classList.remove('hidden');
-        if (desktopTable) desktopTable.classList.add('hidden');
+        if (desktopTable) {
+            desktopTable.classList.add('hidden');
+            desktopTable.classList.remove('lg:block');
+        }
         if (mobileCards) mobileCards.innerHTML = '';
         return;
     }
-    
+
     console.log('🎨 Rendering estimates...');
-    
-    // Show results
+
+    // Show results - desktop table on lg+, mobile cards below lg
     if (emptyState) emptyState.classList.add('hidden');
-    if (desktopTable) desktopTable.classList.remove('hidden');
-    
+    if (desktopTable) {
+        // hidden lg:block = hidden on mobile, visible on lg+
+        desktopTable.className = 'card overflow-hidden hidden lg:block';
+    }
+
     // Render both views (CSS will handle which one displays based on screen size)
     renderDesktopTable();
     renderMobileCards();
-    
+
     console.log('✅ Rendering complete');
 }
 

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Quality Colours Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -26,17 +27,17 @@
         </div>
 
         <!-- Login Card -->
-        <div class="bg-white rounded-2xl shadow-2xl p-8">
+        <div class="card p-8">
             <form id="loginForm">
                 <!-- Username -->
                 <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-semibold mb-2">
+                    <label class="form-label">
                         Username or Email
                     </label>
-                    <input 
-                        type="text" 
+                    <input
+                        type="text"
                         id="username"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent transition"
+                        class="form-input"
                         placeholder="Enter your username"
                         required
                     >
@@ -44,13 +45,13 @@
 
                 <!-- Password -->
                 <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-semibold mb-2">
+                    <label class="form-label">
                         Password
                     </label>
-                    <input 
-                        type="password" 
+                    <input
+                        type="password"
                         id="password"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent transition"
+                        class="form-input"
                         placeholder="Enter your password"
                         required
                     >
@@ -71,10 +72,11 @@
                 </div>
 
                 <!-- Login Button -->
-                <button 
+                <button
                     type="submit"
                     id="loginBtn"
-                    class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transform hover:scale-105 transition duration-200 shadow-lg"
+                    class="btn btn-primary w-full"
+                    style="background: linear-gradient(to right, var(--color-primary), var(--color-secondary));"
                 >
                     <span id="btnText">Sign In</span>
                     <span id="btnLoader" class="hidden">
@@ -140,7 +142,11 @@
                     errorMessage.classList.remove('hidden');
                 }
             } catch (error) {
-                errorText.textContent = 'Connection error. Please try again.';
+                if (error.message && error.message.includes('CORS')) {
+                    errorText.textContent = 'CORS error – server may not allow this origin. Contact admin.';
+                } else {
+                    errorText.textContent = 'Connection error. Please check your network and try again.';
+                }
                 errorMessage.classList.remove('hidden');
             } finally {
                 // Hide loader

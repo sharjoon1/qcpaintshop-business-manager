@@ -3,14 +3,545 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quality Colours Business Manager</title>
-    <script>
-        // Redirect to login page
-        window.location.href = '/login.html';
-    </script>
-    <script src="/universal-nav-loader.js"></script>
+    <meta name="description" content="Quality Colours Paint Shop - 5 Branches Across Ramanathapuram District. Get free quotes, expert painting services, and top brands.">
+    <title>Quality Colours - Professional Paint Shop | 5 Branches in Ramanathapuram</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
+        * { font-family: 'Poppins', sans-serif; }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-attachment: fixed;
+        }
+
+        .hero-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .primary-card {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: 3px solid #fff;
+            transform: scale(1.05);
+        }
+
+        .primary-card:hover {
+            transform: scale(1.08) translateY(-8px);
+            box-shadow: 0 25px 50px rgba(16, 185, 129, 0.3);
+        }
+
+        .blue-card {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+
+        .purple-card {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.8s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .brand-badge {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .brand-badge:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+        }
+
+        .scroll-container {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            padding: 1rem 0;
+            scrollbar-width: thin;
+        }
+
+        .scroll-container::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .scroll-container::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .scroll-container::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
+        }
+
+        .tamil-text {
+            font-family: 'Poppins', 'Noto Sans Tamil', sans-serif;
+        }
+
+        .section-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
 </head>
 <body>
-    <p>Redirecting to login...</p>
+
+    <!-- HERO SECTION -->
+    <section class="hero-gradient min-h-screen flex items-center justify-center px-4 py-12">
+        <div class="text-center fade-in">
+            <!-- Logo Placeholder -->
+            <div class="mb-8 floating">
+                <div class="w-32 h-32 mx-auto bg-white rounded-full flex items-center justify-center shadow-2xl">
+                    <span class="text-6xl">🎨</span>
+                </div>
+            </div>
+
+            <!-- Company Name -->
+            <h1 class="text-5xl md:text-7xl font-bold text-white mb-4">
+                Quality Colours
+            </h1>
+            <p class="text-3xl md:text-4xl text-white font-semibold mb-6 tamil-text">
+                குவாலிட்டி கலர்ஸ்
+            </p>
+
+            <!-- Tagline -->
+            <div class="mb-8">
+                <p class="text-xl md:text-2xl text-white font-medium mb-2">
+                    5 Branches Across Ramanathapuram District
+                </p>
+                <p class="text-lg md:text-xl text-white/90 tamil-text">
+                    ராமநாதபுரம் மாவட்டம் முழுவதும் 5 கிளைகள்
+                </p>
+            </div>
+
+            <!-- Scroll Indicator -->
+            <div class="mt-12">
+                <p class="text-white/80 text-sm mb-2">Scroll Down</p>
+                <div class="w-6 h-10 border-2 border-white/50 rounded-full mx-auto flex items-start justify-center p-2">
+                    <div class="w-1 h-3 bg-white/70 rounded-full floating"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- QUICK ACCESS CARDS SECTION -->
+    <section class="section-container py-16 px-4">
+        <div class="max-w-7xl mx-auto">
+            <h2 class="text-4xl md:text-5xl font-bold text-gray-900 text-center mb-4">
+                Quick Access
+            </h2>
+            <p class="text-xl text-gray-600 text-center mb-12 tamil-text">
+                விரைவு அணுகல்
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+
+                <!-- CARD 1: Request Estimate (PRIMARY) -->
+                <a href="/request-estimate.html" class="primary-card card-hover rounded-2xl p-8 text-white block">
+                    <div class="text-center">
+                        <div class="text-6xl mb-4">🎨</div>
+                        <h3 class="text-2xl font-bold mb-2">Get Free Quote</h3>
+                        <p class="text-lg mb-2 tamil-text">இலவச மதிப்பீடு பெறுங்கள்</p>
+                        <p class="text-white/90 mb-6">Submit your painting requirements without login</p>
+                        <div class="bg-white text-green-600 font-bold py-3 px-6 rounded-lg inline-block">
+                            Request Estimate →
+                        </div>
+                    </div>
+                </a>
+
+                <!-- CARD 2: Customer Login -->
+                <a href="/customer-login.html" class="blue-card card-hover rounded-2xl p-8 text-white block">
+                    <div class="text-center">
+                        <div class="text-6xl mb-4">👤</div>
+                        <h3 class="text-2xl font-bold mb-2">Customer Portal</h3>
+                        <p class="text-lg mb-2 tamil-text">வாடிக்கையாளர் நுழைவு</p>
+                        <p class="text-white/90 mb-6">Track your orders and estimates</p>
+                        <div class="bg-white text-blue-600 font-bold py-3 px-6 rounded-lg inline-block">
+                            Customer Login →
+                        </div>
+                    </div>
+                </a>
+
+                <!-- CARD 3: Staff Login -->
+                <a href="/login.html" class="purple-card card-hover rounded-2xl p-8 text-white block">
+                    <div class="text-center">
+                        <div class="text-6xl mb-4">👨‍💼</div>
+                        <h3 class="text-2xl font-bold mb-2">Staff Portal</h3>
+                        <p class="text-lg mb-2 tamil-text">ஊழியர் நுழைவு</p>
+                        <p class="text-white/90 mb-6">Access attendance, tasks, and reports</p>
+                        <div class="bg-white text-purple-600 font-bold py-3 px-6 rounded-lg inline-block">
+                            Staff Login →
+                        </div>
+                    </div>
+                </a>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- OUR SERVICES SECTION -->
+    <section class="py-16 px-4 bg-gradient-to-r from-purple-50 to-blue-50">
+        <div class="max-w-7xl mx-auto">
+            <h2 class="text-4xl md:text-5xl font-bold text-gray-900 text-center mb-4">
+                Our Services
+            </h2>
+            <p class="text-xl text-gray-600 text-center mb-12 tamil-text">
+                எங்கள் சேவைகள்
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+                <div class="bg-white rounded-xl p-6 shadow-lg card-hover text-center">
+                    <div class="text-5xl mb-4">🏠</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Interior Painting</h3>
+                    <p class="text-gray-600 tamil-text">உட்புற வண்ணம்</p>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 shadow-lg card-hover text-center">
+                    <div class="text-5xl mb-4">🏗️</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Exterior Painting</h3>
+                    <p class="text-gray-600 tamil-text">வெளிப்புற வண்ணம்</p>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 shadow-lg card-hover text-center">
+                    <div class="text-5xl mb-4">🎨</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Texture & Waterproofing</h3>
+                    <p class="text-gray-600 tamil-text">டெக்சர் & நீர்புகா</p>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 shadow-lg card-hover text-center">
+                    <div class="text-5xl mb-4">💡</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Free Color Consultation</h3>
+                    <p class="text-gray-600 tamil-text">இலவச நிற ஆலோசனை</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- BRANDS WE DEAL SECTION -->
+    <section class="section-container py-16 px-4">
+        <div class="max-w-7xl mx-auto">
+            <h2 class="text-4xl md:text-5xl font-bold text-gray-900 text-center mb-4">
+                Brands We Deal
+            </h2>
+            <p class="text-xl text-gray-600 text-center mb-12 tamil-text">
+                எங்கள் பிராண்டுகள்
+            </p>
+
+            <div class="scroll-container">
+                <div class="brand-badge">
+                    <div class="text-center">
+                        <div class="font-bold text-lg text-orange-600">Asian Paints</div>
+                        <div class="text-sm text-gray-600 tamil-text">ஏசியன் பெயிண்ட்ஸ்</div>
+                    </div>
+                </div>
+
+                <div class="brand-badge">
+                    <div class="text-center">
+                        <div class="font-bold text-lg text-blue-600">Berger Paints</div>
+                        <div class="text-sm text-gray-600 tamil-text">பெர்கர் பெயிண்ட்ஸ்</div>
+                    </div>
+                </div>
+
+                <div class="brand-badge">
+                    <div class="text-center">
+                        <div class="font-bold text-lg text-purple-600">Birla Opus</div>
+                        <div class="text-sm text-gray-600 tamil-text">பிர்லா ஓபஸ்</div>
+                    </div>
+                </div>
+
+                <div class="brand-badge">
+                    <div class="text-center">
+                        <div class="font-bold text-lg text-green-600">Dulux</div>
+                        <div class="text-sm text-gray-600 tamil-text">டல்க்ஸ்</div>
+                    </div>
+                </div>
+
+                <div class="brand-badge">
+                    <div class="text-center">
+                        <div class="font-bold text-lg text-red-600">Nerolac</div>
+                        <div class="text-sm text-gray-600 tamil-text">நெரோலாக்</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- OUR BRANCHES SECTION -->
+    <section class="py-16 px-4 bg-gradient-to-r from-blue-50 to-purple-50">
+        <div class="max-w-7xl mx-auto">
+            <h2 class="text-4xl md:text-5xl font-bold text-gray-900 text-center mb-4">
+                Our Branches
+            </h2>
+            <p class="text-xl text-gray-600 text-center mb-12 tamil-text">
+                எங்கள் கிளைகள்
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                <!-- Branch 1: Ramanathapuram (Head Office) -->
+                <div class="bg-white rounded-xl p-6 shadow-lg card-hover border-2 border-purple-200">
+                    <div class="flex items-start gap-3 mb-4">
+                        <div class="text-3xl">📍</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">Ramanathapuram</h3>
+                            <p class="text-sm text-purple-600 font-semibold">(Head Office)</p>
+                            <p class="text-gray-600 tamil-text text-sm">ராமநாதபுரம் (தலைமை அலுவலகம்)</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex items-center gap-2">
+                            <span>📞</span>
+                            <span class="text-gray-700">+91 98765 43210</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span>🕒</span>
+                            <span class="text-gray-700">9:00 AM - 8:00 PM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Branch 2: Thangachimadam -->
+                <div class="bg-white rounded-xl p-6 shadow-lg card-hover">
+                    <div class="flex items-start gap-3 mb-4">
+                        <div class="text-3xl">📍</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">Thangachimadam</h3>
+                            <p class="text-gray-600 tamil-text text-sm">தங்கச்சிமடம்</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex items-center gap-2">
+                            <span>📞</span>
+                            <span class="text-gray-700">+91 98765 43211</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span>🕒</span>
+                            <span class="text-gray-700">9:00 AM - 8:00 PM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Branch 3: Paramakudi -->
+                <div class="bg-white rounded-xl p-6 shadow-lg card-hover">
+                    <div class="flex items-start gap-3 mb-4">
+                        <div class="text-3xl">📍</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">Paramakudi</h3>
+                            <p class="text-gray-600 tamil-text text-sm">பரமக்குடி</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex items-center gap-2">
+                            <span>📞</span>
+                            <span class="text-gray-700">+91 98765 43212</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span>🕒</span>
+                            <span class="text-gray-700">9:00 AM - 8:00 PM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Branch 4: Rameswaram -->
+                <div class="bg-white rounded-xl p-6 shadow-lg card-hover">
+                    <div class="flex items-start gap-3 mb-4">
+                        <div class="text-3xl">📍</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">Rameswaram</h3>
+                            <p class="text-gray-600 tamil-text text-sm">ராமேஸ்வரம்</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex items-center gap-2">
+                            <span>📞</span>
+                            <span class="text-gray-700">+91 98765 43213</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span>🕒</span>
+                            <span class="text-gray-700">9:00 AM - 8:00 PM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Branch 5: Pamban -->
+                <div class="bg-white rounded-xl p-6 shadow-lg card-hover">
+                    <div class="flex items-start gap-3 mb-4">
+                        <div class="text-3xl">📍</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">Pamban</h3>
+                            <p class="text-gray-600 tamil-text text-sm">பாம்பன்</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex items-center gap-2">
+                            <span>📞</span>
+                            <span class="text-gray-700">+91 98765 43214</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span>🕒</span>
+                            <span class="text-gray-700">9:00 AM - 8:00 PM</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- WHY CHOOSE US SECTION -->
+    <section class="section-container py-16 px-4">
+        <div class="max-w-7xl mx-auto">
+            <h2 class="text-4xl md:text-5xl font-bold text-gray-900 text-center mb-4">
+                Why Choose Us
+            </h2>
+            <p class="text-xl text-gray-600 text-center mb-12 tamil-text">
+                ஏன் எங்களை தேர்வு செய்ய வேண்டும்
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+                <div class="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 text-center card-hover">
+                    <div class="text-5xl mb-4">✅</div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">5+ Years Experience</h3>
+                    <p class="text-gray-700 tamil-text">5+ ஆண்டுகள் அனுபவம்</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-blue-50 to-cyan-100 rounded-xl p-6 text-center card-hover">
+                    <div class="text-5xl mb-4">✅</div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Expert Painters</h3>
+                    <p class="text-gray-700 tamil-text">திறமையான ஓவியர்கள்</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-purple-50 to-violet-100 rounded-xl p-6 text-center card-hover">
+                    <div class="text-5xl mb-4">✅</div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Quality Guaranteed</h3>
+                    <p class="text-gray-700 tamil-text">தர உத்தரவாதம்</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-orange-50 to-amber-100 rounded-xl p-6 text-center card-hover">
+                    <div class="text-5xl mb-4">✅</div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Free Home Visit</h3>
+                    <p class="text-gray-700 tamil-text">இலவச வீட்டுப் பார்வை</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="bg-gray-900 text-white py-12 px-4">
+        <div class="max-w-7xl mx-auto">
+
+            <!-- Main Footer Content -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+
+                <!-- Company Info -->
+                <div>
+                    <h3 class="text-2xl font-bold mb-4">Quality Colours</h3>
+                    <p class="text-gray-400 mb-2 tamil-text">குவாலிட்டி கலர்ஸ்</p>
+                    <p class="text-gray-400 text-sm">
+                        Professional paint shop serving Ramanathapuram district since 2019.
+                    </p>
+                </div>
+
+                <!-- Quick Links -->
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Quick Links</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white transition">About Us</a></li>
+                        <li><a href="#" class="hover:text-white transition">Contact</a></li>
+                        <li><a href="#" class="hover:text-white transition">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-white transition">Terms of Service</a></li>
+                    </ul>
+                </div>
+
+                <!-- Contact Info -->
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Contact Us</h4>
+                    <div class="space-y-2 text-gray-400 text-sm">
+                        <p>📧 info@qualitycolours.com</p>
+                        <p>📞 +91 98765 43210</p>
+                        <p>📍 Ramanathapuram, Tamil Nadu</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Divider -->
+            <div class="border-t border-gray-800 pt-8">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <p class="text-gray-400 text-sm text-center md:text-left">
+                        © 2026 Quality Colours Paint Shop. All rights reserved.
+                    </p>
+                    <p class="text-gray-400 text-sm text-center md:text-right">
+                        Developed with ❤️ in Ramanathapuram
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Add fade-in animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('section').forEach(section => {
+            observer.observe(section);
+        });
+    </script>
+
 </body>
 </html>

@@ -297,29 +297,27 @@
             document.getElementById('simpleRequestSection').classList.toggle('hidden', type !== 'custom');
         }
 
-        // Load public products
+        // Load public products (using guest endpoints - no auth required)
         async function loadPublicProducts() {
             try {
-                // Load brands
-                const brandRes = await fetch('/api/brands');
+                // Load all data in parallel
+                const [brandRes, catRes, prodRes] = await Promise.all([
+                    fetch('/api/guest/brands'),
+                    fetch('/api/guest/categories'),
+                    fetch('/api/guest/products')
+                ]);
+
                 allBrands = await brandRes.json();
-                
-                // Load categories
-                const catRes = await fetch('/api/categories');
                 allCategories = await catRes.json();
-                
-                // Load all products (filter for visible_to_guest on frontend)
-                const prodRes = await fetch('/api/products');
-                const allProds = await prodRes.json();
-                allProducts = allProds.filter(p => p.visible_to_guest === 1 && p.status === 'active');
-                
+                allProducts = await prodRes.json();
+
                 // Populate brands that have visible products
                 const brandsWithProducts = [...new Set(allProducts.map(p => p.brand_id))];
                 const visibleBrands = allBrands.filter(b => brandsWithProducts.includes(b.id));
-                
+
                 document.getElementById('brandSelect').innerHTML = '<option value="">-- Select Brand --</option>' +
                     visibleBrands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-                    
+
             } catch (error) {
                 console.error('Error loading products:', error);
             }
@@ -566,7 +564,7 @@
                     document.getElementById('estimateForm').classList.add('hidden');
                     window.scrollTo(0, 0);
                 } else {
-                    alert('Error: ' + (result.message || 'Failed to submit request'));
+                    alert('Error: ' + (result.error || result.message || 'Failed to submit request'));
                 }
             } catch (error) {
                 console.error('Error:', error);

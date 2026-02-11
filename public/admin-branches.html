@@ -10,13 +10,11 @@
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
-
-
-
-    <!-- Main Content -->
+<!-- Main Content -->
     <div class="container mx-auto p-6">
         <!-- Header -->
         <div class="flex justify-between items-center mb-6">
@@ -119,7 +117,7 @@
 
         // Get auth headers
         function getAuthHeaders() {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('auth_token');
             return {
                 'Content-Type': 'application/json',
                 'Authorization': token ? `Bearer ${token}` : ''
@@ -130,7 +128,14 @@
         async function loadBranches() {
             try {
                 const response = await fetch('/api/branches', { headers: getAuthHeaders() });
-                branches = await response.json();
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    branches = result.data;
+                } else {
+                    branches = [];
+                }
+
                 renderBranches();
             } catch (error) {
                 console.error('Error loading branches:', error);
@@ -221,7 +226,6 @@
                 city: document.getElementById('branchCity').value.trim() || null,
                 phone: document.getElementById('branchPhone').value.trim() || null,
                 address: document.getElementById('branchAddress').value.trim() || null,
-                opened_date: document.getElementById('branchOpenedDate').value || null,
                 status: document.getElementById('branchStatus').value
             };
 

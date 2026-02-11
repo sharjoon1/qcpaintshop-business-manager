@@ -7,6 +7,8 @@
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -25,64 +27,7 @@
     </style>
 </head>
 <body class="bg-gray-50">
-    <!-- Unified Header -->
-    <header class="gradient-bg text-white shadow-lg sticky top-0 z-50">
-        <div class="px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <!-- Mobile Menu Button -->
-                <button id="mobileMenuBtn" class="lg:hidden p-2 rounded-md hover:bg-white/10 transition-colors">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                    </svg>
-                </button>
-
-                <!-- Logo -->
-                <div class="flex items-center justify-center flex-1 lg:flex-initial">
-                    <img id="headerLogo" src="https://qcpaintshop.com/assets/images/logo.png" alt="Quality Colours" class="h-[70px] max-w-[250px] object-contain">
-                </div>
-
-                <!-- Desktop Navigation -->
-                <nav class="hidden lg:flex items-center space-x-1 mx-8 flex-1">
-                    <a href="dashboard.html" class="px-4 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Dashboard</a>
-                    <a href="estimates.html" class="px-4 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Estimates</a>
-                    <a href="admin-estimate-requests.html" class="px-4 py-2 rounded-md bg-white/20 transition-colors text-sm font-medium">Leads</a>
-                    <a href="admin-products.html" class="px-4 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Products</a>
-                    <a href="admin-customers.html" class="px-4 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Customers</a>
-                    <a href="admin-staff.html" class="px-4 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Staff</a>
-                    <a href="admin-settings.html" class="px-4 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Settings</a>
-                </nav>
-
-                <!-- Profile Dropdown -->
-                <div class="relative">
-                    <button id="profileBtn" class="flex items-center space-x-3 p-2 rounded-md hover:bg-white/10 transition-colors">
-                        <div id="profileInitial" class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-lg">A</div>
-                        <svg class="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </button>
-                    <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                        <a href="admin-profile.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile Settings</a>
-                        <a href="login.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Mobile Navigation -->
-        <div id="mobileMenu" class="hidden lg:hidden border-t border-white/10">
-            <div class="px-2 pt-2 pb-3 space-y-1">
-                <a href="dashboard.html" class="block px-3 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Dashboard</a>
-                <a href="estimates.html" class="block px-3 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Estimates</a>
-                <a href="admin-estimate-requests.html" class="block px-3 py-2 rounded-md bg-white/20 transition-colors text-sm font-medium">Estimate Requests</a>
-                <a href="admin-products.html" class="block px-3 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Products</a>
-                <a href="admin-customers.html" class="block px-3 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Customers</a>
-                <a href="admin-staff.html" class="block px-3 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Staff</a>
-                <a href="admin-settings.html" class="block px-3 py-2 rounded-md hover:bg-white/10 transition-colors text-sm font-medium">Settings</a>
-            </div>
-        </div>
-    </header>
-
-    <!-- Page Header -->
+<!-- Page Header -->
     <div class="bg-white shadow-sm">
         <div class="px-4 sm:px-6 lg:px-8 py-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -272,10 +217,22 @@
         const API_BASE = '/api';
         let currentRequest = null;
 
+        function getAuthHeaders() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return {};
+            }
+            return {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
         // Load stats
         async function loadStats() {
             try {
-                const response = await fetch(`${API_BASE}/estimate-requests/stats/summary`);
+                const response = await fetch(`${API_BASE}/estimate-requests/stats/summary`, { headers: getAuthHeaders() });
                 const result = await response.json();
                 if (result.success) {
                     const stats = result.data;
@@ -333,10 +290,10 @@
                 if (priority) url += `priority=${priority}&`;
                 if (search) url += `search=${search}&`;
 
-                const response = await fetch(url);
+                const response = await fetch(url, { headers: getAuthHeaders() });
                 const result = await response.json();
 
-                if (!result.success || result.data.length === 0) {
+                if (!result.success || !result.data || result.data.length === 0) {
                     tbody.innerHTML = `
                         <tr>
                             <td colspan="7" class="px-6 py-12 text-center">
@@ -397,7 +354,7 @@
         // View request details
         async function viewRequest(id) {
             try {
-                const response = await fetch(`${API_BASE}/estimate-requests/${id}`);
+                const response = await fetch(`${API_BASE}/estimate-requests/${id}`, { headers: getAuthHeaders() });
                 const result = await response.json();
                 
                 if (!result.success) {
@@ -589,8 +546,8 @@
             try {
                 const response = await fetch(`${API_BASE}/estimate-requests/${currentRequest.id}/status`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus, user_id: 1 })
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ status: newStatus })
                 });
 
                 const result = await response.json();
@@ -664,16 +621,6 @@
             if (hours < 48) return 'Yesterday';
             return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
         }
-
-        // Mobile menu
-        document.getElementById('mobileMenuBtn').addEventListener('click', function() {
-            document.getElementById('mobileMenu').classList.toggle('hidden');
-        });
-
-        // Profile dropdown
-        document.getElementById('profileBtn').addEventListener('click', function() {
-            document.getElementById('profileDropdown').classList.toggle('hidden');
-        });
 
         // Close modal on outside click
         document.getElementById('detailModal').addEventListener('click', function(e) {

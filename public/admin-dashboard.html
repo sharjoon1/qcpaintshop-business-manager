@@ -6,6 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Admin Dashboard - Quality Colours Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -63,8 +64,7 @@
     </style>
 </head>
 <body class="bg-gray-50">
-
-    <div class="container mx-auto p-4 md:p-6">
+<div class="container mx-auto p-4 md:p-6">
         <!-- Page Header -->
         <div class="mb-6">
             <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Admin Dashboard</h1>
@@ -73,38 +73,38 @@
 
         <!-- Stats Grid -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-            <div class="stat-card" style="--accent: #7c3aed;">
+            <div class="card stat-card" style="border-top-color: var(--color-secondary);">
                 <div class="flex justify-between items-start">
                     <div>
-                        <div class="stat-value" id="statUsers">-</div>
-                        <div class="stat-label">Active Staff</div>
+                        <div class="stat-card-number" id="statUsers">0</div>
+                        <div class="stat-card-label">Active Staff</div>
                     </div>
                     <span class="stat-icon">👥</span>
                 </div>
             </div>
-            <div class="stat-card" style="--accent: #2563eb;">
+            <div class="card stat-card" style="border-top-color: var(--color-primary);">
                 <div class="flex justify-between items-start">
                     <div>
-                        <div class="stat-value" id="statCustomers">-</div>
-                        <div class="stat-label">Customers</div>
+                        <div class="stat-card-number" id="statCustomers">0</div>
+                        <div class="stat-card-label">Customers</div>
                     </div>
                     <span class="stat-icon">🧑</span>
                 </div>
             </div>
-            <div class="stat-card" style="--accent: #059669;">
+            <div class="card stat-card stat-card-success">
                 <div class="flex justify-between items-start">
                     <div>
-                        <div class="stat-value" id="statProducts">-</div>
-                        <div class="stat-label">Products</div>
+                        <div class="stat-card-number" id="statProducts">0</div>
+                        <div class="stat-card-label">Products</div>
                     </div>
                     <span class="stat-icon">🎨</span>
                 </div>
             </div>
-            <div class="stat-card" style="--accent: #d97706;">
+            <div class="card stat-card stat-card-warning">
                 <div class="flex justify-between items-start">
                     <div>
-                        <div class="stat-value" id="statEstimates">-</div>
-                        <div class="stat-label">Total Estimates</div>
+                        <div class="stat-card-number" id="statEstimates">0</div>
+                        <div class="stat-card-label">Total Estimates</div>
                     </div>
                     <span class="stat-icon">📋</span>
                 </div>
@@ -113,38 +113,38 @@
 
         <!-- Second Row Stats -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-            <div class="stat-card" style="--accent: #10b981;">
+            <div class="card stat-card stat-card-success">
                 <div class="flex justify-between items-start">
                     <div>
-                        <div class="stat-value" id="statAttendance">-</div>
-                        <div class="stat-label">Present Today</div>
+                        <div class="stat-card-number" id="statAttendance">0</div>
+                        <div class="stat-card-label">Present Today</div>
                     </div>
                     <span class="stat-icon">🟢</span>
                 </div>
             </div>
-            <div class="stat-card" style="--accent: #f59e0b;">
+            <div class="card stat-card stat-card-warning">
                 <div class="flex justify-between items-start">
                     <div>
-                        <div class="stat-value" id="statLeads">-</div>
-                        <div class="stat-label">Total Leads</div>
+                        <div class="stat-card-number" id="statLeads">0</div>
+                        <div class="stat-card-label">Total Leads</div>
                     </div>
                     <span class="stat-icon">🎯</span>
                 </div>
             </div>
-            <div class="stat-card" style="--accent: #ef4444;">
+            <div class="card stat-card stat-card-danger">
                 <div class="flex justify-between items-start">
                     <div>
-                        <div class="stat-value" id="statPendingTasks">-</div>
-                        <div class="stat-label">Pending Tasks</div>
+                        <div class="stat-card-number" id="statPendingTasks">0</div>
+                        <div class="stat-card-label">Pending Tasks</div>
                     </div>
                     <span class="stat-icon">📌</span>
                 </div>
             </div>
-            <div class="stat-card" style="--accent: #dc2626;">
+            <div class="card stat-card stat-card-danger">
                 <div class="flex justify-between items-start">
                     <div>
-                        <div class="stat-value" id="statOverdue">-</div>
-                        <div class="stat-label">Overdue Tasks</div>
+                        <div class="stat-card-number" id="statOverdue">0</div>
+                        <div class="stat-card-label">Overdue Tasks</div>
                     </div>
                     <span class="stat-icon">⚠️</span>
                 </div>
@@ -152,27 +152,27 @@
         </div>
 
         <!-- Monthly Summary -->
-        <div class="bg-white rounded-xl shadow-md p-5 mb-6">
-            <div class="section-title">This Month's Performance</div>
+        <div class="card mb-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 pb-3 border-b border-gray-200">📊 This Month's Performance</h3>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div class="text-center p-3 bg-purple-50 rounded-lg">
-                    <div class="text-2xl font-bold text-purple-700" id="monthEstCount">-</div>
-                    <div class="text-xs text-gray-500">Estimates Created</div>
+                <div class="text-center p-4 bg-purple-50 rounded-lg border border-purple-100">
+                    <div class="text-2xl font-bold text-purple-700" id="monthEstCount">0</div>
+                    <div class="text-xs text-gray-600 mt-1">Estimates Created</div>
                 </div>
-                <div class="text-center p-3 bg-green-50 rounded-lg">
-                    <div class="text-2xl font-bold text-green-700" id="monthEstTotal">-</div>
-                    <div class="text-xs text-gray-500">Estimates Value</div>
+                <div class="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+                    <div class="text-2xl font-bold text-green-700" id="monthEstTotal">₹0</div>
+                    <div class="text-xs text-gray-600 mt-1">Estimates Value</div>
                 </div>
-                <div class="text-center p-3 bg-blue-50 rounded-lg">
-                    <div class="text-2xl font-bold text-blue-700" id="monthNewLeads">-</div>
-                    <div class="text-xs text-gray-500">New Leads</div>
+                <div class="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <div class="text-2xl font-bold text-blue-700" id="monthNewLeads">0</div>
+                    <div class="text-xs text-gray-600 mt-1">New Leads</div>
                 </div>
             </div>
         </div>
 
         <!-- Quick Actions Grid -->
         <div class="mb-6">
-            <div class="section-title">Quick Actions</div>
+            <h3 class="text-lg font-bold text-gray-800 mb-4">⚡ Quick Actions</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <a href="/estimate-create-new.html" class="quick-link">
                     <span class="quick-link-icon">➕</span>
@@ -232,6 +232,18 @@
             const response = await fetch('/api/dashboard/stats', {
                 headers: getAuthHeaders()
             });
+
+            if (response.status === 401) {
+                console.error('Dashboard: 401 Unauthorized - token may be expired');
+                window.location.href = '/login.html';
+                return;
+            }
+
+            if (!response.ok) {
+                console.error('Dashboard API error:', response.status, response.statusText);
+                return;
+            }
+
             const result = await response.json();
 
             if (result.success) {
@@ -250,12 +262,16 @@
                 // Format currency
                 const total = parseFloat(d.month_estimates_total || 0);
                 if (total >= 100000) {
-                    document.getElementById('monthEstTotal').textContent = (total / 100000).toFixed(1) + 'L';
+                    document.getElementById('monthEstTotal').textContent = '₹' + (total / 100000).toFixed(1) + 'L';
                 } else if (total >= 1000) {
-                    document.getElementById('monthEstTotal').textContent = (total / 1000).toFixed(1) + 'K';
+                    document.getElementById('monthEstTotal').textContent = '₹' + (total / 1000).toFixed(1) + 'K';
                 } else {
-                    document.getElementById('monthEstTotal').textContent = total.toFixed(0);
+                    document.getElementById('monthEstTotal').textContent = '₹' + total.toFixed(0);
                 }
+
+                console.log('✅ Dashboard loaded:', d);
+            } else {
+                console.error('Dashboard API returned success=false:', result);
             }
         } catch (error) {
             console.error('Failed to load dashboard:', error);

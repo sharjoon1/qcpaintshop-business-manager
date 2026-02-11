@@ -106,6 +106,53 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /api/estimate-requests/stats/summary
+ * Get dashboard statistics
+ * NOTE: Must be defined BEFORE /:id to avoid being caught by the param route
+ */
+router.get('/stats/summary', requireAuth, async (req, res) => {
+    try {
+        const [stats] = await pool.query(`
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) as new_requests,
+                SUM(CASE WHEN status = 'contacted' THEN 1 ELSE 0 END) as contacted,
+                SUM(CASE WHEN status = 'quote_sent' THEN 1 ELSE 0 END) as quotes_sent,
+                SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted,
+                SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 ELSE 0 END) as last_24h,
+                SUM(CASE WHEN created_at > DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as last_7days
+            FROM estimate_requests
+        `);
+
+        const row = stats[0];
+        res.json({
+            success: true,
+            data: {
+                total: row.total,
+                new_requests: row.new_requests,
+                quotes_sent: row.quotes_sent,
+                last_24h: row.last_24h,
+                last_7days: row.last_7days,
+                by_status: {
+                    new: row.new_requests,
+                    contacted: row.contacted,
+                    quote_sent: row.quotes_sent,
+                    accepted: row.accepted,
+                    rejected: row.rejected,
+                    completed: row.completed
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Get stats error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * GET /api/estimate-requests/:id
  * Get single estimate request with full details
  */
@@ -432,32 +479,6 @@ router.post('/:id/notes', requireAuth, async (req, res) => {
         
     } catch (error) {
         console.error('Add note error:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-/**
- * GET /api/estimate-requests/stats/summary
- * Get dashboard statistics
- */
-router.get('/stats/summary', requireAuth, async (req, res) => {
-    try {
-        const [stats] = await pool.query(`
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) as new_requests,
-                SUM(CASE WHEN status = 'contacted' THEN 1 ELSE 0 END) as contacted,
-                SUM(CASE WHEN status = 'quote_sent' THEN 1 ELSE 0 END) as quotes_sent,
-                SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted,
-                SUM(CASE WHEN created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 ELSE 0 END) as last_24h,
-                SUM(CASE WHEN created_at > DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as last_7days
-            FROM estimate_requests
-        `);
-        
-        res.json({ success: true, data: stats[0] });
-        
-    } catch (error) {
-        console.error('Get stats error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

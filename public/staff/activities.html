@@ -5,11 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Activities - QC Paint Shop Business Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
 </head>
 <body class="bg-gray-50">
+    <!-- Staff Navigation -->
+    <nav class="bg-blue-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold">Quality Colours Staff</h1>
+                <span class="text-blue-200">|</span>
+                <span class="text-lg">Activities</span>
+            </div>
+            <div class="flex gap-4">
+                <a href="/staff/dashboard.html" class="hover:text-blue-200">Dashboard</a>
+                <a href="/staff/clock-in.html" class="hover:text-blue-200">Clock In</a>
+                <a href="/staff/history.html" class="hover:text-blue-200">History</a>
+                <a href="/staff/tasks.html" class="hover:text-blue-200">Tasks</a>
+                <a href="/staff/activities.html" class="hover:text-blue-200">Activities</a>
+                <button onclick="logout()" class="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded">Logout</button>
+            </div>
+        </div>
+    </nav>
 
     <div class="container mx-auto p-6">
         <!-- Page Header -->
@@ -97,7 +116,7 @@
     </div>
 
     <!-- Activity Modal -->
-    <div id="activityModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="activityModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-lg">
                 <h2 class="text-2xl font-bold" id="modalTitle">Log New Activity</h2>
@@ -174,7 +193,7 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div class="p-6">
                 <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
@@ -196,9 +215,6 @@
         </div>
     </div>
 
-    <script src="/universal-nav-loader.js"></script>
-    <script src="/js/auth-helper.js"></script>
-    <script>checkAuthOrRedirect();</script>
     <script>
         const API_BASE = '/api';
         let selectedDate = new Date().toISOString().split('T')[0];
@@ -636,7 +652,7 @@
         function showToast(message, type = 'info') {
             // Create toast element
             const toast = document.createElement('div');
-            toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 ${
+            toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-[9999] ${
                 type === 'success' ? 'bg-green-500' :
                 type === 'error' ? 'bg-red-500' :
                 'bg-blue-500'
