@@ -7,23 +7,11 @@
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
-
-
-
-    <!-- Page Header -->
-    <div class="bg-white shadow-sm px-4 sm:px-6 lg:px-8 py-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-800">👤 Edit Profile</h2>
-                <p class="text-gray-600 text-sm mt-1">Update your personal information and settings</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="max-w-4xl mx-auto p-4 sm:p-6">
+    <div class="max-w-4xl mx-auto p-4 sm:p-6" style="padding-top: 1.5rem;">
         <!-- Profile Header Card -->
         <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg p-8 mb-6 text-white">
             <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
@@ -136,7 +124,7 @@
 
     <script>
         let currentUser = null;
-        let profileImageBase64 = null;
+        let profileImageFile = null;
 
         // Load current user profile
         async function loadProfile() {
@@ -148,14 +136,31 @@
                     return;
                 }
 
-                // Get user from localStorage (set during login)
-                const storedUser = localStorage.getItem('user');
-                if (!storedUser) {
-                    window.location.href = '/login.html';
-                    return;
+                // Fetch fresh user data from server
+                try {
+                    const meRes = await fetch('/api/auth/me', {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    if (meRes.ok) {
+                        const meData = await meRes.json();
+                        if (meData.success && meData.user) {
+                            currentUser = meData.user;
+                            localStorage.setItem('user', JSON.stringify(currentUser));
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch fresh user data, using localStorage');
                 }
-                
-                currentUser = JSON.parse(storedUser);
+
+                // Fallback to localStorage if server fetch didn't work
+                if (!currentUser) {
+                    const storedUser = localStorage.getItem('user');
+                    if (!storedUser) {
+                        window.location.href = '/login.html';
+                        return;
+                    }
+                    currentUser = JSON.parse(storedUser);
+                }
                 console.log('Loaded user:', currentUser);
 
                 // Populate form (handle both 'name' and 'full_name' fields)
@@ -197,63 +202,28 @@
         function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
+
             // Validate file type
             if (!file.type.startsWith('image/')) {
                 alert('Please select an image file');
                 return;
             }
-            
+
             // Validate file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {
                 alert('Image size should be less than 5MB');
                 return;
             }
-            
-            // Read and compress image
+
+            // Store the file for upload
+            profileImageFile = file;
+
+            // Show preview
             const reader = new FileReader();
             reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    // Create canvas for resizing
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Max dimensions for profile picture (smaller = better performance)
-                    const MAX_WIDTH = 300;
-                    const MAX_HEIGHT = 300;
-                    
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    // Calculate new dimensions (maintain aspect ratio)
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    
-                    // Draw and compress
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    // Convert to base64 with compression (0.7 quality for smaller size)
-                    profileImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
-                    
-                    // Show preview
-                    document.getElementById('profilePreview').src = profileImageBase64;
-                    document.getElementById('profilePreview').classList.remove('hidden');
-                    document.getElementById('profileInitial').classList.add('hidden');
-                };
-                img.src = e.target.result;
+                document.getElementById('profilePreview').src = e.target.result;
+                document.getElementById('profilePreview').classList.remove('hidden');
+                document.getElementById('profileInitial').classList.add('hidden');
             };
             reader.readAsDataURL(file);
         }
@@ -261,27 +231,44 @@
         // Save profile changes
         document.getElementById('profileForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            const userId = document.getElementById('userId').value;
+
             const profileData = {
-                username: document.getElementById('username').value, // Required field
                 full_name: document.getElementById('fullName').value,
                 email: document.getElementById('email').value,
                 phone: document.getElementById('phone').value || null
             };
-            
-            // Add profile image if uploaded
-            if (profileImageBase64) {
-                profileData.profile_image_url = profileImageBase64;
-            }
-            
+
             try {
-                const response = await fetch(`/api/users/${userId}`, {
+                // Upload profile image first if one was selected
+                let newProfileUrl = null;
+                if (profileImageFile) {
+                    const formData = new FormData();
+                    formData.append('profile_image', profileImageFile);
+
+                    const token = localStorage.getItem('auth_token');
+                    const uploadRes = await fetch('/api/upload/profile', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        body: formData
+                    });
+
+                    if (uploadRes.ok) {
+                        const uploadResult = await uploadRes.json();
+                        newProfileUrl = uploadResult.profileUrl;
+                    } else {
+                        const uploadError = await uploadRes.json();
+                        alert('Failed to upload profile picture: ' + (uploadError.error || 'Unknown error'));
+                        return;
+                    }
+                }
+
+                // Update profile data
+                const response = await fetch('/api/users/profile/me', {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(profileData)
                 });
-                
+
                 if (response.ok) {
                     // Update localStorage with new data
                     const updatedUser = {
@@ -290,23 +277,23 @@
                         email: profileData.email,
                         phone: profileData.phone
                     };
-                    
-                    // Add profile image if it was uploaded
-                    if (profileData.profile_image_url) {
-                        updatedUser.profile_image_url = profileData.profile_image_url;
+
+                    if (newProfileUrl) {
+                        updatedUser.profile_image_url = newProfileUrl;
                     }
-                    
+
                     localStorage.setItem('user', JSON.stringify(updatedUser));
-                    
-                    alert('✅ Profile updated successfully!');
-                    loadProfile(); // Reload to show changes
+                    profileImageFile = null;
+
+                    alert('Profile updated successfully!');
+                    loadProfile();
                 } else {
                     const error = await response.json();
-                    alert('❌ Failed to update profile: ' + (error.error || 'Unknown error'));
+                    alert('Failed to update profile: ' + (error.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error updating profile:', error);
-                alert('❌ Error updating profile. Check console for details.');
+                alert('Error updating profile. Check console for details.');
             }
         });
 
@@ -333,7 +320,7 @@
             try {
                 const response = await fetch('/api/users/change-password', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({
                         user_id: currentUser.id,
                         current_password: currentPassword,

@@ -10,14 +10,12 @@
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
-
-
-
-    <!-- Main Content -->
-    <div class="lg:ml-64 min-h-screen">
+<!-- Main Content -->
+    <div class="min-h-screen">
         <!-- Header -->
         <header class="bg-white shadow-sm">
             <div class="px-4 sm:px-6 lg:px-8 py-4">
@@ -26,7 +24,7 @@
                         <h2 class="text-2xl font-bold text-gray-800">Estimates Management</h2>
                         <p class="text-gray-600 text-sm mt-1">Manage all your estimates in one place</p>
                     </div>
-                    <button onclick="createNewEstimate()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition shadow-lg flex items-center w-full sm:w-auto justify-center">
+                    <button onclick="createNewEstimate()" class="btn btn-primary flex items-center w-full sm:w-auto justify-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
@@ -38,7 +36,7 @@
 
         <!-- Filters & Search -->
         <div class="p-4 sm:p-6 lg:p-8">
-            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="card mb-6">
                 <!-- Search Bar -->
                 <div class="mb-4">
                     <div class="relative">
@@ -95,33 +93,33 @@
                 </div>
 
                 <!-- Empty state -->
-                <div id="emptyState" class="hidden text-center py-12 bg-white rounded-xl">
+                <div id="emptyState" class="hidden text-center py-12 card">
                     <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
                     <h3 class="text-lg font-semibold text-gray-800 mb-2">No estimates found</h3>
                     <p class="text-gray-600 mb-4">Create your first estimate to get started</p>
-                    <button onclick="createNewEstimate()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition">
+                    <button onclick="createNewEstimate()" class="btn btn-primary">
                         Create Estimate
                     </button>
                 </div>
 
                 <!-- Desktop Table -->
-                <div id="desktopTable" class="hidden lg:block bg-white rounded-xl shadow-lg overflow-hidden">
+                <div id="desktopTable" class="hidden card overflow-hidden">
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-max">
-                        <thead class="bg-gray-50">
+                        <table class="table w-full">
+                        <thead>
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estimate #</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                <th>Estimate #</th>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="desktopTableBody" class="divide-y divide-gray-200">
+                        <tbody id="desktopTableBody">
                         </tbody>
                     </table>
                     </div> <!-- Close overflow-x-auto -->

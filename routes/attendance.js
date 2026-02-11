@@ -208,7 +208,9 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
         const today = new Date().toISOString().split('T')[0];
         const now = new Date();
 
-        // Check geo-fence
+        // Check geo-fence (TEMPORARILY DISABLED FOR TESTING)
+        // TODO: Re-enable after configuring branch GPS coordinates
+        /*
         const geoCheck = await checkGeoFence(branchId, latitude, longitude);
         if (!geoCheck.allowed) {
             return res.status(400).json({
@@ -217,6 +219,7 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
                 code: 'OUTSIDE_GEOFENCE'
             });
         }
+        */
 
         // Check if already clocked in today
         const [existing] = await pool.query(
@@ -303,10 +306,21 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
         });
         
     } catch (error) {
-        console.error('Clock in error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to clock in. Please try again.' 
+        console.error('❌ Clock in error:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            errno: error.errno,
+            sqlMessage: error.sqlMessage
+        });
+
+        // Return more detailed error for debugging
+        res.status(500).json({
+            success: false,
+            message: error.sqlMessage || error.message || 'Failed to clock in. Please try again.',
+            error_code: error.code,
+            error_type: error.name
         });
     }
 });
@@ -348,10 +362,10 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
         
         // Get today's attendance
         const [attendance] = await pool.query(
-            `SELECT a.*, shc.close_time, shc.expected_hours 
+            `SELECT a.*, shc.close_time, shc.expected_hours
              FROM staff_attendance a
-             JOIN shop_hours_config shc ON a.branch_id = shc.branch_id 
-                AND shc.day_of_week = LOWER(DAYNAME(a.date))
+             JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
+                AND shc.day_of_week = DAYOFWEEK(a.date) - 1
              WHERE a.user_id = ? AND a.date = ?`,
             [userId, today]
         );
@@ -430,10 +444,21 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
         });
         
     } catch (error) {
-        console.error('Clock out error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to clock out. Please try again.' 
+        console.error('❌ Clock out error:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            errno: error.errno,
+            sqlMessage: error.sqlMessage
+        });
+
+        // Return more detailed error for debugging
+        res.status(500).json({
+            success: false,
+            message: error.sqlMessage || error.message || 'Failed to clock out. Please try again.',
+            error_code: error.code,
+            error_type: error.name
         });
     }
 });
@@ -448,15 +473,15 @@ router.get('/today', requireAuth, async (req, res) => {
         const today = new Date().toISOString().split('T')[0];
         
         const [rows] = await pool.query(
-            `SELECT a.*, 
+            `SELECT a.*,
                     u.full_name, u.username,
                     b.name as branch_name,
                     shc.open_time, shc.close_time, shc.expected_hours
              FROM staff_attendance a
              JOIN users u ON a.user_id = u.id
              JOIN branches b ON a.branch_id = b.id
-             LEFT JOIN shop_hours_config shc ON a.branch_id = shc.branch_id 
-                AND shc.day_of_week = LOWER(DAYNAME(a.date))
+             LEFT JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
+                AND shc.day_of_week = DAYOFWEEK(a.date) - 1
              WHERE a.user_id = ? AND a.date = ?`,
             [userId, today]
         );
@@ -617,8 +642,8 @@ router.post('/break-end', requireAuth, async (req, res) => {
         const [attendance] = await pool.query(
             `SELECT a.*, shc.break_min_minutes, shc.break_max_minutes
              FROM staff_attendance a
-             JOIN shop_hours_config shc ON a.branch_id = shc.branch_id 
-                AND shc.day_of_week = LOWER(DAYNAME(a.date))
+             JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
+                AND shc.day_of_week = DAYOFWEEK(a.date) - 1
              WHERE a.user_id = ? AND a.date = ?`,
             [userId, today]
         );

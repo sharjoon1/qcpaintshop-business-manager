@@ -15,12 +15,33 @@ function setPool(dbPool) {
 }
 
 // ========================================
+// BRANCH LIST (for dropdowns - any authenticated user)
+// ========================================
+
+/**
+ * GET /api/branches/list
+ * Simple list of active branches for dropdowns (any authenticated user)
+ */
+router.get('/list', requireAuth, async (req, res) => {
+    try {
+        const [branches] = await pool.query(
+            'SELECT id, name, code, city FROM branches WHERE status = ? ORDER BY name ASC',
+            ['active']
+        );
+        res.json({ success: true, data: branches });
+    } catch (error) {
+        console.error('Error fetching branches list:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch branches' });
+    }
+});
+
+// ========================================
 // BRANCH CRUD ENDPOINTS
 // ========================================
 
 /**
  * GET /api/branches
- * List all branches with optional filters
+ * List all branches with optional filters (requires branches:view permission)
  * Query params: status (active/inactive), city
  */
 router.get('/', requirePermission('branches', 'view'), async (req, res) => {
@@ -95,7 +116,7 @@ router.get('/:id', requirePermission('branches', 'view'), async (req, res) => {
         const [shopHours] = await pool.query(
             `SELECT * FROM shop_hours_config
              WHERE branch_id = ?
-             ORDER BY FIELD(day_of_week, 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')`,
+             ORDER BY day_of_week ASC`,
             [id]
         );
 
@@ -155,7 +176,7 @@ router.post('/', requirePermission('branches', 'add'), async (req, res) => {
         await connection.beginTransaction();
 
         try {
-            // Create branch
+            // Create branch - use columns that exist after migration
             const [result] = await connection.query(
                 `INSERT INTO branches
                  (name, code, address, city, state, pincode, phone, email,
@@ -177,26 +198,24 @@ router.post('/', requirePermission('branches', 'add'), async (req, res) => {
             const branchId = result.insertId;
 
             // Auto-create shop_hours_config for all 7 days
-            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            // day_of_week: 0=Sunday, 1=Monday ... 6=Saturday (TINYINT)
             const defaultOpenTime = open_time || '08:30:00';
             const defaultCloseTime = close_time || '20:30:00';
 
-            const dayValues = days.map(day => [
-                branchId,
-                day,
-                1, // is_open
-                defaultOpenTime,
-                defaultCloseTime,
-                day === 'sunday' ? 5.00 : 10.00, // expected_hours
-                15, // late_threshold_minutes
-                60, // break_min_minutes
-                120  // break_max_minutes
-            ]);
+            const dayValues = [
+                [branchId, 1, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Monday
+                [branchId, 2, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Tuesday
+                [branchId, 3, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Wednesday
+                [branchId, 4, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Thursday
+                [branchId, 5, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Friday
+                [branchId, 6, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Saturday
+                [branchId, 0, 0, defaultOpenTime, defaultCloseTime, 0, 15]       // Sunday (closed)
+            ];
 
             await connection.query(
                 `INSERT INTO shop_hours_config
-                 (branch_id, day_of_week, is_open, open_time, close_time,
-                  expected_hours, late_threshold_minutes, break_min_minutes, break_max_minutes)
+                 (branch_id, day_of_week, is_working_day, open_time, close_time,
+                  expected_hours, late_threshold_minutes)
                  VALUES ?`,
                 [dayValues]
             );
@@ -380,7 +399,7 @@ router.get('/:id/hours', requirePermission('branches', 'view'), async (req, res)
         const [hours] = await pool.query(
             `SELECT * FROM shop_hours_config
              WHERE branch_id = ?
-             ORDER BY FIELD(day_of_week, 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')`,
+             ORDER BY day_of_week ASC`,
             [id]
         );
 
@@ -420,18 +439,6 @@ router.put('/:id/hours', requirePermission('branches', 'edit'), async (req, res)
             });
         }
 
-        const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        const providedDays = hours.map(h => h.day_of_week);
-
-        for (const day of validDays) {
-            if (!providedDays.includes(day)) {
-                return res.status(400).json({
-                    success: false,
-                    error: `Missing configuration for ${day}`
-                });
-            }
-        }
-
         // Check if branch exists
         const [branches] = await pool.query('SELECT id FROM branches WHERE id = ?', [id]);
         if (branches.length === 0) {
@@ -453,19 +460,17 @@ router.put('/:id/hours', requirePermission('branches', 'edit'), async (req, res)
             const values = hours.map(h => [
                 id,
                 h.day_of_week,
-                h.is_open !== undefined ? h.is_open : 1,
+                h.is_working_day !== undefined ? h.is_working_day : (h.is_open !== undefined ? h.is_open : 1),
                 h.open_time || '08:30:00',
                 h.close_time || '20:30:00',
                 h.expected_hours !== undefined ? h.expected_hours : 10.00,
-                h.late_threshold_minutes !== undefined ? h.late_threshold_minutes : 15,
-                h.break_min_minutes !== undefined ? h.break_min_minutes : 60,
-                h.break_max_minutes !== undefined ? h.break_max_minutes : 120
+                h.late_threshold_minutes !== undefined ? h.late_threshold_minutes : 15
             ]);
 
             await connection.query(
                 `INSERT INTO shop_hours_config
-                 (branch_id, day_of_week, is_open, open_time, close_time,
-                  expected_hours, late_threshold_minutes, break_min_minutes, break_max_minutes)
+                 (branch_id, day_of_week, is_working_day, open_time, close_time,
+                  expected_hours, late_threshold_minutes)
                  VALUES ?`,
                 [values]
             );

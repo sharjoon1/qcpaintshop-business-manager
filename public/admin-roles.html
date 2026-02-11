@@ -7,6 +7,7 @@
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
@@ -127,9 +128,9 @@
         // Load roles
         async function loadRoles() {
             try {
-                const response = await fetch('/api/roles');
+                const response = await apiRequest('/api/roles');
                 const data = await response.json();
-                
+
                 if (data.success) {
                     allRoles = data.data;
                     filterRoles(currentFilter);

@@ -8,21 +8,90 @@
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/universal-nav-loader.js"></script>
+    <style>
+        /* Searchable Dropdown */
+        .searchable-dropdown { position: relative; }
+        .sd-display {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            border: 2px solid #d1d5db;
+            border-radius: 0.5rem;
+            background: white;
+            cursor: pointer;
+            min-height: 42px;
+            transition: border-color 0.2s;
+        }
+        .sd-display:hover { border-color: #7c3aed; }
+        .sd-display.open { border-color: #7c3aed; }
+        .sd-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.9rem;
+        }
+        .sd-text.placeholder { color: #6b7280; }
+        .sd-arrow {
+            flex-shrink: 0;
+            color: #6b7280;
+            margin-left: 8px;
+            transition: transform 0.2s;
+        }
+        .sd-display.open .sd-arrow { transform: rotate(180deg); }
+        .sd-panel {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #d1d5db;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            z-index: 50;
+            overflow: hidden;
+        }
+        .sd-search {
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            border: none;
+            border-bottom: 1px solid #e5e7eb;
+            outline: none;
+            font-size: 0.875rem;
+            box-sizing: border-box;
+        }
+        .sd-search:focus { background: #faf5ff; }
+        .sd-options {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .sd-option {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .sd-option:last-child { border-bottom: none; }
+        .sd-option:hover { background: #f3e8ff; }
+        .sd-option.selected { background: #ede9fe; font-weight: 600; color: #6d28d9; }
+        .sd-no-results {
+            padding: 0.75rem;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 0.875rem;
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
-
-
-
-    <div class="max-w-7xl mx-auto p-4">
+<div class="max-w-7xl mx-auto p-4">
         <!-- Step 1: Customer Selection -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
             <h2 class="text-lg font-bold text-gray-800 mb-4">Step 1: Select Customer</h2>
-            
+
             <div class="flex gap-3 mb-4">
-                <select id="customerSelect" class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
-                    <option value="">-- Select Customer --</option>
-                </select>
-                <button onclick="openNewCustomerModal()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                <div class="searchable-dropdown flex-1" id="customerDropdown"></div>
+                <button onclick="openNewCustomerModal()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold whitespace-nowrap">
                     + New Customer
                 </button>
             </div>
@@ -41,26 +110,20 @@
         <!-- Step 2: Add Products -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
             <h2 class="text-lg font-bold text-gray-800 mb-4">Step 2: Add Products</h2>
-            
+
             <!-- Brand → Category → Product Selection -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Brand *</label>
-                    <select id="brandSelect" onchange="loadCategories()" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
-                        <option value="">-- Select Brand --</option>
-                    </select>
+                    <div class="searchable-dropdown" id="brandDropdown"></div>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Category *</label>
-                    <select id="categorySelect" onchange="loadProducts()" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
-                        <option value="">-- Select Category --</option>
-                    </select>
+                    <div class="searchable-dropdown" id="categoryDropdown"></div>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Product *</label>
-                    <select id="productSelect" onchange="loadProductDetails()" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
-                        <option value="">-- Select Product --</option>
-                    </select>
+                    <div class="searchable-dropdown" id="productDropdown"></div>
                 </div>
             </div>
 
@@ -127,7 +190,7 @@
         <!-- Products Table -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
             <h2 class="text-lg font-bold text-gray-800 mb-4">Estimate Items</h2>
-            
+
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-800 text-white">
@@ -223,6 +286,141 @@
     </div>
 
     <script>
+        // ========================================
+        // SEARCHABLE DROPDOWN COMPONENT
+        // ========================================
+        class SearchableDropdown {
+            constructor(containerId, config = {}) {
+                this.container = document.getElementById(containerId);
+                this.placeholder = config.placeholder || '-- Select --';
+                this.searchPlaceholder = config.searchPlaceholder || 'Type to search...';
+                this.onSelect = config.onSelect || (() => {});
+                this.options = [];
+                this.selectedValue = '';
+                this.selectedData = null;
+                this.isOpen = false;
+                this._render();
+                this._bind();
+            }
+
+            _render() {
+                this.container.innerHTML = `
+                    <div class="sd-display">
+                        <span class="sd-text placeholder">${this.placeholder}</span>
+                        <svg class="sd-arrow" width="12" height="12" viewBox="0 0 12 12"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    </div>
+                    <div class="sd-panel" style="display:none;">
+                        <input type="text" class="sd-search" placeholder="${this.searchPlaceholder}">
+                        <div class="sd-options"></div>
+                    </div>
+                `;
+                this.displayEl = this.container.querySelector('.sd-display');
+                this.textEl = this.container.querySelector('.sd-text');
+                this.panelEl = this.container.querySelector('.sd-panel');
+                this.searchEl = this.container.querySelector('.sd-search');
+                this.optionsEl = this.container.querySelector('.sd-options');
+            }
+
+            _bind() {
+                this.displayEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggle();
+                });
+                this.searchEl.addEventListener('input', () => this._filter());
+                this.panelEl.addEventListener('click', (e) => e.stopPropagation());
+            }
+
+            toggle() {
+                this.isOpen ? this.close() : this.open();
+            }
+
+            open() {
+                // Close all other dropdowns
+                document.querySelectorAll('.searchable-dropdown').forEach(el => {
+                    if (el !== this.container && el._sdInstance) {
+                        el._sdInstance.close();
+                    }
+                });
+                this.panelEl.style.display = '';
+                this.displayEl.classList.add('open');
+                this.searchEl.value = '';
+                this._filter();
+                this.isOpen = true;
+                // Focus search after a tick so the panel is visible
+                setTimeout(() => this.searchEl.focus(), 10);
+            }
+
+            close() {
+                this.panelEl.style.display = 'none';
+                this.displayEl.classList.remove('open');
+                this.isOpen = false;
+            }
+
+            setOptions(options) {
+                this.options = options;
+                if (this.isOpen) this._filter();
+            }
+
+            _filter() {
+                const q = this.searchEl.value.toLowerCase();
+                const filtered = q
+                    ? this.options.filter(o => o.label.toLowerCase().includes(q))
+                    : this.options;
+
+                if (filtered.length === 0) {
+                    this.optionsEl.innerHTML = '<div class="sd-no-results">No results found</div>';
+                    return;
+                }
+
+                this.optionsEl.innerHTML = filtered.map(o =>
+                    `<div class="sd-option${String(o.value) === String(this.selectedValue) ? ' selected' : ''}" data-value="${o.value}">${o.label}</div>`
+                ).join('');
+
+                this.optionsEl.querySelectorAll('.sd-option').forEach(el => {
+                    el.addEventListener('click', () => {
+                        const opt = this.options.find(o => String(o.value) === el.dataset.value);
+                        this._select(opt);
+                    });
+                });
+            }
+
+            _select(option) {
+                if (option) {
+                    this.selectedValue = option.value;
+                    this.selectedData = option.data;
+                    this.textEl.textContent = option.label;
+                    this.textEl.classList.remove('placeholder');
+                } else {
+                    this.selectedValue = '';
+                    this.selectedData = null;
+                    this.textEl.textContent = this.placeholder;
+                    this.textEl.classList.add('placeholder');
+                }
+                this.close();
+                this.onSelect(this.selectedValue, this.selectedData);
+            }
+
+            getValue() { return this.selectedValue; }
+            getData() { return this.selectedData; }
+
+            setValue(value) {
+                const opt = this.options.find(o => String(o.value) === String(value));
+                if (opt) this._select(opt);
+            }
+
+            reset() { this._select(null); }
+        }
+
+        // Close all dropdowns when clicking outside
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.searchable-dropdown').forEach(el => {
+                if (el._sdInstance) el._sdInstance.close();
+            });
+        });
+
+        // ========================================
+        // APP STATE
+        // ========================================
         let customers = [];
         let brands = [];
         let categories = [];
@@ -233,104 +431,193 @@
         let estimateItems = [];
         let itemIdCounter = 1;
 
-        // Load initial data
-        async function loadInitialData() {
-            try {
-                // Load customers
-                const custRes = await fetch('/api/customers');
-                customers = await custRes.json();
-                const customerSelect = document.getElementById('customerSelect');
-                customerSelect.innerHTML = '<option value="">-- Select Customer --</option>' +
-                    customers.map(c => `<option value="${c.id}" data-customer='${JSON.stringify(c)}'>${c.name} (${c.phone || 'No phone'})</option>`).join('');
+        // Dropdown instances
+        let customerDD, brandDD, categoryDD, productDD;
 
-                // Load branches for new customer modal
-                const branchRes = await fetch('/api/branches');
-                const branches = await branchRes.json();
-                document.getElementById('newCustBranch').innerHTML = '<option value="">-- Select --</option>' +
-                    branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        // ========================================
+        // INIT SEARCHABLE DROPDOWNS
+        // ========================================
+        function initDropdowns() {
+            customerDD = new SearchableDropdown('customerDropdown', {
+                placeholder: '-- Select Customer --',
+                searchPlaceholder: 'Search by name or phone...',
+                onSelect: onCustomerSelected
+            });
+            document.getElementById('customerDropdown')._sdInstance = customerDD;
 
-                // Load brands
-                const brandRes = await fetch('/api/brands');
-                brands = await brandRes.json();
-                document.getElementById('brandSelect').innerHTML = '<option value="">-- Select Brand --</option>' +
-                    brands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+            brandDD = new SearchableDropdown('brandDropdown', {
+                placeholder: '-- Select Brand --',
+                searchPlaceholder: 'Search brands...',
+                onSelect: onBrandSelected
+            });
+            document.getElementById('brandDropdown')._sdInstance = brandDD;
 
-                // Load all products for filtering
-                const prodRes = await fetch('/api/products');
-                allProducts = await prodRes.json();
-            } catch (error) {
-                console.error('Error loading data:', error);
-                alert('Failed to load data');
-            }
+            categoryDD = new SearchableDropdown('categoryDropdown', {
+                placeholder: '-- Select Category --',
+                searchPlaceholder: 'Search categories...',
+                onSelect: onCategorySelected
+            });
+            document.getElementById('categoryDropdown')._sdInstance = categoryDD;
+
+            productDD = new SearchableDropdown('productDropdown', {
+                placeholder: '-- Select Product --',
+                searchPlaceholder: 'Search products...',
+                onSelect: onProductSelected
+            });
+            document.getElementById('productDropdown')._sdInstance = productDD;
         }
 
-        // Customer selection
-        document.getElementById('customerSelect').addEventListener('change', function() {
-            const selected = this.options[this.selectedIndex];
-            if (selected.value) {
-                selectedCustomer = JSON.parse(selected.dataset.customer);
-                document.getElementById('custName').textContent = selectedCustomer.name;
-                document.getElementById('custPhone').textContent = selectedCustomer.phone || '-';
-                document.getElementById('custEmail').textContent = selectedCustomer.email || '-';
-                document.getElementById('custAddress').textContent = selectedCustomer.address || '-';
+        // ========================================
+        // DROPDOWN CALLBACKS
+        // ========================================
+        function onCustomerSelected(value, data) {
+            if (value && data) {
+                selectedCustomer = data;
+                document.getElementById('custName').textContent = data.name;
+                document.getElementById('custPhone').textContent = data.phone || '-';
+                document.getElementById('custEmail').textContent = data.email || '-';
+                document.getElementById('custAddress').textContent = data.address || '-';
                 document.getElementById('customerDetails').classList.remove('hidden');
             } else {
                 selectedCustomer = null;
                 document.getElementById('customerDetails').classList.add('hidden');
             }
-        });
-
-        // Load categories based on brand
-        function loadCategories() {
-            const brandId = document.getElementById('brandSelect').value;
-            if (!brandId) {
-                document.getElementById('categorySelect').innerHTML = '<option value="">-- Select Category --</option>';
-                return;
-            }
-
-            // For now, show all categories (can filter by brand later)
-            fetch('/api/categories')
-                .then(res => res.json())
-                .then(data => {
-                    categories = data;
-                    document.getElementById('categorySelect').innerHTML = '<option value="">-- Select Category --</option>' +
-                        categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-                });
         }
 
-        // Load products based on brand + category
-        function loadProducts() {
-            const brandId = document.getElementById('brandSelect').value;
-            const categoryId = document.getElementById('categorySelect').value;
-            
-            if (!brandId || !categoryId) {
-                document.getElementById('productSelect').innerHTML = '<option value="">-- Select Product --</option>';
+        function onBrandSelected(value, data) {
+            // Reset dependent dropdowns
+            categoryDD.setOptions([]);
+            categoryDD.reset();
+            productDD.setOptions([]);
+            productDD.reset();
+            selectedProduct = null;
+            document.getElementById('productTypeSection').classList.add('hidden');
+            document.getElementById('unitTypeInputs').classList.add('hidden');
+            document.getElementById('areaTypeInputs').classList.add('hidden');
+            document.getElementById('areaCalculation').classList.add('hidden');
+
+            if (!value) return;
+            loadCategories();
+        }
+
+        function onCategorySelected(value, data) {
+            // Reset product dropdown
+            productDD.setOptions([]);
+            productDD.reset();
+            selectedProduct = null;
+            document.getElementById('productTypeSection').classList.add('hidden');
+            document.getElementById('unitTypeInputs').classList.add('hidden');
+            document.getElementById('areaTypeInputs').classList.add('hidden');
+            document.getElementById('areaCalculation').classList.add('hidden');
+
+            if (!value) return;
+            loadProducts();
+        }
+
+        function onProductSelected(value, data) {
+            document.getElementById('productTypeSection').classList.add('hidden');
+            document.getElementById('unitTypeInputs').classList.add('hidden');
+            document.getElementById('areaTypeInputs').classList.add('hidden');
+            document.getElementById('areaCalculation').classList.add('hidden');
+
+            if (!value || !data) {
+                selectedProduct = null;
+                return;
+            }
+            selectedProduct = data;
+            loadProductDetails();
+        }
+
+        // ========================================
+        // DATA LOADING
+        // ========================================
+        async function loadInitialData() {
+            try {
+                const [custRes, branchRes, brandRes, prodRes] = await Promise.all([
+                    apiRequest('/api/customers'),
+                    apiRequest('/api/branches/list'),
+                    apiRequest('/api/brands'),
+                    apiRequest('/api/products')
+                ]);
+
+                // Customers
+                customers = await custRes.json();
+                customerDD.setOptions(customers.map(c => ({
+                    value: c.id,
+                    label: `${c.name} (${c.phone || 'No phone'})`,
+                    data: c
+                })));
+
+                // Branches for new customer modal
+                const branchData = await branchRes.json();
+                const branches = branchData.data || branchData;
+                document.getElementById('newCustBranch').innerHTML = '<option value="">-- Select --</option>' +
+                    branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+                // Brands
+                brands = await brandRes.json();
+                brandDD.setOptions(brands.map(b => ({
+                    value: b.id,
+                    label: b.name,
+                    data: b
+                })));
+
+                // All products (for filtering by brand+category)
+                allProducts = await prodRes.json();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Failed to load data. Please ensure you are logged in.');
+            }
+        }
+
+        // Load categories (uses apiRequest for auth)
+        async function loadCategories() {
+            const brandId = brandDD.getValue();
+            if (!brandId) {
+                categoryDD.setOptions([]);
                 return;
             }
 
-            // Filter products
-            products = allProducts.filter(p => 
+            try {
+                const res = await apiRequest('/api/categories');
+                categories = await res.json();
+                categoryDD.setOptions(categories.map(c => ({
+                    value: c.id,
+                    label: c.name,
+                    data: c
+                })));
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        // Load products based on brand + category (filter from cached list)
+        function loadProducts() {
+            const brandId = brandDD.getValue();
+            const categoryId = categoryDD.getValue();
+
+            if (!brandId || !categoryId) {
+                productDD.setOptions([]);
+                return;
+            }
+
+            products = allProducts.filter(p =>
                 p.brand_id == brandId && p.category_id == categoryId
             );
 
-            document.getElementById('productSelect').innerHTML = '<option value="">-- Select Product --</option>' +
-                products.map(p => `<option value="${p.id}" data-product='${JSON.stringify(p).replace(/'/g, "&apos;")}'>${p.name}</option>`).join('');
+            productDD.setOptions(products.map(p => ({
+                value: p.id,
+                label: p.name,
+                data: p
+            })));
         }
 
-        // Load product details
+        // Show product type section and pack sizes
         function loadProductDetails() {
-            const selected = document.getElementById('productSelect').options[document.getElementById('productSelect').selectedIndex];
-            if (!selected.value) {
-                document.getElementById('productTypeSection').classList.add('hidden');
-                return;
-            }
+            if (!selectedProduct) return;
 
-            selectedProduct = JSON.parse(selected.dataset.product);
-            
-            // Show product type section
             document.getElementById('productTypeSection').classList.remove('hidden');
-            
-            // Show/hide area type option based on product type
+
             if (selectedProduct.product_type === 'area_wise' && selectedProduct.area_coverage > 0) {
                 document.getElementById('areaTypeOption').classList.remove('hidden');
             } else {
@@ -344,7 +631,7 @@
         // Switch between unit and area type
         function switchProductType() {
             const type = document.querySelector('input[name="productType"]:checked').value;
-            
+
             if (type === 'unit') {
                 document.getElementById('unitTypeInputs').classList.remove('hidden');
                 document.getElementById('areaTypeInputs').classList.add('hidden');
@@ -358,14 +645,14 @@
             }
         }
 
-        // Load pack sizes
+        // Load pack sizes into regular select
         function loadPackSizes() {
             if (!selectedProduct || !selectedProduct.available_sizes) return;
-            
+
             try {
                 const packSizes = JSON.parse(selectedProduct.available_sizes);
                 document.getElementById('packSizeSelect').innerHTML = '<option value="">-- Select Pack Size --</option>' +
-                    packSizes.map((ps, idx) => 
+                    packSizes.map((ps, idx) =>
                         `<option value="${idx}" data-pack='${JSON.stringify(ps)}'>${ps.size}L - ₹${parseFloat(ps.price).toFixed(2)}</option>`
                     ).join('');
             } catch (e) {
@@ -373,7 +660,9 @@
             }
         }
 
-        // Calculate area-wise requirement
+        // ========================================
+        // AREA CALCULATION
+        // ========================================
         function calculateAreaWise() {
             const squareFeet = parseFloat(document.getElementById('squareFeet').value) || 0;
             const coats = parseFloat(document.getElementById('coatsNumber').value) || 1;
@@ -384,28 +673,21 @@
                 return;
             }
 
-            // Calculate total liters needed
             const totalLiters = (squareFeet * coats) / coverage;
-
-            // Get pack sizes
             const packSizes = JSON.parse(selectedProduct.available_sizes || '[]');
             if (packSizes.length === 0) return;
 
-            // Find optimal pack combination
             const result = findOptimalPackCombination(totalLiters, packSizes);
 
-            // Display result
             document.getElementById('totalLiters').textContent = totalLiters.toFixed(2) + 'L';
             document.getElementById('packCombo').textContent = result.breakdown;
             document.getElementById('areaPrice').textContent = '₹' + result.totalPrice.toFixed(2);
             document.getElementById('areaCalculation').classList.remove('hidden');
         }
 
-        // Find optimal pack combination
         function findOptimalPackCombination(litersNeeded, packSizes) {
-            // Sort pack sizes descending
-            const sorted = packSizes.sort((a, b) => b.size - a.size);
-            
+            const sorted = [...packSizes].sort((a, b) => b.size - a.size);
+
             let remaining = litersNeeded;
             let combination = [];
             let totalPrice = 0;
@@ -413,44 +695,34 @@
             for (let pack of sorted) {
                 if (remaining >= pack.size) {
                     const quantity = Math.floor(remaining / pack.size);
-                    combination.push({
-                        size: pack.size,
-                        quantity: quantity,
-                        price: pack.price
-                    });
+                    combination.push({ size: pack.size, quantity, price: pack.price });
                     totalPrice += quantity * pack.price;
-                    remaining = remaining - (quantity * pack.size);
+                    remaining -= quantity * pack.size;
                 }
             }
 
-            // Handle remaining with smallest pack
             if (remaining > 0) {
                 const smallestPack = sorted[sorted.length - 1];
                 const additionalPacks = Math.ceil(remaining / smallestPack.size);
-                combination.push({
-                    size: smallestPack.size,
-                    quantity: additionalPacks,
-                    price: smallestPack.price
-                });
+                combination.push({ size: smallestPack.size, quantity: additionalPacks, price: smallestPack.price });
                 totalPrice += additionalPacks * smallestPack.price;
             }
 
-            const breakdown = combination.map(c => `${c.quantity}×${c.size}L`).join(' + ');
-            
             return {
-                combination: combination,
-                breakdown: breakdown,
-                totalPrice: totalPrice
+                combination,
+                breakdown: combination.map(c => `${c.quantity}×${c.size}L`).join(' + '),
+                totalPrice
             };
         }
 
-        // Add product to estimate
+        // ========================================
+        // ADD / REMOVE ITEMS
+        // ========================================
         function addProductToEstimate() {
             if (!selectedCustomer) {
                 alert('Please select a customer first');
                 return;
             }
-
             if (!selectedProduct) {
                 alert('Please select a product');
                 return;
@@ -467,8 +739,8 @@
             if (type === 'unit') {
                 const packIdx = document.getElementById('packSizeSelect').value;
                 const quantity = parseFloat(document.getElementById('unitQuantity').value) || 1;
-                
-                if (!packIdx) {
+
+                if (packIdx === '') {
                     alert('Please select pack size');
                     return;
                 }
@@ -495,16 +767,19 @@
 
             estimateItems.push(item);
             renderEstimateTable();
-            
-            // Reset form
-            document.getElementById('productSelect').value = '';
+
+            // Reset product selection
+            productDD.reset();
+            selectedProduct = null;
             document.getElementById('productTypeSection').classList.add('hidden');
+            document.getElementById('unitTypeInputs').classList.add('hidden');
+            document.getElementById('areaTypeInputs').classList.add('hidden');
+            document.getElementById('areaCalculation').classList.add('hidden');
         }
 
-        // Render estimate table
         function renderEstimateTable() {
             const tbody = document.getElementById('itemsTableBody');
-            
+
             if (estimateItems.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">No items added yet</td></tr>';
                 updateTotals();
@@ -529,18 +804,13 @@
             updateTotals();
         }
 
-        // Remove item
         function removeItem(itemId) {
             estimateItems = estimateItems.filter(item => item.id !== itemId);
             renderEstimateTable();
         }
 
-        // Update totals
         function updateTotals() {
-            // Prices are GST-INCLUSIVE, so we need to back-calculate
             const grandTotal = estimateItems.reduce((sum, item) => sum + item.total, 0);
-            
-            // Back-calculate GST that's already in the price (18% inclusive)
             const gst = grandTotal - (grandTotal / 1.18);
             const subtotal = grandTotal - gst;
 
@@ -549,7 +819,9 @@
             document.getElementById('grandTotal').textContent = '₹' + grandTotal.toFixed(2);
         }
 
-        // Save estimate
+        // ========================================
+        // SAVE ESTIMATE
+        // ========================================
         async function saveEstimate() {
             if (!selectedCustomer) {
                 alert('❌ Please select a customer');
@@ -561,12 +833,10 @@
                 return;
             }
 
-            // Prices are GST-INCLUSIVE - back-calculate GST
             const grandTotal = estimateItems.reduce((sum, item) => sum + item.total, 0);
             const gst = grandTotal - (grandTotal / 1.18);
             const subtotal = grandTotal - gst;
 
-            // Convert items to API format
             const apiItems = estimateItems.map((item, idx) => ({
                 product_id: item.product_id,
                 item_description: item.product_name,
@@ -595,33 +865,21 @@
             };
 
             try {
-                const token = localStorage.getItem('auth_token');
-                if (!token) {
-                    alert('❌ Not authenticated. Please login again.');
-                    window.location.href = '/login.html';
-                    return;
-                }
-
-                const response = await fetch('/api/estimates', {
+                const response = await apiRequest('/api/estimates', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
                     body: JSON.stringify(estimateData)
                 });
 
                 const result = await response.json();
 
                 if (response.ok && result.success) {
-                    // Mark request as converted if this came from a request
                     const urlParams = new URLSearchParams(window.location.search);
                     const requestId = urlParams.get('from_request');
-                    
+
                     if (requestId) {
                         await markRequestAsConverted(requestId, result.id || result.estimate_id);
                     }
-                    
+
                     alert('✅ Estimate created successfully! Estimate #' + (result.estimate_number || result.id));
                     window.location.href = 'estimates.html';
                 } else {
@@ -635,7 +893,9 @@
             }
         }
 
-        // New customer modal
+        // ========================================
+        // NEW CUSTOMER MODAL
+        // ========================================
         function openNewCustomerModal() {
             document.getElementById('newCustomerModal').classList.remove('hidden');
         }
@@ -646,7 +906,7 @@
 
         async function createCustomer(event) {
             event.preventDefault();
-            
+
             const customerData = {
                 name: document.getElementById('newCustName').value,
                 phone: document.getElementById('newCustPhone').value,
@@ -657,9 +917,8 @@
             };
 
             try {
-                const response = await fetch('/api/customers', {
+                const response = await apiRequest('/api/customers', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(customerData)
                 });
 
@@ -667,9 +926,27 @@
                     const result = await response.json();
                     alert('Customer created successfully!');
                     closeNewCustomerModal();
-                    loadInitialData(); // Reload customers
+
+                    // Clear modal form
+                    document.getElementById('newCustName').value = '';
+                    document.getElementById('newCustPhone').value = '';
+                    document.getElementById('newCustEmail').value = '';
+                    document.getElementById('newCustAddress').value = '';
+
+                    // Reload customers into dropdown and auto-select the new one
+                    const custRes = await apiRequest('/api/customers');
+                    customers = await custRes.json();
+                    customerDD.setOptions(customers.map(c => ({
+                        value: c.id,
+                        label: `${c.name} (${c.phone || 'No phone'})`,
+                        data: c
+                    })));
+
+                    const newId = result.id || result.customer_id;
+                    if (newId) customerDD.setValue(String(newId));
                 } else {
-                    alert('Failed to create customer');
+                    const err = await response.json();
+                    alert('Failed to create customer: ' + (err.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -678,18 +955,14 @@
         }
 
         // ========================================
-        // PRE-FILL FROM REQUEST FUNCTIONALITY
+        // PRE-FILL FROM REQUEST
         // ========================================
-
         async function markRequestAsConverted(requestId, estimateId) {
             try {
-                console.log('📝 Marking request as converted:', requestId, '→', estimateId);
-                
-                const response = await fetch(`/api/estimate-requests/${requestId}`, {
+                console.log('Marking request as converted:', requestId, '→', estimateId);
+
+                const response = await apiRequest(`/api/estimate-requests/${requestId}`, {
                     method: 'PATCH',
-                    headers: { 
-                        'Content-Type': 'application/json'
-                    },
                     body: JSON.stringify({
                         status: 'quote_sent',
                         estimate_id: estimateId
@@ -697,122 +970,111 @@
                 });
 
                 if (response.ok) {
-                    console.log('✅ Request marked as converted');
+                    console.log('Request marked as converted');
                 } else {
-                    console.warn('⚠️ Could not update request status');
+                    console.warn('Could not update request status');
                 }
             } catch (error) {
-                console.error('❌ Error marking request:', error);
-                // Don't fail the estimate creation if this fails
+                console.error('Error marking request:', error);
             }
         }
 
         async function prefillFromRequest() {
             const urlParams = new URLSearchParams(window.location.search);
             const requestId = urlParams.get('from_request');
-            
+
             if (!requestId) return;
 
             try {
-                console.log('🔄 Pre-filling from request ID:', requestId);
-                
-                // Show loading indicator
+                console.log('Pre-filling from request ID:', requestId);
+
                 const loadingDiv = document.createElement('div');
                 loadingDiv.id = 'prefillLoading';
                 loadingDiv.className = 'fixed top-20 right-4 bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                loadingDiv.innerHTML = '⏳ Loading request data...';
+                loadingDiv.textContent = 'Loading request data...';
                 document.body.appendChild(loadingDiv);
 
-                // 1. Fetch request details
-                const reqRes = await fetch(`/api/estimate-requests/${requestId}`);
+                const reqRes = await apiRequest(`/api/estimate-requests/${requestId}`);
                 const reqResult = await reqRes.json();
-                
+
                 if (!reqResult.success) {
                     throw new Error('Failed to load request');
                 }
-                
+
                 const request = reqResult.data;
-                console.log('📋 Request data loaded:', request);
+                console.log('Request data loaded:', request);
 
-                // 2. Find or create customer
                 let customer = await findOrCreateCustomer(request);
-                console.log('👤 Customer ready:', customer);
+                console.log('Customer ready:', customer);
 
-                // 3. Select customer in dropdown
-                const customerSelect = document.getElementById('customerSelect');
-                
-                // Reload customers to get the newly created one
-                await loadInitialData();
-                
-                // Small delay to ensure dropdown is populated
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                customerSelect.value = customer.id;
-                customerSelect.dispatchEvent(new Event('change'));
+                // Reload customers to include any new one
+                const custRes = await apiRequest('/api/customers');
+                customers = await custRes.json();
+                customerDD.setOptions(customers.map(c => ({
+                    value: c.id,
+                    label: `${c.name} (${c.phone || 'No phone'})`,
+                    data: c
+                })));
 
-                // 4. If has products, pre-fill them
+                await new Promise(resolve => setTimeout(resolve, 300));
+                customerDD.setValue(String(customer.id));
+
+                // Pre-fill products
                 if (request.products_json) {
-                    loadingDiv.innerHTML = '⏳ Adding products...';
+                    loadingDiv.textContent = 'Adding products...';
                     const productsData = JSON.parse(request.products_json);
-                    
+
                     for (const item of productsData.items) {
                         await addProductFromRequest(item);
-                        await new Promise(resolve => setTimeout(resolve, 300)); // Delay between products
+                        await new Promise(resolve => setTimeout(resolve, 300));
                     }
-                    
-                    console.log(`✅ Added ${productsData.items.length} products`);
+
+                    console.log(`Added ${productsData.items.length} products`);
                 }
 
-                // Success message
                 loadingDiv.className = 'fixed top-20 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                loadingDiv.innerHTML = `✅ Pre-filled from request ${request.request_number}`;
-                
+                loadingDiv.textContent = `Pre-filled from request ${request.request_number}`;
                 setTimeout(() => loadingDiv.remove(), 3000);
 
             } catch (error) {
-                console.error('❌ Error pre-filling:', error);
+                console.error('Error pre-filling:', error);
                 const loadingDiv = document.getElementById('prefillLoading');
                 if (loadingDiv) {
                     loadingDiv.className = 'fixed top-20 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                    loadingDiv.innerHTML = '❌ Error loading request data';
+                    loadingDiv.textContent = 'Error loading request data';
                     setTimeout(() => loadingDiv.remove(), 3000);
                 }
             }
         }
 
         async function findOrCreateCustomer(request) {
-            // Try to find existing customer by phone
-            const searchRes = await fetch(`/api/customers?search=${request.phone}`);
-            const customers = await searchRes.json();
-            
-            const existing = customers.find(c => c.phone === request.phone);
-            
+            const searchRes = await apiRequest(`/api/customers?search=${request.phone}`);
+            const custList = await searchRes.json();
+            const existing = custList.find(c => c.phone === request.phone);
+
             if (existing) {
-                console.log('✓ Found existing customer:', existing.name);
+                console.log('Found existing customer:', existing.name);
                 return existing;
             }
 
-            // Create new customer
-            console.log('+ Creating new customer:', request.customer_name);
-            
+            console.log('Creating new customer:', request.customer_name);
+
             const customerData = {
                 name: request.customer_name,
                 phone: request.phone,
                 email: request.email || null,
                 address: request.location || null,
-                branch_id: 1, // Default to first branch
+                branch_id: 1,
                 status: 'approved'
             };
 
-            const createRes = await fetch('/api/customers', {
+            const createRes = await apiRequest('/api/customers', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(customerData)
             });
 
             const result = await createRes.json();
-            
-            // Return the created customer
+
             return {
                 id: result.id || result.customer_id,
                 name: request.customer_name,
@@ -824,20 +1086,18 @@
 
         async function addProductFromRequest(item) {
             try {
-                console.log('🎨 Adding product:', item.product_name);
+                console.log('Adding product:', item.product_name);
 
-                // Fetch product details
-                const prodRes = await fetch(`/api/products/${item.product_id}`);
+                const prodRes = await apiRequest(`/api/products/${item.product_id}`);
                 const product = await prodRes.json();
-                
+
                 if (!product || !product.id) {
-                    console.warn('⚠️ Product not found:', item.product_id);
+                    console.warn('Product not found:', item.product_id);
                     return;
                 }
 
                 selectedProduct = product;
 
-                // Prepare item for estimate
                 let estimateItem = {
                     id: itemIdCounter++,
                     product_id: product.id,
@@ -846,10 +1106,7 @@
                 };
 
                 if (item.type === 'unit') {
-                    // Unit-based product
                     const packSizes = JSON.parse(product.available_sizes);
-                    
-                    // Find matching pack size
                     const packIdx = packSizes.findIndex(p => parseFloat(p.size) === parseFloat(item.pack_size));
                     const pack = packSizes[packIdx >= 0 ? packIdx : 0];
 
@@ -858,11 +1115,8 @@
                     estimateItem.unit_price = pack.price;
                     estimateItem.total = item.quantity * pack.price;
                 } else {
-                    // Area-based product
                     const coverage = parseFloat(product.area_coverage) || 120;
                     const liters = item.liters || (item.sqft * item.coats) / coverage;
-                    
-                    // Find optimal pack combination
                     const packSizes = JSON.parse(product.available_sizes);
                     const result = findOptimalPackCombination(liters, packSizes);
 
@@ -873,21 +1127,21 @@
                 }
 
                 estimateItems.push(estimateItem);
-                console.log('✅ Product added to estimate');
+                console.log('Product added to estimate');
 
             } catch (error) {
-                console.error('❌ Error adding product:', error);
+                console.error('Error adding product:', error);
             }
         }
 
-        // Initialize
+        // ========================================
+        // INITIALIZE
+        // ========================================
         async function init() {
+            initDropdowns();
             await loadInitialData();
-            
-            // Check if pre-filling from request
             await prefillFromRequest();
-            
-            // Render table if items were added
+
             if (estimateItems.length > 0) {
                 renderEstimateTable();
             }

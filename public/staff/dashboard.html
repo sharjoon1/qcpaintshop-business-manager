@@ -9,6 +9,7 @@
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -124,6 +125,25 @@
     <script src="/universal-nav-loader.js"></script>
 </head>
 <body>
+    <!-- Staff Navigation -->
+    <nav class="bg-blue-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold">Quality Colours Staff</h1>
+                <span class="text-blue-200">|</span>
+                <span class="text-lg">Dashboard</span>
+            </div>
+            <div class="flex gap-4">
+                <a href="/staff/dashboard.html" class="hover:text-blue-200">Dashboard</a>
+                <a href="/staff/clock-in.html" class="hover:text-blue-200">Clock In</a>
+                <a href="/staff/history.html" class="hover:text-blue-200">History</a>
+                <a href="/staff/tasks.html" class="hover:text-blue-200">Tasks</a>
+                <a href="/staff/activities.html" class="hover:text-blue-200">Activities</a>
+                <button onclick="logout()" class="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded">Logout</button>
+            </div>
+        </div>
+    </nav>
+
     <!-- Header -->
     <div class="status-card" style="margin-top: 16px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
@@ -202,6 +222,7 @@
 
         <!-- Actions -->
         <div style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Primary Action: Break Button -->
             <button class="action-btn break-btn" id="breakBtn" onclick="toggleBreak()">
                 <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -209,12 +230,25 @@
                 <span id="breakBtnText">Start Break</span>
             </button>
 
-            <button class="action-btn clock-out-btn" onclick="goToClockOut()">
-                <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                </svg>
-                Clock Out
-            </button>
+            <!-- Clock Out Section (Hidden by default to prevent accidental clicks) -->
+            <div id="clockOutSection" style="display: none; margin-top: 8px;">
+                <button class="action-btn clock-out-btn" onclick="confirmClockOut()">
+                    <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                    </svg>
+                    Clock Out
+                </button>
+            </div>
+
+            <!-- Show Clock Out Link -->
+            <div style="text-align: center; margin-top: 16px;">
+                <button
+                    id="showClockOutBtn"
+                    onclick="toggleClockOutSection()"
+                    style="background: none; border: none; color: #6b7280; font-size: 14px; cursor: pointer; text-decoration: underline; padding: 8px;">
+                    <span id="clockOutToggleText">End of day? Click to show Clock Out</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -482,6 +516,37 @@
             } catch (error) {
                 console.error('Break toggle error:', error);
                 alert('Failed to process request. Please try again.');
+            }
+        }
+
+        // Toggle Clock Out Section
+        function toggleClockOutSection() {
+            const section = document.getElementById('clockOutSection');
+            const toggleBtn = document.getElementById('showClockOutBtn');
+            const toggleText = document.getElementById('clockOutToggleText');
+
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                toggleText.textContent = 'Hide Clock Out';
+            } else {
+                section.style.display = 'none';
+                toggleText.textContent = 'End of day? Click to show Clock Out';
+            }
+        }
+
+        // Confirm Clock Out with warning
+        function confirmClockOut() {
+            const confirmed = confirm(
+                '⚠️ WARNING: Are you sure you want to Clock Out?\n\n' +
+                'This will end your working day. Make sure you:\n' +
+                '✓ Have completed all your tasks\n' +
+                '✓ Have ended any active breaks\n' +
+                '✓ Are ready to leave for the day\n\n' +
+                'Click OK to proceed with Clock Out.'
+            );
+
+            if (confirmed) {
+                window.location.href = 'clock-out.html';
             }
         }
 

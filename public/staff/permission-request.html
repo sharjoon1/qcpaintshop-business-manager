@@ -8,6 +8,7 @@
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -175,6 +176,25 @@
     <script src="/universal-nav-loader.js"></script>
 </head>
 <body>
+    <!-- Staff Navigation -->
+    <nav class="bg-blue-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold">Quality Colours Staff</h1>
+                <span class="text-blue-200">|</span>
+                <span class="text-lg">Request Permission</span>
+            </div>
+            <div class="flex gap-4">
+                <a href="/staff/dashboard.html" class="hover:text-blue-200">Dashboard</a>
+                <a href="/staff/clock-in.html" class="hover:text-blue-200">Clock In</a>
+                <a href="/staff/history.html" class="hover:text-blue-200">History</a>
+                <a href="/staff/tasks.html" class="hover:text-blue-200">Tasks</a>
+                <a href="/staff/activities.html" class="hover:text-blue-200">Activities</a>
+                <button onclick="logout()" class="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded">Logout</button>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
         <!-- Header -->
         <div class="card" style="margin-top: 16px;">

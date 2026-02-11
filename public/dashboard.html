@@ -7,7 +7,8 @@
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/universal-nav-loader-v3.js"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
     <style>
         body { background: #f9fafb; }
         
@@ -381,7 +382,7 @@
                         <div class="data-card-icon" style="background: #fef3c7; color: #d97706;">💰</div>
                         <div>
                             <div class="data-card-value" id="todayRevenue">₹0.00</div>
-                            <div class="data-card-label">Revenue</div>
+                            <div class="data-card-label">This Month</div>
                         </div>
                     </div>
                 </div>
@@ -419,36 +420,52 @@
                     'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
                     'Content-Type': 'application/json'
                 };
-                
+
+                // Load dashboard stats (counts and revenue)
+                try {
+                    const statsRes = await fetch('/api/dashboard/stats', { headers });
+                    if (statsRes.ok) {
+                        const response = await statsRes.json();
+                        const stats = response.data;
+
+                        // Update card values
+                        document.getElementById('totalEstimates').textContent = stats.total_estimates || 0;
+                        document.getElementById('totalProducts').textContent = stats.total_products || 0;
+                        document.getElementById('totalCustomers').textContent = stats.total_customers || 0;
+
+                        // Format and display monthly revenue
+                        const revenue = stats.month_estimates_total || 0;
+                        document.getElementById('todayRevenue').textContent = formatCurrency(revenue);
+
+                        console.log('✅ Dashboard stats loaded:', stats);
+                    }
+                } catch (e) {
+                    console.error('Error loading dashboard stats:', e);
+                    // Set defaults on error
+                    document.getElementById('totalEstimates').textContent = '0';
+                    document.getElementById('totalProducts').textContent = '0';
+                    document.getElementById('totalCustomers').textContent = '0';
+                    document.getElementById('todayRevenue').textContent = '₹0.00';
+                }
+
+                // Load recent estimates for activity section
                 try {
                     const estimatesRes = await fetch('/api/estimates', { headers });
                     if (estimatesRes.ok) {
                         const estimates = await estimatesRes.json();
-                        document.getElementById('totalEstimates').textContent = estimates.length || 0;
                         displayRecentEstimates(estimates.slice(0, 5));
                     }
-                } catch (e) { console.error('Error loading estimates:', e); }
-                
-                try {
-                    const productsRes = await fetch('/api/products', { headers });
-                    if (productsRes.ok) {
-                        const products = await productsRes.json();
-                        document.getElementById('totalProducts').textContent = products.length || 0;
-                    }
-                } catch (e) { console.error('Error loading products:', e); }
-                
-                try {
-                    const customersRes = await fetch('/api/customers', { headers });
-                    if (customersRes.ok) {
-                        const customers = await customersRes.json();
-                        document.getElementById('totalCustomers').textContent = customers.length || 0;
-                    }
-                } catch (e) { console.error('Error loading customers:', e); }
-                
+                } catch (e) { console.error('Error loading recent estimates:', e); }
+
                 console.log('✅ Dashboard data loaded');
             } catch (error) {
                 console.error('❌ Error loading dashboard data:', error);
             }
+        }
+
+        function formatCurrency(amount) {
+            const num = parseFloat(amount) || 0;
+            return '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         
         function displayRecentEstimates(estimates) {
@@ -466,7 +483,7 @@
                         <div class="text-xs sm:text-sm text-gray-600 mt-0.5">Estimate #${est.estimate_number || est.id}</div>
                     </div>
                     <div class="text-right flex-shrink-0">
-                        <div class="text-base sm:text-lg font-bold text-gray-900">₹${est.total_amount || '0.00'}</div>
+                        <div class="text-base sm:text-lg font-bold text-gray-900">${formatCurrency(est.grand_total)}</div>
                         <span class="inline-block mt-0.5 px-2 py-0.5 text-xs font-semibold rounded-full ${
                             est.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                         }">${est.status || 'pending'}</span>

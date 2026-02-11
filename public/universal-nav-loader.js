@@ -147,39 +147,33 @@
      * Ensure global functions are available
      */
     function ensureGlobalFunctions() {
-        // Fallback for toggleEnhancedSidebar
-        if (typeof window.toggleEnhancedSidebar === 'undefined') {
-            console.warn('⚠️ toggleEnhancedSidebar not found, creating fallback');
-            window.toggleEnhancedSidebar = function() {
-                const sidebar = document.getElementById('enhancedSidebar');
-                const overlay = document.getElementById('enhancedSidebarOverlay');
-                const hamburger = document.getElementById('enhancedHamburgerBtn');
-                
-                if (sidebar && overlay) {
+        // Fallback for toggleSidebar
+        if (typeof window.toggleSidebar === 'undefined') {
+            console.warn('⚠️ toggleSidebar not found, creating fallback');
+            window.toggleSidebar = function() {
+                const sidebar = document.getElementById('mainSidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+
+                if (sidebar) {
                     sidebar.classList.toggle('open');
-                    overlay.classList.toggle('show');
                 }
-                
-                if (hamburger) {
-                    hamburger.classList.toggle('active');
+                if (overlay) {
+                    overlay.classList.toggle('show');
                 }
             };
         }
-        
-        // Fallback for closeEnhancedSidebar
-        if (typeof window.closeEnhancedSidebar === 'undefined') {
-            window.closeEnhancedSidebar = function() {
-                const sidebar = document.getElementById('enhancedSidebar');
-                const overlay = document.getElementById('enhancedSidebarOverlay');
-                const hamburger = document.getElementById('enhancedHamburgerBtn');
-                
-                if (sidebar && overlay) {
+
+        // Fallback for closeSidebar
+        if (typeof window.closeSidebar === 'undefined') {
+            window.closeSidebar = function() {
+                const sidebar = document.getElementById('mainSidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+
+                if (sidebar) {
                     sidebar.classList.remove('open');
-                    overlay.classList.remove('show');
                 }
-                
-                if (hamburger) {
-                    hamburger.classList.remove('active');
+                if (overlay) {
+                    overlay.classList.remove('show');
                 }
             };
         }

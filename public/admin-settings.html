@@ -7,13 +7,11 @@
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
-
-
-
-    <div class="max-w-6xl mx-auto p-4 sm:p-6">
+<div class="max-w-6xl mx-auto p-4 sm:p-6">
         <!-- Settings Tabs -->
         <div class="bg-white rounded-xl shadow-lg overflow-hidden">
             <!-- Tab Navigation -->
@@ -304,9 +302,9 @@
     </div>
 
     <script>
-        // Get auth token (try both possible keys)
+        // Get auth token
         function getAuthToken() {
-            return localStorage.getItem('token') || localStorage.getItem('auth_token');
+            return localStorage.getItem('auth_token');
         }
 
         // Tab switching

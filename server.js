@@ -60,6 +60,20 @@ app.use(cors({
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
+        // In development, allow local network IPs (192.168.x.x, 10.x.x.x, etc.)
+        if (process.env.NODE_ENV !== 'production') {
+            try {
+                const url = new URL(origin);
+                const host = url.hostname;
+                if (host.startsWith('192.168.') ||
+                    host.startsWith('10.') ||
+                    host.startsWith('172.') ||
+                    host === 'localhost' ||
+                    host === '127.0.0.1') {
+                    return callback(null, true);
+                }
+            } catch (e) { /* invalid origin, fall through to block */ }
+        }
         console.warn(`⚠️ CORS blocked request from: ${origin}`);
         return callback(new Error('Not allowed by CORS'));
     },
@@ -132,6 +146,27 @@ const uploadLogo = multer({
     }
 });
 
+// Profile picture upload config
+const profileStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'public/uploads/profiles/'),
+    filename: (req, file, cb) => {
+        const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'profile-' + uniqueName + path.extname(file.originalname));
+    }
+});
+
+const uploadProfile = multer({
+    storage: profileStorage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files allowed'));
+        }
+    }
+});
+
 // ========================================
 // MOUNT ROUTE MODULES
 // ========================================
@@ -159,7 +194,10 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const [users] = await pool.query(
-            'SELECT * FROM users WHERE (username = ? OR email = ? OR phone = ?) AND status = ?',
+            `SELECT u.*, b.name as branch_name 
+             FROM users u 
+             LEFT JOIN branches b ON u.branch_id = b.id 
+             WHERE (u.username = ? OR u.email = ? OR u.phone = ?) AND u.status = ?`,
             [username, username, username, 'active']
         );
 
@@ -195,6 +233,7 @@ app.post('/api/auth/login', async (req, res) => {
                 email: user.email,
                 role: user.role,
                 branch_id: user.branch_id,
+                branch_name: user.branch_name || null,
                 phone: user.phone,
                 profile_image_url: user.profile_image_url
             }
@@ -215,8 +254,9 @@ app.get('/api/auth/verify', async (req, res) => {
         }
 
         const [sessions] = await pool.query(
-            `SELECT s.*, u.id as user_id, u.username, u.full_name, u.email, u.role, u.branch_id, u.phone, u.profile_image_url
+            `SELECT s.*, u.id as user_id, u.username, u.full_name, u.email, u.role, u.branch_id, u.phone, u.profile_image_url, b.name as branch_name
              FROM user_sessions s JOIN users u ON s.user_id = u.id
+             LEFT JOIN branches b ON u.branch_id = b.id
              WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
             [token]
         );
@@ -235,6 +275,7 @@ app.get('/api/auth/verify', async (req, res) => {
                 email: session.email,
                 role: session.role,
                 branch_id: session.branch_id,
+                branch_name: session.branch_name || null,
                 phone: session.phone,
                 profile_image_url: session.profile_image_url
             }
@@ -255,8 +296,9 @@ app.get('/api/auth/me', async (req, res) => {
         }
 
         const [sessions] = await pool.query(
-            `SELECT s.*, u.id as user_id, u.username, u.full_name, u.email, u.role, u.branch_id, u.phone, u.profile_image_url
+            `SELECT s.*, u.id as user_id, u.username, u.full_name, u.email, u.role, u.branch_id, u.phone, u.profile_image_url, b.name as branch_name
              FROM user_sessions s JOIN users u ON s.user_id = u.id
+             LEFT JOIN branches b ON u.branch_id = b.id
              WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
             [token]
         );
@@ -275,6 +317,7 @@ app.get('/api/auth/me', async (req, res) => {
                 email: session.email,
                 role: session.role,
                 branch_id: session.branch_id,
+                branch_name: session.branch_name || null,
                 phone: session.phone,
                 profile_image_url: session.profile_image_url
             }
@@ -752,6 +795,64 @@ app.post('/api/upload/logo', requireAuth, uploadLogo.single('logo'), async (req,
     }
 });
 
+// Profile picture upload
+app.post('/api/upload/profile', requireAuth, uploadProfile.single('profile_image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file uploaded' });
+        }
+        const profileUrl = `/uploads/profiles/${req.file.filename}`;
+        const userId = req.user.id;
+
+        // Update user's profile_image_url in database
+        await pool.query('UPDATE users SET profile_image_url = ? WHERE id = ?', [profileUrl, userId]);
+
+        res.json({ success: true, profileUrl, message: 'Profile picture uploaded successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ========================================
+// PUBLIC GUEST ENDPOINTS (for request-estimate page)
+// ========================================
+
+app.get('/api/guest/brands', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT id, name FROM brands WHERE status = ? ORDER BY name', ['active']);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/guest/categories', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT id, name FROM categories WHERE status = ? ORDER BY name', ['active']);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/guest/products', async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT p.id, p.name, p.brand_id, p.category_id, p.product_type,
+                   p.area_coverage, p.available_sizes, p.visible_to_guest,
+                   b.name as brand_name, c.name as category_name
+            FROM products p
+            LEFT JOIN brands b ON p.brand_id = b.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE p.status = 'active' AND p.visible_to_guest = 1
+            ORDER BY p.name
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ========================================
 // BRANDS
 // ========================================
@@ -772,9 +873,9 @@ app.post('/api/brands', requirePermission('brands', 'add'), async (req, res) => 
             'INSERT INTO brands (name, logo_url, status) VALUES (?, ?, ?)',
             [name, logo_url, status || 'active']
         );
-        res.json({ id: result.insertId, name, logo_url, status: status || 'active' });
+        res.json({ success: true, id: result.insertId, name, logo_url, status: status || 'active' });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
@@ -787,7 +888,7 @@ app.put('/api/brands/:id', requirePermission('brands', 'edit'), async (req, res)
         );
         res.json({ success: true, message: 'Brand updated successfully' });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
@@ -796,7 +897,7 @@ app.delete('/api/brands/:id', requirePermission('brands', 'delete'), async (req,
         await pool.query('UPDATE brands SET status = ? WHERE id = ?', ['inactive', req.params.id]);
         res.json({ success: true, message: 'Brand deleted successfully' });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
@@ -916,6 +1017,34 @@ app.post('/api/users', requirePermission('staff', 'add'), async (req, res) => {
     }
 });
 
+// Self-profile update (any authenticated user can update their own profile)
+app.put('/api/users/profile/me', requireAuth, async (req, res) => {
+    try {
+        const { full_name, email, phone, profile_image_url } = req.body;
+        const userId = req.user.id;
+
+        const setClauses = [];
+        const params = [];
+
+        if (full_name !== undefined) { setClauses.push('full_name = ?'); params.push(full_name); }
+        if (email !== undefined) { setClauses.push('email = ?'); params.push(email); }
+        if (phone !== undefined) { setClauses.push('phone = ?'); params.push(phone); }
+        if (profile_image_url !== undefined) { setClauses.push('profile_image_url = ?'); params.push(profile_image_url); }
+
+        if (setClauses.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        params.push(userId);
+        await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, params);
+
+        res.json({ success: true, message: 'Profile updated successfully' });
+    } catch (err) {
+        console.error('Update profile error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.put('/api/users/:id', requirePermission('staff', 'edit'), async (req, res) => {
     try {
         const { username, email, password, full_name, phone, role, branch_id, status, profile_image_url } = req.body;
@@ -1026,10 +1155,10 @@ app.get('/api/customer-types', requireAuth, async (req, res) => {
 
 app.post('/api/customer-types', requirePermission('customers', 'add'), async (req, res) => {
     try {
-        const { name, description, default_discount, status } = req.body;
+        const { name, description, default_discount, price_markup, status } = req.body;
         const [result] = await pool.query(
-            'INSERT INTO customer_types (name, description, default_discount, status) VALUES (?, ?, ?, ?)',
-            [name, description, default_discount || 0, status || 'active']
+            'INSERT INTO customer_types (name, description, default_discount, price_markup, status) VALUES (?, ?, ?, ?, ?)',
+            [name, description, default_discount || 0, price_markup || 0, status || 'active']
         );
         res.json({ success: true, id: result.insertId, message: 'Customer type created successfully' });
     } catch (err) {
@@ -1039,10 +1168,10 @@ app.post('/api/customer-types', requirePermission('customers', 'add'), async (re
 
 app.put('/api/customer-types/:id', requirePermission('customers', 'edit'), async (req, res) => {
     try {
-        const { name, description, default_discount, status } = req.body;
+        const { name, description, default_discount, price_markup, status } = req.body;
         await pool.query(
-            'UPDATE customer_types SET name = ?, description = ?, default_discount = ?, status = ? WHERE id = ?',
-            [name, description, default_discount, status, req.params.id]
+            'UPDATE customer_types SET name = ?, description = ?, default_discount = ?, price_markup = ?, status = ? WHERE id = ?',
+            [name, description, default_discount, price_markup || 0, status, req.params.id]
         );
         res.json({ success: true, message: 'Customer type updated successfully' });
     } catch (err) {
@@ -1111,11 +1240,11 @@ app.get('/api/products/:id', requireAuth, async (req, res) => {
 
 app.post('/api/products', requirePermission('products', 'add'), async (req, res) => {
     try {
-        const { name, brand_id, category_id, product_type, description, gst_percentage, base_price, available_sizes, status } = req.body;
+        const { name, brand_id, category_id, product_type, description, gst_percentage, base_price, available_sizes, area_coverage, status } = req.body;
 
         const [result] = await pool.query(
-            'INSERT INTO products (name, brand_id, category_id, product_type, description, gst_percentage, base_price, available_sizes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, brand_id, category_id, product_type, description || null, gst_percentage || 18, base_price || 0, available_sizes || null, status || 'active']
+            'INSERT INTO products (name, brand_id, category_id, product_type, description, gst_percentage, base_price, available_sizes, area_coverage, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, brand_id, category_id, product_type, description || null, gst_percentage || 18, base_price || 0, available_sizes || null, area_coverage || null, status || 'active']
         );
 
         const productId = result.insertId;
@@ -1143,11 +1272,11 @@ app.post('/api/products', requirePermission('products', 'add'), async (req, res)
 
 app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, res) => {
     try {
-        const { name, brand_id, category_id, product_type, description, gst_percentage, base_price, available_sizes, status } = req.body;
+        const { name, brand_id, category_id, product_type, description, gst_percentage, base_price, available_sizes, area_coverage, status } = req.body;
 
         await pool.query(
-            'UPDATE products SET name = ?, brand_id = ?, category_id = ?, product_type = ?, description = ?, gst_percentage = ?, base_price = ?, available_sizes = ?, status = ? WHERE id = ?',
-            [name, brand_id, category_id, product_type, description || null, gst_percentage || 18, base_price || 0, available_sizes || null, status || 'active', req.params.id]
+            'UPDATE products SET name = ?, brand_id = ?, category_id = ?, product_type = ?, description = ?, gst_percentage = ?, base_price = ?, available_sizes = ?, area_coverage = ?, status = ? WHERE id = ?',
+            [name, brand_id, category_id, product_type, description || null, gst_percentage || 18, base_price || 0, available_sizes || null, area_coverage || null, status || 'active', req.params.id]
         );
 
         await pool.query('DELETE FROM pack_sizes WHERE product_id = ?', [req.params.id]);
@@ -1219,15 +1348,15 @@ app.get('/api/customers/:id', requireAuth, async (req, res) => {
 
 app.post('/api/customers', requirePermission('customers', 'add'), async (req, res) => {
     try {
-        const { name, phone, email, address, city, gst_number, customer_type_id, status } = req.body;
+        const { name, phone, email, address, city, gst_number, customer_type_id, branch_id, status } = req.body;
 
         if (!name) {
             return res.status(400).json({ error: 'Customer name is required' });
         }
 
         const [result] = await pool.query(
-            'INSERT INTO customers (name, phone, email, address, city, gst_number, customer_type_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, phone, email, address, city, gst_number, customer_type_id || null, status || 'approved']
+            'INSERT INTO customers (name, phone, email, address, city, gst_number, customer_type_id, branch_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, phone, email, address, city, gst_number, customer_type_id || null, branch_id || null, status || 'approved']
         );
         res.json({ success: true, id: result.insertId, message: 'Customer created successfully' });
     } catch (err) {
@@ -1237,10 +1366,10 @@ app.post('/api/customers', requirePermission('customers', 'add'), async (req, re
 
 app.put('/api/customers/:id', requirePermission('customers', 'edit'), async (req, res) => {
     try {
-        const { name, phone, email, address, city, gst_number, customer_type_id, status } = req.body;
+        const { name, phone, email, address, city, gst_number, customer_type_id, branch_id, status } = req.body;
         await pool.query(
-            'UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, city = ?, gst_number = ?, customer_type_id = ?, status = ? WHERE id = ?',
-            [name, phone, email, address, city, gst_number, customer_type_id, status, req.params.id]
+            'UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, city = ?, gst_number = ?, customer_type_id = ?, branch_id = ?, status = ? WHERE id = ?',
+            [name, phone, email, address, city, gst_number, customer_type_id, branch_id, status, req.params.id]
         );
         res.json({ success: true, message: 'Customer updated successfully' });
     } catch (err) {
