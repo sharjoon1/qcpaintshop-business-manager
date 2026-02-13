@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>View Estimate - Quality Colours</title>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -56,7 +62,7 @@
 </head>
 <body class="bg-gray-50">
 <!-- Action Bar (No Print) -->
-    <div class="no-print fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b">
+    <div class="no-print fixed top-0 left-0 right-0 bg-white shadow-lg border-b" style="z-index: 1050;">
         <div class="px-4 py-3 flex items-center justify-between flex-wrap gap-2">
             <button onclick="history.back()" class="flex items-center text-gray-600 hover:text-gray-900">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -258,9 +264,13 @@
         // Load estimate
         async function loadEstimate() {
             try {
-                const response = await fetch(`/api/estimates/${estimateId}`);
+                const response = await apiRequest(`/api/estimates/${estimateId}`);
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.message || err.error || 'Estimate not found');
+                }
                 const data = await response.json();
-                
+
                 if (!data || !data.estimate_number) {
                     throw new Error('Estimate not found');
                 }

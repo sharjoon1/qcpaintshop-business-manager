@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Geo-Fence Logs - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+    </style>
+</head>
+<body data-page="geofence-logs">
+    <div id="sidebar-container"></div>
+
+    <main class="qc-main-content">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Geo-Fence Violations</h1>
+                <p class="text-gray-500">Monitor staff location violations during work hours</p>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Branch</label>
+                    <select id="filterBranch" onchange="loadViolations()" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none text-sm">
+                        <option value="">All Branches</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Staff</label>
+                    <select id="filterStaff" onchange="loadViolations()" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none text-sm">
+                        <option value="">All Staff</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">From Date</label>
+                    <input type="date" id="filterFromDate" onchange="loadViolations()" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">To Date</label>
+                    <input type="date" id="filterToDate" onchange="loadViolations()" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none text-sm">
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="summaryCards">
+            <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+                <div class="text-2xl font-bold text-red-600" id="totalViolations">0</div>
+                <div class="text-xs text-gray-500">Total Violations</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+                <div class="text-2xl font-bold text-orange-600" id="leftAreaCount">0</div>
+                <div class="text-xs text-gray-500">Left Area</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+                <div class="text-2xl font-bold text-green-600" id="returnedCount">0</div>
+                <div class="text-xs text-gray-500">Returned</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+                <div class="text-2xl font-bold text-purple-600" id="uniqueStaff">0</div>
+                <div class="text-xs text-gray-500">Unique Staff</div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Staff</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Branch</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Date/Time</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Distance</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Fence Radius</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Type</th>
+                        </tr>
+                    </thead>
+                    <tbody id="violationsTable">
+                        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="/components/logo-loader.js"></script>
+    <script>
+        // Set default date range to last 7 days
+        const today = new Date().toISOString().split('T')[0];
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        document.getElementById('filterFromDate').value = weekAgo;
+        document.getElementById('filterToDate').value = today;
+
+        async function loadFilters() {
+            try {
+                // Load branches
+                const branchRes = await fetch('/api/branches', { headers: getAuthHeaders() });
+                const branchData = await branchRes.json();
+                if (branchData.success) {
+                    const sel = document.getElementById('filterBranch');
+                    (branchData.data || []).forEach(b => {
+                        sel.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+                    });
+                }
+
+                // Load staff
+                const staffRes = await fetch('/api/staff?role=staff', { headers: getAuthHeaders() });
+                const staffData = await staffRes.json();
+                if (staffData.success) {
+                    const sel = document.getElementById('filterStaff');
+                    (staffData.data || []).forEach(s => {
+                        sel.innerHTML += `<option value="${s.id}">${s.full_name || s.name}</option>`;
+                    });
+                }
+            } catch (e) {
+                console.error('Load filters error:', e);
+            }
+        }
+
+        async function loadViolations() {
+            const branch = document.getElementById('filterBranch').value;
+            const staff = document.getElementById('filterStaff').value;
+            const fromDate = document.getElementById('filterFromDate').value;
+            const toDate = document.getElementById('filterToDate').value;
+
+            const params = new URLSearchParams();
+            if (branch) params.append('branch_id', branch);
+            if (staff) params.append('user_id', staff);
+            if (fromDate) params.append('from_date', fromDate);
+            if (toDate) params.append('to_date', toDate);
+
+            try {
+                const res = await fetch(`/api/attendance/geofence-violations?${params}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (data.success) {
+                    const violations = data.data || [];
+                    renderTable(violations);
+                    updateSummary(violations);
+                }
+            } catch (e) {
+                console.error('Load violations error:', e);
+                document.getElementById('violationsTable').innerHTML =
+                    '<tr><td colspan="6" class="px-4 py-8 text-center text-red-400">Failed to load data</td></tr>';
+            }
+        }
+
+        function renderTable(violations) {
+            const tbody = document.getElementById('violationsTable');
+            if (violations.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No violations found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = violations.map(v => {
+                const dt = new Date(v.created_at);
+                const typeClass = v.violation_type === 'left_area' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
+                const typeLabel = v.violation_type === 'left_area' ? 'Left Area' : 'Returned';
+
+                return `<tr class="border-t hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium">${v.staff_name || v.username}</td>
+                    <td class="px-4 py-3">${v.branch_name}</td>
+                    <td class="px-4 py-3">${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</td>
+                    <td class="px-4 py-3 font-semibold">${v.distance_from_fence}m</td>
+                    <td class="px-4 py-3">${v.fence_radius}m</td>
+                    <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ${typeClass}">${typeLabel}</span></td>
+                </tr>`;
+            }).join('');
+        }
+
+        function updateSummary(violations) {
+            document.getElementById('totalViolations').textContent = violations.length;
+            document.getElementById('leftAreaCount').textContent = violations.filter(v => v.violation_type === 'left_area').length;
+            document.getElementById('returnedCount').textContent = violations.filter(v => v.violation_type === 'returned').length;
+            document.getElementById('uniqueStaff').textContent = new Set(violations.map(v => v.user_id)).size;
+        }
+
+        loadFilters();
+        loadViolations();
+    </script>
+</body>
+</html>

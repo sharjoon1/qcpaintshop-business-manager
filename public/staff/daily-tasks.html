@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Daily Tasks - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f3f4f6;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        .gradient-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 16px;
+            border-radius: 0 0 24px 24px;
+        }
+        .task-section {
+            background: white;
+            border-radius: 16px;
+            margin: 12px 16px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .section-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6b7280;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .task-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #f9fafb;
+        }
+        .task-item:last-child { border-bottom: none; }
+        .task-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        .toggle-group {
+            display: flex;
+            gap: 8px;
+        }
+        .toggle-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 2px solid #e5e7eb;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .toggle-btn.yes.active {
+            background: #d1fae5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+        .toggle-btn.no.active {
+            background: #fee2e2;
+            border-color: #ef4444;
+            color: #991b1b;
+        }
+        .detail-fields {
+            margin-top: 10px;
+            display: none;
+        }
+        .detail-fields.show { display: block; }
+        .detail-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 8px;
+            outline: none;
+        }
+        .detail-input:focus { border-color: #667eea; }
+        .reason-box {
+            margin-top: 10px;
+            display: none;
+        }
+        .reason-box.show { display: block; }
+        .photo-section {
+            margin-top: 10px;
+            display: none;
+        }
+        .photo-section.show { display: block; }
+        .photo-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #eff6ff;
+            border: 1px dashed #3b82f6;
+            border-radius: 10px;
+            color: #2563eb;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            justify-content: center;
+        }
+        .photo-preview {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .photo-preview img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #e5e7eb;
+        }
+        .material-list { margin-top: 10px; }
+        .material-entry {
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        .add-material-btn {
+            width: 100%;
+            padding: 10px;
+            border: 1px dashed #9ca3af;
+            border-radius: 10px;
+            background: white;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .submit-btn {
+            width: calc(100% - 32px);
+            margin: 16px;
+            padding: 16px;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+            transition: all 0.3s;
+        }
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .submit-btn:active:not(:disabled) { transform: scale(0.98); }
+        .progress-ring {
+            width: 56px;
+            height: 56px;
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 50;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            text-decoration: none;
+            color: #6b7280;
+            font-size: 12px;
+        }
+        .nav-item.active { color: #667eea; }
+        .toast-container {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            pointer-events: none;
+        }
+        .toast {
+            padding: 12px 20px;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            animation: toastIn 0.3s ease-out;
+            max-width: 90vw;
+            text-align: center;
+        }
+        .toast-success { background: #10b981; }
+        .toast-error { background: #ef4444; }
+        @keyframes toastIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .completed-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            background: #d1fae5;
+            color: #065f46;
+        }
+    </style>
+    <script src="/universal-nav-loader.js"></script>
+</head>
+<body data-page="daily-tasks">
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Header -->
+    <div class="gradient-header">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <div>
+                <h1 style="font-size: 22px; font-weight: 700;">Daily Tasks</h1>
+                <p style="font-size: 13px; opacity: 0.85;" id="headerDate">Loading...</p>
+            </div>
+            <div style="text-align: center;">
+                <svg class="progress-ring" viewBox="0 0 56 56">
+                    <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="4"/>
+                    <circle id="progressCircle" cx="28" cy="28" r="24" fill="none" stroke="white" stroke-width="4"
+                        stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round"
+                        transform="rotate(-90 28 28)" style="transition: stroke-dashoffset 0.5s;"/>
+                </svg>
+                <div style="font-size: 11px; margin-top: 2px; opacity: 0.8;" id="progressText">0/0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingState" style="text-align: center; padding: 40px;">
+        <div style="border: 3px solid #e5e7eb; border-top: 3px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+        <p style="color: #6b7280; margin-top: 12px;">Loading tasks...</p>
+    </div>
+    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+
+    <!-- Tasks Container -->
+    <div id="tasksContainer" style="display: none;"></div>
+
+    <!-- Submit Button -->
+    <button class="submit-btn" id="submitBtn" onclick="submitDay()" style="display: none;">
+        Submit Daily Report
+    </button>
+
+    <!-- Already Submitted -->
+    <div id="submittedState" style="display: none; text-align: center; padding: 20px; margin: 16px;">
+        <div class="completed-badge" style="font-size: 14px; padding: 8px 16px; margin-bottom: 8px;">
+            Submitted Today
+        </div>
+        <p style="color: #6b7280; font-size: 13px;">Your daily report has been submitted.</p>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <a href="dashboard.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"></path>
+            </svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="daily-tasks.html" class="nav-item active">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"></path>
+            </svg>
+            <span>Daily Tasks</span>
+        </a>
+        <a href="tasks.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path>
+            </svg>
+            <span>Tasks</span>
+        </a>
+        <a href="history.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"></path>
+            </svg>
+            <span>History</span>
+        </a>
+    </div>
+
+    <script>
+        let templates = [];
+        let responses = {};
+        let materials = [];
+        let submission = null;
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Load tasks
+        async function loadTasks() {
+            try {
+                const res = await fetch('/api/daily-tasks/today', { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (!data.success) throw new Error(data.error);
+
+                templates = data.data.templates;
+                materials = data.data.materials || [];
+                submission = data.data.submission;
+
+                // Index responses by template_id
+                responses = {};
+                (data.data.responses || []).forEach(r => {
+                    responses[r.template_id] = r;
+                });
+
+                document.getElementById('loadingState').style.display = 'none';
+
+                // Set header date
+                const today = new Date();
+                document.getElementById('headerDate').textContent = today.toLocaleDateString('en-IN', {
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                });
+
+                if (submission) {
+                    document.getElementById('submittedState').style.display = 'block';
+                }
+
+                renderTasks();
+                updateProgress();
+
+                document.getElementById('tasksContainer').style.display = 'block';
+                document.getElementById('submitBtn').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+                document.getElementById('loadingState').innerHTML =
+                    '<p style="color:#ef4444;text-align:center;padding:40px;">Failed to load tasks. <a href="javascript:location.reload()" style="color:#667eea;">Retry</a></p>';
+            }
+        }
+
+        function renderTasks() {
+            const container = document.getElementById('tasksContainer');
+            container.innerHTML = '';
+
+            // Group by section
+            const sections = {};
+            templates.forEach(t => {
+                if (!sections[t.section]) sections[t.section] = [];
+                sections[t.section].push(t);
+            });
+
+            const sectionLabels = {
+                morning: 'Morning Checklist',
+                material: 'Material Tracking',
+                sales: 'Sales & Quotations',
+                outstanding: 'Outstanding Follow-up',
+                marketing: 'Marketing & Calls'
+            };
+
+            for (const [section, tasks] of Object.entries(sections)) {
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'task-section';
+                sectionDiv.innerHTML = `<div class="section-title">${sectionLabels[section] || section.toUpperCase()}</div>`;
+
+                tasks.forEach(task => {
+                    sectionDiv.appendChild(renderTaskItem(task));
+                });
+
+                container.appendChild(sectionDiv);
+            }
+        }
+
+        function renderTaskItem(task) {
+            const resp = responses[task.id];
+            const div = document.createElement('div');
+            div.className = 'task-item';
+            div.id = `task-${task.id}`;
+
+            let html = `<div class="task-title">${escapeHtml(task.title)}</div>`;
+
+            if (task.description) {
+                html += `<p style="font-size:12px;color:#6b7280;margin-bottom:8px;">${escapeHtml(task.description)}</p>`;
+            }
+
+            // Yes/No toggle
+            html += `<div class="toggle-group">
+                <button class="toggle-btn yes ${resp && resp.answer === 'yes' ? 'active' : ''}" onclick="setAnswer(${task.id}, 'yes')">Yes</button>
+                <button class="toggle-btn no ${resp && resp.answer === 'no' ? 'active' : ''}" onclick="setAnswer(${task.id}, 'no')">No</button>
+            </div>`;
+
+            // Photo section (for yes_no_photo)
+            if (task.task_type === 'yes_no_photo' || task.photo_required) {
+                const photos = resp?.photos || [];
+                html += `<div class="photo-section ${resp && resp.answer === 'yes' ? 'show' : ''}" id="photo-section-${task.id}">
+                    <label class="photo-btn">
+                        <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                            <circle cx="12" cy="13" r="3"/>
+                        </svg>
+                        Take Photo
+                        <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadPhoto(${task.id}, this)">
+                    </label>
+                    <div class="photo-preview" id="photos-${task.id}">
+                        ${photos.map(p => `<img src="${p}" alt="Photo">`).join('')}
+                    </div>
+                </div>`;
+            }
+
+            // Detail fields (for yes_no_detail)
+            if (task.task_type === 'yes_no_detail' && task.detail_fields) {
+                const fields = task.detail_fields;
+                const details = resp?.details || {};
+                html += `<div class="detail-fields ${resp && resp.answer === 'yes' ? 'show' : ''}" id="detail-fields-${task.id}">`;
+                fields.forEach(field => {
+                    const label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    html += `<input class="detail-input" placeholder="${label}" value="${escapeHtml(details[field] || '')}" data-task="${task.id}" data-field="${field}" onchange="saveDetails(${task.id})">`;
+                });
+                html += `</div>`;
+            }
+
+            // Material received
+            if (task.task_type === 'material_received') {
+                const respMaterials = resp ? materials.filter(m => m.response_id === resp.id) : [];
+                html += `<div class="material-list ${resp && resp.answer === 'yes' ? 'show' : ''}" id="material-list-${task.id}" style="display:${resp && resp.answer === 'yes' ? 'block' : 'none'}">
+                    <div id="material-entries-${task.id}">
+                        ${respMaterials.map(m => renderMaterialEntry(m)).join('')}
+                    </div>
+                    <button class="add-material-btn" onclick="addMaterial(${task.id})">+ Add Vendor Entry</button>
+                </div>`;
+            }
+
+            // Reason box (when No is selected)
+            if (task.task_type === 'yes_no_detail') {
+                html += `<div class="reason-box ${resp && resp.answer === 'no' ? 'show' : ''}" id="reason-box-${task.id}">
+                    <textarea class="detail-input" placeholder="Reason for No..." style="min-height:60px;resize:vertical;" data-task="${task.id}" onchange="saveReason(${task.id}, this.value)">${escapeHtml(resp?.reason || '')}</textarea>
+                </div>`;
+            }
+
+            div.innerHTML = html;
+            return div;
+        }
+
+        function renderMaterialEntry(m) {
+            return `<div class="material-entry" id="material-${m.id}">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-weight:600;font-size:14px;">${escapeHtml(m.vendor_name)}</span>
+                    <button onclick="deleteMaterial(${m.id})" style="background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer;">&times;</button>
+                </div>
+                ${m.photo_url ? `<img src="${m.photo_url}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;margin-bottom:8px;">` : ''}
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <label class="photo-btn" style="flex:1;padding:6px 10px;font-size:12px;">
+                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><circle cx="12" cy="13" r="3"/></svg>
+                        Bill Photo
+                        <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadMaterialPhoto(${m.id}, this)">
+                    </label>
+                </div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;">
+                    <input type="checkbox" ${m.bill_on_zoho ? 'checked' : ''} onchange="toggleZoho(${m.id}, this.checked)"> Bill on Zoho
+                </label>
+            </div>`;
+        }
+
+        // Set answer (Yes/No)
+        async function setAnswer(templateId, answer) {
+            try {
+                await fetch(`/api/daily-tasks/respond/${templateId}`, {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer })
+                });
+
+                // Update local state
+                if (!responses[templateId]) responses[templateId] = {};
+                responses[templateId].answer = answer;
+
+                // Update UI toggles
+                const taskEl = document.getElementById(`task-${templateId}`);
+                if (taskEl) {
+                    taskEl.querySelectorAll('.toggle-btn.yes').forEach(b => b.classList.toggle('active', answer === 'yes'));
+                    taskEl.querySelectorAll('.toggle-btn.no').forEach(b => b.classList.toggle('active', answer === 'no'));
+                }
+
+                // Show/hide dependent sections
+                const photoSection = document.getElementById(`photo-section-${templateId}`);
+                if (photoSection) photoSection.classList.toggle('show', answer === 'yes');
+
+                const detailFields = document.getElementById(`detail-fields-${templateId}`);
+                if (detailFields) detailFields.classList.toggle('show', answer === 'yes');
+
+                const reasonBox = document.getElementById(`reason-box-${templateId}`);
+                if (reasonBox) reasonBox.classList.toggle('show', answer === 'no');
+
+                const materialList = document.getElementById(`material-list-${templateId}`);
+                if (materialList) materialList.style.display = answer === 'yes' ? 'block' : 'none';
+
+                // If answer is Yes on material_received and no response id yet, reload to get the response id
+                const template = templates.find(t => t.id === templateId);
+                if (template && template.task_type === 'material_received' && answer === 'yes' && !responses[templateId]?.id) {
+                    await loadTasks();
+                }
+
+                updateProgress();
+            } catch (error) {
+                showToast('Failed to save', 'error');
+            }
+        }
+
+        // Save detail fields
+        async function saveDetails(templateId) {
+            const inputs = document.querySelectorAll(`[data-task="${templateId}"][data-field]`);
+            const details = {};
+            inputs.forEach(input => {
+                details[input.dataset.field] = input.value;
+            });
+
+            try {
+                await fetch(`/api/daily-tasks/respond/${templateId}`, {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer: 'yes', details })
+                });
+            } catch (error) {
+                showToast('Failed to save details', 'error');
+            }
+        }
+
+        // Save reason for "No"
+        async function saveReason(templateId, reason) {
+            try {
+                await fetch(`/api/daily-tasks/respond/${templateId}`, {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer: 'no', reason })
+                });
+            } catch (error) {
+                showToast('Failed to save reason', 'error');
+            }
+        }
+
+        // Upload photo
+        async function uploadPhoto(templateId, input) {
+            if (!input.files[0]) return;
+
+            const formData = new FormData();
+            formData.append('photo', input.files[0]);
+            formData.append('template_id', templateId);
+
+            try {
+                const res = await fetch('/api/daily-tasks/upload-photo', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const preview = document.getElementById(`photos-${templateId}`);
+                    if (preview) {
+                        const img = document.createElement('img');
+                        img.src = data.photo_url;
+                        img.alt = 'Photo';
+                        preview.appendChild(img);
+                    }
+                    showToast('Photo uploaded');
+                } else {
+                    showToast(data.error || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                showToast('Failed to upload photo', 'error');
+            }
+            input.value = '';
+        }
+
+        // Add material entry
+        async function addMaterial(templateId) {
+            const vendorName = prompt('Enter vendor name:');
+            if (!vendorName) return;
+
+            const resp = responses[templateId];
+            if (!resp || !resp.id) {
+                showToast('Please select Yes first', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/daily-tasks/material/${resp.id}`, {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ vendor_name: vendorName })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const entriesDiv = document.getElementById(`material-entries-${templateId}`);
+                    const newMaterial = { id: data.id, vendor_name: vendorName, photo_url: null, bill_on_zoho: false };
+                    entriesDiv.insertAdjacentHTML('beforeend', renderMaterialEntry(newMaterial));
+                    showToast('Vendor added');
+                }
+            } catch (error) {
+                showToast('Failed to add vendor', 'error');
+            }
+        }
+
+        // Delete material entry
+        async function deleteMaterial(id) {
+            if (!confirm('Remove this entry?')) return;
+            try {
+                await fetch(`/api/daily-tasks/material/${id}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+                const el = document.getElementById(`material-${id}`);
+                if (el) el.remove();
+                showToast('Entry removed');
+            } catch (error) {
+                showToast('Failed to remove', 'error');
+            }
+        }
+
+        // Upload material photo
+        async function uploadMaterialPhoto(materialId, input) {
+            if (!input.files[0]) return;
+
+            const formData = new FormData();
+            formData.append('photo', input.files[0]);
+
+            try {
+                const res = await fetch(`/api/daily-tasks/material/${materialId}/photo`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Bill photo uploaded');
+                    await loadTasks(); // Reload to show photo
+                }
+            } catch (error) {
+                showToast('Failed to upload', 'error');
+            }
+            input.value = '';
+        }
+
+        // Toggle Zoho checkbox (no endpoint needed - just visual for now)
+        function toggleZoho(materialId, checked) {
+            // Could add an API call here if needed
+        }
+
+        // Update progress ring
+        function updateProgress() {
+            const total = templates.length;
+            const completed = Object.values(responses).filter(r => r && r.answer).length;
+            const pct = total > 0 ? completed / total : 0;
+            const circumference = 150.8;
+
+            document.getElementById('progressCircle').style.strokeDashoffset = circumference * (1 - pct);
+            document.getElementById('progressText').textContent = `${completed}/${total}`;
+        }
+
+        // Submit day
+        async function submitDay() {
+            const total = templates.length;
+            const completed = Object.values(responses).filter(r => r && r.answer).length;
+
+            if (completed < total) {
+                if (!confirm(`You've completed ${completed}/${total} tasks. Submit anyway?`)) return;
+            }
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            try {
+                const res = await fetch('/api/daily-tasks/submit-day', {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Daily report submitted!');
+                    document.getElementById('submittedState').style.display = 'block';
+                } else {
+                    showToast(data.error || 'Failed to submit', 'error');
+                }
+            } catch (error) {
+                showToast('Failed to submit', 'error');
+            }
+            btn.disabled = false;
+            btn.textContent = 'Submit Daily Report';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // Init
+        loadTasks();
+    </script>
+    <script src="/components/logo-loader.js"></script>
+</body>
+</html>

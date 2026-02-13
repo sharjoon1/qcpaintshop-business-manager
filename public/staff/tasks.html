@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>My Tasks - Quality Colours Business Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
@@ -47,25 +53,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-50">
-    <!-- Staff Navigation -->
-    <nav class="bg-blue-600 text-white p-4 shadow-lg">
-        <div class="container mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-4">
-                <h1 class="text-2xl font-bold">Quality Colours Staff</h1>
-                <span class="text-blue-200">|</span>
-                <span class="text-lg">Tasks</span>
-            </div>
-            <div class="flex gap-4">
-                <a href="/staff/dashboard.html" class="hover:text-blue-200">Dashboard</a>
-                <a href="/staff/clock-in.html" class="hover:text-blue-200">Clock In</a>
-                <a href="/staff/history.html" class="hover:text-blue-200">History</a>
-                <a href="/staff/tasks.html" class="hover:text-blue-200">Tasks</a>
-                <a href="/staff/activities.html" class="hover:text-blue-200">Activities</a>
-                <button onclick="logout()" class="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded">Logout</button>
-            </div>
-        </div>
-    </nav>
+<body class="bg-gray-50" data-page="attendance-tasks">
 
     <div class="container mx-auto p-6">
         <!-- Header -->
@@ -337,7 +325,7 @@
                 }
 
                 const data = await response.json();
-                allTasks = data.tasks || [];
+                allTasks = data.data || [];
 
                 displayTasks(allTasks);
                 updateSummary(allTasks);
@@ -413,10 +401,10 @@
                     <div class="mb-3">
                         <div class="flex justify-between items-center mb-1">
                             <span class="text-xs text-gray-500">Progress</span>
-                            <span class="text-xs font-semibold text-purple-600">${task.progress_percentage || 0}%</span>
+                            <span class="text-xs font-semibold text-purple-600">${task.progress_percentage || task.completion_percentage || 0}%</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="progress-bar bg-gradient-to-r from-purple-600 to-purple-700 h-2 rounded-full" style="width: ${task.progress_percentage || 0}%"></div>
+                            <div class="progress-bar bg-gradient-to-r from-purple-600 to-purple-700 h-2 rounded-full" style="width: ${task.progress_percentage || task.completion_percentage || 0}%"></div>
                         </div>
                     </div>
 
@@ -472,8 +460,9 @@
                     throw new Error('Failed to load task details');
                 }
 
-                const data = await response.json();
-                const task = data.task;
+                const result = await response.json();
+                const taskData = result.data || result;
+                const task = taskData.task || taskData;
 
                 // Populate modal
                 document.getElementById('detail-title').textContent = task.title;
@@ -485,8 +474,8 @@
                     day: 'numeric'
                 });
                 document.getElementById('detail-due-date').textContent = dueDate;
-                document.getElementById('detail-progress').textContent = `${task.progress_percentage || 0}%`;
-                document.getElementById('detail-created-by').textContent = task.creator_name || 'Unknown';
+                document.getElementById('detail-progress').textContent = `${task.progress_percentage || task.completion_percentage || 0}%`;
+                document.getElementById('detail-created-by').textContent = task.assigned_by_name || task.creator_name || 'Unknown';
 
                 // Status badge
                 const statusColors = {
@@ -510,7 +499,7 @@
                 priorityBadge.className = `px-3 py-1 rounded-full text-sm font-semibold ${priorityColors[task.priority]}`;
 
                 // Progress bar
-                const progress = task.progress_percentage || 0;
+                const progress = task.progress_percentage || task.completion_percentage || 0;
                 document.getElementById('detail-progress-percent').textContent = `${progress}%`;
                 document.getElementById('detail-progress-bar').style.width = `${progress}%`;
 
@@ -530,7 +519,7 @@
                 }
 
                 // Load updates
-                displayUpdates(data.updates || []);
+                displayUpdates(taskData.updates || []);
 
                 // Show modal
                 document.getElementById('task-detail-modal').classList.add('show');
@@ -605,7 +594,7 @@
 
             try {
                 const response = await fetch(`/api/tasks/${currentTaskId}/status`, {
-                    method: 'PUT',
+                    method: 'PATCH',
                     headers: {
                         ...getAuthHeaders(),
                         'Content-Type': 'application/json'
@@ -654,7 +643,7 @@
             }
 
             try {
-                const response = await fetch(`/api/tasks/${currentTaskId}/comments`, {
+                const response = await fetch(`/api/tasks/${currentTaskId}/update`, {
                     method: 'POST',
                     headers: {
                         ...getAuthHeaders(),

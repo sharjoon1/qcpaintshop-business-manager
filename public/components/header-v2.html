@@ -278,7 +278,7 @@
 
         <!-- Center: Logo -->
         <div class="qc-logo-section">
-            <img id="headerLogo" src="https://qcpaintshop.com/assets/images/logo.png" alt="Quality Colours" class="qc-logo-img">
+            <img id="headerLogo" src="/icons/icon-192x192.png" alt="Quality Colours" class="qc-logo-img">
         </div>
 
         <!-- Right: Profile -->
@@ -420,19 +420,33 @@ async function loadBusinessLogo() {
         const token = localStorage.getItem('auth_token');
         if (!token) return;
 
-        const response = await fetch('/api/settings', {
+        const response = await fetch('/api/settings/branding', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (!response.ok) return;
 
         const settings = await response.json();
+        // Handle both flat and wrapped response formats
+        const data = settings.data || settings;
 
-        if (settings.business_logo) {
+        if (data.business_logo) {
             const logoElement = document.getElementById('headerLogo');
             if (logoElement) {
-                logoElement.src = settings.business_logo;
+                logoElement.onerror = function() {
+                    // Prevent infinite loop - only fallback once
+                    this.onerror = null;
+                    this.src = '/icons/icon-192x192.png';
+                };
+                logoElement.src = data.business_logo;
             }
+            // Also update any other logo elements on the page
+            document.querySelectorAll('.business-logo, [data-logo="business"]').forEach(el => {
+                if (el.tagName === 'IMG') {
+                    el.onerror = function() { this.onerror = null; this.src = '/icons/icon-192x192.png'; };
+                    el.src = data.business_logo;
+                }
+            });
         }
     } catch (error) {
         console.warn('Could not load business logo:', error);

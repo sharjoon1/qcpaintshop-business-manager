@@ -485,17 +485,22 @@
     <nav class="qc-sidebar-nav">
         <!-- Dashboard -->
         <div class="qc-nav-section">
-            <a href="/dashboard.html" class="qc-nav-item" data-page="dashboard">
+            <a href="/dashboard.html" class="qc-nav-item" data-page="dashboard" data-roles="admin,manager">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
                 <span class="qc-nav-item-text">Dashboard</span>
                 <span class="qc-nav-tooltip">Dashboard</span>
+            </a>
+            <a href="/staff/dashboard.html" class="qc-nav-item" data-page="staff-dashboard" data-roles="staff,accountant">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+                <span class="qc-nav-item-text">My Dashboard</span>
+                <span class="qc-nav-tooltip">My Dashboard</span>
             </a>
         </div>
 
         <div class="qc-nav-divider"></div>
 
         <!-- Sales & Estimates -->
-        <div class="qc-nav-section">
+        <div class="qc-nav-section" data-roles="admin,manager,staff">
             <div class="qc-nav-section-title">Sales & Estimates</div>
             <a href="/estimates.html" class="qc-nav-item" data-page="estimates">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
@@ -507,12 +512,12 @@
                 <span class="qc-nav-item-text">Create New</span>
                 <span class="qc-nav-tooltip">Create New</span>
             </a>
-            <a href="/admin-estimate-requests.html" class="qc-nav-item" data-page="estimate-requests">
+            <a href="/admin-estimate-requests.html" class="qc-nav-item" data-page="estimate-requests" data-roles="admin,manager">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
                 <span class="qc-nav-item-text">Estimate Requests</span>
                 <span class="qc-nav-tooltip">Estimate Requests</span>
             </a>
-            <a href="/estimate-settings.html" class="qc-nav-item" data-page="estimate-settings">
+            <a href="/estimate-settings.html" class="qc-nav-item" data-page="estimate-settings" data-roles="admin">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
                 <span class="qc-nav-item-text">Estimate Settings</span>
                 <span class="qc-nav-tooltip">Estimate Settings</span>
@@ -520,19 +525,19 @@
         </div>
 
         <!-- Products & Inventory -->
-        <div class="qc-nav-section">
+        <div class="qc-nav-section" data-roles="admin,manager,staff">
             <div class="qc-nav-section-title">Products & Inventory</div>
             <a href="/admin-products.html" class="qc-nav-item" data-page="products">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
                 <span class="qc-nav-item-text">Products</span>
                 <span class="qc-nav-tooltip">Products</span>
             </a>
-            <a href="/admin-categories.html" class="qc-nav-item" data-page="categories">
+            <a href="/admin-categories.html" class="qc-nav-item" data-page="categories" data-roles="admin,manager">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
                 <span class="qc-nav-item-text">Categories</span>
                 <span class="qc-nav-tooltip">Categories</span>
             </a>
-            <a href="/admin-brands.html" class="qc-nav-item" data-page="brands">
+            <a href="/admin-brands.html" class="qc-nav-item" data-page="brands" data-roles="admin,manager">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
                 <span class="qc-nav-item-text">Brands</span>
                 <span class="qc-nav-tooltip">Brands</span>
@@ -540,14 +545,14 @@
         </div>
 
         <!-- Customers -->
-        <div class="qc-nav-section">
+        <div class="qc-nav-section" data-roles="admin,manager,staff">
             <div class="qc-nav-section-title">Customers</div>
             <a href="/admin-customers.html" class="qc-nav-item" data-page="customers">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
                 <span class="qc-nav-item-text">Customer List</span>
                 <span class="qc-nav-tooltip">Customer List</span>
             </a>
-            <a href="/admin-customer-types.html" class="qc-nav-item" data-page="customer-types">
+            <a href="/admin-customer-types.html" class="qc-nav-item" data-page="customer-types" data-roles="admin,manager">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
                 <span class="qc-nav-item-text">Customer Types</span>
                 <span class="qc-nav-tooltip">Customer Types</span>
@@ -555,17 +560,22 @@
         </div>
 
         <!-- Leads -->
-        <div class="qc-nav-section">
+        <div class="qc-nav-section" data-roles="admin,manager">
             <div class="qc-nav-section-title">Leads & CRM</div>
             <a href="/admin-leads.html" class="qc-nav-item" data-page="leads">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
                 <span class="qc-nav-item-text">Lead Management</span>
                 <span class="qc-nav-tooltip">Lead Management</span>
             </a>
+            <a href="/admin-design-requests.html" class="qc-nav-item" data-page="design-requests" data-roles="admin,manager">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>
+                <span class="qc-nav-item-text">Design Requests</span>
+                <span class="qc-nav-tooltip">Design Requests</span>
+            </a>
         </div>
 
         <!-- Branches & Staff -->
-        <div class="qc-nav-section">
+        <div class="qc-nav-section" data-roles="admin">
             <div class="qc-nav-section-title">Branches & Staff</div>
             <a href="/admin-branches.html" class="qc-nav-item" data-page="branches">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
@@ -576,6 +586,11 @@
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                 <span class="qc-nav-item-text">Staff Management</span>
                 <span class="qc-nav-tooltip">Staff Management</span>
+            </a>
+            <a href="/admin-staff-registrations.html" class="qc-nav-item" data-page="staff-registrations" data-roles="admin,manager">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span>
+                <span class="qc-nav-item-text">Staff Registrations</span>
+                <span class="qc-nav-tooltip">Staff Registrations</span>
             </a>
             <a href="/admin-roles.html" class="qc-nav-item" data-page="roles">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
@@ -622,35 +637,120 @@
                 <span class="qc-nav-item-text">My Tasks</span>
                 <span class="qc-nav-tooltip">My Tasks</span>
             </a>
-            <a href="/admin-tasks.html" class="qc-nav-item" data-page="admin-tasks">
+            <a href="/staff/daily-tasks.html" class="qc-nav-item" data-page="daily-tasks">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg></span>
+                <span class="qc-nav-item-text">Daily Tasks</span>
+                <span class="qc-nav-tooltip">Daily Tasks</span>
+            </a>
+            <a href="/admin-tasks.html" class="qc-nav-item" data-page="admin-tasks" data-roles="admin,manager">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
                 <span class="qc-nav-item-text">Task Management</span>
                 <span class="qc-nav-tooltip">Task Management</span>
             </a>
+            <a href="/admin-daily-tasks.html" class="qc-nav-item" data-page="admin-daily-tasks" data-roles="admin,manager">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg></span>
+                <span class="qc-nav-item-text">Daily Tasks Admin</span>
+                <span class="qc-nav-tooltip">Daily Tasks Admin</span>
+            </a>
+            <a href="/admin-attendance.html" class="qc-nav-item" data-page="admin-attendance" data-roles="admin,manager">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg></span>
+                <span class="qc-nav-item-text">Attendance Admin</span>
+                <span class="qc-nav-tooltip">Attendance Admin</span>
+            </a>
+            <a href="/admin-geofence-logs.html" class="qc-nav-item" data-page="geofence-logs" data-roles="admin,manager">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Geo-Fence Logs</span>
+                <span class="qc-nav-tooltip">Geo-Fence Logs</span>
+            </a>
         </div>
 
         <!-- Salary -->
-        <div class="qc-nav-section">
+        <div class="qc-nav-section" data-roles="admin,manager,accountant,staff">
             <div class="qc-nav-section-title">Salary & Payroll</div>
-            <a href="/admin-salary-config.html" class="qc-nav-item" data-page="salary-config">
+            <a href="/staff/salary.html" class="qc-nav-item" data-page="my-salary" data-roles="staff">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                <span class="qc-nav-item-text">My Salary</span>
+                <span class="qc-nav-tooltip">My Salary</span>
+            </a>
+            <a href="/staff/advance-request.html" class="qc-nav-item" data-page="advance-request" data-roles="staff">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><polyline points="7 2 12 1 17 2"/></svg></span>
+                <span class="qc-nav-item-text">Advance Request</span>
+                <span class="qc-nav-tooltip">Advance Request</span>
+            </a>
+            <a href="/admin-salary-config.html" class="qc-nav-item" data-page="salary-config" data-roles="admin">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
                 <span class="qc-nav-item-text">Salary Config</span>
                 <span class="qc-nav-tooltip">Salary Config</span>
             </a>
-            <a href="/admin-salary-monthly.html" class="qc-nav-item" data-page="salary-monthly">
+            <a href="/admin-salary-monthly.html" class="qc-nav-item" data-page="salary-monthly" data-roles="admin,manager,accountant">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
                 <span class="qc-nav-item-text">Monthly Salary</span>
                 <span class="qc-nav-tooltip">Monthly Salary</span>
             </a>
-            <a href="/admin-salary-payments.html" class="qc-nav-item" data-page="salary-payments">
+            <a href="/admin-salary-payments.html" class="qc-nav-item" data-page="salary-payments" data-roles="admin,manager,accountant">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
                 <span class="qc-nav-item-text">Salary Payments</span>
                 <span class="qc-nav-tooltip">Salary Payments</span>
             </a>
-            <a href="/admin-salary-reports.html" class="qc-nav-item" data-page="salary-reports">
+            <a href="/admin-salary-advances.html" class="qc-nav-item" data-page="salary-advances" data-roles="admin,manager,accountant">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><polyline points="7 2 12 1 17 2"/></svg></span>
+                <span class="qc-nav-item-text">Salary Advances</span>
+                <span class="qc-nav-tooltip">Salary Advances</span>
+            </a>
+            <a href="/admin-salary-reports.html" class="qc-nav-item" data-page="salary-reports" data-roles="admin,manager,accountant">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
                 <span class="qc-nav-item-text">Salary Reports</span>
                 <span class="qc-nav-tooltip">Salary Reports</span>
+            </a>
+        </div>
+
+        <!-- Zoho Books -->
+        <div class="qc-nav-section" data-roles="admin">
+            <div class="qc-nav-section-title">Zoho Books</div>
+            <a href="/admin-zoho-dashboard.html" class="qc-nav-item" data-page="zoho-dashboard">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
+                <span class="qc-nav-item-text">Zoho Dashboard</span>
+                <span class="qc-nav-tooltip">Zoho Dashboard</span>
+            </a>
+            <a href="/admin-zoho-invoices.html" class="qc-nav-item" data-page="zoho-invoices">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+                <span class="qc-nav-item-text">Invoices</span>
+                <span class="qc-nav-tooltip">Invoices</span>
+            </a>
+            <a href="/admin-zoho-items.html" class="qc-nav-item" data-page="zoho-items">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
+                <span class="qc-nav-item-text">Items & Stock</span>
+                <span class="qc-nav-tooltip">Items & Stock</span>
+            </a>
+            <a href="/admin-zoho-stock.html" class="qc-nav-item" data-page="zoho-stock">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
+                <span class="qc-nav-item-text">Stock Levels</span>
+                <span class="qc-nav-tooltip">Stock Levels</span>
+            </a>
+            <a href="/admin-zoho-locations.html" class="qc-nav-item" data-page="zoho-locations">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Locations</span>
+                <span class="qc-nav-tooltip">Locations</span>
+            </a>
+            <a href="/admin-zoho-transactions.html" class="qc-nav-item" data-page="zoho-transactions">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+                <span class="qc-nav-item-text">Transactions</span>
+                <span class="qc-nav-tooltip">Transactions</span>
+            </a>
+            <a href="/admin-zoho-reorder.html" class="qc-nav-item" data-page="zoho-reorder">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+                <span class="qc-nav-item-text">Reorder Alerts</span>
+                <span class="qc-nav-tooltip">Reorder Alerts</span>
+            </a>
+            <a href="/admin-zoho-reports.html" class="qc-nav-item" data-page="zoho-reports">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <span class="qc-nav-item-text">Financial Reports</span>
+                <span class="qc-nav-tooltip">Financial Reports</span>
+            </a>
+            <a href="/admin-zoho-settings.html" class="qc-nav-item" data-page="zoho-settings">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+                <span class="qc-nav-item-text">Zoho Settings</span>
+                <span class="qc-nav-tooltip">Zoho Settings</span>
             </a>
         </div>
 
@@ -659,12 +759,12 @@
         <!-- System -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">System</div>
-            <a href="/admin-reports.html" class="qc-nav-item" data-page="reports">
+            <a href="/admin-reports.html" class="qc-nav-item" data-page="reports" data-roles="admin,manager,accountant">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>
                 <span class="qc-nav-item-text">Reports</span>
                 <span class="qc-nav-tooltip">Reports</span>
             </a>
-            <a href="/admin-settings.html" class="qc-nav-item" data-page="settings">
+            <a href="/admin-settings.html" class="qc-nav-item" data-page="settings" data-roles="admin">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
                 <span class="qc-nav-item-text">Settings</span>
                 <span class="qc-nav-tooltip">Settings</span>
@@ -915,9 +1015,59 @@ window.addEventListener('resize', function() {
     }
 });
 
+// ── role-based nav filtering ──
+
+function filterNavByRole() {
+    let userRole = null;
+    try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        userRole = user && user.role;
+    } catch (e) {}
+
+    // Admin sees everything — no filtering needed
+    if (!userRole || userRole === 'admin') return;
+
+    // Hide sections restricted to other roles
+    document.querySelectorAll('.qc-nav-section[data-roles]').forEach(section => {
+        const allowed = section.getAttribute('data-roles').split(',');
+        if (!allowed.includes(userRole)) {
+            section.style.display = 'none';
+        }
+    });
+
+    // Hide individual items restricted to other roles
+    document.querySelectorAll('.qc-nav-item[data-roles]').forEach(item => {
+        const allowed = item.getAttribute('data-roles').split(',');
+        if (!allowed.includes(userRole)) {
+            item.style.display = 'none';
+        }
+    });
+
+    // Hide dividers that are next to hidden sections
+    document.querySelectorAll('.qc-nav-divider').forEach(divider => {
+        const next = divider.nextElementSibling;
+        const prev = divider.previousElementSibling;
+        const nextHidden = next && next.style.display === 'none';
+        const prevHidden = prev && prev.style.display === 'none';
+        if (nextHidden || prevHidden) {
+            divider.style.display = 'none';
+        }
+    });
+
+    // Hide section titles if all visible items in that section are gone
+    document.querySelectorAll('.qc-nav-section').forEach(section => {
+        if (section.style.display === 'none') return;
+        const visibleItems = section.querySelectorAll('.qc-nav-item:not([style*="display: none"])');
+        if (visibleItems.length === 0) {
+            section.style.display = 'none';
+        }
+    });
+}
+
 // ── init ──
 
 function initSidebar() {
+    filterNavByRole();
     restoreSidebarState();
     highlightActiveSidebarPage();
     attachSidebarListeners();

@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Salary Advances - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #FF6B35;
+            color: white;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 8px 12px;
+            font-size: 12px;
+            min-height: 36px;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-left: 4px solid #FF6B35;
+        }
+
+        .summary-card.warning { border-left-color: #ffc107; }
+        .summary-card.info { border-left-color: #17a2b8; }
+        .summary-card.success { border-left-color: #4CAF50; }
+        .summary-card.danger { border-left-color: #dc3545; }
+
+        .summary-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .summary-card .sub-value {
+            font-size: 13px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .form-group select,
+        .form-group input,
+        .form-group textarea {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .table-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8f9fa;
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-info { background: #d1ecf1; color: #0c5460; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-secondary { background: #e2e3e5; color: #383d41; }
+
+        .money {
+            font-weight: 600;
+            color: #28a745;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .actions {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-body .form-group {
+            margin-bottom: 15px;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .detail-row label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .detail-row span {
+            font-weight: 500;
+            color: #333;
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .header { flex-direction: column; gap: 10px; text-align: center; }
+            .summary-cards { grid-template-columns: repeat(2, 1fr); }
+            .filter-row { grid-template-columns: 1fr; }
+        }
+    </style>
+    <script src="/universal-nav-loader.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1><i class="fas fa-hand-holding-usd"></i> Salary Advances</h1>
+                <p style="color: #666; margin-top: 5px;">Manage salary advance requests and payments</p>
+            </div>
+            <button class="btn btn-primary" onclick="openCreateModal()">
+                <i class="fas fa-plus"></i> New Advance
+            </button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="summary-card">
+                <h3>Total Requested</h3>
+                <div class="value" id="totalRequested">0</div>
+                <div class="sub-value" id="totalRequestedAmt">-</div>
+            </div>
+            <div class="summary-card warning">
+                <h3>Pending Approval</h3>
+                <div class="value" id="pendingCount">0</div>
+                <div class="sub-value" id="pendingAmt">-</div>
+            </div>
+            <div class="summary-card info">
+                <h3>Approved (Awaiting Payment)</h3>
+                <div class="value" id="approvedCount">0</div>
+                <div class="sub-value" id="approvedAmt">-</div>
+            </div>
+            <div class="summary-card success">
+                <h3>Paid Out</h3>
+                <div class="value" id="paidCount">0</div>
+                <div class="sub-value" id="paidAmt">-</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-row">
+                <div class="form-group">
+                    <label>Staff Member</label>
+                    <select id="filterUser" onchange="loadAdvances()">
+                        <option value="">All Staff</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Branch</label>
+                    <select id="filterBranch" onchange="loadAdvances()">
+                        <option value="">All Branches</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="filterStatus" onchange="loadAdvances()">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="paid">Paid</option>
+                        <option value="recovered">Recovered</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-secondary" onclick="loadAdvances(); loadSummary();">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container">
+            <div id="loadingState" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> Loading advances...
+            </div>
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="fas fa-hand-holding-usd"></i>
+                <h3>No advance requests found</h3>
+                <p>Click "New Advance" to create one</p>
+            </div>
+            <div id="tableWrapper" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Staff Name</th>
+                            <th>Branch</th>
+                            <th>Amount</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="advancesTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Advance Modal -->
+    <div class="modal-overlay" id="createModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-plus-circle"></i> New Salary Advance</h2>
+                <button class="modal-close" onclick="closeModal('createModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Staff Member *</label>
+                    <select id="advanceUser" required>
+                        <option value="">Select Staff</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Branch *</label>
+                    <select id="advanceBranch" required>
+                        <option value="">Select Branch</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Amount (₹) *</label>
+                    <input type="number" id="advanceAmount" min="1" step="0.01" placeholder="Enter amount">
+                </div>
+                <div class="form-group">
+                    <label>Reason</label>
+                    <textarea id="advanceReason" placeholder="Reason for advance request"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="advanceNotes" placeholder="Additional notes (optional)"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('createModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="createAdvance()">
+                    <i class="fas fa-paper-plane"></i> Submit Request
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Approve Modal -->
+    <div class="modal-overlay" id="approveModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-check-circle" style="color:#4CAF50"></i> Approve Advance</h2>
+                <button class="modal-close" onclick="closeModal('approveModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-row">
+                    <label>Staff:</label>
+                    <span id="approveStaff">-</span>
+                </div>
+                <div class="detail-row">
+                    <label>Amount:</label>
+                    <span id="approveAmount" class="money">-</span>
+                </div>
+                <div class="detail-row">
+                    <label>Reason:</label>
+                    <span id="approveReason">-</span>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>Notes (optional)</label>
+                    <textarea id="approveNotes" placeholder="Approval notes"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('approveModal')">Cancel</button>
+                <button class="btn btn-success" onclick="approveAdvance()">
+                    <i class="fas fa-check"></i> Approve
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reject Modal -->
+    <div class="modal-overlay" id="rejectModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-times-circle" style="color:#dc3545"></i> Reject Advance</h2>
+                <button class="modal-close" onclick="closeModal('rejectModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-row">
+                    <label>Staff:</label>
+                    <span id="rejectStaff">-</span>
+                </div>
+                <div class="detail-row">
+                    <label>Amount:</label>
+                    <span id="rejectAmount" class="money">-</span>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>Rejection Reason *</label>
+                    <textarea id="rejectionReason" placeholder="Please provide a reason for rejection" required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('rejectModal')">Cancel</button>
+                <button class="btn btn-danger" onclick="rejectAdvance()">
+                    <i class="fas fa-times"></i> Reject
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pay Modal -->
+    <div class="modal-overlay" id="payModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-money-bill-wave" style="color:#4CAF50"></i> Record Payment</h2>
+                <button class="modal-close" onclick="closeModal('payModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-row">
+                    <label>Staff:</label>
+                    <span id="payStaff">-</span>
+                </div>
+                <div class="detail-row">
+                    <label>Amount:</label>
+                    <span id="payAmount" class="money">-</span>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>Payment Date</label>
+                    <input type="date" id="paymentDate">
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="paymentMethod">
+                        <option value="cash">Cash</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="upi">UPI</option>
+                        <option value="cheque">Cheque</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reference Number</label>
+                    <input type="text" id="paymentReference" placeholder="Transaction/cheque reference">
+                </div>
+                <div class="form-group">
+                    <label>Recovery Month</label>
+                    <input type="month" id="recoveryMonth" title="Month to deduct this advance from salary">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('payModal')">Cancel</button>
+                <button class="btn btn-success" onclick="recordPayment()">
+                    <i class="fas fa-check"></i> Record Payment
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Details Modal -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-info-circle"></i> Advance Details</h2>
+                <button class="modal-close" onclick="closeModal('viewModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="viewDetails"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('viewModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let currentUser = null;
+        let selectedAdvanceId = null;
+        let advancesCache = [];
+
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return false;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Unauthorized');
+
+                currentUser = await response.json();
+                return true;
+            } catch (error) {
+                localStorage.removeItem('auth_token');
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        // Load branches (fixed pattern)
+        async function loadBranches() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/branches`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+                const branches = Array.isArray(result) ? result : (result.data || []);
+
+                const selects = ['filterBranch', 'advanceBranch'];
+                selects.forEach(selectId => {
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = selectId === 'filterBranch'
+                        ? '<option value="">All Branches</option>'
+                        : '<option value="">Select Branch</option>';
+                    branches.forEach(branch => {
+                        select.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+                    });
+                });
+            } catch (error) {
+                console.error('Error loading branches:', error);
+            }
+        }
+
+        // Load staff
+        async function loadStaff() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/users?role=staff`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                const users = Array.isArray(data) ? data : (data.data || []);
+
+                const selects = ['filterUser', 'advanceUser'];
+                selects.forEach(selectId => {
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = selectId === 'filterUser'
+                        ? '<option value="">All Staff</option>'
+                        : '<option value="">Select Staff</option>';
+                    users.forEach(user => {
+                        select.innerHTML += `<option value="${user.id}">${user.full_name || user.name}</option>`;
+                    });
+                });
+            } catch (error) {
+                console.error('Error loading staff:', error);
+            }
+        }
+
+        // Load summary cards
+        async function loadSummary() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const branchId = document.getElementById('filterBranch').value;
+                let url = `${API_BASE}/api/salary/advances/summary`;
+                if (branchId) url += `?branch_id=${branchId}`;
+
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    const d = result.data;
+                    document.getElementById('totalRequested').textContent = d.total_requests || 0;
+                    document.getElementById('pendingCount').textContent = d.pending_count || 0;
+                    document.getElementById('pendingAmt').textContent = formatMoney(d.pending_amount);
+                    document.getElementById('approvedCount').textContent = d.approved_count || 0;
+                    document.getElementById('approvedAmt').textContent = formatMoney(d.approved_amount);
+                    document.getElementById('paidCount').textContent = d.paid_count || 0;
+                    document.getElementById('paidAmt').textContent = formatMoney(d.paid_amount);
+                }
+            } catch (error) {
+                console.error('Error loading summary:', error);
+            }
+        }
+
+        // Load advances list
+        async function loadAdvances() {
+            const token = localStorage.getItem('auth_token');
+            const status = document.getElementById('filterStatus').value;
+            const userId = document.getElementById('filterUser').value;
+            const branchId = document.getElementById('filterBranch').value;
+
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('tableWrapper').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'none';
+
+            try {
+                let url = `${API_BASE}/api/salary/advances?`;
+                if (status) url += `status=${status}&`;
+                if (userId) url += `user_id=${userId}&`;
+                if (branchId) url += `branch_id=${branchId}&`;
+
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+
+                document.getElementById('loadingState').style.display = 'none';
+
+                if (result.success && result.data && result.data.length > 0) {
+                    advancesCache = result.data;
+                    renderTable(result.data);
+                    document.getElementById('tableWrapper').style.display = 'block';
+                } else {
+                    document.getElementById('emptyState').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error loading advances:', error);
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        }
+
+        // Render table
+        function renderTable(advances) {
+            const tbody = document.getElementById('advancesTableBody');
+            tbody.innerHTML = advances.map(a => {
+                const statusBadge = getStatusBadge(a.status);
+                const actions = getActions(a);
+
+                return `
+                    <tr>
+                        <td>${escapeHtml(a.user_name || 'Unknown')}</td>
+                        <td>${escapeHtml(a.branch_name || 'Unassigned')}</td>
+                        <td class="money">₹${parseFloat(a.amount).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                        <td>${escapeHtml(a.reason || '-')}</td>
+                        <td>${statusBadge}</td>
+                        <td>${new Date(a.created_at).toLocaleDateString('en-IN')}</td>
+                        <td class="actions">${actions}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getStatusBadge(status) {
+            const map = {
+                pending: 'badge-warning',
+                approved: 'badge-info',
+                rejected: 'badge-danger',
+                paid: 'badge-success',
+                recovered: 'badge-secondary'
+            };
+            return `<span class="badge ${map[status] || 'badge-secondary'}">${status}</span>`;
+        }
+
+        function getActions(advance) {
+            let html = `<button class="btn btn-info btn-sm" onclick="viewAdvance(${advance.id})" title="View Details"><i class="fas fa-eye"></i></button>`;
+
+            if (advance.status === 'pending') {
+                html += `
+                    <button class="btn btn-success btn-sm" onclick="openApproveModal(${advance.id})" title="Approve"><i class="fas fa-check"></i></button>
+                    <button class="btn btn-danger btn-sm" onclick="openRejectModal(${advance.id})" title="Reject"><i class="fas fa-times"></i></button>
+                `;
+            }
+
+            if (advance.status === 'approved') {
+                html += `<button class="btn btn-primary btn-sm" onclick="openPayModal(${advance.id})" title="Record Payment"><i class="fas fa-money-bill"></i></button>`;
+            }
+
+            return html;
+        }
+
+        // Modal helpers
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+            selectedAdvanceId = null;
+        }
+
+        function findAdvance(id) {
+            return advancesCache.find(a => a.id === id);
+        }
+
+        // Create advance
+        function openCreateModal() {
+            document.getElementById('advanceUser').value = '';
+            document.getElementById('advanceBranch').value = '';
+            document.getElementById('advanceAmount').value = '';
+            document.getElementById('advanceReason').value = '';
+            document.getElementById('advanceNotes').value = '';
+            openModal('createModal');
+        }
+
+        async function createAdvance() {
+            const user_id = document.getElementById('advanceUser').value;
+            const branch_id = document.getElementById('advanceBranch').value;
+            const amount = document.getElementById('advanceAmount').value;
+            const reason = document.getElementById('advanceReason').value;
+            const notes = document.getElementById('advanceNotes').value;
+
+            if (!user_id || !branch_id || !amount) {
+                alert('Please fill in Staff, Branch, and Amount');
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/salary/advances`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ user_id, branch_id, amount, reason, notes })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    closeModal('createModal');
+                    loadAdvances();
+                    loadSummary();
+                    alert('Advance request created successfully');
+                } else {
+                    alert(result.message || 'Failed to create advance');
+                }
+            } catch (error) {
+                console.error('Error creating advance:', error);
+                alert('Error creating advance request');
+            }
+        }
+
+        // Approve
+        function openApproveModal(id) {
+            const a = findAdvance(id);
+            if (!a) return;
+            selectedAdvanceId = id;
+            document.getElementById('approveStaff').textContent = a.user_name;
+            document.getElementById('approveAmount').textContent = '₹' + parseFloat(a.amount).toLocaleString('en-IN', {minimumFractionDigits: 2});
+            document.getElementById('approveReason').textContent = a.reason || '-';
+            document.getElementById('approveNotes').value = '';
+            openModal('approveModal');
+        }
+
+        async function approveAdvance() {
+            if (!selectedAdvanceId) return;
+            const notes = document.getElementById('approveNotes').value;
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/salary/advances/${selectedAdvanceId}/approve`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ notes })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    closeModal('approveModal');
+                    loadAdvances();
+                    loadSummary();
+                    alert('Advance approved');
+                } else {
+                    alert(result.message || 'Failed to approve');
+                }
+            } catch (error) {
+                console.error('Error approving advance:', error);
+                alert('Error approving advance');
+            }
+        }
+
+        // Reject
+        function openRejectModal(id) {
+            const a = findAdvance(id);
+            if (!a) return;
+            selectedAdvanceId = id;
+            document.getElementById('rejectStaff').textContent = a.user_name;
+            document.getElementById('rejectAmount').textContent = '₹' + parseFloat(a.amount).toLocaleString('en-IN', {minimumFractionDigits: 2});
+            document.getElementById('rejectionReason').value = '';
+            openModal('rejectModal');
+        }
+
+        async function rejectAdvance() {
+            if (!selectedAdvanceId) return;
+            const rejection_reason = document.getElementById('rejectionReason').value;
+
+            if (!rejection_reason) {
+                alert('Please provide a rejection reason');
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/salary/advances/${selectedAdvanceId}/reject`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ rejection_reason })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    closeModal('rejectModal');
+                    loadAdvances();
+                    loadSummary();
+                    alert('Advance rejected');
+                } else {
+                    alert(result.message || 'Failed to reject');
+                }
+            } catch (error) {
+                console.error('Error rejecting advance:', error);
+                alert('Error rejecting advance');
+            }
+        }
+
+        // Record Payment
+        function openPayModal(id) {
+            const a = findAdvance(id);
+            if (!a) return;
+            selectedAdvanceId = id;
+            document.getElementById('payStaff').textContent = a.user_name;
+            document.getElementById('payAmount').textContent = '₹' + parseFloat(a.amount).toLocaleString('en-IN', {minimumFractionDigits: 2});
+            document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('paymentMethod').value = 'cash';
+            document.getElementById('paymentReference').value = '';
+            document.getElementById('recoveryMonth').value = '';
+            openModal('payModal');
+        }
+
+        async function recordPayment() {
+            if (!selectedAdvanceId) return;
+
+            const payment_date = document.getElementById('paymentDate').value;
+            const payment_method = document.getElementById('paymentMethod').value;
+            const payment_reference = document.getElementById('paymentReference').value;
+            const recovery_month = document.getElementById('recoveryMonth').value;
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/salary/advances/${selectedAdvanceId}/pay`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ payment_date, payment_method, payment_reference, recovery_month })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    closeModal('payModal');
+                    loadAdvances();
+                    loadSummary();
+                    alert('Payment recorded successfully');
+                } else {
+                    alert(result.message || 'Failed to record payment');
+                }
+            } catch (error) {
+                console.error('Error recording payment:', error);
+                alert('Error recording payment');
+            }
+        }
+
+        // View details
+        async function viewAdvance(id) {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/salary/advances/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    const a = result.data;
+                    let html = `
+                        <div class="detail-row"><label>Staff:</label><span>${escapeHtml(a.user_name)}</span></div>
+                        <div class="detail-row"><label>Branch:</label><span>${escapeHtml(a.branch_name)}</span></div>
+                        <div class="detail-row"><label>Amount:</label><span class="money">₹${parseFloat(a.amount).toLocaleString('en-IN', {minimumFractionDigits: 2})}</span></div>
+                        <div class="detail-row"><label>Reason:</label><span>${escapeHtml(a.reason || '-')}</span></div>
+                        <div class="detail-row"><label>Status:</label><span>${getStatusBadge(a.status)}</span></div>
+                        <div class="detail-row"><label>Requested By:</label><span>${escapeHtml(a.requested_by_name || '-')}</span></div>
+                        <div class="detail-row"><label>Created:</label><span>${new Date(a.created_at).toLocaleString('en-IN')}</span></div>
+                    `;
+
+                    if (a.approved_by_name) {
+                        html += `<div class="detail-row"><label>Approved By:</label><span>${escapeHtml(a.approved_by_name)}</span></div>`;
+                        html += `<div class="detail-row"><label>Approved At:</label><span>${new Date(a.approved_at).toLocaleString('en-IN')}</span></div>`;
+                    }
+                    if (a.rejected_by_name) {
+                        html += `<div class="detail-row"><label>Rejected By:</label><span>${escapeHtml(a.rejected_by_name)}</span></div>`;
+                        html += `<div class="detail-row"><label>Rejection Reason:</label><span>${escapeHtml(a.rejection_reason || '-')}</span></div>`;
+                    }
+                    if (a.payment_date) {
+                        html += `<div class="detail-row"><label>Payment Date:</label><span>${new Date(a.payment_date).toLocaleDateString('en-IN')}</span></div>`;
+                        html += `<div class="detail-row"><label>Payment Method:</label><span>${(a.payment_method || '-').replace('_', ' ').toUpperCase()}</span></div>`;
+                        html += `<div class="detail-row"><label>Reference:</label><span>${escapeHtml(a.payment_reference || '-')}</span></div>`;
+                        html += `<div class="detail-row"><label>Paid By:</label><span>${escapeHtml(a.paid_by_name || '-')}</span></div>`;
+                    }
+                    if (a.recovery_month) {
+                        html += `<div class="detail-row"><label>Recovery Month:</label><span>${a.recovery_month}</span></div>`;
+                    }
+                    if (a.notes) {
+                        html += `<div class="detail-row"><label>Notes:</label><span>${escapeHtml(a.notes)}</span></div>`;
+                    }
+
+                    document.getElementById('viewDetails').innerHTML = html;
+                    openModal('viewModal');
+                }
+            } catch (error) {
+                console.error('Error fetching advance details:', error);
+                alert('Error loading advance details');
+            }
+        }
+
+        // Utility
+        function formatMoney(val) {
+            const n = parseFloat(val || 0);
+            return n > 0 ? '₹' + n.toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-';
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        (async () => {
+            if (await checkAuth()) {
+                loadStaff();
+                loadBranches();
+                loadSummary();
+                loadAdvances();
+            }
+        })();
+    </script>
+</body>
+</html>

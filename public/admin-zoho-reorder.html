@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Reorder Alerts - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-info { background: #2563eb; }
+
+        /* Tab styles */
+        .tab-btn {
+            padding: 0.625rem 1.25rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            color: #6b7280;
+            transition: all 0.2s;
+            cursor: pointer;
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+        }
+        .tab-btn:hover { color: #667eea; }
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        /* Summary cards */
+        .summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 4px solid;
+            transition: transform 0.2s;
+        }
+        .summary-card:hover { transform: translateY(-2px); }
+
+        /* Severity badges */
+        .badge-severity {
+            display: inline-block;
+            padding: 0.15rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .badge-critical { background: #fee2e2; color: #991b1b; }
+        .badge-high { background: #ffedd5; color: #9a3412; }
+        .badge-medium { background: #fef9c3; color: #854d0e; }
+        .badge-low { background: #dbeafe; color: #1e40af; }
+
+        /* Status badges */
+        .badge-status {
+            display: inline-block;
+            padding: 0.15rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .badge-active { background: #dcfce7; color: #166534; }
+        .badge-acknowledged { background: #dbeafe; color: #1e40af; }
+        .badge-resolved { background: #f3f4f6; color: #374151; }
+
+        /* Table responsive */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-wrapper table {
+            min-width: 700px;
+        }
+
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Toggle switch */
+        .toggle-switch {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            background: #d1d5db;
+            border-radius: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toggle-switch.on { background: #667eea; }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .toggle-switch.on::after { transform: translateX(18px); }
+
+        /* Searchable dropdown */
+        .search-dropdown {
+            position: relative;
+        }
+        .search-dropdown-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 50;
+            display: none;
+        }
+        .search-dropdown-list.open { display: block; }
+        .search-dropdown-item {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: #374151;
+        }
+        .search-dropdown-item:hover { background: #f3f4f6; }
+
+        /* Modal overlay */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 1rem;
+        }
+        .modal-overlay.hidden { display: none; }
+
+        /* Desktop adjustments for pinned sidebar */
+        @media (min-width: 768px) {
+            .summary-card { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="zoho-reorder">
+<div class="container mx-auto p-4 md:p-6">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast" role="alert"></div>
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Reorder Alerts &amp; Configuration</h1>
+            <p class="text-gray-500 text-sm mt-1">Monitor stock levels and configure reorder thresholds</p>
+        </div>
+        <div class="mt-3 sm:mt-0">
+            <button id="checkReorderBtn" onclick="triggerReorderCheck()" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                <svg id="checkReorderIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span id="checkReorderText">Check Reorder</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-200 mb-6">
+        <button id="tabAlerts" class="tab-btn active" onclick="switchTab('alerts')">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                </svg>
+                Alerts
+            </span>
+        </button>
+        <button id="tabConfig" class="tab-btn" onclick="switchTab('config')">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Configuration
+            </span>
+        </button>
+    </div>
+
+    <!-- =========================================
+         TAB 1: ALERTS
+         ========================================= -->
+    <div id="panelAlerts">
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
+            <div class="summary-card" style="border-left-color: #ef4444;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">Critical</div>
+                <div class="text-2xl font-bold text-red-600 mt-1" id="summCritical">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+            <div class="summary-card" style="border-left-color: #f97316;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">High</div>
+                <div class="text-2xl font-bold text-orange-600 mt-1" id="summHigh">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+            <div class="summary-card" style="border-left-color: #eab308;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">Medium</div>
+                <div class="text-2xl font-bold text-yellow-600 mt-1" id="summMedium">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+            <div class="summary-card" style="border-left-color: #3b82f6;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">Low</div>
+                <div class="text-2xl font-bold text-blue-600 mt-1" id="summLow">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+            <div class="summary-card" style="border-left-color: #667eea;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">Total Active</div>
+                <div class="text-2xl font-bold text-gray-800 mt-1" id="summTotal">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Filter Bar -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                    <select id="alertFilterLocation" onchange="applyAlertFilters()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">All Locations</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+                    <select id="alertFilterSeverity" onchange="applyAlertFilters()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">All Severities</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="alertFilterStatus" onchange="applyAlertFilters()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="active">Active</option>
+                        <option value="acknowledged">Acknowledged</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="">All Statuses</option>
+                    </select>
+                </div>
+                <div>
+                    <button onclick="clearAlertFilters()" class="w-full rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition">
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts Loading -->
+        <div id="alertsLoading" class="text-center py-12">
+            <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-500 mt-3">Loading alerts...</p>
+        </div>
+
+        <!-- Alerts Empty -->
+        <div id="alertsEmpty" class="hidden text-center py-12 bg-white rounded-lg shadow">
+            <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No alerts found</h3>
+            <p class="text-gray-600">All stock levels are within thresholds, or adjust your filters.</p>
+        </div>
+
+        <!-- Alerts Table -->
+        <div id="alertsTableContainer" class="hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="table-wrapper">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Severity</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Item Name</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Location</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">Current Stock</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">Reorder Level</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">Shortage</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Status</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertsTableBody" class="divide-y divide-gray-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Alerts Pagination -->
+            <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-gray-600" id="alertsPaginationInfo">Showing 0 alerts</div>
+                <div class="flex items-center gap-1" id="alertsPaginationControls"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================
+         TAB 2: CONFIGURATION
+         ========================================= -->
+    <div id="panelConfig" class="hidden">
+
+        <!-- Config Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+            <h2 class="text-xl font-bold text-gray-800">Reorder Thresholds</h2>
+            <div class="mt-3 sm:mt-0">
+                <select id="configFilterLocation" onchange="applyConfigFilters()" class="rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Config Loading -->
+        <div id="configLoading" class="text-center py-12">
+            <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-500 mt-3">Loading configuration...</p>
+        </div>
+
+        <!-- Config Empty -->
+        <div id="configEmpty" class="hidden text-center py-12 bg-white rounded-lg shadow mb-6">
+            <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No thresholds configured</h3>
+            <p class="text-gray-600">Add your first reorder threshold below to start monitoring stock levels.</p>
+        </div>
+
+        <!-- Config Table -->
+        <div id="configTableContainer" class="hidden mb-6">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="table-wrapper">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Item Name</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Location</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Reorder Level</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Reorder Qty</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Max Stock</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Active</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="configTableBody" class="divide-y divide-gray-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Config Pagination -->
+            <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-gray-600" id="configPaginationInfo">Showing 0 items</div>
+                <div class="flex items-center gap-1" id="configPaginationControls"></div>
+            </div>
+        </div>
+
+        <!-- Add New Config -->
+        <div class="bg-white rounded-lg shadow p-5 mb-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Add New Threshold</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+                <div class="lg:col-span-2 search-dropdown">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Item</label>
+                    <input type="text" id="newConfigItemSearch" placeholder="Search item..." autocomplete="off"
+                        oninput="searchItems(this.value)"
+                        onfocus="searchItems(this.value)"
+                        class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    <input type="hidden" id="newConfigItemId">
+                    <div id="itemSearchDropdown" class="search-dropdown-list"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                    <select id="newConfigLocation" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">Select Location</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reorder Level</label>
+                    <input type="number" id="newConfigReorderLevel" min="0" placeholder="e.g. 10" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reorder Qty</label>
+                    <input type="number" id="newConfigReorderQty" min="0" placeholder="e.g. 50" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Max Stock</label>
+                    <input type="number" id="newConfigMaxStock" min="0" placeholder="e.g. 200" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+            </div>
+            <div class="mt-4">
+                <button onclick="createConfig()" class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Add Threshold
+                </button>
+            </div>
+        </div>
+
+        <!-- Bulk Set Section -->
+        <div class="bg-white rounded-lg shadow p-5">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Bulk Set Reorder Levels</h3>
+            <p class="text-gray-500 text-sm mb-4">Upload a JSON array or paste data to set multiple thresholds at once. Each entry should include: item_id, location_id, reorder_level, reorder_quantity, max_stock.</p>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Bulk Data (JSON)</label>
+                <textarea id="bulkConfigData" rows="6" placeholder='[{"item_id": "123", "location_id": "456", "reorder_level": 10, "reorder_quantity": 50, "max_stock": 200}]'
+                    class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="submitBulkConfig()" class="inline-flex items-center gap-2 px-5 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    Submit Bulk Config
+                </button>
+                <label class="inline-flex items-center gap-2 px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg transition cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    Upload JSON File
+                    <input type="file" id="bulkFileUpload" accept=".json" onchange="handleBulkFileUpload(event)" class="hidden">
+                </label>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Resolve Alert Modal -->
+<div id="resolveModal" class="modal-overlay hidden" onclick="closeResolveModal(event)">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
+        <div class="border-b px-6 py-4 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800">Resolve Alert</h3>
+            <button onclick="closeResolveModalDirect()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-6">
+            <input type="hidden" id="resolveAlertId">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Resolution Notes</label>
+            <textarea id="resolveNotes" rows="4" placeholder="Describe the resolution (e.g., stock replenished, order placed...)"
+                class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+        </div>
+        <div class="border-t px-6 py-4 flex justify-end gap-3">
+            <button onclick="closeResolveModalDirect()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
+            <button onclick="submitResolve()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition">Resolve</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div id="deleteModal" class="modal-overlay hidden" onclick="closeDeleteModal(event)">
+    <div class="bg-white rounded-lg shadow-xl max-w-sm w-full" onclick="event.stopPropagation()">
+        <div class="border-b px-6 py-4 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800">Delete Threshold</h3>
+            <button onclick="closeDeleteModalDirect()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-6">
+            <input type="hidden" id="deleteConfigId">
+            <p class="text-gray-600 text-sm">Are you sure you want to delete this reorder threshold? This action cannot be undone.</p>
+        </div>
+        <div class="border-t px-6 py-4 flex justify-end gap-3">
+            <button onclick="closeDeleteModalDirect()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
+            <button onclick="submitDelete()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition">Delete</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================
+    // STATE
+    // ============================
+    let currentTab = 'alerts';
+    let alertsPage = 1;
+    let alertsTotal = 0;
+    let alertsTotalPages = 1;
+    const ALERTS_LIMIT = 50;
+
+    let configPage = 1;
+    let configTotal = 0;
+    let configTotalPages = 1;
+    const CONFIG_LIMIT = 50;
+
+    let locations = [];
+    let itemSearchTimeout = null;
+
+    // ============================
+    // AUTH HEADERS
+    // ============================
+    function getAuthHeaders() {
+        return {
+            'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
+            'Content-Type': 'application/json'
+        };
+    }
+
+    // ============================
+    // HELPERS
+    // ============================
+    function escapeHtml(str) {
+        if (!str) return '';
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function showToast(message, type) {
+        var toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast toast-' + (type || 'info') + ' show';
+        setTimeout(function() {
+            toast.classList.remove('show');
+        }, 3500);
+    }
+
+    function getSeverityBadge(severity) {
+        var s = (severity || 'low').toLowerCase();
+        return '<span class="badge-severity badge-' + s + '">' + s + '</span>';
+    }
+
+    function getStatusBadge(status) {
+        var s = (status || 'active').toLowerCase();
+        var labels = { active: 'Active', acknowledged: 'Acknowledged', resolved: 'Resolved' };
+        var label = labels[s] || status;
+        return '<span class="badge-status badge-' + s + '">' + label + '</span>';
+    }
+
+    // ============================
+    // TAB SWITCHING
+    // ============================
+    function switchTab(tab) {
+        currentTab = tab;
+        document.getElementById('tabAlerts').classList.toggle('active', tab === 'alerts');
+        document.getElementById('tabConfig').classList.toggle('active', tab === 'config');
+        document.getElementById('panelAlerts').classList.toggle('hidden', tab !== 'alerts');
+        document.getElementById('panelConfig').classList.toggle('hidden', tab !== 'config');
+
+        if (tab === 'config') {
+            loadConfigs();
+        }
+    }
+
+    // ============================
+    // LOAD LOCATIONS (shared)
+    // ============================
+    async function loadLocations() {
+        try {
+            var response = await fetch('/api/zoho/locations', {
+                headers: getAuthHeaders()
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+            if (result.success && result.data) {
+                locations = result.data;
+            } else if (Array.isArray(result)) {
+                locations = result;
+            } else {
+                locations = [];
+            }
+            populateLocationDropdowns();
+        } catch (error) {
+            console.error('Failed to load locations:', error);
+            locations = [];
+        }
+    }
+
+    function populateLocationDropdowns() {
+        var selectors = ['alertFilterLocation', 'configFilterLocation', 'newConfigLocation'];
+        selectors.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            // Keep the first option
+            var firstOption = el.options[0];
+            el.innerHTML = '';
+            el.appendChild(firstOption);
+            locations.forEach(function(loc) {
+                var opt = document.createElement('option');
+                opt.value = loc.id || loc.location_id || '';
+                opt.textContent = loc.name || loc.location_name || 'Unknown';
+                el.appendChild(opt);
+            });
+        });
+    }
+
+    // ============================
+    // ALERTS - SUMMARY
+    // ============================
+    async function loadAlertsSummary() {
+        try {
+            var response = await fetch('/api/zoho/reorder/alerts/summary', {
+                headers: getAuthHeaders()
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+            if (result.success && result.data) {
+                var d = result.data;
+                document.getElementById('summCritical').textContent = d.critical != null ? d.critical : 0;
+                document.getElementById('summHigh').textContent = d.high != null ? d.high : 0;
+                document.getElementById('summMedium').textContent = d.medium != null ? d.medium : 0;
+                document.getElementById('summLow').textContent = d.low != null ? d.low : 0;
+                document.getElementById('summTotal').textContent = d.total_active != null ? d.total_active : 0;
+            } else {
+                setDefaultSummary();
+            }
+        } catch (error) {
+            console.error('Failed to load alert summary:', error);
+            setDefaultSummary();
+        }
+    }
+
+    function setDefaultSummary() {
+        document.getElementById('summCritical').textContent = '0';
+        document.getElementById('summHigh').textContent = '0';
+        document.getElementById('summMedium').textContent = '0';
+        document.getElementById('summLow').textContent = '0';
+        document.getElementById('summTotal').textContent = '0';
+    }
+
+    // ============================
+    // ALERTS - LIST
+    // ============================
+    async function loadAlerts() {
+        var locationId = document.getElementById('alertFilterLocation').value;
+        var severity = document.getElementById('alertFilterSeverity').value;
+        var status = document.getElementById('alertFilterStatus').value;
+
+        var params = new URLSearchParams({
+            page: alertsPage,
+            limit: ALERTS_LIMIT
+        });
+        if (locationId) params.set('location_id', locationId);
+        if (severity) params.set('severity', severity);
+        if (status) params.set('status', status);
+
+        document.getElementById('alertsLoading').classList.remove('hidden');
+        document.getElementById('alertsTableContainer').classList.add('hidden');
+        document.getElementById('alertsEmpty').classList.add('hidden');
+
+        try {
+            var response = await fetch('/api/zoho/reorder/alerts?' + params.toString(), {
+                headers: getAuthHeaders()
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+
+            document.getElementById('alertsLoading').classList.add('hidden');
+
+            var alerts = [];
+            if (result.success && result.data) {
+                alerts = Array.isArray(result.data) ? result.data : [];
+                alertsTotal = result.pagination ? result.pagination.total : alerts.length;
+                alertsTotalPages = result.pagination ? result.pagination.totalPages : Math.ceil(alertsTotal / ALERTS_LIMIT);
+                alertsPage = result.pagination ? result.pagination.page : alertsPage;
+            }
+
+            if (alerts.length === 0) {
+                document.getElementById('alertsEmpty').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('alertsTableContainer').classList.remove('hidden');
+            renderAlerts(alerts);
+            renderAlertsPagination();
+        } catch (error) {
+            console.error('Failed to load alerts:', error);
+            document.getElementById('alertsLoading').classList.add('hidden');
+            document.getElementById('alertsEmpty').classList.remove('hidden');
+        }
+    }
+
+    function renderAlerts(alerts) {
+        var tbody = document.getElementById('alertsTableBody');
+        tbody.innerHTML = alerts.map(function(alert) {
+            var id = alert.id || alert.alert_id;
+            var status = (alert.status || 'active').toLowerCase();
+            var actions = '';
+
+            if (status === 'active') {
+                actions = '<button onclick="acknowledgeAlert(\'' + id + '\')" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition mr-1">Acknowledge</button>' +
+                    '<button onclick="openResolveModal(\'' + id + '\')" class="px-2.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold rounded-lg transition">Resolve</button>';
+            } else if (status === 'acknowledged') {
+                actions = '<button onclick="openResolveModal(\'' + id + '\')" class="px-2.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold rounded-lg transition">Resolve</button>';
+            } else {
+                actions = '<span class="text-xs text-gray-400">--</span>';
+            }
+
+            return '<tr class="hover:bg-gray-50 transition">' +
+                '<td class="px-4 py-3">' + getSeverityBadge(alert.severity) + '</td>' +
+                '<td class="px-4 py-3 font-medium text-gray-800">' + escapeHtml(alert.item_name) + '</td>' +
+                '<td class="px-4 py-3 text-gray-600">' + escapeHtml(alert.location_name || alert.location || '--') + '</td>' +
+                '<td class="px-4 py-3 text-right text-gray-800 font-medium">' + (alert.current_stock != null ? alert.current_stock : '--') + '</td>' +
+                '<td class="px-4 py-3 text-right text-gray-600">' + (alert.reorder_level != null ? alert.reorder_level : '--') + '</td>' +
+                '<td class="px-4 py-3 text-right font-bold text-red-600">' + (alert.shortage != null ? alert.shortage : '--') + '</td>' +
+                '<td class="px-4 py-3 text-center">' + getStatusBadge(alert.status) + '</td>' +
+                '<td class="px-4 py-3 text-center">' + actions + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function renderAlertsPagination() {
+        var info = document.getElementById('alertsPaginationInfo');
+        var controls = document.getElementById('alertsPaginationControls');
+
+        if (alertsTotal === 0) {
+            info.textContent = 'Showing 0 alerts';
+            controls.innerHTML = '';
+            return;
+        }
+
+        var start = (alertsPage - 1) * ALERTS_LIMIT + 1;
+        var end = Math.min(alertsPage * ALERTS_LIMIT, alertsTotal);
+        info.textContent = 'Showing ' + start + '-' + end + ' of ' + alertsTotal + ' alerts';
+
+        controls.innerHTML = buildPaginationHtml(alertsPage, alertsTotalPages, 'goToAlertsPage');
+    }
+
+    function goToAlertsPage(page) {
+        if (page < 1 || page > alertsTotalPages) return;
+        alertsPage = page;
+        loadAlerts();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function applyAlertFilters() {
+        alertsPage = 1;
+        loadAlerts();
+    }
+
+    function clearAlertFilters() {
+        document.getElementById('alertFilterLocation').value = '';
+        document.getElementById('alertFilterSeverity').value = '';
+        document.getElementById('alertFilterStatus').value = 'active';
+        alertsPage = 1;
+        loadAlerts();
+    }
+
+    // ============================
+    // ALERTS - ACTIONS
+    // ============================
+    async function acknowledgeAlert(alertId) {
+        try {
+            var response = await fetch('/api/zoho/reorder/alerts/' + alertId + '/acknowledge', {
+                method: 'PUT',
+                headers: getAuthHeaders()
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+            if (result.success) {
+                showToast('Alert acknowledged', 'success');
+                loadAlerts();
+                loadAlertsSummary();
+            } else {
+                showToast(result.message || 'Failed to acknowledge alert', 'error');
+            }
+        } catch (error) {
+            console.error('Acknowledge error:', error);
+            showToast('Failed to acknowledge alert', 'error');
+        }
+    }
+
+    function openResolveModal(alertId) {
+        document.getElementById('resolveAlertId').value = alertId;
+        document.getElementById('resolveNotes').value = '';
+        document.getElementById('resolveModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeResolveModal(event) {
+        if (event.target === document.getElementById('resolveModal')) {
+            closeResolveModalDirect();
+        }
+    }
+
+    function closeResolveModalDirect() {
+        document.getElementById('resolveModal').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    async function submitResolve() {
+        var alertId = document.getElementById('resolveAlertId').value;
+        var notes = document.getElementById('resolveNotes').value.trim();
+
+        if (!notes) {
+            showToast('Please enter resolution notes', 'error');
+            return;
+        }
+
+        try {
+            var response = await fetch('/api/zoho/reorder/alerts/' + alertId + '/resolve', {
+                method: 'PUT',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ notes: notes })
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+            if (result.success) {
+                showToast('Alert resolved', 'success');
+                closeResolveModalDirect();
+                loadAlerts();
+                loadAlertsSummary();
+            } else {
+                showToast(result.message || 'Failed to resolve alert', 'error');
+            }
+        } catch (error) {
+            console.error('Resolve error:', error);
+            showToast('Failed to resolve alert', 'error');
+        }
+    }
+
+    // ============================
+    // REORDER CHECK
+    // ============================
+    async function triggerReorderCheck() {
+        var btn = document.getElementById('checkReorderBtn');
+        var icon = document.getElementById('checkReorderIcon');
+        var text = document.getElementById('checkReorderText');
+
+        btn.disabled = true;
+        btn.classList.add('opacity-75');
+        icon.classList.add('animate-spin');
+        text.textContent = 'Checking...';
+
+        try {
+            var response = await fetch('/api/zoho/reorder/check', {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+            if (result.success) {
+                showToast(result.message || 'Reorder check completed', 'success');
+                loadAlertsSummary();
+                loadAlerts();
+            } else {
+                showToast(result.message || 'Reorder check failed', 'error');
+            }
+        } catch (error) {
+            console.error('Reorder check error:', error);
+            showToast('Failed to run reorder check', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.classList.remove('opacity-75');
+            icon.classList.remove('animate-spin');
+            text.textContent = 'Check Reorder';
+        }
+    }
+
+    // ============================
+    // CONFIG - LIST
+    // ============================
+    async function loadConfigs() {
+        var locationId = document.getElementById('configFilterLocation').value;
+
+        var params = new URLSearchParams({
+            page: configPage,
+            limit: CONFIG_LIMIT
+        });
+        if (locationId) params.set('location_id', locationId);
+
+        document.getElementById('configLoading').classList.remove('hidden');
+        document.getElementById('configTableContainer').classList.add('hidden');
+        document.getElementById('configEmpty').classList.add('hidden');
+
+        try {
+            var response = await fetch('/api/zoho/reorder/config?' + params.toString(), {
+                headers: getAuthHeaders()
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+
+            document.getElementById('configLoading').classList.add('hidden');
+
+            var configs = [];
+            if (result.success && result.data) {
+                configs = Array.isArray(result.data) ? result.data : [];
+                configTotal = result.pagination ? result.pagination.total : configs.length;
+                configTotalPages = result.pagination ? result.pagination.totalPages : Math.ceil(configTotal / CONFIG_LIMIT);
+                configPage = result.pagination ? result.pagination.page : configPage;
+            }
+
+            if (configs.length === 0) {
+                document.getElementById('configEmpty').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('configTableContainer').classList.remove('hidden');
+            renderConfigs(configs);
+            renderConfigPagination();
+        } catch (error) {
+            console.error('Failed to load configs:', error);
+            document.getElementById('configLoading').classList.add('hidden');
+            document.getElementById('configEmpty').classList.remove('hidden');
+        }
+    }
+
+    function renderConfigs(configs) {
+        var tbody = document.getElementById('configTableBody');
+        tbody.innerHTML = configs.map(function(cfg) {
+            var id = cfg.id || cfg.config_id;
+            var isActive = cfg.is_active !== false && cfg.is_active !== 0;
+
+            return '<tr class="hover:bg-gray-50 transition" id="configRow_' + id + '">' +
+                '<td class="px-4 py-3 font-medium text-gray-800">' + escapeHtml(cfg.item_name || '--') + '</td>' +
+                '<td class="px-4 py-3 text-gray-600">' + escapeHtml(cfg.location_name || '--') + '</td>' +
+                '<td class="px-4 py-3 text-center">' +
+                    '<input type="number" min="0" value="' + (cfg.reorder_level != null ? cfg.reorder_level : '') + '" ' +
+                    'class="w-20 text-center rounded border border-gray-300 px-2 py-1 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" ' +
+                    'id="cfgLevel_' + id + '">' +
+                '</td>' +
+                '<td class="px-4 py-3 text-center">' +
+                    '<input type="number" min="0" value="' + (cfg.reorder_quantity != null ? cfg.reorder_quantity : '') + '" ' +
+                    'class="w-20 text-center rounded border border-gray-300 px-2 py-1 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" ' +
+                    'id="cfgQty_' + id + '">' +
+                '</td>' +
+                '<td class="px-4 py-3 text-center">' +
+                    '<input type="number" min="0" value="' + (cfg.max_stock != null ? cfg.max_stock : '') + '" ' +
+                    'class="w-20 text-center rounded border border-gray-300 px-2 py-1 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" ' +
+                    'id="cfgMax_' + id + '">' +
+                '</td>' +
+                '<td class="px-4 py-3 text-center">' +
+                    '<div class="toggle-switch ' + (isActive ? 'on' : '') + '" id="cfgActive_' + id + '" onclick="toggleConfigActive(\'' + id + '\')"></div>' +
+                '</td>' +
+                '<td class="px-4 py-3 text-center">' +
+                    '<button onclick="saveConfig(\'' + id + '\')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition mr-1">Save</button>' +
+                    '<button onclick="openDeleteModal(\'' + id + '\')" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold rounded-lg transition">Delete</button>' +
+                '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function renderConfigPagination() {
+        var info = document.getElementById('configPaginationInfo');
+        var controls = document.getElementById('configPaginationControls');
+
+        if (configTotal === 0) {
+            info.textContent = 'Showing 0 items';
+            controls.innerHTML = '';
+            return;
+        }
+
+        var start = (configPage - 1) * CONFIG_LIMIT + 1;
+        var end = Math.min(configPage * CONFIG_LIMIT, configTotal);
+        info.textContent = 'Showing ' + start + '-' + end + ' of ' + configTotal + ' thresholds';
+
+        controls.innerHTML = buildPaginationHtml(configPage, configTotalPages, 'goToConfigPage');
+    }
+
+    function goToConfigPage(page) {
+        if (page < 1 || page > configTotalPages) return;
+        configPage = page;
+        loadConfigs();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function applyConfigFilters() {
+        configPage = 1;
+        loadConfigs();
+    }
+
+    function toggleConfigActive(id) {
+        var el = document.getElementById('cfgActive_' + id);
+        if (el) {
+            el.classList.toggle('on');
+        }
+    }
+
+    // ============================
+    // CONFIG - SAVE ROW
+    // ============================
+    async function saveConfig(id) {
+        var level = document.getElementById('cfgLevel_' + id);
+        var qty = document.getElementById('cfgQty_' + id);
+        var max = document.getElementById('cfgMax_' + id);
+        var activeEl = document.getElementById('cfgActive_' + id);
+
+        var body = {
+            reorder_level: level ? parseInt(level.value) || 0 : 0,
+            reorder_quantity: qty ? parseInt(qty.value) || 0 : 0,
+            max_stock: max ? parseInt(max.value) || 0 : 0,
+            is_active: activeEl ? activeEl.classList.contains('on') : true
+        };
+
+        try {
+            var response = await fetch('/api/zoho/reorder/config/' + id, {
+                method: 'PUT',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(body)
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+            if (result.success) {
+                showToast('Threshold updated', 'success');
+            } else {
+                showToast(result.message || 'Failed to update threshold', 'error');
+            }
+        } catch (error) {
+            console.error('Save config error:', error);
+            showToast('Failed to save threshold', 'error');
+        }
+    }
+
+    // ============================
+    // CONFIG - DELETE
+    // ============================
+    function openDeleteModal(id) {
+        document.getElementById('deleteConfigId').value = id;
+        document.getElementById('deleteModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeDeleteModal(event) {
+        if (event.target === document.getElementById('deleteModal')) {
+            closeDeleteModalDirect();
+        }
+    }
+
+    function closeDeleteModalDirect() {
+        document.getElementById('deleteModal').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    async function submitDelete() {
+        var id = document.getElementById('deleteConfigId').value;
+
+        try {
+            var response = await fetch('/api/zoho/reorder/config/' + id, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+            if (result.success) {
+                showToast('Threshold deleted', 'success');
+                closeDeleteModalDirect();
+                loadConfigs();
+            } else {
+                showToast(result.message || 'Failed to delete threshold', 'error');
+            }
+        } catch (error) {
+            console.error('Delete config error:', error);
+            showToast('Failed to delete threshold', 'error');
+        }
+    }
+
+    // ============================
+    // CONFIG - CREATE
+    // ============================
+    async function createConfig() {
+        var itemId = document.getElementById('newConfigItemId').value;
+        var locationId = document.getElementById('newConfigLocation').value;
+        var reorderLevel = document.getElementById('newConfigReorderLevel').value;
+        var reorderQty = document.getElementById('newConfigReorderQty').value;
+        var maxStock = document.getElementById('newConfigMaxStock').value;
+
+        if (!itemId) {
+            showToast('Please select an item', 'error');
+            return;
+        }
+        if (!locationId) {
+            showToast('Please select a location', 'error');
+            return;
+        }
+        if (!reorderLevel) {
+            showToast('Please enter a reorder level', 'error');
+            return;
+        }
+
+        var body = {
+            item_id: itemId,
+            location_id: locationId,
+            reorder_level: parseInt(reorderLevel) || 0,
+            reorder_quantity: parseInt(reorderQty) || 0,
+            max_stock: parseInt(maxStock) || 0
+        };
+
+        try {
+            var response = await fetch('/api/zoho/reorder/config', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(body)
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+            if (result.success) {
+                showToast('Threshold created', 'success');
+                // Clear form
+                document.getElementById('newConfigItemSearch').value = '';
+                document.getElementById('newConfigItemId').value = '';
+                document.getElementById('newConfigLocation').value = '';
+                document.getElementById('newConfigReorderLevel').value = '';
+                document.getElementById('newConfigReorderQty').value = '';
+                document.getElementById('newConfigMaxStock').value = '';
+                loadConfigs();
+            } else {
+                showToast(result.message || 'Failed to create threshold', 'error');
+            }
+        } catch (error) {
+            console.error('Create config error:', error);
+            showToast('Failed to create threshold', 'error');
+        }
+    }
+
+    // ============================
+    // CONFIG - BULK
+    // ============================
+    async function submitBulkConfig() {
+        var raw = document.getElementById('bulkConfigData').value.trim();
+        if (!raw) {
+            showToast('Please enter bulk configuration data', 'error');
+            return;
+        }
+
+        var data;
+        try {
+            data = JSON.parse(raw);
+        } catch (e) {
+            showToast('Invalid JSON format. Please check your data.', 'error');
+            return;
+        }
+
+        if (!Array.isArray(data) || data.length === 0) {
+            showToast('Data must be a non-empty JSON array', 'error');
+            return;
+        }
+
+        try {
+            var response = await fetch('/api/zoho/reorder/config/bulk', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ configs: data })
+            });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+            var result = await response.json();
+            if (result.success) {
+                showToast(result.message || 'Bulk config applied (' + data.length + ' items)', 'success');
+                document.getElementById('bulkConfigData').value = '';
+                loadConfigs();
+            } else {
+                showToast(result.message || 'Bulk config failed', 'error');
+            }
+        } catch (error) {
+            console.error('Bulk config error:', error);
+            showToast('Failed to apply bulk config', 'error');
+        }
+    }
+
+    function handleBulkFileUpload(event) {
+        var file = event.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('bulkConfigData').value = e.target.result;
+            showToast('File loaded. Review the data and click Submit.', 'info');
+        };
+        reader.onerror = function() {
+            showToast('Failed to read file', 'error');
+        };
+        reader.readAsText(file);
+
+        // Reset file input so same file can be selected again
+        event.target.value = '';
+    }
+
+    // ============================
+    // ITEM SEARCH (searchable dropdown)
+    // ============================
+    function searchItems(query) {
+        clearTimeout(itemSearchTimeout);
+        var dropdown = document.getElementById('itemSearchDropdown');
+
+        if (!query || query.length < 2) {
+            dropdown.classList.remove('open');
+            return;
+        }
+
+        itemSearchTimeout = setTimeout(async function() {
+            try {
+                var response = await fetch('/api/zoho/items?search=' + encodeURIComponent(query), {
+                    headers: getAuthHeaders()
+                });
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                var result = await response.json();
+                var items = [];
+                if (result.success && result.data) {
+                    items = Array.isArray(result.data) ? result.data : [];
+                } else if (Array.isArray(result)) {
+                    items = result;
+                }
+
+                if (items.length === 0) {
+                    dropdown.innerHTML = '<div class="search-dropdown-item text-gray-400">No items found</div>';
+                } else {
+                    dropdown.innerHTML = items.map(function(item) {
+                        var itemId = item.id || item.item_id || '';
+                        var itemName = item.name || item.item_name || 'Unknown';
+                        return '<div class="search-dropdown-item" onclick="selectItem(\'' + escapeHtml(itemId) + '\', \'' + escapeHtml(itemName) + '\')">' +
+                            escapeHtml(itemName) +
+                            (item.sku ? ' <span class="text-gray-400 text-xs">(' + escapeHtml(item.sku) + ')</span>' : '') +
+                            '</div>';
+                    }).join('');
+                }
+                dropdown.classList.add('open');
+            } catch (error) {
+                console.error('Item search error:', error);
+                dropdown.classList.remove('open');
+            }
+        }, 300);
+    }
+
+    function selectItem(itemId, itemName) {
+        document.getElementById('newConfigItemSearch').value = itemName;
+        document.getElementById('newConfigItemId').value = itemId;
+        document.getElementById('itemSearchDropdown').classList.remove('open');
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        var dropdown = document.getElementById('itemSearchDropdown');
+        var input = document.getElementById('newConfigItemSearch');
+        if (dropdown && input && !dropdown.contains(e.target) && e.target !== input) {
+            dropdown.classList.remove('open');
+        }
+    });
+
+    // ============================
+    // SHARED PAGINATION BUILDER
+    // ============================
+    function buildPaginationHtml(currentPg, totalPg, fnName) {
+        var html = '';
+        var maxVisible = 5;
+
+        // Previous button
+        html += '<button onclick="' + fnName + '(' + (currentPg - 1) + ')" ' +
+                (currentPg <= 1 ? 'disabled' : '') +
+                ' class="px-3 py-1.5 text-sm rounded-lg border ' +
+                (currentPg <= 1 ? 'text-gray-400 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100') +
+                '">Prev</button>';
+
+        var startPage = Math.max(1, currentPg - Math.floor(maxVisible / 2));
+        var endPage = Math.min(totalPg, startPage + maxVisible - 1);
+        if (endPage - startPage < maxVisible - 1) {
+            startPage = Math.max(1, endPage - maxVisible + 1);
+        }
+
+        if (startPage > 1) {
+            html += '<button onclick="' + fnName + '(1)" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">1</button>';
+            if (startPage > 2) {
+                html += '<span class="px-2 py-1.5 text-sm text-gray-400">...</span>';
+            }
+        }
+
+        for (var i = startPage; i <= endPage; i++) {
+            if (i === currentPg) {
+                html += '<button class="px-3 py-1.5 text-sm rounded-lg text-white font-medium" style="background:#667eea;">' + i + '</button>';
+            } else {
+                html += '<button onclick="' + fnName + '(' + i + ')" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + i + '</button>';
+            }
+        }
+
+        if (endPage < totalPg) {
+            if (endPage < totalPg - 1) {
+                html += '<span class="px-2 py-1.5 text-sm text-gray-400">...</span>';
+            }
+            html += '<button onclick="' + fnName + '(' + totalPg + ')" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + totalPg + '</button>';
+        }
+
+        // Next button
+        html += '<button onclick="' + fnName + '(' + (currentPg + 1) + ')" ' +
+                (currentPg >= totalPg ? 'disabled' : '') +
+                ' class="px-3 py-1.5 text-sm rounded-lg border ' +
+                (currentPg >= totalPg ? 'text-gray-400 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100') +
+                '">Next</button>';
+
+        return html;
+    }
+
+    // ============================
+    // KEYBOARD SHORTCUTS
+    // ============================
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeResolveModalDirect();
+            closeDeleteModalDirect();
+        }
+    });
+
+    // ============================
+    // INITIALIZE
+    // ============================
+    function init() {
+        loadLocations();
+        loadAlertsSummary();
+        loadAlerts();
+    }
+
+    init();
+</script>
+</body>
+</html>

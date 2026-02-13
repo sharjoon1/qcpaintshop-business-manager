@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Salary Configuration - Quality Colours</title>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -444,20 +450,25 @@
 
         // Load branches
         async function loadBranches() {
-            const token = localStorage.getItem('auth_token');
-            const response = await fetch(`${API_BASE}/api/branches`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            
-            const selects = ['filterBranch', 'branchId'];
-            selects.forEach(selectId => {
-                const select = document.getElementById(selectId);
-                select.innerHTML = selectId === 'filterBranch' ? '<option value="">All Branches</option>' : '<option value="">Select Branch</option>';
-                data.forEach(branch => {
-                    select.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/branches`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
-            });
+                const result = await response.json();
+                const branches = Array.isArray(result) ? result : (result.data || []);
+
+                const selects = ['filterBranch', 'branchId'];
+                selects.forEach(selectId => {
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = selectId === 'filterBranch' ? '<option value="">All Branches</option>' : '<option value="">Select Branch</option>';
+                    branches.forEach(branch => {
+                        select.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+                    });
+                });
+            } catch (error) {
+                console.error('Error loading branches:', error);
+            }
         }
 
         // Load staff

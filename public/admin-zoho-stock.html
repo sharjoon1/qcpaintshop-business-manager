@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Stock Levels - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        /* Stat cards */
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 4px solid var(--accent, #667eea);
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-value { font-size: 1.75rem; font-weight: 800; color: #1f2937; }
+        .stat-label { font-size: 0.8rem; color: #6b7280; font-weight: 500; }
+
+        /* Location tabs */
+        .location-tabs {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding-bottom: 0.25rem;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+        .location-tabs::-webkit-scrollbar { height: 4px; }
+        .location-tabs::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        .location-tab {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #e5e7eb;
+            background: white;
+            color: #6b7280;
+        }
+        .location-tab:hover { background: #f3f4f6; color: #374151; }
+        .location-tab.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.3);
+        }
+
+        /* Status dots */
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .status-dot.out-of-stock { background: #ef4444; }
+        .status-dot.below-reorder { background: #f97316; }
+        .status-dot.near-reorder { background: #eab308; }
+        .status-dot.healthy { background: #22c55e; }
+
+        /* Detail panel slide-down */
+        .detail-panel {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease, padding 0.35s ease;
+            background: #f9fafb;
+        }
+        .detail-panel.open {
+            max-height: 600px;
+            padding: 1rem 1.5rem;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-info { background: #2563eb; }
+
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Responsive table / cards */
+        @media (max-width: 767px) {
+            .stock-table-wrap { display: none; }
+            .stock-cards { display: block; }
+        }
+        @media (min-width: 768px) {
+            .stock-table-wrap { display: block; }
+            .stock-cards { display: none; }
+            .stat-card { padding: 1.5rem; }
+            .stat-value { font-size: 2rem; }
+        }
+
+        /* Clickable row */
+        .stock-row { cursor: pointer; transition: background-color 0.15s; }
+        .stock-row:hover { background-color: #f9fafb; }
+        .stock-row.expanded { background-color: #eef2ff; }
+
+        /* Timeline */
+        .timeline-item {
+            position: relative;
+            padding-left: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-left: 2px solid #e5e7eb;
+        }
+        .timeline-item:last-child { border-left-color: transparent; padding-bottom: 0; }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: 4px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+        }
+    </style>
+</head>
+<body data-page="zoho-stock" class="bg-gray-50">
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast" role="alert"></div>
+
+        <!-- Page Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Stock Levels</h1>
+                <p class="text-gray-500 text-sm mt-1">
+                    Inventory overview synced from Zoho Books
+                    <span id="lastSyncTime" class="ml-2 text-xs text-gray-400"></span>
+                </p>
+            </div>
+            <button onclick="syncStock()" id="syncBtn" class="flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm whitespace-nowrap" style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
+                <svg id="syncIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span id="syncBtnText">Sync Stock</span>
+            </button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+            <!-- Total Items -->
+            <div class="stat-card" style="border-left-color: #667eea;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div id="statTotalItems" class="stat-value">
+                            <div class="skeleton" style="width: 50px; height: 28px;"></div>
+                        </div>
+                        <div class="stat-label">Total Items</div>
+                    </div>
+                    <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Low Stock Items -->
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div id="statLowStock" class="stat-value">
+                            <div class="skeleton" style="width: 50px; height: 28px;"></div>
+                        </div>
+                        <div class="stat-label">Low Stock</div>
+                    </div>
+                    <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Out of Stock -->
+            <div class="stat-card" style="border-left-color: #ef4444;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div id="statOutOfStock" class="stat-value">
+                            <div class="skeleton" style="width: 50px; height: 28px;"></div>
+                        </div>
+                        <div class="stat-label">Out of Stock</div>
+                    </div>
+                    <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Last Sync -->
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div id="statLastSync" class="stat-value text-base font-bold">
+                            <div class="skeleton" style="width: 80px; height: 28px;"></div>
+                        </div>
+                        <div class="stat-label">Last Sync</div>
+                    </div>
+                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Location Tabs -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Locations</h3>
+            </div>
+            <div id="locationTabs" class="location-tabs">
+                <div class="location-tab active" data-location-id="" onclick="selectLocation(this)">All</div>
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Search & Filter Bar -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <input type="text" id="searchInput" onkeyup="debounceSearch()" placeholder="Item name or SKU..." class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none">
+                </div>
+                <div class="flex items-center gap-3 sm:pt-6">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" id="lowStockToggle" onchange="applyFilters()" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="text-sm font-medium text-gray-700">Show low stock only</span>
+                    </label>
+                </div>
+                <div class="flex justify-end">
+                    <button onclick="clearFilters()" class="rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition">
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <svg class="inline w-8 h-8 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-500 mt-3">Loading stock data...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-12 bg-white rounded-lg shadow">
+            <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No stock items found</h3>
+            <p class="text-gray-600 mb-4">Try syncing stock from Zoho Books or adjusting your filters.</p>
+            <button onclick="syncStock()" class="inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition" style="background: #667eea;">
+                Sync Stock
+            </button>
+        </div>
+
+        <!-- Stock Table (Desktop) -->
+        <div id="stockTableContainer" class="hidden">
+            <div class="stock-table-wrap bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left" style="min-width: 650px;">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold text-gray-600">Item Name</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600">SKU</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Stock on Hand</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Available</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Committed</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockTableBody" class="divide-y divide-gray-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Stock Cards (Mobile) -->
+            <div class="stock-cards space-y-3" id="stockCardsContainer">
+            </div>
+
+            <!-- Pagination -->
+            <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-gray-600" id="paginationInfo">Showing 0 items</div>
+                <div class="flex items-center gap-1" id="paginationControls">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Item Detail Slide Panel (inserted dynamically after table rows) -->
+
+    <script>
+        // =============================================
+        // STATE
+        // =============================================
+        let stockItems = [];
+        let locations = [];
+        let currentPage = 1;
+        let totalItems = 0;
+        let totalPages = 1;
+        const PAGE_LIMIT = 50;
+        let searchTimeout = null;
+        let selectedLocationId = '';
+        let expandedItemId = null;
+
+        // =============================================
+        // AUTH HELPERS
+        // =============================================
+        function getAuthHeaders() {
+            return {
+                'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // =============================================
+        // TOAST NOTIFICATIONS
+        // =============================================
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast toast-' + (type || 'info');
+            // Trigger show
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3500);
+        }
+
+        // =============================================
+        // UTILITY
+        // =============================================
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '--';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) +
+                   ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '--';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
+        function timeAgo(dateStr) {
+            if (!dateStr) return 'Never';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            const now = new Date();
+            const diffMs = now - d;
+            const diffMin = Math.floor(diffMs / 60000);
+            if (diffMin < 1) return 'Just now';
+            if (diffMin < 60) return diffMin + 'm ago';
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return diffHr + 'h ago';
+            const diffDay = Math.floor(diffHr / 24);
+            if (diffDay < 7) return diffDay + 'd ago';
+            return formatDate(dateStr);
+        }
+
+        function getStockStatus(item) {
+            const stockOnHand = parseFloat(item.stock_on_hand || item.quantity || 0);
+            const reorderLevel = parseFloat(item.reorder_level || item.reorder_point || 0);
+
+            if (stockOnHand <= 0) return { class: 'out-of-stock', label: 'Out of Stock', color: '#ef4444' };
+            if (reorderLevel > 0 && stockOnHand <= reorderLevel) return { class: 'below-reorder', label: 'Below Reorder', color: '#f97316' };
+            if (reorderLevel > 0 && stockOnHand <= reorderLevel * 1.5) return { class: 'near-reorder', label: 'Near Reorder', color: '#eab308' };
+            return { class: 'healthy', label: 'Healthy', color: '#22c55e' };
+        }
+
+        // =============================================
+        // SHOW / HIDE UI STATES
+        // =============================================
+        function showLoading(show) {
+            document.getElementById('loadingState').classList.toggle('hidden', !show);
+            if (show) {
+                document.getElementById('stockTableContainer').classList.add('hidden');
+                document.getElementById('emptyState').classList.add('hidden');
+            }
+        }
+
+        function showEmpty(show) {
+            document.getElementById('emptyState').classList.toggle('hidden', !show);
+        }
+
+        // =============================================
+        // LOCATION TABS
+        // =============================================
+        async function loadLocations() {
+            try {
+                const response = await fetch('/api/zoho/locations', {
+                    headers: getAuthHeaders()
+                });
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                if (!response.ok) throw new Error('Failed to load locations');
+                const result = await response.json();
+                locations = result.data || result.locations || result || [];
+                if (Array.isArray(locations)) {
+                    renderLocationTabs();
+                }
+            } catch (error) {
+                console.error('Error loading locations:', error);
+            }
+        }
+
+        function renderLocationTabs() {
+            const container = document.getElementById('locationTabs');
+            let html = '<div class="location-tab active" data-location-id="" onclick="selectLocation(this)">All</div>';
+            locations.forEach(loc => {
+                const id = loc.warehouse_id || loc.location_id || loc.id || '';
+                const name = loc.warehouse_name || loc.location_name || loc.name || 'Unknown';
+                html += '<div class="location-tab" data-location-id="' + escapeHtml(String(id)) + '" onclick="selectLocation(this)">' + escapeHtml(name) + '</div>';
+            });
+            container.innerHTML = html;
+        }
+
+        function selectLocation(el) {
+            // Remove active from all tabs
+            document.querySelectorAll('.location-tab').forEach(tab => tab.classList.remove('active'));
+            el.classList.add('active');
+            selectedLocationId = el.getAttribute('data-location-id') || '';
+            currentPage = 1;
+            expandedItemId = null;
+            loadStockData();
+        }
+
+        // =============================================
+        // SEARCH & FILTER
+        // =============================================
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentPage = 1;
+                loadStockData();
+            }, 400);
+        }
+
+        function applyFilters() {
+            currentPage = 1;
+            loadStockData();
+        }
+
+        function clearFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('lowStockToggle').checked = false;
+            selectedLocationId = '';
+            document.querySelectorAll('.location-tab').forEach(tab => tab.classList.remove('active'));
+            const allTab = document.querySelector('.location-tab[data-location-id=""]');
+            if (allTab) allTab.classList.add('active');
+            currentPage = 1;
+            loadStockData();
+        }
+
+        // =============================================
+        // API: LOAD STOCK DATA
+        // =============================================
+        async function loadStockData() {
+            const search = document.getElementById('searchInput').value.trim();
+            const lowStock = document.getElementById('lowStockToggle').checked;
+
+            const params = new URLSearchParams({
+                page: currentPage,
+                limit: PAGE_LIMIT
+            });
+            if (selectedLocationId) params.set('location_id', selectedLocationId);
+            if (search) params.set('search', search);
+            if (lowStock) params.set('low_stock', 'true');
+
+            showLoading(true);
+
+            try {
+                const response = await fetch('/api/zoho/stock?' + params.toString(), {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                if (!response.ok) throw new Error('Failed to fetch stock data');
+
+                const result = await response.json();
+
+                if (result.success) {
+                    stockItems = result.data || [];
+                    totalItems = result.pagination ? result.pagination.total : stockItems.length;
+                    totalPages = result.pagination ? result.pagination.totalPages : Math.ceil(totalItems / PAGE_LIMIT);
+                    currentPage = result.pagination ? result.pagination.page : currentPage;
+
+                    if (result.stats) {
+                        updateSummaryCards(result.stats);
+                    }
+                    if (result.last_sync || result.lastSync) {
+                        updateLastSync(result.last_sync || result.lastSync);
+                    }
+                } else {
+                    stockItems = [];
+                    totalItems = 0;
+                    totalPages = 1;
+                }
+
+                renderStockTable();
+                renderPagination();
+                showLoading(false);
+            } catch (error) {
+                console.error('Error loading stock data:', error);
+                showLoading(false);
+                showEmpty(true);
+                showToast('Failed to load stock data', 'error');
+            }
+        }
+
+        // =============================================
+        // API: SYNC STOCK
+        // =============================================
+        async function syncStock() {
+            const btn = document.getElementById('syncBtn');
+            const icon = document.getElementById('syncIcon');
+            const btnText = document.getElementById('syncBtnText');
+
+            btn.disabled = true;
+            icon.classList.add('animate-spin');
+            btn.classList.add('opacity-75');
+            btnText.textContent = 'Syncing...';
+
+            showToast('Syncing stock from Zoho Books...', 'info');
+
+            try {
+                const response = await fetch('/api/zoho/stock/sync', {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    showToast(result.message || 'Stock synced successfully!', 'success');
+                    currentPage = 1;
+                    loadStockData();
+                } else {
+                    showToast(result.message || 'Stock sync failed. Please try again.', 'error');
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                showToast('Sync failed. Check your connection and try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                icon.classList.remove('animate-spin');
+                btn.classList.remove('opacity-75');
+                btnText.textContent = 'Sync Stock';
+            }
+        }
+
+        // =============================================
+        // API: ITEM DETAIL (stock across locations)
+        // =============================================
+        async function loadItemDetail(itemId) {
+            try {
+                const response = await fetch('/api/zoho/stock/' + encodeURIComponent(itemId), {
+                    headers: getAuthHeaders()
+                });
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                if (!response.ok) throw new Error('Failed to load item detail');
+                const result = await response.json();
+                return result.data || result;
+            } catch (error) {
+                console.error('Error loading item detail:', error);
+                showToast('Failed to load item details', 'error');
+                return null;
+            }
+        }
+
+        // =============================================
+        // API: STOCK HISTORY
+        // =============================================
+        async function loadStockHistory(itemId) {
+            try {
+                const response = await fetch('/api/zoho/stock/history?item_id=' + encodeURIComponent(itemId), {
+                    headers: getAuthHeaders()
+                });
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return [];
+                }
+                if (!response.ok) throw new Error('Failed to load stock history');
+                const result = await response.json();
+                return result.data || result.history || [];
+            } catch (error) {
+                console.error('Error loading stock history:', error);
+                return [];
+            }
+        }
+
+        // =============================================
+        // RENDERING: SUMMARY CARDS
+        // =============================================
+        function updateSummaryCards(stats) {
+            document.getElementById('statTotalItems').textContent = stats.total_items != null ? stats.total_items : (stats.total || '--');
+            document.getElementById('statLowStock').textContent = stats.low_stock != null ? stats.low_stock : (stats.low_stock_items || '--');
+            document.getElementById('statOutOfStock').textContent = stats.out_of_stock != null ? stats.out_of_stock : (stats.out_of_stock_items || '--');
+        }
+
+        function updateLastSync(syncTime) {
+            const formatted = timeAgo(syncTime);
+            document.getElementById('statLastSync').textContent = formatted;
+            document.getElementById('lastSyncTime').textContent = syncTime ? 'Last sync: ' + formatDateTime(syncTime) : '';
+        }
+
+        // =============================================
+        // RENDERING: STOCK TABLE
+        // =============================================
+        function renderStockTable() {
+            const tableBody = document.getElementById('stockTableBody');
+            const cardsContainer = document.getElementById('stockCardsContainer');
+            const tableContainer = document.getElementById('stockTableContainer');
+
+            if (stockItems.length === 0) {
+                tableContainer.classList.add('hidden');
+                showEmpty(true);
+                return;
+            }
+
+            showEmpty(false);
+            tableContainer.classList.remove('hidden');
+
+            // Desktop table rows
+            tableBody.innerHTML = stockItems.map(item => {
+                const id = item.item_id || item.id;
+                const status = getStockStatus(item);
+                const stockOnHand = parseFloat(item.stock_on_hand || item.quantity || 0);
+                const available = parseFloat(item.available_stock || item.available || item.stock_on_hand || 0);
+                const committed = parseFloat(item.committed_stock || item.committed || 0);
+                const isExpanded = expandedItemId === id;
+
+                let rowHtml = '<tr class="stock-row' + (isExpanded ? ' expanded' : '') + '" data-item-id="' + escapeHtml(String(id)) + '" onclick="toggleItemDetail(\'' + escapeHtml(String(id)) + '\')">' +
+                    '<td class="px-4 py-3">' +
+                        '<div class="font-semibold text-gray-800">' + escapeHtml(item.name || item.item_name || '--') + '</div>' +
+                    '</td>' +
+                    '<td class="px-4 py-3 text-gray-500 text-xs font-mono">' + escapeHtml(item.sku || '--') + '</td>' +
+                    '<td class="px-4 py-3 text-right font-medium text-gray-800">' + stockOnHand.toLocaleString() + '</td>' +
+                    '<td class="px-4 py-3 text-right text-gray-700">' + available.toLocaleString() + '</td>' +
+                    '<td class="px-4 py-3 text-right text-gray-700">' + committed.toLocaleString() + '</td>' +
+                    '<td class="px-4 py-3 text-center">' +
+                        '<div class="flex items-center justify-center gap-2">' +
+                            '<span class="status-dot ' + status.class + '"></span>' +
+                            '<span class="text-xs font-medium" style="color: ' + status.color + ';">' + status.label + '</span>' +
+                        '</div>' +
+                    '</td>' +
+                '</tr>';
+
+                // Detail panel row (always present, toggled via class)
+                rowHtml += '<tr class="detail-row" id="detail-row-' + escapeHtml(String(id)) + '"' + (!isExpanded ? ' style="display:none;"' : '') + '>' +
+                    '<td colspan="6" class="p-0">' +
+                        '<div class="detail-panel' + (isExpanded ? ' open' : '') + '" id="detail-panel-' + escapeHtml(String(id)) + '">' +
+                            '<div class="flex items-center justify-center py-4">' +
+                                '<svg class="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
+                                '<span class="ml-2 text-sm text-gray-500">Loading details...</span>' +
+                            '</div>' +
+                        '</div>' +
+                    '</td>' +
+                '</tr>';
+
+                return rowHtml;
+            }).join('');
+
+            // Mobile cards
+            cardsContainer.innerHTML = stockItems.map(item => {
+                const id = item.item_id || item.id;
+                const status = getStockStatus(item);
+                const stockOnHand = parseFloat(item.stock_on_hand || item.quantity || 0);
+                const available = parseFloat(item.available_stock || item.available || item.stock_on_hand || 0);
+                const committed = parseFloat(item.committed_stock || item.committed || 0);
+
+                return '<div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition" onclick="toggleItemDetailMobile(\'' + escapeHtml(String(id)) + '\')">' +
+                    '<div class="flex justify-between items-start mb-2">' +
+                        '<div class="flex-1 min-w-0 mr-3">' +
+                            '<div class="font-bold text-gray-800 text-sm truncate">' + escapeHtml(item.name || item.item_name || '--') + '</div>' +
+                            '<div class="text-xs text-gray-400 font-mono mt-0.5">' + escapeHtml(item.sku || '--') + '</div>' +
+                        '</div>' +
+                        '<div class="flex items-center gap-1.5 flex-shrink-0">' +
+                            '<span class="status-dot ' + status.class + '"></span>' +
+                            '<span class="text-xs font-medium" style="color: ' + status.color + ';">' + status.label + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="grid grid-cols-3 gap-2 mt-3">' +
+                        '<div class="text-center">' +
+                            '<div class="text-xs text-gray-500">On Hand</div>' +
+                            '<div class="text-sm font-bold text-gray-800">' + stockOnHand.toLocaleString() + '</div>' +
+                        '</div>' +
+                        '<div class="text-center">' +
+                            '<div class="text-xs text-gray-500">Available</div>' +
+                            '<div class="text-sm font-bold text-gray-700">' + available.toLocaleString() + '</div>' +
+                        '</div>' +
+                        '<div class="text-center">' +
+                            '<div class="text-xs text-gray-500">Committed</div>' +
+                            '<div class="text-sm font-bold text-gray-700">' + committed.toLocaleString() + '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="detail-panel mt-2" id="detail-panel-mobile-' + escapeHtml(String(id)) + '"></div>' +
+                '</div>';
+            }).join('');
+        }
+
+        // =============================================
+        // ITEM DETAIL: TOGGLE (Desktop)
+        // =============================================
+        async function toggleItemDetail(itemId) {
+            const detailRow = document.getElementById('detail-row-' + itemId);
+            const detailPanel = document.getElementById('detail-panel-' + itemId);
+            const stockRow = document.querySelector('tr.stock-row[data-item-id="' + itemId + '"]');
+
+            if (!detailRow || !detailPanel) return;
+
+            // If already expanded, collapse
+            if (expandedItemId === itemId) {
+                detailPanel.classList.remove('open');
+                stockRow && stockRow.classList.remove('expanded');
+                setTimeout(() => { detailRow.style.display = 'none'; }, 350);
+                expandedItemId = null;
+                return;
+            }
+
+            // Collapse any previously expanded
+            if (expandedItemId) {
+                const prevRow = document.getElementById('detail-row-' + expandedItemId);
+                const prevPanel = document.getElementById('detail-panel-' + expandedItemId);
+                const prevStockRow = document.querySelector('tr.stock-row[data-item-id="' + expandedItemId + '"]');
+                if (prevPanel) prevPanel.classList.remove('open');
+                if (prevStockRow) prevStockRow.classList.remove('expanded');
+                if (prevRow) setTimeout(() => { prevRow.style.display = 'none'; }, 350);
+            }
+
+            expandedItemId = itemId;
+            detailRow.style.display = '';
+            stockRow && stockRow.classList.add('expanded');
+
+            // Show loading inside panel
+            detailPanel.innerHTML = '<div class="flex items-center justify-center py-4">' +
+                '<svg class="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
+                '<span class="ml-2 text-sm text-gray-500">Loading details...</span>' +
+            '</div>';
+            requestAnimationFrame(() => { detailPanel.classList.add('open'); });
+
+            // Fetch item detail + history in parallel
+            const [itemDetail, history] = await Promise.all([
+                loadItemDetail(itemId),
+                loadStockHistory(itemId)
+            ]);
+
+            detailPanel.innerHTML = renderDetailContent(itemDetail, history);
+        }
+
+        // =============================================
+        // ITEM DETAIL: TOGGLE (Mobile)
+        // =============================================
+        async function toggleItemDetailMobile(itemId) {
+            const detailPanel = document.getElementById('detail-panel-mobile-' + itemId);
+            if (!detailPanel) return;
+
+            // If already open, close it
+            if (detailPanel.classList.contains('open')) {
+                detailPanel.classList.remove('open');
+                setTimeout(() => { detailPanel.innerHTML = ''; }, 350);
+                expandedItemId = null;
+                return;
+            }
+
+            // Close previous
+            if (expandedItemId) {
+                const prevPanel = document.getElementById('detail-panel-mobile-' + expandedItemId);
+                if (prevPanel) {
+                    prevPanel.classList.remove('open');
+                    setTimeout(() => { prevPanel.innerHTML = ''; }, 350);
+                }
+            }
+
+            expandedItemId = itemId;
+
+            detailPanel.innerHTML = '<div class="flex items-center justify-center py-4">' +
+                '<svg class="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
+                '<span class="ml-2 text-sm text-gray-500">Loading details...</span>' +
+            '</div>';
+            requestAnimationFrame(() => { detailPanel.classList.add('open'); });
+
+            const [itemDetail, history] = await Promise.all([
+                loadItemDetail(itemId),
+                loadStockHistory(itemId)
+            ]);
+
+            detailPanel.innerHTML = renderDetailContent(itemDetail, history);
+        }
+
+        // =============================================
+        // RENDERING: DETAIL CONTENT
+        // =============================================
+        function renderDetailContent(itemDetail, history) {
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+
+            // Stock by Location mini-table
+            html += '<div>';
+            html += '<h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Stock by Location</h4>';
+
+            const locationStock = itemDetail && (itemDetail.warehouses || itemDetail.locations || itemDetail.location_stock);
+            if (locationStock && Array.isArray(locationStock) && locationStock.length > 0) {
+                html += '<div class="border rounded-lg overflow-hidden">';
+                html += '<table class="w-full text-xs">';
+                html += '<thead class="bg-gray-50"><tr>' +
+                    '<th class="px-3 py-2 text-left font-semibold text-gray-600">Location</th>' +
+                    '<th class="px-3 py-2 text-right font-semibold text-gray-600">On Hand</th>' +
+                    '<th class="px-3 py-2 text-right font-semibold text-gray-600">Available</th>' +
+                    '<th class="px-3 py-2 text-right font-semibold text-gray-600">Committed</th>' +
+                '</tr></thead>';
+                html += '<tbody class="divide-y divide-gray-100">';
+                locationStock.forEach(loc => {
+                    const locName = loc.warehouse_name || loc.location_name || loc.name || 'Unknown';
+                    const onHand = parseFloat(loc.stock_on_hand || loc.quantity_on_hand || loc.quantity || 0);
+                    const avail = parseFloat(loc.available_stock || loc.available || loc.stock_on_hand || 0);
+                    const committed = parseFloat(loc.committed_stock || loc.committed || 0);
+                    html += '<tr class="hover:bg-gray-50">' +
+                        '<td class="px-3 py-2 text-gray-800 font-medium">' + escapeHtml(locName) + '</td>' +
+                        '<td class="px-3 py-2 text-right text-gray-700">' + onHand.toLocaleString() + '</td>' +
+                        '<td class="px-3 py-2 text-right text-gray-700">' + avail.toLocaleString() + '</td>' +
+                        '<td class="px-3 py-2 text-right text-gray-700">' + committed.toLocaleString() + '</td>' +
+                    '</tr>';
+                });
+                html += '</tbody></table></div>';
+            } else {
+                html += '<p class="text-sm text-gray-400 italic">No location breakdown available.</p>';
+            }
+            html += '</div>';
+
+            // Stock History Timeline
+            html += '<div>';
+            html += '<h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Stock History</h4>';
+
+            if (history && Array.isArray(history) && history.length > 0) {
+                const recentHistory = history.slice(0, 10);
+                html += '<div class="pl-2 max-h-48 overflow-y-auto">';
+                recentHistory.forEach(entry => {
+                    const date = formatDateTime(entry.date || entry.created_at || entry.timestamp);
+                    const desc = entry.description || entry.reason || entry.action || 'Stock updated';
+                    const qty = entry.quantity_changed || entry.quantity || entry.change;
+                    const qtyStr = qty != null ? (parseFloat(qty) >= 0 ? '+' + parseFloat(qty) : String(parseFloat(qty))) : '';
+                    const qtyColor = qty != null ? (parseFloat(qty) >= 0 ? 'text-green-600' : 'text-red-600') : 'text-gray-500';
+
+                    html += '<div class="timeline-item">' +
+                        '<div class="flex justify-between items-start">' +
+                            '<div>' +
+                                '<div class="text-xs font-medium text-gray-800">' + escapeHtml(desc) + '</div>' +
+                                '<div class="text-xs text-gray-400 mt-0.5">' + date + '</div>' +
+                            '</div>' +
+                            (qtyStr ? '<span class="text-xs font-bold ' + qtyColor + ' whitespace-nowrap ml-2">' + qtyStr + '</span>' : '') +
+                        '</div>' +
+                    '</div>';
+                });
+                html += '</div>';
+            } else {
+                html += '<p class="text-sm text-gray-400 italic">No history available.</p>';
+            }
+            html += '</div>';
+
+            html += '</div>';
+            return html;
+        }
+
+        // =============================================
+        // RENDERING: PAGINATION
+        // =============================================
+        function renderPagination() {
+            const info = document.getElementById('paginationInfo');
+            const controls = document.getElementById('paginationControls');
+
+            const start = totalItems === 0 ? 0 : ((currentPage - 1) * PAGE_LIMIT) + 1;
+            const end = Math.min(currentPage * PAGE_LIMIT, totalItems);
+            info.textContent = 'Showing ' + start + '-' + end + ' of ' + totalItems + ' items';
+
+            if (totalPages <= 1) {
+                controls.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+
+            // Previous button
+            html += '<button onclick="goToPage(' + (currentPage - 1) + ')" ' +
+                (currentPage <= 1 ? 'disabled' : '') +
+                ' class="px-3 py-1.5 text-sm font-medium rounded-lg border transition ' +
+                (currentPage <= 1 ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-700 hover:bg-gray-100') +
+                '">Prev</button>';
+
+            // Page numbers
+            const maxVisible = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+            if (endPage - startPage + 1 < maxVisible) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+            }
+
+            if (startPage > 1) {
+                html += '<button onclick="goToPage(1)" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition">1</button>';
+                if (startPage > 2) {
+                    html += '<span class="px-2 text-gray-400">...</span>';
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                if (i === currentPage) {
+                    html += '<button class="px-3 py-1.5 text-sm font-medium rounded-lg text-white transition" style="background: #667eea;">' + i + '</button>';
+                } else {
+                    html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition">' + i + '</button>';
+                }
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += '<span class="px-2 text-gray-400">...</span>';
+                }
+                html += '<button onclick="goToPage(' + totalPages + ')" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition">' + totalPages + '</button>';
+            }
+
+            // Next button
+            html += '<button onclick="goToPage(' + (currentPage + 1) + ')" ' +
+                (currentPage >= totalPages ? 'disabled' : '') +
+                ' class="px-3 py-1.5 text-sm font-medium rounded-lg border transition ' +
+                (currentPage >= totalPages ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-700 hover:bg-gray-100') +
+                '">Next</button>';
+
+            controls.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            expandedItemId = null;
+            loadStockData();
+            // Scroll to top of table
+            document.getElementById('stockTableContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // =============================================
+        // INITIALIZATION
+        // =============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            loadLocations();
+            loadStockData();
+        });
+    </script>
+</body>
+</html>

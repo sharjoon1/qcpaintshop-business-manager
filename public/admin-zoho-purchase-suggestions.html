@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Purchase Suggestions - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        .toast {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-info { background: #2563eb; }
+
+        .tab-btn {
+            padding: 0.625rem 1.25rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            color: #6b7280;
+            transition: all 0.2s;
+            cursor: pointer;
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+        }
+        .tab-btn:hover { color: #667eea; }
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 4px solid;
+            transition: transform 0.2s;
+        }
+        .summary-card:hover { transform: translateY(-2px); }
+
+        .badge-priority {
+            display: inline-block;
+            padding: 0.15rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .badge-HIGH { background: #fee2e2; color: #991b1b; }
+        .badge-MEDIUM { background: #fef9c3; color: #854d0e; }
+        .badge-LOW { background: #dbeafe; color: #1e40af; }
+
+        .badge-status {
+            display: inline-block;
+            padding: 0.15rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-pending { background: #fef9c3; color: #854d0e; }
+        .badge-ordered { background: #dcfce7; color: #166534; }
+        .badge-dismissed { background: #f3f4f6; color: #374151; }
+
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-wrapper table { min-width: 800px; }
+
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 1rem;
+        }
+        .modal-overlay.hidden { display: none; }
+
+        @media (min-width: 768px) {
+            .summary-card { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="zoho-purchase-suggestions">
+<div class="container mx-auto p-4 md:p-6">
+
+    <!-- Toast -->
+    <div id="toast" class="toast" role="alert"></div>
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Purchase Suggestions</h1>
+            <p class="text-gray-500 text-sm mt-1">Auto-generated purchase orders based on 90-day sales data</p>
+        </div>
+        <div class="mt-3 sm:mt-0">
+            <button id="calcBtn" onclick="runCalculation()" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                <svg id="calcIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+                <span id="calcText">Calculate Now</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+        <button id="tabSuggestions" class="tab-btn active" onclick="switchTab('suggestions')">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"></path>
+                </svg>
+                Suggestions
+            </span>
+        </button>
+        <button id="tabBranches" class="tab-btn" onclick="switchTab('branches')">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Branch Allocations
+            </span>
+        </button>
+        <button id="tabCategories" class="tab-btn" onclick="switchTab('categories')">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                </svg>
+                Category Defaults
+            </span>
+        </button>
+        <button id="tabHistory" class="tab-btn" onclick="switchTab('history')">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                History
+            </span>
+        </button>
+    </div>
+
+    <!-- =========================================
+         TAB 1: SUGGESTIONS
+         ========================================= -->
+    <div id="panelSuggestions">
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
+            <div class="summary-card" style="border-left-color: #ef4444;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">High Priority</div>
+                <div class="text-2xl font-bold text-red-600 mt-1" id="summHigh">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+            <div class="summary-card" style="border-left-color: #eab308;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">Medium</div>
+                <div class="text-2xl font-bold text-yellow-600 mt-1" id="summMedium">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+            <div class="summary-card" style="border-left-color: #3b82f6;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">Low</div>
+                <div class="text-2xl font-bold text-blue-600 mt-1" id="summLow">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+            <div class="summary-card" style="border-left-color: #667eea;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">Total</div>
+                <div class="text-2xl font-bold text-gray-800 mt-1" id="summTotal">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+            <div class="summary-card" style="border-left-color: #10b981;">
+                <div class="text-xs font-semibold text-gray-500 uppercase">Unique Items</div>
+                <div class="text-2xl font-bold text-green-600 mt-1" id="summItems">
+                    <div class="skeleton" style="width: 40px; height: 28px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+                    <select id="filterBranch" onchange="loadSuggestions()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">All Branches</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select id="filterPriority" onchange="loadSuggestions()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">All Priorities</option>
+                        <option value="HIGH">High</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="LOW">Low</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="filterStatus" onchange="loadSuggestions()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="pending">Pending</option>
+                        <option value="ordered">Ordered</option>
+                        <option value="dismissed">Dismissed</option>
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <input type="text" id="filterSearch" placeholder="Item name or SKU..." oninput="debounceSearch()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="clearFilters()" class="flex-1 rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition">
+                        Clear
+                    </button>
+                    <button onclick="bulkAction('ordered')" class="flex-1 rounded-lg bg-green-600 hover:bg-green-700 px-3 py-2 text-sm font-medium text-white transition" title="Mark selected as ordered">
+                        Ordered
+                    </button>
+                    <button onclick="bulkAction('dismiss')" class="flex-1 rounded-lg bg-gray-500 hover:bg-gray-600 px-3 py-2 text-sm font-medium text-white transition" title="Dismiss selected">
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="suggestionsLoading" class="text-center py-12">
+            <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-500 mt-3">Loading suggestions...</p>
+        </div>
+
+        <!-- Empty -->
+        <div id="suggestionsEmpty" class="hidden text-center py-12 bg-white rounded-lg shadow">
+            <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No suggestions found</h3>
+            <p class="text-gray-600">Click "Calculate Now" to generate purchase suggestions from sales data.</p>
+        </div>
+
+        <!-- Suggestions Table -->
+        <div id="suggestionsTableContainer" class="hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="table-wrapper">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-3 py-3 w-10">
+                                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded border-gray-300">
+                                </th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Priority</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Item Name</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">SKU</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Branch</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">Current Stock</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">Reorder Level</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">Suggested Qty</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Status</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suggestionsTableBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-gray-600" id="suggestionsPaginationInfo">Showing 0 suggestions</div>
+                <div class="flex items-center gap-1" id="suggestionsPaginationControls"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================
+         TAB 2: BRANCH ALLOCATIONS
+         ========================================= -->
+    <div id="panelBranches" class="hidden">
+
+        <div class="bg-white rounded-lg shadow p-5 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Branch Distribution</h2>
+                <div class="text-sm text-gray-500" id="allocationTotal">Total: 0%</div>
+            </div>
+            <p class="text-gray-500 text-sm mb-4">Configure how the global reorder level is distributed across branches. Percentages must total 100%.</p>
+
+            <div id="branchesLoading" class="text-center py-8">
+                <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+
+            <div id="branchesTable" class="hidden">
+                <div class="table-wrapper">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Branch Name</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Zoho Location</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Allocation %</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Min Stock</th>
+                            </tr>
+                        </thead>
+                        <tbody id="branchesTableBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex items-center justify-between">
+                    <div id="allocationValidation" class="text-sm"></div>
+                    <button onclick="saveBranchAllocations()" class="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Save Allocations
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================
+         TAB 3: CATEGORY DEFAULTS
+         ========================================= -->
+    <div id="panelCategories" class="hidden">
+
+        <div class="bg-white rounded-lg shadow p-5 mb-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Category Defaults</h2>
+            <p class="text-gray-500 text-sm mb-4">Fallback reorder quantities for low-volume items (items selling fewer than the configured threshold per month).</p>
+
+            <div id="categoriesLoading" class="text-center py-8">
+                <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+
+            <div id="categoriesTable" class="hidden">
+                <div class="table-wrapper">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Category Name</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Default Reorder Qty</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Active</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categoriesTableBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add New Category Default -->
+        <div class="bg-white rounded-lg shadow p-5">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Add Category Default</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category Name</label>
+                    <input type="text" id="newCategoryName" placeholder="e.g. Lacquer" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Default Reorder Qty</label>
+                    <input type="number" id="newCategoryQty" min="1" placeholder="e.g. 10" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+                <div>
+                    <button onclick="addCategoryDefault()" class="w-full inline-flex items-center justify-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        Add
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================
+         TAB 4: HISTORY
+         ========================================= -->
+    <div id="panelHistory" class="hidden">
+
+        <div id="historyLoading" class="text-center py-12">
+            <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-500 mt-3">Loading history...</p>
+        </div>
+
+        <div id="historyEmpty" class="hidden text-center py-12 bg-white rounded-lg shadow">
+            <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No calculation history</h3>
+            <p class="text-gray-600">Run your first calculation to see history here.</p>
+        </div>
+
+        <div id="historyTableContainer" class="hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="table-wrapper">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Date</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Batch ID</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Total</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">High</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Medium</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Low</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Pending</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Ordered</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Items</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-gray-600" id="historyPaginationInfo">Showing 0 batches</div>
+                <div class="flex items-center gap-1" id="historyPaginationControls"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ============================
+    // STATE
+    // ============================
+    var currentTab = 'suggestions';
+    var suggestionsPage = 1;
+    var suggestionsTotal = 0;
+    var suggestionsTotalPages = 1;
+    var currentBatchId = null;
+    var selectedIds = new Set();
+    var searchTimeout = null;
+
+    var historyPage = 1;
+    var historyTotal = 0;
+    var historyTotalPages = 1;
+
+    var branchAllocations = [];
+    var categoryDefaults = [];
+
+    // ============================
+    // AUTH & API
+    // ============================
+    function getAuthHeaders() {
+        return {
+            'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
+            'Content-Type': 'application/json'
+        };
+    }
+
+    async function apiFetch(url, options) {
+        options = options || {};
+        try {
+            var headers = Object.assign({}, getAuthHeaders(), options.headers || {});
+            var response = await fetch(url, Object.assign({}, options, { headers: headers }));
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return null;
+            }
+            var result = await response.json();
+            if (!result.success && result.message) {
+                throw new Error(result.message);
+            }
+            return result;
+        } catch (err) {
+            if (err.message && !err.message.includes('JSON')) {
+                throw err;
+            }
+            console.error('API fetch error:', err);
+            throw new Error('Network error. Please try again.');
+        }
+    }
+
+    // ============================
+    // HELPERS
+    // ============================
+    function showToast(msg, type) {
+        var toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.className = 'toast toast-' + (type || 'info') + ' show';
+        setTimeout(function() { toast.classList.remove('show'); }, 3500);
+    }
+
+    function formatDate(d) {
+        if (!d) return '-';
+        var dt = new Date(d);
+        return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatNum(n) {
+        if (n === null || n === undefined) return '-';
+        return parseFloat(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    }
+
+    // ============================
+    // TAB SWITCHING
+    // ============================
+    function switchTab(tab) {
+        currentTab = tab;
+        ['suggestions', 'branches', 'categories', 'history'].forEach(function(t) {
+            var panel = document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1));
+            var btn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+            if (panel) panel.classList.toggle('hidden', t !== tab);
+            if (btn) btn.classList.toggle('active', t === tab);
+        });
+
+        if (tab === 'branches' && branchAllocations.length === 0) loadBranchAllocations();
+        if (tab === 'categories' && categoryDefaults.length === 0) loadCategoryDefaults();
+        if (tab === 'history') loadHistory();
+    }
+
+    // ============================
+    // SUGGESTIONS TAB
+    // ============================
+    async function loadSuggestions() {
+        var params = new URLSearchParams();
+        var branch = document.getElementById('filterBranch').value;
+        var priority = document.getElementById('filterPriority').value;
+        var status = document.getElementById('filterStatus').value;
+        var search = document.getElementById('filterSearch').value;
+
+        if (branch) params.set('branch', branch);
+        if (priority) params.set('priority', priority);
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+        params.set('page', suggestionsPage);
+        params.set('limit', 50);
+
+        try {
+            var res = await apiFetch('/api/zoho/purchase-suggestions/latest?' + params.toString());
+            var data = res.data;
+            currentBatchId = data.batchId;
+
+            var suggestions = data.suggestions || [];
+            suggestionsTotal = data.total || 0;
+            suggestionsTotalPages = data.totalPages || 1;
+
+            document.getElementById('suggestionsLoading').classList.add('hidden');
+
+            if (suggestions.length === 0 && suggestionsPage === 1) {
+                document.getElementById('suggestionsEmpty').classList.remove('hidden');
+                document.getElementById('suggestionsTableContainer').classList.add('hidden');
+            } else {
+                document.getElementById('suggestionsEmpty').classList.add('hidden');
+                document.getElementById('suggestionsTableContainer').classList.remove('hidden');
+                renderSuggestionsTable(suggestions);
+                renderPagination('suggestions', suggestionsPage, suggestionsTotalPages, suggestionsTotal);
+            }
+
+            // Load summary
+            loadSummary();
+            // Populate branch filter
+            populateBranchFilter(suggestions);
+        } catch (err) {
+            document.getElementById('suggestionsLoading').classList.add('hidden');
+            document.getElementById('suggestionsEmpty').classList.remove('hidden');
+            console.error('Load suggestions error:', err);
+        }
+    }
+
+    async function loadSummary() {
+        try {
+            var params = currentBatchId ? '?batch_id=' + currentBatchId : '';
+            var res = await apiFetch('/api/zoho/purchase-suggestions/summary' + params);
+            var d = res.data;
+            if (d) {
+                document.getElementById('summHigh').textContent = d.high_count || 0;
+                document.getElementById('summMedium').textContent = d.medium_count || 0;
+                document.getElementById('summLow').textContent = d.low_count || 0;
+                document.getElementById('summTotal').textContent = d.total || 0;
+                document.getElementById('summItems').textContent = d.unique_items || 0;
+            } else {
+                ['summHigh','summMedium','summLow','summTotal','summItems'].forEach(function(id) {
+                    document.getElementById(id).textContent = '0';
+                });
+            }
+        } catch (e) {
+            console.error('Summary error:', e);
+        }
+    }
+
+    function populateBranchFilter(suggestions) {
+        var select = document.getElementById('filterBranch');
+        if (select.options.length > 1) return; // already populated
+        var branches = {};
+        (suggestions || []).forEach(function(s) { if (s.branch_name) branches[s.branch_name] = true; });
+        // Also fetch from allocations if available
+        if (branchAllocations.length > 0) {
+            branchAllocations.forEach(function(b) { branches[b.branch_name] = true; });
+        }
+        Object.keys(branches).sort().forEach(function(b) {
+            var opt = document.createElement('option');
+            opt.value = b;
+            opt.textContent = b;
+            select.appendChild(opt);
+        });
+    }
+
+    function renderSuggestionsTable(suggestions) {
+        var tbody = document.getElementById('suggestionsTableBody');
+        tbody.innerHTML = '';
+        selectedIds.clear();
+        document.getElementById('selectAll').checked = false;
+
+        suggestions.forEach(function(s) {
+            var tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.innerHTML = '<td class="px-3 py-3">' +
+                    '<input type="checkbox" class="row-cb rounded border-gray-300" data-id="' + s.id + '" onchange="toggleRowSelect(' + s.id + ', this.checked)"' + (s.status !== 'pending' ? ' disabled' : '') + '>' +
+                '</td>' +
+                '<td class="px-4 py-3"><span class="badge-priority badge-' + s.priority + '">' + s.priority + '</span></td>' +
+                '<td class="px-4 py-3 font-medium text-gray-800">' + escHtml(s.item_name || '-') + (s.used_category_default ? ' <span class="text-xs text-orange-500" title="Used category default">*</span>' : '') + '</td>' +
+                '<td class="px-4 py-3 text-gray-500 text-xs">' + escHtml(s.sku || '-') + '</td>' +
+                '<td class="px-4 py-3 text-gray-700">' + escHtml(s.branch_name || '-') + '</td>' +
+                '<td class="px-4 py-3 text-right font-mono ' + (parseFloat(s.current_stock) === 0 ? 'text-red-600 font-bold' : 'text-gray-700') + '">' + formatNum(s.current_stock) + '</td>' +
+                '<td class="px-4 py-3 text-right font-mono text-gray-700">' + formatNum(s.branch_reorder_threshold) + '</td>' +
+                '<td class="px-4 py-3 text-right font-mono font-semibold text-indigo-600">' + formatNum(s.suggested_qty) + '</td>' +
+                '<td class="px-4 py-3 text-center"><span class="badge-status badge-' + s.status + '">' + s.status + '</span></td>' +
+                '<td class="px-4 py-3 text-center">' +
+                    (s.status === 'pending' ?
+                        '<button onclick="markAsOrdered(' + s.id + ')" class="text-green-600 hover:text-green-800 text-xs font-semibold mr-2" title="Mark Ordered">Order</button>' +
+                        '<button onclick="dismissItem(' + s.id + ')" class="text-gray-500 hover:text-gray-700 text-xs font-semibold" title="Dismiss">Dismiss</button>'
+                        : '-') +
+                '</td>';
+            tbody.appendChild(tr);
+        });
+    }
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    // ============================
+    // PAGINATION
+    // ============================
+    function renderPagination(type, page, totalPages, total) {
+        var infoEl = document.getElementById(type + 'PaginationInfo');
+        var ctrlEl = document.getElementById(type + 'PaginationControls');
+        var limit = 50;
+        var start = (page - 1) * limit + 1;
+        var end = Math.min(page * limit, total);
+        infoEl.textContent = 'Showing ' + start + '-' + end + ' of ' + total;
+
+        ctrlEl.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        var prev = document.createElement('button');
+        prev.textContent = 'Prev';
+        prev.className = 'px-3 py-1 text-sm rounded border ' + (page <= 1 ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-700 hover:bg-gray-100');
+        prev.disabled = page <= 1;
+        prev.onclick = function() { goPage(type, page - 1); };
+        ctrlEl.appendChild(prev);
+
+        var pageInfo = document.createElement('span');
+        pageInfo.className = 'px-3 py-1 text-sm text-gray-600';
+        pageInfo.textContent = page + ' / ' + totalPages;
+        ctrlEl.appendChild(pageInfo);
+
+        var next = document.createElement('button');
+        next.textContent = 'Next';
+        next.className = 'px-3 py-1 text-sm rounded border ' + (page >= totalPages ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-700 hover:bg-gray-100');
+        next.disabled = page >= totalPages;
+        next.onclick = function() { goPage(type, page + 1); };
+        ctrlEl.appendChild(next);
+    }
+
+    function goPage(type, page) {
+        if (type === 'suggestions') { suggestionsPage = page; loadSuggestions(); }
+        if (type === 'history') { historyPage = page; loadHistory(); }
+    }
+
+    // ============================
+    // SELECTION & BULK ACTIONS
+    // ============================
+    function toggleSelectAll() {
+        var checked = document.getElementById('selectAll').checked;
+        document.querySelectorAll('.row-cb:not(:disabled)').forEach(function(cb) {
+            cb.checked = checked;
+            var id = parseInt(cb.dataset.id);
+            if (checked) selectedIds.add(id); else selectedIds.delete(id);
+        });
+    }
+
+    function toggleRowSelect(id, checked) {
+        if (checked) selectedIds.add(id); else selectedIds.delete(id);
+    }
+
+    async function bulkAction(action) {
+        var ids = Array.from(selectedIds);
+        if (ids.length === 0) { showToast('Select items first', 'error'); return; }
+
+        try {
+            if (action === 'dismiss') {
+                await apiFetch('/api/zoho/purchase-suggestions/bulk-dismiss', {
+                    method: 'PUT',
+                    body: JSON.stringify({ ids: ids })
+                });
+                showToast(ids.length + ' suggestions dismissed', 'success');
+            } else if (action === 'ordered') {
+                await apiFetch('/api/zoho/purchase-suggestions/bulk-ordered', {
+                    method: 'PUT',
+                    body: JSON.stringify({ ids: ids })
+                });
+                showToast(ids.length + ' suggestions marked as ordered', 'success');
+            }
+            selectedIds.clear();
+            loadSuggestions();
+        } catch (err) {
+            showToast('Bulk action failed: ' + err.message, 'error');
+        }
+    }
+
+    async function markAsOrdered(id) {
+        try {
+            await apiFetch('/api/zoho/purchase-suggestions/' + id + '/ordered', { method: 'PUT' });
+            showToast('Marked as ordered', 'success');
+            loadSuggestions();
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        }
+    }
+
+    async function dismissItem(id) {
+        try {
+            await apiFetch('/api/zoho/purchase-suggestions/' + id + '/dismiss', { method: 'PUT' });
+            showToast('Dismissed', 'success');
+            loadSuggestions();
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        }
+    }
+
+    function clearFilters() {
+        document.getElementById('filterBranch').value = '';
+        document.getElementById('filterPriority').value = '';
+        document.getElementById('filterStatus').value = 'pending';
+        document.getElementById('filterSearch').value = '';
+        suggestionsPage = 1;
+        loadSuggestions();
+    }
+
+    function debounceSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() { suggestionsPage = 1; loadSuggestions(); }, 400);
+    }
+
+    // ============================
+    // CALCULATE
+    // ============================
+    async function runCalculation() {
+        var btn = document.getElementById('calcBtn');
+        var icon = document.getElementById('calcIcon');
+        var text = document.getElementById('calcText');
+
+        btn.disabled = true;
+        text.textContent = 'Calculating...';
+        icon.innerHTML = '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>';
+        icon.classList.add('animate-spin');
+
+        try {
+            var res = await apiFetch('/api/zoho/purchase-suggestions/calculate', { method: 'POST' });
+            var d = res.data;
+            showToast('Calculation complete! ' + d.totalSuggestions + ' suggestions generated (' + d.highPriority + ' high priority)', 'success');
+            suggestionsPage = 1;
+            document.getElementById('filterStatus').value = 'pending';
+            loadSuggestions();
+        } catch (err) {
+            showToast('Calculation failed: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            text.textContent = 'Calculate Now';
+            icon.classList.remove('animate-spin');
+            icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>';
+        }
+    }
+
+    // ============================
+    // BRANCH ALLOCATIONS TAB
+    // ============================
+    async function loadBranchAllocations() {
+        try {
+            var res = await apiFetch('/api/zoho/purchase-suggestions/branch-allocations');
+            branchAllocations = res.data || [];
+            document.getElementById('branchesLoading').classList.add('hidden');
+            document.getElementById('branchesTable').classList.remove('hidden');
+            renderBranchesTable();
+            // Also populate the branch filter
+            populateBranchFilter([]);
+        } catch (err) {
+            document.getElementById('branchesLoading').innerHTML = '<p class="text-red-500">Failed to load: ' + err.message + '</p>';
+        }
+    }
+
+    function renderBranchesTable() {
+        var tbody = document.getElementById('branchesTableBody');
+        tbody.innerHTML = '';
+        branchAllocations.forEach(function(b, i) {
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td class="px-4 py-3 font-medium text-gray-800">' + escHtml(b.branch_name) + '</td>' +
+                '<td class="px-4 py-3 text-gray-500 text-xs">' + (b.zoho_location_id || '<span class="text-red-400">Not linked</span>') + '</td>' +
+                '<td class="px-4 py-3 text-center"><input type="number" class="alloc-pct w-20 text-center rounded border-gray-300 border px-2 py-1 text-sm" data-idx="' + i + '" value="' + b.allocation_pct + '" step="0.1" min="0" max="100" onchange="updateAllocationTotal()"></td>' +
+                '<td class="px-4 py-3 text-center"><input type="number" class="alloc-min w-16 text-center rounded border-gray-300 border px-2 py-1 text-sm" data-idx="' + i + '" value="' + b.min_stock + '" min="0"></td>';
+            tbody.appendChild(tr);
+        });
+        updateAllocationTotal();
+    }
+
+    function updateAllocationTotal() {
+        var inputs = document.querySelectorAll('.alloc-pct');
+        var total = 0;
+        inputs.forEach(function(inp) { total += parseFloat(inp.value) || 0; });
+        var totalEl = document.getElementById('allocationTotal');
+        var validEl = document.getElementById('allocationValidation');
+        totalEl.textContent = 'Total: ' + total.toFixed(1) + '%';
+
+        if (Math.abs(total - 100) < 0.1) {
+            totalEl.className = 'text-sm text-green-600 font-semibold';
+            validEl.textContent = '';
+        } else {
+            totalEl.className = 'text-sm text-red-600 font-semibold';
+            validEl.textContent = 'Percentages must sum to 100%';
+            validEl.className = 'text-sm text-red-500';
+        }
+    }
+
+    async function saveBranchAllocations() {
+        var pctInputs = document.querySelectorAll('.alloc-pct');
+        var minInputs = document.querySelectorAll('.alloc-min');
+        var allocations = [];
+        var total = 0;
+
+        pctInputs.forEach(function(inp, i) {
+            var pct = parseFloat(inp.value) || 0;
+            total += pct;
+            allocations.push({
+                id: branchAllocations[i].id,
+                allocation_pct: pct,
+                min_stock: parseInt(minInputs[i].value) || 5
+            });
+        });
+
+        if (Math.abs(total - 100) >= 0.1) {
+            showToast('Allocation percentages must sum to 100%. Current: ' + total.toFixed(1) + '%', 'error');
+            return;
+        }
+
+        try {
+            await apiFetch('/api/zoho/purchase-suggestions/branch-allocations', {
+                method: 'PUT',
+                body: JSON.stringify({ allocations: allocations })
+            });
+            showToast('Branch allocations saved', 'success');
+            // Update local state
+            allocations.forEach(function(a, i) {
+                branchAllocations[i].allocation_pct = a.allocation_pct;
+                branchAllocations[i].min_stock = a.min_stock;
+            });
+        } catch (err) {
+            showToast('Save failed: ' + err.message, 'error');
+        }
+    }
+
+    // ============================
+    // CATEGORY DEFAULTS TAB
+    // ============================
+    async function loadCategoryDefaults() {
+        try {
+            var res = await apiFetch('/api/zoho/purchase-suggestions/category-defaults');
+            categoryDefaults = res.data || [];
+            document.getElementById('categoriesLoading').classList.add('hidden');
+            document.getElementById('categoriesTable').classList.remove('hidden');
+            renderCategoriesTable();
+        } catch (err) {
+            document.getElementById('categoriesLoading').innerHTML = '<p class="text-red-500">Failed to load: ' + err.message + '</p>';
+        }
+    }
+
+    function renderCategoriesTable() {
+        var tbody = document.getElementById('categoriesTableBody');
+        tbody.innerHTML = '';
+        categoryDefaults.forEach(function(c) {
+            var tr = document.createElement('tr');
+            tr.id = 'cat-row-' + c.id;
+            tr.innerHTML = '<td class="px-4 py-3 font-medium text-gray-800">' +
+                    '<input type="text" class="cat-name rounded border-gray-300 border px-2 py-1 text-sm w-full" value="' + escAttr(c.category_name) + '" data-id="' + c.id + '">' +
+                '</td>' +
+                '<td class="px-4 py-3 text-center">' +
+                    '<input type="number" class="cat-qty w-20 text-center rounded border-gray-300 border px-2 py-1 text-sm" value="' + c.default_reorder_qty + '" min="1" data-id="' + c.id + '">' +
+                '</td>' +
+                '<td class="px-4 py-3 text-center">' +
+                    '<span class="badge-status ' + (c.is_active ? 'badge-ordered' : 'badge-dismissed') + '">' + (c.is_active ? 'Active' : 'Inactive') + '</span>' +
+                '</td>' +
+                '<td class="px-4 py-3 text-center">' +
+                    '<button onclick="saveCategoryDefault(' + c.id + ')" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold mr-2">Save</button>' +
+                    '<button onclick="deleteCategoryDefault(' + c.id + ')" class="text-red-500 hover:text-red-700 text-xs font-semibold">Delete</button>' +
+                '</td>';
+            tbody.appendChild(tr);
+        });
+    }
+
+    function escAttr(s) {
+        return String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    async function saveCategoryDefault(id) {
+        var row = document.getElementById('cat-row-' + id);
+        var name = row.querySelector('.cat-name').value.trim();
+        var qty = parseInt(row.querySelector('.cat-qty').value) || 10;
+
+        if (!name) { showToast('Category name required', 'error'); return; }
+
+        try {
+            await apiFetch('/api/zoho/purchase-suggestions/category-defaults/' + id, {
+                method: 'PUT',
+                body: JSON.stringify({ category_name: name, default_reorder_qty: qty, is_active: 1 })
+            });
+            showToast('Category default saved', 'success');
+        } catch (err) {
+            showToast('Save failed: ' + err.message, 'error');
+        }
+    }
+
+    async function deleteCategoryDefault(id) {
+        if (!confirm('Delete this category default?')) return;
+        try {
+            await apiFetch('/api/zoho/purchase-suggestions/category-defaults/' + id, { method: 'DELETE' });
+            showToast('Deleted', 'success');
+            categoryDefaults = categoryDefaults.filter(function(c) { return c.id !== id; });
+            renderCategoriesTable();
+        } catch (err) {
+            showToast('Delete failed: ' + err.message, 'error');
+        }
+    }
+
+    async function addCategoryDefault() {
+        var name = document.getElementById('newCategoryName').value.trim();
+        var qty = parseInt(document.getElementById('newCategoryQty').value) || 10;
+
+        if (!name) { showToast('Category name required', 'error'); return; }
+
+        try {
+            var res = await apiFetch('/api/zoho/purchase-suggestions/category-defaults', {
+                method: 'POST',
+                body: JSON.stringify({ category_name: name, default_reorder_qty: qty })
+            });
+            showToast('Category default added', 'success');
+            document.getElementById('newCategoryName').value = '';
+            document.getElementById('newCategoryQty').value = '';
+            categoryDefaults.push({ id: res.data.id, category_name: name, default_reorder_qty: qty, is_active: 1 });
+            renderCategoriesTable();
+        } catch (err) {
+            showToast('Add failed: ' + err.message, 'error');
+        }
+    }
+
+    // ============================
+    // HISTORY TAB
+    // ============================
+    async function loadHistory() {
+        document.getElementById('historyLoading').classList.remove('hidden');
+        document.getElementById('historyEmpty').classList.add('hidden');
+        document.getElementById('historyTableContainer').classList.add('hidden');
+
+        try {
+            var res = await apiFetch('/api/zoho/purchase-suggestions/history?page=' + historyPage + '&limit=20');
+            var data = res.data;
+            var batches = data.batches || [];
+            historyTotal = data.total || 0;
+            historyTotalPages = data.totalPages || 1;
+
+            document.getElementById('historyLoading').classList.add('hidden');
+
+            if (batches.length === 0) {
+                document.getElementById('historyEmpty').classList.remove('hidden');
+            } else {
+                document.getElementById('historyTableContainer').classList.remove('hidden');
+                renderHistoryTable(batches);
+                renderPagination('history', historyPage, historyTotalPages, historyTotal);
+            }
+        } catch (err) {
+            document.getElementById('historyLoading').classList.add('hidden');
+            document.getElementById('historyEmpty').classList.remove('hidden');
+        }
+    }
+
+    function renderHistoryTable(batches) {
+        var tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = '';
+        batches.forEach(function(b) {
+            var tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.innerHTML = '<td class="px-4 py-3 text-gray-700">' + formatDate(b.created_at) + '</td>' +
+                '<td class="px-4 py-3 text-xs font-mono text-gray-500">' + escHtml(b.batch_id) + '</td>' +
+                '<td class="px-4 py-3 text-center font-semibold">' + b.total_suggestions + '</td>' +
+                '<td class="px-4 py-3 text-center"><span class="badge-priority badge-HIGH">' + b.high_count + '</span></td>' +
+                '<td class="px-4 py-3 text-center"><span class="badge-priority badge-MEDIUM">' + b.medium_count + '</span></td>' +
+                '<td class="px-4 py-3 text-center"><span class="badge-priority badge-LOW">' + b.low_count + '</span></td>' +
+                '<td class="px-4 py-3 text-center">' + b.pending_count + '</td>' +
+                '<td class="px-4 py-3 text-center text-green-600">' + b.ordered_count + '</td>' +
+                '<td class="px-4 py-3 text-center">' + b.unique_items + '</td>' +
+                '<td class="px-4 py-3 text-center"><button onclick="viewBatch(\'' + escAttr(b.batch_id) + '\')" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">View</button></td>';
+            tbody.appendChild(tr);
+        });
+    }
+
+    function viewBatch(batchId) {
+        currentBatchId = batchId;
+        document.getElementById('filterStatus').value = '';
+        suggestionsPage = 1;
+        switchTab('suggestions');
+
+        // Load this specific batch
+        loadBatchSuggestions(batchId);
+    }
+
+    async function loadBatchSuggestions(batchId) {
+        var params = new URLSearchParams();
+        params.set('page', 1);
+        params.set('limit', 50);
+
+        try {
+            var res = await apiFetch('/api/zoho/purchase-suggestions/batch/' + batchId + '?' + params.toString());
+            var data = res.data;
+            var suggestions = data.suggestions || [];
+            suggestionsTotal = data.total || 0;
+            suggestionsTotalPages = data.totalPages || 1;
+
+            document.getElementById('suggestionsLoading').classList.add('hidden');
+            if (suggestions.length === 0) {
+                document.getElementById('suggestionsEmpty').classList.remove('hidden');
+                document.getElementById('suggestionsTableContainer').classList.add('hidden');
+            } else {
+                document.getElementById('suggestionsEmpty').classList.add('hidden');
+                document.getElementById('suggestionsTableContainer').classList.remove('hidden');
+                renderSuggestionsTable(suggestions);
+                renderPagination('suggestions', 1, suggestionsTotalPages, suggestionsTotal);
+            }
+
+            // Load summary for this batch
+            var summRes = await apiFetch('/api/zoho/purchase-suggestions/summary?batch_id=' + batchId);
+            var d = summRes.data;
+            if (d) {
+                document.getElementById('summHigh').textContent = d.high_count || 0;
+                document.getElementById('summMedium').textContent = d.medium_count || 0;
+                document.getElementById('summLow').textContent = d.low_count || 0;
+                document.getElementById('summTotal').textContent = d.total || 0;
+                document.getElementById('summItems').textContent = d.unique_items || 0;
+            }
+        } catch (err) {
+            showToast('Failed to load batch: ' + err.message, 'error');
+        }
+    }
+
+    // ============================
+    // INIT
+    // ============================
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSuggestions();
+    });
+</script>
+</body>
+</html>

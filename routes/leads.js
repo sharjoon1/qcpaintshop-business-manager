@@ -206,7 +206,7 @@ router.get('/stats', requirePermission('leads', 'view'), async (req, res) => {
                 SUM(CASE WHEN status = 'lost' THEN 1 ELSE 0 END) as lost,
                 SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive,
                 SUM(CASE WHEN priority = 'urgent' THEN 1 ELSE 0 END) as urgent,
-                SUM(CASE WHEN priority = 'high' THEN 1 ELSE 0 END) as high_priority,
+                SUM(CASE WHEN priority = 'high' THEN 1 ELSE 0 END) as \`high_priority\`,
                 SUM(CASE WHEN next_followup_date = CURDATE() THEN 1 ELSE 0 END) as followups_today,
                 SUM(CASE WHEN next_followup_date < CURDATE() AND status NOT IN ('won','lost','inactive') THEN 1 ELSE 0 END) as overdue_followups
              FROM leads${whereClause}`,

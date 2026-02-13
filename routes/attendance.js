@@ -208,18 +208,17 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
         const today = new Date().toISOString().split('T')[0];
         const now = new Date();
 
-        // Check geo-fence (TEMPORARILY DISABLED FOR TESTING)
-        // TODO: Re-enable after configuring branch GPS coordinates
-        /*
+        // Check geo-fence
         const geoCheck = await checkGeoFence(branchId, latitude, longitude);
         if (!geoCheck.allowed) {
             return res.status(400).json({
                 success: false,
                 message: `You are ${geoCheck.distance}m away from the branch. Must be within ${geoCheck.radius}m to clock in.`,
-                code: 'OUTSIDE_GEOFENCE'
+                code: 'OUTSIDE_GEOFENCE',
+                distance: geoCheck.distance,
+                radius: geoCheck.radius
             });
         }
-        */
 
         // Check if already clocked in today
         const [existing] = await pool.query(
@@ -359,7 +358,7 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
 
         const today = new Date().toISOString().split('T')[0];
         const now = new Date();
-        
+
         // Get today's attendance
         const [attendance] = await pool.query(
             `SELECT a.*, shc.close_time, shc.expected_hours
@@ -369,25 +368,37 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
              WHERE a.user_id = ? AND a.date = ?`,
             [userId, today]
         );
-        
+
         if (attendance.length === 0) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'No clock in record found for today. Please clock in first.',
                 code: 'NOT_CLOCKED_IN'
             });
         }
-        
+
         const record = attendance[0];
-        
+
         if (record.clock_out_time) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'You have already clocked out today',
                 code: 'ALREADY_CLOCKED_OUT'
             });
         }
-        
+
+        // Check geo-fence
+        const geoCheck = await checkGeoFence(record.branch_id, latitude, longitude);
+        if (!geoCheck.allowed) {
+            return res.status(400).json({
+                success: false,
+                message: `You are ${geoCheck.distance}m away from the branch. Must be within ${geoCheck.radius}m to clock out.`,
+                code: 'OUTSIDE_GEOFENCE',
+                distance: geoCheck.distance,
+                radius: geoCheck.radius
+            });
+        }
+
         // Save photo
         const photoPath = await saveAttendancePhoto(photo.buffer, userId, 'clock-out');
         
@@ -572,44 +583,67 @@ router.get('/my-history', requireAuth, async (req, res) => {
 
 /**
  * POST /api/attendance/break-start
- * Start lunch break
+ * Start lunch break with photo and GPS
  */
-router.post('/break-start', requireAuth, async (req, res) => {
+router.post('/break-start', requireAuth, upload.single('photo'), async (req, res) => {
     try {
         const userId = req.user.id;
+        const { latitude, longitude } = req.body;
+        const photo = req.file;
         const today = new Date().toISOString().split('T')[0];
         const now = new Date();
-        
+
+        if (!photo) {
+            return res.status(400).json({ success: false, message: 'Photo is required for break start' });
+        }
+        if (!latitude || !longitude || !validateGPS(latitude, longitude)) {
+            return res.status(400).json({ success: false, message: 'Valid GPS location is required' });
+        }
+
         // Get today's attendance
         const [attendance] = await pool.query(
             'SELECT * FROM staff_attendance WHERE user_id = ? AND date = ?',
             [userId, today]
         );
-        
+
         if (attendance.length === 0) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'Please clock in first before starting break',
                 code: 'NOT_CLOCKED_IN'
             });
         }
-        
+
         const record = attendance[0];
-        
+
         if (record.break_start_time) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'Break already started',
                 code: 'BREAK_ALREADY_STARTED'
             });
         }
-        
-        // Update attendance with break start
+
+        // Save break photo
+        const photoPath = await saveAttendancePhoto(photo.buffer, userId, 'break');
+
+        // Update attendance with break start + photo + GPS
         await pool.query(
-            'UPDATE staff_attendance SET break_start_time = ? WHERE id = ?',
-            [now, record.id]
+            `UPDATE staff_attendance SET break_start_time = ?,
+             break_start_photo = ?, break_start_lat = ?, break_start_lng = ?
+             WHERE id = ?`,
+            [now, photoPath, latitude, longitude, record.id]
         );
-        
+
+        // Save photo record
+        await pool.query(
+            `INSERT INTO attendance_photos
+             (attendance_id, user_id, photo_type, file_path, file_size,
+              latitude, longitude, captured_at, delete_after)
+             VALUES (?, ?, 'break_start', ?, ?, ?, ?, ?, ?)`,
+            [record.id, userId, photoPath, photo.size, latitude, longitude, now, getDeleteAfterDate()]
+        );
+
         res.json({
             success: true,
             message: 'Break started successfully',
@@ -618,26 +652,35 @@ router.post('/break-start', requireAuth, async (req, res) => {
                 break_start_time: now
             }
         });
-        
+
     } catch (error) {
         console.error('Break start error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to start break' 
+        res.status(500).json({
+            success: false,
+            message: 'Failed to start break'
         });
     }
 });
 
 /**
  * POST /api/attendance/break-end
- * End lunch break
+ * End lunch break with photo and GPS
  */
-router.post('/break-end', requireAuth, async (req, res) => {
+router.post('/break-end', requireAuth, upload.single('photo'), async (req, res) => {
     try {
         const userId = req.user.id;
+        const { latitude, longitude } = req.body;
+        const photo = req.file;
         const today = new Date().toISOString().split('T')[0];
         const now = new Date();
-        
+
+        if (!photo) {
+            return res.status(400).json({ success: false, message: 'Photo is required for break end' });
+        }
+        if (!latitude || !longitude || !validateGPS(latitude, longitude)) {
+            return res.status(400).json({ success: false, message: 'Valid GPS location is required' });
+        }
+
         // Get today's attendance with shop hours
         const [attendance] = await pool.query(
             `SELECT a.*, shc.break_min_minutes, shc.break_max_minutes
@@ -647,37 +690,37 @@ router.post('/break-end', requireAuth, async (req, res) => {
              WHERE a.user_id = ? AND a.date = ?`,
             [userId, today]
         );
-        
+
         if (attendance.length === 0) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'No attendance record found',
                 code: 'NOT_CLOCKED_IN'
             });
         }
-        
+
         const record = attendance[0];
-        
+
         if (!record.break_start_time) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'Break has not been started yet',
                 code: 'BREAK_NOT_STARTED'
             });
         }
-        
+
         if (record.break_end_time) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'Break already ended',
                 code: 'BREAK_ALREADY_ENDED'
             });
         }
-        
+
         // Calculate break duration
         const breakStart = new Date(record.break_start_time);
-        const breakDuration = Math.floor((now - breakStart) / 1000 / 60); // minutes
-        
+        const breakDuration = Math.floor((now - breakStart) / 1000 / 60);
+
         // Check if break is too short or too long
         const warnings = [];
         if (breakDuration < record.break_min_minutes) {
@@ -686,15 +729,28 @@ router.post('/break-end', requireAuth, async (req, res) => {
         if (breakDuration > record.break_max_minutes) {
             warnings.push(`Break exceeded maximum ${record.break_max_minutes} minutes`);
         }
-        
-        // Update attendance
+
+        // Save break photo
+        const photoPath = await saveAttendancePhoto(photo.buffer, userId, 'break');
+
+        // Update attendance with break end + photo + GPS
         await pool.query(
-            `UPDATE staff_attendance 
-             SET break_end_time = ?, break_duration_minutes = ? 
+            `UPDATE staff_attendance
+             SET break_end_time = ?, break_duration_minutes = ?,
+             break_end_photo = ?, break_end_lat = ?, break_end_lng = ?
              WHERE id = ?`,
-            [now, breakDuration, record.id]
+            [now, breakDuration, photoPath, latitude, longitude, record.id]
         );
-        
+
+        // Save photo record
+        await pool.query(
+            `INSERT INTO attendance_photos
+             (attendance_id, user_id, photo_type, file_path, file_size,
+              latitude, longitude, captured_at, delete_after)
+             VALUES (?, ?, 'break_end', ?, ?, ?, ?, ?, ?)`,
+            [record.id, userId, photoPath, photo.size, latitude, longitude, now, getDeleteAfterDate()]
+        );
+
         res.json({
             success: true,
             message: 'Break ended successfully',
@@ -707,12 +763,12 @@ router.post('/break-end', requireAuth, async (req, res) => {
                 break_duration_hours: (breakDuration / 60).toFixed(2)
             }
         });
-        
+
     } catch (error) {
         console.error('Break end error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to end break' 
+        res.status(500).json({
+            success: false,
+            message: 'Failed to end break'
         });
     }
 });
@@ -823,6 +879,60 @@ router.get('/permission/my-requests', requireAuth, async (req, res) => {
         res.status(500).json({ 
             success: false, 
             message: 'Failed to get permission requests' 
+        });
+    }
+});
+
+/**
+ * GET /api/attendance/permission/all
+ * Get all permission requests with optional status filter (for admin/manager)
+ */
+router.get('/permission/all', requirePermission('attendance', 'approve'), async (req, res) => {
+    try {
+        const { status, branch_id, limit = 100 } = req.query;
+
+        let query = `
+            SELECT ap.*,
+                   u.full_name as user_name,
+                   u.username,
+                   b.name as branch_name,
+                   reviewer.full_name as reviewed_by_name
+            FROM attendance_permissions ap
+            JOIN users u ON ap.user_id = u.id
+            LEFT JOIN staff_attendance sa ON ap.attendance_id = sa.id
+            LEFT JOIN branches b ON sa.branch_id = b.id
+            LEFT JOIN users reviewer ON ap.reviewed_by = reviewer.id
+            WHERE 1=1
+        `;
+
+        const params = [];
+
+        if (status) {
+            query += ' AND ap.status = ?';
+            params.push(status);
+        }
+
+        if (branch_id) {
+            query += ' AND sa.branch_id = ?';
+            params.push(branch_id);
+        }
+
+        query += ' ORDER BY ap.requested_at DESC LIMIT ?';
+        params.push(parseInt(limit));
+
+        const [rows] = await pool.query(query, params);
+
+        res.json({
+            success: true,
+            count: rows.length,
+            data: rows
+        });
+
+    } catch (error) {
+        console.error('Get all permissions error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get permission requests'
         });
     }
 });
@@ -1286,6 +1396,191 @@ router.post('/admin/mark', requirePermission('attendance', 'manage'), async (req
             success: false, 
             message: 'Failed to mark attendance' 
         });
+    }
+});
+
+/**
+ * GET /api/attendance/admin/today-summary
+ * Consolidated stats for admin dashboard
+ */
+router.get('/admin/today-summary', requirePermission('attendance', 'view'), async (req, res) => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+
+        // Get total active staff
+        const [staffRows] = await pool.query(
+            "SELECT COUNT(*) as total FROM users WHERE role = 'staff' AND status = 'active'"
+        );
+        const totalStaff = staffRows[0].total;
+
+        // Get today's attendance stats
+        const [attendanceRows] = await pool.query(
+            `SELECT
+                COUNT(*) as present,
+                SUM(CASE WHEN is_late = 1 THEN 1 ELSE 0 END) as late,
+                SUM(CASE WHEN break_start_time IS NOT NULL AND break_end_time IS NULL THEN 1 ELSE 0 END) as on_break,
+                SUM(CASE WHEN clock_out_time IS NULL THEN 1 ELSE 0 END) as not_clocked_out
+             FROM staff_attendance
+             WHERE date = ? AND status = 'present'`,
+            [today]
+        );
+
+        const stats = attendanceRows[0];
+        const present = stats.present || 0;
+
+        // Get pending permission count
+        const [permRows] = await pool.query(
+            "SELECT COUNT(*) as pending FROM attendance_permissions WHERE status = 'pending'"
+        );
+
+        res.json({
+            success: true,
+            data: {
+                total_staff: totalStaff,
+                present: present,
+                absent: Math.max(0, totalStaff - present),
+                late: stats.late || 0,
+                on_break: stats.on_break || 0,
+                not_clocked_out: stats.not_clocked_out || 0,
+                pending_permissions: permRows[0].pending || 0
+            }
+        });
+
+    } catch (error) {
+        console.error('Admin today summary error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get attendance summary'
+        });
+    }
+});
+
+// ========================================
+// GEO-FENCE MONITORING ENDPOINTS
+// ========================================
+
+/**
+ * GET /api/attendance/geofence-check
+ * Check if current location is within branch geo-fence
+ */
+router.get('/geofence-check', requireAuth, async (req, res) => {
+    try {
+        const { latitude, longitude } = req.query;
+        if (!latitude || !longitude || !validateGPS(latitude, longitude)) {
+            return res.status(400).json({ success: false, message: 'Valid GPS coordinates required' });
+        }
+
+        const branchId = req.user.branch_id;
+        const result = await checkGeoFence(branchId, latitude, longitude);
+
+        res.json({
+            success: true,
+            data: {
+                allowed: result.allowed,
+                distance: result.distance,
+                radius: result.radius
+            }
+        });
+    } catch (error) {
+        console.error('Geofence check error:', error);
+        res.status(500).json({ success: false, message: 'Failed to check geofence' });
+    }
+});
+
+/**
+ * POST /api/attendance/geofence-violation
+ * Log a geofence violation (rate-limited: max 1 per 5 minutes per user)
+ */
+router.post('/geofence-violation', requireAuth, async (req, res) => {
+    try {
+        const { latitude, longitude, distance, radius, violation_type } = req.body;
+        const userId = req.user.id;
+        const branchId = req.user.branch_id;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({ success: false, message: 'Location required' });
+        }
+
+        // Rate limit: max 1 violation per 5 minutes per user
+        const [recent] = await pool.query(
+            `SELECT id FROM geofence_violations
+             WHERE user_id = ? AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+             LIMIT 1`,
+            [userId]
+        );
+
+        if (recent.length > 0) {
+            return res.json({ success: true, message: 'Violation already logged recently', data: { rate_limited: true } });
+        }
+
+        const [result] = await pool.query(
+            `INSERT INTO geofence_violations
+             (user_id, branch_id, latitude, longitude, distance_from_fence, fence_radius, violation_type)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [userId, branchId, latitude, longitude, distance || 0, radius || 0, violation_type || 'left_area']
+        );
+
+        res.json({
+            success: true,
+            message: 'Violation logged',
+            data: { id: result.insertId }
+        });
+    } catch (error) {
+        console.error('Geofence violation log error:', error);
+        res.status(500).json({ success: false, message: 'Failed to log violation' });
+    }
+});
+
+/**
+ * GET /api/attendance/geofence-violations
+ * Admin view of geofence violations
+ */
+router.get('/geofence-violations', requirePermission('attendance', 'view'), async (req, res) => {
+    try {
+        const { user_id, branch_id, from_date, to_date, limit = 100 } = req.query;
+
+        let query = `
+            SELECT gv.*,
+                   u.full_name as staff_name,
+                   u.username,
+                   b.name as branch_name
+            FROM geofence_violations gv
+            JOIN users u ON gv.user_id = u.id
+            JOIN branches b ON gv.branch_id = b.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (user_id) {
+            query += ' AND gv.user_id = ?';
+            params.push(user_id);
+        }
+        if (branch_id) {
+            query += ' AND gv.branch_id = ?';
+            params.push(branch_id);
+        }
+        if (from_date) {
+            query += ' AND DATE(gv.created_at) >= ?';
+            params.push(from_date);
+        }
+        if (to_date) {
+            query += ' AND DATE(gv.created_at) <= ?';
+            params.push(to_date);
+        }
+
+        query += ' ORDER BY gv.created_at DESC LIMIT ?';
+        params.push(parseInt(limit));
+
+        const [violations] = await pool.query(query, params);
+
+        res.json({
+            success: true,
+            count: violations.length,
+            data: violations
+        });
+    } catch (error) {
+        console.error('Geofence violations list error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch violations' });
     }
 });
 

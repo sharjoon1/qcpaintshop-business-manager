@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Role Management - Quality Colours</title>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -54,12 +60,12 @@
 
     <!-- Add/Edit Role Modal -->
     <div id="roleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-gray-200">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <div class="p-6 border-b border-gray-200 flex-shrink-0">
                 <h2 class="text-xl font-bold text-gray-800" id="modalTitle">Add Role</h2>
             </div>
-            
-            <form id="roleForm" class="p-6 space-y-4">
+
+            <form id="roleForm" class="p-6 space-y-4 overflow-y-auto">
                 <input type="hidden" id="roleId">
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -132,14 +138,14 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    allRoles = data.data;
+                    allRoles = data.data || [];
                     filterRoles(currentFilter);
                 } else {
-                    alert('❌ Failed to load roles');
+                    alert('❌ Failed to load roles: ' + (data.error || data.message || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error loading roles:', error);
-                alert('❌ Error loading roles');
+                alert('❌ Error loading roles: ' + error.message);
             }
         }
 

@@ -180,16 +180,16 @@ router.post('/', requirePermission('branches', 'add'), async (req, res) => {
             const [result] = await connection.query(
                 `INSERT INTO branches
                  (name, code, address, city, state, pincode, phone, email,
-                  manager_user_id, latitude, longitude, geo_fence_radius_meters,
+                  manager_user_id, latitude, longitude, geo_fence_radius_meters, geo_fence_radius,
                   open_time, close_time, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     name, code,
                     address || null, city || null, state || null, pincode || null,
                     phone || null, email || null,
                     manager_user_id || null,
                     latitude || null, longitude || null,
-                    geo_fence_radius_meters || 100,
+                    geo_fence_radius_meters || 100, geo_fence_radius_meters || 100,
                     open_time || '08:30:00', close_time || '20:30:00',
                     status || 'active'
                 ]
@@ -299,7 +299,7 @@ router.put('/:id', requirePermission('branches', 'edit'), async (req, res) => {
         if (manager_user_id !== undefined) { updates.push('manager_user_id = ?'); params.push(manager_user_id); }
         if (latitude !== undefined) { updates.push('latitude = ?'); params.push(latitude); }
         if (longitude !== undefined) { updates.push('longitude = ?'); params.push(longitude); }
-        if (geo_fence_radius_meters !== undefined) { updates.push('geo_fence_radius_meters = ?'); params.push(geo_fence_radius_meters); }
+        if (geo_fence_radius_meters !== undefined) { updates.push('geo_fence_radius_meters = ?'); params.push(geo_fence_radius_meters); updates.push('geo_fence_radius = ?'); params.push(geo_fence_radius_meters); }
         if (open_time !== undefined) { updates.push('open_time = ?'); params.push(open_time); }
         if (close_time !== undefined) { updates.push('close_time = ?'); params.push(close_time); }
         if (status !== undefined) { updates.push('status = ?'); params.push(status); }

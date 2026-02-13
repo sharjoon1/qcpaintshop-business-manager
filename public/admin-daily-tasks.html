@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Daily Tasks Admin - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+        .tab-btn { padding: 12px 20px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; border-radius: 8px 8px 0 0; transition: all 0.2s; min-height: 44px; }
+        .tab-btn.active { background: white; color: #7c3aed; border-bottom: 3px solid #7c3aed; }
+        .tab-btn:not(.active) { background: #f3f4f6; color: #6b7280; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); overflow-y: auto; }
+        .modal.active { display: flex; align-items: flex-start; justify-content: center; padding: 0.5rem; }
+        .modal-content { background: white; border-radius: 16px; width: 100%; max-width: 600px; max-height: 95vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin-top: 1rem; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+        .badge-yes { background: #d1fae5; color: #065f46; }
+        .badge-no { background: #fee2e2; color: #991b1b; }
+        .badge-pending { background: #f3f4f6; color: #6b7280; }
+        .badge-active { background: #dbeafe; color: #1e40af; }
+        .badge-inactive { background: #f3f4f6; color: #9ca3af; }
+        .response-card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 12px; overflow: hidden; }
+        .response-header { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 48px; }
+        .response-body { padding: 12px; display: none; }
+        .response-body.open { display: block; }
+        .photo-thumb { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid #e5e7eb; }
+        .photo-thumb:hover { border-color: #667eea; }
+        select, input, textarea { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 12px; font-size: 16px; min-height: 44px; }
+        select:focus, input:focus, textarea:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+        .btn { padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; font-size: 14px; min-height: 44px; }
+        .btn-primary { background: linear-gradient(135deg, #7c3aed, #9333ea); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.4); }
+        .btn-secondary { background: #f3f4f6; color: #374151; }
+        .btn-danger { background: #fee2e2; color: #991b1b; }
+        .stat-card { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center; }
+        .stat-value { font-size: 28px; font-weight: 700; color: #1f2937; }
+        .stat-label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Template cards for mobile (replaces table) */
+        .template-card { background: white; border: 1px solid #f3f4f6; border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+        .template-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .template-card-title { font-weight: 700; font-size: 15px; color: #1f2937; }
+        .template-card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .template-card-actions { display: flex; gap: 8px; }
+
+        /* Desktop table, mobile cards */
+        .templates-table-wrapper { display: none; }
+        .templates-cards-wrapper { display: block; }
+
+        @media (min-width: 768px) {
+            .templates-table-wrapper { display: block; }
+            .templates-cards-wrapper { display: none; }
+            .stat-value { font-size: 32px; }
+            .stat-card { padding: 20px; }
+            .response-body { padding: 16px; }
+            select, input, textarea { font-size: 14px; }
+            .modal.active { align-items: center; padding: 1rem; }
+            .modal-content { margin-top: 0; }
+        }
+
+        /* Touch-friendly mobile improvements */
+        @media (max-width: 767px) {
+            .response-header { flex-wrap: wrap; }
+            .response-header > div:last-child { flex-wrap: wrap; justify-content: flex-end; }
+        }
+    </style>
+</head>
+<body data-page="admin-daily-tasks">
+    <div class="min-h-screen" style="padding: 1rem 0 2rem;">
+        <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+
+            <!-- Header -->
+            <div class="mb-6">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Daily Tasks Management</h1>
+                <p class="text-sm text-gray-600">Manage daily checklists and review staff submissions</p>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; gap: 4px; margin-bottom: 0;">
+                <button class="tab-btn active" onclick="switchTab('templates')" id="tabTemplates">Templates</button>
+                <button class="tab-btn" onclick="switchTab('responses')" id="tabResponses">Responses</button>
+            </div>
+
+            <!-- Templates Tab -->
+            <div id="templatesPanel" class="bg-white rounded-b-lg rounded-tr-lg shadow-lg p-4 sm:p-6">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+                    <h2 class="text-lg font-bold text-gray-900">Task Templates</h2>
+                    <button class="btn btn-primary" onclick="openTemplateModal()">+ Add Template</button>
+                </div>
+                <!-- Desktop: Table view -->
+                <div class="templates-table-wrapper">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-left">
+                                <th class="px-3 py-2 font-semibold text-gray-700">Order</th>
+                                <th class="px-3 py-2 font-semibold text-gray-700">Section</th>
+                                <th class="px-3 py-2 font-semibold text-gray-700">Title</th>
+                                <th class="px-3 py-2 font-semibold text-gray-700">Type</th>
+                                <th class="px-3 py-2 font-semibold text-gray-700">Roles</th>
+                                <th class="px-3 py-2 font-semibold text-gray-700">Photo</th>
+                                <th class="px-3 py-2 font-semibold text-gray-700">Status</th>
+                                <th class="px-3 py-2 font-semibold text-gray-700">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="templatesBody">
+                            <tr><td colspan="8" class="px-3 py-8 text-center text-gray-500">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Mobile: Card view -->
+                <div class="templates-cards-wrapper" id="templatesCards">
+                    <p class="text-center text-gray-500 py-8">Loading...</p>
+                </div>
+            </div>
+
+            <!-- Responses Tab -->
+            <div id="responsesPanel" class="bg-white rounded-b-lg rounded-tr-lg shadow-lg p-4 sm:p-6" style="display: none;">
+                <!-- Filters -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                        <input type="date" id="responseDate" onchange="loadResponses()" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Staff Member</label>
+                        <select id="responseUser" onchange="loadResponses()" class="w-full">
+                            <option value="">All Staff</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button class="btn btn-primary w-full" onclick="loadResponses()">Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Summary Stats -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6" id="summaryStats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statSubmitted">0</div>
+                        <div class="stat-label">Submitted</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statNotSubmitted">0</div>
+                        <div class="stat-label">Not Submitted</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statTotalResponses">0</div>
+                        <div class="stat-label">Responses</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statPhotos">0</div>
+                        <div class="stat-label">Photos</div>
+                    </div>
+                </div>
+
+                <!-- Responses List -->
+                <div id="responsesList">
+                    <p class="text-gray-500 text-center py-8">Select a date to view responses</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Template Modal -->
+    <div id="templateModal" class="modal">
+        <div class="modal-content">
+            <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-2xl">
+                <h2 class="text-xl font-bold" id="templateModalTitle">Add Template</h2>
+            </div>
+            <div class="p-6">
+                <form id="templateForm" onsubmit="saveTemplate(event)">
+                    <input type="hidden" id="templateId">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Section *</label>
+                            <select id="tplSection" required class="w-full">
+                                <option value="morning">Morning Checklist</option>
+                                <option value="material">Material Tracking</option>
+                                <option value="sales">Sales & Quotations</option>
+                                <option value="outstanding">Outstanding Follow-up</option>
+                                <option value="marketing">Marketing & Calls</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Task Type *</label>
+                            <select id="tplType" required class="w-full" onchange="toggleDetailFieldsInput()">
+                                <option value="yes_no">Yes / No</option>
+                                <option value="yes_no_photo">Yes / No + Photo</option>
+                                <option value="yes_no_detail">Yes / No + Detail Fields</option>
+                                <option value="material_received">Material Received</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Title *</label>
+                            <input type="text" id="tplTitle" required class="w-full" placeholder="e.g. Shop Clean + Racks Filled">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                            <textarea id="tplDescription" rows="2" class="w-full" placeholder="Optional description..."></textarea>
+                        </div>
+                        <div id="detailFieldsGroup" style="display:none;" class="sm:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Detail Fields (comma-separated)</label>
+                            <input type="text" id="tplDetailFields" class="w-full" placeholder="e.g. to_whom, amount">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Sort Order</label>
+                            <input type="number" id="tplSortOrder" class="w-full" value="0" min="0">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Photo Required</label>
+                            <select id="tplPhotoRequired" class="w-full">
+                                <option value="false">No</option>
+                                <option value="true">Yes</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Applicable Roles</label>
+                            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                                <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+                                    <input type="checkbox" value="staff" class="role-checkbox" checked> Staff
+                                </label>
+                                <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+                                    <input type="checkbox" value="manager" class="role-checkbox" checked> Manager
+                                </label>
+                                <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+                                    <input type="checkbox" value="accountant" class="role-checkbox"> Accountant
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 border-t">
+                        <button type="button" onclick="closeModal('templateModal')" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Template</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Lightbox -->
+    <div id="photoLightbox" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:2000;display:none;align-items:center;justify-content:center;cursor:pointer;" onclick="this.style.display='none'">
+        <img id="lightboxImg" style="max-width:90vw;max-height:90vh;border-radius:8px;">
+    </div>
+
+    <script>
+        document.addEventListener('navigationLoaded', initPage);
+        setTimeout(initPage, 1000);
+
+        let pageInitialized = false;
+        let allTemplates = [];
+        let allUsers = [];
+
+        function initPage() {
+            if (pageInitialized) return;
+            pageInitialized = true;
+            loadTemplates();
+            loadUsers();
+            // Set default date
+            document.getElementById('responseDate').value = new Date().toISOString().split('T')[0];
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tabTemplates').classList.toggle('active', tab === 'templates');
+            document.getElementById('tabResponses').classList.toggle('active', tab === 'responses');
+            document.getElementById('templatesPanel').style.display = tab === 'templates' ? 'block' : 'none';
+            document.getElementById('responsesPanel').style.display = tab === 'responses' ? 'block' : 'none';
+
+            if (tab === 'responses') {
+                loadResponses();
+                loadSummary();
+            }
+        }
+
+        // ========================================
+        // TEMPLATES
+        // ========================================
+
+        async function loadTemplates() {
+            try {
+                const res = await fetch('/api/daily-tasks/templates', { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) {
+                    allTemplates = data.data;
+                    displayTemplates(data.data);
+                }
+            } catch (error) {
+                console.error('Error loading templates:', error);
+            }
+        }
+
+        function displayTemplates(templates) {
+            const tbody = document.getElementById('templatesBody');
+            const cardsDiv = document.getElementById('templatesCards');
+            const typeLabels = { yes_no: 'Yes/No', yes_no_photo: 'Yes/No + Photo', yes_no_detail: 'Yes/No + Detail', material_received: 'Material' };
+
+            if (templates.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-3 py-8 text-center text-gray-500">No templates yet. Create your first one!</td></tr>';
+                cardsDiv.innerHTML = '<p class="text-center text-gray-500 py-8">No templates yet. Create your first one!</p>';
+                return;
+            }
+
+            // Desktop table
+            tbody.innerHTML = templates.map(t => `
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="px-3 py-3 font-semibold text-gray-600">${t.sort_order}</td>
+                    <td class="px-3 py-3">
+                        <span class="badge" style="background:#eff6ff;color:#2563eb;">${t.section}</span>
+                    </td>
+                    <td class="px-3 py-3 font-semibold text-gray-900">${escapeHtml(t.title)}</td>
+                    <td class="px-3 py-3 text-gray-600">${typeLabels[t.task_type] || t.task_type}</td>
+                    <td class="px-3 py-3 text-gray-600">${(t.roles || []).join(', ')}</td>
+                    <td class="px-3 py-3">${t.photo_required ? '<span style="color:#10b981;">Yes</span>' : '<span style="color:#9ca3af;">No</span>'}</td>
+                    <td class="px-3 py-3">
+                        <span class="badge ${t.is_active ? 'badge-active' : 'badge-inactive'}">${t.is_active ? 'Active' : 'Inactive'}</span>
+                    </td>
+                    <td class="px-3 py-3">
+                        <div style="display:flex;gap:4px;">
+                            <button class="btn btn-secondary" onclick="editTemplate(${t.id})" style="padding:4px 8px;">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteTemplate(${t.id})" style="padding:4px 8px;">${t.is_active ? 'Deactivate' : 'Delete'}</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Mobile cards
+            cardsDiv.innerHTML = templates.map(t => `
+                <div class="template-card">
+                    <div class="template-card-header">
+                        <div class="template-card-title">${escapeHtml(t.title)}</div>
+                        <span class="badge ${t.is_active ? 'badge-active' : 'badge-inactive'}">${t.is_active ? 'Active' : 'Inactive'}</span>
+                    </div>
+                    <div class="template-card-meta">
+                        <span class="badge" style="background:#eff6ff;color:#2563eb;">${t.section}</span>
+                        <span class="badge" style="background:#f3f4f6;color:#374151;">${typeLabels[t.task_type] || t.task_type}</span>
+                        ${t.photo_required ? '<span class="badge" style="background:#d1fae5;color:#065f46;">Photo</span>' : ''}
+                        <span class="badge" style="background:#faf5ff;color:#7c3aed;">#${t.sort_order}</span>
+                    </div>
+                    <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">Roles: ${(t.roles || []).join(', ')}</div>
+                    <div class="template-card-actions">
+                        <button class="btn btn-secondary" onclick="editTemplate(${t.id})" style="flex:1;">Edit</button>
+                        <button class="btn btn-danger" onclick="deleteTemplate(${t.id})" style="flex:1;">${t.is_active ? 'Deactivate' : 'Delete'}</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openTemplateModal() {
+            document.getElementById('templateModalTitle').textContent = 'Add Template';
+            document.getElementById('templateForm').reset();
+            document.getElementById('templateId').value = '';
+            document.querySelectorAll('.role-checkbox').forEach(cb => { cb.checked = cb.value === 'staff' || cb.value === 'manager'; });
+            toggleDetailFieldsInput();
+            openModal('templateModal');
+        }
+
+        function editTemplate(id) {
+            const t = allTemplates.find(tpl => tpl.id === id);
+            if (!t) return;
+
+            document.getElementById('templateModalTitle').textContent = 'Edit Template';
+            document.getElementById('templateId').value = t.id;
+            document.getElementById('tplSection').value = t.section;
+            document.getElementById('tplType').value = t.task_type;
+            document.getElementById('tplTitle').value = t.title;
+            document.getElementById('tplDescription').value = t.description || '';
+            document.getElementById('tplSortOrder').value = t.sort_order;
+            document.getElementById('tplPhotoRequired').value = t.photo_required ? 'true' : 'false';
+            document.getElementById('tplDetailFields').value = (t.detail_fields || []).join(', ');
+
+            document.querySelectorAll('.role-checkbox').forEach(cb => {
+                cb.checked = (t.roles || []).includes(cb.value);
+            });
+
+            toggleDetailFieldsInput();
+            openModal('templateModal');
+        }
+
+        async function saveTemplate(e) {
+            e.preventDefault();
+            const id = document.getElementById('templateId').value;
+            const roles = [];
+            document.querySelectorAll('.role-checkbox:checked').forEach(cb => roles.push(cb.value));
+
+            const detailFieldsStr = document.getElementById('tplDetailFields').value.trim();
+            const detailFields = detailFieldsStr ? detailFieldsStr.split(',').map(f => f.trim()).filter(Boolean) : null;
+
+            const body = {
+                section: document.getElementById('tplSection').value,
+                title: document.getElementById('tplTitle').value,
+                description: document.getElementById('tplDescription').value || null,
+                task_type: document.getElementById('tplType').value,
+                detail_fields: detailFields,
+                roles,
+                photo_required: document.getElementById('tplPhotoRequired').value === 'true',
+                sort_order: parseInt(document.getElementById('tplSortOrder').value) || 0
+            };
+
+            try {
+                const url = id ? `/api/daily-tasks/templates/${id}` : '/api/daily-tasks/templates';
+                const method = id ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method,
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(id ? 'Template updated!' : 'Template created!');
+                    closeModal('templateModal');
+                    loadTemplates();
+                } else {
+                    alert(data.error || 'Failed to save');
+                }
+            } catch (error) {
+                alert('Error saving template');
+            }
+        }
+
+        async function deleteTemplate(id) {
+            if (!confirm('Deactivate this template?')) return;
+            try {
+                await fetch(`/api/daily-tasks/templates/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+                loadTemplates();
+            } catch (error) {
+                alert('Error deleting template');
+            }
+        }
+
+        function toggleDetailFieldsInput() {
+            const type = document.getElementById('tplType').value;
+            document.getElementById('detailFieldsGroup').style.display = type === 'yes_no_detail' ? 'block' : 'none';
+        }
+
+        // ========================================
+        // RESPONSES
+        // ========================================
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/users', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const users = await res.json();
+                    allUsers = users;
+                    const select = document.getElementById('responseUser');
+                    users.forEach(u => {
+                        select.add(new Option(`${u.full_name} (${u.username})`, u.id));
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        async function loadResponses() {
+            const date = document.getElementById('responseDate').value;
+            const userId = document.getElementById('responseUser').value;
+
+            if (!date) return;
+
+            try {
+                let url = `/api/daily-tasks/admin/responses?date=${date}`;
+                if (userId) url += `&user_id=${userId}`;
+
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (data.success) {
+                    displayResponses(data.data);
+                }
+
+                loadSummary();
+            } catch (error) {
+                console.error('Error loading responses:', error);
+            }
+        }
+
+        function displayResponses(responses) {
+            const container = document.getElementById('responsesList');
+
+            if (responses.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No responses found for this date.</p>';
+                return;
+            }
+
+            // Group by user
+            const byUser = {};
+            responses.forEach(r => {
+                if (!byUser[r.user_id]) {
+                    byUser[r.user_id] = { name: r.user_name, username: r.username, responses: [] };
+                }
+                byUser[r.user_id].responses.push(r);
+            });
+
+            let html = '';
+            for (const [userId, data] of Object.entries(byUser)) {
+                const yesCount = data.responses.filter(r => r.answer === 'yes').length;
+                const noCount = data.responses.filter(r => r.answer === 'no').length;
+                const totalPhotos = data.responses.reduce((sum, r) => {
+                    const photos = r.photos || [];
+                    return sum + photos.length;
+                }, 0);
+
+                html += `<div class="response-card">
+                    <div class="response-header" onclick="toggleResponseBody(this)">
+                        <div>
+                            <span style="font-weight:700;color:#1f2937;">${escapeHtml(data.name)}</span>
+                            <span style="color:#6b7280;font-size:12px;margin-left:8px;">@${escapeHtml(data.username)}</span>
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <span class="badge badge-yes">${yesCount} Yes</span>
+                            <span class="badge badge-no">${noCount} No</span>
+                            ${totalPhotos > 0 ? `<span class="badge" style="background:#eff6ff;color:#2563eb;">${totalPhotos} photos</span>` : ''}
+                            <svg style="width:16px;height:16px;color:#9ca3af;transition:transform 0.2s;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="response-body">`;
+
+                data.responses.forEach(r => {
+                    const details = r.details || {};
+                    const photos = r.photos || [];
+                    const mats = r.materials || [];
+                    const typeLabels = { yes_no: 'Yes/No', yes_no_photo: 'Photo', yes_no_detail: 'Detail', material_received: 'Material' };
+
+                    html += `<div style="padding:10px 0;border-bottom:1px solid #f3f4f6;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <div>
+                                <span style="font-weight:600;color:#374151;">${escapeHtml(r.template_title)}</span>
+                                <span class="badge" style="background:#f3f4f6;color:#6b7280;margin-left:6px;">${r.section}</span>
+                            </div>
+                            <span class="badge ${r.answer === 'yes' ? 'badge-yes' : r.answer === 'no' ? 'badge-no' : 'badge-pending'}">
+                                ${r.answer ? r.answer.toUpperCase() : 'Pending'}
+                            </span>
+                        </div>`;
+
+                    if (r.reason) {
+                        html += `<div style="background:#fef3c7;padding:8px 12px;border-radius:8px;font-size:13px;color:#92400e;margin-bottom:6px;">
+                            <strong>Reason:</strong> ${escapeHtml(r.reason)}
+                        </div>`;
+                    }
+
+                    if (Object.keys(details).length > 0) {
+                        html += `<div style="background:#f0fdf4;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:6px;">`;
+                        for (const [key, val] of Object.entries(details)) {
+                            html += `<div><strong>${key.replace(/_/g, ' ')}:</strong> ${escapeHtml(val || '-')}</div>`;
+                        }
+                        html += `</div>`;
+                    }
+
+                    if (photos.length > 0) {
+                        html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">`;
+                        photos.forEach(p => {
+                            html += `<img src="${p}" class="photo-thumb" onclick="showPhoto('${p}')">`;
+                        });
+                        html += `</div>`;
+                    }
+
+                    if (mats.length > 0) {
+                        html += `<div style="margin-top:8px;">
+                            <span style="font-size:12px;font-weight:700;color:#6b7280;">Materials Received:</span>`;
+                        mats.forEach(m => {
+                            html += `<div style="background:#f9fafb;padding:8px;border-radius:8px;margin-top:4px;display:flex;align-items:center;gap:8px;">
+                                ${m.photo_url ? `<img src="${m.photo_url}" class="photo-thumb" style="width:50px;height:50px;" onclick="showPhoto('${m.photo_url}')">` : ''}
+                                <div>
+                                    <div style="font-weight:600;font-size:13px;">${escapeHtml(m.vendor_name)}</div>
+                                    <div style="font-size:11px;color:#6b7280;">${m.bill_on_zoho ? 'Bill on Zoho' : 'No Zoho bill'}</div>
+                                </div>
+                            </div>`;
+                        });
+                        html += `</div>`;
+                    }
+
+                    html += `</div>`;
+                });
+
+                html += `</div></div>`;
+            }
+
+            container.innerHTML = html;
+
+            // Update stats
+            document.getElementById('statTotalResponses').textContent = responses.length;
+            document.getElementById('statPhotos').textContent = responses.reduce((sum, r) => sum + (r.photos || []).length, 0);
+        }
+
+        async function loadSummary() {
+            const date = document.getElementById('responseDate').value;
+            if (!date) return;
+
+            try {
+                const res = await fetch(`/api/daily-tasks/admin/summary?date=${date}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('statSubmitted').textContent = data.data.submitted.length;
+                    document.getElementById('statNotSubmitted').textContent = data.data.not_submitted.length;
+                }
+            } catch (error) {
+                console.error('Error loading summary:', error);
+            }
+        }
+
+        function toggleResponseBody(header) {
+            const body = header.nextElementSibling;
+            body.classList.toggle('open');
+            const arrow = header.querySelector('svg');
+            if (arrow) arrow.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+        }
+
+        function showPhoto(url) {
+            document.getElementById('lightboxImg').src = url;
+            document.getElementById('photoLightbox').style.display = 'flex';
+        }
+
+        // ========================================
+        // UTILS
+        // ========================================
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        document.querySelectorAll('.modal').forEach(m => {
+            m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); });
+        });
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text ? String(text).replace(/[&<>"']/g, c => map[c]) : '';
+        }
+
+        // Use the global getAuthHeaders from universal-nav-loader.js
+        // Do NOT redefine getAuthHeaders here to avoid infinite recursion
+    </script>
+</body>
+</html>

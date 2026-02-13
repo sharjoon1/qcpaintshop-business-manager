@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Zoho Settings - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        .toggle-switch { position: relative; width: 44px; height: 24px; display: inline-block; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e1; border-radius: 24px; transition: 0.3s; }
+        .toggle-slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        input:checked + .toggle-slider { background: #7c3aed; }
+        input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .toast {
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease-out;
+            max-width: 400px;
+        }
+        .toast-success { background: #10b981; }
+        .toast-error { background: #ef4444; }
+        .toast-warning { background: #f59e0b; }
+        .toast-info { background: #3b82f6; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+        .status-dot.connected { background: #10b981; }
+        .status-dot.disconnected { background: #ef4444; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-green { background: #d1fae5; color: #065f46; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        .badge-yellow { background: #fef3c7; color: #92400e; }
+
+        .mapping-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            z-index: 50;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            width: 280px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="zoho-settings">
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Page Header -->
+        <div class="mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Zoho Books Settings</h1>
+            <p class="text-gray-500 text-sm mt-1">Manage your Zoho Books integration</p>
+        </div>
+
+        <!-- 1. Connection Status Card -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6" id="connectionCard">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Connection Status</h2>
+            <div id="connectionLoading" class="flex items-center gap-2 text-gray-400">
+                <svg class="w-5 h-5 spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                <span>Checking connection...</span>
+            </div>
+            <div id="connectionContent" class="hidden">
+                <!-- Connected State -->
+                <div id="connectedState" class="hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <span class="status-dot connected"></span>
+                            <div>
+                                <p class="font-semibold text-gray-800">Connected to Zoho Books</p>
+                                <p class="text-sm text-gray-500" id="tokenExpiry">Token expires in -- minutes</p>
+                            </div>
+                        </div>
+                        <button onclick="disconnectZoho()" class="px-4 py-2 border-2 border-red-500 text-red-500 rounded-lg hover:bg-red-50 font-semibold text-sm transition">
+                            Disconnect
+                        </button>
+                    </div>
+                </div>
+                <!-- Disconnected State -->
+                <div id="disconnectedState" class="hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="status-dot disconnected"></span>
+                            <div>
+                                <p class="font-semibold text-gray-800">Not Connected</p>
+                                <p class="text-sm text-gray-500">Connect your Zoho Books account to enable syncing</p>
+                            </div>
+                        </div>
+                        <button onclick="connectZoho()" class="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm transition">
+                            Connect to Zoho Books
+                        </button>
+                    </div>
+                    <!-- Manual Code Entry (for when callback redirects to production instead of local) -->
+                    <div id="manualCodeSection" class="hidden mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p class="text-sm font-semibold text-gray-700 mb-2">Paste Authorization Code</p>
+                        <p class="text-xs text-gray-500 mb-3">After authorizing on Zoho, copy the <code class="bg-gray-200 px-1 rounded">code</code> parameter from the redirect URL and paste it below.</p>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input type="text" id="manualAuthCode" placeholder="Paste the full callback URL or just the code..."
+                                class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm font-mono">
+                            <button onclick="exchangeManualCode()" id="btnExchangeCode" class="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-sm transition whitespace-nowrap">
+                                Exchange Code
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Sync Configuration Card -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Sync Configuration</h2>
+            <div class="space-y-5">
+                <!-- Auto Sync Toggle -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700">Auto Sync Enabled</label>
+                        <p class="text-xs text-gray-400 mt-0.5">Automatically sync data with Zoho Books</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="syncEnabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Sync Interval -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Sync Interval</label>
+                    <select id="syncInterval" class="w-full sm:w-64 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
+                        <option value="15">Every 15 minutes</option>
+                        <option value="30">Every 30 minutes</option>
+                        <option value="60">Every 1 hour</option>
+                        <option value="120">Every 2 hours</option>
+                        <option value="360">Every 6 hours</option>
+                    </select>
+                </div>
+
+                <!-- Save Button -->
+                <div>
+                    <button onclick="saveSyncSettings()" id="btnSaveSyncSettings" class="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm transition">
+                        Save Sync Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Manual Sync Actions Card -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Manual Sync Actions</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <button onclick="triggerSync('full')" id="btn-sync-full" class="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg id="spinner-sync-full" class="w-4 h-4 spin hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span>Full Sync</span>
+                </button>
+                <button onclick="triggerSync('customers')" id="btn-sync-customers" class="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg id="spinner-sync-customers" class="w-4 h-4 spin hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span>Sync Customers</span>
+                </button>
+                <button onclick="triggerSync('invoices')" id="btn-sync-invoices" class="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg id="spinner-sync-invoices" class="w-4 h-4 spin hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span>Sync Invoices</span>
+                </button>
+                <button onclick="triggerSync('payments')" id="btn-sync-payments" class="flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg id="spinner-sync-payments" class="w-4 h-4 spin hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span>Sync Payments</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 4. WhatsApp Configuration Card -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">WhatsApp Configuration</h2>
+            <div class="space-y-5">
+                <!-- WhatsApp Enabled Toggle -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700">WhatsApp Enabled</label>
+                        <p class="text-xs text-gray-400 mt-0.5">Send payment reminders via WhatsApp</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="whatsappEnabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <!-- WhatsApp API URL -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">WhatsApp API URL</label>
+                    <input type="text" id="whatsappApiUrl" placeholder="https://api.whatsapp.com/..."
+                        class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
+                </div>
+
+                <!-- WhatsApp API Key -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">WhatsApp API Key</label>
+                    <input type="password" id="whatsappApiKey" placeholder="Enter your API key"
+                        class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
+                </div>
+
+                <!-- Overdue Reminder Days -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Overdue Reminder Days</label>
+                    <input type="text" id="overdueReminderDays" placeholder="7,14,30"
+                        class="w-full sm:w-64 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
+                    <p class="text-xs text-gray-400 mt-1">Comma-separated days after due date to send reminders</p>
+                </div>
+
+                <!-- Save Button -->
+                <div>
+                    <button onclick="saveWhatsAppSettings()" id="btnSaveWhatsApp" class="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm transition">
+                        Save WhatsApp Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Customer Mapping Section -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-800">Customer Mapping</h2>
+                    <p class="text-sm text-gray-500" id="mappingStats">Loading...</p>
+                </div>
+                <button onclick="loadUnmappedCustomers()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-semibold text-gray-700 transition">
+                    Refresh
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" id="mappingTable">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="text-left py-3 px-3 font-semibold text-gray-600">Zoho Name</th>
+                            <th class="text-left py-3 px-3 font-semibold text-gray-600 hidden sm:table-cell">Phone</th>
+                            <th class="text-left py-3 px-3 font-semibold text-gray-600 hidden md:table-cell">Email</th>
+                            <th class="text-right py-3 px-3 font-semibold text-gray-600">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mappingBody">
+                        <tr><td colspan="4" class="py-8 text-center text-gray-400">Loading unmapped customers...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 6. Sync History Log -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Sync History Log</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" id="syncLogTable">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="text-left py-3 px-3 font-semibold text-gray-600">Type</th>
+                            <th class="text-left py-3 px-3 font-semibold text-gray-600">Status</th>
+                            <th class="text-left py-3 px-3 font-semibold text-gray-600 hidden sm:table-cell">Records</th>
+                            <th class="text-left py-3 px-3 font-semibold text-gray-600 hidden md:table-cell">Triggered By</th>
+                            <th class="text-left py-3 px-3 font-semibold text-gray-600 hidden lg:table-cell">Started</th>
+                            <th class="text-left py-3 px-3 font-semibold text-gray-600 hidden lg:table-cell">Completed</th>
+                        </tr>
+                    </thead>
+                    <tbody id="syncLogBody">
+                        <tr><td colspan="6" class="py-8 text-center text-gray-400">Loading sync history...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div><!-- /container -->
+
+<script>
+    // ========================
+    // Toast Notification
+    // ========================
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.animation = 'slideOut 0.3s ease-in forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, 3500);
+    }
+
+    // ========================
+    // API Helper
+    // ========================
+    async function apiFetch(url, options = {}) {
+        try {
+            const headers = { ...getAuthHeaders(), ...(options.headers || {}) };
+            // Auto-add Content-Type for JSON bodies
+            if (options.body && typeof options.body === 'string' && !headers['Content-Type']) {
+                headers['Content-Type'] = 'application/json';
+            }
+            const response = await fetch(url, { ...options, headers });
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return null;
+            }
+            return response;
+        } catch (err) {
+            console.error('API fetch error:', err);
+            showToast('Network error. Please try again.', 'error');
+            return null;
+        }
+    }
+
+    // ========================
+    // 1. Connection Status
+    // ========================
+    async function loadConnectionStatus() {
+        const loadingEl = document.getElementById('connectionLoading');
+        const contentEl = document.getElementById('connectionContent');
+        const connectedEl = document.getElementById('connectedState');
+        const disconnectedEl = document.getElementById('disconnectedState');
+
+        loadingEl.classList.remove('hidden');
+        contentEl.classList.add('hidden');
+
+        const response = await apiFetch('/api/zoho/status');
+        if (!response) {
+            loadingEl.innerHTML = '<span class="text-red-500">Failed to load connection status</span>';
+            return;
+        }
+
+        const result = await response.json();
+        const connection = result.data?.connection || result.connection || {};
+        loadingEl.classList.add('hidden');
+        contentEl.classList.remove('hidden');
+
+        if (connection.connected) {
+            connectedEl.classList.remove('hidden');
+            disconnectedEl.classList.add('hidden');
+            const mins = connection.expires_in_minutes;
+            document.getElementById('tokenExpiry').textContent =
+                mins != null ? `Token expires in ${mins} minutes` : `Status: ${connection.status || 'connected'}`;
+        } else {
+            connectedEl.classList.add('hidden');
+            disconnectedEl.classList.remove('hidden');
+        }
+    }
+
+    async function connectZoho() {
+        const response = await apiFetch('/api/zoho/oauth/url');
+        if (!response) return;
+        const data = await response.json();
+        const authUrl = data.authorization_url || (data.data && data.data.authorization_url);
+        if (authUrl) {
+            window.open(authUrl, '_blank');
+            // Show the manual code entry section
+            const manualSection = document.getElementById('manualCodeSection');
+            if (manualSection) manualSection.classList.remove('hidden');
+            showToast('Zoho authorization page opened. After authorizing, paste the code below.', 'info');
+        } else {
+            showToast(data.message || 'Failed to get authorization URL', 'error');
+        }
+    }
+
+    async function exchangeManualCode() {
+        const input = document.getElementById('manualAuthCode');
+        const btn = document.getElementById('btnExchangeCode');
+        let codeValue = input.value.trim();
+
+        if (!codeValue) {
+            showToast('Please paste the authorization code or callback URL', 'error');
+            return;
+        }
+
+        // Extract code from full URL if user pasted the entire callback URL
+        try {
+            if (codeValue.includes('code=')) {
+                const url = new URL(codeValue);
+                codeValue = url.searchParams.get('code') || codeValue;
+            }
+        } catch (e) {
+            // If URL parsing fails, check for code= in a simpler way
+            const match = codeValue.match(/code=([^&]+)/);
+            if (match) codeValue = match[1];
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Exchanging...';
+        showToast('Sending code to server...', 'info');
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch('/api/zoho/oauth/exchange', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ code: codeValue })
+            });
+
+            btn.disabled = false;
+            btn.textContent = 'Exchange Code';
+
+            const data = await response.json();
+            console.log('Exchange response:', response.status, data);
+
+            if (response.ok && data.success) {
+                showToast('Zoho Books connected successfully!', 'success');
+                document.getElementById('manualCodeSection').classList.add('hidden');
+                input.value = '';
+                loadConnectionStatus();
+            } else {
+                const errMsg = data.message || 'Failed to exchange code';
+                if (errMsg.includes('invalid_code')) {
+                    showToast('Code expired! Click "Connect" again, authorize, then paste the URL immediately (within 1-2 minutes).', 'error');
+                } else {
+                    showToast('Error: ' + errMsg, 'error');
+                }
+            }
+        } catch (err) {
+            btn.disabled = false;
+            btn.textContent = 'Exchange Code';
+            console.error('Exchange fetch error:', err);
+            showToast('Network error: ' + err.message, 'error');
+        }
+    }
+
+    async function disconnectZoho() {
+        if (!confirm('Are you sure you want to disconnect from Zoho Books? This will stop all syncing.')) return;
+
+        const response = await apiFetch('/api/zoho/oauth/disconnect', { method: 'POST' });
+        if (!response) return;
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast('Disconnected from Zoho Books', 'success');
+            loadConnectionStatus();
+        } else {
+            showToast(result.message || 'Failed to disconnect', 'error');
+        }
+    }
+
+    // ========================
+    // 2. Sync Configuration
+    // ========================
+    async function loadSyncConfig() {
+        const response = await apiFetch('/api/zoho/config');
+        if (!response) return;
+        const result = await response.json();
+        const configs = result.data || result.configs || [];
+
+        if (Array.isArray(configs)) {
+            configs.forEach(c => {
+                const key = c.config_key || c.key;
+                const val = c.config_value || c.value;
+                switch (key) {
+                    case 'sync_enabled':
+                        document.getElementById('syncEnabled').checked = val === 'true' || val === true;
+                        break;
+                    case 'sync_interval_minutes':
+                        document.getElementById('syncInterval').value = val || '60';
+                        break;
+                }
+            });
+        }
+    }
+
+    async function saveSyncSettings() {
+        const btn = document.getElementById('btnSaveSyncSettings');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        const configs = [
+            { key: 'sync_enabled', value: String(document.getElementById('syncEnabled').checked) },
+            { key: 'sync_interval_minutes', value: document.getElementById('syncInterval').value }
+        ];
+
+        const response = await apiFetch('/api/zoho/config', {
+            method: 'PUT',
+            body: JSON.stringify({ configs })
+        });
+
+        btn.disabled = false;
+        btn.textContent = 'Save Sync Settings';
+
+        if (!response) return;
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast('Sync settings saved successfully', 'success');
+        } else {
+            showToast(result.message || 'Failed to save sync settings', 'error');
+        }
+    }
+
+    // ========================
+    // 3. Manual Sync Actions
+    // ========================
+    async function triggerSync(type) {
+        const btn = document.getElementById(`btn-sync-${type}`);
+        const spinner = document.getElementById(`spinner-sync-${type}`);
+
+        btn.disabled = true;
+        spinner.classList.remove('hidden');
+
+        const urlMap = {
+            full: '/api/zoho/sync/full',
+            customers: '/api/zoho/sync/customers',
+            invoices: '/api/zoho/sync/invoices',
+            payments: '/api/zoho/sync/payments'
+        };
+
+        const response = await apiFetch(urlMap[type], { method: 'POST' });
+
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+
+        if (!response) return;
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            const label = type.charAt(0).toUpperCase() + type.slice(1);
+            showToast(`${label} sync initiated successfully`, 'success');
+            loadSyncLog();
+        } else {
+            showToast(result.message || `Failed to trigger ${type} sync`, 'error');
+        }
+    }
+
+    // ========================
+    // 4. WhatsApp Configuration
+    // ========================
+    async function loadWhatsAppConfig() {
+        const response = await apiFetch('/api/zoho/config');
+        if (!response) return;
+        const result = await response.json();
+        const configs = result.data || result.configs || [];
+
+        if (Array.isArray(configs)) {
+            configs.forEach(c => {
+                const key = c.config_key || c.key;
+                const val = c.config_value || c.value || '';
+                switch (key) {
+                    case 'whatsapp_enabled':
+                        document.getElementById('whatsappEnabled').checked = val === 'true' || val === true;
+                        break;
+                    case 'whatsapp_api_url':
+                        document.getElementById('whatsappApiUrl').value = val;
+                        break;
+                    case 'whatsapp_api_key':
+                        document.getElementById('whatsappApiKey').value = val;
+                        break;
+                    case 'overdue_reminder_days':
+                        document.getElementById('overdueReminderDays').value = val;
+                        break;
+                }
+            });
+        }
+    }
+
+    async function saveWhatsAppSettings() {
+        const btn = document.getElementById('btnSaveWhatsApp');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        const configs = [
+            { key: 'whatsapp_enabled', value: String(document.getElementById('whatsappEnabled').checked) },
+            { key: 'whatsapp_api_url', value: document.getElementById('whatsappApiUrl').value.trim() },
+            { key: 'whatsapp_api_key', value: document.getElementById('whatsappApiKey').value.trim() },
+            { key: 'overdue_reminder_days', value: document.getElementById('overdueReminderDays').value.trim() }
+        ];
+
+        const response = await apiFetch('/api/zoho/config', {
+            method: 'PUT',
+            body: JSON.stringify({ configs })
+        });
+
+        btn.disabled = false;
+        btn.textContent = 'Save WhatsApp Settings';
+
+        if (!response) return;
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast('WhatsApp settings saved successfully', 'success');
+        } else {
+            showToast(result.message || 'Failed to save WhatsApp settings', 'error');
+        }
+    }
+
+    // ========================
+    // 5. Customer Mapping
+    // ========================
+    let localCustomersCache = [];
+
+    async function loadUnmappedCustomers() {
+        const body = document.getElementById('mappingBody');
+        body.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-gray-400">Loading unmapped customers...</td></tr>';
+
+        const response = await apiFetch('/api/zoho/customers?mapped=false&limit=10');
+        if (!response) {
+            body.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-red-400">Failed to load customers</td></tr>';
+            return;
+        }
+
+        const result = await response.json();
+        const customers = result.data || result.customers || [];
+        const mapped = result.mapped_count || result.pagination?.total || 0;
+        const unmapped = result.unmapped_count || customers.length || 0;
+
+        document.getElementById('mappingStats').textContent = `Mapped: ${mapped} | Unmapped: ${unmapped}`;
+
+        if (customers.length === 0) {
+            body.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-gray-400">All customers are mapped</td></tr>';
+            return;
+        }
+
+        body.innerHTML = customers.map(c => `
+            <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="py-3 px-3 font-medium text-gray-800">${escapeHtml(c.contact_name || c.name || '--')}</td>
+                <td class="py-3 px-3 text-gray-600 hidden sm:table-cell">${escapeHtml(c.phone || '--')}</td>
+                <td class="py-3 px-3 text-gray-600 hidden md:table-cell">${escapeHtml(c.email || '--')}</td>
+                <td class="py-3 px-3 text-right">
+                    <div class="relative inline-block">
+                        <button onclick="openMappingDropdown(this, ${c.id})" class="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-semibold text-xs transition">
+                            Map to Local
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function openMappingDropdown(btn, zohoCustomerId) {
+        // Close any existing dropdowns
+        document.querySelectorAll('.mapping-dropdown').forEach(d => d.remove());
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'mapping-dropdown';
+        dropdown.innerHTML = `
+            <div class="p-2 border-b border-gray-100">
+                <input type="text" placeholder="Search local customers..."
+                    class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    oninput="filterLocalCustomers(this, ${zohoCustomerId})">
+            </div>
+            <div class="py-1 customer-list" id="customerList-${zohoCustomerId}">
+                <div class="px-3 py-2 text-sm text-gray-400">Loading...</div>
+            </div>
+        `;
+
+        btn.parentElement.appendChild(dropdown);
+
+        // Load local customers if not cached
+        if (localCustomersCache.length === 0) {
+            const response = await apiFetch('/api/customers?limit=100');
+            if (response) {
+                const data = await response.json();
+                localCustomersCache = data.customers || data.data || [];
+            }
+        }
+
+        renderLocalCustomers(zohoCustomerId, localCustomersCache);
+
+        // Close dropdown on outside click
+        setTimeout(() => {
+            document.addEventListener('click', function closeDropdown(e) {
+                if (!dropdown.contains(e.target) && e.target !== btn) {
+                    dropdown.remove();
+                    document.removeEventListener('click', closeDropdown);
+                }
+            });
+        }, 100);
+    }
+
+    function renderLocalCustomers(zohoCustomerId, customers) {
+        const listEl = document.getElementById(`customerList-${zohoCustomerId}`);
+        if (!listEl) return;
+
+        if (customers.length === 0) {
+            listEl.innerHTML = '<div class="px-3 py-2 text-sm text-gray-400">No customers found</div>';
+            return;
+        }
+
+        listEl.innerHTML = customers.slice(0, 20).map(c => `
+            <button onclick="mapCustomer(${zohoCustomerId}, ${c.id})"
+                class="w-full text-left px-3 py-2 text-sm hover:bg-purple-50 hover:text-purple-700 transition flex flex-col">
+                <span class="font-medium">${escapeHtml(c.name || c.customer_name || '--')}</span>
+                <span class="text-xs text-gray-400">${escapeHtml(c.phone || c.email || '')}</span>
+            </button>
+        `).join('');
+    }
+
+    function filterLocalCustomers(input, zohoCustomerId) {
+        const query = input.value.toLowerCase().trim();
+        const filtered = localCustomersCache.filter(c => {
+            const name = (c.name || c.customer_name || '').toLowerCase();
+            const phone = (c.phone || '').toLowerCase();
+            const email = (c.email || '').toLowerCase();
+            return name.includes(query) || phone.includes(query) || email.includes(query);
+        });
+        renderLocalCustomers(zohoCustomerId, filtered);
+    }
+
+    async function mapCustomer(zohoCustomerId, localCustomerId) {
+        // Close dropdown
+        document.querySelectorAll('.mapping-dropdown').forEach(d => d.remove());
+
+        const response = await apiFetch(`/api/zoho/customers/${zohoCustomerId}/map`, {
+            method: 'PUT',
+            body: JSON.stringify({ local_customer_id: localCustomerId })
+        });
+
+        if (!response) return;
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast('Customer mapped successfully', 'success');
+            loadUnmappedCustomers();
+        } else {
+            showToast(result.message || 'Failed to map customer', 'error');
+        }
+    }
+
+    // ========================
+    // 6. Sync History Log
+    // ========================
+    let syncLogRefreshInterval = null;
+
+    async function loadSyncLog() {
+        const body = document.getElementById('syncLogBody');
+
+        const response = await apiFetch('/api/zoho/sync/log?limit=20');
+        if (!response) {
+            body.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-red-400">Failed to load sync history</td></tr>';
+            return;
+        }
+
+        const result = await response.json();
+        const logs = result.data || result.logs || [];
+
+        if (logs.length === 0) {
+            body.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">No sync history yet</td></tr>';
+            clearAutoRefresh();
+            return;
+        }
+
+        let hasActiveSync = false;
+
+        body.innerHTML = logs.map(log => {
+            const status = (log.status || '').toLowerCase();
+            if (status === 'started' || status === 'in_progress') hasActiveSync = true;
+
+            let badgeClass = 'badge-blue';
+            if (status === 'completed') badgeClass = 'badge-green';
+            else if (status === 'failed') badgeClass = 'badge-red';
+            else if (status === 'in_progress') badgeClass = 'badge-yellow';
+
+            return `
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="py-3 px-3 font-medium text-gray-800 capitalize">${escapeHtml(log.sync_type || log.type || '--')}</td>
+                    <td class="py-3 px-3"><span class="badge ${badgeClass}">${escapeHtml(log.status || '--')}</span></td>
+                    <td class="py-3 px-3 text-gray-600 hidden sm:table-cell">${log.records_synced != null ? log.records_synced : (log.records || '--')}</td>
+                    <td class="py-3 px-3 text-gray-600 hidden md:table-cell">${escapeHtml(log.triggered_by || '--')}</td>
+                    <td class="py-3 px-3 text-gray-500 text-xs hidden lg:table-cell">${formatDateTime(log.started_at || log.created_at)}</td>
+                    <td class="py-3 px-3 text-gray-500 text-xs hidden lg:table-cell">${formatDateTime(log.completed_at)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        // Auto-refresh if there are active syncs
+        if (hasActiveSync) {
+            startAutoRefresh();
+        } else {
+            clearAutoRefresh();
+        }
+    }
+
+    function startAutoRefresh() {
+        if (syncLogRefreshInterval) return;
+        syncLogRefreshInterval = setInterval(() => {
+            loadSyncLog();
+        }, 10000);
+    }
+
+    function clearAutoRefresh() {
+        if (syncLogRefreshInterval) {
+            clearInterval(syncLogRefreshInterval);
+            syncLogRefreshInterval = null;
+        }
+    }
+
+    // ========================
+    // Utility Functions
+    // ========================
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatDateTime(dateStr) {
+        if (!dateStr) return '--';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '--';
+            return d.toLocaleString('en-IN', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: true
+            });
+        } catch {
+            return '--';
+        }
+    }
+
+    // ========================
+    // Initialize
+    // ========================
+    document.addEventListener('DOMContentLoaded', function() {
+        loadConnectionStatus();
+        loadSyncConfig();
+        loadWhatsAppConfig();
+        loadUnmappedCustomers();
+        loadSyncLog();
+    });
+
+    // Cleanup on page leave
+    window.addEventListener('beforeunload', function() {
+        clearAutoRefresh();
+    });
+</script>
+</body>
+</html>

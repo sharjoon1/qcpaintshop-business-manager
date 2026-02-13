@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Zoho Books Dashboard - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 4px solid var(--accent, #7c3aed);
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-value { font-size: 1.75rem; font-weight: 800; color: #1f2937; }
+        .stat-label { font-size: 0.8rem; color: #6b7280; font-weight: 500; }
+        .stat-icon { font-size: 1.5rem; }
+        .quick-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            text-decoration: none;
+            color: #1f2937;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .quick-link:hover { transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .quick-link-icon { font-size: 1.25rem; }
+
+        /* Status badge styles */
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .badge-paid { background: #dcfce7; color: #166534; }
+        .badge-overdue { background: #fee2e2; color: #991b1b; }
+        .badge-sent { background: #dbeafe; color: #1e40af; }
+        .badge-partially_paid { background: #fef9c3; color: #854d0e; }
+        .badge-draft { background: #f3f4f6; color: #374151; }
+        .badge-void { background: #f3f4f6; color: #6b7280; }
+
+        /* Sync log entry */
+        .sync-entry {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.8rem;
+        }
+        .sync-entry:last-child { border-bottom: none; }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-info { background: #2563eb; }
+
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Table responsive */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-wrapper table {
+            min-width: 600px;
+        }
+
+        /* Desktop adjustments for pinned sidebar */
+        @media (min-width: 768px) {
+            .stat-card { padding: 1.5rem; }
+            .stat-value { font-size: 2rem; }
+            .stat-label { font-size: 0.85rem; }
+            .stat-icon { font-size: 1.75rem; }
+            .quick-link { padding: 0.85rem 1.25rem; }
+        }
+        @media (min-width: 1280px) {
+            .stat-card { padding: 1.75rem; }
+            .stat-value { font-size: 2.25rem; }
+            .stat-label { font-size: 0.9rem; }
+        }
+        /* API Usage Monitor Styles */
+        .usage-gauge {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+        }
+        .usage-gauge svg {
+            transform: rotate(-90deg);
+            position: absolute;
+            top: 0; left: 0;
+        }
+        .usage-gauge-text {
+            text-align: center;
+            z-index: 1;
+        }
+        .usage-gauge-text .value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .usage-gauge-text .label {
+            font-size: 0.65rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        /* Mini bar chart */
+        .rate-bar {
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 48px;
+        }
+        .rate-bar-col {
+            flex: 1;
+            min-width: 0;
+            border-radius: 3px 3px 0 0;
+            background: linear-gradient(180deg, #667eea, #764ba2);
+            transition: height 0.5s ease;
+        }
+
+        /* Caller badge */
+        .caller-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: #f3f4f6;
+            color: #374151;
+        }
+        .caller-badge .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        /* Activity log */
+        .activity-entry {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.75rem;
+        }
+        .activity-entry:last-child { border-bottom: none; }
+
+        /* Sync lock banner */
+        .sync-lock-banner {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            font-size: 0.8rem;
+            color: #92400e;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sync-lock-banner.idle {
+            background: #ecfdf5;
+            border-color: #6ee7b7;
+            color: #065f46;
+        }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="zoho-dashboard">
+<div class="container mx-auto p-4 md:p-6">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast" role="alert"></div>
+
+    <!-- Connection Status Banner -->
+    <div id="connectionBanner" class="hidden mb-4 rounded-lg p-4 border">
+        <!-- Populated dynamically -->
+    </div>
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Zoho Books Dashboard</h1>
+            <p class="text-gray-500 text-sm mt-1">Financial overview synced from Zoho Books</p>
+        </div>
+        <div class="mt-3 sm:mt-0 flex items-center gap-2">
+            <span id="lastSyncLabel" class="text-xs text-gray-400 hidden">Last sync: --</span>
+            <button id="syncNowBtn" onclick="triggerFullSync()" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+                <svg id="syncIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span id="syncBtnText">Sync Now</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Stats Grid - Row 1 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
+        <!-- Total Revenue -->
+        <div class="stat-card" style="border-left-color: #7c3aed;">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div id="statRevenue" class="stat-value">
+                        <div class="skeleton" style="width: 80px; height: 28px;"></div>
+                    </div>
+                    <div class="stat-label">Total Revenue</div>
+                </div>
+                <span class="stat-icon">
+                    <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </span>
+            </div>
+        </div>
+
+        <!-- Outstanding -->
+        <div class="stat-card" style="border-left-color: #f59e0b;">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div id="statOutstanding" class="stat-value">
+                        <div class="skeleton" style="width: 80px; height: 28px;"></div>
+                    </div>
+                    <div class="stat-label">Outstanding</div>
+                </div>
+                <span class="stat-icon">
+                    <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </span>
+            </div>
+        </div>
+
+        <!-- Overdue Amount -->
+        <div class="stat-card" style="border-left-color: #ef4444;">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div id="statOverdue" class="stat-value">
+                        <div class="skeleton" style="width: 80px; height: 28px;"></div>
+                    </div>
+                    <div class="stat-label">Overdue Amount</div>
+                </div>
+                <span class="stat-icon">
+                    <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                </span>
+            </div>
+        </div>
+
+        <!-- Collected -->
+        <div class="stat-card" style="border-left-color: #10b981;">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div id="statCollected" class="stat-value">
+                        <div class="skeleton" style="width: 80px; height: 28px;"></div>
+                    </div>
+                    <div class="stat-label">Collected</div>
+                </div>
+                <span class="stat-icon">
+                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Stats Grid - Row 2 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+        <!-- Total Invoices -->
+        <div class="card stat-card" style="border-left-color: #6366f1;">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="stat-card-number" id="statTotalInvoices">
+                        <div class="skeleton" style="width: 50px; height: 24px;"></div>
+                    </div>
+                    <div class="stat-card-label">Total Invoices</div>
+                </div>
+                <span class="stat-icon">
+                    <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </span>
+            </div>
+        </div>
+
+        <!-- Overdue Invoices -->
+        <div class="card stat-card stat-card-danger">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="stat-card-number" id="statOverdueInvoices">
+                        <div class="skeleton" style="width: 50px; height: 24px;"></div>
+                    </div>
+                    <div class="stat-card-label">Overdue Invoices</div>
+                </div>
+                <span class="stat-icon">
+                    <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                    </svg>
+                </span>
+            </div>
+        </div>
+
+        <!-- Unpaid Invoices -->
+        <div class="card stat-card stat-card-warning">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="stat-card-number" id="statUnpaidInvoices">
+                        <div class="skeleton" style="width: 50px; height: 24px;"></div>
+                    </div>
+                    <div class="stat-card-label">Unpaid Invoices</div>
+                </div>
+                <span class="stat-icon">
+                    <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </span>
+            </div>
+        </div>
+
+        <!-- Zoho Customers -->
+        <div class="card stat-card stat-card-info">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="stat-card-number" id="statZohoCustomers">
+                        <div class="skeleton" style="width: 50px; height: 24px;"></div>
+                    </div>
+                    <div class="stat-card-label">Zoho Customers</div>
+                </div>
+                <span class="stat-icon">
+                    <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid: Recent Invoices + Sidebar -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+        <!-- Recent Invoices Table -->
+        <div class="lg:col-span-2 bg-white rounded-lg shadow p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-800">Recent Invoices</h3>
+                <a href="/admin-zoho-invoices.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All &rarr;</a>
+            </div>
+
+            <div id="invoicesLoading" class="space-y-3">
+                <div class="skeleton" style="width: 100%; height: 40px;"></div>
+                <div class="skeleton" style="width: 100%; height: 32px;"></div>
+                <div class="skeleton" style="width: 100%; height: 32px;"></div>
+                <div class="skeleton" style="width: 100%; height: 32px;"></div>
+                <div class="skeleton" style="width: 100%; height: 32px;"></div>
+            </div>
+
+            <div id="invoicesContent" class="hidden">
+                <div class="table-wrapper">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200 text-left">
+                                <th class="pb-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Invoice #</th>
+                                <th class="pb-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Customer</th>
+                                <th class="pb-3 font-semibold text-gray-600 text-xs uppercase tracking-wide hidden sm:table-cell">Date</th>
+                                <th class="pb-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">Amount</th>
+                                <th class="pb-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right hidden sm:table-cell">Balance</th>
+                                <th class="pb-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoicesTableBody">
+                            <!-- Rows populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="noInvoices" class="hidden text-center py-8 text-gray-400 text-sm">
+                    No invoices found. Sync with Zoho to load data.
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar: Sync Status + Quick Actions -->
+        <div class="space-y-6">
+
+            <!-- Sync Status Card -->
+            <div class="bg-white rounded-lg shadow p-5">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Sync Status</h3>
+
+                <div class="space-y-3 mb-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Last Full Sync</span>
+                        <span id="syncLastTime" class="text-sm font-medium text-gray-800">--</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Auto-Sync</span>
+                        <span id="syncAutoStatus" class="text-sm font-medium">
+                            <div class="skeleton" style="width: 60px; height: 18px;"></div>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-3">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recent Sync Log</h4>
+                    <div id="syncLogLoading">
+                        <div class="skeleton mb-2" style="width: 100%; height: 20px;"></div>
+                        <div class="skeleton mb-2" style="width: 90%; height: 20px;"></div>
+                        <div class="skeleton" style="width: 85%; height: 20px;"></div>
+                    </div>
+                    <div id="syncLogContent" class="hidden">
+                        <div id="syncLogEntries">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div id="noSyncLog" class="hidden text-xs text-gray-400 text-center py-2">
+                            No sync history available
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-lg shadow p-5">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Quick Actions</h3>
+                <div class="grid grid-cols-1 gap-3">
+                    <a href="/admin-zoho-invoices.html" class="quick-link">
+                        <span class="quick-link-icon">
+                            <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </span>
+                        <span>View Invoices</span>
+                    </a>
+                    <a href="/admin-zoho-reports.html" class="quick-link">
+                        <span class="quick-link-icon">
+                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </span>
+                        <span>Financial Reports</span>
+                    </a>
+                    <a href="/admin-zoho-settings.html" class="quick-link">
+                        <span class="quick-link-icon">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </span>
+                        <span>Zoho Settings</span>
+                    </a>
+                    <button onclick="syncCustomers()" class="quick-link text-left w-full" id="syncCustomersBtn">
+                        <span class="quick-link-icon">
+                            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                        </span>
+                        <span id="syncCustomersText">Sync Customers</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- API USAGE MONITOR -->
+    <!-- ============================== -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">API Usage Monitor</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Real-time Zoho Books API call tracking (10,000/day limit)</p>
+            </div>
+            <button onclick="loadApiUsage()" id="usageRefreshBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition shadow-sm">
+                <svg id="usageRefreshIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Refresh
+            </button>
+        </div>
+
+        <!-- Sync Lock Status -->
+        <div id="syncLockBanner" class="sync-lock-banner idle mb-4 hidden">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+            <span id="syncLockText">No active sync operations</span>
+        </div>
+
+        <!-- Row 1: Daily Quota + Rate Gauge + Quick Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+
+            <!-- Daily Quota Gauge -->
+            <div class="bg-white rounded-xl shadow-sm p-5 flex flex-col items-center justify-center">
+                <div class="usage-gauge mb-2">
+                    <svg width="120" height="120">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="#e5e7eb" stroke-width="8"/>
+                        <circle id="quotaArc" cx="60" cy="60" r="52" fill="none" stroke="#667eea" stroke-width="8"
+                            stroke-dasharray="326.7" stroke-dashoffset="326.7" stroke-linecap="round"/>
+                    </svg>
+                    <div class="usage-gauge-text">
+                        <div class="value" id="quotaPercent">--%</div>
+                        <div class="label">used today</div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <div class="text-sm font-bold text-gray-800"><span id="quotaUsed">--</span> / <span id="quotaLimit">10,000</span></div>
+                    <div class="text-xs text-gray-500">API calls today</div>
+                </div>
+            </div>
+
+            <!-- Remaining + Rate -->
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <div class="text-xs font-semibold text-gray-500 uppercase mb-3">Quota Status</div>
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-gray-600">Remaining</span>
+                            <span class="text-sm font-bold" id="quotaRemaining">--</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="quotaBar" class="h-2 rounded-full bg-green-500 transition-all" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-600">Rate Tokens</span>
+                        <span class="text-sm font-bold" id="rateTokens">--/80</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-600">Queued Requests</span>
+                        <span class="text-sm font-bold" id="rateQueued">0</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-600">Last 5 Minutes</span>
+                        <span class="text-sm font-bold" id="rateLast5">--</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-600">Last Hour</span>
+                        <span class="text-sm font-bold" id="rateLastHour">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calls Per Minute Chart -->
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <div class="text-xs font-semibold text-gray-500 uppercase mb-3">Calls/Minute (Last 5 min)</div>
+                <div class="rate-bar mb-2" id="rateBarChart">
+                    <div class="rate-bar-col" style="height: 0%"></div>
+                    <div class="rate-bar-col" style="height: 0%"></div>
+                    <div class="rate-bar-col" style="height: 0%"></div>
+                    <div class="rate-bar-col" style="height: 0%"></div>
+                    <div class="rate-bar-col" style="height: 0%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-gray-400" id="rateBarLabels">
+                    <span>--</span><span>--</span><span>--</span><span>--</span><span>--</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-100">
+                    <div class="text-xs font-semibold text-gray-500 uppercase mb-2">Hourly Trend</div>
+                    <div class="rate-bar" id="hourlyBarChart" style="height: 36px;"></div>
+                </div>
+            </div>
+
+            <!-- Active Operations -->
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <div class="text-xs font-semibold text-gray-500 uppercase mb-3">Active Operations</div>
+                <div id="activeOpsContent" class="space-y-2">
+                    <div class="text-xs text-gray-400 text-center py-4">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Top Callers + Recent Activity -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+            <!-- Top API Callers -->
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <div class="text-xs font-semibold text-gray-500 uppercase mb-3">Top API Consumers</div>
+                <div id="topCallersContent">
+                    <div class="skeleton" style="width: 100%; height: 120px;"></div>
+                </div>
+            </div>
+
+            <!-- Recent Activity Log -->
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <div class="text-xs font-semibold text-gray-500 uppercase mb-3">Recent API Activity</div>
+                <div id="recentActivityContent" style="max-height: 240px; overflow-y: auto;">
+                    <div class="skeleton" style="width: 100%; height: 120px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Currency formatting helper
+    function formatCurrency(amount) {
+        const num = parseFloat(amount || 0);
+        if (num >= 10000000) return '\u20B9' + (num / 10000000).toFixed(2) + 'Cr';
+        if (num >= 100000) return '\u20B9' + (num / 100000).toFixed(2) + 'L';
+        if (num >= 1000) return '\u20B9' + (num / 1000).toFixed(1) + 'K';
+        return '\u20B9' + num.toFixed(0);
+    }
+
+    // Format date for display
+    function formatDate(dateStr) {
+        if (!dateStr) return '--';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    // Format relative time for sync timestamps
+    function formatRelativeTime(dateStr) {
+        if (!dateStr) return 'Never';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMin = Math.floor(diffMs / 60000);
+        const diffHr = Math.floor(diffMs / 3600000);
+        const diffDay = Math.floor(diffMs / 86400000);
+
+        if (diffMin < 1) return 'Just now';
+        if (diffMin < 60) return diffMin + 'm ago';
+        if (diffHr < 24) return diffHr + 'h ago';
+        if (diffDay < 7) return diffDay + 'd ago';
+        return formatDate(dateStr);
+    }
+
+    // Toast notification
+    function showToast(message, type) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast toast-' + (type || 'info') + ' show';
+        setTimeout(function() {
+            toast.classList.remove('show');
+        }, 3500);
+    }
+
+    // Get status badge HTML
+    function getStatusBadge(status) {
+        const s = (status || 'draft').toLowerCase().replace(/\s+/g, '_');
+        const labels = {
+            paid: 'Paid',
+            overdue: 'Overdue',
+            sent: 'Sent',
+            partially_paid: 'Partial',
+            draft: 'Draft',
+            void: 'Void'
+        };
+        const label = labels[s] || status;
+        return '<span class="badge badge-' + s + '">' + label + '</span>';
+    }
+
+    // Load connection status
+    async function loadConnectionStatus() {
+        try {
+            const response = await fetch('/api/zoho/status', {
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const data = result.data;
+                const banner = document.getElementById('connectionBanner');
+                const connection = data.connection || {};
+
+                if (!connection.connected) {
+                    banner.className = 'mb-4 rounded-lg p-4 border bg-yellow-50 border-yellow-300';
+                    banner.innerHTML = '<div class="flex items-center gap-3">' +
+                        '<svg class="w-5 h-5 text-yellow-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path>' +
+                        '</svg>' +
+                        '<div class="flex-1">' +
+                        '<p class="text-sm font-semibold text-yellow-800">Zoho Books not connected</p>' +
+                        '<p class="text-xs text-yellow-700 mt-0.5">Connect your Zoho Books account to sync invoices and financial data.</p>' +
+                        '</div>' +
+                        '<a href="/admin-zoho-settings.html" class="text-sm font-medium text-yellow-800 hover:text-yellow-900 underline flex-shrink-0">Go to Settings</a>' +
+                        '</div>';
+                    banner.classList.remove('hidden');
+                } else {
+                    banner.className = 'mb-4 rounded-lg p-4 border bg-green-50 border-green-300';
+                    banner.innerHTML = '<div class="flex items-center gap-3">' +
+                        '<svg class="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
+                        '</svg>' +
+                        '<p class="text-sm font-medium text-green-800">Zoho Books connected' +
+                        (connection.organization_name ? ' - ' + connection.organization_name : '') +
+                        '</p>' +
+                        '</div>';
+                    banner.classList.remove('hidden');
+                }
+
+                // Update sync status card
+                updateSyncStatus(data);
+            }
+        } catch (error) {
+            console.error('Failed to load connection status:', error);
+        }
+    }
+
+    // Update sync status card
+    function updateSyncStatus(data) {
+        // Last sync time
+        const lastSync = data.last_full_sync;
+        const syncTimeEl = document.getElementById('syncLastTime');
+        syncTimeEl.textContent = formatRelativeTime(lastSync);
+
+        // Update header label too
+        const lastSyncLabel = document.getElementById('lastSyncLabel');
+        if (lastSync) {
+            lastSyncLabel.textContent = 'Last sync: ' + formatRelativeTime(lastSync);
+            lastSyncLabel.classList.remove('hidden');
+        }
+
+        // Auto-sync status
+        const autoEl = document.getElementById('syncAutoStatus');
+        if (data.sync_enabled) {
+            autoEl.innerHTML = '<span class="inline-flex items-center gap-1 text-green-700"><span class="w-2 h-2 bg-green-500 rounded-full"></span> Enabled</span>';
+        } else {
+            autoEl.innerHTML = '<span class="inline-flex items-center gap-1 text-gray-500"><span class="w-2 h-2 bg-gray-400 rounded-full"></span> Disabled</span>';
+        }
+
+        // Sync log
+        const logLoading = document.getElementById('syncLogLoading');
+        const logContent = document.getElementById('syncLogContent');
+        const logEntries = document.getElementById('syncLogEntries');
+        const noLog = document.getElementById('noSyncLog');
+
+        logLoading.classList.add('hidden');
+        logContent.classList.remove('hidden');
+
+        const recentSyncs = data.recent_syncs || [];
+
+        if (recentSyncs.length === 0) {
+            noLog.classList.remove('hidden');
+        } else {
+            noLog.classList.add('hidden');
+            logEntries.innerHTML = '';
+            // Show last 5 entries
+            const entries = recentSyncs.slice(0, 5);
+            entries.forEach(function(sync) {
+                const statusColor = sync.status === 'success' ? 'text-green-600' : (sync.status === 'error' ? 'text-red-600' : 'text-yellow-600');
+                const statusIcon = sync.status === 'success' ? '&#10003;' : (sync.status === 'error' ? '&#10007;' : '&#8635;');
+                const entry = document.createElement('div');
+                entry.className = 'sync-entry flex items-center justify-between';
+                entry.innerHTML = '<div class="flex items-center gap-2">' +
+                    '<span class="' + statusColor + ' font-bold text-xs">' + statusIcon + '</span>' +
+                    '<span class="text-gray-700">' + (sync.type || 'Full sync') + '</span>' +
+                    '</div>' +
+                    '<span class="text-gray-400">' + formatRelativeTime(sync.timestamp || sync.created_at) + '</span>';
+                logEntries.appendChild(entry);
+            });
+        }
+    }
+
+    // Load dashboard KPI data
+    async function loadDashboardData() {
+        try {
+            const response = await fetch('/api/zoho/dashboard', {
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const data = result.data;
+                const inv = data.invoices || {};
+                const pay = data.payments || {};
+                const cust = data.customers || {};
+
+                // Row 1 - Currency KPIs
+                document.getElementById('statRevenue').textContent = formatCurrency(inv.total_revenue);
+                document.getElementById('statOutstanding').textContent = formatCurrency(inv.total_outstanding);
+                document.getElementById('statOverdue').textContent = formatCurrency(inv.overdue_amount);
+                document.getElementById('statCollected').textContent = formatCurrency(pay.total_collected);
+
+                // Row 2 - Count KPIs
+                document.getElementById('statTotalInvoices').textContent = inv.total_count || 0;
+                document.getElementById('statOverdueInvoices').textContent = inv.overdue_count || 0;
+                document.getElementById('statUnpaidInvoices').textContent = inv.unpaid_count || 0;
+                document.getElementById('statZohoCustomers').textContent = cust.total_count || 0;
+            } else {
+                // Set defaults when no data
+                document.getElementById('statRevenue').textContent = '\u20B90';
+                document.getElementById('statOutstanding').textContent = '\u20B90';
+                document.getElementById('statOverdue').textContent = '\u20B90';
+                document.getElementById('statCollected').textContent = '\u20B90';
+                document.getElementById('statTotalInvoices').textContent = '0';
+                document.getElementById('statOverdueInvoices').textContent = '0';
+                document.getElementById('statUnpaidInvoices').textContent = '0';
+                document.getElementById('statZohoCustomers').textContent = '0';
+            }
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            // Show zeros on error
+            ['statRevenue', 'statOutstanding', 'statOverdue', 'statCollected'].forEach(function(id) {
+                document.getElementById(id).textContent = '\u20B90';
+            });
+            ['statTotalInvoices', 'statOverdueInvoices', 'statUnpaidInvoices', 'statZohoCustomers'].forEach(function(id) {
+                document.getElementById(id).textContent = '0';
+            });
+        }
+    }
+
+    // Load recent invoices
+    async function loadRecentInvoices() {
+        try {
+            const response = await fetch('/api/zoho/invoices?limit=10&sort=invoice_date&order=DESC', {
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const result = await response.json();
+
+            document.getElementById('invoicesLoading').classList.add('hidden');
+            document.getElementById('invoicesContent').classList.remove('hidden');
+
+            if (result.success && result.data && result.data.length > 0) {
+                const tbody = document.getElementById('invoicesTableBody');
+                tbody.innerHTML = '';
+
+                result.data.forEach(function(inv) {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-gray-100 hover:bg-gray-50 transition';
+                    row.innerHTML = '<td class="py-3 pr-3 font-medium text-indigo-700">' + (inv.invoice_number || '--') + '</td>' +
+                        '<td class="py-3 pr-3 text-gray-700 max-w-[150px] truncate">' + (inv.customer_name || '--') + '</td>' +
+                        '<td class="py-3 pr-3 text-gray-500 hidden sm:table-cell">' + formatDate(inv.invoice_date || inv.date) + '</td>' +
+                        '<td class="py-3 pr-3 text-right font-medium text-gray-800">' + formatCurrency(inv.total || inv.amount) + '</td>' +
+                        '<td class="py-3 pr-3 text-right text-gray-600 hidden sm:table-cell">' + formatCurrency(inv.balance) + '</td>' +
+                        '<td class="py-3 text-center">' + getStatusBadge(inv.status) + '</td>';
+                    tbody.appendChild(row);
+                });
+            } else {
+                document.getElementById('noInvoices').classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Failed to load invoices:', error);
+            document.getElementById('invoicesLoading').classList.add('hidden');
+            document.getElementById('invoicesContent').classList.remove('hidden');
+            document.getElementById('noInvoices').classList.remove('hidden');
+        }
+    }
+
+    // Trigger full sync
+    async function triggerFullSync() {
+        const btn = document.getElementById('syncNowBtn');
+        const icon = document.getElementById('syncIcon');
+        const text = document.getElementById('syncBtnText');
+
+        btn.disabled = true;
+        btn.classList.add('opacity-75');
+        icon.classList.add('animate-spin');
+        text.textContent = 'Syncing...';
+
+        try {
+            const response = await fetch('/api/zoho/sync/full', {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(result.message || 'Full sync started successfully', 'success');
+                // Reload data after a brief delay to allow sync to begin
+                setTimeout(function() {
+                    loadAll();
+                }, 2000);
+            } else {
+                showToast(result.message || 'Sync failed. Please try again.', 'error');
+            }
+        } catch (error) {
+            console.error('Sync error:', error);
+            showToast('Failed to start sync. Check your connection.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.classList.remove('opacity-75');
+            icon.classList.remove('animate-spin');
+            text.textContent = 'Sync Now';
+        }
+    }
+
+    // Sync customers only
+    async function syncCustomers() {
+        const btn = document.getElementById('syncCustomersBtn');
+        const text = document.getElementById('syncCustomersText');
+
+        btn.disabled = true;
+        btn.style.opacity = '0.75';
+        text.textContent = 'Syncing...';
+
+        try {
+            const response = await fetch('/api/zoho/sync/customers', {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast(result.message || 'Customer sync started', 'success');
+                setTimeout(function() {
+                    loadAll();
+                }, 2000);
+            } else {
+                showToast(result.message || 'Customer sync failed', 'error');
+            }
+        } catch (error) {
+            console.error('Customer sync error:', error);
+            showToast('Failed to sync customers', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            text.textContent = 'Sync Customers';
+        }
+    }
+
+    // ============================
+    // API USAGE MONITOR
+    // ============================
+
+    const callerColors = [
+        '#667eea', '#764ba2', '#f59e0b', '#10b981', '#ef4444',
+        '#6366f1', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6',
+        '#06b6d4', '#84cc16', '#e11d48', '#0ea5e9', '#a855f7'
+    ];
+
+    function getCallerColor(index) {
+        return callerColors[index % callerColors.length];
+    }
+
+    function getCallerLabel(name) {
+        const labels = {
+            'syncItems': 'Sync Items',
+            'getItemDetails': 'Item Details',
+            'bulkUpdateItem': 'Bulk Update',
+            'getInvoiceDetail': 'Invoice Detail',
+            'getItemDetail': 'Item Detail',
+            'dailyReport.invoices': 'Report: Invoices',
+            'dailyReport.bills': 'Report: Bills',
+            'dailyReport.salesOrders': 'Report: Sales Orders',
+            'dailyReport.purchaseOrders': 'Report: PO',
+            'inventoryAdjustment': 'Stock Adjustment',
+            'unknown': 'Other'
+        };
+        return labels[name] || name;
+    }
+
+    async function loadApiUsage() {
+        var refreshIcon = document.getElementById('usageRefreshIcon');
+        refreshIcon.classList.add('animate-spin');
+
+        try {
+            var response = await fetch('/api/zoho/api-usage', {
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            if (!response.ok) throw new Error('Failed to load API usage');
+
+            var result = await response.json();
+
+            if (result.success && result.data) {
+                renderApiUsage(result.data);
+            }
+        } catch (error) {
+            console.error('Failed to load API usage:', error);
+        } finally {
+            refreshIcon.classList.remove('animate-spin');
+        }
+    }
+
+    function renderApiUsage(data) {
+        var daily = data.daily || {};
+        var rate = data.rate || {};
+        var topCallers = data.top_callers || [];
+        var recentActivity = data.recent_activity || [];
+        var syncLock = data.sync_lock || {};
+        var hourly = data.hourly_breakdown || [];
+        var recentSyncs = data.recent_syncs || [];
+        var activeBulkJobs = data.active_bulk_jobs || [];
+
+        // === Quota Gauge ===
+        var percent = daily.percentage || 0;
+        var circumference = 2 * Math.PI * 52; // 326.7
+        var offset = circumference - (percent / 100) * circumference;
+
+        var arc = document.getElementById('quotaArc');
+        arc.style.strokeDasharray = circumference;
+        arc.style.strokeDashoffset = offset;
+
+        // Color based on usage level
+        if (percent >= 90) {
+            arc.style.stroke = '#ef4444';
+        } else if (percent >= 70) {
+            arc.style.stroke = '#f59e0b';
+        } else {
+            arc.style.stroke = '#667eea';
+        }
+
+        document.getElementById('quotaPercent').textContent = percent + '%';
+        document.getElementById('quotaPercent').style.color = percent >= 90 ? '#ef4444' : percent >= 70 ? '#f59e0b' : '#1f2937';
+        document.getElementById('quotaUsed').textContent = (daily.used || 0).toLocaleString();
+        document.getElementById('quotaLimit').textContent = (daily.limit || 10000).toLocaleString();
+        document.getElementById('quotaRemaining').textContent = (daily.remaining || 0).toLocaleString();
+
+        // Quota bar color
+        var quotaBar = document.getElementById('quotaBar');
+        var remainPct = Math.max(0, 100 - percent);
+        quotaBar.style.width = remainPct + '%';
+        quotaBar.className = 'h-2 rounded-full transition-all ' + (percent >= 90 ? 'bg-red-500' : percent >= 70 ? 'bg-yellow-500' : 'bg-green-500');
+
+        // Rate info
+        document.getElementById('rateTokens').textContent = (rate.current_tokens || 0) + '/80';
+        document.getElementById('rateQueued').textContent = rate.queued || 0;
+        document.getElementById('rateLast5').textContent = (rate.calls_last_5_min || 0) + ' calls';
+        document.getElementById('rateLastHour').textContent = (rate.calls_last_hour || 0) + ' calls';
+
+        // === Calls Per Minute Bar Chart ===
+        var cpm = rate.calls_per_minute || [];
+        var maxCount = Math.max(1, ...cpm.map(function(c) { return c.count; }));
+        var barChart = document.getElementById('rateBarChart');
+        var barLabels = document.getElementById('rateBarLabels');
+
+        barChart.innerHTML = '';
+        barLabels.innerHTML = '';
+        cpm.forEach(function(item) {
+            var heightPct = Math.max(2, (item.count / maxCount) * 100);
+            var bar = document.createElement('div');
+            bar.className = 'rate-bar-col';
+            bar.style.height = heightPct + '%';
+            bar.title = item.minute + ': ' + item.count + ' calls';
+            barChart.appendChild(bar);
+
+            var label = document.createElement('span');
+            label.textContent = item.minute;
+            barLabels.appendChild(label);
+        });
+
+        // === Hourly Breakdown Chart ===
+        var hourlyChart = document.getElementById('hourlyBarChart');
+        hourlyChart.innerHTML = '';
+        if (hourly.length > 0) {
+            var maxHourly = Math.max(1, ...hourly.map(function(h) { return h.count; }));
+            hourly.forEach(function(h) {
+                var heightPct = Math.max(2, (h.count / maxHourly) * 100);
+                var bar = document.createElement('div');
+                bar.className = 'rate-bar-col';
+                bar.style.height = heightPct + '%';
+                bar.style.background = h.count > 0 ? 'linear-gradient(180deg, #10b981, #059669)' : '#e5e7eb';
+                bar.title = h.hour + ': ' + h.count + ' calls';
+                hourlyChart.appendChild(bar);
+            });
+        }
+
+        // === Sync Lock Banner ===
+        var banner = document.getElementById('syncLockBanner');
+        var bannerText = document.getElementById('syncLockText');
+        banner.classList.remove('hidden');
+        if (syncLock.locked) {
+            var durationMin = Math.round((syncLock.duration_ms || 0) / 60000);
+            banner.className = 'sync-lock-banner mb-4';
+            bannerText.innerHTML = '<strong>' + (syncLock.operation || 'Unknown') + '</strong> in progress (' + durationMin + ' min) - Bulk jobs paused';
+        } else {
+            banner.className = 'sync-lock-banner idle mb-4';
+            bannerText.textContent = 'No active sync operations - all systems idle';
+        }
+
+        // === Active Operations ===
+        var opsContent = document.getElementById('activeOpsContent');
+        var opsHtml = '';
+
+        if (activeBulkJobs.length > 0) {
+            activeBulkJobs.forEach(function(job) {
+                var jobPct = job.total_items > 0 ? Math.round(((job.processed_items || 0) / job.total_items) * 100) : 0;
+                opsHtml += '<div class="p-2 rounded-lg bg-blue-50 border border-blue-200">';
+                opsHtml += '<div class="flex items-center justify-between mb-1">';
+                opsHtml += '<span class="text-xs font-semibold text-blue-800">Bulk Job #' + job.id + '</span>';
+                opsHtml += '<span class="text-xs text-blue-600">' + jobPct + '%</span>';
+                opsHtml += '</div>';
+                opsHtml += '<div class="w-full bg-blue-200 rounded-full h-1.5">';
+                opsHtml += '<div class="h-1.5 rounded-full bg-blue-600" style="width: ' + jobPct + '%"></div>';
+                opsHtml += '</div>';
+                opsHtml += '<div class="text-[10px] text-blue-600 mt-1">' + (job.processed_items || 0) + '/' + job.total_items + ' items</div>';
+                opsHtml += '</div>';
+            });
+        }
+
+        if (recentSyncs.length > 0) {
+            var activeSync = recentSyncs.find(function(s) { return s.status === 'started' || s.status === 'in_progress'; });
+            if (activeSync) {
+                opsHtml += '<div class="p-2 rounded-lg bg-green-50 border border-green-200">';
+                opsHtml += '<div class="flex items-center gap-2">';
+                opsHtml += '<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>';
+                opsHtml += '<span class="text-xs font-semibold text-green-800">' + (activeSync.sync_type || 'Sync') + ' in progress</span>';
+                opsHtml += '</div>';
+                opsHtml += '</div>';
+            }
+        }
+
+        if (daily.paused) {
+            opsHtml += '<div class="p-2 rounded-lg bg-red-50 border border-red-200">';
+            opsHtml += '<div class="flex items-center gap-2">';
+            opsHtml += '<svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+            opsHtml += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path>';
+            opsHtml += '</svg>';
+            opsHtml += '<span class="text-xs font-semibold text-red-800">Daily quota paused!</span>';
+            opsHtml += '</div>';
+            opsHtml += '<div class="text-[10px] text-red-600 mt-1">Non-essential API operations are paused until tomorrow to preserve quota.</div>';
+            opsHtml += '</div>';
+        }
+
+        if (!opsHtml) {
+            opsHtml = '<div class="text-xs text-gray-400 text-center py-4">No active operations</div>';
+        }
+
+        opsContent.innerHTML = opsHtml;
+
+        // === Top Callers ===
+        var callersHtml = '';
+        if (topCallers.length > 0) {
+            var maxCallerCount = topCallers[0].count || 1;
+            topCallers.forEach(function(caller, index) {
+                var barWidth = Math.max(4, Math.round((caller.count / maxCallerCount) * 100));
+                var color = getCallerColor(index);
+                callersHtml += '<div class="flex items-center gap-3 mb-2">';
+                callersHtml += '<div class="w-28 flex-shrink-0 text-xs font-medium text-gray-700 truncate" title="' + caller.name + '">' + getCallerLabel(caller.name) + '</div>';
+                callersHtml += '<div class="flex-1">';
+                callersHtml += '<div class="flex items-center gap-2">';
+                callersHtml += '<div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">';
+                callersHtml += '<div class="h-full rounded-full" style="width: ' + barWidth + '%; background: ' + color + ';"></div>';
+                callersHtml += '</div>';
+                callersHtml += '<span class="text-xs font-bold text-gray-700 w-12 text-right">' + caller.count + '</span>';
+                callersHtml += '<span class="text-[10px] text-gray-400 w-8 text-right">' + caller.percentage + '%</span>';
+                callersHtml += '</div>';
+                callersHtml += '</div>';
+                callersHtml += '</div>';
+            });
+        } else {
+            callersHtml = '<div class="text-xs text-gray-400 text-center py-6">No API calls recorded today</div>';
+        }
+        document.getElementById('topCallersContent').innerHTML = callersHtml;
+
+        // === Recent Activity ===
+        var activityHtml = '';
+        if (recentActivity.length > 0) {
+            recentActivity.forEach(function(entry) {
+                activityHtml += '<div class="activity-entry">';
+                activityHtml += '<span class="text-gray-700">' + getCallerLabel(entry.caller) + '</span>';
+                activityHtml += '<span class="text-gray-400">' + entry.time + '</span>';
+                activityHtml += '</div>';
+            });
+        } else {
+            activityHtml = '<div class="text-xs text-gray-400 text-center py-6">No recent activity</div>';
+        }
+        document.getElementById('recentActivityContent').innerHTML = activityHtml;
+    }
+
+    // === Auto-refresh API usage every 30 seconds ===
+    var usageRefreshInterval = null;
+
+    function startUsageAutoRefresh() {
+        if (usageRefreshInterval) return;
+        usageRefreshInterval = setInterval(loadApiUsage, 30000);
+    }
+
+    function stopUsageAutoRefresh() {
+        if (usageRefreshInterval) {
+            clearInterval(usageRefreshInterval);
+            usageRefreshInterval = null;
+        }
+    }
+
+    // Stop auto-refresh when tab is not visible
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            stopUsageAutoRefresh();
+        } else {
+            loadApiUsage();
+            startUsageAutoRefresh();
+        }
+    });
+
+    // Load all data
+    function loadAll() {
+        loadConnectionStatus();
+        loadDashboardData();
+        loadRecentInvoices();
+        loadApiUsage();
+        startUsageAutoRefresh();
+    }
+
+    // Initialize
+    loadAll();
+</script>
+</body>
+</html>

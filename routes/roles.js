@@ -19,7 +19,7 @@ function setPool(dbPool) {
  * GET /api/roles
  * List all roles
  */
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requirePermission('roles', 'view'), async (req, res) => {
     try {
         const { user_type, status } = req.query;
 
@@ -59,7 +59,7 @@ router.get('/', requireAuth, async (req, res) => {
  * GET /api/roles/permissions/all
  * List all available permissions (must be before /:id)
  */
-router.get('/permissions/all', requireAuth, async (req, res) => {
+router.get('/permissions/all', requirePermission('roles', 'view'), async (req, res) => {
     try {
         const [permissions] = await pool.query('SELECT * FROM permissions ORDER BY module, action');
 
@@ -82,7 +82,7 @@ router.get('/permissions/all', requireAuth, async (req, res) => {
  * GET /api/roles/permissions/by-module
  * List permissions grouped by module
  */
-router.get('/permissions/by-module', requireAuth, async (req, res) => {
+router.get('/permissions/by-module', requirePermission('roles', 'view'), async (req, res) => {
     try {
         const [permissions] = await pool.query('SELECT * FROM permissions ORDER BY module, action');
 
@@ -90,6 +90,11 @@ router.get('/permissions/by-module', requireAuth, async (req, res) => {
         permissions.forEach(perm => {
             if (!grouped[perm.module]) {
                 grouped[perm.module] = [];
+            }
+            // Auto-generate display_name if missing
+            if (!perm.display_name) {
+                const action = perm.action.replace(/_/g, ' ');
+                perm.display_name = action.charAt(0).toUpperCase() + action.slice(1);
             }
             grouped[perm.module].push(perm);
         });
@@ -112,7 +117,7 @@ router.get('/permissions/by-module', requireAuth, async (req, res) => {
  * GET /api/roles/:id
  * Get role details with permissions
  */
-router.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', requirePermission('roles', 'view'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -333,7 +338,7 @@ router.delete('/:id', requirePermission('roles', 'manage'), async (req, res) => 
  * GET /api/roles/:id/permissions
  * Get permissions for a specific role
  */
-router.get('/:id/permissions', requireAuth, async (req, res) => {
+router.get('/:id/permissions', requirePermission('roles', 'view'), async (req, res) => {
     try {
         const { id } = req.params;
 

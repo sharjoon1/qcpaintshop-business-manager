@@ -10,6 +10,8 @@
     const CONFIG = {
         HEADER_PATH: '/components/header-v2.html',
         SIDEBAR_PATH: '/components/sidebar-complete.html',
+        ZOHO_SUBNAV_PATH: '/components/zoho-subnav.html',
+        ATTENDANCE_SUBNAV_PATH: '/components/attendance-subnav.html',
         RETRY_ATTEMPTS: 3,
         RETRY_DELAY: 1000
     };
@@ -126,10 +128,27 @@
             if (headerLoaded && sidebarLoaded) {
                 componentsLoaded = true;
                 console.log('✅ Universal navigation loaded successfully!');
-                
+
                 // Ensure global functions exist
                 ensureGlobalFunctions();
-                
+
+                // Load module subnavs based on data-page
+                const dataPage = document.body.getAttribute('data-page') || document.documentElement.getAttribute('data-page') || '';
+                const header = document.getElementById('mainHeader');
+                if (header && header.nextSibling) {
+                    if (dataPage.startsWith('zoho-')) {
+                        const subnavLoaded = await loadComponentWithRetry(CONFIG.ZOHO_SUBNAV_PATH, header.nextSibling);
+                        if (subnavLoaded) {
+                            console.log('✅ Zoho sub-navigation loaded');
+                        }
+                    } else if (dataPage.startsWith('attendance-')) {
+                        const subnavLoaded = await loadComponentWithRetry(CONFIG.ATTENDANCE_SUBNAV_PATH, header.nextSibling);
+                        if (subnavLoaded) {
+                            console.log('✅ Attendance sub-navigation loaded');
+                        }
+                    }
+                }
+
                 // Dispatch custom event
                 document.dispatchEvent(new CustomEvent('navigationLoaded'));
             } else {

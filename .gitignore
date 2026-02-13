@@ -12,3 +12,19 @@ storage/framework/views/*
 *.log
 composer.lock
 package-lock.json
+
+# User uploads (runtime data, not source code)
+uploads/
+public/uploads/attendance/
+public/uploads/profiles/
+public/uploads/documents/
+public/uploads/design-requests/
+public/uploads/visualizations/
+public/uploads/daily-tasks/
+public/uploads/aadhar/
+public/uploads/logos/
+
+# Artifacts
+cookie.txt
+nul
+.claude/settings.local.json

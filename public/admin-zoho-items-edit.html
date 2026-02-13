@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Edit Items - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+        .toast { position: fixed; top: 1rem; right: 1rem; z-index: 9999; padding: 0.75rem 1.25rem; border-radius: 8px; color: white; font-weight: 500; font-size: 0.875rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateX(120%); transition: transform 0.3s ease; }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-info { background: #2563eb; }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* Full-height table wrapper */
+        .edit-table-outer { position: relative; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+        .edit-table-scroll { overflow: auto; max-height: calc(100vh - 220px); min-height: 400px; }
+
+        /* Table */
+        .edit-table { font-size: 0.8rem; border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+        .edit-table thead th { position: sticky; top: 0; z-index: 12; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; padding: 0; font-weight: 600; color: #475569; white-space: nowrap; text-align: left; }
+        .edit-table thead th .th-inner { display: flex; flex-direction: column; }
+        .edit-table thead th .th-label { display: flex; align-items: center; gap: 4px; padding: 6px 8px; cursor: pointer; user-select: none; }
+        .edit-table thead th .th-label:hover { background: #e2e8f0; }
+        .edit-table thead th .th-label .sort-icon { opacity: 0.3; font-size: 0.65rem; }
+        .edit-table thead th .th-label .sort-icon.active { opacity: 1; color: #667eea; }
+        .edit-table thead th .th-filter { padding: 2px 4px 4px; }
+        .edit-table thead th .th-filter input, .edit-table thead th .th-filter select { width: 100%; padding: 2px 5px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.7rem; outline: none; background: white; }
+        .edit-table thead th .th-filter input:focus, .edit-table thead th .th-filter select:focus { border-color: #667eea; }
+        .edit-table tbody td { padding: 1px 3px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .edit-table tbody tr:hover { background: #f0f4ff; }
+        .edit-table tbody tr.row-dirty { background: #fffdf5; }
+
+        /* Sticky first columns: checkbox + Item Name */
+        .edit-table thead th.col-cb, .edit-table tbody td.col-cb { position: sticky; left: 0; z-index: 11; background: inherit; min-width: 32px; width: 32px; }
+        .edit-table thead th.col-cb { z-index: 14; background: #f1f5f9; }
+        .edit-table thead th.col-name, .edit-table tbody td.col-name { position: sticky; left: 32px; z-index: 11; min-width: 200px; max-width: 260px; border-right: 2px solid #e2e8f0; }
+        .edit-table thead th.col-name { z-index: 14; background: #f1f5f9; }
+        .edit-table tbody td.col-cb { background: white; }
+        .edit-table tbody td.col-name { background: white; }
+        .edit-table tbody tr:hover td.col-cb, .edit-table tbody tr:hover td.col-name { background: #f0f4ff; }
+        .edit-table tbody tr.row-dirty td.col-cb, .edit-table tbody tr.row-dirty td.col-name { background: #fffdf5; }
+
+        /* Hidden column */
+        .col-hidden { display: none !important; }
+
+        /* Editable cell */
+        .ecell { cursor: pointer; padding: 4px 5px; border-radius: 3px; min-height: 26px; display: flex; align-items: center; border: 1px solid transparent; transition: border-color 0.1s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; }
+        .ecell:hover { border-color: #cbd5e1; background: #fafbfc; }
+        .ecell.dirty { background: #fffbeb; border-color: #fbbf24; }
+        .ecell.editing { padding: 0; border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.2); }
+        .ecell input, .ecell select, .ecell textarea { width: 100%; padding: 3px 5px; border: none; outline: none; font-size: 0.8rem; background: transparent; font-family: inherit; }
+        .ecell textarea { resize: vertical; min-height: 26px; }
+        .rcell { padding: 4px 5px; color: #64748b; font-size: 0.75rem; white-space: nowrap; }
+
+        /* Change badge */
+        .change-badge { display: inline-flex; align-items: center; gap: 4px; background: #fef3c7; color: #92400e; font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid #fbbf24; }
+
+        /* Sticky toolbar */
+        .edit-toolbar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; background: white; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 8px 16px; transition: transform 0.3s ease; }
+        .edit-toolbar.hidden-bar { transform: translateY(100%); pointer-events: none; }
+
+        .item-checkbox { width: 0.875rem; height: 0.875rem; accent-color: #667eea; cursor: pointer; }
+
+        /* Column toggle dropdown */
+        .col-toggle-dropdown { position: absolute; top: 100%; right: 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); padding: 8px 0; z-index: 60; min-width: 200px; max-height: 400px; overflow-y: auto; }
+        .col-toggle-dropdown label { display: flex; align-items: center; gap: 8px; padding: 5px 12px; font-size: 0.8rem; cursor: pointer; transition: background 0.1s; }
+        .col-toggle-dropdown label:hover { background: #f1f5f9; }
+
+        /* % adjustment popover */
+        .pct-popover { position: absolute; top: 100%; left: 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 12px; z-index: 60; min-width: 240px; }
+
+        /* Mobile */
+        @media (max-width: 767px) { .edit-table-outer { display: none; } .edit-cards { display: block; } }
+        @media (min-width: 768px) { .edit-table-outer { display: block; } .edit-cards { display: none; } }
+        .edit-card-field label { font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em; }
+        .edit-card-field input, .edit-card-field select, .edit-card-field textarea { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.8125rem; outline: none; transition: border-color 0.15s; }
+        .edit-card-field input:focus, .edit-card-field select:focus, .edit-card-field textarea:focus { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.15); }
+        .edit-card-field .dirty-input { background: #fffbeb; border-color: #fbbf24; }
+        .slide-form-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+        .slide-form { background: white; border-radius: 16px 16px 0 0; width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto; padding: 1rem; animation: slideUp 0.25s ease; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    </style>
+</head>
+<body data-page="zoho-items-edit" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
+
+    <div style="padding: 12px 16px; max-width: 100%;">
+
+        <!-- Header Row -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
+            <div>
+                <div class="flex items-center gap-3">
+                    <h2 class="text-xl md:text-2xl font-bold text-gray-800">Edit Items</h2>
+                    <span id="changesBadge" class="change-badge hidden">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <span id="changesCount">0</span> changes
+                    </span>
+                    <span id="itemsCount" class="inline-block bg-gray-200 text-gray-700 text-xs font-semibold px-2 py-0.5 rounded-full">--</span>
+                </div>
+                <p class="text-gray-500 mt-0.5 text-xs">Click any cell to edit inline. Use column headers to sort/filter.</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- % Adjust button -->
+                <div class="relative" id="pctAdjustWrap">
+                    <button onclick="togglePctPopover()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1.5 transition" title="Adjust rates by %">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        % Adjust
+                    </button>
+                    <div id="pctPopover" class="pct-popover hidden">
+                        <div class="text-xs font-semibold text-gray-700 mb-2">Adjust Rates by Percentage</div>
+                        <div class="space-y-2">
+                            <div>
+                                <label class="text-xs text-gray-500">Apply to</label>
+                                <select id="pctField" class="w-full mt-0.5 px-2 py-1.5 border border-gray-300 rounded text-xs">
+                                    <option value="rate">Rate (Selling Price)</option>
+                                    <option value="purchase_rate">Purchase Rate</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500">Percentage (%)</label>
+                                <div class="flex gap-1 mt-0.5">
+                                    <input type="number" id="pctValue" step="0.01" placeholder="e.g. 10 or -5" class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs outline-none focus:border-indigo-500">
+                                    <span class="flex items-center text-xs text-gray-400">%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500">Scope</label>
+                                <select id="pctScope" class="w-full mt-0.5 px-2 py-1.5 border border-gray-300 rounded text-xs">
+                                    <option value="selected">Selected items only</option>
+                                    <option value="page">All on current page</option>
+                                </select>
+                            </div>
+                            <div class="flex gap-2 pt-1">
+                                <button onclick="togglePctPopover()" class="flex-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-600">Cancel</button>
+                                <button onclick="applyPctAdjust()" class="flex-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-xs font-medium text-white">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Column toggle -->
+                <div class="relative" id="colToggleWrap">
+                    <button onclick="toggleColDropdown()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1.5 transition" title="Toggle columns">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+                        Columns
+                    </button>
+                    <div id="colDropdown" class="col-toggle-dropdown hidden"></div>
+                </div>
+                <button onclick="syncItems()" id="syncBtn" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1.5 transition">
+                    <svg id="syncIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <span id="syncBtnText">Sync</span>
+                </button>
+                <a href="/admin-zoho-items.html" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 transition">View Items</a>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <div class="bg-white rounded-lg shadow-sm p-2 mb-3 flex flex-col sm:flex-row gap-2 items-end">
+            <div class="flex-1 relative">
+                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <input type="text" id="searchInput" onkeyup="debounceSearch()" placeholder="Search by item name or SKU..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+            </div>
+            <button onclick="clearSearch()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 text-xs font-medium text-gray-700 transition whitespace-nowrap">Clear</button>
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingState" class="text-center py-12">
+            <svg class="inline w-8 h-8 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <p class="text-gray-500 mt-3 text-sm">Loading items...</p>
+        </div>
+
+        <!-- Empty -->
+        <div id="emptyState" class="hidden text-center py-12 bg-white rounded-lg shadow">
+            <svg class="mx-auto w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+            <h3 class="text-base font-semibold text-gray-800 mb-1">No items found</h3>
+            <p class="text-gray-600 text-sm">Try syncing or adjusting your search.</p>
+        </div>
+
+        <!-- Table Container -->
+        <div id="itemsTableContainer" class="hidden">
+            <div class="edit-table-outer">
+                <div class="edit-table-scroll" id="tableScroll">
+                    <table class="edit-table" id="editTable">
+                        <thead><tr id="tableHead"></tr></thead>
+                        <tbody id="itemsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Mobile Cards -->
+            <div class="edit-cards space-y-3" id="editCardsContainer"></div>
+
+            <!-- Pagination -->
+            <div class="mt-3 flex flex-col sm:flex-row items-center justify-between gap-3 pb-14">
+                <div class="text-xs text-gray-600" id="paginationInfo">Showing 0 items</div>
+                <div class="flex items-center gap-1" id="paginationControls"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sticky bottom toolbar -->
+    <div id="editToolbar" class="edit-toolbar hidden-bar">
+        <div style="max-width:100%;margin:0 auto;" class="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div class="flex items-center gap-3 flex-wrap">
+                <span class="change-badge">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    <span id="toolbarChangesCount">0</span> changes in <span id="toolbarItemCount">0</span> items
+                </span>
+                <button onclick="discardChanges()" class="text-xs text-gray-500 hover:text-red-600 underline">Discard All</button>
+                <button onclick="selectAllChanged()" class="text-xs text-gray-500 hover:text-indigo-600 underline">Select Changed</button>
+            </div>
+            <button onclick="pushChangesToZoho()" id="pushBtn" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-xs transition flex items-center gap-2">
+                <svg id="pushSpinner" class="hidden w-3.5 h-3.5 spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <svg class="w-3.5 h-3.5" id="pushIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                <span id="pushBtnText">Push Changes to Zoho</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile Edit Slide-up -->
+    <div id="mobileEditOverlay" class="slide-form-overlay hidden" onclick="if(event.target===this)closeMobileEditForm()">
+        <div class="slide-form" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-gray-800 text-base" id="mobileEditTitle">Edit Item</h3>
+                <button onclick="closeMobileEditForm()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div id="mobileEditFields" class="space-y-3"></div>
+            <div class="mt-4 flex gap-2">
+                <button onclick="closeMobileEditForm()" class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700">Cancel</button>
+                <button onclick="saveMobileEdit()" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium text-white">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ============ STATE ============
+    var items = [];
+    var currentPage = 1, totalItems = 0, totalPages = 1, PAGE_LIMIT = 100;
+    var searchTimeout = null;
+    var selectedItemIds = new Set();
+    var dirtyItems = new Map();   // { zoho_item_id: { field: newValue } }
+    var originalValues = new Map();
+    var activeEditCell = null;
+    var sortField = 'name', sortDir = 'asc';
+    var columnFilters = {};  // { field: filterValue }
+
+    // Column definitions
+    var allColumns = [
+        { key: 'name', label: 'Item Name', type: 'text', zohoField: 'name', sticky: true, visible: true, filterable: true },
+        { key: 'sku', label: 'SKU', type: 'text', zohoField: 'sku', visible: true, filterable: true, width: 110 },
+        { key: 'rate', label: 'Rate', type: 'number', zohoField: 'rate', step: '0.01', visible: true, filterable: true, width: 90, pctAdjust: true },
+        { key: 'purchase_rate', label: 'Purchase Rate', type: 'number', zohoField: 'purchase_rate', step: '0.01', visible: true, filterable: true, width: 100, pctAdjust: true },
+        { key: 'cf_dpl', label: 'DPL', type: 'number', zohoField: 'cf_dpl', step: '0.01', visible: true, filterable: true, width: 90 },
+        { key: 'unit', label: 'Unit', type: 'select', zohoField: 'unit', options: ['','pcs','kg','ltr','nos','box','set','mtr','sqft','gm','ml','pair','dozen','bundle'], visible: true, filterable: true, width: 75 },
+        { key: 'hsn_or_sac', label: 'HSN/SAC', type: 'text', zohoField: 'hsn_or_sac', visible: true, filterable: true, width: 90 },
+        { key: 'tax_percentage', label: 'Tax %', type: 'number', zohoField: 'tax_percentage', step: '0.01', visible: false, filterable: true, width: 65 },
+        { key: 'brand', label: 'Brand', type: 'text', zohoField: 'brand', visible: true, filterable: true, width: 110 },
+        { key: 'manufacturer', label: 'Manufacturer', type: 'text', zohoField: 'manufacturer', visible: false, filterable: true, width: 110 },
+        { key: 'reorder_level', label: 'Reorder Lvl', type: 'number', zohoField: 'reorder_level', step: '1', visible: false, filterable: true, width: 80 },
+        { key: 'description', label: 'Description', type: 'textarea', zohoField: 'description', visible: false, filterable: true, width: 180 },
+        { key: 'cf_product_name', label: 'Product Name', type: 'text', zohoField: 'cf_product_name', visible: false, filterable: true, width: 150 },
+        { key: 'stock_on_hand', label: 'Stock', type: 'readonly', visible: true, width: 70 },
+        { key: 'last_synced', label: 'Last Synced', type: 'readonly', visible: false, width: 110 }
+    ];
+
+    function getEditableColumns() { return allColumns.filter(function(c) { return c.type !== 'readonly'; }); }
+    function getVisibleColumns() { return allColumns.filter(function(c) { return c.visible; }); }
+
+    // ============ AUTH / HELPERS ============
+    function getAuthHeaders() { return { 'Authorization': 'Bearer ' + localStorage.getItem('auth_token'), 'Content-Type': 'application/json' }; }
+    function showToast(msg, type) { var t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast toast-' + (type || 'info'); t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 3500); }
+    function formatINR(a) { return '\u20B9' + parseFloat(a || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }); }
+    function formatDateTime(d) { if (!d) return '--'; var dt = new Date(d); if (isNaN(dt.getTime())) return d; return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' + dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
+    function escapeHtml(s) { if (s === null || s === undefined) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // ============ DIRTY TRACKING ============
+    function getOriginal(id, f) { var o = originalValues.get(String(id)); return o ? o[f] : undefined; }
+    function setDirty(itemId, field, newValue) {
+        var id = String(itemId);
+        var origStr = String(getOriginal(id, field) ?? '');
+        var newStr = String(newValue ?? '');
+        if (origStr === newStr) {
+            if (dirtyItems.has(id)) { var c = dirtyItems.get(id); delete c[field]; if (!Object.keys(c).length) dirtyItems.delete(id); }
+        } else {
+            if (!dirtyItems.has(id)) dirtyItems.set(id, {});
+            dirtyItems.get(id)[field] = newValue;
+        }
+        updateChangesUI();
+    }
+    function isDirty(id, f) { var i = String(id); return dirtyItems.has(i) && dirtyItems.get(i).hasOwnProperty(f); }
+    function getCurrentValue(id, f) { var i = String(id); if (dirtyItems.has(i) && dirtyItems.get(i).hasOwnProperty(f)) return dirtyItems.get(i)[f]; return getOriginal(i, f); }
+    function getTotalChanges() { var c = 0; dirtyItems.forEach(function(ch) { c += Object.keys(ch).length; }); return c; }
+    function getDirtyItemCount() { return dirtyItems.size; }
+
+    function updateChangesUI() {
+        var count = getDirtyItemCount(), total = getTotalChanges();
+        var badge = document.getElementById('changesBadge'), toolbar = document.getElementById('editToolbar');
+        if (count > 0) {
+            badge.classList.remove('hidden');
+            document.getElementById('changesCount').textContent = total;
+            document.getElementById('toolbarChangesCount').textContent = total;
+            document.getElementById('toolbarItemCount').textContent = count;
+            toolbar.classList.remove('hidden-bar');
+            document.getElementById('pushBtnText').textContent = 'Push ' + count + ' Item' + (count > 1 ? 's' : '') + ' to Zoho';
+        } else { badge.classList.add('hidden'); toolbar.classList.add('hidden-bar'); }
+    }
+    function discardChanges() { if (!getDirtyItemCount()) return; if (!confirm('Discard all ' + getTotalChanges() + ' unsaved changes?')) return; dirtyItems.clear(); updateChangesUI(); renderTable(); renderCards(); }
+    function selectAllChanged() { selectedItemIds.clear(); dirtyItems.forEach(function(_, id) { selectedItemIds.add(id); }); renderTable(); renderCards(); }
+
+    // ============ COLUMN TOGGLE ============
+    function toggleColDropdown() {
+        var dd = document.getElementById('colDropdown');
+        if (dd.classList.contains('hidden')) { buildColDropdown(); dd.classList.remove('hidden'); } else { dd.classList.add('hidden'); }
+    }
+    function buildColDropdown() {
+        var html = '<div class="px-3 py-1 text-xs font-semibold text-gray-500 border-b mb-1">Show/Hide Columns</div>';
+        allColumns.forEach(function(col, idx) {
+            if (col.sticky) return; // Item Name always visible
+            html += '<label><input type="checkbox" ' + (col.visible ? 'checked' : '') + ' onchange="toggleColumn(' + idx + ', this.checked)" class="item-checkbox"> ' + escapeHtml(col.label) + '</label>';
+        });
+        html += '<div class="border-t mt-1 pt-1 px-3 py-1 flex gap-2"><button onclick="setAllCols(true)" class="text-xs text-indigo-600 hover:underline">Show All</button><button onclick="setAllCols(false)" class="text-xs text-gray-500 hover:underline">Minimal</button></div>';
+        document.getElementById('colDropdown').innerHTML = html;
+    }
+    function toggleColumn(idx, visible) { allColumns[idx].visible = visible; renderTableHead(); renderTable(); }
+    function setAllCols(show) { allColumns.forEach(function(c) { if (!c.sticky) c.visible = show; }); if (!show) { ['sku','rate','purchase_rate','cf_dpl','unit','brand','stock_on_hand'].forEach(function(k) { var c = allColumns.find(function(x){return x.key===k;}); if(c) c.visible = true; }); } buildColDropdown(); renderTableHead(); renderTable(); }
+
+    // ============ % ADJUSTMENT ============
+    function togglePctPopover() { document.getElementById('pctPopover').classList.toggle('hidden'); }
+    function applyPctAdjust() {
+        var field = document.getElementById('pctField').value;
+        var pct = parseFloat(document.getElementById('pctValue').value);
+        var scope = document.getElementById('pctScope').value;
+        if (isNaN(pct) || pct === 0) { showToast('Enter a non-zero percentage', 'error'); return; }
+        var targetItems = [];
+        if (scope === 'selected') {
+            if (selectedItemIds.size === 0) { showToast('Select items first', 'error'); return; }
+            targetItems = items.filter(function(it) { return selectedItemIds.has(String(it.item_id || it.zoho_item_id)); });
+        } else { targetItems = items; }
+        var count = 0;
+        targetItems.forEach(function(item) {
+            var id = String(item.item_id || item.zoho_item_id);
+            var current = parseFloat(getCurrentValue(id, field)) || 0;
+            if (current > 0) {
+                var newVal = Math.round((current * (1 + pct / 100)) * 100) / 100;
+                setDirty(id, field, String(newVal));
+                count++;
+            }
+        });
+        togglePctPopover();
+        renderTable();
+        showToast('Adjusted ' + field.replace('_', ' ') + ' by ' + (pct > 0 ? '+' : '') + pct + '% for ' + count + ' items', 'success');
+    }
+
+    // ============ SORTING ============
+    function toggleSort(field) {
+        if (sortField === field) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+        else { sortField = field; sortDir = 'asc'; }
+        sortItems();
+        renderTableHead();
+        renderTable();
+    }
+    function sortItems() {
+        items.sort(function(a, b) {
+            var va = a[sortField], vb = b[sortField];
+            if (va === null || va === undefined) va = '';
+            if (vb === null || vb === undefined) vb = '';
+            var na = parseFloat(va), nb = parseFloat(vb);
+            if (!isNaN(na) && !isNaN(nb)) { return sortDir === 'asc' ? na - nb : nb - na; }
+            va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+            if (va < vb) return sortDir === 'asc' ? -1 : 1;
+            if (va > vb) return sortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    // ============ COLUMN FILTERS ============
+    function onColumnFilter(field, value) {
+        if (value) { columnFilters[field] = value.toLowerCase(); } else { delete columnFilters[field]; }
+        renderTable();
+    }
+    function getFilteredItems() {
+        var keys = Object.keys(columnFilters);
+        if (keys.length === 0) return items;
+        return items.filter(function(item) {
+            return keys.every(function(f) {
+                var val = String(getCurrentValue(String(item.item_id || item.zoho_item_id), f) || item[f] || '').toLowerCase();
+                return val.indexOf(columnFilters[f]) !== -1;
+            });
+        });
+    }
+
+    // ============ SEARCH ============
+    function debounceSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(function() { currentPage = 1; loadItems(); }, 400); }
+    function clearSearch() { document.getElementById('searchInput').value = ''; currentPage = 1; loadItems(); }
+
+    // ============ LOAD ITEMS ============
+    async function loadItems() {
+        var search = document.getElementById('searchInput').value.trim();
+        var url = '/api/zoho/items?page=' + currentPage + '&limit=' + PAGE_LIMIT;
+        if (search) url += '&search=' + encodeURIComponent(search);
+
+        document.getElementById('loadingState').classList.remove('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('itemsTableContainer').classList.add('hidden');
+
+        try {
+            var resp = await fetch(url, { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Failed to load items');
+            var data = await resp.json();
+            items = data.data || [];
+            var pg = data.pagination || {};
+            totalItems = pg.total || items.length;
+            totalPages = pg.pages || Math.ceil(totalItems / PAGE_LIMIT) || 1;
+            document.getElementById('itemsCount').textContent = totalItems + ' items';
+
+            items.forEach(function(item) {
+                var id = String(item.item_id || item.zoho_item_id);
+                if (!originalValues.has(id)) {
+                    var orig = {};
+                    allColumns.forEach(function(col) { orig[col.key] = item[col.key] !== undefined ? item[col.key] : null; });
+                    originalValues.set(id, orig);
+                }
+            });
+
+            sortItems();
+            document.getElementById('loadingState').classList.add('hidden');
+            if (items.length === 0) { document.getElementById('emptyState').classList.remove('hidden'); }
+            else { document.getElementById('itemsTableContainer').classList.remove('hidden'); renderTableHead(); renderTable(); renderCards(); renderPagination(); }
+        } catch (err) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('emptyState').classList.remove('hidden');
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+
+    // ============ RENDER TABLE HEAD ============
+    function renderTableHead() {
+        var tr = document.getElementById('tableHead');
+        var html = '<th class="col-cb"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="item-checkbox" title="Select all"></th>';
+        allColumns.forEach(function(col) {
+            var hiddenCls = col.visible ? '' : ' col-hidden';
+            var stickyCls = col.sticky ? ' col-name' : '';
+            var w = col.width ? 'min-width:' + col.width + 'px' : (col.sticky ? 'min-width:200px' : '');
+            var sortIcon = '';
+            if (sortField === col.key) { sortIcon = '<span class="sort-icon active">' + (sortDir === 'asc' ? '&#9650;' : '&#9660;') + '</span>'; }
+            else { sortIcon = '<span class="sort-icon">&#9650;</span>'; }
+            html += '<th class="' + stickyCls + hiddenCls + '" style="' + w + '">';
+            html += '<div class="th-inner">';
+            html += '<div class="th-label" onclick="toggleSort(\'' + col.key + '\')">' + escapeHtml(col.label) + ' ' + sortIcon + '</div>';
+            if (col.filterable) {
+                html += '<div class="th-filter"><input type="text" placeholder="Filter..." value="' + escapeHtml(columnFilters[col.key] || '') + '" oninput="onColumnFilter(\'' + col.key + '\', this.value)" onclick="event.stopPropagation()"></div>';
+            }
+            html += '</div></th>';
+        });
+        tr.innerHTML = html;
+    }
+
+    // ============ RENDER TABLE BODY ============
+    function renderTable() {
+        var tbody = document.getElementById('itemsTableBody');
+        var filtered = getFilteredItems();
+        var html = '';
+        filtered.forEach(function(item) {
+            var itemId = String(item.item_id || item.zoho_item_id);
+            var checked = selectedItemIds.has(itemId) ? 'checked' : '';
+            var rowDirty = dirtyItems.has(itemId) ? ' row-dirty' : '';
+            html += '<tr data-item-id="' + escapeHtml(itemId) + '" class="' + rowDirty + '">';
+            html += '<td class="col-cb"><input type="checkbox" class="item-checkbox" data-id="' + escapeHtml(itemId) + '" onchange="toggleItemSelect(this)" ' + checked + '></td>';
+
+            allColumns.forEach(function(col) {
+                var hiddenCls = col.visible ? '' : ' col-hidden';
+                var stickyCls = col.sticky ? ' col-name' : '';
+                if (col.type === 'readonly') {
+                    var rv = col.key === 'last_synced' ? formatDateTime(item[col.key]) : (item[col.key] != null ? String(item[col.key]) : '--');
+                    html += '<td class="' + stickyCls + hiddenCls + '"><div class="rcell">' + escapeHtml(rv) + '</div></td>';
+                } else {
+                    var val = getCurrentValue(itemId, col.key);
+                    var displayVal = val !== null && val !== undefined ? String(val) : '';
+                    var dirty = isDirty(itemId, col.key);
+                    html += '<td class="' + stickyCls + hiddenCls + '">';
+                    html += '<div class="ecell' + (dirty ? ' dirty' : '') + '" data-item-id="' + escapeHtml(itemId) + '" data-field="' + col.key + '" onclick="startEdit(this)" title="' + escapeHtml(displayVal) + '">';
+                    html += escapeHtml(displayVal) || '<span style="color:#cbd5e1">--</span>';
+                    html += '</div></td>';
+                }
+            });
+            html += '</tr>';
+        });
+        tbody.innerHTML = html;
+        updateSelectAllCheckbox();
+    }
+
+    // ============ INLINE EDIT ============
+    function startEdit(cell) {
+        if (cell.classList.contains('editing')) return;
+        if (activeEditCell && activeEditCell !== cell) commitEdit(activeEditCell);
+        var itemId = cell.getAttribute('data-item-id'), field = cell.getAttribute('data-field');
+        var col = allColumns.find(function(c) { return c.key === field; });
+        if (!col || col.type === 'readonly') return;
+        var val = getCurrentValue(itemId, field);
+        var valStr = val !== null && val !== undefined ? String(val) : '';
+        cell.classList.add('editing');
+        activeEditCell = cell;
+
+        if (col.type === 'select') {
+            var sh = '<select data-item-id="'+escapeHtml(itemId)+'" data-field="'+field+'" onchange="onCellChange(this)" onblur="commitEdit(this.parentNode)" onkeydown="onCellKeydown(event,this.parentNode)">';
+            col.options.forEach(function(o) { sh += '<option value="'+escapeHtml(o)+'"'+(o===valStr?' selected':'')+'>'+escapeHtml(o||'(none)')+'</option>'; });
+            sh += '</select>';
+            cell.innerHTML = sh; cell.querySelector('select').focus();
+        } else if (col.type === 'textarea') {
+            cell.innerHTML = '<textarea data-item-id="'+escapeHtml(itemId)+'" data-field="'+field+'" oninput="onCellChange(this)" onblur="commitEdit(this.parentNode)" onkeydown="onCellKeydown(event,this.parentNode)" rows="2">'+escapeHtml(valStr)+'</textarea>';
+            cell.querySelector('textarea').focus();
+        } else {
+            var it = col.type === 'number' ? 'number' : 'text';
+            var st = col.step ? ' step="'+col.step+'"' : '';
+            cell.innerHTML = '<input type="'+it+'"'+st+' data-item-id="'+escapeHtml(itemId)+'" data-field="'+field+'" value="'+escapeHtml(valStr)+'" oninput="onCellChange(this)" onblur="commitEdit(this.parentNode)" onkeydown="onCellKeydown(event,this.parentNode)">';
+            var inp = cell.querySelector('input'); inp.focus(); inp.select();
+        }
+    }
+    function onCellChange(input) {
+        var itemId = input.getAttribute('data-item-id'), field = input.getAttribute('data-field');
+        setDirty(itemId, field, input.value);
+        var cell = input.closest('.ecell');
+        cell.classList.toggle('dirty', isDirty(itemId, field));
+    }
+    function onCellKeydown(event, cell) {
+        if (event.key === 'Escape') {
+            var itemId = cell.getAttribute('data-item-id'), field = cell.getAttribute('data-field');
+            if (dirtyItems.has(itemId)) { var c = dirtyItems.get(itemId); delete c[field]; if (!Object.keys(c).length) dirtyItems.delete(itemId); }
+            updateChangesUI(); commitEdit(cell); event.preventDefault();
+        } else if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') {
+            commitEdit(cell);
+            var tr = cell.closest('tr'), next = tr.nextElementSibling;
+            if (next) { var nc = next.querySelector('.ecell[data-field="'+cell.getAttribute('data-field')+'"]'); if (nc) setTimeout(function(){startEdit(nc);},50); }
+            event.preventDefault();
+        } else if (event.key === 'Tab') {
+            event.preventDefault(); commitEdit(cell);
+            var td = cell.closest('td'), tr = td.closest('tr');
+            var nextTd = event.shiftKey ? td.previousElementSibling : td.nextElementSibling;
+            while (nextTd && (!nextTd.querySelector('.ecell') || nextTd.classList.contains('col-hidden'))) nextTd = event.shiftKey ? nextTd.previousElementSibling : nextTd.nextElementSibling;
+            if (nextTd) { var nc = nextTd.querySelector('.ecell'); if (nc) setTimeout(function(){startEdit(nc);},50); }
+            else { var nextTr = event.shiftKey ? tr.previousElementSibling : tr.nextElementSibling; if (nextTr) { var cells = Array.from(nextTr.querySelectorAll('.ecell')).filter(function(c){return !c.closest('td').classList.contains('col-hidden');}); var tc = event.shiftKey ? cells[cells.length-1] : cells[0]; if (tc) setTimeout(function(){startEdit(tc);},50); } }
+        }
+    }
+    function commitEdit(cell) {
+        if (!cell || !cell.classList.contains('editing')) return;
+        var itemId = cell.getAttribute('data-item-id'), field = cell.getAttribute('data-field');
+        var val = getCurrentValue(itemId, field);
+        var displayVal = val !== null && val !== undefined ? String(val) : '';
+        cell.classList.remove('editing');
+        cell.classList.toggle('dirty', isDirty(itemId, field));
+        cell.innerHTML = escapeHtml(displayVal) || '<span style="color:#cbd5e1">--</span>';
+        cell.title = displayVal;
+        if (activeEditCell === cell) activeEditCell = null;
+        // Update row dirty class
+        var tr = cell.closest('tr');
+        if (tr) tr.classList.toggle('row-dirty', dirtyItems.has(itemId));
+    }
+
+    // ============ MOBILE CARDS ============
+    function renderCards() {
+        var container = document.getElementById('editCardsContainer');
+        var html = '';
+        items.forEach(function(item) {
+            var itemId = String(item.item_id || item.zoho_item_id);
+            var hasDirty = dirtyItems.has(itemId);
+            html += '<div class="bg-white rounded-lg shadow p-4'+(hasDirty?' border-l-4 border-amber-400':'')+'">';
+            html += '<div class="flex items-start justify-between gap-2"><div class="flex-1 min-w-0">';
+            html += '<h4 class="font-semibold text-gray-800 text-sm truncate">'+escapeHtml(getCurrentValue(itemId,'name')||'--')+'</h4>';
+            html += '<div class="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-gray-500">';
+            html += '<span>SKU: <b class="text-gray-700">'+escapeHtml(getCurrentValue(itemId,'sku')||'--')+'</b></span>';
+            html += '<span>Rate: <b class="text-gray-700">'+formatINR(getCurrentValue(itemId,'rate'))+'</b></span>';
+            html += '<span>DPL: <b class="text-gray-700">'+escapeHtml(getCurrentValue(itemId,'cf_dpl')||'--')+'</b></span>';
+            html += '</div>';
+            if (hasDirty) { var cc = Object.keys(dirtyItems.get(itemId)).length; html += '<div class="mt-1"><span class="change-badge">'+cc+' change'+(cc>1?'s':'')+'</span></div>'; }
+            html += '</div>';
+            html += '<button onclick="openMobileEdit(\''+escapeHtml(itemId)+'\')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-medium transition flex-shrink-0">Edit</button>';
+            html += '</div></div>';
+        });
+        container.innerHTML = html;
+    }
+
+    // ============ MOBILE EDIT FORM ============
+    var mobileEditItemId = null;
+    function openMobileEdit(itemId) {
+        mobileEditItemId = itemId;
+        var item = items.find(function(it) { return String(it.item_id || it.zoho_item_id) === itemId; });
+        if (!item) return;
+        document.getElementById('mobileEditTitle').textContent = getCurrentValue(itemId,'name') || 'Edit Item';
+        var html = '';
+        getEditableColumns().forEach(function(col) {
+            var val = getCurrentValue(itemId, col.key), valStr = val != null ? String(val) : '', dirty = isDirty(itemId, col.key);
+            html += '<div class="edit-card-field"><label>'+escapeHtml(col.label)+'</label>';
+            if (col.type === 'select') {
+                html += '<select data-field="'+col.key+'" class="'+(dirty?'dirty-input':'')+'">';
+                col.options.forEach(function(o) { html += '<option value="'+escapeHtml(o)+'"'+(o===valStr?' selected':'')+'>'+escapeHtml(o||'(none)')+'</option>'; });
+                html += '</select>';
+            } else if (col.type === 'textarea') { html += '<textarea data-field="'+col.key+'" rows="2" class="'+(dirty?'dirty-input':'')+'">'+escapeHtml(valStr)+'</textarea>';
+            } else { html += '<input type="'+(col.type==='number'?'number':'text')+'"'+(col.step?' step="'+col.step+'"':'')+' data-field="'+col.key+'" value="'+escapeHtml(valStr)+'" class="'+(dirty?'dirty-input':'')+'">'; }
+            html += '</div>';
+        });
+        html += '<div class="edit-card-field"><label>Stock</label><input type="text" value="'+escapeHtml(String(item.stock_on_hand!=null?item.stock_on_hand:'--'))+'" disabled class="bg-gray-50 text-gray-500"></div>';
+        document.getElementById('mobileEditFields').innerHTML = html;
+        document.getElementById('mobileEditOverlay').classList.remove('hidden');
+    }
+    function saveMobileEdit() {
+        if (!mobileEditItemId) return;
+        document.querySelectorAll('#mobileEditFields [data-field]').forEach(function(inp) { setDirty(mobileEditItemId, inp.getAttribute('data-field'), inp.value); });
+        closeMobileEditForm(); renderCards();
+    }
+    function closeMobileEditForm() { document.getElementById('mobileEditOverlay').classList.add('hidden'); mobileEditItemId = null; }
+
+    // ============ SELECTION ============
+    function toggleItemSelect(cb) { var id = cb.getAttribute('data-id'); if (cb.checked) selectedItemIds.add(id); else selectedItemIds.delete(id); updateSelectAllCheckbox(); }
+    function toggleSelectAll() { var sa = document.getElementById('selectAll'); items.forEach(function(it) { var id = String(it.item_id||it.zoho_item_id); if (sa.checked) selectedItemIds.add(id); else selectedItemIds.delete(id); }); document.querySelectorAll('.item-checkbox[data-id]').forEach(function(cb) { cb.checked = sa.checked; }); }
+    function updateSelectAllCheckbox() { var sa = document.getElementById('selectAll'); if (!sa) return; var pids = items.map(function(it){return String(it.item_id||it.zoho_item_id);}); var all = pids.length>0&&pids.every(function(id){return selectedItemIds.has(id);}); var some = pids.some(function(id){return selectedItemIds.has(id);}); sa.checked = all; sa.indeterminate = some && !all; }
+
+    // ============ PAGINATION ============
+    function renderPagination() {
+        var info = document.getElementById('paginationInfo'), ctl = document.getElementById('paginationControls');
+        var s = (currentPage-1)*PAGE_LIMIT+1, e = Math.min(currentPage*PAGE_LIMIT, totalItems);
+        info.textContent = 'Showing '+s+'-'+e+' of '+totalItems;
+        var h = '';
+        h += '<button onclick="goToPage('+(currentPage-1)+')" '+(currentPage<=1?'disabled':'')+' class="px-2.5 py-1 rounded text-xs font-medium transition '+(currentPage<=1?'bg-gray-100 text-gray-400 cursor-not-allowed':'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')+'">Prev</button>';
+        var sp = Math.max(1,currentPage-2), ep = Math.min(totalPages,currentPage+2);
+        if (sp>1) { h+='<button onclick="goToPage(1)" class="px-2.5 py-1 rounded text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">1</button>'; if(sp>2) h+='<span class="px-1 text-gray-400 text-xs">...</span>'; }
+        for (var i=sp;i<=ep;i++) { h+=i===currentPage?'<button class="px-2.5 py-1 rounded text-xs font-medium bg-indigo-600 text-white">'+i+'</button>':'<button onclick="goToPage('+i+')" class="px-2.5 py-1 rounded text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">'+i+'</button>'; }
+        if (ep<totalPages) { if(ep<totalPages-1) h+='<span class="px-1 text-gray-400 text-xs">...</span>'; h+='<button onclick="goToPage('+totalPages+')" class="px-2.5 py-1 rounded text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">'+totalPages+'</button>'; }
+        h += '<button onclick="goToPage('+(currentPage+1)+')" '+(currentPage>=totalPages?'disabled':'')+' class="px-2.5 py-1 rounded text-xs font-medium transition '+(currentPage>=totalPages?'bg-gray-100 text-gray-400 cursor-not-allowed':'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')+'">Next</button>';
+        ctl.innerHTML = h;
+    }
+    function goToPage(p) { if (p<1||p>totalPages) return; if (activeEditCell) commitEdit(activeEditCell); currentPage = p; loadItems(); document.getElementById('tableScroll').scrollTop = 0; }
+
+    // ============ SYNC ============
+    async function syncItems() {
+        var btn=document.getElementById('syncBtn'), icon=document.getElementById('syncIcon'), text=document.getElementById('syncBtnText');
+        btn.disabled=true; icon.classList.add('spinner'); text.textContent='Syncing...';
+        try {
+            var resp=await fetch('/api/zoho/sync/items',{method:'POST',headers:getAuthHeaders()});
+            if(!resp.ok){var e=await resp.json().catch(function(){return{};}); throw new Error(e.message||'Sync failed');}
+            var data=await resp.json();
+            showToast('Items synced'+(data.data&&data.data.synced?' ('+data.data.synced+')':''),'success');
+            originalValues.clear(); currentPage=1; loadItems();
+        } catch(err){showToast('Sync failed: '+err.message,'error');}
+        finally{btn.disabled=false;icon.classList.remove('spinner');text.textContent='Sync';}
+    }
+
+    // ============ PUSH TO ZOHO ============
+    async function pushChangesToZoho() {
+        var count=getDirtyItemCount();
+        if(!count){showToast('No changes','info');return;}
+        if(!confirm('Push changes for '+count+' item'+(count>1?'s':'')+' to Zoho Books?')) return;
+        var btn=document.getElementById('pushBtn'),spinner=document.getElementById('pushSpinner'),icon=document.getElementById('pushIcon'),text=document.getElementById('pushBtnText');
+        btn.disabled=true;spinner.classList.remove('hidden');icon.classList.add('hidden');text.textContent='Pushing...';
+        var payload=[];
+        dirtyItems.forEach(function(changes,itemId){var item=items.find(function(it){return String(it.item_id||it.zoho_item_id)===itemId;});payload.push({zoho_item_id:itemId,item_name:item?(item.name||item.item_name||''):'',changes:changes});});
+        try {
+            var resp=await fetch('/api/zoho/items/bulk-edit',{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({items:payload})});
+            if(!resp.ok){var e=await resp.json().catch(function(){return{};}); throw new Error(e.message||'Push failed');}
+            var data=await resp.json();
+            showToast('Bulk job created'+(data.data?' (Job #'+data.data.job_id+')':'')+' - '+count+' items queued','success');
+            dirtyItems.clear();originalValues.clear();updateChangesUI();loadItems();
+        } catch(err){showToast('Push failed: '+err.message,'error');}
+        finally{btn.disabled=false;spinner.classList.add('hidden');icon.classList.remove('hidden');text.textContent='Push Changes to Zoho';updateChangesUI();}
+    }
+
+    // ============ INIT ============
+    document.addEventListener('DOMContentLoaded', function() { loadItems(); });
+    window.addEventListener('beforeunload', function(e) { if(getDirtyItemCount()>0){e.preventDefault();e.returnValue='';} });
+    // Close dropdowns on outside click
+    document.addEventListener('click', function(e) {
+        if (!document.getElementById('colToggleWrap').contains(e.target)) document.getElementById('colDropdown').classList.add('hidden');
+        if (!document.getElementById('pctAdjustWrap').contains(e.target)) document.getElementById('pctPopover').classList.add('hidden');
+    });
+    </script>
+</body>
+</html>

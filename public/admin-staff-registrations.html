@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Staff Registrations - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <style>
+        .pulse-badge { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .modal-overlay { backdrop-filter: blur(4px); }
+        .aadhar-viewer { max-width: 100%; max-height: 300px; object-fit: contain; border-radius: 8px; }
+        .letter-paper { background: white; box-shadow: 0 4px 24px rgba(0,0,0,0.12); border: 1px solid #e5e7eb; }
+        .letter-paper table { border: 1px solid #e5e7eb; }
+        .letter-paper table td { border: 1px solid #e5e7eb; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Page Header -->
+    <div class="bg-white shadow-sm px-4 sm:px-6 lg:px-8 py-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Staff Registrations</h2>
+                <p class="text-gray-600 text-sm mt-1">Review and approve staff registration applications</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto p-4 sm:p-6">
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-sm text-gray-600">Total</div>
+                <div class="text-2xl font-bold text-gray-900" id="statTotal">0</div>
+            </div>
+            <div class="bg-yellow-50 rounded-lg shadow p-4 relative">
+                <div class="text-sm text-yellow-600">Pending</div>
+                <div class="text-2xl font-bold text-yellow-700" id="statPending">0</div>
+                <div class="absolute top-3 right-3 w-3 h-3 rounded-full bg-yellow-400 pulse-badge hidden" id="pendingDot"></div>
+            </div>
+            <div class="bg-green-50 rounded-lg shadow p-4">
+                <div class="text-sm text-green-600">Approved</div>
+                <div class="text-2xl font-bold text-green-700" id="statApproved">0</div>
+            </div>
+            <div class="bg-red-50 rounded-lg shadow p-4">
+                <div class="text-sm text-red-600">Rejected</div>
+                <div class="text-2xl font-bold text-red-700" id="statRejected">0</div>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="bg-white rounded-xl shadow-lg p-4 mb-6">
+            <div class="flex flex-col sm:flex-row gap-3">
+                <select id="filterStatus" onchange="loadRegistrations()" class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <div class="flex-1">
+                    <input type="text" id="filterSearch" placeholder="Search by name, phone, email, city..."
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                           oninput="debounceSearch()">
+                </div>
+            </div>
+        </div>
+
+        <!-- Registrations Table -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <!-- Loading State -->
+            <div id="loadingState" class="text-center py-8">
+                <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-12">
+                <svg class="mx-auto w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <p class="text-gray-500 mt-4">No registrations found</p>
+            </div>
+
+            <!-- Table -->
+            <div id="tableContainer" class="hidden overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b-2 border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">ID</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden sm:table-cell">Phone</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Email</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden lg:table-cell">City</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Date</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="regTableBody" class="divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div id="pagination" class="hidden flex items-center justify-between mt-4 pt-4 border-t">
+                <div class="text-sm text-gray-500" id="paginationInfo"></div>
+                <div class="flex gap-2" id="paginationButtons"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="reviewModal" class="fixed inset-0 bg-black bg-opacity-50 modal-overlay z-50 hidden flex items-start justify-center overflow-y-auto pt-16 sm:pt-20 pb-4 px-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mb-8">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-6 border-b">
+                <h3 class="text-lg font-bold text-gray-800" id="modalTitle">Review Registration</h3>
+                <button onclick="closeModal('reviewModal')" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 max-h-[70vh] overflow-y-auto" id="modalBody">
+                <!-- Personal Info Section -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Personal Information</h4>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div><span class="text-gray-500">Full Name:</span><br><strong id="mFullName"></strong></div>
+                        <div><span class="text-gray-500">Phone:</span><br><strong id="mPhone"></strong></div>
+                        <div><span class="text-gray-500">Email:</span><br><strong id="mEmail"></strong></div>
+                        <div><span class="text-gray-500">Date of Birth:</span><br><strong id="mDob"></strong></div>
+                    </div>
+                </div>
+
+                <!-- Address Section -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Address</h4>
+                    <div class="text-sm">
+                        <span id="mAddress" class="text-gray-700"></span>
+                    </div>
+                </div>
+
+                <!-- Emergency Contact -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Emergency Contact</h4>
+                    <div class="text-sm">
+                        <span id="mEmergency" class="text-gray-700"></span>
+                    </div>
+                </div>
+
+                <!-- Aadhar Section -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Aadhar Details</h4>
+                    <div class="text-sm mb-2">
+                        <span class="text-gray-500">Number:</span> <strong id="mAadhar"></strong>
+                    </div>
+                    <div id="mAadharProofContainer" class="hidden">
+                        <a id="mAadharProofLink" href="#" target="_blank" class="text-purple-600 hover:underline text-sm">View Document</a>
+                        <div class="mt-2">
+                            <img id="mAadharProofImg" class="aadhar-viewer hidden" alt="Aadhar proof">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Info (for approved/rejected) -->
+                <div id="mStatusInfo" class="mb-6 hidden">
+                    <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Status Information</h4>
+                    <div class="text-sm" id="mStatusDetails"></div>
+                </div>
+
+                <!-- Admin Action Section (only for pending) -->
+                <div id="adminActionSection">
+                    <hr class="my-4">
+                    <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Assign Role & Salary</h4>
+
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Role *</label>
+                            <select id="mRole" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                                <option value="">Select Role</option>
+                                <option value="staff">Staff</option>
+                                <option value="manager">Manager</option>
+                                <option value="accountant">Accountant</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Branch *</label>
+                            <select id="mBranch" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                                <option value="">Select Branch</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Joining Date *</label>
+                            <input type="date" id="mJoiningDate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Monthly Salary *</label>
+                            <input type="number" id="mSalary" placeholder="e.g. 15000" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3 mb-4">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Transport Allow.</label>
+                            <input type="number" id="mTransport" value="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Food Allow.</label>
+                            <input type="number" id="mFood" value="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Other Allow.</label>
+                            <input type="number" id="mOther" value="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button onclick="approveRegistration()" id="btnApprove"
+                                class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold text-sm">
+                            Approve & Generate Offer Letter
+                        </button>
+                        <button onclick="openRejectModal()" class="flex-1 bg-red-50 text-red-600 border border-red-200 py-3 rounded-lg hover:bg-red-100 transition font-semibold text-sm">
+                            Reject
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Actions for approved registrations -->
+                <div id="approvedActions" class="hidden">
+                    <hr class="my-4">
+                    <div class="flex gap-3 mb-2">
+                        <button onclick="openEditStaffModal()" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2.5 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition text-sm font-semibold flex items-center justify-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            Edit Staff Details
+                        </button>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="openOfferLetterEditor()" class="flex-1 bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 transition text-sm font-semibold">
+                            Preview & Edit Offer Letter
+                        </button>
+                        <button onclick="sendOfferLetter()" id="btnSendOffer"
+                                class="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
+                            Email Offer Letter
+                        </button>
+                    </div>
+                    <div id="offerSentInfo" class="hidden mt-2 text-xs text-green-600 text-center"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reject Modal -->
+    <div id="rejectModal" class="fixed inset-0 bg-black bg-opacity-50 modal-overlay z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div class="p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Reject Registration</h3>
+                <div class="mb-4">
+                    <label class="block text-sm text-gray-600 mb-2">Reason for rejection *</label>
+                    <textarea id="rejectReason" rows="4" placeholder="Explain why this registration is being rejected..."
+                              class="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"></textarea>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="confirmReject()" id="btnReject"
+                            class="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition font-semibold text-sm">
+                        Confirm Reject
+                    </button>
+                    <button onclick="closeModal('rejectModal')" class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Offer Letter Editor Modal -->
+    <div id="offerLetterModal" class="fixed inset-0 bg-black bg-opacity-50 modal-overlay z-[70] hidden flex items-start justify-center overflow-y-auto pt-16 sm:pt-20 pb-2 px-2 sm:px-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mb-4">
+            <!-- Modal Header with tabs -->
+            <div class="flex items-center justify-between p-3 sm:p-4 border-b">
+                <div class="flex items-center gap-3">
+                    <h3 class="text-base sm:text-lg font-bold text-gray-800">Offer Letter</h3>
+                    <div class="flex bg-gray-100 rounded-lg p-0.5">
+                        <button onclick="switchOfferTab('preview')" id="tabPreview" class="px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition bg-white shadow text-purple-700">Preview</button>
+                        <button onclick="switchOfferTab('edit')" id="tabEdit" class="px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition text-gray-600">Edit</button>
+                    </div>
+                </div>
+                <button onclick="closeModal('offerLetterModal')" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+
+            <!-- Preview Tab -->
+            <div id="offerPreviewTab" class="p-2 sm:p-4 max-h-[70vh] overflow-y-auto">
+                <div id="offerPreviewContent" class="max-w-[700px] mx-auto letter-paper rounded-lg overflow-hidden">
+                    <div class="text-center py-12 text-gray-400">Loading preview...</div>
+                </div>
+            </div>
+
+            <!-- Edit Tab -->
+            <div id="offerEditTab" class="p-2 sm:p-4 max-h-[70vh] overflow-y-auto hidden">
+                <div class="max-w-2xl mx-auto space-y-4">
+                    <!-- Company Details -->
+                    <div class="border rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Company Details</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Company Name</label>
+                                <input type="text" id="olCompanyName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Company Address</label>
+                                <input type="text" id="olCompanyAddress" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Position & Branch -->
+                    <div class="border rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Position Details</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Position Title</label>
+                                <input type="text" id="olPosition" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Branch Name</label>
+                                <input type="text" id="olBranch" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Offer Text (English) -->
+                    <div class="border rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Offer Text (English)</h4>
+                        <textarea id="olOfferText" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 resize-y"></textarea>
+                    </div>
+
+                    <!-- Offer Text (Tamil) -->
+                    <div class="border rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Offer Text (Tamil / தமிழ்)</h4>
+                        <textarea id="olTamilOfferText" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 resize-y" dir="auto"></textarea>
+                    </div>
+
+                    <!-- Salary -->
+                    <div class="border rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Salary Components</h4>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Basic Salary</label>
+                                <input type="number" id="olSalary" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Transport</label>
+                                <input type="number" id="olTransport" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Food</label>
+                                <input type="number" id="olFood" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Other</label>
+                                <input type="number" id="olOther" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Terms (English) -->
+                    <div class="border rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-semibold text-purple-600 uppercase">Terms & Conditions (English)</h4>
+                            <button onclick="addTerm('olTermsList')" class="text-purple-600 hover:text-purple-800 text-xs font-medium flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Term
+                            </button>
+                        </div>
+                        <div id="olTermsList" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Terms (Tamil) -->
+                    <div class="border rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-semibold text-purple-600 uppercase">Terms & Conditions (Tamil / தமிழ்)</h4>
+                            <button onclick="addTerm('olTamilTermsList')" class="text-purple-600 hover:text-purple-800 text-xs font-medium flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Term
+                            </button>
+                        </div>
+                        <div id="olTamilTermsList" class="space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="border-t p-3 sm:p-4 flex flex-wrap gap-2 justify-between items-center">
+                <p class="text-xs text-gray-400 hidden sm:block">Edit content and regenerate to update the PDF</p>
+                <div class="flex flex-wrap gap-2 ml-auto">
+                    <button onclick="regenerateOfferLetter()" id="btnRegenerate" class="bg-purple-600 text-white px-4 sm:px-6 py-2.5 rounded-lg hover:bg-purple-700 transition text-sm font-semibold">
+                        Save & Regenerate PDF
+                    </button>
+                    <button onclick="downloadOfferLetterFromEditor()" class="bg-gray-100 text-gray-700 px-4 sm:px-6 py-2.5 rounded-lg hover:bg-gray-200 transition text-sm font-medium">
+                        Download PDF
+                    </button>
+                    <button onclick="sendOfferLetterFromEditor()" id="btnSendFromEditor" class="bg-blue-600 text-white px-4 sm:px-6 py-2.5 rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
+                        Email to Staff
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Staff Details Modal -->
+    <div id="editStaffModal" class="fixed inset-0 bg-black bg-opacity-50 modal-overlay z-[60] hidden flex items-start justify-center overflow-y-auto pt-16 sm:pt-20 pb-4 px-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mb-8">
+            <form id="editStaffForm" onsubmit="saveStaffEdit(event)">
+                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white rounded-t-2xl flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Edit Staff Details</h3>
+                    <button type="button" onclick="closeModal('editStaffModal')" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+                </div>
+
+                <div class="p-6 max-h-[65vh] overflow-y-auto space-y-4">
+                    <input type="hidden" id="esUserId">
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Full Name *</label>
+                            <input type="text" id="esFullName" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Username</label>
+                            <input type="text" id="esUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Email *</label>
+                            <input type="email" id="esEmail" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Phone *</label>
+                            <input type="tel" id="esPhone" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Role *</label>
+                            <select id="esRole" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                <option value="">Select Role</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Branch *</label>
+                            <select id="esBranch" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                <option value="">Select Branch</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Status *</label>
+                            <select id="esStatus" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="pending_approval">Pending Approval</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">New Password</label>
+                            <input type="password" id="esPassword" placeholder="Leave blank to keep" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        </div>
+                    </div>
+
+                    <!-- Bank Details Section -->
+                    <div class="border-t pt-4 mt-2">
+                        <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Bank Details</h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Account Holder Name</label>
+                                <input type="text" id="esBankName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Bank Name</label>
+                                <input type="text" id="esBankBankName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 mt-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Account Number</label>
+                                <input type="text" id="esBankAccount" inputmode="numeric" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">IFSC Code</label>
+                                <input type="text" id="esBankIFSC" maxlength="11" placeholder="e.g. SBIN0001234" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent uppercase">
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <label class="block text-xs text-gray-600 mb-1">UPI ID</label>
+                            <input type="text" id="esBankUPI" placeholder="e.g. name@upi" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 px-6 py-4 flex gap-3 rounded-b-2xl">
+                    <button type="button" onclick="closeModal('editStaffModal')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 text-sm">
+                        Cancel
+                    </button>
+                    <button type="submit" id="btnSaveStaff" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 font-semibold text-sm">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let currentRegId = null;
+        let currentRegData = null;
+        let branches = [];
+        let roles = [];
+        let searchTimeout = null;
+        let offerData = null;
+
+        // ── Init ──
+        document.addEventListener('DOMContentLoaded', async () => {
+            await Promise.all([loadBranches(), loadRoles()]);
+            await loadStats();
+            await loadRegistrations();
+        });
+
+        // ── Load branches for dropdown ──
+        async function loadBranches() {
+            try {
+                const res = await fetch('/api/branches', { headers: getAuthHeaders() });
+                const data = await res.json();
+                branches = Array.isArray(data) ? data : (data.data || []);
+                // Populate approval form branch dropdown
+                const select = document.getElementById('mBranch');
+                select.innerHTML = '<option value="">Select Branch</option>';
+                branches.forEach(b => {
+                    select.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+                });
+                // Populate edit staff modal branch dropdown
+                const esSelect = document.getElementById('esBranch');
+                esSelect.innerHTML = '<option value="">Select Branch</option>';
+                branches.forEach(b => {
+                    esSelect.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+                });
+            } catch (err) {
+                console.error('Failed to load branches:', err);
+            }
+        }
+
+        // ── Load roles ──
+        async function loadRoles() {
+            try {
+                const res = await fetch('/api/roles?user_type=staff', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const data = await res.json();
+                    roles = data.success ? data.data : (Array.isArray(data) ? data : []);
+                    const esSelect = document.getElementById('esRole');
+                    esSelect.innerHTML = '<option value="">Select Role</option>';
+                    roles.forEach(r => {
+                        esSelect.innerHTML += `<option value="${r.id}" data-name="${r.name}">${r.display_name || r.name}</option>`;
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load roles:', err);
+                // Fallback roles
+                const esSelect = document.getElementById('esRole');
+                esSelect.innerHTML = `
+                    <option value="">Select Role</option>
+                    <option value="staff" data-name="staff">Staff</option>
+                    <option value="manager" data-name="manager">Manager</option>
+                    <option value="accountant" data-name="accountant">Accountant</option>
+                `;
+            }
+        }
+
+        // ── Load stats ──
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/staff-registration/stats', { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) {
+                    const s = data.data;
+                    document.getElementById('statTotal').textContent = s.total || 0;
+                    document.getElementById('statPending').textContent = s.pending || 0;
+                    document.getElementById('statApproved').textContent = s.approved || 0;
+                    document.getElementById('statRejected').textContent = s.rejected || 0;
+                    // Show pulse dot if pending > 0
+                    const dot = document.getElementById('pendingDot');
+                    if (s.pending > 0) dot.classList.remove('hidden');
+                    else dot.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+            }
+        }
+
+        // ── Load registrations ──
+        async function loadRegistrations(page = 1) {
+            currentPage = page;
+            const status = document.getElementById('filterStatus').value;
+            const search = document.getElementById('filterSearch').value.trim();
+
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('tableContainer').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('pagination').classList.add('hidden');
+
+            try {
+                const params = new URLSearchParams({ page, limit: 20 });
+                if (status) params.append('status', status);
+                if (search) params.append('search', search);
+
+                const res = await fetch(`/api/staff-registration/registrations?${params}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                document.getElementById('loadingState').classList.add('hidden');
+
+                if (data.success && data.data.length > 0) {
+                    renderTable(data.data);
+                    renderPagination(data.pagination);
+                    document.getElementById('tableContainer').classList.remove('hidden');
+                } else {
+                    document.getElementById('emptyState').classList.remove('hidden');
+                }
+            } catch (err) {
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+                console.error('Failed to load registrations:', err);
+            }
+        }
+
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => loadRegistrations(1), 400);
+        }
+
+        // ── Render table ──
+        function renderTable(registrations) {
+            const tbody = document.getElementById('regTableBody');
+            tbody.innerHTML = registrations.map(r => {
+                const statusBadge = getStatusBadge(r.status);
+                const date = new Date(r.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                return `
+                    <tr class="hover:bg-gray-50 cursor-pointer" onclick="viewRegistration(${r.id})">
+                        <td class="px-4 py-3 text-sm text-gray-500">REG-${r.id}</td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-900 text-sm">${escapeHtml(r.full_name)}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">${r.phone}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">${escapeHtml(r.email)}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">${escapeHtml(r.city || '-')}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500 hidden md:table-cell">${date}</td>
+                        <td class="px-4 py-3">${statusBadge}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="event.stopPropagation(); viewRegistration(${r.id})"
+                                    class="text-purple-600 hover:text-purple-800 text-sm font-medium">
+                                ${r.status === 'pending' ? 'Review' : 'View'}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getStatusBadge(status) {
+            const map = {
+                pending: '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>',
+                approved: '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>',
+                rejected: '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>'
+            };
+            return map[status] || status;
+        }
+
+        // ── Render pagination ──
+        function renderPagination(p) {
+            if (!p || p.pages <= 1) return;
+            document.getElementById('pagination').classList.remove('hidden');
+            document.getElementById('paginationInfo').textContent =
+                `Showing ${(p.page - 1) * p.limit + 1}-${Math.min(p.page * p.limit, p.total)} of ${p.total}`;
+
+            const btns = document.getElementById('paginationButtons');
+            btns.innerHTML = '';
+            for (let i = 1; i <= p.pages; i++) {
+                btns.innerHTML += `
+                    <button onclick="loadRegistrations(${i})"
+                            class="px-3 py-1 rounded text-sm ${i === p.page ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                        ${i}
+                    </button>
+                `;
+            }
+        }
+
+        // ── View/Review registration ──
+        async function viewRegistration(id) {
+            currentRegId = id;
+            try {
+                const res = await fetch(`/api/staff-registration/registrations/${id}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (!data.success) return alert('Failed to load registration');
+
+                const r = data.data;
+                populateModal(r);
+                document.getElementById('reviewModal').classList.remove('hidden');
+            } catch (err) {
+                alert('Failed to load registration details');
+            }
+        }
+
+        function populateModal(r) {
+            currentRegData = r;
+            document.getElementById('modalTitle').textContent =
+                r.status === 'pending' ? `Review Registration REG-${r.id}` : `Registration REG-${r.id}`;
+
+            // Personal info
+            document.getElementById('mFullName').textContent = r.full_name;
+            document.getElementById('mPhone').textContent = r.phone;
+            document.getElementById('mEmail').textContent = r.email;
+            document.getElementById('mDob').textContent = r.date_of_birth ?
+                new Date(r.date_of_birth).toLocaleDateString('en-IN') : 'Not provided';
+
+            // Address
+            const addrParts = [r.door_no, r.street, r.city, r.state, r.pincode].filter(Boolean);
+            document.getElementById('mAddress').textContent = addrParts.join(', ') || 'Not provided';
+
+            // Emergency
+            document.getElementById('mEmergency').textContent =
+                r.emergency_contact_name ? `${r.emergency_contact_name} - ${r.emergency_contact_phone || 'No phone'}` : 'Not provided';
+
+            // Aadhar
+            document.getElementById('mAadhar').textContent = r.aadhar_number || 'Not provided';
+            const proofContainer = document.getElementById('mAadharProofContainer');
+            if (r.aadhar_proof_url) {
+                proofContainer.classList.remove('hidden');
+                document.getElementById('mAadharProofLink').href = r.aadhar_proof_url;
+                const img = document.getElementById('mAadharProofImg');
+                if (r.aadhar_proof_url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+                    img.src = r.aadhar_proof_url;
+                    img.classList.remove('hidden');
+                } else {
+                    img.classList.add('hidden');
+                }
+            } else {
+                proofContainer.classList.add('hidden');
+            }
+
+            // Toggle sections based on status
+            const adminSection = document.getElementById('adminActionSection');
+            const approvedSection = document.getElementById('approvedActions');
+            const statusInfo = document.getElementById('mStatusInfo');
+
+            if (r.status === 'pending') {
+                adminSection.classList.remove('hidden');
+                approvedSection.classList.add('hidden');
+                statusInfo.classList.add('hidden');
+                // Set default joining date to today
+                document.getElementById('mJoiningDate').value = new Date().toISOString().split('T')[0];
+                // Reset form
+                document.getElementById('mRole').value = '';
+                document.getElementById('mBranch').value = '';
+                document.getElementById('mSalary').value = '';
+                document.getElementById('mTransport').value = '0';
+                document.getElementById('mFood').value = '0';
+                document.getElementById('mOther').value = '0';
+            } else {
+                adminSection.classList.add('hidden');
+                statusInfo.classList.remove('hidden');
+
+                let details = '';
+                if (r.status === 'approved') {
+                    approvedSection.classList.remove('hidden');
+                    details = `
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <p class="text-green-700 font-medium mb-2">Approved</p>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div><span class="text-gray-500">By:</span> ${escapeHtml(r.approved_by_name || 'Admin')}</div>
+                                <div><span class="text-gray-500">Date:</span> ${r.approved_at ? new Date(r.approved_at).toLocaleDateString('en-IN') : '-'}</div>
+                                <div><span class="text-gray-500">Role:</span> ${r.assigned_role || '-'}</div>
+                                <div><span class="text-gray-500">Branch:</span> ${escapeHtml(r.branch_name || '-')}</div>
+                                <div><span class="text-gray-500">Joining:</span> ${r.joining_date ? new Date(r.joining_date).toLocaleDateString('en-IN') : '-'}</div>
+                                <div><span class="text-gray-500">Salary:</span> ${r.monthly_salary ? '₹' + parseFloat(r.monthly_salary).toLocaleString('en-IN') : '-'}</div>
+                            </div>
+                        </div>
+                    `;
+                    // Show offer letter sent info
+                    const offerInfo = document.getElementById('offerSentInfo');
+                    if (r.offer_letter_sent) {
+                        offerInfo.classList.remove('hidden');
+                        offerInfo.textContent = `Sent on ${new Date(r.offer_letter_sent_at).toLocaleDateString('en-IN')}`;
+                    } else {
+                        offerInfo.classList.add('hidden');
+                    }
+                } else if (r.status === 'rejected') {
+                    approvedSection.classList.add('hidden');
+                    details = `
+                        <div class="bg-red-50 rounded-lg p-3">
+                            <p class="text-red-700 font-medium mb-2">Rejected</p>
+                            <div class="text-xs">
+                                <div><span class="text-gray-500">By:</span> ${escapeHtml(r.rejected_by_name || 'Admin')}</div>
+                                <div><span class="text-gray-500">Date:</span> ${r.rejected_at ? new Date(r.rejected_at).toLocaleDateString('en-IN') : '-'}</div>
+                                <div class="mt-2"><span class="text-gray-500">Reason:</span> ${escapeHtml(r.rejection_reason || '-')}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                document.getElementById('mStatusDetails').innerHTML = details;
+            }
+        }
+
+        // ── Approve ──
+        async function approveRegistration() {
+            const role = document.getElementById('mRole').value;
+            const branch = document.getElementById('mBranch').value;
+            const joiningDate = document.getElementById('mJoiningDate').value;
+            const salary = document.getElementById('mSalary').value;
+
+            if (!role) return alert('Please select a role');
+            if (!branch) return alert('Please select a branch');
+            if (!joiningDate) return alert('Please set a joining date');
+            if (!salary || parseFloat(salary) <= 0) return alert('Please enter monthly salary');
+
+            const btn = document.getElementById('btnApprove');
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            try {
+                const res = await fetch(`/api/staff-registration/registrations/${currentRegId}/approve`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        assigned_role: role,
+                        assigned_branch_id: parseInt(branch),
+                        joining_date: joiningDate,
+                        monthly_salary: parseFloat(salary),
+                        transport_allowance: parseFloat(document.getElementById('mTransport').value) || 0,
+                        food_allowance: parseFloat(document.getElementById('mFood').value) || 0,
+                        other_allowance: parseFloat(document.getElementById('mOther').value) || 0
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    alert('Registration approved! User account created and offer letter generated.');
+                    closeModal('reviewModal');
+                    loadStats();
+                    loadRegistrations(currentPage);
+                } else {
+                    alert(data.message || 'Approval failed');
+                }
+            } catch (err) {
+                alert('Network error. Please try again.');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Approve & Generate Offer Letter';
+        }
+
+        // ── Reject ──
+        function openRejectModal() {
+            document.getElementById('rejectReason').value = '';
+            document.getElementById('rejectModal').classList.remove('hidden');
+        }
+
+        async function confirmReject() {
+            const reason = document.getElementById('rejectReason').value.trim();
+            if (!reason) return alert('Please provide a rejection reason');
+
+            const btn = document.getElementById('btnReject');
+            btn.disabled = true;
+            btn.textContent = 'Rejecting...';
+
+            try {
+                const res = await fetch(`/api/staff-registration/registrations/${currentRegId}/reject`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ reason })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    alert('Registration rejected.');
+                    closeModal('rejectModal');
+                    closeModal('reviewModal');
+                    loadStats();
+                    loadRegistrations(currentPage);
+                } else {
+                    alert(data.message || 'Rejection failed');
+                }
+            } catch (err) {
+                alert('Network error. Please try again.');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Confirm Reject';
+        }
+
+        // ── Offer letter actions ──
+        function downloadOfferLetter() {
+            const token = localStorage.getItem('auth_token');
+            window.open(`/api/staff-registration/registrations/${currentRegId}/offer-letter?token=${token}`, '_blank');
+        }
+
+        async function sendOfferLetter() {
+            if (!confirm('Send the offer letter email to this staff member?')) return;
+
+            const btn = document.getElementById('btnSendOffer');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const res = await fetch(`/api/staff-registration/registrations/${currentRegId}/send-offer-letter`, {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    alert('Offer letter emailed successfully!');
+                    const offerInfo = document.getElementById('offerSentInfo');
+                    offerInfo.classList.remove('hidden');
+                    offerInfo.textContent = `Sent just now`;
+                } else {
+                    alert(data.message || 'Failed to send');
+                }
+            } catch (err) {
+                alert('Network error. Please try again.');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Email Offer Letter';
+        }
+
+        // ── Helpers ──
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ══════════════════════════════════════
+        // OFFER LETTER EDITOR
+        // ══════════════════════════════════════
+
+        async function openOfferLetterEditor() {
+            document.getElementById('offerPreviewContent').innerHTML = '<div class="text-center py-12 text-gray-400"><svg class="inline w-6 h-6 animate-spin mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Loading...</div>';
+            document.getElementById('offerLetterModal').classList.remove('hidden');
+
+            try {
+                const res = await fetch(`/api/staff-registration/registrations/${currentRegId}/offer-letter-data`, { headers: getAuthHeaders() });
+                const result = await res.json();
+                if (!result.success) { alert(result.message || 'Failed to load offer letter data'); closeModal('offerLetterModal'); return; }
+
+                offerData = result.data;
+                renderOfferPreview(offerData);
+                populateOfferEditForm(offerData);
+                switchOfferTab('preview');
+            } catch (err) {
+                alert('Failed to load offer letter data');
+                closeModal('offerLetterModal');
+            }
+        }
+
+        function switchOfferTab(tab) {
+            const previewTab = document.getElementById('offerPreviewTab');
+            const editTab = document.getElementById('offerEditTab');
+            const tabPreviewBtn = document.getElementById('tabPreview');
+            const tabEditBtn = document.getElementById('tabEdit');
+
+            if (tab === 'preview') {
+                // Update preview with current edit data if coming from edit tab
+                if (!editTab.classList.contains('hidden')) {
+                    offerData = { ...offerData, ...getOfferEditData() };
+                    renderOfferPreview(offerData);
+                }
+                previewTab.classList.remove('hidden');
+                editTab.classList.add('hidden');
+                tabPreviewBtn.className = 'px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition bg-white shadow text-purple-700';
+                tabEditBtn.className = 'px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition text-gray-600';
+            } else {
+                previewTab.classList.add('hidden');
+                editTab.classList.remove('hidden');
+                tabEditBtn.className = 'px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition bg-white shadow text-purple-700';
+                tabPreviewBtn.className = 'px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition text-gray-600';
+            }
+        }
+
+        function renderOfferPreview(data) {
+            const sal = parseFloat(data.monthly_salary || 0);
+            const trans = parseFloat(data.transport_allowance || 0);
+            const food = parseFloat(data.food_allowance || 0);
+            const other = parseFloat(data.other_allowance || 0);
+            const totalCTC = sal + trans + food + other;
+            const annualCTC = totalCTC * 12;
+            const fmt = (n) => parseFloat(n).toLocaleString('en-IN');
+
+            const termsHtml = (data.terms || []).map((t, i) =>
+                `<p style="margin:3px 0;font-size:8.5pt;color:#4b5563;line-height:1.4;">${i+1}. ${escapeHtml(t)}</p>`
+            ).join('');
+
+            const tamilTermsHtml = (data.tamil_terms || []).map((t, i) =>
+                `<p style="margin:3px 0;font-size:8.5pt;color:#4b5563;line-height:1.4;">${i+1}. ${escapeHtml(t)}</p>`
+            ).join('');
+
+            const salaryTableHtml = `
+                <table style="width:100%;border-collapse:collapse;font-size:9pt;">
+                    <tr style="background:#667eea;">
+                        <td style="padding:6px 10px;font-weight:600;color:white;">Component</td>
+                        <td style="padding:6px 10px;font-weight:600;text-align:right;color:white;">Monthly (₹)</td>
+                        <td style="padding:6px 10px;font-weight:600;text-align:right;color:white;">Annual (₹)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:6px 10px;">Basic Salary</td>
+                        <td style="padding:6px 10px;text-align:right;">₹${fmt(sal)}</td>
+                        <td style="padding:6px 10px;text-align:right;">₹${fmt(sal * 12)}</td>
+                    </tr>
+                    <tr style="background:#f9fafb;">
+                        <td style="padding:6px 10px;">Transport Allowance</td>
+                        <td style="padding:6px 10px;text-align:right;">₹${fmt(trans)}</td>
+                        <td style="padding:6px 10px;text-align:right;">₹${fmt(trans * 12)}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:6px 10px;">Food Allowance</td>
+                        <td style="padding:6px 10px;text-align:right;">₹${fmt(food)}</td>
+                        <td style="padding:6px 10px;text-align:right;">₹${fmt(food * 12)}</td>
+                    </tr>
+                    <tr style="background:#f9fafb;">
+                        <td style="padding:6px 10px;">Other Allowance</td>
+                        <td style="padding:6px 10px;text-align:right;">₹${fmt(other)}</td>
+                        <td style="padding:6px 10px;text-align:right;">₹${fmt(other * 12)}</td>
+                    </tr>
+                    <tr style="background:linear-gradient(135deg,#667eea,#764ba2);">
+                        <td style="padding:6px 10px;color:white;font-weight:600;">Total CTC</td>
+                        <td style="padding:6px 10px;color:white;font-weight:600;text-align:right;">₹${fmt(totalCTC)}</td>
+                        <td style="padding:6px 10px;color:white;font-weight:600;text-align:right;">₹${fmt(annualCTC)}</td>
+                    </tr>
+                </table>`;
+
+            const aadharSection = data.aadhar_proof_url ? `
+                <div style="margin-top:20px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;text-align:center;">
+                    <p style="font-size:9pt;color:#15803d;margin:0 0 4px;">Aadhar proof attached as Page 3 of PDF</p>
+                    ${data.aadhar_number ? `<p style="font-size:8pt;color:#6b7280;margin:0;">Aadhar No: ${data.aadhar_number.replace(/(\d{4})/g, '$1 ').trim()}</p>` : ''}
+                </div>` : '';
+
+            document.getElementById('offerPreviewContent').innerHTML = `
+                <!-- PAGE 1: ENGLISH -->
+                <div style="height:10px;background:linear-gradient(to right,#667eea,#764ba2);"></div>
+                <div style="padding:25px 30px;font-family:Georgia,'Times New Roman',serif;color:#374151;">
+                    <div style="text-align:center;margin-bottom:12px;">
+                        <h1 style="color:#667eea;font-size:18pt;margin:0;font-weight:700;">${escapeHtml(data.company_name)}</h1>
+                        <p style="color:#6b7280;font-size:8.5pt;margin:3px 0 0;">${escapeHtml(data.company_address)}</p>
+                    </div>
+                    <hr style="border:none;border-top:2px solid #667eea;margin:10px 0;">
+                    <div style="display:flex;justify-content:space-between;margin:10px 0;font-size:9pt;">
+                        <span>Date: ${escapeHtml(data.letter_date)}</span>
+                        <span>Ref: ${escapeHtml(data.ref_number)}</span>
+                    </div>
+                    <div style="text-align:center;margin:15px 0;">
+                        <span style="background:#667eea;color:white;padding:5px 25px;border-radius:4px;font-size:12pt;letter-spacing:2px;font-weight:600;">OFFER LETTER</span>
+                    </div>
+                    <p style="font-size:10pt;margin:15px 0 8px;">Dear ${escapeHtml(data.employee_name)},</p>
+                    <p style="font-size:9.5pt;line-height:1.6;text-align:justify;margin:8px 0;">${escapeHtml(data.offer_text)}</p>
+                    <p style="font-size:9.5pt;margin:10px 0;">Your date of joining will be <strong>${escapeHtml(data.joining_date)}</strong>.</p>
+                    <h3 style="font-size:10pt;text-decoration:underline;margin:15px 0 6px;">Compensation Details:</h3>
+                    ${salaryTableHtml}
+                    <h3 style="font-size:10pt;text-decoration:underline;margin:15px 0 6px;">Terms & Conditions:</h3>
+                    ${termsHtml}
+                    <div style="display:flex;justify-content:space-between;margin-top:30px;">
+                        <div>
+                            <p style="font-size:9pt;">For ${escapeHtml(data.company_name)}</p>
+                            <p style="font-size:9pt;margin-top:30px;">________________________</p>
+                            <p style="font-size:8.5pt;color:#6b7280;">Authorized Signatory</p>
+                        </div>
+                        <div>
+                            <p style="font-size:9pt;">Acceptance by Employee:</p>
+                            <p style="font-size:9pt;margin-top:30px;">________________________</p>
+                            <p style="font-size:8.5pt;">${escapeHtml(data.employee_name)}</p>
+                            <p style="font-size:8.5pt;color:#6b7280;">Date: ________________</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="height:10px;background:linear-gradient(to right,#764ba2,#667eea);font-size:7pt;color:white;text-align:center;line-height:10px;">Page 1 - English</div>
+
+                <!-- PAGE 2: TAMIL -->
+                <div style="height:10px;background:linear-gradient(to right,#667eea,#764ba2);margin-top:20px;"></div>
+                <div style="padding:25px 30px;font-family:'Noto Sans Tamil',Arial,sans-serif;color:#374151;">
+                    <div style="text-align:center;margin-bottom:12px;">
+                        <h1 style="color:#667eea;font-size:18pt;margin:0;font-weight:700;">${escapeHtml(data.company_name)}</h1>
+                        <p style="color:#6b7280;font-size:8.5pt;margin:3px 0 0;">${escapeHtml(data.company_address)}</p>
+                    </div>
+                    <hr style="border:none;border-top:2px solid #667eea;margin:10px 0;">
+                    <div style="display:flex;justify-content:space-between;margin:10px 0;font-size:9pt;">
+                        <span>தேதி: ${escapeHtml(data.letter_date)}</span>
+                        <span>குறிப்பு எண்: ${escapeHtml(data.ref_number)}</span>
+                    </div>
+                    <div style="text-align:center;margin:15px 0;">
+                        <span style="background:#667eea;color:white;padding:5px 25px;border-radius:4px;font-size:12pt;letter-spacing:1px;font-weight:600;">வேலை வாய்ப்பு கடிதம்</span>
+                    </div>
+                    <p style="font-size:10pt;margin:15px 0 8px;">அன்புள்ள ${escapeHtml(data.employee_name)} அவர்களுக்கு,</p>
+                    <p style="font-size:9.5pt;line-height:1.6;text-align:justify;margin:8px 0;">${escapeHtml(data.tamil_offer_text || '')}</p>
+                    <p style="font-size:9.5pt;margin:10px 0;">உங்கள் சேரும் தேதி <strong>${escapeHtml(data.joining_date)}</strong>.</p>
+                    <h3 style="font-size:10pt;text-decoration:underline;margin:15px 0 6px;">ஊதிய விவரங்கள்:</h3>
+                    ${salaryTableHtml}
+                    <h3 style="font-size:10pt;text-decoration:underline;margin:15px 0 6px;">விதிமுறைகள் மற்றும் நிபந்தனைகள்:</h3>
+                    ${tamilTermsHtml}
+                    <div style="display:flex;justify-content:space-between;margin-top:30px;">
+                        <div>
+                            <p style="font-size:9pt;">${escapeHtml(data.company_name)} சார்பாக</p>
+                            <p style="font-size:9pt;margin-top:30px;">________________________</p>
+                            <p style="font-size:8.5pt;color:#6b7280;">அங்கீகரிக்கப்பட்ட கையொப்பமிடுபவர்</p>
+                        </div>
+                        <div>
+                            <p style="font-size:9pt;">ஊழியர் ஏற்றுக்கொள்ளல்:</p>
+                            <p style="font-size:9pt;margin-top:30px;">________________________</p>
+                            <p style="font-size:8.5pt;">${escapeHtml(data.employee_name)}</p>
+                            <p style="font-size:8.5pt;color:#6b7280;">தேதி: ________________</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="height:10px;background:linear-gradient(to right,#764ba2,#667eea);font-size:7pt;color:white;text-align:center;line-height:10px;">Page 2 - Tamil (தமிழ்)</div>
+
+                ${aadharSection}
+            `;
+        }
+
+        function populateOfferEditForm(data) {
+            document.getElementById('olCompanyName').value = data.company_name || '';
+            document.getElementById('olCompanyAddress').value = data.company_address || '';
+            document.getElementById('olPosition').value = data.position || '';
+            document.getElementById('olBranch').value = data.branch_name || '';
+            document.getElementById('olOfferText').value = data.offer_text || '';
+            document.getElementById('olTamilOfferText').value = data.tamil_offer_text || '';
+            document.getElementById('olSalary').value = data.monthly_salary || 0;
+            document.getElementById('olTransport').value = data.transport_allowance || 0;
+            document.getElementById('olFood').value = data.food_allowance || 0;
+            document.getElementById('olOther').value = data.other_allowance || 0;
+            renderTermsList('olTermsList', 'ol-term', data.terms || []);
+            renderTermsList('olTamilTermsList', 'ol-tamil-term', data.tamil_terms || []);
+        }
+
+        function renderTermsList(containerId, termClass, terms) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = terms.map((term, i) => `
+                <div class="flex gap-2 items-start">
+                    <span class="text-xs text-gray-400 mt-2.5 w-5 shrink-0 text-right">${i + 1}.</span>
+                    <textarea class="${termClass} flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 resize-none" rows="2" dir="auto">${escapeHtml(term)}</textarea>
+                    <button onclick="removeTerm(this, '${containerId}')" class="text-red-400 hover:text-red-600 mt-2 shrink-0 text-lg" title="Remove">&times;</button>
+                </div>
+            `).join('');
+        }
+
+        function addTerm(containerId = 'olTermsList') {
+            const container = document.getElementById(containerId);
+            const termClass = containerId === 'olTamilTermsList' ? 'ol-tamil-term' : 'ol-term';
+            const index = container.children.length + 1;
+            const div = document.createElement('div');
+            div.className = 'flex gap-2 items-start';
+            div.innerHTML = `
+                <span class="text-xs text-gray-400 mt-2.5 w-5 shrink-0 text-right">${index}.</span>
+                <textarea class="${termClass} flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 resize-none" rows="2" placeholder="Enter new term..." dir="auto"></textarea>
+                <button onclick="removeTerm(this, '${containerId}')" class="text-red-400 hover:text-red-600 mt-2 shrink-0 text-lg" title="Remove">&times;</button>
+            `;
+            container.appendChild(div);
+            div.querySelector('textarea').focus();
+        }
+
+        function removeTerm(btn, containerId = 'olTermsList') {
+            btn.closest('.flex').remove();
+            document.querySelectorAll(`#${containerId} > div`).forEach((div, i) => {
+                div.querySelector('span').textContent = (i + 1) + '.';
+            });
+        }
+
+        function getOfferEditData() {
+            const terms = Array.from(document.querySelectorAll('.ol-term')).map(t => t.value.trim()).filter(Boolean);
+            const tamilTerms = Array.from(document.querySelectorAll('.ol-tamil-term')).map(t => t.value.trim()).filter(Boolean);
+            return {
+                company_name: document.getElementById('olCompanyName').value.trim(),
+                company_address: document.getElementById('olCompanyAddress').value.trim(),
+                position: document.getElementById('olPosition').value.trim(),
+                branch_name: document.getElementById('olBranch').value.trim(),
+                offer_text: document.getElementById('olOfferText').value.trim(),
+                tamil_offer_text: document.getElementById('olTamilOfferText').value.trim(),
+                monthly_salary: parseFloat(document.getElementById('olSalary').value) || 0,
+                transport_allowance: parseFloat(document.getElementById('olTransport').value) || 0,
+                food_allowance: parseFloat(document.getElementById('olFood').value) || 0,
+                other_allowance: parseFloat(document.getElementById('olOther').value) || 0,
+                terms,
+                tamil_terms: tamilTerms
+            };
+        }
+
+        async function regenerateOfferLetter() {
+            const editData = getOfferEditData();
+            if (!editData.company_name) return alert('Company name is required');
+            if (!editData.offer_text) return alert('Offer text is required');
+
+            const btn = document.getElementById('btnRegenerate');
+            btn.disabled = true;
+            btn.textContent = 'Regenerating...';
+
+            try {
+                const res = await fetch(`/api/staff-registration/registrations/${currentRegId}/regenerate-offer-letter`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(editData)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    offerData = { ...offerData, ...editData, offer_letter_url: data.data.offer_letter_url };
+                    renderOfferPreview(offerData);
+                    switchOfferTab('preview');
+                    // Reset sent info in review modal
+                    document.getElementById('offerSentInfo').classList.add('hidden');
+                    alert('Offer letter regenerated successfully!');
+                } else {
+                    alert(data.message || 'Failed to regenerate');
+                }
+            } catch (err) {
+                alert('Network error. Please try again.');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Save & Regenerate PDF';
+        }
+
+        function downloadOfferLetterFromEditor() {
+            const token = localStorage.getItem('auth_token');
+            window.open(`/api/staff-registration/registrations/${currentRegId}/offer-letter?token=${token}`, '_blank');
+        }
+
+        async function sendOfferLetterFromEditor() {
+            if (!confirm('Send the offer letter email to this staff member?')) return;
+
+            const btn = document.getElementById('btnSendFromEditor');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const res = await fetch(`/api/staff-registration/registrations/${currentRegId}/send-offer-letter`, {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    alert('Offer letter emailed successfully!');
+                    document.getElementById('offerSentInfo').classList.remove('hidden');
+                    document.getElementById('offerSentInfo').textContent = 'Sent just now';
+                } else {
+                    alert(data.message || 'Failed to send');
+                }
+            } catch (err) {
+                alert('Network error. Please try again.');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Email to Staff';
+        }
+
+        // ══════════════════════════════════════
+        // EDIT STAFF DETAILS (post-approval)
+        // ══════════════════════════════════════
+
+        async function openEditStaffModal() {
+            if (!currentRegData || !currentRegData.created_user_id) {
+                alert('No linked user account found for this registration.');
+                return;
+            }
+
+            const userId = currentRegData.created_user_id;
+            document.getElementById('esUserId').value = userId;
+
+            // Load user details from users API
+            try {
+                const res = await fetch(`/api/users/${userId}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                const user = data.success ? data.data : data;
+
+                if (!user || !user.id) {
+                    alert('Failed to load staff details');
+                    return;
+                }
+
+                // Populate form
+                document.getElementById('esFullName').value = user.full_name || '';
+                document.getElementById('esUsername').value = user.username || '';
+                document.getElementById('esEmail').value = user.email || '';
+                document.getElementById('esPhone').value = user.phone || '';
+                document.getElementById('esStatus').value = user.status || 'active';
+                document.getElementById('esPassword').value = '';
+
+                // Set branch
+                document.getElementById('esBranch').value = user.branch_id || '';
+
+                // Set role - match by name
+                const roleSelect = document.getElementById('esRole');
+                const roleName = (user.role || '').toLowerCase();
+                let matched = false;
+                for (const opt of roleSelect.options) {
+                    if (opt.dataset.name && opt.dataset.name.toLowerCase() === roleName) {
+                        roleSelect.value = opt.value;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    // Try matching by value for fallback roles
+                    roleSelect.value = roleName;
+                }
+
+                // Load bank details
+                try {
+                    const bankRes = await fetch(`/api/staff-registration/bank-details/${userId}`, { headers: getAuthHeaders() });
+                    const bankData = await bankRes.json();
+                    if (bankData.success && bankData.data) {
+                        document.getElementById('esBankName').value = bankData.data.bank_account_name || '';
+                        document.getElementById('esBankBankName').value = bankData.data.bank_name || '';
+                        document.getElementById('esBankAccount').value = bankData.data.bank_account_number || '';
+                        document.getElementById('esBankIFSC').value = bankData.data.bank_ifsc_code || '';
+                        document.getElementById('esBankUPI').value = bankData.data.upi_id || '';
+                    }
+                } catch(e) { /* bank details may not exist yet */ }
+
+                document.getElementById('editStaffModal').classList.remove('hidden');
+            } catch (err) {
+                console.error('Load user error:', err);
+                alert('Failed to load staff details. Please try again.');
+            }
+        }
+
+        async function saveStaffEdit(event) {
+            event.preventDefault();
+            const userId = document.getElementById('esUserId').value;
+            if (!userId) return;
+
+            const btn = document.getElementById('btnSaveStaff');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            // Get role name from selected option
+            const roleSelect = document.getElementById('esRole');
+            const selectedOption = roleSelect.options[roleSelect.selectedIndex];
+            const roleName = selectedOption.dataset.name || selectedOption.value;
+
+            const staffData = {
+                full_name: document.getElementById('esFullName').value.trim(),
+                username: document.getElementById('esUsername').value.trim(),
+                email: document.getElementById('esEmail').value.trim(),
+                phone: document.getElementById('esPhone').value.trim(),
+                role: roleName.toLowerCase(),
+                branch_id: document.getElementById('esBranch').value,
+                status: document.getElementById('esStatus').value
+            };
+
+            const password = document.getElementById('esPassword').value;
+            if (password) staffData.password = password;
+
+            try {
+                // Save user details
+                const res = await fetch(`/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(staffData)
+                });
+                const data = await res.json();
+
+                if (!data.success && data.error) {
+                    alert(data.error || 'Failed to update staff');
+                    btn.disabled = false;
+                    btn.textContent = 'Save Changes';
+                    return;
+                }
+
+                // Save bank details if any field is filled
+                const bankName = document.getElementById('esBankName').value.trim();
+                const bankBankName = document.getElementById('esBankBankName').value.trim();
+                const bankAccount = document.getElementById('esBankAccount').value.trim();
+                const bankIFSC = document.getElementById('esBankIFSC').value.trim().toUpperCase();
+                const bankUPI = document.getElementById('esBankUPI').value.trim();
+
+                if (bankName && bankBankName && bankAccount && bankIFSC) {
+                    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(bankIFSC)) {
+                        alert('Staff details saved, but IFSC code format is invalid. Bank details not updated.');
+                        closeModal('editStaffModal');
+                        viewRegistration(currentRegId);
+                        btn.disabled = false;
+                        btn.textContent = 'Save Changes';
+                        return;
+                    }
+
+                    // Use admin bank-details endpoint
+                    await fetch(`/api/staff-registration/bank-details/${userId}`, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({
+                            bank_account_name: bankName,
+                            bank_name: bankBankName,
+                            bank_account_number: bankAccount,
+                            bank_ifsc_code: bankIFSC,
+                            upi_id: bankUPI || null
+                        })
+                    });
+                }
+
+                alert('Staff details updated successfully!');
+                closeModal('editStaffModal');
+                // Refresh the registration view to show updated info
+                viewRegistration(currentRegId);
+            } catch (err) {
+                alert('Network error. Please try again.');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Save Changes';
+        }
+    </script>
+</body>
+</html>

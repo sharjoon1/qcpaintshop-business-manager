@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Clock Out - Quality Colours</title>
     <script src="/js/auth-helper.js"></script>
@@ -146,25 +152,7 @@
     </style>
     <script src="/universal-nav-loader.js"></script>
 </head>
-<body>
-    <!-- Staff Navigation -->
-    <nav class="bg-blue-600 text-white p-4 shadow-lg">
-        <div class="container mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-4">
-                <h1 class="text-2xl font-bold">Quality Colours Staff</h1>
-                <span class="text-blue-200">|</span>
-                <span class="text-lg">Clock Out</span>
-            </div>
-            <div class="flex gap-4">
-                <a href="/staff/dashboard.html" class="hover:text-blue-200">Dashboard</a>
-                <a href="/staff/clock-in.html" class="hover:text-blue-200">Clock In</a>
-                <a href="/staff/history.html" class="hover:text-blue-200">History</a>
-                <a href="/staff/tasks.html" class="hover:text-blue-200">Tasks</a>
-                <a href="/staff/activities.html" class="hover:text-blue-200">Activities</a>
-                <button onclick="logout()" class="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded">Logout</button>
-            </div>
-        </div>
-    </nav>
+<body data-page="attendance-clock-out">
 
     <div class="container">
         <!-- Header -->
@@ -509,7 +497,11 @@
                     document.getElementById('successCard').style.display = 'block';
 
                 } else {
-                    alert(data.message || 'Failed to clock out. Please try again.');
+                    if (data.code === 'OUTSIDE_GEOFENCE') {
+                        alert(`You are ${data.distance}m away from the branch.\nYou must be within ${data.radius}m to clock out.\n\nPlease move closer to your branch location.`);
+                    } else {
+                        alert(data.message || 'Failed to clock out. Please try again.');
+                    }
                     submitBtn.disabled = false;
                     submitBtnText.textContent = '✓ Clock Out Now';
                 }

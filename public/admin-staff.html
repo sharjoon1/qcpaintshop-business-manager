@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Staff Management - Quality Colours</title>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -177,14 +183,15 @@
                 branchSelect.innerHTML = '<option value="">-- Select Branch --</option>' +
                     branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
                 
-                // Load roles
+                // Load roles (only staff-type roles for staff assignment)
                 try {
-                    const rolesRes = await fetch('/api/roles', { headers: getAuthHeaders() });
+                    const rolesRes = await fetch('/api/roles?user_type=staff', { headers: getAuthHeaders() });
                     if (rolesRes.ok) {
-                        roles = await rolesRes.json();
+                        const rolesData = await rolesRes.json();
+                        roles = rolesData.success ? rolesData.data : (Array.isArray(rolesData) ? rolesData : []);
                         const roleSelect = document.getElementById('roleId');
                         roleSelect.innerHTML = '<option value="">-- Select Role --</option>' +
-                            roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+                            roles.map(r => `<option value="${r.id}">${r.display_name || r.name}</option>`).join('');
                     }
                 } catch (roleError) {
                     console.error('Error loading roles:', roleError);
@@ -272,9 +279,9 @@
                             <button onclick="editStaff(${staff.id})" class="text-blue-600 hover:text-blue-900 font-semibold text-sm">
                                 Edit
                             </button>
-                            <button onclick="deleteStaff(${staff.id})" class="text-red-600 hover:text-red-900 font-semibold text-sm">
+                            ${staff.id === 1 ? '' : `<button onclick="deleteStaff(${staff.id})" class="text-red-600 hover:text-red-900 font-semibold text-sm">
                                 Delete
-                            </button>
+                            </button>`}
                         </td>
                     </tr>
                 `;
@@ -320,7 +327,9 @@
             document.getElementById('email').value = staff.email;
             document.getElementById('phone').value = staff.phone || '';
             document.getElementById('branchId').value = staff.branch_id || '';
-            document.getElementById('roleId').value = staff.role_id || '';
+            // Match role by name since users table stores role as text, not role_id
+            const matchedRole = roles.find(r => r.name.toLowerCase() === (staff.role || '').toLowerCase());
+            document.getElementById('roleId').value = matchedRole ? matchedRole.id : '';
             document.getElementById('status').value = staff.status;
             document.getElementById('password').required = false;
             document.getElementById('password').value = '';
@@ -335,15 +344,17 @@
         async function saveStaff(event) {
             event.preventDefault();
             
+            const selectedRoleId = document.getElementById('roleId').value;
+            const selectedRole = roles.find(r => r.id == selectedRoleId);
+
             const staffData = {
                 full_name: document.getElementById('fullName').value,
                 username: document.getElementById('username').value,
                 email: document.getElementById('email').value,
                 phone: document.getElementById('phone').value || null,
                 branch_id: document.getElementById('branchId').value,
-                role_id: document.getElementById('roleId').value,
                 status: document.getElementById('status').value,
-                role: 'staff'
+                role: selectedRole ? selectedRole.name.toLowerCase() : 'staff'
             };
             
             const password = document.getElementById('password').value;

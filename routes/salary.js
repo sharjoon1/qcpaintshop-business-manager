@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { requirePermission, requireAuth, requireRole } = require('../middleware/permissionMiddleware');
 
 // Database connection (imported from main app)
 let pool;
@@ -15,13 +15,166 @@ function setPool(dbPool) {
 }
 
 // ========================================
+// STAFF SELF-SERVICE ENDPOINTS
+// (Must be BEFORE /:id routes to avoid param conflicts)
+// ========================================
+
+/**
+ * GET /my-config - Staff views own salary configuration
+ */
+router.get('/my-config', requireAuth, async (req, res) => {
+    try {
+        const [configs] = await pool.query(`
+            SELECT sc.*, b.name as branch_name
+            FROM staff_salary_config sc
+            JOIN branches b ON sc.branch_id = b.id
+            WHERE sc.user_id = ? AND sc.is_active = 1
+            ORDER BY sc.effective_from DESC LIMIT 1
+        `, [req.user.id]);
+
+        res.json({
+            success: true,
+            data: configs.length > 0 ? configs[0] : null
+        });
+    } catch (error) {
+        console.error('Error fetching own salary config:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch salary configuration' });
+    }
+});
+
+/**
+ * GET /my-monthly - Staff views own monthly salary history
+ */
+router.get('/my-monthly', requireAuth, async (req, res) => {
+    try {
+        const { month } = req.query;
+        let query = `
+            SELECT ms.*, b.name as branch_name
+            FROM monthly_salaries ms
+            JOIN branches b ON ms.branch_id = b.id
+            WHERE ms.user_id = ?
+        `;
+        const params = [req.user.id];
+
+        if (month) {
+            query += ' AND ms.salary_month = ?';
+            params.push(month);
+        }
+
+        query += ' ORDER BY ms.salary_month DESC LIMIT 12';
+
+        const [salaries] = await pool.query(query, params);
+
+        res.json({ success: true, data: salaries });
+    } catch (error) {
+        console.error('Error fetching own monthly salary:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch monthly salary data' });
+    }
+});
+
+/**
+ * GET /my-payments - Staff views own payment history
+ */
+router.get('/my-payments', requireAuth, async (req, res) => {
+    try {
+        const [payments] = await pool.query(`
+            SELECT sp.*, ms.salary_month, ms.net_salary,
+                   payer.full_name as paid_by_name
+            FROM salary_payments sp
+            JOIN monthly_salaries ms ON sp.monthly_salary_id = ms.id
+            LEFT JOIN users payer ON sp.paid_by = payer.id
+            WHERE sp.user_id = ?
+            ORDER BY sp.payment_date DESC LIMIT 50
+        `, [req.user.id]);
+
+        res.json({ success: true, data: payments });
+    } catch (error) {
+        console.error('Error fetching own payments:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch payment history' });
+    }
+});
+
+/**
+ * GET /my-advances - Staff views own advance history
+ */
+router.get('/my-advances', requireAuth, async (req, res) => {
+    try {
+        const [advances] = await pool.query(`
+            SELECT sa.*, b.name as branch_name,
+                   ab.full_name as approved_by_name,
+                   rb.full_name as rejected_by_name
+            FROM salary_advances sa
+            LEFT JOIN branches b ON sa.branch_id = b.id
+            LEFT JOIN users ab ON sa.approved_by = ab.id
+            LEFT JOIN users rb ON sa.rejected_by = rb.id
+            WHERE sa.user_id = ?
+            ORDER BY sa.created_at DESC LIMIT 50
+        `, [req.user.id]);
+
+        res.json({ success: true, data: advances });
+    } catch (error) {
+        console.error('Error fetching own advances:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch advance history' });
+    }
+});
+
+/**
+ * POST /my-advance-request - Staff submits advance request
+ */
+router.post('/my-advance-request', requireAuth, async (req, res) => {
+    try {
+        const { amount, reason } = req.body;
+        const userId = req.user.id;
+        const branchId = req.user.branch_id;
+
+        if (!amount || parseFloat(amount) <= 0) {
+            return res.status(400).json({ success: false, message: 'Please enter a valid amount greater than 0' });
+        }
+
+        if (!branchId) {
+            return res.status(400).json({
+                success: false,
+                message: 'You are not assigned to a branch. Please contact admin to assign your branch first.'
+            });
+        }
+
+        // Check for existing pending request
+        const [pending] = await pool.query(
+            "SELECT id FROM salary_advances WHERE user_id = ? AND status = 'pending'",
+            [userId]
+        );
+        if (pending.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'You already have a pending advance request. Please wait for it to be processed.'
+            });
+        }
+
+        const [result] = await pool.query(
+            `INSERT INTO salary_advances (user_id, branch_id, amount, reason, requested_by, status)
+             VALUES (?, ?, ?, ?, ?, 'pending')`,
+            [userId, branchId, parseFloat(amount), reason || null, userId]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Advance request submitted successfully',
+            data: { id: result.insertId }
+        });
+    } catch (error) {
+        console.error('Error creating advance request:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit advance request' });
+    }
+});
+
+// ========================================
 // SALARY CONFIGURATION ROUTES
 // ========================================
 
 /**
  * GET all staff salary configurations
  */
-router.get('/config', requireAuth, requirePermission('salary', 'view'), async (req, res) => {
+router.get('/config', requireRole('admin', 'manager', 'accountant'), requirePermission('salary', 'view'), async (req, res) => {
     try {
         const { branch_id, user_id, is_active } = req.query;
         
@@ -78,7 +231,7 @@ router.get('/config', requireAuth, requirePermission('salary', 'view'), async (r
 /**
  * GET single staff salary configuration
  */
-router.get('/config/:id', requireAuth, requirePermission('salary', 'view'), async (req, res) => {
+router.get('/config/:id', requireRole('admin', 'manager', 'accountant'), requirePermission('salary', 'view'), async (req, res) => {
     try {
         const [configs] = await pool.query(`
             SELECT 
@@ -501,7 +654,7 @@ router.post('/calculate-all', requireAuth, requirePermission('salary', 'manage')
 /**
  * GET monthly salaries
  */
-router.get('/monthly', requireAuth, requirePermission('salary', 'view'), async (req, res) => {
+router.get('/monthly', requireRole('admin', 'manager', 'accountant'), requirePermission('salary', 'view'), async (req, res) => {
     try {
         const { month, branch_id, user_id, status, payment_status } = req.query;
         
@@ -569,7 +722,7 @@ router.get('/monthly', requireAuth, requirePermission('salary', 'view'), async (
 /**
  * GET single monthly salary details
  */
-router.get('/monthly/:id', requireAuth, requirePermission('salary', 'view'), async (req, res) => {
+router.get('/monthly/:id', requireRole('admin', 'manager', 'accountant'), requirePermission('salary', 'view'), async (req, res) => {
     try {
         const [salaries] = await pool.query(`
             SELECT 
@@ -807,7 +960,7 @@ router.post('/payments', requireAuth, requirePermission('salary', 'manage'), asy
 /**
  * GET payment history
  */
-router.get('/payments', requireAuth, requirePermission('salary', 'view'), async (req, res) => {
+router.get('/payments', requireRole('admin', 'manager', 'accountant'), requirePermission('salary', 'view'), async (req, res) => {
     try {
         const { user_id, month, payment_method } = req.query;
         
@@ -869,7 +1022,7 @@ router.get('/payments', requireAuth, requirePermission('salary', 'view'), async 
 /**
  * GET salary summary by month
  */
-router.get('/reports/summary', requireAuth, requirePermission('salary', 'view'), async (req, res) => {
+router.get('/reports/summary', requireRole('admin', 'manager', 'accountant'), requirePermission('salary', 'view'), async (req, res) => {
     try {
         const { month, branch_id } = req.query;
         
@@ -946,6 +1099,272 @@ router.get('/reports/summary', requireAuth, requirePermission('salary', 'view'),
             success: false,
             message: 'Failed to fetch salary summary'
         });
+    }
+});
+
+// ========================================
+// SALARY ADVANCE ROUTES
+// ========================================
+
+/**
+ * GET salary advances list with filters
+ */
+router.get('/advances', requireRole('admin', 'manager', 'accountant'), requirePermission('salary', 'view'), async (req, res) => {
+    try {
+        const { status, user_id, branch_id, page = 1, limit = 50 } = req.query;
+        const offset = (page - 1) * limit;
+
+        let query = `
+            SELECT
+                sa.*,
+                u.full_name as user_name,
+                b.name as branch_name,
+                ab.full_name as approved_by_name,
+                rb.full_name as rejected_by_name,
+                pb.full_name as paid_by_name,
+                rq.full_name as requested_by_name
+            FROM salary_advances sa
+            JOIN users u ON sa.user_id = u.id
+            LEFT JOIN branches b ON sa.branch_id = b.id
+            LEFT JOIN users ab ON sa.approved_by = ab.id
+            LEFT JOIN users rb ON sa.rejected_by = rb.id
+            LEFT JOIN users pb ON sa.paid_by = pb.id
+            LEFT JOIN users rq ON sa.requested_by = rq.id
+            WHERE 1=1
+        `;
+        let countQuery = `SELECT COUNT(*) as total FROM salary_advances sa WHERE 1=1`;
+        const params = [];
+        const countParams = [];
+
+        if (status) {
+            query += ' AND sa.status = ?';
+            countQuery += ' AND sa.status = ?';
+            params.push(status);
+            countParams.push(status);
+        }
+        if (user_id) {
+            query += ' AND sa.user_id = ?';
+            countQuery += ' AND sa.user_id = ?';
+            params.push(user_id);
+            countParams.push(user_id);
+        }
+        if (branch_id) {
+            query += ' AND sa.branch_id = ?';
+            countQuery += ' AND sa.branch_id = ?';
+            params.push(branch_id);
+            countParams.push(branch_id);
+        }
+
+        query += ' ORDER BY sa.created_at DESC LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), parseInt(offset));
+
+        const [advances] = await pool.query(query, params);
+        const [countResult] = await pool.query(countQuery, countParams);
+
+        res.json({
+            success: true,
+            data: advances,
+            total: countResult[0].total,
+            page: parseInt(page),
+            limit: parseInt(limit)
+        });
+    } catch (error) {
+        console.error('Error fetching advances:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch advances' });
+    }
+});
+
+/**
+ * GET salary advances summary (dashboard cards)
+ * NOTE: Must be registered BEFORE /advances/:id
+ */
+router.get('/advances/summary', requireRole('admin', 'manager', 'accountant'), requirePermission('salary', 'view'), async (req, res) => {
+    try {
+        const { branch_id } = req.query;
+
+        let query = `
+            SELECT
+                COUNT(*) as total_requests,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+                SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) as pending_amount,
+                SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved_count,
+                SUM(CASE WHEN status = 'approved' THEN amount ELSE 0 END) as approved_amount,
+                SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count,
+                SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) as paid_amount,
+                SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_count
+            FROM salary_advances
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (branch_id) {
+            query += ' AND branch_id = ?';
+            params.push(branch_id);
+        }
+
+        const [summary] = await pool.query(query, params);
+
+        res.json({
+            success: true,
+            data: summary[0]
+        });
+    } catch (error) {
+        console.error('Error fetching advance summary:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch advance summary' });
+    }
+});
+
+/**
+ * GET single salary advance
+ */
+router.get('/advances/:id', requireRole('admin', 'manager', 'accountant'), requirePermission('salary', 'view'), async (req, res) => {
+    try {
+        const [advances] = await pool.query(`
+            SELECT
+                sa.*,
+                u.full_name as user_name,
+                b.name as branch_name,
+                ab.full_name as approved_by_name,
+                rb.full_name as rejected_by_name,
+                pb.full_name as paid_by_name,
+                rq.full_name as requested_by_name
+            FROM salary_advances sa
+            JOIN users u ON sa.user_id = u.id
+            LEFT JOIN branches b ON sa.branch_id = b.id
+            LEFT JOIN users ab ON sa.approved_by = ab.id
+            LEFT JOIN users rb ON sa.rejected_by = rb.id
+            LEFT JOIN users pb ON sa.paid_by = pb.id
+            LEFT JOIN users rq ON sa.requested_by = rq.id
+            WHERE sa.id = ?
+        `, [req.params.id]);
+
+        if (advances.length === 0) {
+            return res.status(404).json({ success: false, message: 'Advance not found' });
+        }
+
+        res.json({ success: true, data: advances[0] });
+    } catch (error) {
+        console.error('Error fetching advance:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch advance' });
+    }
+});
+
+/**
+ * POST create new salary advance
+ */
+router.post('/advances', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const { user_id, branch_id, amount, reason, notes } = req.body;
+
+        if (!user_id || !branch_id || !amount) {
+            return res.status(400).json({ success: false, message: 'user_id, branch_id, and amount are required' });
+        }
+
+        const [result] = await pool.query(
+            `INSERT INTO salary_advances (user_id, branch_id, amount, reason, notes, requested_by, status)
+             VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+            [user_id, branch_id, amount, reason || null, notes || null, req.user.id]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Advance request created',
+            data: { id: result.insertId }
+        });
+    } catch (error) {
+        console.error('Error creating advance:', error);
+        res.status(500).json({ success: false, message: 'Failed to create advance' });
+    }
+});
+
+/**
+ * PUT approve salary advance
+ */
+router.put('/advances/:id/approve', requireAuth, requirePermission('salary', 'approve'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { notes } = req.body;
+
+        const [advance] = await pool.query('SELECT * FROM salary_advances WHERE id = ?', [id]);
+        if (advance.length === 0) {
+            return res.status(404).json({ success: false, message: 'Advance not found' });
+        }
+        if (advance[0].status !== 'pending') {
+            return res.status(400).json({ success: false, message: 'Only pending advances can be approved' });
+        }
+
+        await pool.query(
+            `UPDATE salary_advances SET status = 'approved', approved_by = ?, approved_at = NOW(), notes = COALESCE(?, notes) WHERE id = ?`,
+            [req.user.id, notes || null, id]
+        );
+
+        res.json({ success: true, message: 'Advance approved' });
+    } catch (error) {
+        console.error('Error approving advance:', error);
+        res.status(500).json({ success: false, message: 'Failed to approve advance' });
+    }
+});
+
+/**
+ * PUT reject salary advance
+ */
+router.put('/advances/:id/reject', requireAuth, requirePermission('salary', 'approve'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { rejection_reason } = req.body;
+
+        if (!rejection_reason) {
+            return res.status(400).json({ success: false, message: 'Rejection reason is required' });
+        }
+
+        const [advance] = await pool.query('SELECT * FROM salary_advances WHERE id = ?', [id]);
+        if (advance.length === 0) {
+            return res.status(404).json({ success: false, message: 'Advance not found' });
+        }
+        if (advance[0].status !== 'pending') {
+            return res.status(400).json({ success: false, message: 'Only pending advances can be rejected' });
+        }
+
+        await pool.query(
+            `UPDATE salary_advances SET status = 'rejected', rejected_by = ?, rejected_at = NOW(), rejection_reason = ? WHERE id = ?`,
+            [req.user.id, rejection_reason, id]
+        );
+
+        res.json({ success: true, message: 'Advance rejected' });
+    } catch (error) {
+        console.error('Error rejecting advance:', error);
+        res.status(500).json({ success: false, message: 'Failed to reject advance' });
+    }
+});
+
+/**
+ * PUT record advance payment
+ */
+router.put('/advances/:id/pay', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { payment_method, payment_reference, payment_date, recovery_month } = req.body;
+
+        const [advance] = await pool.query('SELECT * FROM salary_advances WHERE id = ?', [id]);
+        if (advance.length === 0) {
+            return res.status(404).json({ success: false, message: 'Advance not found' });
+        }
+        if (advance[0].status !== 'approved') {
+            return res.status(400).json({ success: false, message: 'Only approved advances can be paid' });
+        }
+
+        await pool.query(
+            `UPDATE salary_advances
+             SET status = 'paid', payment_date = ?, payment_method = ?, payment_reference = ?,
+                 paid_by = ?, recovery_month = ?
+             WHERE id = ?`,
+            [payment_date || new Date().toISOString().split('T')[0], payment_method || null, payment_reference || null, req.user.id, recovery_month || null, id]
+        );
+
+        res.json({ success: true, message: 'Advance payment recorded' });
+    } catch (error) {
+        console.error('Error recording payment:', error);
+        res.status(500).json({ success: false, message: 'Failed to record payment' });
     }
 });
 

@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Attendance Management - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 1.5rem;
+            }
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1.25rem;
+            transition: all 0.3s;
+            border-top: 4px solid var(--border-color);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin: 0.5rem 0;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover td {
+            background-color: #f9fafb;
+        }
+
+        .filter-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 1.5rem;
+        }
+
+        select, input[type="date"], input[type="month"], input[type="text"], textarea {
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7c3aed, #9333ea);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #6d28d9, #7c3aed);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-present { background: #dcfce7; color: #166534; }
+        .badge-absent { background: #fee2e2; color: #991b1b; }
+        .badge-late { background: #fef3c7; color: #92400e; }
+        .badge-on_leave { background: #dbeafe; color: #1e40af; }
+        .badge-half_day { background: #fef3c7; color: #92400e; }
+        .badge-holiday { background: #f3e8ff; color: #6b21a8; }
+        .badge-week_off { background: #f3f4f6; color: #6b7280; }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-approved { background: #dcfce7; color: #166534; }
+        .badge-rejected { background: #fee2e2; color: #991b1b; }
+        .badge-ongoing { background: #dbeafe; color: #1e40af; }
+        .badge-complete { background: #dcfce7; color: #166534; }
+        .badge-incomplete { background: #fee2e2; color: #991b1b; }
+
+        .badge-late_arrival { background: #fef3c7; color: #92400e; }
+        .badge-early_checkout { background: #fed7aa; color: #9a3412; }
+        .badge-extended_break { background: #dbeafe; color: #1e40af; }
+
+        .tab-bar {
+            display: flex;
+            gap: 0.25rem;
+            background: white;
+            border-radius: 12px;
+            padding: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            border: none;
+            cursor: pointer;
+            white-space: nowrap;
+            background: transparent;
+            color: #6b7280;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #7c3aed, #9333ea);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        .permission-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1.25rem;
+            border-left: 4px solid #d1d5db;
+            margin-bottom: 1rem;
+            transition: all 0.2s;
+        }
+
+        .permission-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        .permission-card.pending { border-left-color: #f59e0b; }
+        .permission-card.approved { border-left-color: #10b981; }
+        .permission-card.rejected { border-left-color: #ef4444; }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+        }
+
+        .gradient-header th {
+            background: linear-gradient(135deg, #7c3aed, #9333ea);
+            color: white;
+            padding: 0.875rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .gradient-header th:first-child {
+            border-radius: 12px 0 0 0;
+        }
+
+        .gradient-header th:last-child {
+            border-radius: 0 12px 0 0;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            font-size: 0.875rem;
+            border-bottom: 1px solid #f3f4f6;
+            white-space: nowrap;
+        }
+
+        .action-btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6b7280;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease-out;
+            max-width: 400px;
+        }
+
+        .toast-success { background: #10b981; }
+        .toast-error { background: #ef4444; }
+        .toast-warning { background: #f59e0b; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    </style>
+</head>
+<body data-page="attendance-admin">
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="min-h-screen" style="padding: 1rem 0 2rem;">
+        <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+
+            <!-- Header -->
+            <div class="mb-6">
+                <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1">Attendance Management</h1>
+                <p class="text-sm sm:text-base text-gray-600">Monitor staff attendance, approve permissions, and manage records</p>
+            </div>
+
+            <!-- Stat Cards -->
+            <div class="stats-grid mb-6">
+                <div class="stat-card" style="--border-color: #10b981;">
+                    <div class="stat-label">Present Today</div>
+                    <div class="stat-value" id="statPresent">-</div>
+                </div>
+                <div class="stat-card" style="--border-color: #ef4444;">
+                    <div class="stat-label">Absent</div>
+                    <div class="stat-value" id="statAbsent">-</div>
+                </div>
+                <div class="stat-card" style="--border-color: #f59e0b;">
+                    <div class="stat-label">Late Arrivals</div>
+                    <div class="stat-value" id="statLate">-</div>
+                </div>
+                <div class="stat-card" style="--border-color: #3b82f6;">
+                    <div class="stat-label">On Break</div>
+                    <div class="stat-value" id="statOnBreak">-</div>
+                </div>
+                <div class="stat-card" style="--border-color: #8b5cf6;">
+                    <div class="stat-label">Pending Permissions</div>
+                    <div class="stat-value" id="statPendingPerms">-</div>
+                </div>
+            </div>
+
+            <!-- Tab Bar -->
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('live')">Live Today</button>
+                <button class="tab-btn" onclick="switchTab('permissions')">Permission Requests</button>
+                <button class="tab-btn" onclick="switchTab('monthly')">Monthly View</button>
+                <button class="tab-btn" onclick="switchTab('mark')">Mark Attendance</button>
+                <button class="tab-btn" onclick="switchTab('activity')">Activity Report</button>
+            </div>
+
+            <!-- Tab 1: Live Today -->
+            <div class="tab-content active" id="tab-live">
+                <div class="filter-bar">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                            <input type="date" id="liveDate" onchange="loadLiveAttendance()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Branch</label>
+                            <select id="liveBranch" onchange="loadLiveAttendance()">
+                                <option value="">All Branches</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="btn btn-primary w-full" onclick="loadLiveAttendance()">Refresh</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="table-container">
+                        <table>
+                            <thead class="gradient-header">
+                                <tr>
+                                    <th>Staff Name</th>
+                                    <th>Branch</th>
+                                    <th>Clock In</th>
+                                    <th>Clock Out</th>
+                                    <th>Break</th>
+                                    <th>Working Hours</th>
+                                    <th>Status</th>
+                                    <th>Late</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="liveTableBody">
+                                <tr><td colspan="9" class="text-center py-8 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Permission Requests -->
+            <div class="tab-content" id="tab-permissions">
+                <div class="filter-bar">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                            <select id="permissionFilter" onchange="loadPermissions()">
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="">All</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="permissionsContainer">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Monthly View -->
+            <div class="tab-content" id="tab-monthly">
+                <div class="filter-bar">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Staff Member</label>
+                            <select id="monthlyStaff">
+                                <option value="">Select Staff</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Month</label>
+                            <input type="month" id="monthlyMonth">
+                        </div>
+                        <div class="flex items-end">
+                            <button class="btn btn-primary w-full" onclick="loadMonthlyView()">Load Report</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monthly Summary -->
+                <div id="monthlySummary" class="stats-grid mb-6" style="display: none;">
+                    <div class="stat-card" style="--border-color: #10b981;">
+                        <div class="stat-label">Total Days</div>
+                        <div class="stat-value" id="msTotalDays">0</div>
+                    </div>
+                    <div class="stat-card" style="--border-color: #3b82f6;">
+                        <div class="stat-label">Present</div>
+                        <div class="stat-value" id="msPresent">0</div>
+                    </div>
+                    <div class="stat-card" style="--border-color: #f59e0b;">
+                        <div class="stat-label">Late</div>
+                        <div class="stat-value" id="msLate">0</div>
+                    </div>
+                    <div class="stat-card" style="--border-color: #8b5cf6;">
+                        <div class="stat-label">Total Hours</div>
+                        <div class="stat-value" id="msTotalHours">0</div>
+                    </div>
+                    <div class="stat-card" style="--border-color: #ef4444;">
+                        <div class="stat-label">Shortage (hrs)</div>
+                        <div class="stat-value" id="msShortage">0</div>
+                    </div>
+                </div>
+
+                <div class="card" id="monthlyTableCard" style="display: none;">
+                    <div class="table-container">
+                        <table>
+                            <thead class="gradient-header">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Day</th>
+                                    <th>Clock In</th>
+                                    <th>Clock Out</th>
+                                    <th>Break</th>
+                                    <th>Working Hours</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="monthlyTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="monthlyEmpty" class="empty-state">
+                    <div class="empty-state-icon">&#128197;</div>
+                    <p class="font-semibold text-gray-700 mb-1">Select a staff member and month</p>
+                    <p class="text-sm">Choose a staff member and month above to view their attendance report</p>
+                </div>
+            </div>
+
+            <!-- Tab 4: Mark Attendance -->
+            <div class="tab-content" id="tab-mark">
+                <div class="card" style="padding: 2rem;">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Manually Mark Attendance</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Staff Member</label>
+                            <select id="markStaff">
+                                <option value="">Select Staff</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                            <input type="date" id="markDate">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                            <select id="markStatus">
+                                <option value="present">Present</option>
+                                <option value="absent">Absent</option>
+                                <option value="half_day">Half Day</option>
+                                <option value="on_leave">On Leave</option>
+                                <option value="holiday">Holiday</option>
+                                <option value="week_off">Week Off</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Notes</label>
+                        <textarea id="markNotes" rows="3" placeholder="Add any notes about this attendance entry..."></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="submitMarkAttendance()">Submit Attendance</button>
+                </div>
+            </div>
+
+            <!-- Tab 5: Activity Report -->
+            <div class="tab-content" id="tab-activity">
+                <div class="filter-bar">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                            <input type="date" id="activityDate" onchange="loadActivityReport()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Branch</label>
+                            <select id="activityBranch" onchange="loadActivityReport()">
+                                <option value="">All Branches</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="btn btn-primary w-full" onclick="loadActivityReport()">Load Report</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="activityContainer">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">&#128202;</div>
+                        <p class="font-semibold text-gray-700 mb-1">Activity Report</p>
+                        <p class="text-sm">Select a date above to view staff activity reports</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Photo Viewer Modal -->
+    <div class="modal" id="photoModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="text-lg font-bold text-gray-900">Attendance Photos</h3>
+                <button onclick="closeModal('photoModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">&times;</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="photoContent">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permission Review Modal -->
+    <div class="modal" id="reviewModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb;">
+                <h3 class="text-lg font-bold text-gray-900" id="reviewModalTitle">Review Permission</h3>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div id="reviewDetails" class="mb-4"></div>
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Review Notes</label>
+                    <textarea id="reviewNotes" rows="3" placeholder="Add review notes..."></textarea>
+                </div>
+                <div class="flex gap-3">
+                    <button class="btn btn-success flex-1" id="reviewApproveBtn" onclick="submitReview('approve')">Approve</button>
+                    <button class="btn btn-danger flex-1" id="reviewRejectBtn" onclick="submitReview('reject')">Reject</button>
+                    <button class="btn btn-secondary" onclick="closeModal('reviewModal')">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Detail Modal -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="text-lg font-bold text-gray-900">Attendance Details</h3>
+                <button onclick="closeModal('detailModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">&times;</button>
+            </div>
+            <div style="padding: 1.5rem;" id="detailContent">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let branches = [];
+        let staffList = [];
+        let currentReviewId = null;
+        let autoRefreshInterval = null;
+        let initialized = false;
+
+        // ========================================
+        // INITIALIZATION
+        // ========================================
+        function initPage() {
+            if (initialized) return;
+            initialized = true;
+            // Set default dates
+            const today = new Date().toISOString().split('T')[0];
+            const currentMonth = today.substring(0, 7);
+
+            document.getElementById('liveDate').value = today;
+            document.getElementById('activityDate').value = today;
+            document.getElementById('markDate').value = today;
+            document.getElementById('monthlyMonth').value = currentMonth;
+
+            // Load initial data
+            loadBranches();
+            loadStaffList();
+            loadSummaryStats();
+            loadLiveAttendance();
+
+            // Auto-refresh every 60 seconds for live view
+            autoRefreshInterval = setInterval(() => {
+                const activeTab = document.querySelector('.tab-btn.active');
+                if (activeTab && activeTab.textContent.trim() === 'Live Today') {
+                    loadSummaryStats();
+                    loadLiveAttendance();
+                }
+            }, 60000);
+        }
+
+        document.addEventListener('navigationLoaded', initPage);
+        setTimeout(initPage, 1000);
+
+        // ========================================
+        // HELPERS
+        // ========================================
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function formatTime(dateStr) {
+            if (!dateStr) return '--:--';
+            const d = new Date(dateStr);
+            return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '--';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function formatMinutesToHours(minutes) {
+            if (!minutes && minutes !== 0) return '--';
+            const hrs = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            return `${hrs}h ${mins}m`;
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease-in forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+
+            // Load data for the tab
+            if (tab === 'live') loadLiveAttendance();
+            if (tab === 'permissions') loadPermissions();
+            if (tab === 'activity') loadActivityReport();
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // Close modal on backdrop click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.classList.remove('active');
+            });
+        });
+
+        // ========================================
+        // LOAD BRANCHES & STAFF
+        // ========================================
+        async function loadBranches() {
+            try {
+                const res = await fetch('/api/branches', { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success !== false) {
+                    branches = Array.isArray(data) ? data : (data.data || []);
+                    const options = '<option value="">All Branches</option>' +
+                        branches.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+                    document.getElementById('liveBranch').innerHTML = options;
+                    document.getElementById('activityBranch').innerHTML = options;
+                }
+            } catch (e) {
+                console.error('Load branches error:', e);
+            }
+        }
+
+        async function loadStaffList() {
+            try {
+                const res = await fetch('/api/users?role=staff&status=active', { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success !== false) {
+                    staffList = Array.isArray(data) ? data : (data.data || []);
+                    const options = '<option value="">Select Staff</option>' +
+                        staffList.map(s => `<option value="${s.id}">${escapeHtml(s.full_name || s.username)}</option>`).join('');
+                    document.getElementById('monthlyStaff').innerHTML = options;
+                    document.getElementById('markStaff').innerHTML = options;
+                }
+            } catch (e) {
+                console.error('Load staff error:', e);
+            }
+        }
+
+        // ========================================
+        // SUMMARY STATS
+        // ========================================
+        async function loadSummaryStats() {
+            try {
+                const res = await fetch('/api/attendance/admin/today-summary', { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) {
+                    const s = data.data;
+                    document.getElementById('statPresent').textContent = s.present;
+                    document.getElementById('statAbsent').textContent = s.absent;
+                    document.getElementById('statLate').textContent = s.late;
+                    document.getElementById('statOnBreak').textContent = s.on_break;
+                    document.getElementById('statPendingPerms').textContent = s.pending_permissions;
+                }
+            } catch (e) {
+                console.error('Load summary error:', e);
+            }
+        }
+
+        // ========================================
+        // TAB 1: LIVE TODAY
+        // ========================================
+        async function loadLiveAttendance() {
+            const date = document.getElementById('liveDate').value;
+            const branchId = document.getElementById('liveBranch').value;
+            const tbody = document.getElementById('liveTableBody');
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">Loading...</td></tr>';
+
+            try {
+                let url = `/api/attendance/report?date=${date}`;
+                if (branchId) url += `&branch_id=${branchId}`;
+
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (!data.success) {
+                    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-gray-400">${escapeHtml(data.message)}</td></tr>`;
+                    return;
+                }
+
+                const rows = data.attendance || [];
+                if (rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No attendance records for this date</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = rows.map(r => {
+                    const clockIn = r.clock_in_time ? formatTime(r.clock_in_time) : '--:--';
+                    const clockOut = r.clock_out_time ? formatTime(r.clock_out_time) : '--:--';
+                    const breakDur = r.break_duration_minutes ? `${r.break_duration_minutes}m` : '--';
+                    const workHrs = r.total_working_minutes ? formatMinutesToHours(r.total_working_minutes) : (r.clock_in_time && !r.clock_out_time ? 'Ongoing' : '--');
+                    const statusClass = r.status || 'absent';
+                    const dayStatus = r.day_status || r.status;
+
+                    return `<tr>
+                        <td class="font-semibold">${escapeHtml(r.full_name)}</td>
+                        <td>${escapeHtml(r.branch_name)}</td>
+                        <td>${clockIn}</td>
+                        <td>${clockOut}</td>
+                        <td>${breakDur}</td>
+                        <td>${workHrs}</td>
+                        <td><span class="badge badge-${statusClass}">${statusClass}</span></td>
+                        <td>${r.is_late ? '<span class="badge badge-late">LATE</span>' : '-'}</td>
+                        <td>
+                            ${r.clock_in_time ? `<button class="action-btn-sm btn-primary" onclick="viewPhotos(${r.id})" title="View Photos">Photos</button>` : '-'}
+                        </td>
+                    </tr>`;
+                }).join('');
+
+            } catch (e) {
+                console.error('Load live attendance error:', e);
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-red-500">Failed to load attendance data</td></tr>';
+            }
+        }
+
+        // ========================================
+        // TAB 2: PERMISSION REQUESTS
+        // ========================================
+        async function loadPermissions() {
+            const status = document.getElementById('permissionFilter').value;
+            const container = document.getElementById('permissionsContainer');
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">Loading...</div></div>';
+
+            try {
+                let url = '/api/attendance/permission/all';
+                if (status) url += `?status=${status}`;
+
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                let requests = data.data || [];
+
+                if (requests.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">&#9989;</div>
+                            <p class="font-semibold text-gray-700 mb-1">No ${status || ''} permission requests</p>
+                            <p class="text-sm">All caught up!</p>
+                        </div>`;
+                    return;
+                }
+
+                container.innerHTML = requests.map(r => {
+                    const typeLabel = (r.request_type || '').replace(/_/g, ' ');
+                    const requestedDate = formatDate(r.request_date);
+                    const requestedAt = r.requested_at ? formatDate(r.requested_at) + ' ' + formatTime(r.requested_at) : '--';
+
+                    return `
+                    <div class="permission-card ${r.status}">
+                        <div class="flex flex-wrap justify-between items-start gap-2 mb-3">
+                            <div>
+                                <span class="font-bold text-gray-900 text-lg">${escapeHtml(r.user_name || r.username || 'Staff')}</span>
+                                ${r.branch_name ? `<span class="text-sm text-gray-500 ml-2">${escapeHtml(r.branch_name)}</span>` : ''}
+                            </div>
+                            <span class="badge badge-${r.request_type}">${typeLabel}</span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm mb-3">
+                            <div><span class="text-gray-500">Date:</span> <span class="font-semibold">${requestedDate}</span></div>
+                            <div><span class="text-gray-500">Duration:</span> <span class="font-semibold">${r.duration_minutes ? r.duration_minutes + ' min' : '--'}</span></div>
+                            <div><span class="text-gray-500">Requested:</span> <span class="font-semibold">${requestedAt}</span></div>
+                            <div><span class="text-gray-500">Status:</span> <span class="badge badge-${r.status}">${r.status}</span></div>
+                        </div>
+                        <div class="text-sm text-gray-700 mb-3" style="background: #f9fafb; padding: 0.75rem; border-radius: 8px;">
+                            <strong>Reason:</strong> ${escapeHtml(r.reason || 'No reason provided')}
+                        </div>
+                        ${r.status === 'pending' ? `
+                            <div class="flex gap-2">
+                                <button class="btn btn-success btn-sm" onclick="openReviewModal(${r.id}, 'approve')">Approve</button>
+                                <button class="btn btn-danger btn-sm" onclick="openReviewModal(${r.id}, 'reject')">Reject</button>
+                            </div>
+                        ` : `
+                            ${r.review_notes ? `<div class="text-sm text-gray-500"><strong>Review Notes:</strong> ${escapeHtml(r.review_notes)}</div>` : ''}
+                        `}
+                    </div>`;
+                }).join('');
+
+            } catch (e) {
+                console.error('Load permissions error:', e);
+                container.innerHTML = '<div class="empty-state"><p class="text-red-500">Failed to load permissions</p></div>';
+            }
+        }
+
+        function openReviewModal(permissionId, action) {
+            currentReviewId = permissionId;
+            document.getElementById('reviewNotes').value = '';
+
+            if (action === 'approve') {
+                document.getElementById('reviewModalTitle').textContent = 'Approve Permission Request';
+                document.getElementById('reviewApproveBtn').style.display = '';
+                document.getElementById('reviewRejectBtn').style.display = 'none';
+            } else {
+                document.getElementById('reviewModalTitle').textContent = 'Reject Permission Request';
+                document.getElementById('reviewApproveBtn').style.display = 'none';
+                document.getElementById('reviewRejectBtn').style.display = '';
+            }
+
+            openModal('reviewModal');
+        }
+
+        async function submitReview(action) {
+            if (!currentReviewId) return;
+
+            const notes = document.getElementById('reviewNotes').value.trim();
+            if (action === 'reject' && !notes) {
+                showToast('Review notes are required when rejecting', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/attendance/permission/${currentReviewId}/${action}`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ review_notes: notes })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Permission ${action}d successfully`, 'success');
+                    closeModal('reviewModal');
+                    loadPermissions();
+                    loadSummaryStats();
+                } else {
+                    showToast(data.message || `Failed to ${action}`, 'error');
+                }
+            } catch (e) {
+                console.error('Review error:', e);
+                showToast(`Failed to ${action} permission`, 'error');
+            }
+        }
+
+        // ========================================
+        // TAB 3: MONTHLY VIEW
+        // ========================================
+        async function loadMonthlyView() {
+            const userId = document.getElementById('monthlyStaff').value;
+            const month = document.getElementById('monthlyMonth').value;
+
+            if (!userId || !month) {
+                showToast('Please select a staff member and month', 'warning');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/attendance/user/${userId}/month/${month}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (!data.success) {
+                    showToast(data.message || 'Failed to load monthly data', 'error');
+                    return;
+                }
+
+                // Show summary
+                const s = data.summary;
+                document.getElementById('msTotalDays').textContent = s.total_days;
+                document.getElementById('msPresent').textContent = s.present_days;
+                document.getElementById('msLate').textContent = s.late_days;
+                document.getElementById('msTotalHours').textContent = s.total_working_hours;
+                document.getElementById('msShortage').textContent = (s.shortage_minutes / 60).toFixed(1);
+                document.getElementById('monthlySummary').style.display = '';
+
+                // Show table
+                const rows = data.attendance || [];
+                const tbody = document.getElementById('monthlyTableBody');
+
+                if (rows.length === 0) {
+                    document.getElementById('monthlyTableCard').style.display = 'none';
+                    document.getElementById('monthlyEmpty').style.display = '';
+                    document.getElementById('monthlyEmpty').innerHTML = `
+                        <div class="empty-state-icon">&#128197;</div>
+                        <p class="font-semibold text-gray-700 mb-1">No attendance records</p>
+                        <p class="text-sm">No records found for the selected month</p>`;
+                    return;
+                }
+
+                document.getElementById('monthlyTableCard').style.display = '';
+                document.getElementById('monthlyEmpty').style.display = 'none';
+
+                tbody.innerHTML = rows.map(r => {
+                    const date = formatDate(r.date);
+                    const dayName = r.day_name || '';
+                    const clockIn = r.clock_in_time ? formatTime(r.clock_in_time) : '--:--';
+                    const clockOut = r.clock_out_time ? formatTime(r.clock_out_time) : '--:--';
+                    const breakDur = r.break_duration_minutes ? `${r.break_duration_minutes}m` : '--';
+                    const workHrs = r.total_working_minutes ? formatMinutesToHours(r.total_working_minutes) : '--';
+                    const statusClass = (r.day_status || r.status || '').toLowerCase();
+
+                    return `<tr>
+                        <td>${date}</td>
+                        <td>${escapeHtml(dayName)}</td>
+                        <td>${clockIn}</td>
+                        <td>${clockOut}</td>
+                        <td>${breakDur}</td>
+                        <td>${workHrs}</td>
+                        <td>
+                            <span class="badge badge-${statusClass}">${escapeHtml(r.day_status || r.status)}</span>
+                            ${r.is_late ? ' <span class="badge badge-late">LATE</span>' : ''}
+                        </td>
+                    </tr>`;
+                }).join('');
+
+            } catch (e) {
+                console.error('Load monthly error:', e);
+                showToast('Failed to load monthly view', 'error');
+            }
+        }
+
+        // ========================================
+        // TAB 4: MARK ATTENDANCE
+        // ========================================
+        async function submitMarkAttendance() {
+            const userId = document.getElementById('markStaff').value;
+            const date = document.getElementById('markDate').value;
+            const status = document.getElementById('markStatus').value;
+            const notes = document.getElementById('markNotes').value.trim();
+
+            if (!userId || !date || !status) {
+                showToast('Please fill in all required fields', 'warning');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/attendance/admin/mark', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ user_id: userId, date, status, notes })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Attendance marked successfully', 'success');
+                    document.getElementById('markNotes').value = '';
+                    loadSummaryStats();
+                } else {
+                    showToast(data.message || 'Failed to mark attendance', 'error');
+                }
+            } catch (e) {
+                console.error('Mark attendance error:', e);
+                showToast('Failed to mark attendance', 'error');
+            }
+        }
+
+        // ========================================
+        // TAB 5: ACTIVITY REPORT
+        // ========================================
+        async function loadActivityReport() {
+            const date = document.getElementById('activityDate').value;
+            const branchId = document.getElementById('activityBranch').value;
+            const container = document.getElementById('activityContainer');
+
+            if (!date) return;
+
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">Loading...</div></div>';
+
+            try {
+                let url = `/api/activities/report/daily?date=${date}`;
+                if (branchId) url += `&branch_id=${branchId}`;
+
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (!data.success) {
+                    container.innerHTML = `<div class="empty-state"><p class="text-red-500">${escapeHtml(data.message)}</p></div>`;
+                    return;
+                }
+
+                const report = data.activities || data.data || data.report || [];
+
+                if (report.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">&#128202;</div>
+                            <p class="font-semibold text-gray-700 mb-1">No activities found</p>
+                            <p class="text-sm">No activities logged for this date</p>
+                        </div>`;
+                    return;
+                }
+
+                // Group by user
+                const grouped = {};
+                report.forEach(a => {
+                    const key = a.user_id || a.id;
+                    if (!grouped[key]) {
+                        grouped[key] = {
+                            name: a.full_name || a.user_name || 'Unknown',
+                            branch: a.branch_name || '',
+                            activities: [],
+                            total: 0,
+                            completed: 0,
+                            duration: 0
+                        };
+                    }
+                    grouped[key].activities.push(a);
+                    grouped[key].total++;
+                    if (a.status === 'completed') grouped[key].completed++;
+                    grouped[key].duration += (a.duration_minutes || 0);
+                });
+
+                container.innerHTML = Object.values(grouped).map(g => `
+                    <div class="card mb-4" style="padding: 1.25rem;">
+                        <div class="flex flex-wrap justify-between items-center mb-3">
+                            <div>
+                                <span class="font-bold text-gray-900 text-lg">${escapeHtml(g.name)}</span>
+                                ${g.branch ? `<span class="text-sm text-gray-500 ml-2">${escapeHtml(g.branch)}</span>` : ''}
+                            </div>
+                            <div class="flex gap-3 text-sm">
+                                <span class="font-semibold text-purple-700">${g.total} activities</span>
+                                <span class="font-semibold text-green-700">${g.completed} completed</span>
+                                <span class="font-semibold text-blue-700">${formatMinutesToHours(g.duration)}</span>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            ${g.activities.map(a => `
+                                <div style="background: #f9fafb; padding: 0.75rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <span class="font-semibold text-sm">${escapeHtml(a.title || a.activity_type || 'Activity')}</span>
+                                        ${a.description ? `<p class="text-xs text-gray-500 mt-1">${escapeHtml(a.description).substring(0, 100)}</p>` : ''}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        ${a.duration_minutes ? `<span class="text-xs text-gray-500">${a.duration_minutes}m</span>` : ''}
+                                        <span class="badge badge-${a.status || 'pending'}">${a.status || 'pending'}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (e) {
+                console.error('Load activity report error:', e);
+                container.innerHTML = '<div class="empty-state"><p class="text-red-500">Failed to load activity report</p></div>';
+            }
+        }
+
+        // ========================================
+        // PHOTO VIEWER
+        // ========================================
+        async function viewPhotos(attendanceId) {
+            const content = document.getElementById('photoContent');
+            content.innerHTML = '<div class="text-center py-8 text-gray-400">Loading photos...</div>';
+            openModal('photoModal');
+
+            try {
+                // Get attendance photos
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch(`/api/attendance/report?date=${document.getElementById('liveDate').value}`, {
+                    headers: getAuthHeaders()
+                });
+                const data = await res.json();
+                const record = (data.attendance || []).find(r => r.id === attendanceId);
+
+                if (!record) {
+                    content.innerHTML = '<div class="text-center py-8 text-gray-400">Record not found</div>';
+                    return;
+                }
+
+                let html = '';
+
+                if (record.clock_in_photo) {
+                    html += `
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2 text-center">Clock In Photo</h4>
+                            <img src="/${record.clock_in_photo}" alt="Clock In" style="width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover;"
+                                 onerror="this.parentElement.innerHTML='<div class=\\'text-center py-8 text-gray-400\\'>Photo not available</div>'">
+                            <p class="text-xs text-gray-500 text-center mt-2">${formatTime(record.clock_in_time)}</p>
+                            ${record.clock_in_address ? `<p class="text-xs text-gray-400 text-center">${escapeHtml(record.clock_in_address)}</p>` : ''}
+                        </div>`;
+                }
+
+                if (record.clock_out_photo) {
+                    html += `
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2 text-center">Clock Out Photo</h4>
+                            <img src="/${record.clock_out_photo}" alt="Clock Out" style="width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover;"
+                                 onerror="this.parentElement.innerHTML='<div class=\\'text-center py-8 text-gray-400\\'>Photo not available</div>'">
+                            <p class="text-xs text-gray-500 text-center mt-2">${formatTime(record.clock_out_time)}</p>
+                            ${record.clock_out_address ? `<p class="text-xs text-gray-400 text-center">${escapeHtml(record.clock_out_address)}</p>` : ''}
+                        </div>`;
+                }
+
+                if (!html) {
+                    html = '<div class="text-center py-8 text-gray-400 col-span-2">No photos available for this record</div>';
+                }
+
+                content.innerHTML = html;
+
+            } catch (e) {
+                console.error('View photos error:', e);
+                content.innerHTML = '<div class="text-center py-8 text-red-500">Failed to load photos</div>';
+            }
+        }
+    </script>
+</body>
+</html>
