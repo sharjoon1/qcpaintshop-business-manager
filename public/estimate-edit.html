@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -238,27 +244,27 @@
         async function loadInitialData() {
             try {
                 // Load customers
-                const custRes = await fetch('/api/customers');
+                const custRes = await apiRequest('/api/customers');
                 customers = await custRes.json();
                 const customerSelect = document.getElementById('customerSelect');
                 customerSelect.innerHTML = '<option value="">-- Select Customer --</option>' +
                     customers.map(c => `<option value="${c.id}" data-customer='${JSON.stringify(c)}'>${c.name} (${c.phone || 'No phone'})</option>`).join('');
 
                 // Load branches for new customer modal
-                const branchRes = await fetch('/api/branches');
+                const branchRes = await apiRequest('/api/branches');
                 const branchData = await branchRes.json();
                 const branches = branchData.success ? branchData.data : branchData;
                 document.getElementById('newCustBranch').innerHTML = '<option value="">-- Select --</option>' +
                     branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
 
                 // Load brands
-                const brandRes = await fetch('/api/brands');
+                const brandRes = await apiRequest('/api/brands');
                 brands = await brandRes.json();
                 document.getElementById('brandSelect').innerHTML = '<option value="">-- Select Brand --</option>' +
                     brands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
 
                 // Load all products for filtering
-                const prodRes = await fetch('/api/products');
+                const prodRes = await apiRequest('/api/products');
                 allProducts = await prodRes.json();
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -291,7 +297,7 @@
             }
 
             // For now, show all categories (can filter by brand later)
-            fetch('/api/categories')
+            apiRequest('/api/categories')
                 .then(res => res.json())
                 .then(data => {
                     categories = data;
@@ -605,9 +611,8 @@
                 console.log('Saving estimate ID:', estimateId);
                 console.log('Estimate data:', estimateData);
                 
-                const response = await fetch(`/api/estimates/${estimateId}`, {
+                const response = await apiRequest(`/api/estimates/${estimateId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(estimateData)
                 });
 
@@ -651,9 +656,8 @@
             };
 
             try {
-                const response = await fetch('/api/customers', {
+                const response = await apiRequest('/api/customers', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(customerData)
                 });
 
@@ -684,9 +688,9 @@
         async function loadEstimateData() {
             try {
                 console.log('Loading estimate ID:', estimateId);
-                const response = await fetch(`/api/estimates/${estimateId}`);
+                const response = await apiRequest(`/api/estimates/${estimateId}`);
                 console.log('Response status:', response.status);
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }

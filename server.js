@@ -16,6 +16,7 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
+const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
@@ -32,6 +33,11 @@ const leadsRoutes = require('./routes/leads');
 const branchesRoutes = require('./routes/branches');
 const activitiesRoutes = require('./routes/activities');
 const tasksRoutes = require('./routes/tasks');
+const zohoRoutes = require('./routes/zoho');
+const staffRegistrationRoutes = require('./routes/staff-registration');
+const dailyTasksRoutes = require('./routes/daily-tasks');
+const syncScheduler = require('./services/sync-scheduler');
+const whatsappProcessor = require('./services/whatsapp-processor');
 
 const app = express();
 
@@ -82,6 +88,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static('public'));
+app.use('/uploads', express.static('uploads'));
 
 // ========================================
 // DATABASE CONNECTION
@@ -107,6 +114,11 @@ leadsRoutes.setPool(pool);
 branchesRoutes.setPool(pool);
 activitiesRoutes.setPool(pool);
 tasksRoutes.setPool(pool);
+zohoRoutes.setPool(pool);
+staffRegistrationRoutes.setPool(pool);
+dailyTasksRoutes.setPool(pool);
+syncScheduler.setPool(pool);
+whatsappProcessor.setPool(pool);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -118,7 +130,12 @@ const uploadDirs = [
     'public/uploads/profiles',
     'public/uploads/attendance/clock-in',
     'public/uploads/attendance/clock-out',
-    'public/uploads/documents'
+    'public/uploads/documents',
+    'public/uploads/design-requests',
+    'public/uploads/visualizations',
+    'public/uploads/aadhar',
+    'public/uploads/daily-tasks',
+    'uploads/attendance/break'
 ];
 uploadDirs.forEach(dir => {
     if (!fs.existsSync(dir)) {
@@ -167,6 +184,40 @@ const uploadProfile = multer({
     }
 });
 
+// Aadhar proof upload config
+const aadharStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'public/uploads/aadhar/'),
+    filename: (req, file, cb) => {
+        const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'aadhar-' + uniqueName + path.extname(file.originalname));
+    }
+});
+
+const uploadAadhar = multer({
+    storage: aadharStorage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image and PDF files allowed'));
+        }
+    }
+});
+
+// Design request photo upload config (memory storage + sharp compression)
+const designRequestUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files allowed'));
+        }
+    }
+});
+
 // ========================================
 // MOUNT ROUTE MODULES
 // ========================================
@@ -179,6 +230,33 @@ app.use('/api/leads', leadsRoutes.router);
 app.use('/api/branches', branchesRoutes.router);
 app.use('/api/activities', activitiesRoutes.router);
 app.use('/api/tasks', tasksRoutes.router);
+app.use('/api/zoho', zohoRoutes.router);
+app.use('/api/staff-registration', staffRegistrationRoutes.router);
+app.use('/api/daily-tasks', dailyTasksRoutes.router);
+
+// Zoho OAuth callback redirect (Zoho app configured with /oauth/callback)
+app.get('/oauth/callback', (req, res) => {
+    const query = new URLSearchParams(req.query).toString();
+    res.redirect(`/api/zoho/oauth/callback${query ? '?' + query : ''}`);
+});
+
+// Zoho OAuth manual code exchange (direct route for reliability)
+app.post('/api/zoho/oauth/exchange', requireRole('admin'), async (req, res) => {
+    try {
+        const zohoOAuth = require('./services/zoho-oauth');
+        const { code } = req.body;
+        if (!code) {
+            return res.status(400).json({ success: false, message: 'Authorization code is required' });
+        }
+        console.log('[Zoho] Manual code exchange - code:', code.substring(0, 20) + '...');
+        const result = await zohoOAuth.generateTokenFromCode(code.trim());
+        console.log('[Zoho] Code exchange successful! Token expires at:', result.expires_at);
+        res.json({ success: true, message: 'Zoho Books connected successfully!', data: { expires_at: result.expires_at } });
+    } catch (error) {
+        console.error('[Zoho] Manual code exchange error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
 // ========================================
 // AUTHENTICATION ENDPOINTS
@@ -308,18 +386,49 @@ app.get('/api/auth/me', async (req, res) => {
         }
 
         const session = sessions[0];
+
+        // Fetch full user details including personal, KYC, and bank fields
+        let u = session;
+        try {
+            const [fullUser] = await pool.query(
+                `SELECT id, username, full_name, email, role, branch_id, phone, profile_image_url, created_at,
+                        date_of_birth, door_no, street, city, state, pincode,
+                        aadhar_number, aadhar_proof_url,
+                        emergency_contact_name, emergency_contact_phone,
+                        bank_account_name, bank_name, bank_account_number, bank_ifsc_code, upi_id
+                 FROM users WHERE id = ?`, [session.user_id]
+            );
+            if (fullUser.length > 0) u = fullUser[0];
+        } catch(e) { /* fallback to session data */ }
+
         res.json({
             success: true,
             user: {
-                id: session.user_id,
-                username: session.username,
-                full_name: session.full_name,
-                email: session.email,
-                role: session.role,
-                branch_id: session.branch_id,
+                id: u.id || session.user_id,
+                username: u.username || session.username,
+                full_name: u.full_name || session.full_name,
+                email: u.email || session.email,
+                role: u.role || session.role,
+                branch_id: u.branch_id || session.branch_id,
                 branch_name: session.branch_name || null,
-                phone: session.phone,
-                profile_image_url: session.profile_image_url
+                phone: u.phone || session.phone,
+                profile_image_url: u.profile_image_url || session.profile_image_url,
+                created_at: u.created_at,
+                date_of_birth: u.date_of_birth || null,
+                door_no: u.door_no || null,
+                street: u.street || null,
+                city: u.city || null,
+                state: u.state || null,
+                pincode: u.pincode || null,
+                aadhar_number: u.aadhar_number || null,
+                aadhar_proof_url: u.aadhar_proof_url || null,
+                emergency_contact_name: u.emergency_contact_name || null,
+                emergency_contact_phone: u.emergency_contact_phone || null,
+                bank_account_name: u.bank_account_name || null,
+                bank_name: u.bank_name || null,
+                bank_account_number: u.bank_account_number || null,
+                bank_ifsc_code: u.bank_ifsc_code || null,
+                upi_id: u.upi_id || null
             }
         });
 
@@ -379,7 +488,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
             const transporter = nodemailer.createTransport({
                 host: process.env.SMTP_HOST,
                 port: parseInt(process.env.SMTP_PORT || '587'),
-                secure: process.env.SMTP_SECURE === 'true',
+                secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
                 auth: {
                     user: process.env.SMTP_USER,
                     pass: process.env.SMTP_PASSWORD
@@ -436,7 +545,7 @@ app.post('/api/otp/send', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid mobile number', code: 'VALIDATION_ERROR' });
         }
 
-        if (!['Registration', 'Login', 'Password Reset'].includes(purpose)) {
+        if (!['Registration', 'Login', 'Password Reset', 'Staff Registration'].includes(purpose)) {
             return res.status(400).json({ success: false, error: 'Invalid purpose', code: 'VALIDATION_ERROR' });
         }
 
@@ -454,14 +563,26 @@ app.post('/api/otp/send', async (req, res) => {
             });
         }
 
-        if (purpose === 'Registration') {
-            const [existing] = await pool.query('SELECT id FROM users WHERE phone = ?', [mobile]);
+        if (purpose === 'Registration' || purpose === 'Staff Registration') {
+            const [existing] = await pool.query('SELECT id FROM users WHERE phone = ? OR phone = ? OR phone = ?', [mobile, '+91' + mobile, '91' + mobile]);
             if (existing.length > 0) {
                 return res.status(400).json({
                     success: false,
                     error: 'Mobile number already registered.',
                     code: 'MOBILE_ALREADY_REGISTERED'
                 });
+            }
+            if (purpose === 'Staff Registration') {
+                const [pendingRegs] = await pool.query(
+                    "SELECT id FROM staff_registrations WHERE phone = ? AND status = 'pending'", [mobile]
+                );
+                if (pendingRegs.length > 0) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'A staff registration with this mobile number is already pending.',
+                        code: 'MOBILE_ALREADY_REGISTERED'
+                    });
+                }
             }
         }
 
@@ -479,12 +600,19 @@ app.post('/api/otp/send', async (req, res) => {
             [mobile, otpCode, purpose, expiresAt]
         );
 
-        // Send SMS via configured provider (credentials from env)
+        // Send SMS via configured provider (DLT-registered templates)
         if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-            const https = require('https');
+            const http = require('http');
             const querystring = require('querystring');
 
-            const message = `Your verification OTP for Quality Colours is ${otpCode}. Valid for 5 minutes.`;
+            // Select DLT-registered template based on purpose
+            let message;
+            if (purpose === 'Staff Registration') {
+                message = `Your verification OTP for Quality Colours registration is ${otpCode}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
+            } else {
+                message = `Hi, your Quality Colours verification code is ${otpCode}. Use this code to complete registration and view product pricing. - QUALTQ`;
+            }
+
             const params = querystring.stringify({
                 user: process.env.SMS_USER,
                 password: process.env.SMS_PASSWORD,
@@ -497,17 +625,52 @@ app.post('/api/otp/send', async (req, res) => {
                 route: '4'
             });
 
-            const smsUrl = `https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
+            const smsUrl = `http://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
 
-            https.get(smsUrl, (smsRes) => {
+            http.get(smsUrl, (smsRes) => {
                 let data = '';
                 smsRes.on('data', chunk => { data += chunk; });
                 smsRes.on('end', () => {
-                    console.log('SMS sent:', data);
+                    console.log('[SMS] Response:', data);
                 });
             }).on('error', (err) => {
-                console.error('SMS Error:', err.message);
+                console.error('[SMS] Error:', err.message);
             });
+        }
+
+        // For Staff Registration, also send OTP via email
+        if (purpose === 'Staff Registration' && req.body.email && process.env.SMTP_HOST) {
+            try {
+                const transporter = nodemailer.createTransport({
+                    host: process.env.SMTP_HOST,
+                    port: parseInt(process.env.SMTP_PORT || '587'),
+                    secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
+                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
+                });
+                await transporter.sendMail({
+                    from: `"${process.env.MAIL_FROM_NAME || 'Quality Colours'}" <${process.env.MAIL_FROM || process.env.SMTP_USER}>`,
+                    to: req.body.email,
+                    subject: 'OTP Verification - Quality Colours Staff Registration',
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                                <h1 style="color: white; margin: 0;">Quality Colours</h1>
+                            </div>
+                            <div style="background: #f9fafb; padding: 30px;">
+                                <h2 style="color: #333;">Staff Registration OTP</h2>
+                                <p>Your verification code is:</p>
+                                <div style="background: white; border: 2px solid #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+                                    <code style="font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 8px;">${otpCode}</code>
+                                </div>
+                                <p style="color: #6b7280; font-size: 13px;">Valid for 5 minutes. Do not share this code.</p>
+                            </div>
+                        </div>
+                    `
+                });
+                console.log('OTP email sent to:', req.body.email);
+            } catch (emailErr) {
+                console.error('OTP email error:', emailErr.message);
+            }
         }
 
         const response = {
@@ -617,11 +780,18 @@ app.post('/api/otp/resend', async (req, res) => {
             [mobile, otpCode, purpose, expiresAt]
         );
 
-        // Send SMS
+        // Send SMS (DLT-registered templates)
         if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
-            const https = require('https');
+            const http = require('http');
             const querystring = require('querystring');
-            const message = `Your verification OTP for Quality Colours is ${otpCode}. Valid for 5 minutes.`;
+
+            let message;
+            if (purpose === 'Staff Registration') {
+                message = `Your verification OTP for Quality Colours registration is ${otpCode}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
+            } else {
+                message = `Hi, your Quality Colours verification code is ${otpCode}. Use this code to complete registration and view product pricing. - QUALTQ`;
+            }
+
             const params = querystring.stringify({
                 user: process.env.SMS_USER,
                 password: process.env.SMS_PASSWORD,
@@ -629,7 +799,46 @@ app.post('/api/otp/resend', async (req, res) => {
                 channel: 'Trans', DCS: '0', flashsms: '0',
                 number: '91' + mobile, text: message, route: '4'
             });
-            https.get(`https://retailsms.nettyfish.com/api/mt/SendSMS?${params}`, () => {}).on('error', () => {});
+            http.get(`http://retailsms.nettyfish.com/api/mt/SendSMS?${params}`, (smsRes) => {
+                let data = '';
+                smsRes.on('data', chunk => { data += chunk; });
+                smsRes.on('end', () => { console.log('[SMS] Resend response:', data); });
+            }).on('error', () => {});
+        }
+
+        // For Staff Registration, also resend OTP via email
+        if (purpose === 'Staff Registration' && req.body.email && process.env.SMTP_HOST) {
+            try {
+                const transporter = nodemailer.createTransport({
+                    host: process.env.SMTP_HOST,
+                    port: parseInt(process.env.SMTP_PORT || '587'),
+                    secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
+                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
+                });
+                await transporter.sendMail({
+                    from: `"${process.env.MAIL_FROM_NAME || 'Quality Colours'}" <${process.env.MAIL_FROM || process.env.SMTP_USER}>`,
+                    to: req.body.email,
+                    subject: 'OTP Verification - Quality Colours Staff Registration',
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                                <h1 style="color: white; margin: 0;">Quality Colours</h1>
+                            </div>
+                            <div style="background: #f9fafb; padding: 30px;">
+                                <h2 style="color: #333;">Staff Registration OTP</h2>
+                                <p>Your verification code is:</p>
+                                <div style="background: white; border: 2px solid #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+                                    <code style="font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 8px;">${otpCode}</code>
+                                </div>
+                                <p style="color: #6b7280; font-size: 13px;">Valid for 5 minutes. Do not share this code.</p>
+                            </div>
+                        </div>
+                    `
+                });
+                console.log('[OTP] Email resent to:', req.body.email);
+            } catch (emailErr) {
+                console.error('[OTP] Email resend error:', emailErr.message);
+            }
         }
 
         const response = {
@@ -728,7 +937,21 @@ app.post('/api/auth/register', async (req, res) => {
 // SETTINGS
 // ========================================
 
-app.get('/api/settings', requireAuth, async (req, res) => {
+// Public branding settings (logo, company name) - available to all authenticated users
+app.get('/api/settings/branding', requireAuth, async (req, res) => {
+    try {
+        const safeKeys = ['business_name', 'business_logo', 'business_phone', 'business_email', 'business_address'];
+        const [settings] = await pool.query('SELECT * FROM settings WHERE setting_key IN (?)', [safeKeys]);
+        const settingsObj = {};
+        settings.forEach(s => { settingsObj[s.setting_key] = s.setting_value; });
+        res.json(settingsObj);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Full settings - admin only
+app.get('/api/settings', requirePermission('settings', 'manage'), async (req, res) => {
     try {
         const [settings] = await pool.query('SELECT * FROM settings');
         const settingsObj = {};
@@ -739,7 +962,7 @@ app.get('/api/settings', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/settings/:category', requireAuth, async (req, res) => {
+app.get('/api/settings/:category', requirePermission('settings', 'manage'), async (req, res) => {
     try {
         const [settings] = await pool.query('SELECT * FROM settings WHERE category = ?', [req.params.category]);
         const settingsObj = {};
@@ -778,8 +1001,8 @@ app.put('/api/settings/:key', requirePermission('settings', 'manage'), async (re
     }
 });
 
-// Logo upload
-app.post('/api/upload/logo', requireAuth, uploadLogo.single('logo'), async (req, res) => {
+// Logo upload - admin only
+app.post('/api/upload/logo', requirePermission('settings', 'manage'), uploadLogo.single('logo'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No file uploaded' });
@@ -850,6 +1073,692 @@ app.get('/api/guest/products', async (req, res) => {
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// PUBLIC API (no auth required)
+// ========================================
+
+app.get('/api/public/site-info', async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            "SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('business_name','business_logo','business_phone','business_email','business_address')"
+        );
+        const info = {};
+        rows.forEach(r => { info[r.setting_key] = r.setting_value; });
+        res.json({ success: true, data: info });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.get('/api/public/branches', async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            'SELECT id, name, address, city, state, phone, open_time, close_time FROM branches WHERE status = ? ORDER BY name',
+            ['active']
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.get('/api/public/brands', async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            'SELECT id, name, logo_url FROM brands WHERE status = ? ORDER BY name',
+            ['active']
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/public/design-requests', designRequestUpload.single('photo'), async (req, res) => {
+    try {
+        const { name, mobile, city } = req.body;
+
+        if (!name || !mobile) {
+            return res.status(400).json({ success: false, error: 'Name and mobile are required' });
+        }
+
+        // Validate mobile (Indian format)
+        const mobileClean = mobile.replace(/[\s-]/g, '');
+        if (!/^(\+91)?[6-9]\d{9}$/.test(mobileClean)) {
+            return res.status(400).json({ success: false, error: 'Invalid mobile number' });
+        }
+
+        // Process photo if uploaded
+        let photoPath = null;
+        if (req.file) {
+            const timestamp = Date.now();
+            const filename = `design_${timestamp}_${Math.round(Math.random() * 1E9)}.jpg`;
+            const dir = path.join(__dirname, 'public', 'uploads', 'design-requests');
+            const fullPath = path.join(dir, filename);
+
+            await sharp(req.file.buffer)
+                .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+                .jpeg({ quality: 80, progressive: true })
+                .toFile(fullPath);
+
+            photoPath = `/uploads/design-requests/${filename}`;
+        }
+
+        // Generate request number: CDR-YYYYMMDD-XXXX
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const [countRows] = await pool.query(
+            "SELECT COUNT(*) as cnt FROM color_design_requests WHERE request_number LIKE ?",
+            [`CDR-${dateStr}-%`]
+        );
+        const seq = String((countRows[0].cnt || 0) + 1).padStart(4, '0');
+        const requestNumber = `CDR-${dateStr}-${seq}`;
+
+        await pool.query(
+            'INSERT INTO color_design_requests (request_number, name, mobile, city, photo_path) VALUES (?, ?, ?, ?, ?)',
+            [requestNumber, name, mobileClean, city || null, photoPath]
+        );
+
+        res.json({ success: true, request_number: requestNumber, message: 'Design request submitted successfully' });
+    } catch (err) {
+        console.error('Design request error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ========================================
+// DESIGN REQUESTS ADMIN API
+// ========================================
+
+app.get('/api/design-requests', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { status, search, page = 1, limit = 20 } = req.query;
+        const offset = (page - 1) * limit;
+        let where = '1=1';
+        const params = [];
+
+        if (status) {
+            where += ' AND status = ?';
+            params.push(status);
+        }
+        if (search) {
+            where += ' AND (name LIKE ? OR mobile LIKE ? OR request_number LIKE ? OR city LIKE ?)';
+            const s = `%${search}%`;
+            params.push(s, s, s, s);
+        }
+
+        const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM color_design_requests WHERE ${where}`, params);
+        const [rows] = await pool.query(
+            `SELECT * FROM color_design_requests WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+            [...params, parseInt(limit), parseInt(offset)]
+        );
+
+        res.json({ success: true, data: rows, total: countRows[0].total, page: parseInt(page), limit: parseInt(limit) });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.get('/api/design-requests/stats', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT
+                COUNT(*) as total,
+                SUM(status = 'new') as new_count,
+                SUM(status = 'in_progress') as in_progress_count,
+                SUM(status = 'completed') as completed_count,
+                SUM(status = 'rejected') as rejected_count
+            FROM color_design_requests
+        `);
+        res.json({ success: true, data: rows[0] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.put('/api/design-requests/:id', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { status, admin_notes } = req.body;
+        const fields = [];
+        const params = [];
+
+        if (status) { fields.push('status = ?'); params.push(status); }
+        if (admin_notes !== undefined) { fields.push('admin_notes = ?'); params.push(admin_notes); }
+
+        if (fields.length === 0) {
+            return res.status(400).json({ success: false, error: 'No fields to update' });
+        }
+
+        params.push(req.params.id);
+        await pool.query(`UPDATE color_design_requests SET ${fields.join(', ')} WHERE id = ?`, params);
+        res.json({ success: true, message: 'Design request updated' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ========================================
+// PAINT COLORS & VISUALIZATION
+// ========================================
+
+// Load paint color catalogs
+const paintColorsDir = path.join(__dirname, 'data', 'paint-colors');
+const paintCatalogs = {};
+if (fs.existsSync(paintColorsDir)) {
+    fs.readdirSync(paintColorsDir).filter(f => f.endsWith('.json')).forEach(f => {
+        try {
+            const data = JSON.parse(fs.readFileSync(path.join(paintColorsDir, f), 'utf8'));
+            paintCatalogs[data.brandCode] = data;
+        } catch (e) { console.error(`Error loading paint catalog ${f}:`, e.message); }
+    });
+}
+
+// --- Color theory helpers for auto-visualization ---
+function hexToHsl(hex) {
+    let r = parseInt(hex.slice(1, 3), 16) / 255;
+    let g = parseInt(hex.slice(3, 5), 16) / 255;
+    let b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    if (max === min) { h = s = 0; }
+    else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+            case g: h = ((b - r) / d + 2) / 6; break;
+            case b: h = ((r - g) / d + 4) / 6; break;
+        }
+    }
+    return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+function escXml(str) {
+    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function selectColorCombinations(catalog) {
+    const allColors = [];
+    for (const family of catalog.families) {
+        for (const color of family.colors) {
+            allColors.push({ ...color, family: family.code, familyName: family.name, hsl: hexToHsl(color.hex) });
+        }
+    }
+    const light = allColors.filter(c => c.hsl.l >= 65).sort((a, b) => b.hsl.l - a.hsl.l);
+    const medium = allColors.filter(c => c.hsl.l >= 30 && c.hsl.l < 65).sort((a, b) => b.hsl.l - a.hsl.l);
+    const dark = allColors.filter(c => c.hsl.l < 30).sort((a, b) => a.hsl.l - b.hsl.l);
+
+    const lightNeutral = light.filter(c => c.hsl.s < 20);
+    const lightWarm = light.filter(c => c.temperature === 'Warm' && c.hsl.s >= 15);
+    const lightCool = light.filter(c => c.temperature === 'Cool' && c.hsl.s >= 15);
+    const medWarm = medium.filter(c => c.temperature === 'Warm');
+    const medCool = medium.filter(c => c.temperature === 'Cool');
+    const pick = (arr, i = 0) => arr[Math.min(i, arr.length - 1)] || allColors[0];
+
+    return [
+        // 2-COLOR
+        { type: 'two-color', label: 'Classic Elegance', description: 'Neutral walls with a refined accent',
+          colors: [{ ...pick(lightNeutral, 2), role: 'Walls' }, { ...pick(medium, 5), role: 'Trim & Accents' }] },
+        { type: 'two-color', label: 'Warm Harmony', description: 'Inviting warm tones throughout',
+          colors: [{ ...pick(lightWarm.length ? lightWarm : light, 3), role: 'Walls' }, { ...pick(medWarm.length ? medWarm : medium, 4), role: 'Trim & Accents' }] },
+        { type: 'two-color', label: 'Cool Contemporary', description: 'Modern cool tones for a sleek look',
+          colors: [{ ...pick(lightCool.length ? lightCool : light, 2), role: 'Walls' }, { ...pick(medCool.length ? medCool : medium, 5), role: 'Trim & Accents' }] },
+        // 3-COLOR
+        { type: 'three-color', label: 'Sophisticated Trio', description: 'Balanced light, medium and dark tones',
+          colors: [{ ...pick(lightNeutral, 5), role: 'Walls' }, { ...pick(medium, 10), role: 'Secondary' }, { ...pick(dark, 2), role: 'Doors & Accents' }] },
+        { type: 'three-color', label: 'Vibrant Living', description: 'Bold and expressive color story',
+          colors: [{ ...pick(lightWarm.length ? lightWarm : light, 5), role: 'Walls' }, { ...pick(medCool.length ? medCool : medium, 8), role: 'Secondary' }, { ...pick(dark, 5), role: 'Doors & Accents' }] },
+        { type: 'three-color', label: 'Earth & Nature', description: 'Natural tones inspired by the landscape',
+          colors: [
+            pick(light.filter(c => c.hsl.h >= 25 && c.hsl.h <= 90), 0) || pick(light, 8),
+            { role: 'Walls' },
+            pick(medium.filter(c => c.hsl.h >= 60 && c.hsl.h <= 180), 0) || pick(medium, 15),
+            { role: 'Secondary' },
+            pick(dark.filter(c => c.hsl.h >= 15 && c.hsl.h <= 60), 0) || pick(dark, 0),
+            { role: 'Doors & Accents' }
+          ].filter(x => x.hex) // build properly below
+        }
+    ].map(combo => {
+        // Fix Earth & Nature combo which needs special handling
+        if (combo.label === 'Earth & Nature') {
+            const earthWall = light.find(c => c.hsl.h >= 25 && c.hsl.h <= 90) || pick(light, 8);
+            const earthMid = medium.find(c => c.hsl.h >= 60 && c.hsl.h <= 180) || pick(medium, 15);
+            const earthDark = dark.find(c => c.hsl.h >= 15 && c.hsl.h <= 60) || pick(dark, 0);
+            combo.colors = [
+                { ...earthWall, role: 'Walls' },
+                { ...earthMid, role: 'Secondary' },
+                { ...earthDark, role: 'Doors & Accents' }
+            ];
+        }
+        return combo;
+    });
+}
+
+function createFooterSvg(imgWidth, combo, customerInfo, brandName) {
+    const colors = combo.colors;
+    const footerH = colors.length === 3 ? 130 : 110;
+    const swatchSz = 28;
+
+    let swatchesXml = '';
+    const colW = Math.floor((imgWidth - 40) / colors.length);
+    colors.forEach((c, i) => {
+        const x = 20 + colW * i;
+        swatchesXml += `
+            <rect x="${x}" y="12" width="${swatchSz}" height="${swatchSz}" rx="5" fill="${c.hex}" stroke="#ffffff" stroke-width="1.5"/>
+            <text x="${x + swatchSz + 8}" y="25" font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="#ffffff">${escXml(c.name)}</text>
+            <text x="${x + swatchSz + 8}" y="38" font-family="Arial,sans-serif" font-size="9" fill="#a0a0c0">${escXml(c.code)} | ${escXml(c.role)}</text>`;
+    });
+
+    const custLine = (customerInfo.name || '') + (customerInfo.city ? ' | ' + customerInfo.city : '');
+    const promo = 'Transform your space with Quality Colours \u2013 Professional Color Consultation';
+
+    return { height: footerH, svg: `<svg width="${imgWidth}" height="${footerH}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="${imgWidth}" height="${footerH}" fill="#1a1a2e"/>
+        <line x1="20" y1="48" x2="${imgWidth - 20}" y2="48" stroke="#2a2a4e" stroke-width="1"/>
+        ${swatchesXml}
+        <text x="20" y="66" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#e0e0ff">${escXml(combo.label)}</text>
+        <text x="20" y="80" font-family="Arial,sans-serif" font-size="10" fill="#8080b0">${escXml(combo.description)}</text>
+        <text x="20" y="${footerH - 28}" font-family="Arial,sans-serif" font-size="10" fill="#a0a0c0">${escXml(custLine)}</text>
+        <text x="20" y="${footerH - 12}" font-family="Arial,sans-serif" font-size="9" fill="#667eea" font-style="italic">${escXml(promo)}</text>
+        <text x="${imgWidth - 20}" y="66" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="end">${escXml(brandName)}</text>
+        <text x="${imgWidth - 20}" y="${footerH - 12}" font-family="Arial,sans-serif" font-size="10" fill="#667eea" text-anchor="end">Quality Colours Visualizer</text>
+    </svg>` };
+}
+
+// --- Gemini AI Image Generation ---
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const geminiAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+
+async function generateAutoViz(photoBuffer, combo, customerInfo, brandName) {
+    if (!geminiAI) throw new Error('Gemini API key not configured');
+
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
+    const model = geminiAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+    });
+
+    // Convert photo to base64
+    const imageBase64 = photoBuffer.toString('base64');
+    const colors = combo.colors;
+
+    // Build color instructions
+    let colorInstructions;
+    if (combo.type === 'two-color') {
+        colorInstructions = `- Main walls and large flat painted surfaces: ${colors[0].name} (hex ${colors[0].hex}, RGB ${colors[0].rgb.join(',')})
+- Trim, pillars, borders, railings, and accent painted areas: ${colors[1].name} (hex ${colors[1].hex}, RGB ${colors[1].rgb.join(',')})`;
+    } else {
+        colorInstructions = `- Main walls and large flat painted surfaces: ${colors[0].name} (hex ${colors[0].hex}, RGB ${colors[0].rgb.join(',')})
+- Secondary surfaces like pillars, balcony walls, borders, and fascia: ${colors[1].name} (hex ${colors[1].hex}, RGB ${colors[1].rgb.join(',')})
+- Doors, window frames, gates, and small accent features: ${colors[2].name} (hex ${colors[2].hex}, RGB ${colors[2].rgb.join(',')})`;
+    }
+
+    const prompt = `You are a professional building exterior paint color visualization tool.
+
+Edit this building/elevation photo by precisely repainting the painted surfaces with these exact colors:
+
+${colorInstructions}
+
+CRITICAL RULES:
+- ONLY repaint surfaces that would normally be painted (walls, trim, pillars, doors, gates)
+- Keep sky, ground, vegetation, glass windows, roof tiles, stone/brick textures, and all non-paintable surfaces COMPLETELY UNCHANGED
+- Preserve all architectural details, shadows, depth, lighting, and perspective exactly
+- The paint must look photorealistic - natural finish with proper shading from existing light sources
+- Maintain the exact same image composition, angle, and framing
+- Do NOT add any text, labels, watermarks, or annotations to the image
+- The result should look like an actual professional photograph of the repainted building`;
+
+    const result = await model.generateContent([
+        { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } },
+        { text: prompt }
+    ]);
+
+    // Extract generated image from response
+    let imageBuffer = null;
+    const candidate = result.response.candidates?.[0];
+    if (candidate?.content?.parts) {
+        for (const part of candidate.content.parts) {
+            if (part.inlineData) {
+                imageBuffer = Buffer.from(part.inlineData.data, 'base64');
+                break;
+            }
+        }
+    }
+
+    if (!imageBuffer) {
+        const textResponse = candidate?.content?.parts?.map(p => p.text).filter(Boolean).join(' ') || 'No response';
+        throw new Error('Gemini did not return an image. Response: ' + textResponse.slice(0, 200));
+    }
+
+    // Get dimensions of the AI-generated image
+    const meta = await sharp(imageBuffer).metadata();
+    const imgWidth = meta.width;
+
+    // Create branded footer
+    const { height: footerH, svg: footerSvg } = createFooterSvg(imgWidth, combo, customerInfo, brandName);
+    const footerBuf = await sharp(Buffer.from(footerSvg)).png().toBuffer();
+
+    const filename = `viz-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
+    const outputPath = path.join(__dirname, 'public', 'uploads', 'visualizations', filename);
+
+    await sharp(imageBuffer)
+        .extend({ bottom: footerH, background: { r: 26, g: 26, b: 46, alpha: 255 } })
+        .composite([{ input: footerBuf, gravity: 'south' }])
+        .jpeg({ quality: 92 })
+        .toFile(outputPath);
+
+    return `/uploads/visualizations/${filename}`;
+}
+
+// --- Pollinations AI (Kontext) Image Generation ---
+async function generateAutoVizPollinations(photoRelPath, combo, customerInfo, brandName) {
+    const appUrl = process.env.APP_PUBLIC_URL;
+    if (!appUrl || appUrl.includes('localhost')) {
+        throw new Error('Pollinations AI requires APP_PUBLIC_URL to be a publicly accessible domain (not localhost). Set APP_PUBLIC_URL in .env to your production URL.');
+    }
+
+    const publicImageUrl = appUrl.replace(/\/$/, '') + photoRelPath;
+    const colors = combo.colors;
+
+    // Build color prompt
+    let prompt;
+    if (combo.type === 'two-color') {
+        prompt = `Edit this building exterior photo. Repaint ONLY the painted wall surfaces with ${colors[0].name} (exact hex color: ${colors[0].hex}). Repaint the trim, pillars, borders, and accent areas with ${colors[1].name} (exact hex color: ${colors[1].hex}). CRITICAL: Keep the sky, ground, vegetation, glass windows, roof tiles, and all non-painted surfaces completely unchanged. The result must look like a professional realistic photograph of the repainted building.`;
+    } else {
+        prompt = `Edit this building exterior photo. Repaint the main walls with ${colors[0].name} (${colors[0].hex}). Repaint secondary surfaces like pillars and balcony walls with ${colors[1].name} (${colors[1].hex}). Repaint doors and small accents with ${colors[2].name} (${colors[2].hex}). CRITICAL: Keep the sky, ground, vegetation, glass windows, roof tiles, and all non-painted surfaces completely unchanged. The result must look like a professional realistic photograph of the repainted building.`;
+    }
+
+    const seed = Math.floor(Math.random() * 999999);
+    const apiUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=kontext&image=${encodeURIComponent(publicImageUrl)}&width=1024&height=1024&nologo=true&seed=${seed}`;
+
+    console.log(`[Pollinations] Generating: ${combo.label}`);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+    try {
+        const response = await fetch(apiUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Pollinations API ${response.status}: ${errText.slice(0, 200)}`);
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.startsWith('image/')) {
+            throw new Error('Pollinations returned non-image response: ' + contentType);
+        }
+
+        const imageBuffer = Buffer.from(await response.arrayBuffer());
+        const meta = await sharp(imageBuffer).metadata();
+        if (!meta.width || !meta.height) throw new Error('Invalid image from Pollinations');
+
+        // Add branded footer
+        const { height: footerH, svg: footerSvg } = createFooterSvg(meta.width, combo, customerInfo, brandName);
+        const footerBuf = await sharp(Buffer.from(footerSvg)).png().toBuffer();
+
+        const filename = `viz-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
+        const outputPath = path.join(__dirname, 'public', 'uploads', 'visualizations', filename);
+
+        await sharp(imageBuffer)
+            .extend({ bottom: footerH, background: { r: 26, g: 26, b: 46, alpha: 255 } })
+            .composite([{ input: footerBuf, gravity: 'south' }])
+            .jpeg({ quality: 92 })
+            .toFile(outputPath);
+
+        console.log(`[Pollinations] Done: ${combo.label}`);
+        return `/uploads/visualizations/${filename}`;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+// GET /api/paint-colors/brands - list available paint brands
+app.get('/api/paint-colors/brands', requireAuth, (req, res) => {
+    const brands = Object.values(paintCatalogs).map(c => ({
+        code: c.brandCode,
+        name: c.brand,
+        familyCount: c.families.length,
+        colorCount: c.families.reduce((sum, f) => sum + f.colors.length, 0)
+    }));
+    res.json({ success: true, data: brands });
+});
+
+// GET /api/paint-colors/:brand/families - color families for a brand
+app.get('/api/paint-colors/:brand/families', requireAuth, (req, res) => {
+    const catalog = paintCatalogs[req.params.brand];
+    if (!catalog) return res.status(404).json({ success: false, error: 'Brand not found' });
+    const families = catalog.families.map(f => ({
+        code: f.code,
+        name: f.name,
+        colorCount: f.colors.length
+    }));
+    res.json({ success: true, data: families });
+});
+
+// GET /api/paint-colors/:brand/colors - filtered/paginated colors
+app.get('/api/paint-colors/:brand/colors', requireAuth, (req, res) => {
+    const catalog = paintCatalogs[req.params.brand];
+    if (!catalog) return res.status(404).json({ success: false, error: 'Brand not found' });
+
+    const { family, search, temperature, page = 1, limit = 60 } = req.query;
+    let colors = [];
+    const families = family ? catalog.families.filter(f => f.code === family) : catalog.families;
+    families.forEach(f => {
+        f.colors.forEach(c => colors.push({ ...c, family: f.code, familyName: f.name }));
+    });
+
+    if (search) {
+        const q = search.toLowerCase();
+        colors = colors.filter(c => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
+    }
+    if (temperature) {
+        colors = colors.filter(c => c.temperature === temperature);
+    }
+
+    const total = colors.length;
+    const pg = parseInt(page);
+    const lim = parseInt(limit);
+    const paginated = colors.slice((pg - 1) * lim, pg * lim);
+
+    res.json({ success: true, data: paginated, total, page: pg, limit: lim });
+});
+
+// POST /api/design-requests/:id/visualize - generate color visualization
+app.post('/api/design-requests/:id/visualize', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { colorCode, brand } = req.body;
+        if (!colorCode || !brand) {
+            return res.status(400).json({ success: false, error: 'colorCode and brand are required' });
+        }
+
+        // Find the color in catalog
+        const catalog = paintCatalogs[brand];
+        if (!catalog) return res.status(404).json({ success: false, error: 'Brand not found' });
+
+        let colorInfo = null;
+        for (const fam of catalog.families) {
+            colorInfo = fam.colors.find(c => c.code === colorCode);
+            if (colorInfo) { colorInfo = { ...colorInfo, family: fam.code, familyName: fam.name }; break; }
+        }
+        if (!colorInfo) return res.status(404).json({ success: false, error: 'Color not found' });
+
+        // Get the design request photo
+        const [rows] = await pool.query('SELECT * FROM color_design_requests WHERE id = ?', [req.params.id]);
+        if (!rows.length) return res.status(404).json({ success: false, error: 'Design request not found' });
+        const designReq = rows[0];
+        if (!designReq.photo_path) return res.status(400).json({ success: false, error: 'No photo uploaded for this request' });
+
+        // Load original image
+        const photoFullPath = path.join(__dirname, 'public', designReq.photo_path);
+        if (!fs.existsSync(photoFullPath)) {
+            return res.status(404).json({ success: false, error: 'Original photo file not found' });
+        }
+
+        const originalImage = sharp(photoFullPath);
+        const metadata = await originalImage.metadata();
+        const imgWidth = metadata.width;
+        const imgHeight = metadata.height;
+
+        // Create color overlay with soft-light blend
+        const [r, g, b] = colorInfo.rgb;
+        const colorOverlay = await sharp({
+            create: { width: imgWidth, height: imgHeight, channels: 4, background: { r, g, b, alpha: 160 } }
+        }).png().toBuffer();
+
+        // Apply soft-light blend
+        const blended = await sharp(photoFullPath)
+            .composite([{ input: colorOverlay, blend: 'soft-light' }])
+            .toBuffer();
+
+        // Create branded footer SVG
+        const footerHeight = 80;
+        const swatchSize = 50;
+        const footerSvg = `<svg width="${imgWidth}" height="${footerHeight}" xmlns="http://www.w3.org/2000/svg">
+            <rect width="${imgWidth}" height="${footerHeight}" fill="#1a1a2e"/>
+            <rect x="20" y="15" width="${swatchSize}" height="${swatchSize}" rx="6" fill="${colorInfo.hex}" stroke="#fff" stroke-width="2"/>
+            <text x="${swatchSize + 35}" y="32" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ffffff">${colorInfo.name}</text>
+            <text x="${swatchSize + 35}" y="52" font-family="Arial, sans-serif" font-size="13" fill="#a0a0c0">${colorInfo.code} | RGB(${colorInfo.rgb.join(', ')}) | ${colorInfo.hex}</text>
+            <text x="${imgWidth - 20}" y="32" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="end">${catalog.brand}</text>
+            <text x="${imgWidth - 20}" y="52" font-family="Arial, sans-serif" font-size="11" fill="#a0a0c0" text-anchor="end">${colorInfo.temperature} | ${colorInfo.finishes.join(', ')}</text>
+            <text x="${imgWidth - 20}" y="68" font-family="Arial, sans-serif" font-size="10" fill="#667eea" text-anchor="end">Quality Colours Visualizer</text>
+        </svg>`;
+        const footerBuffer = await sharp(Buffer.from(footerSvg)).png().toBuffer();
+
+        // Combine blended image + footer
+        const filename = `viz-${req.params.id}-${Date.now()}.jpg`;
+        const outputPath = path.join(__dirname, 'public', 'uploads', 'visualizations', filename);
+
+        await sharp(blended)
+            .extend({ bottom: footerHeight, background: { r: 26, g: 26, b: 46, alpha: 255 } })
+            .composite([{ input: footerBuffer, gravity: 'south' }])
+            .jpeg({ quality: 90 })
+            .toFile(outputPath);
+
+        const vizUrl = `/uploads/visualizations/${filename}`;
+
+        // Save to DB
+        await pool.query(
+            `INSERT INTO design_visualizations (design_request_id, brand, color_code, color_name, color_hex, visualization_path, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [req.params.id, brand, colorInfo.code, colorInfo.name, colorInfo.hex, vizUrl, req.user.id]
+        );
+
+        res.json({
+            success: true,
+            visualizationUrl: vizUrl,
+            colorInfo: {
+                code: colorInfo.code,
+                name: colorInfo.name,
+                hex: colorInfo.hex,
+                rgb: colorInfo.rgb,
+                temperature: colorInfo.temperature,
+                finishes: colorInfo.finishes,
+                brand: catalog.brand
+            }
+        });
+    } catch (err) {
+        console.error('Visualization error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// GET /api/design-requests/:id/visualizations - list visualizations for a request
+app.get('/api/design-requests/:id/visualizations', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            'SELECT * FROM design_visualizations WHERE design_request_id = ? ORDER BY created_at DESC',
+            [req.params.id]
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// POST /api/design-requests/:id/auto-visualize - generate AI color combinations
+app.post('/api/design-requests/:id/auto-visualize', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { brand, aiModel = 'pollinations' } = req.body;
+        if (!brand) return res.status(400).json({ success: false, error: 'brand is required' });
+
+        const catalog = paintCatalogs[brand];
+        if (!catalog) return res.status(404).json({ success: false, error: 'Brand not found' });
+
+        const [rows] = await pool.query('SELECT * FROM color_design_requests WHERE id = ?', [req.params.id]);
+        if (!rows.length) return res.status(404).json({ success: false, error: 'Design request not found' });
+        const designReq = rows[0];
+        if (!designReq.photo_path) return res.status(400).json({ success: false, error: 'No photo uploaded for this request' });
+
+        const photoFullPath = path.join(__dirname, 'public', designReq.photo_path);
+        if (!fs.existsSync(photoFullPath)) return res.status(404).json({ success: false, error: 'Original photo not found' });
+
+        const customerInfo = { name: designReq.name, city: designReq.city || '' };
+        const isGemini = aiModel === 'gemini';
+        const isPollinations = aiModel === 'pollinations';
+
+        // Prepare photo buffer for Gemini (Pollinations uses URL instead)
+        let photoBuffer;
+        if (isGemini) {
+            photoBuffer = await sharp(photoFullPath).resize(1200, null, { withoutEnlargement: true }).toBuffer();
+        }
+
+        // Select color combinations (3 variations)
+        const allCombos = selectColorCombinations(catalog);
+        const combos = allCombos.slice(0, 3);
+
+        // Delay between calls: Pollinations needs 16s (rate limit), Gemini needs 2s
+        const delayMs = isPollinations ? 16000 : 2000;
+
+        const variations = [];
+        const errors = [];
+        for (let i = 0; i < combos.length; i++) {
+            const combo = combos[i];
+            try {
+                console.log(`[Viz:${aiModel}] Generating ${i + 1}/${combos.length}: ${combo.label}...`);
+
+                let imageUrl;
+                if (isPollinations) {
+                    imageUrl = await generateAutoVizPollinations(designReq.photo_path, combo, customerInfo, catalog.brand);
+                } else {
+                    imageUrl = await generateAutoViz(photoBuffer, combo, customerInfo, catalog.brand);
+                }
+
+                // Save to DB
+                const colorCodes = combo.colors.map(c => c.code).join(' + ');
+                const primaryHex = combo.colors[0].hex;
+                await pool.query(
+                    `INSERT INTO design_visualizations (design_request_id, brand, color_code, color_name, color_hex, visualization_path, created_by)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [req.params.id, brand, colorCodes.slice(0, 20), combo.label.slice(0, 100), primaryHex, imageUrl, req.user.id]
+                );
+
+                variations.push({ type: combo.type, label: combo.label, description: combo.description, imageUrl,
+                    colors: combo.colors.map(c => ({ code: c.code, name: c.name, hex: c.hex, role: c.role })) });
+                console.log(`[Viz:${aiModel}] Done: ${combo.label}`);
+
+                // Rate-limit delay between API calls
+                if (i < combos.length - 1) await new Promise(r => setTimeout(r, delayMs));
+            } catch (err) {
+                console.error(`[Viz:${aiModel}] Failed ${combo.label}:`, err.message);
+                errors.push(combo.label + ': ' + err.message);
+            }
+        }
+
+        if (!variations.length) {
+            const errMsg = errors[0] || 'Unknown error';
+            if (errMsg.includes('429') || errMsg.includes('quota')) {
+                throw new Error('API quota exceeded. Please try again later or switch to a different AI model.');
+            }
+            throw new Error('Generation failed: ' + errMsg);
+        }
+        res.json({ success: true, variations, aiModel, partialErrors: errors.length ? errors : undefined });
+    } catch (err) {
+        console.error('Auto-visualize error:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
@@ -973,6 +1882,10 @@ app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
 
 app.get('/api/users/:id', requireAuth, async (req, res) => {
     try {
+        // Staff can only view their own profile; admin/manager can view any
+        if (req.params.id != req.user.id && !['admin', 'manager'].includes(req.user.role)) {
+            return res.status(403).json({ success: false, message: 'Access denied' });
+        }
         const [rows] = await pool.query(
             'SELECT id, username, email, full_name, phone, role, branch_id, status, created_at, last_login, profile_image_url FROM users WHERE id = ?',
             [req.params.id]
@@ -1020,16 +1933,44 @@ app.post('/api/users', requirePermission('staff', 'add'), async (req, res) => {
 // Self-profile update (any authenticated user can update their own profile)
 app.put('/api/users/profile/me', requireAuth, async (req, res) => {
     try {
-        const { full_name, email, phone, profile_image_url } = req.body;
+        const {
+            full_name, email, phone, profile_image_url,
+            date_of_birth, door_no, street, city, state, pincode,
+            aadhar_number, emergency_contact_name, emergency_contact_phone,
+            bank_account_name, bank_name, bank_account_number, bank_ifsc_code, upi_id
+        } = req.body;
         const userId = req.user.id;
 
         const setClauses = [];
         const params = [];
 
+        // Basic profile
         if (full_name !== undefined) { setClauses.push('full_name = ?'); params.push(full_name); }
         if (email !== undefined) { setClauses.push('email = ?'); params.push(email); }
         if (phone !== undefined) { setClauses.push('phone = ?'); params.push(phone); }
         if (profile_image_url !== undefined) { setClauses.push('profile_image_url = ?'); params.push(profile_image_url); }
+
+        // Personal details
+        if (date_of_birth !== undefined) { setClauses.push('date_of_birth = ?'); params.push(date_of_birth || null); }
+        if (door_no !== undefined) { setClauses.push('door_no = ?'); params.push(door_no || null); }
+        if (street !== undefined) { setClauses.push('street = ?'); params.push(street || null); }
+        if (city !== undefined) { setClauses.push('city = ?'); params.push(city || null); }
+        if (state !== undefined) { setClauses.push('state = ?'); params.push(state || null); }
+        if (pincode !== undefined) { setClauses.push('pincode = ?'); params.push(pincode || null); }
+
+        // KYC
+        if (aadhar_number !== undefined) { setClauses.push('aadhar_number = ?'); params.push(aadhar_number || null); }
+
+        // Emergency contact
+        if (emergency_contact_name !== undefined) { setClauses.push('emergency_contact_name = ?'); params.push(emergency_contact_name || null); }
+        if (emergency_contact_phone !== undefined) { setClauses.push('emergency_contact_phone = ?'); params.push(emergency_contact_phone || null); }
+
+        // Bank details
+        if (bank_account_name !== undefined) { setClauses.push('bank_account_name = ?'); params.push(bank_account_name || null); }
+        if (bank_name !== undefined) { setClauses.push('bank_name = ?'); params.push(bank_name || null); }
+        if (bank_account_number !== undefined) { setClauses.push('bank_account_number = ?'); params.push(bank_account_number || null); }
+        if (bank_ifsc_code !== undefined) { setClauses.push('bank_ifsc_code = ?'); params.push(bank_ifsc_code || null); }
+        if (upi_id !== undefined) { setClauses.push('upi_id = ?'); params.push(upi_id || null); }
 
         if (setClauses.length === 0) {
             return res.status(400).json({ error: 'No fields to update' });
@@ -1042,6 +1983,21 @@ app.put('/api/users/profile/me', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('Update profile error:', err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Upload Aadhar proof (self-service)
+app.post('/api/upload/aadhar', requireAuth, uploadAadhar.single('aadhar_proof'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+        const aadharUrl = `/uploads/aadhar/${req.file.filename}`;
+        await pool.query('UPDATE users SET aadhar_proof_url = ? WHERE id = ?', [aadharUrl, req.user.id]);
+        res.json({ success: true, aadhar_proof_url: aadharUrl });
+    } catch (err) {
+        console.error('Aadhar upload error:', err);
+        res.status(500).json({ success: false, message: 'Failed to upload Aadhar proof' });
     }
 });
 
@@ -1334,7 +2290,7 @@ app.get('/api/customers', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/customers/:id', requireAuth, async (req, res) => {
+app.get('/api/customers/:id', requirePermission('customers', 'view'), async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM customers WHERE id = ?', [req.params.id]);
         if (rows.length === 0) {
@@ -1410,7 +2366,7 @@ app.get('/api/estimates', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/estimates/:id', requireAuth, async (req, res) => {
+app.get('/api/estimates/:id', requirePermission('estimates', 'view'), async (req, res) => {
     try {
         const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
         if (estimate.length === 0) {
@@ -1543,7 +2499,7 @@ app.put('/api/estimates/:id', requirePermission('estimates', 'edit'), async (req
     }
 });
 
-app.get('/api/estimates/:id/items', requireAuth, async (req, res) => {
+app.get('/api/estimates/:id/items', requirePermission('estimates', 'view'), async (req, res) => {
     try {
         const [items] = await pool.query(
             'SELECT * FROM estimate_items WHERE estimate_id = ? ORDER BY display_order',
@@ -1556,7 +2512,7 @@ app.get('/api/estimates/:id/items', requireAuth, async (req, res) => {
 });
 
 // Update estimate status (FIXED: parameterized SET)
-app.patch('/api/estimates/:id/status', requireAuth, async (req, res) => {
+app.patch('/api/estimates/:id/status', requirePermission('estimates', 'edit'), async (req, res) => {
     try {
         const { status, reason, notes } = req.body;
         const estimateId = req.params.id;
@@ -1609,7 +2565,7 @@ app.delete('/api/estimates/:id', requirePermission('estimates', 'delete'), async
     }
 });
 
-app.get('/api/estimates/:id/history', requireAuth, async (req, res) => {
+app.get('/api/estimates/:id/history', requirePermission('estimates', 'view'), async (req, res) => {
     try {
         const [history] = await pool.query(`
             SELECT h.*, u.full_name as changed_by_name
@@ -1688,7 +2644,7 @@ app.post('/api/calculate', requireAuth, async (req, res) => {
 // DASHBOARD STATS
 // ========================================
 
-app.get('/api/dashboard/stats', requireAuth, async (req, res) => {
+app.get('/api/dashboard/stats', requireRole('admin', 'manager'), async (req, res) => {
     try {
         const today = new Date().toISOString().split('T')[0];
         const thisMonth = today.substring(0, 7);
@@ -1783,7 +2739,8 @@ app.get('/', (req, res) => {
         modules: [
             'auth', 'roles', 'permissions', 'branches', 'users',
             'customers', 'leads', 'products', 'estimates',
-            'attendance', 'salary', 'activities', 'tasks', 'settings'
+            'attendance', 'salary', 'activities', 'tasks', 'settings',
+            'zoho-books'
         ],
         endpoints: {
             auth: '/api/auth/*',
@@ -1801,6 +2758,7 @@ app.get('/', (req, res) => {
             tasks: '/api/tasks',
             settings: '/api/settings',
             dashboard: '/api/dashboard/stats',
+            zoho: '/api/zoho/*',
             health: '/health'
         }
     });
@@ -1825,5 +2783,16 @@ app.use((err, req, res, _next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`QC Business Manager API v2.0.0 running on port ${PORT}`);
-    console.log(`Modules loaded: auth, roles, branches, users, customers, leads, products, estimates, attendance, salary, activities, tasks, settings`);
+    console.log(`Modules loaded: auth, roles, branches, users, customers, leads, products, estimates, attendance, salary, activities, tasks, settings, zoho-books`);
+
+    // Start background services after server is ready
+    if (process.env.ZOHO_ORGANIZATION_ID) {
+        syncScheduler.start().catch(err => {
+            console.error('Failed to start sync scheduler:', err.message);
+        });
+        whatsappProcessor.start();
+        console.log('Background services started: sync-scheduler, whatsapp-processor');
+    } else {
+        console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - background services skipped');
+    }
 });

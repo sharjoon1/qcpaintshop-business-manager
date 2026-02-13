@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Daily Transactions - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        /* Summary cards */
+        .summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 4px solid var(--accent, #667eea);
+            transition: transform 0.2s;
+        }
+        .summary-card:hover { transform: translateY(-2px); }
+        .summary-card .card-count { font-size: 1.5rem; font-weight: 800; color: #1f2937; }
+        .summary-card .card-amount { font-size: 0.85rem; font-weight: 600; color: #6b7280; margin-top: 0.15rem; }
+        .summary-card .card-label { font-size: 0.78rem; color: #9ca3af; font-weight: 500; margin-top: 0.25rem; }
+
+        /* Comparison bar */
+        .comparison-bar {
+            height: 24px;
+            border-radius: 6px;
+            transition: width 0.5s ease;
+            min-width: 2px;
+        }
+
+        /* Expandable row */
+        .expand-row { cursor: pointer; transition: background-color 0.15s; }
+        .expand-row:hover { background-color: #f9fafb; }
+        .expand-icon { transition: transform 0.2s; display: inline-block; }
+        .expand-icon.open { transform: rotate(90deg); }
+        .detail-row { display: none; }
+        .detail-row.open { display: table-row; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-info { background: #2563eb; }
+
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Table responsive */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-wrapper table { min-width: 800px; }
+
+        /* Spinner */
+        .spinner {
+            border: 3px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            width: 2rem;
+            height: 2rem;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Modal overlay */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            padding: 1rem;
+        }
+        .modal-overlay.hidden { display: none; }
+
+        /* Desktop adjustments */
+        @media (min-width: 768px) {
+            .summary-card { padding: 1.5rem; }
+            .summary-card .card-count { font-size: 1.75rem; }
+            .summary-card .card-amount { font-size: 0.9rem; }
+        }
+
+        /* Mobile card fallback */
+        @media (max-width: 767px) {
+            .txn-table-desktop { display: none; }
+            .txn-cards-mobile { display: block; }
+        }
+        @media (min-width: 768px) {
+            .txn-table-desktop { display: block; }
+            .txn-cards-mobile { display: none; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="zoho-transactions">
+<div class="container mx-auto p-4 md:p-6">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast" role="alert"></div>
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Daily Transactions</h1>
+            <p class="text-gray-500 text-sm mt-1">Track invoices, bills, sales and purchase orders by date and location</p>
+        </div>
+        <div class="mt-3 sm:mt-0 flex items-center gap-2">
+            <button onclick="exportCSV()" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Export CSV
+            </button>
+            <button onclick="openGenerateModal()" class="inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm" style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Generate Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                <input type="date" id="fromDate"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <input type="date" id="toDate"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <select id="locationFilter"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+            <div>
+                <button onclick="applyFilters()" id="applyBtn"
+                    class="w-full text-white px-6 py-2 rounded-lg text-sm font-medium transition focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
+                    Apply
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div id="summaryCardsLoading" class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+        <div class="summary-card" style="border-left-color: #667eea;">
+            <div class="skeleton" style="width: 50px; height: 28px;"></div>
+            <div class="skeleton mt-2" style="width: 80px; height: 16px;"></div>
+            <div class="card-label">Total Invoices</div>
+        </div>
+        <div class="summary-card" style="border-left-color: #ef4444;">
+            <div class="skeleton" style="width: 50px; height: 28px;"></div>
+            <div class="skeleton mt-2" style="width: 80px; height: 16px;"></div>
+            <div class="card-label">Total Bills</div>
+        </div>
+        <div class="summary-card" style="border-left-color: #10b981;">
+            <div class="skeleton" style="width: 50px; height: 28px;"></div>
+            <div class="skeleton mt-2" style="width: 80px; height: 16px;"></div>
+            <div class="card-label">Sales Orders</div>
+        </div>
+        <div class="summary-card" style="border-left-color: #f59e0b;">
+            <div class="skeleton" style="width: 50px; height: 28px;"></div>
+            <div class="skeleton mt-2" style="width: 80px; height: 16px;"></div>
+            <div class="card-label">Purchase Orders</div>
+        </div>
+    </div>
+    <div id="summaryCards" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+        <!-- Total Invoices -->
+        <div class="summary-card" style="border-left-color: #667eea;">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="card-count" id="invoiceCount">0</div>
+                    <div class="card-amount" id="invoiceAmount">Rs. 0</div>
+                    <div class="card-label">Total Invoices</div>
+                </div>
+                <svg class="w-6 h-6 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+            </div>
+        </div>
+        <!-- Total Bills -->
+        <div class="summary-card" style="border-left-color: #ef4444;">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="card-count" id="billCount">0</div>
+                    <div class="card-amount" id="billAmount">Rs. 0</div>
+                    <div class="card-label">Total Bills</div>
+                </div>
+                <svg class="w-6 h-6 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                </svg>
+            </div>
+        </div>
+        <!-- Sales Orders -->
+        <div class="summary-card" style="border-left-color: #10b981;">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="card-count" id="salesOrderCount">0</div>
+                    <div class="card-amount" id="salesOrderAmount">Rs. 0</div>
+                    <div class="card-label">Sales Orders</div>
+                </div>
+                <svg class="w-6 h-6 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                </svg>
+            </div>
+        </div>
+        <!-- Purchase Orders -->
+        <div class="summary-card" style="border-left-color: #f59e0b;">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="card-count" id="purchaseOrderCount">0</div>
+                    <div class="card-amount" id="purchaseOrderAmount">Rs. 0</div>
+                    <div class="card-label">Purchase Orders</div>
+                </div>
+                <svg class="w-6 h-6 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Location Comparison Section -->
+    <div id="comparisonSection" class="hidden bg-white rounded-lg shadow p-5 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-gray-800">Location Comparison</h3>
+            <span class="text-xs text-gray-400" id="comparisonDateRange"></span>
+        </div>
+        <div id="comparisonContent">
+            <!-- Comparison bars/table rendered here -->
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="hidden">
+        <div class="bg-white rounded-lg shadow p-12 flex flex-col items-center justify-center">
+            <div class="spinner mb-4"></div>
+            <p class="text-gray-500 text-sm">Loading transaction data...</p>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden">
+        <div class="bg-white rounded-lg shadow p-12 flex flex-col items-center justify-center">
+            <svg class="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No transactions found</h3>
+            <p class="text-gray-500 text-sm">Try adjusting your date range or generate a report first.</p>
+        </div>
+    </div>
+
+    <!-- Transaction Table Container -->
+    <div id="transactionContainer" class="hidden">
+
+        <!-- Desktop Table -->
+        <div class="txn-table-desktop bg-white rounded-lg shadow overflow-hidden">
+            <div class="table-wrapper">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide"></th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Date</th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Location</th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Invoices</th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">Inv. Amount</th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Bills</th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">Bill Amount</th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Sales Orders</th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">SO Amount</th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-center">Purchase Orders</th>
+                            <th class="px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide text-right">PO Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionTableBody" class="divide-y divide-gray-100">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Mobile Cards -->
+        <div class="txn-cards-mobile space-y-3" id="transactionCardsContainer">
+        </div>
+
+        <!-- Pagination -->
+        <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="text-sm text-gray-600" id="paginationInfo">Showing 0 transactions</div>
+            <div class="flex items-center gap-1" id="paginationControls">
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Generate Report Modal -->
+<div id="generateModal" class="modal-overlay hidden" onclick="closeGenerateModalBackdrop(event)">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
+        <div class="border-b px-6 py-4 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800">Generate Transaction Report</h3>
+            <button onclick="closeGenerateModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <p class="text-sm text-gray-600">Generate a comprehensive daily transaction report for the selected date range. This will pull the latest data from Zoho Books.</p>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                <input type="date" id="generateFromDate"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <input type="date" id="generateToDate"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+        </div>
+        <div class="border-t px-6 py-4 flex justify-end gap-3">
+            <button onclick="closeGenerateModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition">Cancel</button>
+            <button onclick="generateReport()" id="generateBtn"
+                class="inline-flex items-center gap-2 px-5 py-2 text-white font-medium rounded-lg text-sm transition"
+                style="background: #667eea;" onmouseover="this.style.background='#5a6fd6'" onmouseout="this.style.background='#667eea'">
+                <svg id="generateSpinner" class="w-4 h-4 hidden animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="generateBtnText">Generate</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Drilldown Detail Modal -->
+<div id="detailModal" class="modal-overlay hidden" onclick="closeDetailModalBackdrop(event)">
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+        <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-10">
+            <h3 class="text-lg font-bold text-gray-800" id="detailModalTitle">Transaction Details</h3>
+            <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div id="detailModalLoading" class="text-center py-12">
+            <div class="spinner mx-auto mb-4"></div>
+            <p class="text-gray-500 text-sm">Loading details...</p>
+        </div>
+        <div id="detailModalContent" class="hidden p-6">
+            <div id="detailModalBody">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+        <div class="border-t px-6 py-4">
+            <button onclick="closeDetailModal()" class="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ===== State =====
+    let transactions = [];
+    let comparisonData = [];
+    let locations = [];
+    let currentPage = 1;
+    let totalRecords = 0;
+    let totalPages = 1;
+    const PAGE_LIMIT = 50;
+    let expandedRows = {};
+
+    // ===== Auth =====
+    function getAuthHeaders() {
+        return {
+            'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
+            'Content-Type': 'application/json'
+        };
+    }
+
+    // ===== Currency formatting (Indian Rupees) =====
+    function formatCurrency(amount) {
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(parseFloat(amount || 0));
+    }
+
+    // ===== Date formatting =====
+    function formatDate(dateStr) {
+        if (!dateStr) return '--';
+        var d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function toISO(d) {
+        return d.toISOString().split('T')[0];
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ===== Toast =====
+    function showToast(message, type) {
+        var toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast toast-' + (type || 'info') + ' show';
+        setTimeout(function() {
+            toast.classList.remove('show');
+        }, 3500);
+    }
+
+    // ===== Set default dates (last 7 days) =====
+    function setDefaultDates() {
+        var now = new Date();
+        var from = new Date();
+        from.setDate(now.getDate() - 7);
+
+        document.getElementById('fromDate').value = toISO(from);
+        document.getElementById('toDate').value = toISO(now);
+        document.getElementById('generateFromDate').value = toISO(from);
+        document.getElementById('generateToDate').value = toISO(now);
+    }
+
+    // ===== Load locations for filter dropdown =====
+    async function loadLocations() {
+        try {
+            var response = await fetch('/api/zoho/locations', {
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            if (!response.ok) return;
+
+            var result = await response.json();
+            var locationList = result.data || result.locations || result || [];
+
+            if (Array.isArray(locationList)) {
+                locations = locationList;
+                var select = document.getElementById('locationFilter');
+                locationList.forEach(function(loc) {
+                    var opt = document.createElement('option');
+                    opt.value = loc.id || loc.location_id || '';
+                    opt.textContent = loc.name || loc.location_name || 'Unknown';
+                    select.appendChild(opt);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load locations:', error);
+        }
+    }
+
+    // ===== Load transaction data =====
+    async function loadTransactions() {
+        var fromDate = document.getElementById('fromDate').value;
+        var toDate = document.getElementById('toDate').value;
+        var locationId = document.getElementById('locationFilter').value;
+
+        if (!fromDate || !toDate) {
+            showToast('Please select both From and To dates', 'error');
+            return;
+        }
+
+        showState('loading');
+
+        var params = new URLSearchParams({
+            from_date: fromDate,
+            to_date: toDate,
+            page: currentPage,
+            limit: PAGE_LIMIT
+        });
+        if (locationId) params.set('location_id', locationId);
+
+        try {
+            var response = await fetch('/api/zoho/transactions/daily?' + params.toString(), {
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            if (!response.ok) {
+                var errData = await response.json().catch(function() { return {}; });
+                throw new Error(errData.message || 'Failed to fetch transactions');
+            }
+
+            var result = await response.json();
+
+            transactions = result.data || result.transactions || [];
+            totalRecords = result.pagination ? result.pagination.total : transactions.length;
+            totalPages = result.pagination ? result.pagination.totalPages : Math.ceil(totalRecords / PAGE_LIMIT);
+            currentPage = result.pagination ? result.pagination.page : currentPage;
+
+            updateSummaryCards();
+            renderTransactions();
+            renderPagination();
+
+            if (transactions.length === 0) {
+                showState('empty');
+            } else {
+                showState('data');
+            }
+        } catch (error) {
+            console.error('Error loading transactions:', error);
+            showToast('Failed to load transactions: ' + error.message, 'error');
+            showState('empty');
+        }
+    }
+
+    // ===== Load location comparison =====
+    async function loadComparison() {
+        var fromDate = document.getElementById('fromDate').value;
+        var toDate = document.getElementById('toDate').value;
+
+        if (!fromDate || !toDate) return;
+
+        var params = new URLSearchParams({
+            from_date: fromDate,
+            to_date: toDate
+        });
+
+        try {
+            var response = await fetch('/api/zoho/transactions/comparison?' + params.toString(), {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) return;
+
+            var result = await response.json();
+            comparisonData = result.data || result.comparison || result.locations || [];
+
+            if (Array.isArray(comparisonData) && comparisonData.length > 0) {
+                renderComparison();
+                document.getElementById('comparisonSection').classList.remove('hidden');
+                document.getElementById('comparisonDateRange').textContent = formatDate(fromDate) + ' - ' + formatDate(toDate);
+            } else {
+                document.getElementById('comparisonSection').classList.add('hidden');
+            }
+        } catch (error) {
+            console.error('Error loading comparison:', error);
+            document.getElementById('comparisonSection').classList.add('hidden');
+        }
+    }
+
+    // ===== Update summary cards from transaction data =====
+    function updateSummaryCards() {
+        var totals = {
+            invoiceCount: 0, invoiceAmount: 0,
+            billCount: 0, billAmount: 0,
+            salesOrderCount: 0, salesOrderAmount: 0,
+            purchaseOrderCount: 0, purchaseOrderAmount: 0
+        };
+
+        transactions.forEach(function(txn) {
+            totals.invoiceCount += parseInt(txn.invoice_count || txn.invoices_count || 0);
+            totals.invoiceAmount += parseFloat(txn.invoice_amount || txn.invoices_amount || 0);
+            totals.billCount += parseInt(txn.bill_count || txn.bills_count || 0);
+            totals.billAmount += parseFloat(txn.bill_amount || txn.bills_amount || 0);
+            totals.salesOrderCount += parseInt(txn.sales_order_count || txn.salesorders_count || 0);
+            totals.salesOrderAmount += parseFloat(txn.sales_order_amount || txn.salesorders_amount || 0);
+            totals.purchaseOrderCount += parseInt(txn.purchase_order_count || txn.purchaseorders_count || 0);
+            totals.purchaseOrderAmount += parseFloat(txn.purchase_order_amount || txn.purchaseorders_amount || 0);
+        });
+
+        document.getElementById('invoiceCount').textContent = totals.invoiceCount;
+        document.getElementById('invoiceAmount').textContent = formatCurrency(totals.invoiceAmount);
+        document.getElementById('billCount').textContent = totals.billCount;
+        document.getElementById('billAmount').textContent = formatCurrency(totals.billAmount);
+        document.getElementById('salesOrderCount').textContent = totals.salesOrderCount;
+        document.getElementById('salesOrderAmount').textContent = formatCurrency(totals.salesOrderAmount);
+        document.getElementById('purchaseOrderCount').textContent = totals.purchaseOrderCount;
+        document.getElementById('purchaseOrderAmount').textContent = formatCurrency(totals.purchaseOrderAmount);
+
+        document.getElementById('summaryCardsLoading').classList.add('hidden');
+        document.getElementById('summaryCards').classList.remove('hidden');
+    }
+
+    // ===== Render comparison section =====
+    function renderComparison() {
+        var content = document.getElementById('comparisonContent');
+
+        // Find max invoice amount for bar scaling
+        var maxAmount = 0;
+        comparisonData.forEach(function(loc) {
+            var invAmt = parseFloat(loc.invoice_amount || loc.invoices_amount || loc.total_invoices || 0);
+            var billAmt = parseFloat(loc.bill_amount || loc.bills_amount || loc.total_bills || 0);
+            var total = invAmt + billAmt;
+            if (total > maxAmount) maxAmount = total;
+        });
+        if (maxAmount === 0) maxAmount = 1;
+
+        var html = '<div class="space-y-4">';
+
+        comparisonData.forEach(function(loc) {
+            var name = loc.location_name || loc.name || 'Unknown';
+            var invAmt = parseFloat(loc.invoice_amount || loc.invoices_amount || loc.total_invoices || 0);
+            var billAmt = parseFloat(loc.bill_amount || loc.bills_amount || loc.total_bills || 0);
+            var soAmt = parseFloat(loc.sales_order_amount || loc.salesorders_amount || 0);
+            var poAmt = parseFloat(loc.purchase_order_amount || loc.purchaseorders_amount || 0);
+            var total = invAmt + billAmt + soAmt + poAmt;
+            var barWidth = Math.max((total / maxAmount) * 100, 2);
+
+            html += '<div class="border-b border-gray-100 pb-3 last:border-0">';
+            html += '  <div class="flex items-center justify-between mb-1">';
+            html += '    <span class="text-sm font-medium text-gray-800">' + escapeHtml(name) + '</span>';
+            html += '    <span class="text-sm font-bold text-gray-700">' + formatCurrency(total) + '</span>';
+            html += '  </div>';
+            html += '  <div class="w-full bg-gray-100 rounded-full h-6 overflow-hidden flex">';
+
+            // Stacked bar: invoices (indigo) + bills (red) + SO (green) + PO (yellow)
+            if (total > 0) {
+                var invPct = (invAmt / total) * barWidth;
+                var billPct = (billAmt / total) * barWidth;
+                var soPct = (soAmt / total) * barWidth;
+                var poPct = (poAmt / total) * barWidth;
+
+                if (invAmt > 0) html += '<div class="comparison-bar" style="width: ' + invPct + '%; background: #667eea;" title="Invoices: ' + formatCurrency(invAmt) + '"></div>';
+                if (billAmt > 0) html += '<div class="comparison-bar" style="width: ' + billPct + '%; background: #ef4444;" title="Bills: ' + formatCurrency(billAmt) + '"></div>';
+                if (soAmt > 0) html += '<div class="comparison-bar" style="width: ' + soPct + '%; background: #10b981;" title="Sales Orders: ' + formatCurrency(soAmt) + '"></div>';
+                if (poAmt > 0) html += '<div class="comparison-bar" style="width: ' + poPct + '%; background: #f59e0b;" title="Purchase Orders: ' + formatCurrency(poAmt) + '"></div>';
+            }
+
+            html += '  </div>';
+            html += '  <div class="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">';
+            html += '    <span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#667eea;"></span>Inv: ' + formatCurrency(invAmt) + '</span>';
+            html += '    <span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#ef4444;"></span>Bills: ' + formatCurrency(billAmt) + '</span>';
+            html += '    <span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#10b981;"></span>SO: ' + formatCurrency(soAmt) + '</span>';
+            html += '    <span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#f59e0b;"></span>PO: ' + formatCurrency(poAmt) + '</span>';
+            html += '  </div>';
+            html += '</div>';
+        });
+
+        html += '</div>';
+        content.innerHTML = html;
+    }
+
+    // ===== Render transactions table =====
+    function renderTransactions() {
+        var tbody = document.getElementById('transactionTableBody');
+        var cardsContainer = document.getElementById('transactionCardsContainer');
+        expandedRows = {};
+
+        // Desktop table
+        var tableHtml = '';
+        transactions.forEach(function(txn, index) {
+            var date = txn.date || txn.transaction_date || '';
+            var location = txn.location_name || txn.location || 'All';
+            var locationId = txn.location_id || '';
+
+            var invCount = parseInt(txn.invoice_count || txn.invoices_count || 0);
+            var invAmount = parseFloat(txn.invoice_amount || txn.invoices_amount || 0);
+            var billCount = parseInt(txn.bill_count || txn.bills_count || 0);
+            var billAmount = parseFloat(txn.bill_amount || txn.bills_amount || 0);
+            var soCount = parseInt(txn.sales_order_count || txn.salesorders_count || 0);
+            var soAmount = parseFloat(txn.sales_order_amount || txn.salesorders_amount || 0);
+            var poCount = parseInt(txn.purchase_order_count || txn.purchaseorders_count || 0);
+            var poAmount = parseFloat(txn.purchase_order_amount || txn.purchaseorders_amount || 0);
+
+            var rowId = 'row-' + index;
+
+            tableHtml += '<tr class="expand-row" onclick="toggleRowDetail(\'' + rowId + '\', \'' + escapeHtml(date) + '\', \'' + escapeHtml(locationId) + '\')">';
+            tableHtml += '  <td class="px-4 py-3 text-gray-400"><span class="expand-icon" id="icon-' + rowId + '">&#9654;</span></td>';
+            tableHtml += '  <td class="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">' + formatDate(date) + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-gray-700">' + escapeHtml(location) + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-center font-semibold" style="color: #667eea;">' + invCount + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-right text-gray-800">' + formatCurrency(invAmount) + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-center font-semibold text-red-600">' + billCount + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-right text-gray-800">' + formatCurrency(billAmount) + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-center font-semibold text-green-600">' + soCount + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-right text-gray-800">' + formatCurrency(soAmount) + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-center font-semibold text-yellow-600">' + poCount + '</td>';
+            tableHtml += '  <td class="px-4 py-3 text-right text-gray-800">' + formatCurrency(poAmount) + '</td>';
+            tableHtml += '</tr>';
+
+            // Detail row (hidden initially)
+            tableHtml += '<tr class="detail-row" id="detail-' + rowId + '">';
+            tableHtml += '  <td colspan="11" class="px-4 py-0">';
+            tableHtml += '    <div class="py-3 pl-8" id="detail-content-' + rowId + '">';
+            tableHtml += '      <div class="text-center py-4"><div class="spinner mx-auto"></div><p class="text-xs text-gray-400 mt-2">Loading details...</p></div>';
+            tableHtml += '    </div>';
+            tableHtml += '  </td>';
+            tableHtml += '</tr>';
+        });
+
+        tbody.innerHTML = tableHtml;
+
+        // Mobile cards
+        var cardsHtml = '';
+        transactions.forEach(function(txn, index) {
+            var date = txn.date || txn.transaction_date || '';
+            var location = txn.location_name || txn.location || 'All';
+            var locationId = txn.location_id || '';
+
+            var invCount = parseInt(txn.invoice_count || txn.invoices_count || 0);
+            var invAmount = parseFloat(txn.invoice_amount || txn.invoices_amount || 0);
+            var billCount = parseInt(txn.bill_count || txn.bills_count || 0);
+            var billAmount = parseFloat(txn.bill_amount || txn.bills_amount || 0);
+            var soCount = parseInt(txn.sales_order_count || txn.salesorders_count || 0);
+            var soAmount = parseFloat(txn.sales_order_amount || txn.salesorders_amount || 0);
+            var poCount = parseInt(txn.purchase_order_count || txn.purchaseorders_count || 0);
+            var poAmount = parseFloat(txn.purchase_order_amount || txn.purchaseorders_amount || 0);
+
+            cardsHtml += '<div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition" onclick="openDetailModal(\'' + escapeHtml(date) + '\', \'' + escapeHtml(locationId) + '\')">';
+            cardsHtml += '  <div class="flex justify-between items-start mb-3">';
+            cardsHtml += '    <div>';
+            cardsHtml += '      <div class="font-bold text-gray-800 text-sm">' + formatDate(date) + '</div>';
+            cardsHtml += '      <div class="text-gray-500 text-xs mt-0.5">' + escapeHtml(location) + '</div>';
+            cardsHtml += '    </div>';
+            cardsHtml += '    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>';
+            cardsHtml += '  </div>';
+            cardsHtml += '  <div class="grid grid-cols-2 gap-2 text-xs">';
+            cardsHtml += '    <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:#667eea;"></span><span class="text-gray-600">Invoices:</span> <span class="font-semibold">' + invCount + '</span> <span class="text-gray-400">(' + formatCurrency(invAmount) + ')</span></div>';
+            cardsHtml += '    <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span><span class="text-gray-600">Bills:</span> <span class="font-semibold">' + billCount + '</span> <span class="text-gray-400">(' + formatCurrency(billAmount) + ')</span></div>';
+            cardsHtml += '    <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span><span class="text-gray-600">SO:</span> <span class="font-semibold">' + soCount + '</span> <span class="text-gray-400">(' + formatCurrency(soAmount) + ')</span></div>';
+            cardsHtml += '    <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-yellow-500"></span><span class="text-gray-600">PO:</span> <span class="font-semibold">' + poCount + '</span> <span class="text-gray-400">(' + formatCurrency(poAmount) + ')</span></div>';
+            cardsHtml += '  </div>';
+            cardsHtml += '</div>';
+        });
+
+        cardsContainer.innerHTML = cardsHtml;
+    }
+
+    // ===== Toggle row detail (drilldown) =====
+    async function toggleRowDetail(rowId, date, locationId) {
+        var detailRow = document.getElementById('detail-' + rowId);
+        var icon = document.getElementById('icon-' + rowId);
+
+        if (!detailRow || !icon) return;
+
+        var isOpen = detailRow.classList.contains('open');
+
+        if (isOpen) {
+            detailRow.classList.remove('open');
+            icon.classList.remove('open');
+            return;
+        }
+
+        detailRow.classList.add('open');
+        icon.classList.add('open');
+
+        // Only fetch if not already loaded
+        if (expandedRows[rowId]) return;
+
+        try {
+            var url = '/api/zoho/transactions/daily/' + encodeURIComponent(date) + '/' + encodeURIComponent(locationId || 'all');
+            var response = await fetch(url, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) throw new Error('Failed to load details');
+
+            var result = await response.json();
+            var details = result.data || result.transactions || result.items || [];
+
+            renderRowDetail(rowId, details);
+            expandedRows[rowId] = true;
+        } catch (error) {
+            console.error('Error loading detail:', error);
+            var contentEl = document.getElementById('detail-content-' + rowId);
+            if (contentEl) {
+                contentEl.innerHTML = '<p class="text-sm text-red-500 py-2">Failed to load transaction details.</p>';
+            }
+        }
+    }
+
+    // ===== Render row detail content =====
+    function renderRowDetail(rowId, details) {
+        var contentEl = document.getElementById('detail-content-' + rowId);
+        if (!contentEl) return;
+
+        if (!details || details.length === 0) {
+            contentEl.innerHTML = '<p class="text-sm text-gray-400 py-2">No detailed transactions available for this entry.</p>';
+            return;
+        }
+
+        var html = '<table class="w-full text-xs">';
+        html += '<thead><tr class="border-b border-gray-200">';
+        html += '  <th class="pb-2 text-left font-semibold text-gray-500 uppercase">Type</th>';
+        html += '  <th class="pb-2 text-left font-semibold text-gray-500 uppercase">Number</th>';
+        html += '  <th class="pb-2 text-left font-semibold text-gray-500 uppercase">Customer/Vendor</th>';
+        html += '  <th class="pb-2 text-right font-semibold text-gray-500 uppercase">Amount</th>';
+        html += '  <th class="pb-2 text-center font-semibold text-gray-500 uppercase">Status</th>';
+        html += '</tr></thead><tbody>';
+
+        details.forEach(function(item) {
+            var type = item.type || item.transaction_type || '--';
+            var number = item.number || item.transaction_number || item.invoice_number || item.bill_number || '--';
+            var entity = item.customer_name || item.vendor_name || item.entity_name || '--';
+            var amount = parseFloat(item.amount || item.total || 0);
+            var status = item.status || '--';
+
+            var typeColor = 'text-gray-700';
+            if (type.toLowerCase().indexOf('invoice') >= 0) typeColor = 'text-indigo-600';
+            else if (type.toLowerCase().indexOf('bill') >= 0) typeColor = 'text-red-600';
+            else if (type.toLowerCase().indexOf('sales') >= 0) typeColor = 'text-green-600';
+            else if (type.toLowerCase().indexOf('purchase') >= 0) typeColor = 'text-yellow-600';
+
+            var statusCls = 'bg-gray-100 text-gray-600';
+            var st = (status || '').toLowerCase();
+            if (st === 'paid' || st === 'confirmed') statusCls = 'bg-green-100 text-green-800';
+            else if (st === 'sent' || st === 'open') statusCls = 'bg-blue-100 text-blue-800';
+            else if (st === 'overdue') statusCls = 'bg-red-100 text-red-800';
+            else if (st === 'draft') statusCls = 'bg-gray-100 text-gray-600';
+            else if (st === 'partially_paid') statusCls = 'bg-yellow-100 text-yellow-800';
+
+            html += '<tr class="border-b border-gray-50">';
+            html += '  <td class="py-2 font-medium ' + typeColor + ' capitalize">' + escapeHtml(type.replace(/_/g, ' ')) + '</td>';
+            html += '  <td class="py-2 font-medium text-gray-700">' + escapeHtml(number) + '</td>';
+            html += '  <td class="py-2 text-gray-600">' + escapeHtml(entity) + '</td>';
+            html += '  <td class="py-2 text-right font-medium text-gray-800">' + formatCurrency(amount) + '</td>';
+            html += '  <td class="py-2 text-center"><span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold ' + statusCls + '">' + escapeHtml(status.replace(/_/g, ' ')) + '</span></td>';
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        contentEl.innerHTML = html;
+    }
+
+    // ===== Open detail modal (mobile drilldown) =====
+    async function openDetailModal(date, locationId) {
+        document.getElementById('detailModal').classList.remove('hidden');
+        document.getElementById('detailModalLoading').classList.remove('hidden');
+        document.getElementById('detailModalContent').classList.add('hidden');
+        document.getElementById('detailModalTitle').textContent = 'Transactions - ' + formatDate(date);
+        document.body.style.overflow = 'hidden';
+
+        try {
+            var url = '/api/zoho/transactions/daily/' + encodeURIComponent(date) + '/' + encodeURIComponent(locationId || 'all');
+            var response = await fetch(url, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) throw new Error('Failed to load details');
+
+            var result = await response.json();
+            var details = result.data || result.transactions || result.items || [];
+
+            var body = document.getElementById('detailModalBody');
+
+            if (!details || details.length === 0) {
+                body.innerHTML = '<p class="text-center text-gray-400 py-6">No detailed transactions found for this date.</p>';
+            } else {
+                var html = '<div class="space-y-3">';
+                details.forEach(function(item) {
+                    var type = item.type || item.transaction_type || '--';
+                    var number = item.number || item.transaction_number || item.invoice_number || item.bill_number || '--';
+                    var entity = item.customer_name || item.vendor_name || item.entity_name || '--';
+                    var amount = parseFloat(item.amount || item.total || 0);
+                    var status = item.status || '--';
+
+                    var typeBg = 'bg-gray-50 border-gray-200';
+                    if (type.toLowerCase().indexOf('invoice') >= 0) typeBg = 'bg-indigo-50 border-indigo-200';
+                    else if (type.toLowerCase().indexOf('bill') >= 0) typeBg = 'bg-red-50 border-red-200';
+                    else if (type.toLowerCase().indexOf('sales') >= 0) typeBg = 'bg-green-50 border-green-200';
+                    else if (type.toLowerCase().indexOf('purchase') >= 0) typeBg = 'bg-yellow-50 border-yellow-200';
+
+                    html += '<div class="border rounded-lg p-3 ' + typeBg + '">';
+                    html += '  <div class="flex justify-between items-start mb-1">';
+                    html += '    <div>';
+                    html += '      <span class="text-xs font-semibold text-gray-500 uppercase">' + escapeHtml(type.replace(/_/g, ' ')) + '</span>';
+                    html += '      <div class="font-medium text-gray-800 text-sm">' + escapeHtml(number) + '</div>';
+                    html += '    </div>';
+                    html += '    <div class="text-right">';
+                    html += '      <div class="font-bold text-gray-800">' + formatCurrency(amount) + '</div>';
+                    html += '      <span class="text-xs capitalize text-gray-500">' + escapeHtml(status.replace(/_/g, ' ')) + '</span>';
+                    html += '    </div>';
+                    html += '  </div>';
+                    html += '  <div class="text-xs text-gray-600">' + escapeHtml(entity) + '</div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+                body.innerHTML = html;
+            }
+
+            document.getElementById('detailModalLoading').classList.add('hidden');
+            document.getElementById('detailModalContent').classList.remove('hidden');
+        } catch (error) {
+            console.error('Error loading detail modal:', error);
+            closeDetailModal();
+            showToast('Failed to load transaction details', 'error');
+        }
+    }
+
+    // ===== Pagination =====
+    function renderPagination() {
+        var info = document.getElementById('paginationInfo');
+        var controls = document.getElementById('paginationControls');
+
+        if (totalRecords === 0) {
+            info.textContent = 'Showing 0 transactions';
+            controls.innerHTML = '';
+            return;
+        }
+
+        var start = (currentPage - 1) * PAGE_LIMIT + 1;
+        var end = Math.min(currentPage * PAGE_LIMIT, totalRecords);
+        info.textContent = 'Showing ' + start + '-' + end + ' of ' + totalRecords + ' entries';
+
+        var html = '';
+
+        // Previous
+        html += '<button onclick="goToPage(' + (currentPage - 1) + ')" ' +
+                (currentPage <= 1 ? 'disabled' : '') +
+                ' class="px-3 py-1.5 text-sm rounded-lg border ' +
+                (currentPage <= 1 ? 'text-gray-400 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100') +
+                '">Prev</button>';
+
+        // Page numbers
+        var maxVisible = 5;
+        var startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+        var endPage = Math.min(totalPages, startPage + maxVisible - 1);
+        if (endPage - startPage < maxVisible - 1) {
+            startPage = Math.max(1, endPage - maxVisible + 1);
+        }
+
+        if (startPage > 1) {
+            html += '<button onclick="goToPage(1)" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">1</button>';
+            if (startPage > 2) {
+                html += '<span class="px-2 py-1.5 text-sm text-gray-400">...</span>';
+            }
+        }
+
+        for (var i = startPage; i <= endPage; i++) {
+            if (i === currentPage) {
+                html += '<button class="px-3 py-1.5 text-sm rounded-lg text-white font-medium" style="background:#667eea;">' + i + '</button>';
+            } else {
+                html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + i + '</button>';
+            }
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += '<span class="px-2 py-1.5 text-sm text-gray-400">...</span>';
+            }
+            html += '<button onclick="goToPage(' + totalPages + ')" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + totalPages + '</button>';
+        }
+
+        // Next
+        html += '<button onclick="goToPage(' + (currentPage + 1) + ')" ' +
+                (currentPage >= totalPages ? 'disabled' : '') +
+                ' class="px-3 py-1.5 text-sm rounded-lg border ' +
+                (currentPage >= totalPages ? 'text-gray-400 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100') +
+                '">Next</button>';
+
+        controls.innerHTML = html;
+    }
+
+    // ===== CSV Export =====
+    function exportCSV() {
+        if (!transactions || transactions.length === 0) {
+            showToast('No data to export', 'error');
+            return;
+        }
+
+        var headers = ['Date', 'Location', 'Invoice Count', 'Invoice Amount', 'Bill Count', 'Bill Amount', 'Sales Order Count', 'Sales Order Amount', 'Purchase Order Count', 'Purchase Order Amount'];
+        var rows = [headers.join(',')];
+
+        transactions.forEach(function(txn) {
+            var date = txn.date || txn.transaction_date || '';
+            var location = (txn.location_name || txn.location || 'All').replace(/,/g, ' ');
+            var invCount = parseInt(txn.invoice_count || txn.invoices_count || 0);
+            var invAmount = parseFloat(txn.invoice_amount || txn.invoices_amount || 0).toFixed(2);
+            var billCount = parseInt(txn.bill_count || txn.bills_count || 0);
+            var billAmount = parseFloat(txn.bill_amount || txn.bills_amount || 0).toFixed(2);
+            var soCount = parseInt(txn.sales_order_count || txn.salesorders_count || 0);
+            var soAmount = parseFloat(txn.sales_order_amount || txn.salesorders_amount || 0).toFixed(2);
+            var poCount = parseInt(txn.purchase_order_count || txn.purchaseorders_count || 0);
+            var poAmount = parseFloat(txn.purchase_order_amount || txn.purchaseorders_amount || 0).toFixed(2);
+
+            rows.push([date, '"' + location + '"', invCount, invAmount, billCount, billAmount, soCount, soAmount, poCount, poAmount].join(','));
+        });
+
+        var csvContent = rows.join('\n');
+        var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.setAttribute('href', url);
+
+        var fromDate = document.getElementById('fromDate').value || 'unknown';
+        var toDate = document.getElementById('toDate').value || 'unknown';
+        link.setAttribute('download', 'daily-transactions_' + fromDate + '_to_' + toDate + '.csv');
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        showToast('CSV file downloaded successfully', 'success');
+    }
+
+    // ===== Generate Report =====
+    async function generateReport() {
+        var fromDate = document.getElementById('generateFromDate').value;
+        var toDate = document.getElementById('generateToDate').value;
+
+        if (!fromDate || !toDate) {
+            showToast('Please select both From and To dates', 'error');
+            return;
+        }
+
+        if (new Date(fromDate) > new Date(toDate)) {
+            showToast('From date must be before To date', 'error');
+            return;
+        }
+
+        var btn = document.getElementById('generateBtn');
+        var spinner = document.getElementById('generateSpinner');
+        var btnText = document.getElementById('generateBtnText');
+
+        btn.disabled = true;
+        spinner.classList.remove('hidden');
+        btnText.textContent = 'Generating...';
+
+        try {
+            var response = await fetch('/api/zoho/transactions/generate', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ from_date: fromDate, to_date: toDate })
+            });
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            var result = await response.json();
+
+            if (response.ok && result.success) {
+                showToast(result.message || 'Report generated successfully', 'success');
+                closeGenerateModal();
+
+                // Update filter dates to match the generated report and reload
+                document.getElementById('fromDate').value = fromDate;
+                document.getElementById('toDate').value = toDate;
+                currentPage = 1;
+                loadTransactions();
+                loadComparison();
+            } else {
+                showToast(result.message || 'Failed to generate report', 'error');
+            }
+        } catch (error) {
+            console.error('Generate report error:', error);
+            showToast('Failed to generate report. Check your connection.', 'error');
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('hidden');
+            btnText.textContent = 'Generate';
+        }
+    }
+
+    // ===== UI State Management =====
+    function showState(state) {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('transactionContainer').classList.add('hidden');
+
+        if (state === 'loading') {
+            document.getElementById('loadingState').classList.remove('hidden');
+        } else if (state === 'empty') {
+            document.getElementById('emptyState').classList.remove('hidden');
+        } else if (state === 'data') {
+            document.getElementById('transactionContainer').classList.remove('hidden');
+        }
+    }
+
+    // ===== Filters / Pagination actions =====
+    function applyFilters() {
+        currentPage = 1;
+        loadTransactions();
+        loadComparison();
+    }
+
+    function goToPage(page) {
+        if (page < 1 || page > totalPages) return;
+        currentPage = page;
+        loadTransactions();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ===== Modal controls =====
+    function openGenerateModal() {
+        // Sync generate modal dates with filter dates
+        document.getElementById('generateFromDate').value = document.getElementById('fromDate').value;
+        document.getElementById('generateToDate').value = document.getElementById('toDate').value;
+        document.getElementById('generateModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeGenerateModal() {
+        document.getElementById('generateModal').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    function closeGenerateModalBackdrop(event) {
+        if (event.target === document.getElementById('generateModal')) {
+            closeGenerateModal();
+        }
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detailModal').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    function closeDetailModalBackdrop(event) {
+        if (event.target === document.getElementById('detailModal')) {
+            closeDetailModal();
+        }
+    }
+
+    // Close modals on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeGenerateModal();
+            closeDetailModal();
+        }
+    });
+
+    // ===== Initialize =====
+    function init() {
+        setDefaultDates();
+        loadLocations();
+        loadTransactions();
+        loadComparison();
+    }
+
+    init();
+</script>
+</body>
+</html>

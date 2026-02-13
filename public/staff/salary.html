@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>My Salary - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            margin: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+        .loader {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 50;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            text-decoration: none;
+            color: #6b7280;
+            font-size: 12px;
+        }
+        .nav-item.active { color: #667eea; }
+        .amount { font-size: 24px; font-weight: 700; color: #1f2937; }
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 16px;
+        }
+        .month-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        .month-btn {
+            background: none;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            color: #6b7280;
+        }
+        .month-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            min-width: 140px;
+            text-align: center;
+        }
+    </style>
+    <script src="/universal-nav-loader.js"></script>
+</head>
+<body data-page="my-salary">
+    <!-- Header -->
+    <div class="card" style="margin-top: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h1 style="font-size: 24px; font-weight: 700; color: #1f2937;">My Salary</h1>
+                <p style="color: #6b7280; font-size: 14px;">View your salary details</p>
+            </div>
+            <a href="dashboard.html" style="color: #667eea; text-decoration: none; font-weight: 600; font-size: 14px;">Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingState" class="card">
+        <div class="loader"></div>
+        <p style="text-align: center; color: #6b7280;">Loading salary data...</p>
+    </div>
+
+    <!-- Salary Config Card -->
+    <div id="configCard" class="card" style="display: none;">
+        <div class="section-title">Salary Configuration</div>
+        <div id="configContent"></div>
+        <div id="noConfig" style="display: none; text-align: center; padding: 16px; color: #6b7280;">
+            No salary configuration found. Contact your admin.
+        </div>
+    </div>
+
+    <!-- Monthly Summary Card -->
+    <div id="monthlyCard" class="card" style="display: none;">
+        <div class="section-title">Monthly Summary</div>
+        <div class="month-selector">
+            <button class="month-btn" onclick="changeMonth(-1)">&larr;</button>
+            <span class="month-label" id="monthLabel">--</span>
+            <button class="month-btn" onclick="changeMonth(1)">&rarr;</button>
+        </div>
+        <div id="monthlyContent"></div>
+        <div id="noMonthly" style="display: none; text-align: center; padding: 16px; color: #6b7280;">
+            No salary data for this month.
+        </div>
+    </div>
+
+    <!-- Monthly History -->
+    <div id="historyCard" class="card" style="display: none;">
+        <div class="section-title">Salary History</div>
+        <div id="historyContent"></div>
+    </div>
+
+    <!-- Payment History -->
+    <div id="paymentsCard" class="card" style="display: none;">
+        <div class="section-title">Payment History</div>
+        <div id="paymentsContent"></div>
+        <div id="noPayments" style="display: none; text-align: center; padding: 16px; color: #6b7280;">
+            No payments recorded yet.
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <a href="dashboard.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"></path></svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="salary.html" class="nav-item active">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+            <span>Salary</span>
+        </a>
+        <a href="advance-request.html" class="nav-item">
+            <svg style="width: 24px; height: 24px;" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+            <span>Advance</span>
+        </a>
+    </div>
+
+    <script src="/components/logo-loader.js"></script>
+    <script>
+        let currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount || 0);
+        }
+
+        function formatMonth(monthStr) {
+            const [y, m] = monthStr.split('-');
+            return new Date(y, m - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+
+        function changeMonth(delta) {
+            const [y, m] = currentMonth.split('-').map(Number);
+            const d = new Date(y, m - 1 + delta);
+            currentMonth = d.toISOString().slice(0, 7);
+            document.getElementById('monthLabel').textContent = formatMonth(currentMonth);
+            loadMonthly();
+        }
+
+        function statusBadge(status) {
+            const map = {
+                calculated: 'badge-info',
+                approved: 'badge-success',
+                paid: 'badge-success',
+                unpaid: 'badge-warning',
+                partial: 'badge-warning'
+            };
+            return `<span class="badge ${map[status] || 'badge-info'}">${status}</span>`;
+        }
+
+        async function loadAll() {
+            document.getElementById('monthLabel').textContent = formatMonth(currentMonth);
+            await Promise.all([loadConfig(), loadMonthly(), loadHistory(), loadPayments()]);
+            document.getElementById('loadingState').style.display = 'none';
+        }
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/salary/my-config', { headers: getAuthHeaders() });
+                const data = await res.json();
+                const card = document.getElementById('configCard');
+                card.style.display = 'block';
+
+                if (data.success && data.data) {
+                    const c = data.data;
+                    document.getElementById('configContent').innerHTML = `
+                        <div class="info-row"><span style="color:#6b7280;">Base Salary</span><span class="amount">${formatCurrency(c.monthly_salary)}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Branch</span><span style="font-weight:600;">${c.branch_name}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Daily Hours</span><span style="font-weight:600;">${c.standard_daily_hours}h</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Sunday Hours</span><span style="font-weight:600;">${c.sunday_hours}h</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">OT Multiplier</span><span style="font-weight:600;">${c.overtime_multiplier}x</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Transport</span><span style="font-weight:600;">${formatCurrency(c.transport_allowance)}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Food</span><span style="font-weight:600;">${formatCurrency(c.food_allowance)}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Effective From</span><span style="font-weight:600;">${new Date(c.effective_from).toLocaleDateString()}</span></div>
+                    `;
+                } else {
+                    document.getElementById('noConfig').style.display = 'block';
+                }
+            } catch (e) {
+                console.error('Load config error:', e);
+            }
+        }
+
+        async function loadMonthly() {
+            try {
+                const res = await fetch(`/api/salary/my-monthly?month=${currentMonth}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                const card = document.getElementById('monthlyCard');
+                card.style.display = 'block';
+
+                if (data.success && data.data && data.data.length > 0) {
+                    const s = data.data[0];
+                    const netSalary = parseFloat(s.net_salary || 0) || (
+                        parseFloat(s.standard_hours_pay || 0) + parseFloat(s.sunday_hours_pay || 0) +
+                        parseFloat(s.overtime_pay || 0) + parseFloat(s.total_allowances || 0) -
+                        parseFloat(s.total_deductions || 0)
+                    );
+                    document.getElementById('monthlyContent').innerHTML = `
+                        <div style="text-align:center;margin-bottom:20px;">
+                            <div class="amount" style="font-size:32px;">${formatCurrency(netSalary)}</div>
+                            <div style="color:#6b7280;font-size:13px;margin-top:4px;">Net Salary ${statusBadge(s.payment_status || s.status)}</div>
+                        </div>
+                        <div class="info-row"><span style="color:#6b7280;">Working Days</span><span style="font-weight:600;">${s.total_present_days || 0} / ${s.total_working_days || 0}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Standard Hours</span><span style="font-weight:600;">${parseFloat(s.total_standard_hours || 0).toFixed(1)}h</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Sunday Hours</span><span style="font-weight:600;">${parseFloat(s.total_sunday_hours || 0).toFixed(1)}h</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Overtime Hours</span><span style="font-weight:600;">${parseFloat(s.total_overtime_hours || 0).toFixed(1)}h</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Standard Pay</span><span style="font-weight:600;">${formatCurrency(s.standard_hours_pay)}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Sunday Pay</span><span style="font-weight:600;">${formatCurrency(s.sunday_hours_pay)}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Overtime Pay</span><span style="font-weight:600;">${formatCurrency(s.overtime_pay)}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Allowances</span><span style="font-weight:600;color:#10b981;">+${formatCurrency(s.total_allowances)}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Deductions</span><span style="font-weight:600;color:#ef4444;">-${formatCurrency(s.total_deductions)}</span></div>
+                        <div class="info-row"><span style="color:#6b7280;">Paid Amount</span><span style="font-weight:600;">${formatCurrency(s.paid_amount)}</span></div>
+                    `;
+                    document.getElementById('noMonthly').style.display = 'none';
+                } else {
+                    document.getElementById('monthlyContent').innerHTML = '';
+                    document.getElementById('noMonthly').style.display = 'block';
+                }
+            } catch (e) {
+                console.error('Load monthly error:', e);
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/salary/my-monthly', { headers: getAuthHeaders() });
+                const data = await res.json();
+                const card = document.getElementById('historyCard');
+
+                if (data.success && data.data && data.data.length > 0) {
+                    card.style.display = 'block';
+                    document.getElementById('historyContent').innerHTML = data.data.map(s => {
+                        const net = parseFloat(s.net_salary || 0) || (
+                            parseFloat(s.standard_hours_pay || 0) + parseFloat(s.sunday_hours_pay || 0) +
+                            parseFloat(s.overtime_pay || 0) + parseFloat(s.total_allowances || 0) -
+                            parseFloat(s.total_deductions || 0)
+                        );
+                        return `
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
+                                <div>
+                                    <div style="font-weight:600;color:#1f2937;">${formatMonth(s.salary_month)}</div>
+                                    <div style="font-size:12px;color:#6b7280;">${s.total_present_days || 0} days worked</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-weight:700;color:#1f2937;">${formatCurrency(net)}</div>
+                                    ${statusBadge(s.payment_status || s.status)}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Load history error:', e);
+            }
+        }
+
+        async function loadPayments() {
+            try {
+                const res = await fetch('/api/salary/my-payments', { headers: getAuthHeaders() });
+                const data = await res.json();
+                const card = document.getElementById('paymentsCard');
+
+                if (data.success && data.data && data.data.length > 0) {
+                    card.style.display = 'block';
+                    document.getElementById('paymentsContent').innerHTML = data.data.map(p => `
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
+                            <div>
+                                <div style="font-weight:600;color:#1f2937;">${formatCurrency(p.amount_paid)}</div>
+                                <div style="font-size:12px;color:#6b7280;">${p.salary_month} - ${p.payment_method || 'N/A'}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-size:13px;color:#6b7280;">${new Date(p.payment_date).toLocaleDateString()}</div>
+                                ${p.paid_by_name ? `<div style="font-size:11px;color:#9ca3af;">by ${p.paid_by_name}</div>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    card.style.display = 'block';
+                    document.getElementById('noPayments').style.display = 'block';
+                }
+            } catch (e) {
+                console.error('Load payments error:', e);
+            }
+        }
+
+        loadAll();
+    </script>
+</body>
+</html>

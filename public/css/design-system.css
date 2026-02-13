@@ -1271,3 +1271,39 @@ body {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
+
+/* ========================================
+   MOBILE RESPONSIVENESS GLOBALS
+   ======================================== */
+
+/* Prevent iOS zoom on input focus - 16px minimum */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="month"],
+  input[type="search"],
+  input[type="url"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Minimum touch target size */
+  button,
+  .btn,
+  .btn-sm,
+  a.btn,
+  input[type="submit"],
+  input[type="button"] {
+    min-height: 40px;
+  }
+
+  .btn-sm {
+    padding: 8px 12px;
+    min-height: 36px;
+  }
+}

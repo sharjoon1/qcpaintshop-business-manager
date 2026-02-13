@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Zoho Items - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-info { background: #2563eb; }
+
+        /* Checkbox styling */
+        .item-checkbox {
+            width: 1rem;
+            height: 1rem;
+            accent-color: #667eea;
+            cursor: pointer;
+        }
+
+        /* Bulk action bar */
+        .bulk-bar {
+            position: sticky;
+            bottom: 0;
+            z-index: 40;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        .bulk-bar.hidden {
+            transform: translateY(100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Table row hover */
+        .item-row:hover {
+            background: #f0f4ff;
+        }
+
+        /* Modal overlay */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            padding: 1rem;
+        }
+
+        /* Responsive: hide table on mobile, show cards */
+        @media (max-width: 767px) {
+            .items-table-wrap { display: none; }
+            .items-cards { display: block; }
+        }
+        @media (min-width: 768px) {
+            .items-table-wrap { display: block; }
+            .items-cards { display: none; }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body data-page="zoho-items" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
+
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+                <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Zoho Items</h2>
+                <p class="text-gray-600 mt-1">
+                    Manage items synced from Zoho Books
+                    <span id="itemsCount" class="ml-2 inline-block bg-gray-200 text-gray-700 text-xs font-semibold px-2 py-0.5 rounded-full">--</span>
+                </p>
+            </div>
+            <button onclick="syncItems()" id="syncBtn" class="btn btn-primary flex items-center gap-2 whitespace-nowrap">
+                <svg id="syncIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span id="syncBtnText">Sync Items</span>
+            </button>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="flex flex-col sm:flex-row gap-3 items-end">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search Items</label>
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <input type="text" id="searchInput" onkeyup="debounceSearch()" placeholder="Search by item name or SKU..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                    </div>
+                </div>
+                <button onclick="clearSearch()" class="px-4 py-2 rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 transition whitespace-nowrap">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <svg class="inline w-8 h-8 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-500 mt-3">Loading items...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-12 bg-white rounded-lg shadow">
+            <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No items found</h3>
+            <p class="text-gray-600 mb-4">Try syncing items from Zoho Books or adjusting your search.</p>
+            <button onclick="syncItems()" class="btn btn-primary">Sync Items</button>
+        </div>
+
+        <!-- Items Table Container -->
+        <div id="itemsTableContainer" class="hidden">
+
+            <!-- Desktop Table -->
+            <div class="items-table-wrap bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3 w-10">
+                                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="item-checkbox" title="Select all">
+                                </th>
+                                <th class="px-4 py-3 font-semibold text-gray-600">Item Name</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600">SKU</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Rate</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600">Unit</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600">Last Synced</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsTableBody" class="divide-y divide-gray-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Mobile Cards -->
+            <div class="items-cards space-y-3" id="itemsCardsContainer">
+            </div>
+
+            <!-- Pagination -->
+            <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-gray-600" id="paginationInfo">Showing 0 items</div>
+                <div class="flex items-center gap-1" id="paginationControls">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Action Bar -->
+    <div id="bulkBar" class="bulk-bar hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
+        <div class="container mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm" id="selectedCountBadge">0</div>
+                <span class="text-sm font-medium text-gray-700"><span id="selectedCountText">0</span> items selected</span>
+                <button onclick="clearSelection()" class="text-xs text-gray-500 hover:text-gray-700 underline">Clear selection</button>
+            </div>
+            <button onclick="openBulkModal()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                Bulk Update
+            </button>
+        </div>
+    </div>
+
+    <!-- Bulk Update Modal -->
+    <div id="bulkModal" class="hidden modal-overlay" onclick="closeBulkModalBackdrop(event)">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-10">
+                <h3 class="text-lg font-bold text-gray-800">Bulk Update Items</h3>
+                <button onclick="closeBulkModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6">
+                <p class="text-sm text-gray-600 mb-4">
+                    Select the fields you want to update for <strong id="bulkModalCount">0</strong> selected items.
+                </p>
+
+                <!-- Field: Rate -->
+                <div class="mb-4">
+                    <label class="flex items-center gap-3 mb-2 cursor-pointer">
+                        <input type="checkbox" id="updateRate" onchange="toggleField('rate')" class="item-checkbox">
+                        <span class="text-sm font-medium text-gray-700">Rate</span>
+                    </label>
+                    <div id="fieldRate" class="hidden ml-7">
+                        <input type="number" id="inputRate" step="0.01" min="0" placeholder="Enter new rate" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <!-- Field: Unit -->
+                <div class="mb-4">
+                    <label class="flex items-center gap-3 mb-2 cursor-pointer">
+                        <input type="checkbox" id="updateUnit" onchange="toggleField('unit')" class="item-checkbox">
+                        <span class="text-sm font-medium text-gray-700">Unit</span>
+                    </label>
+                    <div id="fieldUnit" class="hidden ml-7">
+                        <select id="inputUnit" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                            <option value="">Select unit</option>
+                            <option value="pcs">pcs</option>
+                            <option value="kg">kg</option>
+                            <option value="ltr">ltr</option>
+                            <option value="nos">nos</option>
+                            <option value="box">box</option>
+                            <option value="set">set</option>
+                            <option value="mtr">mtr</option>
+                            <option value="sqft">sqft</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Field: Description -->
+                <div class="mb-4">
+                    <label class="flex items-center gap-3 mb-2 cursor-pointer">
+                        <input type="checkbox" id="updateDescription" onchange="toggleField('description')" class="item-checkbox">
+                        <span class="text-sm font-medium text-gray-700">Description</span>
+                    </label>
+                    <div id="fieldDescription" class="hidden ml-7">
+                        <textarea id="inputDescription" rows="3" placeholder="Enter new description" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-vertical"></textarea>
+                    </div>
+                </div>
+
+                <!-- Field: Tax -->
+                <div class="mb-4">
+                    <label class="flex items-center gap-3 mb-2 cursor-pointer">
+                        <input type="checkbox" id="updateTax" onchange="toggleField('tax')" class="item-checkbox">
+                        <span class="text-sm font-medium text-gray-700">Tax</span>
+                    </label>
+                    <div id="fieldTax" class="hidden ml-7">
+                        <input type="number" id="inputTax" step="0.01" min="0" max="100" placeholder="Tax percentage (e.g. 18)" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                        <p class="text-xs text-gray-500 mt-1">Enter tax percentage (0-100)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="border-t px-6 py-4 flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <button onclick="closeBulkModal()" class="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition">
+                    Cancel
+                </button>
+                <button onclick="submitBulkUpdate()" id="bulkSubmitBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition flex items-center justify-center gap-2">
+                    <svg id="bulkSubmitSpinner" class="hidden w-4 h-4 spinner" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span id="bulkSubmitText">Submit Bulk Update</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State ---
+        let items = [];
+        let currentPage = 1;
+        let totalItems = 0;
+        let totalPages = 1;
+        const PAGE_LIMIT = 50;
+        let searchTimeout = null;
+        let selectedItemIds = new Set();
+
+        // --- Auth ---
+        function getAuthHeaders() {
+            return {
+                'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // --- Toast ---
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast toast-' + (type || 'info');
+            toast.classList.add('show');
+            setTimeout(function() {
+                toast.classList.remove('show');
+            }, 3500);
+        }
+
+        // --- Helpers ---
+        function formatINR(amount) {
+            return '\u20B9' + parseFloat(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        }
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '--';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) +
+                   ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // --- Search ---
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                currentPage = 1;
+                selectedItemIds.clear();
+                updateBulkBar();
+                loadItems();
+            }, 400);
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            currentPage = 1;
+            selectedItemIds.clear();
+            updateBulkBar();
+            loadItems();
+        }
+
+        // --- Load Items ---
+        async function loadItems() {
+            var search = document.getElementById('searchInput').value.trim();
+            var url = '/api/zoho/items?page=' + currentPage + '&limit=' + PAGE_LIMIT;
+            if (search) url += '&search=' + encodeURIComponent(search);
+
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('itemsTableContainer').classList.add('hidden');
+
+            try {
+                var resp = await fetch(url, { headers: getAuthHeaders() });
+                if (!resp.ok) throw new Error('Failed to load items');
+                var data = await resp.json();
+
+                items = data.data || data.items || [];
+                var pg = data.pagination || {};
+                totalItems = pg.total || data.total || data.totalCount || items.length;
+                totalPages = pg.pages || data.totalPages || Math.ceil(totalItems / PAGE_LIMIT) || 1;
+
+                document.getElementById('itemsCount').textContent = totalItems + ' items';
+
+                document.getElementById('loadingState').classList.add('hidden');
+
+                if (items.length === 0) {
+                    document.getElementById('emptyState').classList.remove('hidden');
+                } else {
+                    document.getElementById('itemsTableContainer').classList.remove('hidden');
+                    renderTable();
+                    renderCards();
+                    renderPagination();
+                }
+            } catch (err) {
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+                showToast('Error loading items: ' + err.message, 'error');
+            }
+        }
+
+        // --- Render Table ---
+        function renderTable() {
+            var tbody = document.getElementById('itemsTableBody');
+            var html = '';
+
+            items.forEach(function(item) {
+                var itemId = item.item_id || item.id;
+                var checked = selectedItemIds.has(String(itemId)) ? 'checked' : '';
+                html += '<tr class="item-row hover:bg-gray-50 transition">';
+                html += '<td class="px-4 py-3"><input type="checkbox" class="item-checkbox" data-id="' + escapeHtml(String(itemId)) + '" onchange="toggleItemSelect(this)" ' + checked + '></td>';
+                html += '<td class="px-4 py-3 font-medium text-gray-800">' + escapeHtml(item.name || item.item_name || '--') + '</td>';
+                html += '<td class="px-4 py-3 text-gray-600">' + escapeHtml(item.sku || '--') + '</td>';
+                html += '<td class="px-4 py-3 text-right font-medium text-gray-800">' + formatINR(item.rate) + '</td>';
+                html += '<td class="px-4 py-3 text-gray-600">' + escapeHtml(item.unit || '--') + '</td>';
+                html += '<td class="px-4 py-3 text-gray-500 text-xs">' + formatDateTime(item.last_synced || item.updated_at || item.synced_at) + '</td>';
+                html += '</tr>';
+            });
+
+            tbody.innerHTML = html;
+            updateSelectAllCheckbox();
+        }
+
+        // --- Render Mobile Cards ---
+        function renderCards() {
+            var container = document.getElementById('itemsCardsContainer');
+            var html = '';
+
+            items.forEach(function(item) {
+                var itemId = item.item_id || item.id;
+                var checked = selectedItemIds.has(String(itemId)) ? 'checked' : '';
+                html += '<div class="bg-white rounded-lg shadow p-4">';
+                html += '<div class="flex items-start gap-3">';
+                html += '<input type="checkbox" class="item-checkbox mt-1" data-id="' + escapeHtml(String(itemId)) + '" onchange="toggleItemSelect(this)" ' + checked + '>';
+                html += '<div class="flex-1 min-w-0">';
+                html += '<div class="flex justify-between items-start gap-2">';
+                html += '<h4 class="font-semibold text-gray-800 text-sm truncate">' + escapeHtml(item.name || item.item_name || '--') + '</h4>';
+                html += '<span class="text-sm font-bold text-gray-800 whitespace-nowrap">' + formatINR(item.rate) + '</span>';
+                html += '</div>';
+                html += '<div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">';
+                html += '<span>SKU: <span class="text-gray-700">' + escapeHtml(item.sku || '--') + '</span></span>';
+                html += '<span>Unit: <span class="text-gray-700">' + escapeHtml(item.unit || '--') + '</span></span>';
+                html += '</div>';
+                html += '<div class="text-xs text-gray-400 mt-1">Synced: ' + formatDateTime(item.last_synced || item.updated_at || item.synced_at) + '</div>';
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        // --- Selection ---
+        function toggleItemSelect(checkbox) {
+            var id = checkbox.getAttribute('data-id');
+            if (checkbox.checked) {
+                selectedItemIds.add(id);
+            } else {
+                selectedItemIds.delete(id);
+            }
+            updateSelectAllCheckbox();
+            updateBulkBar();
+            // Sync checkboxes across table and cards
+            syncCheckboxes(id, checkbox.checked);
+        }
+
+        function syncCheckboxes(id, checked) {
+            var allCbs = document.querySelectorAll('.item-checkbox[data-id="' + id + '"]');
+            allCbs.forEach(function(cb) {
+                cb.checked = checked;
+            });
+        }
+
+        function toggleSelectAll() {
+            var selectAll = document.getElementById('selectAll');
+            items.forEach(function(item) {
+                var id = String(item.item_id || item.id);
+                if (selectAll.checked) {
+                    selectedItemIds.add(id);
+                } else {
+                    selectedItemIds.delete(id);
+                }
+            });
+            // Update all checkboxes on page
+            var allCbs = document.querySelectorAll('.item-checkbox[data-id]');
+            allCbs.forEach(function(cb) {
+                cb.checked = selectAll.checked;
+            });
+            updateBulkBar();
+        }
+
+        function updateSelectAllCheckbox() {
+            var selectAll = document.getElementById('selectAll');
+            if (!selectAll) return;
+            var pageIds = items.map(function(item) { return String(item.item_id || item.id); });
+            var allSelected = pageIds.length > 0 && pageIds.every(function(id) { return selectedItemIds.has(id); });
+            var someSelected = pageIds.some(function(id) { return selectedItemIds.has(id); });
+            selectAll.checked = allSelected;
+            selectAll.indeterminate = someSelected && !allSelected;
+        }
+
+        function updateBulkBar() {
+            var bar = document.getElementById('bulkBar');
+            var count = selectedItemIds.size;
+            if (count > 0) {
+                bar.classList.remove('hidden');
+                document.getElementById('selectedCountBadge').textContent = count;
+                document.getElementById('selectedCountText').textContent = count;
+            } else {
+                bar.classList.add('hidden');
+            }
+        }
+
+        function clearSelection() {
+            selectedItemIds.clear();
+            var allCbs = document.querySelectorAll('.item-checkbox');
+            allCbs.forEach(function(cb) { cb.checked = false; });
+            document.getElementById('selectAll').checked = false;
+            document.getElementById('selectAll').indeterminate = false;
+            updateBulkBar();
+        }
+
+        // --- Pagination ---
+        function renderPagination() {
+            var info = document.getElementById('paginationInfo');
+            var controls = document.getElementById('paginationControls');
+            var start = (currentPage - 1) * PAGE_LIMIT + 1;
+            var end = Math.min(currentPage * PAGE_LIMIT, totalItems);
+            info.textContent = 'Showing ' + start + '-' + end + ' of ' + totalItems + ' items';
+
+            var html = '';
+
+            // Prev button
+            html += '<button onclick="goToPage(' + (currentPage - 1) + ')" ' +
+                    (currentPage <= 1 ? 'disabled' : '') +
+                    ' class="px-3 py-1.5 rounded-lg text-sm font-medium transition ' +
+                    (currentPage <= 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50') +
+                    '">Prev</button>';
+
+            // Page numbers
+            var startPage = Math.max(1, currentPage - 2);
+            var endPage = Math.min(totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                html += '<button onclick="goToPage(1)" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition">1</button>';
+                if (startPage > 2) {
+                    html += '<span class="px-2 text-gray-400">...</span>';
+                }
+            }
+
+            for (var i = startPage; i <= endPage; i++) {
+                if (i === currentPage) {
+                    html += '<button class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white">' + i + '</button>';
+                } else {
+                    html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition">' + i + '</button>';
+                }
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += '<span class="px-2 text-gray-400">...</span>';
+                }
+                html += '<button onclick="goToPage(' + totalPages + ')" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition">' + totalPages + '</button>';
+            }
+
+            // Next button
+            html += '<button onclick="goToPage(' + (currentPage + 1) + ')" ' +
+                    (currentPage >= totalPages ? 'disabled' : '') +
+                    ' class="px-3 py-1.5 rounded-lg text-sm font-medium transition ' +
+                    (currentPage >= totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50') +
+                    '">Next</button>';
+
+            controls.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            loadItems();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // --- Sync Items ---
+        async function syncItems() {
+            var btn = document.getElementById('syncBtn');
+            var icon = document.getElementById('syncIcon');
+            var text = document.getElementById('syncBtnText');
+
+            btn.disabled = true;
+            icon.classList.add('spinner');
+            text.textContent = 'Syncing...';
+
+            try {
+                var resp = await fetch('/api/zoho/sync/items', {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+                if (!resp.ok) {
+                    var errData = await resp.json().catch(function() { return {}; });
+                    throw new Error(errData.message || 'Sync failed');
+                }
+                var data = await resp.json();
+                showToast('Items synced successfully' + (data.count ? ' (' + data.count + ' items)' : ''), 'success');
+                currentPage = 1;
+                selectedItemIds.clear();
+                updateBulkBar();
+                loadItems();
+            } catch (err) {
+                showToast('Sync failed: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                icon.classList.remove('spinner');
+                text.textContent = 'Sync Items';
+            }
+        }
+
+        // --- Bulk Update Modal ---
+        function openBulkModal() {
+            document.getElementById('bulkModalCount').textContent = selectedItemIds.size;
+            // Reset form
+            document.getElementById('updateRate').checked = false;
+            document.getElementById('updateUnit').checked = false;
+            document.getElementById('updateDescription').checked = false;
+            document.getElementById('updateTax').checked = false;
+            document.getElementById('fieldRate').classList.add('hidden');
+            document.getElementById('fieldUnit').classList.add('hidden');
+            document.getElementById('fieldDescription').classList.add('hidden');
+            document.getElementById('fieldTax').classList.add('hidden');
+            document.getElementById('inputRate').value = '';
+            document.getElementById('inputUnit').value = '';
+            document.getElementById('inputDescription').value = '';
+            document.getElementById('inputTax').value = '';
+            document.getElementById('bulkModal').classList.remove('hidden');
+        }
+
+        function closeBulkModal() {
+            document.getElementById('bulkModal').classList.add('hidden');
+        }
+
+        function closeBulkModalBackdrop(event) {
+            if (event.target === event.currentTarget) {
+                closeBulkModal();
+            }
+        }
+
+        function toggleField(field) {
+            var checkbox = document.getElementById('update' + field.charAt(0).toUpperCase() + field.slice(1));
+            var container = document.getElementById('field' + field.charAt(0).toUpperCase() + field.slice(1));
+            if (checkbox.checked) {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
+        }
+
+        async function submitBulkUpdate() {
+            // Collect selected fields
+            var updateFields = {};
+            var hasField = false;
+
+            if (document.getElementById('updateRate').checked) {
+                var rate = document.getElementById('inputRate').value;
+                if (rate === '' || isNaN(parseFloat(rate))) {
+                    showToast('Please enter a valid rate', 'error');
+                    return;
+                }
+                updateFields.rate = parseFloat(rate);
+                hasField = true;
+            }
+
+            if (document.getElementById('updateUnit').checked) {
+                var unit = document.getElementById('inputUnit').value;
+                if (!unit) {
+                    showToast('Please select a unit', 'error');
+                    return;
+                }
+                updateFields.unit = unit;
+                hasField = true;
+            }
+
+            if (document.getElementById('updateDescription').checked) {
+                var description = document.getElementById('inputDescription').value.trim();
+                if (!description) {
+                    showToast('Please enter a description', 'error');
+                    return;
+                }
+                updateFields.description = description;
+                hasField = true;
+            }
+
+            if (document.getElementById('updateTax').checked) {
+                var tax = document.getElementById('inputTax').value;
+                if (tax === '' || isNaN(parseFloat(tax)) || parseFloat(tax) < 0 || parseFloat(tax) > 100) {
+                    showToast('Please enter a valid tax percentage (0-100)', 'error');
+                    return;
+                }
+                updateFields.tax_percentage = parseFloat(tax);
+                hasField = true;
+            }
+
+            if (!hasField) {
+                showToast('Please select at least one field to update', 'error');
+                return;
+            }
+
+            var btn = document.getElementById('bulkSubmitBtn');
+            var spinner = document.getElementById('bulkSubmitSpinner');
+            var text = document.getElementById('bulkSubmitText');
+
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            text.textContent = 'Updating...';
+
+            try {
+                var resp = await fetch('/api/zoho/items/bulk-update', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        filter: {
+                            item_ids: Array.from(selectedItemIds)
+                        },
+                        update_fields: updateFields
+                    })
+                });
+
+                if (!resp.ok) {
+                    var errData = await resp.json().catch(function() { return {}; });
+                    throw new Error(errData.message || 'Bulk update failed');
+                }
+
+                var data = await resp.json();
+                showToast('Bulk update job created successfully' + (data.jobId ? ' (Job #' + data.jobId + ')' : ''), 'success');
+                closeBulkModal();
+                selectedItemIds.clear();
+                updateBulkBar();
+                loadItems();
+            } catch (err) {
+                showToast('Bulk update failed: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+                text.textContent = 'Submit Bulk Update';
+            }
+        }
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', function() {
+            loadItems();
+        });
+    </script>
+</body>
+</html>

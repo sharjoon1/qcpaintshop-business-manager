@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Stock Adjustment - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+        .toast { position: fixed; top: 1rem; right: 1rem; z-index: 9999; padding: 0.75rem 1.25rem; border-radius: 8px; color: white; font-weight: 500; font-size: 0.875rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateX(120%); transition: transform 0.3s ease; }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-info { background: #2563eb; }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .adj-table { font-size: 0.8125rem; width: 100%; border-collapse: collapse; }
+        .adj-table thead th { background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 8px 10px; font-weight: 600; color: #475569; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 5; }
+        .adj-table tbody td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .adj-table tbody tr:hover { background: #f0f4ff; }
+        .adj-table tbody tr.has-adj { background: #fffdf5; }
+
+        .adj-input { width: 90px; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.8125rem; text-align: right; outline: none; transition: border-color 0.15s; }
+        .adj-input:focus { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.15); }
+        .adj-input.positive { background: #ecfdf5; border-color: #34d399; }
+        .adj-input.negative { background: #fef2f2; border-color: #f87171; }
+
+        .qty-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 1px 6px; border-radius: 999px; }
+        .qty-badge.increase { background: #d1fae5; color: #065f46; }
+        .qty-badge.decrease { background: #fee2e2; color: #991b1b; }
+
+        .location-tab { padding: 8px 16px; border-radius: 8px 8px 0 0; font-size: 0.8125rem; font-weight: 500; color: #64748b; cursor: pointer; border: 1px solid transparent; border-bottom: none; transition: all 0.2s; }
+        .location-tab:hover { background: #f1f5f9; color: #334155; }
+        .location-tab.active { background: white; color: #667eea; font-weight: 600; border-color: #e2e8f0; box-shadow: 0 -2px 4px rgba(0,0,0,0.03); }
+
+        .summary-card { background: white; border-radius: 10px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .summary-card .label { font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .summary-card .value { font-size: 1.25rem; font-weight: 700; color: #1e293b; margin-top: 2px; }
+
+        /* Mobile */
+        @media (max-width: 767px) {
+            .adj-table-wrap { display: none; }
+            .adj-cards { display: block; }
+        }
+        @media (min-width: 768px) {
+            .adj-table-wrap { display: block; }
+            .adj-cards { display: none; }
+        }
+    </style>
+</head>
+<body data-page="zoho-stock-adjust" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
+
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+            <div>
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800">Stock Adjustment</h2>
+                <p class="text-gray-500 mt-0.5 text-xs">Adjust stock quantities by branch/warehouse and push to Zoho Books.</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <a href="/admin-zoho-stock.html" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 transition">View Stock</a>
+            </div>
+        </div>
+
+        <!-- Adjustment Config -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Adjustment Type</label>
+                    <select id="adjType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="quantity">Quantity Adjustment</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Date</label>
+                    <input type="date" id="adjDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Reason</label>
+                    <input type="text" id="adjReason" placeholder="e.g. Physical count, Damage, Return" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+            </div>
+            <div class="mt-3">
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Description (optional)</label>
+                <input type="text" id="adjDescription" placeholder="Additional notes..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+        </div>
+
+        <!-- Location Tabs -->
+        <div id="locationTabs" class="flex gap-1 overflow-x-auto pb-0 mb-0" style="scrollbar-width:none;"></div>
+
+        <!-- Loading -->
+        <div id="loadingState" class="text-center py-12">
+            <svg class="inline w-8 h-8 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <p class="text-gray-500 mt-3 text-sm">Loading locations...</p>
+        </div>
+
+        <!-- Stock Content -->
+        <div id="stockContent" class="hidden">
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div class="summary-card"><div class="label">Items Shown</div><div class="value" id="summaryTotal">0</div></div>
+                <div class="summary-card"><div class="label">Items Adjusted</div><div class="value text-amber-600" id="summaryAdjusted">0</div></div>
+                <div class="summary-card"><div class="label">Total Increase</div><div class="value text-green-600" id="summaryIncrease">0</div></div>
+                <div class="summary-card"><div class="label">Total Decrease</div><div class="value text-red-600" id="summaryDecrease">0</div></div>
+            </div>
+
+            <!-- Search -->
+            <div class="bg-white rounded-lg shadow-sm p-2 mb-3 flex gap-2">
+                <div class="flex-1 relative">
+                    <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" id="stockSearch" onkeyup="debounceStockSearch()" placeholder="Search items..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-300 text-xs outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                </div>
+                <label class="flex items-center gap-1.5 text-xs text-gray-600 whitespace-nowrap cursor-pointer">
+                    <input type="checkbox" id="showAdjustedOnly" onchange="renderStockTable()" class="accent-indigo-600"> Adjusted only
+                </label>
+            </div>
+
+            <!-- Table -->
+            <div class="adj-table-wrap bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-auto" style="max-height: calc(100vh - 420px); min-height: 300px;">
+                    <table class="adj-table">
+                        <thead>
+                            <tr>
+                                <th style="min-width:220px">Item Name</th>
+                                <th>SKU</th>
+                                <th class="text-right">Current Stock</th>
+                                <th class="text-right">Available</th>
+                                <th class="text-center" style="min-width:130px">Adjust Qty</th>
+                                <th class="text-right">New Stock</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Mobile Cards -->
+            <div class="adj-cards space-y-2" id="stockCardsContainer"></div>
+
+            <!-- Pagination -->
+            <div class="mt-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="text-xs text-gray-600" id="stockPagInfo">--</div>
+                <div class="flex items-center gap-1" id="stockPagControls"></div>
+            </div>
+        </div>
+
+        <!-- Push Bar -->
+        <div id="pushBar" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40">
+            <div class="container mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1 rounded-full border border-amber-300">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                        <span id="pushBarCount">0</span> items to adjust
+                    </span>
+                    <button onclick="clearAllAdjustments()" class="text-xs text-gray-500 hover:text-red-600 underline">Clear All</button>
+                </div>
+                <button onclick="pushAdjustment()" id="pushAdjBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition flex items-center gap-2">
+                    <svg id="pushAdjSpinner" class="hidden w-4 h-4 spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <svg class="w-4 h-4" id="pushAdjIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <span id="pushAdjText">Push Adjustment to Zoho</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    var locations = [];
+    var selectedLocationId = null;
+    var stockItems = [];
+    var adjustments = {};  // { item_id: quantity_adjusted }
+    var stockPage = 1, stockTotal = 0, stockPages = 1;
+    var STOCK_LIMIT = 50;
+    var stockSearchTimeout = null;
+
+    function getAuthHeaders() { return { 'Authorization': 'Bearer ' + localStorage.getItem('auth_token'), 'Content-Type': 'application/json' }; }
+    function showToast(msg, type) { var t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast toast-' + (type||'info'); t.classList.add('show'); setTimeout(function(){t.classList.remove('show');}, 3500); }
+    function escapeHtml(s) { if (s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // ---- Load Locations ----
+    async function loadLocations() {
+        try {
+            var resp = await fetch('/api/zoho/locations', { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Failed to load locations');
+            var data = await resp.json();
+            locations = (data.data || []).filter(function(l) { return l.is_active !== 0; });
+
+            if (locations.length === 0) {
+                document.getElementById('loadingState').innerHTML = '<p class="text-gray-500 text-sm">No locations found. Sync locations first.</p>';
+                return;
+            }
+
+            renderLocationTabs();
+            selectLocation(locations[0].zoho_location_id);
+        } catch (err) {
+            document.getElementById('loadingState').innerHTML = '<p class="text-red-500 text-sm">Error: ' + escapeHtml(err.message) + '</p>';
+        }
+    }
+
+    function renderLocationTabs() {
+        var html = '';
+        locations.forEach(function(loc) {
+            var locAdj = getLocationAdjCount(loc.zoho_location_id);
+            html += '<div class="location-tab' + (loc.zoho_location_id === selectedLocationId ? ' active' : '') + '" onclick="selectLocation(\'' + escapeHtml(loc.zoho_location_id) + '\')">';
+            html += escapeHtml(loc.zoho_location_name || loc.location_name);
+            if (locAdj > 0) html += ' <span class="inline-block bg-amber-400 text-white text-xs rounded-full px-1.5 ml-1">' + locAdj + '</span>';
+            html += '</div>';
+        });
+        document.getElementById('locationTabs').innerHTML = html;
+    }
+
+    function getLocationAdjCount(locId) {
+        var count = 0;
+        Object.keys(adjustments).forEach(function(key) {
+            if (key.startsWith(locId + ':') && adjustments[key] !== 0 && adjustments[key] !== '' && adjustments[key] != null) count++;
+        });
+        return count;
+    }
+
+    function selectLocation(locId) {
+        selectedLocationId = locId;
+        stockPage = 1;
+        renderLocationTabs();
+        loadStockForLocation();
+    }
+
+    // ---- Load Stock ----
+    async function loadStockForLocation() {
+        if (!selectedLocationId) return;
+        document.getElementById('loadingState').classList.remove('hidden');
+        document.getElementById('stockContent').classList.add('hidden');
+
+        var search = document.getElementById('stockSearch') ? document.getElementById('stockSearch').value.trim() : '';
+        var url = '/api/zoho/stock/by-location?location_id=' + selectedLocationId + '&page=' + stockPage + '&limit=' + STOCK_LIMIT;
+        if (search) url += '&search=' + encodeURIComponent(search);
+
+        try {
+            var resp = await fetch(url, { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Failed to load stock');
+            var data = await resp.json();
+            stockItems = data.data || [];
+            var pg = data.pagination || {};
+            stockTotal = pg.total || stockItems.length;
+            stockPages = pg.pages || 1;
+
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('stockContent').classList.remove('hidden');
+            renderStockTable();
+            renderStockPagination();
+            updateSummary();
+        } catch (err) {
+            document.getElementById('loadingState').classList.add('hidden');
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+
+    function debounceStockSearch() { clearTimeout(stockSearchTimeout); stockSearchTimeout = setTimeout(function() { stockPage = 1; loadStockForLocation(); }, 400); }
+
+    // ---- Render Stock Table ----
+    function renderStockTable() {
+        var tbody = document.getElementById('stockTableBody');
+        var showAdjOnly = document.getElementById('showAdjustedOnly') && document.getElementById('showAdjustedOnly').checked;
+        var html = '';
+
+        stockItems.forEach(function(item) {
+            var key = selectedLocationId + ':' + item.item_id;
+            var adj = adjustments[key];
+            var hasAdj = adj !== undefined && adj !== '' && adj !== 0 && adj != null;
+
+            if (showAdjOnly && !hasAdj) return;
+
+            var adjVal = hasAdj ? parseFloat(adj) : 0;
+            var currentStock = parseFloat(item.stock_on_hand) || 0;
+            var newStock = currentStock + adjVal;
+
+            html += '<tr class="' + (hasAdj ? 'has-adj' : '') + '">';
+            html += '<td class="font-medium text-gray-800">' + escapeHtml(item.name) + '</td>';
+            html += '<td class="text-gray-500 text-xs">' + escapeHtml(item.sku || '--') + '</td>';
+            html += '<td class="text-right font-medium">' + currentStock + '</td>';
+            html += '<td class="text-right text-gray-500">' + (parseFloat(item.available_stock) || 0) + '</td>';
+            html += '<td class="text-center">';
+            html += '<div class="flex items-center justify-center gap-1">';
+            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', -1)" class="w-6 h-6 rounded bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center text-sm font-bold transition">-</button>';
+            html += '<input type="number" class="adj-input' + (adjVal > 0 ? ' positive' : (adjVal < 0 ? ' negative' : '')) + '" value="' + (hasAdj ? adj : '') + '" placeholder="0" data-key="' + escapeHtml(key) + '" data-item-id="' + escapeHtml(item.item_id) + '" onchange="onAdjInput(this)" onkeydown="if(event.key===\'Enter\')this.blur()">';
+            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', 1)" class="w-6 h-6 rounded bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 flex items-center justify-center text-sm font-bold transition">+</button>';
+            html += '</div></td>';
+            html += '<td class="text-right font-medium' + (adjVal > 0 ? ' text-green-600' : (adjVal < 0 ? ' text-red-600' : '')) + '">';
+            html += hasAdj ? newStock.toFixed(0) : '--';
+            if (hasAdj && adjVal !== 0) {
+                html += ' <span class="qty-badge ' + (adjVal > 0 ? 'increase' : 'decrease') + '">' + (adjVal > 0 ? '+' : '') + adjVal + '</span>';
+            }
+            html += '</td>';
+            html += '</tr>';
+        });
+
+        if (!html) html = '<tr><td colspan="6" class="text-center py-8 text-gray-400 text-sm">No items' + (showAdjOnly ? ' with adjustments' : '') + '</td></tr>';
+        tbody.innerHTML = html;
+
+        // Mobile cards
+        renderStockCards();
+    }
+
+    function renderStockCards() {
+        var container = document.getElementById('stockCardsContainer');
+        var html = '';
+        stockItems.forEach(function(item) {
+            var key = selectedLocationId + ':' + item.item_id;
+            var adj = adjustments[key];
+            var hasAdj = adj !== undefined && adj !== '' && adj !== 0 && adj != null;
+            var adjVal = hasAdj ? parseFloat(adj) : 0;
+            var currentStock = parseFloat(item.stock_on_hand) || 0;
+
+            html += '<div class="bg-white rounded-lg shadow p-3' + (hasAdj ? ' border-l-4 border-amber-400' : '') + '">';
+            html += '<div class="flex justify-between items-start gap-2">';
+            html += '<div class="flex-1 min-w-0"><h4 class="font-semibold text-gray-800 text-sm truncate">' + escapeHtml(item.name) + '</h4>';
+            html += '<div class="text-xs text-gray-500 mt-0.5">SKU: ' + escapeHtml(item.sku || '--') + ' | Stock: <b>' + currentStock + '</b></div></div>';
+            html += '<div class="flex items-center gap-1">';
+            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', -1)" class="w-7 h-7 rounded bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center text-base font-bold">-</button>';
+            html += '<input type="number" class="adj-input" style="width:60px" value="' + (hasAdj ? adj : '') + '" placeholder="0" data-key="' + escapeHtml(key) + '" data-item-id="' + escapeHtml(item.item_id) + '" onchange="onAdjInput(this)">';
+            html += '<button onclick="adjustQty(\'' + escapeHtml(key) + '\', 1)" class="w-7 h-7 rounded bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-600 flex items-center justify-center text-base font-bold">+</button>';
+            html += '</div></div>';
+            if (hasAdj) html += '<div class="text-xs mt-1">New: <b class="' + (adjVal > 0 ? 'text-green-600' : 'text-red-600') + '">' + (currentStock + adjVal) + '</b> <span class="qty-badge ' + (adjVal > 0 ? 'increase' : 'decrease') + '">' + (adjVal > 0 ? '+' : '') + adjVal + '</span></div>';
+            html += '</div>';
+        });
+        container.innerHTML = html;
+    }
+
+    // ---- Adjustment Tracking ----
+    function onAdjInput(input) {
+        var key = input.getAttribute('data-key');
+        var val = input.value.trim();
+        if (val === '' || val === '0') {
+            delete adjustments[key];
+        } else {
+            adjustments[key] = parseFloat(val);
+        }
+        updatePushBar();
+        updateSummary();
+        renderLocationTabs();
+        // Update row highlighting
+        var tr = input.closest('tr');
+        if (tr) tr.classList.toggle('has-adj', adjustments[key] != null);
+        // Update input styling
+        var v = parseFloat(val) || 0;
+        input.classList.toggle('positive', v > 0);
+        input.classList.toggle('negative', v < 0);
+    }
+
+    function adjustQty(key, delta) {
+        var current = adjustments[key] || 0;
+        var newVal = current + delta;
+        if (newVal === 0) {
+            delete adjustments[key];
+        } else {
+            adjustments[key] = newVal;
+        }
+        updatePushBar();
+        updateSummary();
+        renderLocationTabs();
+        // Re-render table to update inputs
+        renderStockTable();
+    }
+
+    function clearAllAdjustments() {
+        if (!confirm('Clear all adjustments?')) return;
+        adjustments = {};
+        updatePushBar();
+        updateSummary();
+        renderLocationTabs();
+        renderStockTable();
+    }
+
+    function getTotalAdjCount() {
+        var count = 0;
+        Object.keys(adjustments).forEach(function(k) { if (adjustments[k] !== 0 && adjustments[k] != null) count++; });
+        return count;
+    }
+
+    function updatePushBar() {
+        var count = getTotalAdjCount();
+        var bar = document.getElementById('pushBar');
+        if (count > 0) { bar.classList.remove('hidden'); document.getElementById('pushBarCount').textContent = count; }
+        else { bar.classList.add('hidden'); }
+    }
+
+    function updateSummary() {
+        document.getElementById('summaryTotal').textContent = stockTotal;
+        var adjCount = 0, totalInc = 0, totalDec = 0;
+        Object.keys(adjustments).forEach(function(k) {
+            var v = adjustments[k];
+            if (v && v !== 0) { adjCount++; if (v > 0) totalInc += v; else totalDec += Math.abs(v); }
+        });
+        document.getElementById('summaryAdjusted').textContent = adjCount;
+        document.getElementById('summaryIncrease').textContent = '+' + totalInc;
+        document.getElementById('summaryDecrease').textContent = '-' + totalDec;
+    }
+
+    // ---- Stock Pagination ----
+    function renderStockPagination() {
+        var info = document.getElementById('stockPagInfo'), ctl = document.getElementById('stockPagControls');
+        var s = (stockPage-1)*STOCK_LIMIT+1, e = Math.min(stockPage*STOCK_LIMIT, stockTotal);
+        info.textContent = 'Showing '+s+'-'+e+' of '+stockTotal+' items';
+        var h = '';
+        h += '<button onclick="goStockPage('+(stockPage-1)+')" '+(stockPage<=1?'disabled':'')+' class="px-2.5 py-1 rounded text-xs font-medium transition '+(stockPage<=1?'bg-gray-100 text-gray-400 cursor-not-allowed':'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')+'">Prev</button>';
+        var sp = Math.max(1,stockPage-2), ep = Math.min(stockPages,stockPage+2);
+        if(sp>1){h+='<button onclick="goStockPage(1)" class="px-2.5 py-1 rounded text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">1</button>'; if(sp>2) h+='<span class="px-1 text-gray-400 text-xs">...</span>';}
+        for(var i=sp;i<=ep;i++){h+=i===stockPage?'<button class="px-2.5 py-1 rounded text-xs font-medium bg-indigo-600 text-white">'+i+'</button>':'<button onclick="goStockPage('+i+')" class="px-2.5 py-1 rounded text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">'+i+'</button>';}
+        if(ep<stockPages){if(ep<stockPages-1) h+='<span class="px-1 text-gray-400 text-xs">...</span>'; h+='<button onclick="goStockPage('+stockPages+')" class="px-2.5 py-1 rounded text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">'+stockPages+'</button>';}
+        h += '<button onclick="goStockPage('+(stockPage+1)+')" '+(stockPage>=stockPages?'disabled':'')+' class="px-2.5 py-1 rounded text-xs font-medium transition '+(stockPage>=stockPages?'bg-gray-100 text-gray-400 cursor-not-allowed':'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')+'">Next</button>';
+        ctl.innerHTML = h;
+    }
+    function goStockPage(p) { if (p<1||p>stockPages) return; stockPage = p; loadStockForLocation(); }
+
+    // ---- Push Adjustment to Zoho ----
+    async function pushAdjustment() {
+        var count = getTotalAdjCount();
+        if (!count) { showToast('No adjustments to push', 'info'); return; }
+
+        var date = document.getElementById('adjDate').value;
+        if (!date) { showToast('Please select a date', 'error'); return; }
+        var reason = document.getElementById('adjReason').value.trim();
+        var description = document.getElementById('adjDescription').value.trim();
+
+        // Group adjustments by location
+        var byLocation = {};
+        Object.keys(adjustments).forEach(function(key) {
+            var val = adjustments[key];
+            if (!val || val === 0) return;
+            var parts = key.split(':');
+            var locId = parts[0], itemId = parts[1];
+            if (!byLocation[locId]) byLocation[locId] = [];
+            byLocation[locId].push({ item_id: itemId, quantity_adjusted: val });
+        });
+
+        var locationIds = Object.keys(byLocation);
+        if (locationIds.length === 0) return;
+
+        if (!confirm('Push stock adjustments for ' + count + ' items across ' + locationIds.length + ' location(s) to Zoho Books?')) return;
+
+        var btn = document.getElementById('pushAdjBtn');
+        var spinner = document.getElementById('pushAdjSpinner');
+        var icon = document.getElementById('pushAdjIcon');
+        var text = document.getElementById('pushAdjText');
+        btn.disabled = true; spinner.classList.remove('hidden'); icon.classList.add('hidden'); text.textContent = 'Pushing...';
+
+        var success = 0, failed = 0;
+        for (var i = 0; i < locationIds.length; i++) {
+            var locId = locationIds[i];
+            try {
+                var resp = await fetch('/api/zoho/inventory-adjustments', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        adjustment_type: 'quantity',
+                        date: date,
+                        reason: reason || 'Stock Adjustment',
+                        description: description || '',
+                        location_id: locId,
+                        line_items: byLocation[locId]
+                    })
+                });
+                if (!resp.ok) {
+                    var err = await resp.json().catch(function() { return {}; });
+                    throw new Error(err.message || 'Failed');
+                }
+                success++;
+            } catch (e) {
+                failed++;
+                showToast('Error for location: ' + e.message, 'error');
+            }
+        }
+
+        btn.disabled = false; spinner.classList.add('hidden'); icon.classList.remove('hidden'); text.textContent = 'Push Adjustment to Zoho';
+
+        if (success > 0) {
+            showToast('Adjustments pushed for ' + success + ' location(s)' + (failed > 0 ? ', ' + failed + ' failed' : ''), success > 0 && failed === 0 ? 'success' : 'info');
+            adjustments = {};
+            updatePushBar();
+            updateSummary();
+            renderLocationTabs();
+            loadStockForLocation();
+        }
+    }
+
+    // ---- Init ----
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set today as default date
+        var today = new Date().toISOString().split('T')[0];
+        document.getElementById('adjDate').value = today;
+        loadLocations();
+    });
+
+    window.addEventListener('beforeunload', function(e) {
+        if (getTotalAdjCount() > 0) { e.preventDefault(); e.returnValue = ''; }
+    });
+    </script>
+</body>
+</html>

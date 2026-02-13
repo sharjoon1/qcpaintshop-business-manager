@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Financial Reports - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        .report-table th { position: sticky; top: 0; background: #f9fafb; z-index: 1; }
+        .report-table tr:hover td { background: #f3f4f6; }
+        .pill-btn { transition: all 0.2s; }
+        .pill-btn:focus { outline: 2px solid #9333ea; outline-offset: 2px; }
+        .spinner { border: 3px solid #e5e7eb; border-top-color: #7c3aed; border-radius: 50%; width: 2rem; height: 2rem; animation: spin 0.7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 640px) {
+            .pills-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+            .pills-scroll::-webkit-scrollbar { display: none; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="zoho-reports">
+
+    <!-- Main Content -->
+    <div class="min-h-screen">
+        <!-- Page Header -->
+        <div class="bg-white shadow-sm px-4 sm:px-6 lg:px-8 py-6">
+            <h2 class="text-2xl font-bold text-gray-800">Financial Reports</h2>
+            <p class="text-gray-600 text-sm mt-1">Zoho Books financial analysis</p>
+        </div>
+
+        <div class="container mx-auto p-4 md:p-6">
+
+            <!-- Report Type Selector -->
+            <div class="mb-6">
+                <div class="pills-scroll">
+                    <div class="flex flex-nowrap gap-2" id="reportTabs">
+                        <button onclick="selectReport('profit_loss')" data-report="profit_loss"
+                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-purple-600 text-white">
+                            Profit &amp; Loss
+                        </button>
+                        <button onclick="selectReport('balance_sheet')" data-report="balance_sheet"
+                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            Balance Sheet
+                        </button>
+                        <button onclick="selectReport('sales_by_customer')" data-report="sales_by_customer"
+                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            Sales by Customer
+                        </button>
+                        <button onclick="selectReport('sales_by_item')" data-report="sales_by_item"
+                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            Sales by Item
+                        </button>
+                        <button onclick="selectReport('receivables')" data-report="receivables"
+                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            Receivables Summary
+                        </button>
+                        <button onclick="selectReport('aging')" data-report="aging"
+                            class="pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50">
+                            Aging Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date Range Picker -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                    <div id="fromDateGroup">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                        <input type="date" id="fromDate"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                        <input type="date" id="toDate"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quick Presets</label>
+                        <select id="datePreset" onchange="applyPreset()"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            <option value="">-- Select Preset --</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="this_quarter">This Quarter</option>
+                            <option value="this_fy">This Year (FY)</option>
+                            <option value="last_fy">Last Year (FY)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button onclick="generateReport()"
+                            class="w-full bg-purple-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                            Generate Report
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center gap-2">
+                    <input type="checkbox" id="useCached" checked
+                        class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                    <label for="useCached" class="text-sm text-gray-600">Use cached data</label>
+                </div>
+            </div>
+
+            <!-- Cache Indicator -->
+            <div id="cacheIndicator" class="hidden mb-4 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex items-center justify-between">
+                <span class="text-sm text-yellow-800" id="cacheMessage">Cached data from --. Click to refresh.</span>
+                <button onclick="refreshReport()" class="text-sm text-purple-600 font-medium hover:text-purple-800 underline">Refresh</button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="hidden">
+                <div class="bg-white rounded-lg shadow p-12 flex flex-col items-center justify-center">
+                    <div class="spinner mb-4"></div>
+                    <p class="text-gray-500 text-sm">Loading report data...</p>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="hidden">
+                <div class="bg-white rounded-lg shadow p-12 flex flex-col items-center justify-center">
+                    <svg class="w-12 h-12 text-red-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                    <p class="text-gray-700 font-medium mb-1" id="errorTitle">Failed to load report</p>
+                    <p class="text-gray-500 text-sm mb-4" id="errorMessage">An error occurred while fetching the report.</p>
+                    <button onclick="generateReport()"
+                        class="bg-purple-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition">
+                        Retry
+                    </button>
+                </div>
+            </div>
+
+            <!-- Empty / Initial State -->
+            <div id="initialState">
+                <div class="bg-white rounded-lg shadow p-12 flex flex-col items-center justify-center">
+                    <svg class="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <p class="text-gray-500 text-sm">Select a report type, choose a date range, and click "Generate Report".</p>
+                </div>
+            </div>
+
+            <!-- Report Display Area -->
+            <div id="reportArea" class="hidden">
+                <!-- Summary Cards -->
+                <div id="summaryCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6"></div>
+
+                <!-- Report Table -->
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="report-table w-full text-sm" id="reportTable">
+                            <thead id="reportTableHead"></thead>
+                            <tbody id="reportTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // ===== State =====
+        let currentReport = 'profit_loss';
+        let lastCacheTime = null;
+
+        // ===== Auth =====
+        function getAuthHeaders() {
+            const token = localStorage.getItem('auth_token');
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            };
+        }
+
+        // ===== Currency formatting =====
+        function formatCurrency(val) {
+            if (val === null || val === undefined || val === '') return '--';
+            return '\u20B9' + parseFloat(val).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        }
+
+        // ===== Date helpers (Indian Financial Year: Apr 1 - Mar 31) =====
+        function toISO(d) {
+            return d.toISOString().split('T')[0];
+        }
+
+        function getIndianFYStart(refDate) {
+            const y = refDate.getMonth() >= 3 ? refDate.getFullYear() : refDate.getFullYear() - 1;
+            return new Date(y, 3, 1); // April 1
+        }
+
+        function getIndianFYEnd(refDate) {
+            const y = refDate.getMonth() >= 3 ? refDate.getFullYear() + 1 : refDate.getFullYear();
+            return new Date(y, 2, 31); // March 31
+        }
+
+        function getCurrentQuarterDates() {
+            const now = new Date();
+            const m = now.getMonth(); // 0-indexed
+            // Indian FY quarters: Q1=Apr-Jun, Q2=Jul-Sep, Q3=Oct-Dec, Q4=Jan-Mar
+            let qStart, qEnd;
+            if (m >= 3 && m <= 5) {
+                qStart = new Date(now.getFullYear(), 3, 1);
+                qEnd = new Date(now.getFullYear(), 5, 30);
+            } else if (m >= 6 && m <= 8) {
+                qStart = new Date(now.getFullYear(), 6, 1);
+                qEnd = new Date(now.getFullYear(), 8, 30);
+            } else if (m >= 9 && m <= 11) {
+                qStart = new Date(now.getFullYear(), 9, 1);
+                qEnd = new Date(now.getFullYear(), 11, 31);
+            } else {
+                qStart = new Date(now.getFullYear(), 0, 1);
+                qEnd = new Date(now.getFullYear(), 2, 31);
+            }
+            return { start: qStart, end: qEnd };
+        }
+
+        function applyPreset() {
+            const preset = document.getElementById('datePreset').value;
+            if (!preset) return;
+            const now = new Date();
+            let from, to;
+
+            switch (preset) {
+                case 'this_month':
+                    from = new Date(now.getFullYear(), now.getMonth(), 1);
+                    to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    break;
+                case 'last_month':
+                    from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    to = new Date(now.getFullYear(), now.getMonth(), 0);
+                    break;
+                case 'this_quarter': {
+                    const q = getCurrentQuarterDates();
+                    from = q.start;
+                    to = q.end;
+                    break;
+                }
+                case 'this_fy':
+                    from = getIndianFYStart(now);
+                    to = getIndianFYEnd(now);
+                    break;
+                case 'last_fy': {
+                    const lastFYRef = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+                    from = getIndianFYStart(lastFYRef);
+                    to = getIndianFYEnd(lastFYRef);
+                    break;
+                }
+            }
+
+            if (from) document.getElementById('fromDate').value = toISO(from);
+            if (to) document.getElementById('toDate').value = toISO(to);
+        }
+
+        // ===== Report Tab Selection =====
+        function selectReport(type) {
+            currentReport = type;
+            const tabs = document.querySelectorAll('#reportTabs button');
+            tabs.forEach(btn => {
+                if (btn.dataset.report === type) {
+                    btn.className = 'pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-purple-600 text-white';
+                } else {
+                    btn.className = 'pill-btn px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap bg-white text-gray-700 border hover:bg-gray-50';
+                }
+            });
+
+            // Balance Sheet only needs to_date
+            const fromGroup = document.getElementById('fromDateGroup');
+            if (type === 'balance_sheet') {
+                fromGroup.style.opacity = '0.5';
+                fromGroup.querySelector('input').disabled = true;
+            } else {
+                fromGroup.style.opacity = '1';
+                fromGroup.querySelector('input').disabled = false;
+            }
+        }
+
+        // ===== Show/Hide States =====
+        function showState(state) {
+            ['loadingState', 'errorState', 'initialState', 'reportArea'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            if (state) document.getElementById(state).classList.remove('hidden');
+        }
+
+        function showError(title, message) {
+            document.getElementById('errorTitle').textContent = title || 'Failed to load report';
+            document.getElementById('errorMessage').textContent = message || 'An error occurred while fetching the report.';
+            showState('errorState');
+        }
+
+        // ===== Generate Report =====
+        async function generateReport() {
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            const useCached = document.getElementById('useCached').checked;
+
+            // Validate dates
+            if (currentReport !== 'balance_sheet' && !fromDate) {
+                showError('Missing Date', 'Please select a From Date.');
+                return;
+            }
+            if (!toDate) {
+                showError('Missing Date', 'Please select a To Date.');
+                return;
+            }
+
+            showState('loadingState');
+            document.getElementById('cacheIndicator').classList.add('hidden');
+
+            // Build URL
+            let url = `/api/zoho/reports/${currentReport}?`;
+            const params = new URLSearchParams();
+            if (currentReport !== 'balance_sheet' && fromDate) {
+                params.append('from_date', fromDate);
+            }
+            params.append('to_date', toDate);
+            if (useCached) {
+                params.append('use_cache', 'true');
+            }
+            url += params.toString();
+
+            try {
+                const response = await fetch(url, { headers: getAuthHeaders() });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.message || `Server returned ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Check for cache indicator
+                if (data.cached && data.cached_at) {
+                    lastCacheTime = data.cached_at;
+                    const cacheDate = new Date(data.cached_at);
+                    const timeStr = cacheDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+                    document.getElementById('cacheMessage').textContent = `Cached data from ${timeStr}. Click to refresh.`;
+                    document.getElementById('cacheIndicator').classList.remove('hidden');
+                } else {
+                    document.getElementById('cacheIndicator').classList.add('hidden');
+                }
+
+                renderReport(currentReport, data);
+                showState('reportArea');
+
+            } catch (err) {
+                console.error('Report fetch error:', err);
+                showError('Failed to load report', err.message);
+            }
+        }
+
+        function refreshReport() {
+            document.getElementById('useCached').checked = false;
+            generateReport();
+        }
+
+        // ===== Render Report =====
+        function renderReport(type, data) {
+            const summaryCards = document.getElementById('summaryCards');
+            const thead = document.getElementById('reportTableHead');
+            const tbody = document.getElementById('reportTableBody');
+            summaryCards.innerHTML = '';
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            const reportData = data.report_data || data.data || data;
+
+            switch (type) {
+                case 'profit_loss':
+                    renderProfitLoss(reportData, summaryCards, thead, tbody);
+                    break;
+                case 'balance_sheet':
+                    renderBalanceSheet(reportData, summaryCards, thead, tbody);
+                    break;
+                case 'sales_by_customer':
+                    renderSalesByCustomer(reportData, summaryCards, thead, tbody);
+                    break;
+                case 'sales_by_item':
+                    renderSalesByItem(reportData, summaryCards, thead, tbody);
+                    break;
+                case 'receivables':
+                    renderReceivables(reportData, summaryCards, thead, tbody);
+                    break;
+                case 'aging':
+                    renderAging(reportData, summaryCards, thead, tbody);
+                    break;
+            }
+        }
+
+        // ===== Summary Card Helper =====
+        function createSummaryCard(label, value, colorClass) {
+            return `
+                <div class="bg-white rounded-lg shadow p-5 border-l-4 ${colorClass}">
+                    <p class="text-sm text-gray-500 font-medium">${label}</p>
+                    <p class="text-2xl font-bold mt-1 ${colorClass.includes('green') ? 'text-green-700' : colorClass.includes('red') ? 'text-red-700' : 'text-gray-800'}">${value}</p>
+                </div>`;
+        }
+
+        // ===== Table Helpers =====
+        function buildTableHead(columns) {
+            return '<tr>' + columns.map(col =>
+                `<th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">${col}</th>`
+            ).join('') + '</tr>';
+        }
+
+        function buildTableRow(cells, isTotal) {
+            const cls = isTotal ? 'font-bold bg-gray-50' : '';
+            return `<tr class="${cls}">` + cells.map(cell =>
+                `<td class="px-4 py-3 text-gray-700 border-b border-gray-100 whitespace-nowrap">${cell}</td>`
+            ).join('') + '</tr>';
+        }
+
+        // ===== Extract value from Zoho report rows =====
+        function extractVal(row, key) {
+            if (row[key] !== undefined) return row[key];
+            if (row.total !== undefined) return row.total;
+            return '';
+        }
+
+        // ===== Profit & Loss =====
+        function renderProfitLoss(data, summaryCards, thead, tbody) {
+            let totalIncome = 0, totalExpense = 0, netProfit = 0;
+
+            // Try to extract summary values from various Zoho response structures
+            if (data.summary) {
+                totalIncome = parseFloat(data.summary.total_income || data.summary.income || 0);
+                totalExpense = parseFloat(data.summary.total_expense || data.summary.expense || 0);
+                netProfit = parseFloat(data.summary.net_profit || data.summary.net_profit_or_loss || 0);
+            } else if (data.total_income !== undefined) {
+                totalIncome = parseFloat(data.total_income || 0);
+                totalExpense = parseFloat(data.total_expense || 0);
+                netProfit = parseFloat(data.net_profit || 0);
+            } else {
+                netProfit = totalIncome - totalExpense;
+            }
+
+            const profitColor = netProfit >= 0 ? 'border-green-500' : 'border-red-500';
+            const profitTextColor = netProfit >= 0 ? 'text-green-700' : 'text-red-700';
+
+            summaryCards.innerHTML =
+                createSummaryCard('Total Income', formatCurrency(totalIncome), 'border-blue-500') +
+                createSummaryCard('Total Expense', formatCurrency(totalExpense), 'border-orange-500') +
+                `<div class="bg-white rounded-lg shadow p-5 border-l-4 ${profitColor}">
+                    <p class="text-sm text-gray-500 font-medium">Net Profit / Loss</p>
+                    <p class="text-2xl font-bold mt-1 ${profitTextColor}">${formatCurrency(netProfit)}</p>
+                </div>`;
+
+            // Render detail rows if available
+            thead.innerHTML = buildTableHead(['Account', 'Amount']);
+
+            const rows = data.rows || data.line_items || data.sections || [];
+            if (Array.isArray(rows) && rows.length > 0) {
+                rows.forEach(row => {
+                    const name = row.account_name || row.name || row.label || row.account || '';
+                    const amount = row.amount || row.total || row.value || 0;
+                    const isSection = row.is_section || row.is_header || false;
+                    if (isSection) {
+                        tbody.innerHTML += `<tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 font-bold text-gray-800 border-b">${name}</td></tr>`;
+                    } else {
+                        tbody.innerHTML += buildTableRow([name, formatCurrency(amount)], row.is_total || false);
+                    }
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="2" class="px-4 py-8 text-center text-gray-400">No detailed line items available.</td></tr>`;
+            }
+        }
+
+        // ===== Balance Sheet =====
+        function renderBalanceSheet(data, summaryCards, thead, tbody) {
+            let totalAssets = 0, totalLiabilities = 0, equity = 0;
+
+            if (data.summary) {
+                totalAssets = parseFloat(data.summary.total_assets || 0);
+                totalLiabilities = parseFloat(data.summary.total_liabilities || 0);
+                equity = parseFloat(data.summary.equity || data.summary.total_equity || 0);
+            } else {
+                totalAssets = parseFloat(data.total_assets || 0);
+                totalLiabilities = parseFloat(data.total_liabilities || 0);
+                equity = parseFloat(data.equity || data.total_equity || 0);
+            }
+
+            summaryCards.innerHTML =
+                createSummaryCard('Total Assets', formatCurrency(totalAssets), 'border-blue-500') +
+                createSummaryCard('Total Liabilities', formatCurrency(totalLiabilities), 'border-red-500') +
+                createSummaryCard('Equity', formatCurrency(equity), 'border-green-500');
+
+            thead.innerHTML = buildTableHead(['Account', 'Amount']);
+
+            const rows = data.rows || data.line_items || data.sections || [];
+            if (Array.isArray(rows) && rows.length > 0) {
+                rows.forEach(row => {
+                    const name = row.account_name || row.name || row.label || row.account || '';
+                    const amount = row.amount || row.total || row.value || 0;
+                    const isSection = row.is_section || row.is_header || false;
+                    if (isSection) {
+                        tbody.innerHTML += `<tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 font-bold text-gray-800 border-b">${name}</td></tr>`;
+                    } else {
+                        tbody.innerHTML += buildTableRow([name, formatCurrency(amount)], row.is_total || false);
+                    }
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="2" class="px-4 py-8 text-center text-gray-400">No detailed line items available.</td></tr>`;
+            }
+        }
+
+        // ===== Sales by Customer =====
+        function renderSalesByCustomer(data, summaryCards, thead, tbody) {
+            const rows = data.rows || data.sales || data.customers || data || [];
+            summaryCards.innerHTML = '';
+
+            thead.innerHTML = buildTableHead(['Customer Name', 'Invoice Count', 'Total Sales', 'Returns', 'Net Sales']);
+
+            if (Array.isArray(rows) && rows.length > 0) {
+                // Sort by highest sales
+                const sorted = [...rows].sort((a, b) => {
+                    const aVal = parseFloat(a.total_sales || a.sales || a.total || 0);
+                    const bVal = parseFloat(b.total_sales || b.sales || b.total || 0);
+                    return bVal - aVal;
+                });
+
+                let grandTotal = 0;
+                sorted.forEach(row => {
+                    const name = row.customer_name || row.name || row.customer || '';
+                    const invoices = row.invoice_count || row.invoices || row.count || 0;
+                    const totalSales = parseFloat(row.total_sales || row.sales || row.total || 0);
+                    const returns = parseFloat(row.returns || row.credit_notes || 0);
+                    const netSales = parseFloat(row.net_sales || (totalSales - returns));
+                    grandTotal += netSales;
+                    tbody.innerHTML += buildTableRow([name, invoices, formatCurrency(totalSales), formatCurrency(returns), formatCurrency(netSales)], false);
+                });
+
+                tbody.innerHTML += buildTableRow(['Total', '', '', '', formatCurrency(grandTotal)], true);
+            } else {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No sales data available.</td></tr>`;
+            }
+        }
+
+        // ===== Sales by Item =====
+        function renderSalesByItem(data, summaryCards, thead, tbody) {
+            const rows = data.rows || data.items || data.sales || data || [];
+            summaryCards.innerHTML = '';
+
+            thead.innerHTML = buildTableHead(['Item Name', 'Quantity Sold', 'Amount']);
+
+            if (Array.isArray(rows) && rows.length > 0) {
+                const sorted = [...rows].sort((a, b) => {
+                    const aVal = parseFloat(a.amount || a.total || a.sales_amount || 0);
+                    const bVal = parseFloat(b.amount || b.total || b.sales_amount || 0);
+                    return bVal - aVal;
+                });
+
+                let grandTotal = 0;
+                sorted.forEach(row => {
+                    const name = row.item_name || row.name || row.item || '';
+                    const qty = row.quantity_sold || row.quantity || row.qty || 0;
+                    const amount = parseFloat(row.amount || row.total || row.sales_amount || 0);
+                    grandTotal += amount;
+                    tbody.innerHTML += buildTableRow([name, qty, formatCurrency(amount)], false);
+                });
+
+                tbody.innerHTML += buildTableRow(['Total', '', formatCurrency(grandTotal)], true);
+            } else {
+                tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-gray-400">No item sales data available.</td></tr>`;
+            }
+        }
+
+        // ===== Receivables Summary =====
+        function renderReceivables(data, summaryCards, thead, tbody) {
+            const rows = data.rows || data.receivables || data.customers || data || [];
+            summaryCards.innerHTML = '';
+
+            thead.innerHTML = buildTableHead(['Customer', 'Current', '1-15 days', '16-30 days', '31-45 days', '>45 days', 'Total']);
+
+            if (Array.isArray(rows) && rows.length > 0) {
+                let totals = { current: 0, d15: 0, d30: 0, d45: 0, d45plus: 0, total: 0 };
+
+                rows.forEach(row => {
+                    const name = row.customer_name || row.name || row.customer || '';
+                    const current = parseFloat(row.current || row.not_due || 0);
+                    const d15 = parseFloat(row['1_15_days'] || row.days_1_15 || row.bucket_1 || 0);
+                    const d30 = parseFloat(row['16_30_days'] || row.days_16_30 || row.bucket_2 || 0);
+                    const d45 = parseFloat(row['31_45_days'] || row.days_31_45 || row.bucket_3 || 0);
+                    const d45plus = parseFloat(row['above_45_days'] || row.days_above_45 || row.bucket_4 || 0);
+                    const total = parseFloat(row.total || (current + d15 + d30 + d45 + d45plus));
+
+                    totals.current += current;
+                    totals.d15 += d15;
+                    totals.d30 += d30;
+                    totals.d45 += d45;
+                    totals.d45plus += d45plus;
+                    totals.total += total;
+
+                    tbody.innerHTML += buildTableRow([
+                        name, formatCurrency(current), formatCurrency(d15), formatCurrency(d30),
+                        formatCurrency(d45), formatCurrency(d45plus), formatCurrency(total)
+                    ], false);
+                });
+
+                tbody.innerHTML += buildTableRow([
+                    'Total', formatCurrency(totals.current), formatCurrency(totals.d15),
+                    formatCurrency(totals.d30), formatCurrency(totals.d45),
+                    formatCurrency(totals.d45plus), formatCurrency(totals.total)
+                ], true);
+            } else {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No receivables data available.</td></tr>`;
+            }
+        }
+
+        // ===== Aging Report =====
+        function renderAging(data, summaryCards, thead, tbody) {
+            const rows = data.rows || data.aging || data.customers || data || [];
+            summaryCards.innerHTML = '';
+
+            // Detect aging buckets from data or use defaults
+            const defaultBuckets = ['Current', '1-15', '16-30', '31-45', '46-60', '>60'];
+            const bucketHeaders = data.bucket_headers || defaultBuckets;
+
+            thead.innerHTML = buildTableHead(['Customer', ...bucketHeaders, 'Total']);
+
+            if (Array.isArray(rows) && rows.length > 0) {
+                const bucketTotals = new Array(bucketHeaders.length).fill(0);
+                let grandTotal = 0;
+
+                rows.forEach(row => {
+                    const name = row.customer_name || row.name || row.customer || '';
+                    const buckets = row.buckets || row.aging_buckets || [];
+                    const total = parseFloat(row.total || 0);
+                    grandTotal += total;
+
+                    const bucketCells = bucketHeaders.map((_, i) => {
+                        const val = parseFloat(buckets[i] || 0);
+                        bucketTotals[i] += val;
+                        return formatCurrency(val);
+                    });
+
+                    tbody.innerHTML += buildTableRow([name, ...bucketCells, formatCurrency(total)], false);
+                });
+
+                const totalCells = bucketTotals.map(v => formatCurrency(v));
+                tbody.innerHTML += buildTableRow(['Total', ...totalCells, formatCurrency(grandTotal)], true);
+            } else {
+                const colSpan = bucketHeaders.length + 2;
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="px-4 py-8 text-center text-gray-400">No aging data available.</td></tr>`;
+            }
+        }
+
+        // ===== Init =====
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default dates to current Indian FY
+            const now = new Date();
+            const fyStart = getIndianFYStart(now);
+            const fyEnd = getIndianFYEnd(now);
+            document.getElementById('fromDate').value = toISO(fyStart);
+            document.getElementById('toDate').value = toISO(now > fyEnd ? fyEnd : now);
+
+            // Ensure correct initial tab state
+            selectReport('profit_loss');
+        });
+    </script>
+</body>
+</html>

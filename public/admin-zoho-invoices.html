@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en" data-page="zoho-invoices">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Zoho Invoices - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        @media (max-width: 767px) {
+            .invoice-table-wrap { display: none; }
+            .invoice-cards { display: block; }
+        }
+        @media (min-width: 768px) {
+            .invoice-table-wrap { display: block; }
+            .invoice-cards { display: none; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+                <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Zoho Invoices</h2>
+                <p class="text-gray-600 mt-1">View and manage invoices synced from Zoho Books</p>
+            </div>
+            <button onclick="syncInvoices()" id="syncBtn" class="btn btn-primary flex items-center gap-2 whitespace-nowrap">
+                <svg id="syncIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Sync Invoices
+            </button>
+        </div>
+
+        <!-- Sync Status Banner -->
+        <div id="syncBanner" class="hidden mb-4 p-4 rounded-lg flex items-center gap-3">
+            <span id="syncBannerText"></span>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-xs font-semibold uppercase">Total Invoices</div>
+                <div class="text-2xl font-bold text-gray-800 mt-1" id="statTotal">--</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-xs font-semibold uppercase">Paid</div>
+                <div class="text-2xl font-bold text-green-600 mt-1" id="statPaid">--</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-xs font-semibold uppercase">Sent / Unpaid</div>
+                <div class="text-2xl font-bold text-blue-600 mt-1" id="statSent">--</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-xs font-semibold uppercase">Overdue</div>
+                <div class="text-2xl font-bold text-red-600 mt-1" id="statOverdue">--</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-xs font-semibold uppercase">Partially Paid</div>
+                <div class="text-2xl font-bold text-yellow-600 mt-1" id="statPartial">--</div>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="filterStatus" onchange="applyFilters()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">All Statuses</option>
+                        <option value="draft">Draft</option>
+                        <option value="sent">Sent</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="paid">Paid</option>
+                        <option value="partially_paid">Partially Paid</option>
+                        <option value="void">Void</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <input type="text" id="filterSearch" onkeyup="debounceSearch()" placeholder="Customer name or invoice #" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                    <select id="filterSort" onchange="applyFilters()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="invoice_date_desc">Date (newest)</option>
+                        <option value="invoice_date_asc">Date (oldest)</option>
+                        <option value="total_desc">Amount (high)</option>
+                        <option value="total_asc">Amount (low)</option>
+                        <option value="customer_name_asc">Customer name</option>
+                    </select>
+                </div>
+                <div>
+                    <button onclick="clearFilters()" class="w-full rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition">
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-500 mt-3">Loading invoices...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-12 bg-white rounded-lg shadow">
+            <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No invoices found</h3>
+            <p class="text-gray-600 mb-4">Try syncing invoices from Zoho Books or adjusting your filters.</p>
+            <button onclick="syncInvoices()" class="btn btn-primary">Sync Invoices</button>
+        </div>
+
+        <!-- Invoice Table (Desktop) -->
+        <div id="invoiceTableContainer" class="hidden">
+            <div class="invoice-table-wrap bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold text-gray-600">Invoice #</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600">Customer</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600">Invoice Date</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600">Due Date</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Total</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Balance</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoiceTableBody" class="divide-y divide-gray-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Invoice Cards (Mobile) -->
+            <div class="invoice-cards space-y-3" id="invoiceCardsContainer">
+            </div>
+
+            <!-- Pagination -->
+            <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-gray-600" id="paginationInfo">Showing 0 invoices</div>
+                <div class="flex items-center gap-1" id="paginationControls">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Detail Modal -->
+    <div id="invoiceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeModalBackdrop(event)">
+        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-10">
+                <h3 class="text-xl font-bold text-gray-800" id="modalInvoiceTitle">Invoice Details</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+
+            <!-- Modal Loading -->
+            <div id="modalLoading" class="text-center py-12">
+                <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-gray-500 mt-3">Loading invoice details...</p>
+            </div>
+
+            <!-- Modal Content -->
+            <div id="modalContent" class="hidden p-6">
+                <!-- Invoice Info -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">Invoice Number</div>
+                        <div class="text-lg font-bold text-gray-800" id="modalInvoiceNumber"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">Status</div>
+                        <div id="modalStatus"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">Customer</div>
+                        <div class="text-gray-800 font-medium" id="modalCustomer"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">Reference</div>
+                        <div class="text-gray-800" id="modalReference"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">Invoice Date</div>
+                        <div class="text-gray-800" id="modalInvoiceDate"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">Due Date</div>
+                        <div class="text-gray-800" id="modalDueDate"></div>
+                    </div>
+                </div>
+
+                <!-- Line Items -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-bold text-gray-700 uppercase mb-3">Line Items</h4>
+                    <div class="overflow-x-auto border rounded-lg">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left font-semibold text-gray-600">Item</th>
+                                    <th class="px-4 py-2 text-right font-semibold text-gray-600">Qty</th>
+                                    <th class="px-4 py-2 text-right font-semibold text-gray-600">Rate</th>
+                                    <th class="px-4 py-2 text-right font-semibold text-gray-600">Tax</th>
+                                    <th class="px-4 py-2 text-right font-semibold text-gray-600">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modalLineItems" class="divide-y divide-gray-100">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Totals -->
+                <div class="border-t pt-4">
+                    <div class="flex flex-col items-end space-y-2">
+                        <div class="flex justify-between w-full max-w-xs text-sm">
+                            <span class="text-gray-600">Sub Total</span>
+                            <span class="font-medium text-gray-800" id="modalSubTotal"></span>
+                        </div>
+                        <div class="flex justify-between w-full max-w-xs text-sm">
+                            <span class="text-gray-600">Tax</span>
+                            <span class="font-medium text-gray-800" id="modalTax"></span>
+                        </div>
+                        <div class="flex justify-between w-full max-w-xs text-sm border-t pt-2">
+                            <span class="font-bold text-gray-800">Grand Total</span>
+                            <span class="font-bold text-gray-800" id="modalGrandTotal"></span>
+                        </div>
+                        <div class="flex justify-between w-full max-w-xs text-sm">
+                            <span class="font-bold text-red-600">Balance Due</span>
+                            <span class="font-bold text-red-600" id="modalBalance"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="border-t px-6 py-4">
+                <button onclick="closeModal()" class="w-full sm:w-auto px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State ---
+        let invoices = [];
+        let currentPage = 1;
+        let totalInvoices = 0;
+        let totalPages = 1;
+        const PAGE_LIMIT = 20;
+        let searchTimeout = null;
+
+        // --- Helpers ---
+        function formatINR(amount) {
+            return '\u20B9' + parseFloat(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '--';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
+        function getStatusBadge(status) {
+            const map = {
+                paid:           'bg-green-100 text-green-800',
+                overdue:        'bg-red-100 text-red-800',
+                sent:           'bg-blue-100 text-blue-800',
+                partially_paid: 'bg-yellow-100 text-yellow-800',
+                draft:          'bg-gray-100 text-gray-700',
+                void:           'bg-gray-200 text-gray-500'
+            };
+            const cls = map[(status || '').toLowerCase()] || 'bg-gray-100 text-gray-700';
+            const label = (status || 'unknown').replace(/_/g, ' ');
+            return '<span class="inline-block px-2.5 py-1 rounded-full text-xs font-semibold capitalize ' + cls + '">' + label + '</span>';
+        }
+
+        function getSortParams() {
+            const val = document.getElementById('filterSort').value;
+            const parts = val.split('_');
+            const order = parts.pop(); // asc or desc
+            const sort = parts.join('_');
+            return { sort, order: order.toUpperCase() };
+        }
+
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentPage = 1;
+                loadInvoices();
+            }, 400);
+        }
+
+        // --- API Calls ---
+        async function loadInvoices() {
+            const status = document.getElementById('filterStatus').value;
+            const search = document.getElementById('filterSearch').value.trim();
+            const { sort, order } = getSortParams();
+
+            const params = new URLSearchParams({
+                page: currentPage,
+                limit: PAGE_LIMIT,
+                sort: sort,
+                order: order
+            });
+            if (status) params.set('status', status);
+            if (search) params.set('search', search);
+
+            showLoading(true);
+            try {
+                const response = await fetch('/api/zoho/invoices?' + params.toString(), {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch invoices');
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    invoices = result.data || [];
+                    totalInvoices = result.pagination ? result.pagination.total : invoices.length;
+                    totalPages = result.pagination ? result.pagination.totalPages : Math.ceil(totalInvoices / PAGE_LIMIT);
+                    currentPage = result.pagination ? result.pagination.page : currentPage;
+
+                    if (result.stats) {
+                        updateStats(result.stats);
+                    }
+                } else {
+                    invoices = [];
+                    totalInvoices = 0;
+                    totalPages = 1;
+                }
+
+                renderInvoices();
+                renderPagination();
+                showLoading(false);
+            } catch (error) {
+                console.error('Error loading invoices:', error);
+                showLoading(false);
+                showEmpty(true);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/zoho/invoices?page=1&limit=1', {
+                    headers: getAuthHeaders()
+                });
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.stats) {
+                        updateStats(result.stats);
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading stats:', e);
+            }
+        }
+
+        async function syncInvoices() {
+            const btn = document.getElementById('syncBtn');
+            const icon = document.getElementById('syncIcon');
+            btn.disabled = true;
+            icon.classList.add('animate-spin');
+            btn.classList.add('opacity-75');
+
+            showBanner('Syncing invoices from Zoho Books...', 'info');
+
+            try {
+                const response = await fetch('/api/zoho/sync/invoices', {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    const msg = result.message || 'Invoices synced successfully.';
+                    showBanner(msg, 'success');
+                    currentPage = 1;
+                    loadInvoices();
+                } else {
+                    showBanner(result.message || 'Sync failed. Please try again.', 'error');
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                showBanner('Sync failed. Check your connection and try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                icon.classList.remove('animate-spin');
+                btn.classList.remove('opacity-75');
+            }
+        }
+
+        async function openInvoiceDetail(invoiceId) {
+            document.getElementById('invoiceModal').classList.remove('hidden');
+            document.getElementById('modalLoading').classList.remove('hidden');
+            document.getElementById('modalContent').classList.add('hidden');
+            document.body.style.overflow = 'hidden';
+
+            try {
+                const response = await fetch('/api/zoho/invoices/' + invoiceId, {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                if (!response.ok) throw new Error('Failed to load invoice detail');
+
+                const result = await response.json();
+                const inv = result.data || result;
+
+                populateModal(inv);
+                document.getElementById('modalLoading').classList.add('hidden');
+                document.getElementById('modalContent').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading invoice detail:', error);
+                closeModal();
+                alert('Failed to load invoice details. Please try again.');
+            }
+        }
+
+        // --- Rendering ---
+        function updateStats(stats) {
+            document.getElementById('statTotal').textContent = stats.total != null ? stats.total : '--';
+            document.getElementById('statPaid').textContent = stats.paid != null ? stats.paid : '--';
+            document.getElementById('statSent').textContent = stats.sent != null ? stats.sent : '--';
+            document.getElementById('statOverdue').textContent = stats.overdue != null ? stats.overdue : '--';
+            document.getElementById('statPartial').textContent = stats.partially_paid != null ? stats.partially_paid : '--';
+        }
+
+        function renderInvoices() {
+            const tableBody = document.getElementById('invoiceTableBody');
+            const cardsContainer = document.getElementById('invoiceCardsContainer');
+            const tableContainer = document.getElementById('invoiceTableContainer');
+
+            if (invoices.length === 0) {
+                tableContainer.classList.add('hidden');
+                showEmpty(true);
+                return;
+            }
+
+            showEmpty(false);
+            tableContainer.classList.remove('hidden');
+
+            // Desktop table rows
+            tableBody.innerHTML = invoices.map(inv => {
+                const id = inv.id || inv.zoho_invoice_id;
+                return '<tr class="hover:bg-gray-50 cursor-pointer transition" onclick="openInvoiceDetail(\'' + id + '\')">' +
+                    '<td class="px-4 py-3 font-semibold text-purple-700 whitespace-nowrap">' + escapeHtml(inv.invoice_number || '--') + '</td>' +
+                    '<td class="px-4 py-3 text-gray-800">' + escapeHtml(inv.customer_name || '--') + '</td>' +
+                    '<td class="px-4 py-3 text-gray-600 whitespace-nowrap">' + formatDate(inv.invoice_date) + '</td>' +
+                    '<td class="px-4 py-3 text-gray-600 whitespace-nowrap">' + formatDate(inv.due_date) + '</td>' +
+                    '<td class="px-4 py-3 text-gray-800 font-medium text-right whitespace-nowrap">' + formatINR(inv.total) + '</td>' +
+                    '<td class="px-4 py-3 text-gray-800 font-medium text-right whitespace-nowrap">' + formatINR(inv.balance) + '</td>' +
+                    '<td class="px-4 py-3 text-center">' + getStatusBadge(inv.status) + '</td>' +
+                '</tr>';
+            }).join('');
+
+            // Mobile cards
+            cardsContainer.innerHTML = invoices.map(inv => {
+                const id = inv.id || inv.zoho_invoice_id;
+                return '<div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition" onclick="openInvoiceDetail(\'' + id + '\')">' +
+                    '<div class="flex justify-between items-start mb-2">' +
+                        '<div>' +
+                            '<div class="font-bold text-purple-700 text-sm">' + escapeHtml(inv.invoice_number || '--') + '</div>' +
+                            '<div class="text-gray-800 font-medium text-sm mt-0.5">' + escapeHtml(inv.customer_name || '--') + '</div>' +
+                        '</div>' +
+                        '<div>' + getStatusBadge(inv.status) + '</div>' +
+                    '</div>' +
+                    '<div class="flex justify-between items-end mt-3">' +
+                        '<div class="text-xs text-gray-500">' + formatDate(inv.invoice_date) + '</div>' +
+                        '<div class="text-right">' +
+                            '<div class="text-sm font-bold text-gray-800">' + formatINR(inv.total) + '</div>' +
+                            (parseFloat(inv.balance || 0) > 0 ? '<div class="text-xs text-red-600">Bal: ' + formatINR(inv.balance) + '</div>' : '') +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function renderPagination() {
+            const info = document.getElementById('paginationInfo');
+            const controls = document.getElementById('paginationControls');
+
+            if (totalInvoices === 0) {
+                info.textContent = 'Showing 0 invoices';
+                controls.innerHTML = '';
+                return;
+            }
+
+            const start = (currentPage - 1) * PAGE_LIMIT + 1;
+            const end = Math.min(currentPage * PAGE_LIMIT, totalInvoices);
+            info.textContent = 'Showing ' + start + '-' + end + ' of ' + totalInvoices + ' invoices';
+
+            let html = '';
+
+            // Previous button
+            html += '<button onclick="goToPage(' + (currentPage - 1) + ')" ' +
+                    (currentPage <= 1 ? 'disabled' : '') +
+                    ' class="px-3 py-1.5 text-sm rounded-lg border ' +
+                    (currentPage <= 1 ? 'text-gray-400 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100') +
+                    '">Prev</button>';
+
+            // Page numbers
+            const maxVisible = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+            if (endPage - startPage < maxVisible - 1) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+            }
+
+            if (startPage > 1) {
+                html += '<button onclick="goToPage(1)" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">1</button>';
+                if (startPage > 2) {
+                    html += '<span class="px-2 py-1.5 text-sm text-gray-400">...</span>';
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                if (i === currentPage) {
+                    html += '<button class="px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white font-medium">' + i + '</button>';
+                } else {
+                    html += '<button onclick="goToPage(' + i + ')" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + i + '</button>';
+                }
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += '<span class="px-2 py-1.5 text-sm text-gray-400">...</span>';
+                }
+                html += '<button onclick="goToPage(' + totalPages + ')" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">' + totalPages + '</button>';
+            }
+
+            // Next button
+            html += '<button onclick="goToPage(' + (currentPage + 1) + ')" ' +
+                    (currentPage >= totalPages ? 'disabled' : '') +
+                    ' class="px-3 py-1.5 text-sm rounded-lg border ' +
+                    (currentPage >= totalPages ? 'text-gray-400 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100') +
+                    '">Next</button>';
+
+            controls.innerHTML = html;
+        }
+
+        function populateModal(inv) {
+            const detail = inv.zoho_detail || {};
+            const lineItems = detail.line_items || [];
+
+            document.getElementById('modalInvoiceTitle').textContent = 'Invoice ' + (inv.invoice_number || '--');
+            document.getElementById('modalInvoiceNumber').textContent = inv.invoice_number || '--';
+            document.getElementById('modalStatus').innerHTML = getStatusBadge(inv.status);
+            document.getElementById('modalCustomer').textContent = inv.customer_name || '--';
+            document.getElementById('modalReference').textContent = inv.reference_number || detail.reference_number || '--';
+            document.getElementById('modalInvoiceDate').textContent = formatDate(inv.invoice_date);
+            document.getElementById('modalDueDate').textContent = formatDate(inv.due_date);
+
+            // Line items
+            const lineItemsBody = document.getElementById('modalLineItems');
+            if (lineItems.length === 0) {
+                lineItemsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">No line items available</td></tr>';
+            } else {
+                lineItemsBody.innerHTML = lineItems.map(item => {
+                    return '<tr>' +
+                        '<td class="px-4 py-2 text-gray-800">' + escapeHtml(item.name || item.description || '--') + '</td>' +
+                        '<td class="px-4 py-2 text-right text-gray-700">' + (item.quantity != null ? item.quantity : '--') + '</td>' +
+                        '<td class="px-4 py-2 text-right text-gray-700">' + formatINR(item.rate) + '</td>' +
+                        '<td class="px-4 py-2 text-right text-gray-700">' + formatINR(item.tax_amount) + '</td>' +
+                        '<td class="px-4 py-2 text-right font-medium text-gray-800">' + formatINR(item.item_total) + '</td>' +
+                    '</tr>';
+                }).join('');
+            }
+
+            // Totals
+            const subTotal = detail.sub_total != null ? detail.sub_total : inv.total;
+            const taxTotal = detail.tax_total != null ? detail.tax_total : 0;
+            const grandTotal = inv.total || detail.total || 0;
+            const balance = inv.balance != null ? inv.balance : (detail.balance != null ? detail.balance : 0);
+
+            document.getElementById('modalSubTotal').textContent = formatINR(subTotal);
+            document.getElementById('modalTax').textContent = formatINR(taxTotal);
+            document.getElementById('modalGrandTotal').textContent = formatINR(grandTotal);
+            document.getElementById('modalBalance').textContent = formatINR(balance);
+        }
+
+        // --- UI Helpers ---
+        function showLoading(show) {
+            document.getElementById('loadingState').classList.toggle('hidden', !show);
+            if (show) {
+                document.getElementById('invoiceTableContainer').classList.add('hidden');
+                document.getElementById('emptyState').classList.add('hidden');
+            }
+        }
+
+        function showEmpty(show) {
+            document.getElementById('emptyState').classList.toggle('hidden', !show);
+        }
+
+        function showBanner(message, type) {
+            const banner = document.getElementById('syncBanner');
+            const text = document.getElementById('syncBannerText');
+            text.textContent = message;
+
+            banner.className = 'mb-4 p-4 rounded-lg flex items-center gap-3 text-sm font-medium';
+            if (type === 'success') {
+                banner.classList.add('bg-green-50', 'text-green-800', 'border', 'border-green-200');
+            } else if (type === 'error') {
+                banner.classList.add('bg-red-50', 'text-red-800', 'border', 'border-red-200');
+            } else {
+                banner.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200');
+            }
+            banner.classList.remove('hidden');
+
+            if (type !== 'info') {
+                setTimeout(() => {
+                    banner.classList.add('hidden');
+                }, 6000);
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // --- Actions ---
+        function applyFilters() {
+            currentPage = 1;
+            loadInvoices();
+        }
+
+        function clearFilters() {
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterSearch').value = '';
+            document.getElementById('filterSort').value = 'invoice_date_desc';
+            currentPage = 1;
+            loadInvoices();
+        }
+
+        function goToPage(page) {
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            loadInvoices();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function closeModal() {
+            document.getElementById('invoiceModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        function closeModalBackdrop(event) {
+            if (event.target === document.getElementById('invoiceModal')) {
+                closeModal();
+            }
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // --- Init ---
+        loadInvoices();
+    </script>
+</body>
+</html>

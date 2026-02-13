@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Role Permissions - Quality Colours</title>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -14,7 +17,7 @@
     <script src="/universal-nav-loader.js"></script>
 </head>
 <body class="bg-gray-50">
-    <!-- Simplified Header for this page -->
+    <!-- Header -->
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-4">
             <div class="flex items-center justify-between">
@@ -26,10 +29,10 @@
                     </a>
                     <div>
                         <h1 class="text-white text-xl font-bold">Edit Role Permissions</h1>
-                        <p class="text-purple-100 text-sm" id="roleName">Loading...</p>
+                        <p class="text-purple-100 text-sm" id="roleName">Select a role below</p>
                     </div>
                 </div>
-                <button onclick="savePermissions()" class="bg-white text-purple-600 px-6 py-2 rounded-lg hover:bg-purple-50 transition shadow-lg font-semibold">
+                <button id="saveBtn" onclick="savePermissions()" class="hidden bg-white text-purple-600 px-6 py-2 rounded-lg hover:bg-purple-50 transition shadow-lg font-semibold">
                     Save Permissions
                 </button>
             </div>
@@ -38,9 +41,17 @@
 
     <!-- Main Content -->
     <div class="max-w-7xl mx-auto px-4 py-6">
-        
+
+        <!-- Role Selector (shown when no role_id in URL) -->
+        <div id="roleSelectorCard" class="hidden bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Select a Role to Manage Permissions</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="roleCards">
+                <div class="text-center py-8 col-span-full text-gray-500">Loading roles...</div>
+            </div>
+        </div>
+
         <!-- Permission Summary -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div id="summaryCard" class="hidden bg-white rounded-lg shadow-md p-6 mb-6">
             <div class="flex items-center justify-between">
                 <div>
                     <h2 class="text-lg font-bold text-gray-800">Permission Summary</h2>
@@ -53,7 +64,7 @@
         </div>
 
         <!-- Search and Filters -->
-        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div id="searchCard" class="hidden bg-white rounded-lg shadow-md p-4 mb-6">
             <div class="flex gap-4 items-center">
                 <input type="text" id="searchPermissions" placeholder="Search permissions..." class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600">
                 <button onclick="selectAll()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
@@ -66,26 +77,14 @@
         </div>
 
         <!-- Permissions by Module -->
-        <div id="permissionsContainer" class="space-y-4">
-            <!-- Loading state -->
-            <div class="text-center py-12">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-                <p class="text-gray-600 mt-4">Loading permissions...</p>
-            </div>
-        </div>
+        <div id="permissionsContainer" class="space-y-4"></div>
 
     </div>
 
     <script>
-// Get role ID from URL (check both 'role' and 'role_id' parameters)
+// Get role ID from URL
 const urlParams = new URLSearchParams(window.location.search);
-const roleId = urlParams.get('role_id') || urlParams.get('role');
-
-if (!roleId) {
-    alert('❌ No role specified');
-    window.location.href = '/admin-roles.html';
-    throw new Error('No role ID provided');
-}
+let roleId = urlParams.get('role_id') || urlParams.get('role');
 
 // Global state
 let allPermissions = {};
@@ -94,36 +93,75 @@ let selectedPermissions = new Set();
 
 // Module icons
 const moduleIcons = {
-    'estimates': '📝',
-    'products': '📦',
-    'customers': '👥',
-    'staff': '👨‍💼',
-    'branches': '🏪',
-    'brands': '🏷️',
-    'categories': '📂',
-    'reports': '📊',
-    'settings': '⚙️',
-    'roles': '🔐',
-    'leads': '🎯',
-    'marketing': '📢'
+    'estimates': '📝', 'products': '📦', 'customers': '👥',
+    'staff': '👨‍💼', 'branches': '🏪', 'brands': '🏷️',
+    'categories': '📂', 'reports': '📊', 'settings': '⚙️',
+    'roles': '🔐', 'leads': '🎯', 'marketing': '📢',
+    'dashboard': '📊', 'attendance': '📅', 'salary': '💰',
+    'activities': '📋', 'tasks': '✅', 'zoho': '📘'
 };
+
+// Friendly module display names
+const moduleNames = {
+    'zoho': 'Zoho Books'
+};
+
+// Show role selector when no role_id is provided
+async function showRoleSelector() {
+    document.getElementById('roleSelectorCard').classList.remove('hidden');
+
+    try {
+        const response = await apiRequest('/api/roles');
+        const data = await response.json();
+
+        if (!data.success || !data.data || data.data.length === 0) {
+            document.getElementById('roleCards').innerHTML = '<p class="text-gray-500 col-span-full text-center py-4">No roles found. <a href="/admin-roles.html" class="text-purple-600 underline">Create roles first</a>.</p>';
+            return;
+        }
+
+        const roles = data.data;
+        document.getElementById('roleCards').innerHTML = roles.map(role => `
+            <button onclick="selectRole(${role.id})" class="text-left border-2 border-gray-200 rounded-lg p-4 hover:border-purple-500 hover:shadow-lg transition ${role.is_system_role ? 'bg-blue-50 border-blue-200' : ''}">
+                <div class="flex justify-between items-start mb-1">
+                    <h3 class="font-bold text-gray-800">${role.display_name}</h3>
+                    <span class="px-2 py-0.5 text-xs rounded ${role.user_type === 'staff' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}">${role.user_type}</span>
+                </div>
+                <p class="text-sm text-gray-600">${role.description || role.name}</p>
+            </button>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading roles:', error);
+        document.getElementById('roleCards').innerHTML = '<p class="text-red-500 col-span-full text-center py-4">Failed to load roles.</p>';
+    }
+}
+
+// Handle role selection from the selector cards
+function selectRole(id) {
+    roleId = id;
+    // Update URL without reload
+    const newUrl = `${window.location.pathname}?role_id=${id}`;
+    history.replaceState(null, '', newUrl);
+    // Hide selector, load permissions
+    document.getElementById('roleSelectorCard').classList.add('hidden');
+    init();
+}
 
 // Load role details and permissions
 async function loadRoleDetails() {
     try {
-        const response = await fetch(`/api/roles/${roleId}`);
+        const response = await apiRequest(`/api/roles/${roleId}`);
         const data = await response.json();
-        
+
         if (data.success) {
             const role = data.data;
             document.getElementById('roleName').textContent = role.display_name;
             document.title = `Permissions: ${role.display_name} - Quality Colours`;
-            
+
             // Store current permissions
             rolePermissions = role.permissions.map(p => p.id);
             selectedPermissions = new Set(rolePermissions);
         } else {
-            showNotification('Failed to load role details', 'error');
+            showNotification('Failed to load role details: ' + (data.error || ''), 'error');
         }
     } catch (error) {
         console.error('Error loading role:', error);
@@ -134,14 +172,14 @@ async function loadRoleDetails() {
 // Load all permissions
 async function loadAllPermissions() {
     try {
-        const response = await fetch('/api/roles/permissions/by-module');
+        const response = await apiRequest('/api/roles/permissions/by-module');
         const data = await response.json();
-        
+
         if (data.success) {
             allPermissions = data.data;
             displayPermissions();
         } else {
-            showNotification('Failed to load permissions', 'error');
+            showNotification('Failed to load permissions: ' + (data.error || ''), 'error');
         }
     } catch (error) {
         console.error('Error loading permissions:', error);
@@ -153,21 +191,21 @@ async function loadAllPermissions() {
 function displayPermissions() {
     const container = document.getElementById('permissionsContainer');
     const modules = Object.keys(allPermissions).sort();
-    
+
     let totalPerms = 0;
     modules.forEach(module => {
         totalPerms += allPermissions[module].length;
     });
-    
+
     document.getElementById('totalPermissions').textContent = totalPerms;
     document.getElementById('availableCount').textContent = totalPerms;
     updateSelectedCount();
-    
+
     container.innerHTML = modules.map(module => {
         const permissions = allPermissions[module];
         const icon = moduleIcons[module] || '📋';
-        const moduleName = module.charAt(0).toUpperCase() + module.slice(1).replace(/_/g, ' ');
-        
+        const moduleName = moduleNames[module] || (module.charAt(0).toUpperCase() + module.slice(1).replace(/_/g, ' '));
+
         return `
             <div class="bg-white rounded-lg shadow-md overflow-hidden module-section" data-module="${module}">
                 <div class="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 border-b border-purple-200">
@@ -189,20 +227,24 @@ function displayPermissions() {
                     </div>
                 </div>
                 <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    ${permissions.map(perm => `
-                        <label class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer permission-item" data-permission-id="${perm.id}" data-search-text="${perm.display_name.toLowerCase()} ${perm.description.toLowerCase()}">
-                            <input type="checkbox" 
-                                   class="permission-checkbox mt-1" 
+                    ${permissions.map(perm => {
+                        const displayName = perm.display_name || perm.description || (perm.action.charAt(0).toUpperCase() + perm.action.slice(1).replace(/_/g, ' '));
+                        const desc = perm.display_name ? (perm.description || '') : '';
+                        const searchText = (displayName + ' ' + (perm.description || '') + ' ' + perm.action).toLowerCase();
+                        return `
+                        <label class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer permission-item" data-permission-id="${perm.id}" data-search-text="${searchText}">
+                            <input type="checkbox"
+                                   class="permission-checkbox mt-1"
                                    data-permission-id="${perm.id}"
                                    data-module="${module}"
                                    ${selectedPermissions.has(perm.id) ? 'checked' : ''}
                                    onchange="togglePermission(${perm.id}, this.checked)">
                             <div class="flex-1">
-                                <p class="font-semibold text-gray-800 text-sm">${perm.display_name}</p>
-                                <p class="text-xs text-gray-600 mt-1">${perm.description}</p>
+                                <p class="font-semibold text-gray-800 text-sm">${displayName}</p>
+                                ${desc ? `<p class="text-xs text-gray-600 mt-1">${desc}</p>` : ''}
                             </div>
                         </label>
-                    `).join('')}
+                    `;}).join('')}
                 </div>
             </div>
         `;
@@ -226,22 +268,20 @@ function updateSelectedCount() {
 
 // Select module
 function selectModule(module) {
-    const perms = allPermissions[module];
-    perms.forEach(perm => {
+    allPermissions[module].forEach(perm => {
         selectedPermissions.add(perm.id);
-        const checkbox = document.querySelector(`input[data-permission-id="${perm.id}"]`);
-        if (checkbox) checkbox.checked = true;
+        const cb = document.querySelector(`input[data-permission-id="${perm.id}"]`);
+        if (cb) cb.checked = true;
     });
     updateSelectedCount();
 }
 
 // Deselect module
 function deselectModule(module) {
-    const perms = allPermissions[module];
-    perms.forEach(perm => {
+    allPermissions[module].forEach(perm => {
         selectedPermissions.delete(perm.id);
-        const checkbox = document.querySelector(`input[data-permission-id="${perm.id}"]`);
-        if (checkbox) checkbox.checked = false;
+        const cb = document.querySelector(`input[data-permission-id="${perm.id}"]`);
+        if (cb) cb.checked = false;
     });
     updateSelectedCount();
 }
@@ -250,8 +290,8 @@ function deselectModule(module) {
 function selectAll() {
     Object.values(allPermissions).flat().forEach(perm => {
         selectedPermissions.add(perm.id);
-        const checkbox = document.querySelector(`input[data-permission-id="${perm.id}"]`);
-        if (checkbox) checkbox.checked = true;
+        const cb = document.querySelector(`input[data-permission-id="${perm.id}"]`);
+        if (cb) cb.checked = true;
     });
     updateSelectedCount();
 }
@@ -259,9 +299,7 @@ function selectAll() {
 // Deselect all
 function deselectAll() {
     selectedPermissions.clear();
-    document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
-        checkbox.checked = false;
-    });
+    document.querySelectorAll('.permission-checkbox').forEach(cb => cb.checked = false);
     updateSelectedCount();
 }
 
@@ -271,24 +309,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
-            
+
             document.querySelectorAll('.permission-item').forEach(item => {
                 const searchText = item.getAttribute('data-search-text');
-                if (searchText.includes(searchTerm)) {
-                    item.style.display = 'flex';
-                } else {
-                    item.style.display = 'none';
-                }
+                item.style.display = searchText.includes(searchTerm) ? 'flex' : 'none';
             });
-            
-            // Hide modules with no visible permissions
+
             document.querySelectorAll('.module-section').forEach(section => {
-                const visibleItems = section.querySelectorAll('.permission-item[style*="display: flex"], .permission-item:not([style*="display: none"])');
-                if (visibleItems.length === 0 && searchTerm) {
-                    section.style.display = 'none';
-                } else {
-                    section.style.display = 'block';
-                }
+                const visibleItems = section.querySelectorAll('.permission-item:not([style*="display: none"])');
+                section.style.display = (visibleItems.length === 0 && searchTerm) ? 'none' : 'block';
             });
         });
     }
@@ -297,29 +326,23 @@ document.addEventListener('DOMContentLoaded', () => {
 // Save permissions
 async function savePermissions() {
     const permissionIds = Array.from(selectedPermissions);
-    
-    // Show loading
-    const saveButton = document.querySelector('button[onclick="savePermissions()"]');
+
+    const saveButton = document.getElementById('saveBtn');
     const originalText = saveButton.textContent;
     saveButton.textContent = 'Saving...';
     saveButton.disabled = true;
-    
+
     try {
-        const response = await fetch(`/api/roles/${roleId}/permissions`, {
+        const response = await apiRequest(`/api/roles/${roleId}/permissions`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ permission_ids: permissionIds })
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
             showNotification(`Permissions saved successfully! (${permissionIds.length} permissions assigned)`, 'success');
-            
-            // Redirect back after 1.5 seconds
-            setTimeout(() => {
-                window.location.href = '/admin-roles.html';
-            }, 1500);
+            setTimeout(() => { window.location.href = '/admin-roles.html'; }, 1500);
         } else {
             showNotification(result.error || 'Failed to save permissions', 'error');
             saveButton.textContent = originalText;
@@ -335,18 +358,11 @@ async function savePermissions() {
 
 // Show notification
 function showNotification(message, type = 'info') {
-    const colors = {
-        success: 'bg-green-500',
-        error: 'bg-red-500',
-        info: 'bg-blue-500'
-    };
-    
+    const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-blue-500' };
     const notification = document.createElement('div');
     notification.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity`;
     notification.textContent = message;
-    
     document.body.appendChild(notification);
-    
     setTimeout(() => {
         notification.style.opacity = '0';
         setTimeout(() => notification.remove(), 300);
@@ -355,6 +371,21 @@ function showNotification(message, type = 'info') {
 
 // Initialize
 async function init() {
+    if (!roleId) {
+        showRoleSelector();
+        return;
+    }
+
+    // Show permission editing UI
+    document.getElementById('saveBtn').classList.remove('hidden');
+    document.getElementById('summaryCard').classList.remove('hidden');
+    document.getElementById('searchCard').classList.remove('hidden');
+    document.getElementById('permissionsContainer').innerHTML = `
+        <div class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+            <p class="text-gray-600 mt-4">Loading permissions...</p>
+        </div>`;
+
     await loadRoleDetails();
     await loadAllPermissions();
 }

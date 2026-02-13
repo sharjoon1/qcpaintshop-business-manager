@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Design Requests - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        .status-new { background: #dbeafe; color: #1e40af; }
+        .status-in_progress { background: #fef3c7; color: #92400e; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+        .viz-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .viz-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .color-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .gen-pulse { animation: genPulse 2s ease-in-out infinite; }
+        @keyframes genPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto p-6">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-800">Color Design Requests</h2>
+                <p class="text-gray-600 mt-1">Manage customer color design requests & AI visualization</p>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">Total</p>
+                <p class="text-2xl font-bold text-gray-800" id="statTotal">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">New</p>
+                <p class="text-2xl font-bold text-blue-600" id="statNew">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">In Progress</p>
+                <p class="text-2xl font-bold text-yellow-600" id="statInProgress">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">Completed</p>
+                <p class="text-2xl font-bold text-green-600" id="statCompleted">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm text-gray-600">Rejected</p>
+                <p class="text-2xl font-bold text-red-600" id="statRejected">0</p>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="filterStatus" onchange="loadRequests()" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        <option value="">All Statuses</option>
+                        <option value="new">New</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <input type="text" id="filterSearch" onkeyup="debounceSearch()" placeholder="Name, mobile, request #, city..." class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="loadRequests()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-medium">Search</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Request #</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mobile</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">City</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Photo</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="requestsBody" class="divide-y divide-gray-200">
+                        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 py-3 border-t flex items-center justify-between">
+                <p class="text-sm text-gray-600" id="paginationInfo">Showing 0 results</p>
+                <div class="flex gap-2" id="paginationBtns"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detailModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Design Request Details</h3>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <p class="text-sm text-gray-500">Request Number</p>
+                        <p class="font-semibold" id="modalReqNum"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Date</p>
+                        <p class="font-semibold" id="modalDate"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Name</p>
+                        <p class="font-semibold" id="modalName"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Mobile</p>
+                        <p class="font-semibold" id="modalMobile"></p>
+                    </div>
+                    <div class="col-span-2">
+                        <p class="text-sm text-gray-500">City</p>
+                        <p class="font-semibold" id="modalCity"></p>
+                    </div>
+                </div>
+
+                <!-- Photo -->
+                <div id="modalPhotoWrap" class="mb-6 hidden">
+                    <p class="text-sm text-gray-500 mb-2">Uploaded Photo</p>
+                    <img id="modalPhoto" src="" alt="Design photo" class="rounded-lg max-h-80 w-full object-contain bg-gray-100 cursor-pointer" onclick="window.open(this.src, '_blank')">
+                    <button id="btnVisualize" onclick="openVisualizer()" class="mt-3 w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold py-3 rounded-lg hover:from-indigo-600 hover:to-purple-700 transition flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                        AI Color Visualizer
+                    </button>
+                </div>
+
+                <!-- Previous Visualizations -->
+                <div id="vizHistorySection" class="mb-6 hidden">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Previous Visualizations</p>
+                    <div id="vizHistoryGrid" class="grid grid-cols-3 gap-2"></div>
+                </div>
+
+                <!-- Status & Notes -->
+                <div class="space-y-4 border-t pt-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select id="modalStatus" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                            <option value="new">New</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Admin Notes</label>
+                        <textarea id="modalNotes" rows="3" placeholder="Add notes about this request..." class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea>
+                    </div>
+                    <button onclick="saveRequest()" id="modalSaveBtn" class="w-full bg-purple-600 text-white font-semibold py-3 rounded-lg hover:bg-purple-700 transition">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Color Visualizer Modal -->
+    <div id="vizModal" class="fixed inset-0 bg-black/60 z-[60] hidden flex items-center justify-center p-2">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col">
+            <!-- Header -->
+            <div class="flex justify-between items-center p-4 border-b shrink-0">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">AI Color Visualizer</h3>
+                    <p class="text-sm text-gray-500" id="vizReqInfo"></p>
+                </div>
+                <button onclick="closeVisualizer()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+
+            <!-- Body -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <!-- Brand Selection & AI Model & Generate -->
+                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 mb-5">
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div class="flex-1 min-w-[200px]">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Select Paint Brand</label>
+                            <select id="vizBrand" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm font-medium bg-white">
+                                <option value="">Choose brand...</option>
+                            </select>
+                        </div>
+                        <div class="min-w-[220px]">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">AI Model</label>
+                            <div class="flex gap-2">
+                                <label class="flex-1 cursor-pointer">
+                                    <input type="radio" name="aiModel" value="pollinations" checked class="hidden peer">
+                                    <div class="peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 bg-white border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-medium transition hover:border-indigo-400">
+                                        Pollinations AI
+                                        <span class="block text-[10px] font-normal opacity-75">Free - No Limits</span>
+                                    </div>
+                                </label>
+                                <label class="flex-1 cursor-pointer">
+                                    <input type="radio" name="aiModel" value="gemini" class="hidden peer">
+                                    <div class="peer-checked:bg-purple-600 peer-checked:text-white peer-checked:border-purple-600 bg-white border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-medium transition hover:border-purple-400">
+                                        Gemini AI
+                                        <span class="block text-[10px] font-normal opacity-75">Paid - High Quality</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <button onclick="generateVariations()" id="btnGenerate" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold px-8 py-2.5 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition flex items-center gap-2 disabled:opacity-50">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            Generate AI Variations
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2" id="vizModelHint">Pollinations AI (Kontext) detects building zones and applies 3 professionally curated color combinations</p>
+                </div>
+
+                <!-- Processing State -->
+                <div id="vizProcessing" class="hidden mb-5">
+                    <div class="bg-indigo-50 rounded-xl p-8 text-center">
+                        <div class="inline-block w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                        <p class="text-indigo-700 font-semibold text-lg" id="vizProcessTitle">AI is repainting your building...</p>
+                        <p class="text-indigo-500 text-sm mt-1 gen-pulse">Detecting walls, trim, doors &mdash; applying colors realistically</p>
+                        <p class="text-indigo-400 text-xs mt-3" id="vizProcessTime">Generating 3 AI variations &mdash; this takes 30-60 seconds</p>
+                    </div>
+                </div>
+
+                <!-- Results Grid -->
+                <div id="vizResults" class="hidden mb-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="font-bold text-gray-800 text-lg">Generated Variations</h4>
+                        <div class="flex gap-2">
+                            <button onclick="downloadAll()" class="text-sm bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                Download All
+                            </button>
+                            <button onclick="generateVariations()" class="text-sm bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300">Regenerate</button>
+                        </div>
+                    </div>
+
+                    <!-- Two-Color Section -->
+                    <p class="text-sm font-semibold text-indigo-600 uppercase tracking-wide mb-3">Two-Color Combinations</p>
+                    <div id="twoColorGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
+
+                    <!-- Three-Color Section -->
+                    <p class="text-sm font-semibold text-purple-600 uppercase tracking-wide mb-3">Three-Color Combinations</p>
+                    <div id="threeColorGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4"></div>
+                </div>
+
+                <!-- Original Photo Reference -->
+                <div id="vizOriginalWrap" class="hidden">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Original Photo</p>
+                    <img id="vizOriginal" src="" class="rounded-lg max-h-[200px] object-contain bg-gray-100">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let currentPage = 1;
+    let currentRequestId = null;
+    let currentRequestData = null;
+    let searchTimeout = null;
+    let generatedVariations = [];
+
+    function debounceSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => loadRequests(), 400);
+    }
+
+    async function loadStats() {
+        try {
+            const res = await apiFetch('/api/design-requests/stats');
+            if (res.success) {
+                const d = res.data;
+                document.getElementById('statTotal').textContent = d.total || 0;
+                document.getElementById('statNew').textContent = d.new_count || 0;
+                document.getElementById('statInProgress').textContent = d.in_progress_count || 0;
+                document.getElementById('statCompleted').textContent = d.completed_count || 0;
+                document.getElementById('statRejected').textContent = d.rejected_count || 0;
+            }
+        } catch (err) { console.error('Stats error:', err); }
+    }
+
+    async function loadRequests(page = 1) {
+        currentPage = page;
+        const status = document.getElementById('filterStatus').value;
+        const search = document.getElementById('filterSearch').value;
+        const params = new URLSearchParams({ page, limit: 20 });
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+
+        try {
+            const res = await apiFetch(`/api/design-requests?${params}`);
+            if (!res.success) throw new Error(res.error);
+            const tbody = document.getElementById('requestsBody');
+            if (!res.data.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No design requests found</td></tr>';
+            } else {
+                tbody.innerHTML = res.data.map(r => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 font-mono text-sm font-semibold text-purple-700">${esc(r.request_number)}</td>
+                        <td class="px-4 py-3 font-medium">${esc(r.name)}</td>
+                        <td class="px-4 py-3"><a href="tel:${esc(r.mobile)}" class="text-blue-600 hover:underline">${esc(r.mobile)}</a></td>
+                        <td class="px-4 py-3 text-gray-600">${esc(r.city || '-')}</td>
+                        <td class="px-4 py-3">
+                            ${r.photo_path
+                                ? `<img src="${esc(r.photo_path)}" alt="Photo" class="w-12 h-12 object-cover rounded-lg cursor-pointer" onclick="window.open('${esc(r.photo_path)}','_blank')">`
+                                : '<span class="text-gray-400 text-sm">No photo</span>'}
+                        </td>
+                        <td class="px-4 py-3"><span class="status-${r.status} px-2 py-1 rounded-full text-xs font-semibold">${formatStatus(r.status)}</span></td>
+                        <td class="px-4 py-3 text-sm text-gray-600">${formatDate(r.created_at)}</td>
+                        <td class="px-4 py-3">
+                            <button onclick="openDetail(${r.id})" class="text-purple-600 hover:text-purple-800 font-medium text-sm">View</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+            const totalPages = Math.ceil(res.total / res.limit);
+            document.getElementById('paginationInfo').textContent =
+                `Showing ${res.data.length} of ${res.total} results (Page ${res.page}/${totalPages || 1})`;
+            const btns = document.getElementById('paginationBtns');
+            btns.innerHTML = '';
+            if (currentPage > 1) btns.innerHTML += `<button onclick="loadRequests(${currentPage-1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-100">Prev</button>`;
+            if (currentPage < totalPages) btns.innerHTML += `<button onclick="loadRequests(${currentPage+1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-100">Next</button>`;
+        } catch (err) {
+            console.error('Load error:', err);
+            document.getElementById('requestsBody').innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-red-500">Error: ${esc(err.message)}</td></tr>`;
+        }
+    }
+
+    async function openDetail(id) {
+        currentRequestId = id;
+        try {
+            const res = await apiFetch(`/api/design-requests?search=&page=1&limit=100`);
+            const req = res.data.find(r => r.id === id);
+            if (!req) return alert('Request not found');
+            currentRequestData = req;
+
+            document.getElementById('modalReqNum').textContent = req.request_number;
+            document.getElementById('modalDate').textContent = formatDate(req.created_at);
+            document.getElementById('modalName').textContent = req.name;
+            document.getElementById('modalMobile').textContent = req.mobile;
+            document.getElementById('modalCity').textContent = req.city || '-';
+            document.getElementById('modalStatus').value = req.status;
+            document.getElementById('modalNotes').value = req.admin_notes || '';
+
+            const photoWrap = document.getElementById('modalPhotoWrap');
+            if (req.photo_path) {
+                document.getElementById('modalPhoto').src = req.photo_path;
+                photoWrap.classList.remove('hidden');
+            } else {
+                photoWrap.classList.add('hidden');
+            }
+            loadVizHistory(id);
+            document.getElementById('detailModal').classList.remove('hidden');
+        } catch (err) {
+            alert('Error loading details: ' + err.message);
+        }
+    }
+
+    async function loadVizHistory(requestId) {
+        const section = document.getElementById('vizHistorySection');
+        const grid = document.getElementById('vizHistoryGrid');
+        try {
+            const res = await apiFetch(`/api/design-requests/${requestId}/visualizations`);
+            if (res.success && res.data.length > 0) {
+                grid.innerHTML = res.data.map(v => `
+                    <div class="relative group">
+                        <img src="${esc(v.visualization_path)}" alt="${esc(v.color_name)}" class="w-full h-24 object-cover rounded-lg cursor-pointer" onclick="window.open('${esc(v.visualization_path)}', '_blank')">
+                        <div class="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs px-2 py-1 rounded-b-lg truncate">
+                            <span class="inline-block w-2 h-2 rounded-full mr-1" style="background:${esc(v.color_hex)}"></span>
+                            ${esc(v.color_name)}
+                        </div>
+                    </div>
+                `).join('');
+                section.classList.remove('hidden');
+            } else {
+                section.classList.add('hidden');
+            }
+        } catch (err) { section.classList.add('hidden'); }
+    }
+
+    function closeModal() {
+        document.getElementById('detailModal').classList.add('hidden');
+        currentRequestId = null;
+        currentRequestData = null;
+    }
+
+    async function saveRequest() {
+        if (!currentRequestId) return;
+        const btn = document.getElementById('modalSaveBtn');
+        btn.disabled = true; btn.textContent = 'Saving...';
+        try {
+            const res = await apiFetch(`/api/design-requests/${currentRequestId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: document.getElementById('modalStatus').value,
+                    admin_notes: document.getElementById('modalNotes').value
+                })
+            });
+            if (res.success) { closeModal(); loadRequests(currentPage); loadStats(); }
+            else alert(res.error || 'Failed to save');
+        } catch (err) { alert('Error saving: ' + err.message); }
+        finally { btn.disabled = false; btn.textContent = 'Save Changes'; }
+    }
+
+    // ===== AI COLOR VISUALIZER =====
+
+    async function openVisualizer() {
+        if (!currentRequestData || !currentRequestData.photo_path) {
+            return alert('No photo available for this request');
+        }
+        // Reset state
+        generatedVariations = [];
+        document.getElementById('vizResults').classList.add('hidden');
+        document.getElementById('vizProcessing').classList.add('hidden');
+        document.getElementById('twoColorGrid').innerHTML = '';
+        document.getElementById('threeColorGrid').innerHTML = '';
+        document.getElementById('vizReqInfo').textContent = `${currentRequestData.request_number} - ${currentRequestData.name}`;
+        document.getElementById('vizOriginal').src = currentRequestData.photo_path;
+        document.getElementById('vizOriginalWrap').classList.remove('hidden');
+
+        // Load brands
+        await loadBrands();
+        document.getElementById('vizModal').classList.remove('hidden');
+    }
+
+    function closeVisualizer() {
+        document.getElementById('vizModal').classList.add('hidden');
+        if (currentRequestId) loadVizHistory(currentRequestId);
+    }
+
+    async function loadBrands() {
+        try {
+            const res = await apiFetch('/api/paint-colors/brands');
+            if (res.success) {
+                const sel = document.getElementById('vizBrand');
+                sel.innerHTML = '<option value="">Choose brand...</option>';
+                res.data.forEach(b => {
+                    sel.innerHTML += `<option value="${esc(b.code)}">${esc(b.name)} (${b.colorCount} colors)</option>`;
+                });
+                if (res.data.length === 1) { sel.value = res.data[0].code; }
+            }
+        } catch (err) { console.error('Load brands error:', err); }
+    }
+
+    function getSelectedAiModel() {
+        return document.querySelector('input[name="aiModel"]:checked')?.value || 'pollinations';
+    }
+
+    // Update hint text when AI model changes
+    document.querySelectorAll('input[name="aiModel"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const hint = document.getElementById('vizModelHint');
+            if (radio.value === 'gemini') {
+                hint.textContent = 'Gemini AI (Nano Banana) detects building zones and applies 3 professionally curated color combinations';
+            } else {
+                hint.textContent = 'Pollinations AI (Kontext) detects building zones and applies 3 professionally curated color combinations';
+            }
+        });
+    });
+
+    async function generateVariations() {
+        const brand = document.getElementById('vizBrand').value;
+        if (!brand) return alert('Please select a paint brand');
+        if (!currentRequestId) return;
+
+        const aiModel = getSelectedAiModel();
+        const modelLabel = aiModel === 'gemini' ? 'Gemini AI (Nano Banana)' : 'Pollinations AI (Kontext)';
+        const timeEstimate = aiModel === 'pollinations' ? '60-90 seconds' : '30-60 seconds';
+
+        const btn = document.getElementById('btnGenerate');
+        btn.disabled = true;
+        document.getElementById('vizProcessTitle').textContent = modelLabel + ' is repainting your building...';
+        document.getElementById('vizProcessTime').textContent = 'Generating 3 AI variations — this takes ' + timeEstimate;
+        document.getElementById('vizProcessing').classList.remove('hidden');
+        document.getElementById('vizResults').classList.add('hidden');
+
+        try {
+            const res = await apiFetch(`/api/design-requests/${currentRequestId}/auto-visualize`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ brand, aiModel })
+            });
+
+            document.getElementById('vizProcessing').classList.add('hidden');
+
+            if (res.success && res.variations) {
+                generatedVariations = res.variations;
+                renderVariations(res.variations);
+                document.getElementById('vizResults').classList.remove('hidden');
+                if (res.partialErrors) {
+                    console.warn('Some variations failed:', res.partialErrors);
+                }
+            } else {
+                const err = res.error || 'Generation failed';
+                if (err.includes('quota') || err.includes('429')) {
+                    alert('API Quota Exceeded\n\nThe Gemini API plan has limited image generations. Please try Pollinations AI (free) or try again later.');
+                } else {
+                    alert(err);
+                }
+            }
+        } catch (err) {
+            document.getElementById('vizProcessing').classList.add('hidden');
+            alert('Error: ' + err.message);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function renderVariations(variations) {
+        const twoGrid = document.getElementById('twoColorGrid');
+        const threeGrid = document.getElementById('threeColorGrid');
+        twoGrid.innerHTML = '';
+        threeGrid.innerHTML = '';
+
+        variations.forEach((v, idx) => {
+            const card = `
+                <div class="viz-card bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="relative">
+                        <img src="${esc(v.imageUrl)}?t=${Date.now()}" alt="${esc(v.label)}" class="w-full h-52 object-cover cursor-pointer" onclick="window.open('${esc(v.imageUrl)}', '_blank')">
+                        <div class="absolute top-2 right-2 flex gap-1">
+                            ${v.colors.map(c => `<div class="color-dot" style="background:${c.hex}" title="${esc(c.name)}"></div>`).join('')}
+                        </div>
+                    </div>
+                    <div class="p-3">
+                        <p class="font-bold text-sm text-gray-800">${esc(v.label)}</p>
+                        <p class="text-xs text-gray-500 mb-2">${esc(v.description)}</p>
+                        <div class="space-y-1 mb-3">
+                            ${v.colors.map(c => `
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-sm shrink-0 border border-gray-300" style="background:${c.hex}"></span>
+                                    <span class="text-xs text-gray-700 font-medium">${esc(c.name)}</span>
+                                    <span class="text-xs text-gray-400">${esc(c.code)}</span>
+                                    <span class="text-xs text-purple-600 ml-auto">${esc(c.role)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button onclick="downloadViz(${idx})" class="w-full text-sm bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 flex items-center justify-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Download
+                        </button>
+                    </div>
+                </div>`;
+
+            if (v.type === 'two-color') twoGrid.innerHTML += card;
+            else threeGrid.innerHTML += card;
+        });
+    }
+
+    function downloadViz(idx) {
+        const v = generatedVariations[idx];
+        if (!v) return;
+        const a = document.createElement('a');
+        a.href = v.imageUrl;
+        a.download = `QC-${currentRequestData.request_number}-${v.label.replace(/\s+/g, '-')}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    function downloadAll() {
+        generatedVariations.forEach((v, i) => {
+            setTimeout(() => downloadViz(i), i * 300);
+        });
+    }
+
+    function formatStatus(s) {
+        const map = { new: 'New', in_progress: 'In Progress', completed: 'Completed', rejected: 'Rejected' };
+        return map[s] || s;
+    }
+    function formatDate(d) {
+        if (!d) return '-';
+        return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    function esc(str) {
+        if (!str) return '';
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // Close modals on backdrop click
+    document.getElementById('detailModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+    document.getElementById('vizModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeVisualizer(); });
+
+    // Init
+    loadStats();
+    loadRequests();
+    </script>
+</body>
+</html>

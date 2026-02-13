@@ -59,29 +59,22 @@ function logout() {
  * @returns {Promise} Fetch promise
  */
 async function apiRequest(url, options = {}) {
-    const defaultOptions = {
-        headers: getAuthHeaders(),
-        ...options
+    const { headers: customHeaders, ...restOptions } = options;
+    const mergedHeaders = {
+        ...getAuthHeaders(),
+        ...(customHeaders || {})
     };
-    
-    // Merge headers if provided
-    if (options.headers) {
-        defaultOptions.headers = {
-            ...defaultOptions.headers,
-            ...options.headers
-        };
-    }
-    
+
     try {
-        const response = await fetch(url, defaultOptions);
-        
+        const response = await fetch(url, { ...restOptions, headers: mergedHeaders });
+
         // Handle 401 Unauthorized
         if (response.status === 401) {
             console.warn('⚠️ Unauthorized - redirecting to login');
             logout();
             throw new Error('Unauthorized');
         }
-        
+
         return response;
     } catch (error) {
         console.error('API Request Error:', error);
@@ -101,12 +94,56 @@ function checkAuthOrRedirect() {
     return true;
 }
 
+/**
+ * Detect if running inside the QC Android app WebView
+ * @returns {boolean} True if inside Android WebView
+ */
+function isAndroidApp() {
+    return navigator.userAgent.includes('QCManagerApp');
+}
+
+/**
+ * Register service worker for PWA / offline support
+ */
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(function(reg) {
+                console.log('SW registered, scope:', reg.scope);
+            })
+            .catch(function(err) {
+                console.warn('SW registration failed:', err);
+            });
+    }
+}
+
+// Register service worker on load
+registerServiceWorker();
+
+/**
+ * Convenience wrapper: authenticated fetch that auto-parses JSON.
+ * Automatically sets Content-Type for JSON bodies.
+ * @param {string} url - API endpoint
+ * @param {Object} options - Fetch options (method, body, headers, etc.)
+ * @returns {Promise<Object>} Parsed JSON response
+ */
+async function apiFetch(url, options = {}) {
+    // Auto-set Content-Type for JSON string bodies
+    if (options.body && typeof options.body === 'string' && !options.headers?.['Content-Type']) {
+        options.headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    }
+    const response = await apiRequest(url, options);
+    return response.json();
+}
+
 // Expose functions globally
 window.getAuthHeaders = getAuthHeaders;
 window.isAuthenticated = isAuthenticated;
 window.getCurrentUser = getCurrentUser;
 window.logout = logout;
 window.apiRequest = apiRequest;
+window.apiFetch = apiFetch;
 window.checkAuthOrRedirect = checkAuthOrRedirect;
+window.isAndroidApp = isAndroidApp;
 
 console.log('✅ Auth helper loaded');

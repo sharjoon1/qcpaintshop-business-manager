@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>Product Management - Quality Colours</title>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -29,10 +35,45 @@
     </div>
 
     <div class="max-w-7xl mx-auto p-4 sm:p-6">
+        <!-- Search & Filters -->
+        <div class="bg-white rounded-xl shadow-sm p-4 mb-4">
+            <div class="flex flex-col gap-3">
+                <!-- Search Row -->
+                <div class="relative">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="text" id="searchInput" placeholder="Search by product name..." class="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none text-sm" oninput="applyFilters()">
+                </div>
+                <!-- Filter Row -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <select id="filterBrand" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
+                        <option value="">All Brands</option>
+                    </select>
+                    <select id="filterCategory" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
+                        <option value="">All Categories</option>
+                    </select>
+                    <select id="filterType" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
+                        <option value="">All Types</option>
+                        <option value="unit_wise">Unit Wise</option>
+                        <option value="area_wise">Area Wise</option>
+                    </select>
+                    <select id="filterStatus" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <!-- Results count & clear -->
+                <div class="flex items-center justify-between">
+                    <span id="resultsCount" class="text-xs text-gray-500"></span>
+                    <button onclick="clearFilters()" class="text-xs text-purple-600 hover:text-purple-800 font-semibold">Clear Filters</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Products List -->
         <div class="card">
-            <h2 class="text-lg font-bold text-gray-800 mb-4">All Products</h2>
-            
             <!-- Loading State -->
             <div id="loadingState" class="text-center py-8">
                 <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
@@ -235,32 +276,83 @@
             }
         }
 
-        // Populate brand/category dropdowns
+        // Populate brand/category dropdowns (form + filters)
         function populateDropdowns() {
             const brandSelect = document.getElementById('productBrand');
             const categorySelect = document.getElementById('productCategory');
+            const filterBrand = document.getElementById('filterBrand');
+            const filterCategory = document.getElementById('filterCategory');
 
             brandSelect.innerHTML = '<option value="">-- Select Brand --</option>';
+            filterBrand.innerHTML = '<option value="">All Brands</option>';
             brands.forEach(brand => {
-                const option = document.createElement('option');
-                option.value = brand.id;
-                option.textContent = brand.name;
-                brandSelect.appendChild(option);
+                brandSelect.innerHTML += `<option value="${brand.id}">${brand.name}</option>`;
+                filterBrand.innerHTML += `<option value="${brand.id}">${brand.name}</option>`;
             });
 
             categorySelect.innerHTML = '<option value="">-- Select Category --</option>';
+            filterCategory.innerHTML = '<option value="">All Categories</option>';
             categories.forEach(cat => {
-                const option = document.createElement('option');
-                option.value = cat.id;
-                option.textContent = cat.name;
-                categorySelect.appendChild(option);
+                categorySelect.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+                filterCategory.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
             });
+        }
+
+        // Get filtered products based on search and filter inputs
+        function getFilteredProducts() {
+            const search = document.getElementById('searchInput').value.toLowerCase().trim();
+            const brandId = document.getElementById('filterBrand').value;
+            const categoryId = document.getElementById('filterCategory').value;
+            const type = document.getElementById('filterType').value;
+            const status = document.getElementById('filterStatus').value;
+
+            return products.filter(product => {
+                if (search && !product.name.toLowerCase().includes(search) &&
+                    !(product.brand_name || '').toLowerCase().includes(search) &&
+                    !(product.category_name || '').toLowerCase().includes(search) &&
+                    !(product.description || '').toLowerCase().includes(search)) {
+                    return false;
+                }
+                if (brandId && String(product.brand_id) !== brandId) return false;
+                if (categoryId && String(product.category_id) !== categoryId) return false;
+                if (type && product.product_type !== type) return false;
+                if (status && product.status !== status) return false;
+                return true;
+            });
+        }
+
+        // Apply filters and re-render
+        function applyFilters() {
+            renderProducts();
+        }
+
+        // Clear all filters
+        function clearFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterBrand').value = '';
+            document.getElementById('filterCategory').value = '';
+            document.getElementById('filterType').value = '';
+            document.getElementById('filterStatus').value = '';
+            renderProducts();
         }
 
         // Render products table
         function renderProducts() {
+            const filtered = getFilteredProducts();
             const tbody = document.getElementById('productsBody');
-            tbody.innerHTML = products.map(product => `
+
+            // Update results count
+            const isFiltered = document.getElementById('searchInput').value || document.getElementById('filterBrand').value || document.getElementById('filterCategory').value || document.getElementById('filterType').value || document.getElementById('filterStatus').value;
+            document.getElementById('resultsCount').textContent = isFiltered
+                ? `Showing ${filtered.length} of ${products.length} products`
+                : `${products.length} products`;
+
+            if (filtered.length === 0 && products.length > 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No products match your filters. <button onclick="clearFilters()" class="text-purple-600 hover:text-purple-800 font-semibold underline">Clear filters</button></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(product => `
                 <tr class="hover:bg-gray-50">
                     <td class="px-4 py-3 text-sm font-medium text-gray-900">${product.id}</td>
                     <td class="px-4 py-3 text-sm font-semibold text-gray-900">${product.name}</td>

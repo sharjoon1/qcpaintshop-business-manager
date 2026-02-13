@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -141,7 +147,7 @@
         // Load estimate info
         async function loadEstimate() {
             try {
-                const response = await fetch(`/api/estimates/${estimateId}`);
+                const response = await apiRequest(`/api/estimates/${estimateId}`);
                 const data = await response.json();
                 
                 document.getElementById('estimateTitle').textContent = `Estimate #${data.estimate_number}`;
@@ -164,7 +170,7 @@
         // Load status history
         async function loadHistory() {
             try {
-                const response = await fetch(`/api/estimates/${estimateId}/history`);
+                const response = await apiRequest(`/api/estimates/${estimateId}/history`);
                 const history = await response.json();
                 
                 const container = document.getElementById('historyContainer');
@@ -250,9 +256,8 @@
             const notes = document.getElementById('statusNotes').value;
             
             try {
-                const response = await fetch(`/api/estimates/${estimateId}/status`, {
+                const response = await apiRequest(`/api/estimates/${estimateId}/status`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: currentNewStatus, reason, notes })
                 });
                 

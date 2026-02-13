@@ -64,32 +64,18 @@ function requirePermission(module, action) {
             }
 
             // Check role_permissions table using parameterized queries
-            try {
-                const [permissions] = await pool.query(
-                    `SELECT rp.id
-                     FROM role_permissions rp
-                     JOIN permissions p ON rp.permission_id = p.id
-                     JOIN roles r ON rp.role_id = r.id
-                     WHERE r.name = ?
-                     AND p.module = ?
-                     AND p.action = ?`,
-                    [user.role, module, action]
-                );
+            const [permissions] = await pool.query(
+                `SELECT rp.id
+                 FROM role_permissions rp
+                 JOIN permissions p ON rp.permission_id = p.id
+                 JOIN roles r ON rp.role_id = r.id
+                 WHERE r.name = ?
+                 AND p.module = ?
+                 AND p.action = ?`,
+                [user.role, module, action]
+            );
 
-                if (permissions.length > 0) {
-                    return next();
-                }
-            } catch (err) {
-                // Tables might not exist yet - fall through to default check
-            }
-
-            // Default staff permissions for basic actions
-            if (user.role === 'staff' && ['view', 'add'].includes(action)) {
-                return next();
-            }
-
-            // Manager gets most permissions except delete/manage
-            if (user.role === 'manager' && ['view', 'add', 'edit', 'approve'].includes(action)) {
+            if (permissions.length > 0) {
                 return next();
             }
 
@@ -159,44 +145,30 @@ function requireAnyPermission(permissionsNeeded) {
                 return next();
             }
 
-            // Check role_permissions using parameterized queries (FIXED: no SQL injection)
-            try {
-                const [roleInfo] = await pool.query(
-                    'SELECT id FROM roles WHERE name = ? LIMIT 1',
-                    [user.role]
+            // Check role_permissions using parameterized queries
+            const [roleInfo] = await pool.query(
+                'SELECT id FROM roles WHERE name = ? LIMIT 1',
+                [user.role]
+            );
+
+            if (roleInfo.length > 0) {
+                // Build parameterized query for multiple permission checks
+                const placeholders = permissionsNeeded.map(() => '(p.module = ? AND p.action = ?)').join(' OR ');
+                const params = [roleInfo[0].id];
+                permissionsNeeded.forEach(p => {
+                    params.push(p.module, p.action);
+                });
+
+                const [userPermissions] = await pool.query(
+                    `SELECT rp.id
+                     FROM role_permissions rp
+                     JOIN permissions p ON rp.permission_id = p.id
+                     WHERE rp.role_id = ?
+                     AND (${placeholders})`,
+                    params
                 );
 
-                if (roleInfo.length > 0) {
-                    // Build parameterized query for multiple permission checks
-                    const placeholders = permissionsNeeded.map(() => '(p.module = ? AND p.action = ?)').join(' OR ');
-                    const params = [roleInfo[0].id];
-                    permissionsNeeded.forEach(p => {
-                        params.push(p.module, p.action);
-                    });
-
-                    const [userPermissions] = await pool.query(
-                        `SELECT rp.id
-                         FROM role_permissions rp
-                         JOIN permissions p ON rp.permission_id = p.id
-                         WHERE rp.role_id = ?
-                         AND (${placeholders})`,
-                        params
-                    );
-
-                    if (userPermissions.length > 0) {
-                        return next();
-                    }
-                }
-            } catch (err) {
-                // Tables might not exist
-            }
-
-            // Default: staff view/add
-            if (user.role === 'staff') {
-                const hasBasicPermission = permissionsNeeded.some(p =>
-                    p.action === 'view' || p.action === 'add'
-                );
-                if (hasBasicPermission) {
+                if (userPermissions.length > 0) {
                     return next();
                 }
             }
