@@ -629,13 +629,8 @@ app.post('/api/otp/send', async (req, res) => {
             const http = require('http');
             const querystring = require('querystring');
 
-            // Select DLT-registered template based on purpose
-            let message;
-            if (purpose === 'Staff Registration') {
-                message = `Your verification OTP for Quality Colours registration is ${otpCode}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
-            } else {
-                message = `Hi, your Quality Colours verification code is ${otpCode}. Use this code to complete registration and view product pricing. - QUALTQ`;
-            }
+            // DLT-registered template (single verified template for all OTP purposes)
+            const message = `Your verification OTP for Quality Colours registration is ${otpCode}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
 
             const params = querystring.stringify({
                 user: process.env.SMS_USER,
@@ -809,12 +804,8 @@ app.post('/api/otp/resend', async (req, res) => {
             const http = require('http');
             const querystring = require('querystring');
 
-            let message;
-            if (purpose === 'Staff Registration') {
-                message = `Your verification OTP for Quality Colours registration is ${otpCode}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
-            } else {
-                message = `Hi, your Quality Colours verification code is ${otpCode}. Use this code to complete registration and view product pricing. - QUALTQ`;
-            }
+            // DLT-registered template (single verified template for all OTP purposes)
+            const message = `Your verification OTP for Quality Colours registration is ${otpCode}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
 
             const params = querystring.stringify({
                 user: process.env.SMS_USER,
@@ -2424,7 +2415,7 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
             const httpModule = require('http');
             const querystring = require('querystring');
 
-            const message = `Hi, your Quality Colours verification code is ${otp}. Use this code to complete registration and view product pricing. - QUALTQ`;
+            const message = `Your verification OTP for Quality Colours registration is ${otp}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
 
             const params = querystring.stringify({
                 user: process.env.SMS_USER,
