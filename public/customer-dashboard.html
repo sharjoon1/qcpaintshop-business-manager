@@ -10,8 +10,12 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>My Dashboard - Quality Colours</title>
-    <script src="/js/auth-helper.js"></script>
-    <script>checkAuthOrRedirect();</script>
+    <script>
+    // Customer auth check
+    if (localStorage.getItem('customer_logged_in') !== 'true') {
+        window.location.href = '/customer-login.html';
+    }
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .gradient-bg {
@@ -74,8 +78,7 @@
                         </svg>
                     </button>
                     <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                        <a href="admin-profile.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</a>
-                        <a href="customer-login.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
+                        <a href="#" onclick="customerLogout()" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
                     </div>
                 </div>
             </div>
@@ -407,6 +410,16 @@
             if (days < 7) return `${days} days ago`;
             return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
         }
+    </script>
+    <script>
+    function customerLogout() {
+        localStorage.removeItem('customer_phone');
+        localStorage.removeItem('customer_name');
+        localStorage.removeItem('customer_logged_in');
+        localStorage.removeItem('customer_token');
+        localStorage.removeItem('customer_id');
+        window.location.href = '/customer-login.html';
+    }
     </script>
     <script src="/components/logo-loader.js"></script>
 </body>

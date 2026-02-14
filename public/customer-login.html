@@ -12,9 +12,9 @@
     <title>Customer Login - Quality Colours</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .otp-input { width: 48px; height: 48px; text-align: center; font-size: 1.25rem; font-weight: 700; border: 2px solid #e5e7eb; border-radius: 12px; outline: none; }
+        .otp-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.2); }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -22,70 +22,240 @@
         <div class="max-w-md w-full">
             <!-- Logo -->
             <div class="text-center mb-8">
-                <img id="headerLogo" src="https://qcpaintshop.com/assets/images/logo.png" alt="Quality Colours" class="h-20 mx-auto mb-4">
+                <img id="headerLogo" src="/icons/icon-192x192.png" alt="Quality Colours" class="h-20 mx-auto mb-4">
                 <h2 class="text-3xl font-bold text-gray-800">Customer Portal</h2>
-                <p class="text-gray-600 mt-2">Track your estimate requests</p>
+                <p class="text-gray-600 mt-2">Track your estimates & design requests</p>
             </div>
 
-            <!-- Login Card -->
-            <div class="bg-white rounded-xl shadow-lg p-8">
+            <!-- Phone Step -->
+            <div id="phoneStep" class="bg-white rounded-xl shadow-lg p-8">
                 <h3 class="text-xl font-bold text-gray-800 mb-6">Login with Phone Number</h3>
-                
-                <form id="loginForm" class="space-y-4">
+
+                <form id="phoneForm" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
-                        <input type="tel" id="phone" required pattern="[6-9][0-9]{9}" maxlength="10"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="Enter 10-digit mobile number">
-                        <p class="text-xs text-gray-500 mt-1">Use the same number you used for estimate request</p>
+                        <div class="flex gap-2">
+                            <span class="flex items-center px-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 text-sm">+91</span>
+                            <input type="tel" id="phone" required pattern="[6-9][0-9]{9}" maxlength="10"
+                                class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                placeholder="Enter 10-digit number">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Use the same number from your estimate request</p>
                     </div>
 
-                    <button type="submit" id="loginBtn"
+                    <button type="submit" id="sendOtpBtn"
                         class="w-full gradient-bg text-white font-semibold py-3 rounded-lg hover:opacity-90 transition">
-                        Continue
+                        Send OTP
                     </button>
                 </form>
 
+                <div id="phoneError" class="hidden mt-3 p-3 bg-red-50 text-red-700 text-sm rounded-lg"></div>
+
                 <div class="mt-6 text-center text-sm text-gray-600">
                     <p>Don't have a request yet?</p>
-                    <a href="request-estimate.html" class="text-purple-600 hover:text-purple-700 font-medium">
-                        Submit New Request →
-                    </a>
+                    <a href="request-estimate.html" class="text-purple-600 hover:text-purple-700 font-medium">Submit New Request</a>
                 </div>
             </div>
 
-            <!-- Info -->
+            <!-- OTP Step -->
+            <div id="otpStep" class="hidden bg-white rounded-xl shadow-lg p-8">
+                <button onclick="backToPhone()" class="text-gray-500 hover:text-gray-700 text-sm mb-4 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    Change number
+                </button>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Enter OTP</h3>
+                <p class="text-sm text-gray-600 mb-6">We sent a 6-digit code to <strong id="otpPhoneDisplay"></strong></p>
+
+                <div class="flex justify-center gap-3 mb-6">
+                    <input type="text" class="otp-input" maxlength="1" data-otp="0" autofocus>
+                    <input type="text" class="otp-input" maxlength="1" data-otp="1">
+                    <input type="text" class="otp-input" maxlength="1" data-otp="2">
+                    <input type="text" class="otp-input" maxlength="1" data-otp="3">
+                    <input type="text" class="otp-input" maxlength="1" data-otp="4">
+                    <input type="text" class="otp-input" maxlength="1" data-otp="5">
+                </div>
+
+                <button onclick="verifyOTP()" id="verifyBtn"
+                    class="w-full gradient-bg text-white font-semibold py-3 rounded-lg hover:opacity-90 transition">
+                    Verify & Login
+                </button>
+
+                <div id="otpError" class="hidden mt-3 p-3 bg-red-50 text-red-700 text-sm rounded-lg"></div>
+
+                <div class="mt-4 text-center">
+                    <button onclick="resendOTP()" id="resendBtn" disabled
+                        class="text-purple-600 hover:text-purple-700 text-sm font-medium disabled:text-gray-400 disabled:cursor-not-allowed">
+                        Resend OTP (<span id="resendTimer">30</span>s)
+                    </button>
+                </div>
+            </div>
+
             <div class="mt-6 text-center text-sm text-gray-500">
-                <p>Need help? Call us at <a href="tel:+919876543210" class="text-purple-600 hover:text-purple-700">98765 43210</a></p>
+                <p>Need help? Call us at <a href="tel:+917418831122" class="text-purple-600 hover:text-purple-700">74188 31122</a></p>
             </div>
         </div>
     </div>
 
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const phone = document.getElementById('phone').value;
-            
-            if (!/^[6-9]\d{9}$/.test(phone)) {
-                alert('Please enter a valid 10-digit mobile number');
-                return;
-            }
+<script>
+let customerPhone = '';
+let resendInterval = null;
 
-            // Store in localStorage (in real app, would verify OTP first)
-            localStorage.setItem('customer_phone', phone);
-            localStorage.setItem('customer_name', 'Customer'); // Would come from database
+// Phone input cleanup
+document.getElementById('phone').addEventListener('input', function() {
+    this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+});
+
+// Send OTP
+document.getElementById('phoneForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const phone = document.getElementById('phone').value;
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+        showError('phoneError', 'Please enter a valid 10-digit mobile number');
+        return;
+    }
+
+    const btn = document.getElementById('sendOtpBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    hideError('phoneError');
+
+    try {
+        const r = await fetch('/api/customer/auth/send-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone })
+        });
+        const result = await r.json();
+        if (result.success) {
+            customerPhone = phone;
+            document.getElementById('otpPhoneDisplay').textContent = '+91 ' + phone;
+            document.getElementById('phoneStep').classList.add('hidden');
+            document.getElementById('otpStep').classList.remove('hidden');
+            startResendTimer();
+            document.querySelector('[data-otp="0"]').focus();
+        } else {
+            showError('phoneError', result.message || 'Failed to send OTP');
+        }
+    } catch (err) {
+        showError('phoneError', 'Network error. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send OTP';
+    }
+});
+
+// OTP input auto-advance
+document.querySelectorAll('.otp-input').forEach((input, idx) => {
+    input.addEventListener('input', function() {
+        this.value = this.value.replace(/[^0-9]/g, '');
+        if (this.value && idx < 5) {
+            document.querySelector(`[data-otp="${idx + 1}"]`).focus();
+        }
+        if (idx === 5 && this.value) verifyOTP();
+    });
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Backspace' && !this.value && idx > 0) {
+            document.querySelector(`[data-otp="${idx - 1}"]`).focus();
+        }
+    });
+    input.addEventListener('paste', function(e) {
+        e.preventDefault();
+        const paste = (e.clipboardData.getData('text') || '').replace(/[^0-9]/g, '').slice(0, 6);
+        paste.split('').forEach((char, i) => {
+            const el = document.querySelector(`[data-otp="${i}"]`);
+            if (el) el.value = char;
+        });
+        if (paste.length === 6) verifyOTP();
+    });
+});
+
+// Verify OTP
+async function verifyOTP() {
+    const otp = Array.from(document.querySelectorAll('.otp-input')).map(i => i.value).join('');
+    if (otp.length !== 6) {
+        showError('otpError', 'Please enter the complete 6-digit OTP');
+        return;
+    }
+
+    const btn = document.getElementById('verifyBtn');
+    btn.disabled = true;
+    btn.textContent = 'Verifying...';
+    hideError('otpError');
+
+    try {
+        const r = await fetch('/api/customer/auth/verify-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: customerPhone, otp })
+        });
+        const result = await r.json();
+        if (result.success) {
+            localStorage.setItem('customer_phone', customerPhone);
+            localStorage.setItem('customer_name', result.data.name || 'Customer');
             localStorage.setItem('customer_logged_in', 'true');
-            
-            // Redirect to dashboard
+            localStorage.setItem('customer_token', result.data.token || '');
+            localStorage.setItem('customer_id', result.data.customer_id || '');
             window.location.href = 'customer-dashboard.html';
-        });
+        } else {
+            showError('otpError', result.message || 'Invalid OTP');
+        }
+    } catch (err) {
+        showError('otpError', 'Network error. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Verify & Login';
+    }
+}
 
-        // Phone input validation
-        document.getElementById('phone').addEventListener('input', function(e) {
-            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+function backToPhone() {
+    document.getElementById('otpStep').classList.add('hidden');
+    document.getElementById('phoneStep').classList.remove('hidden');
+    clearInterval(resendInterval);
+}
+
+async function resendOTP() {
+    try {
+        await fetch('/api/customer/auth/send-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: customerPhone })
         });
-    </script>
-    <script src="/components/logo-loader.js"></script>
+        startResendTimer();
+    } catch {}
+}
+
+function startResendTimer() {
+    let seconds = 30;
+    const btn = document.getElementById('resendBtn');
+    const timer = document.getElementById('resendTimer');
+    btn.disabled = true;
+    clearInterval(resendInterval);
+    resendInterval = setInterval(() => {
+        seconds--;
+        timer.textContent = seconds;
+        if (seconds <= 0) {
+            clearInterval(resendInterval);
+            btn.disabled = false;
+            btn.innerHTML = 'Resend OTP';
+        }
+    }, 1000);
+}
+
+function showError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.classList.remove('hidden');
+}
+
+function hideError(id) {
+    document.getElementById(id).classList.add('hidden');
+}
+
+// Auto-redirect if already logged in
+if (localStorage.getItem('customer_logged_in') === 'true') {
+    window.location.href = 'customer-dashboard.html';
+}
+</script>
+<script src="/components/logo-loader.js"></script>
 </body>
 </html>

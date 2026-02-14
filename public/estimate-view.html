@@ -82,6 +82,12 @@
             </div>
 
             <div class="flex gap-2">
+                <button onclick="shareViaWhatsApp()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm" title="Share via WhatsApp">
+                    📱 WhatsApp
+                </button>
+                <button onclick="downloadPDF()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm" title="Download PDF">
+                    📄 PDF
+                </button>
                 <button onclick="editEstimate()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
                     ✏️ Edit
                 </button>
@@ -396,6 +402,53 @@
 
         function editEstimate() {
             window.location.href = `estimate-edit.html?id=${estimateId}`;
+        }
+
+        async function shareViaWhatsApp() {
+            try {
+                const r = await apiRequest('/api/share/whatsapp', {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders() },
+                    body: JSON.stringify({ resource_type: 'estimate', resource_id: estimateId })
+                });
+                const result = await r.json();
+                if (result.success && result.data.whatsapp_url) {
+                    window.open(result.data.whatsapp_url, '_blank');
+                } else {
+                    alert(result.message || 'Failed to generate share link');
+                }
+            } catch (err) {
+                console.error('WhatsApp share error:', err);
+                alert('Failed to share. Please try again.');
+            }
+        }
+
+        function downloadPDF() {
+            const token = localStorage.getItem('auth_token');
+            // Check if running in Android WebView
+            const ua = navigator.userAgent || '';
+            if (ua.includes('QCManagerApp')) {
+                // Android: use direct URL with token param for DownloadManager
+                window.location.href = `/api/estimates/${estimateId}/pdf?token=${token}`;
+            } else {
+                // Browser: fetch as blob and trigger download
+                fetch(`/api/estimates/${estimateId}/pdf`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }).then(r => {
+                    if (!r.ok) throw new Error('PDF generation failed');
+                    return r.blob();
+                }).then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Estimate-${estimateId}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }).catch(err => {
+                    console.error('PDF download error:', err);
+                    alert('Failed to download PDF');
+                });
+            }
         }
 
         // Initialize

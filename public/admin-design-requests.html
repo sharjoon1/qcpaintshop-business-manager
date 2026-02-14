@@ -207,23 +207,23 @@
                                 <option value="">Choose brand...</option>
                             </select>
                         </div>
-                        <div class="min-w-[220px]">
+                        <div class="min-w-[280px]">
                             <label class="block text-sm font-semibold text-gray-700 mb-1">AI Model</label>
                             <div class="flex gap-2">
                                 <label class="flex-1 cursor-pointer">
-                                    <input type="radio" name="aiModel" value="pollinations" checked class="hidden peer">
-                                    <div class="peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 bg-white border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-medium transition hover:border-indigo-400">
-                                        Pollinations AI
-                                        <span class="block text-[10px] font-normal opacity-75">Free - No Limits</span>
-                                        <span id="pollinationsStatus" class="block"></span>
+                                    <input type="radio" name="aiModel" value="gemini" checked class="hidden peer">
+                                    <div class="peer-checked:bg-purple-600 peer-checked:text-white peer-checked:border-purple-600 bg-white border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-medium transition hover:border-purple-400">
+                                        Gemini AI
+                                        <span class="block text-[10px] font-normal opacity-75">Edits Your Photo</span>
+                                        <span id="geminiStatus" class="block"></span>
                                     </div>
                                 </label>
                                 <label class="flex-1 cursor-pointer">
-                                    <input type="radio" name="aiModel" value="gemini" class="hidden peer">
-                                    <div class="peer-checked:bg-purple-600 peer-checked:text-white peer-checked:border-purple-600 bg-white border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-medium transition hover:border-purple-400">
-                                        Gemini AI
-                                        <span class="block text-[10px] font-normal opacity-75">Paid - High Quality</span>
-                                        <span id="geminiStatus" class="block"></span>
+                                    <input type="radio" name="aiModel" value="pollinations" class="hidden peer">
+                                    <div class="peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 bg-white border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-medium transition hover:border-indigo-400">
+                                        Pollinations
+                                        <span class="block text-[10px] font-normal opacity-75">Free Unlimited</span>
+                                        <span id="pollinationsStatus" class="block"></span>
                                     </div>
                                 </label>
                             </div>
@@ -233,7 +233,7 @@
                             Generate AI Variations
                         </button>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2" id="vizModelHint">Pollinations AI (Kontext) detects building zones and applies 3 professionally curated color combinations</p>
+                    <p class="text-xs text-gray-500 mt-2" id="vizModelHint">Gemini AI edits your actual building photo with selected colors. Pollinations generates a sample building visualization (free unlimited).</p>
                 </div>
 
                 <!-- Processing State -->
@@ -473,19 +473,27 @@
 
     function updateAiStatusUI() {
         const statusLabels = {
-            available: '<span class="text-green-600 text-[10px]">Online</span>',
-            down: '<span class="text-red-600 text-[10px]">Offline</span>',
-            slow: '<span class="text-yellow-600 text-[10px]">Slow</span>',
-            error: '<span class="text-red-600 text-[10px]">Error</span>',
-            quota_exceeded: '<span class="text-orange-600 text-[10px]">Quota Full</span>',
-            not_configured: '<span class="text-gray-400 text-[10px]">Not Set Up</span>',
-            unknown: '<span class="text-gray-400 text-[10px]">Checking...</span>'
+            'available': { html: '<span class="text-green-600 text-[10px]">&#9679; Online</span>', ok: true },
+            'down': { html: '<span class="text-red-600 text-[10px]">&#9679; Offline</span>', ok: false },
+            'slow': { html: '<span class="text-yellow-600 text-[10px]">&#9679; Slow</span>', ok: true },
+            'error': { html: '<span class="text-red-600 text-[10px]">&#9679; Error</span>', ok: false },
+            'quota_exceeded': { html: '<span class="text-orange-600 text-[10px]">&#9679; Quota Full</span>', ok: false },
+            'not_configured': { html: '<span class="text-gray-400 text-[10px]">&#9679; Not Set Up</span>', ok: false },
+            'unknown': { html: '<span class="text-gray-400 text-[10px]">Checking...</span>', ok: false }
         };
 
         const polStatus = document.getElementById('pollinationsStatus');
         const gemStatus = document.getElementById('geminiStatus');
-        if (polStatus) polStatus.innerHTML = statusLabels[aiStatus.pollinations] || statusLabels.unknown;
-        if (gemStatus) gemStatus.innerHTML = statusLabels[aiStatus.gemini] || statusLabels.unknown;
+        const gemLabel = statusLabels[aiStatus.gemini] || statusLabels.unknown;
+        const polLabel = statusLabels[aiStatus.pollinations] || statusLabels.unknown;
+        if (gemStatus) gemStatus.innerHTML = gemLabel.html;
+        if (polStatus) polStatus.innerHTML = polLabel.html;
+
+        // Auto-select best available model
+        if (!gemLabel.ok && polLabel.ok) {
+            const polRadio = document.querySelector('input[name="aiModel"][value="pollinations"]');
+            if (polRadio) polRadio.checked = true;
+        }
     }
 
     async function openVisualizer() {
@@ -530,7 +538,7 @@
     }
 
     function getSelectedAiModel() {
-        return document.querySelector('input[name="aiModel"]:checked')?.value || 'pollinations';
+        return document.querySelector('input[name="aiModel"]:checked')?.value || 'gemini';
     }
 
     // Update hint text when AI model changes
@@ -538,9 +546,9 @@
         radio.addEventListener('change', () => {
             const hint = document.getElementById('vizModelHint');
             if (radio.value === 'gemini') {
-                hint.textContent = 'Gemini AI detects building zones and applies 3 professionally curated color combinations';
+                hint.textContent = 'Gemini AI edits your actual building photo with selected colors (recommended). Falls back to Pollinations if unavailable.';
             } else {
-                hint.textContent = 'Pollinations AI (Kontext) detects building zones and applies 3 professionally curated color combinations';
+                hint.textContent = 'Pollinations generates a sample building with selected colors (free, unlimited). Does not edit your actual photo.';
             }
         });
     });
@@ -554,12 +562,15 @@
         document.querySelectorAll('.viz-error-banner').forEach(el => el.remove());
 
         const aiModel = getSelectedAiModel();
-        const modelLabel = aiModel === 'gemini' ? 'Gemini AI' : 'Pollinations AI (Kontext)';
-        const timeEstimate = '30-90 seconds';
+        const modelLabel = aiModel === 'gemini' ? 'Gemini AI' : 'Pollinations AI';
+        const processMsg = aiModel === 'gemini'
+            ? modelLabel + ' is repainting your building...'
+            : modelLabel + ' is generating a color visualization...';
+        const timeEstimate = aiModel === 'gemini' ? '30-60 seconds' : '45-90 seconds';
 
         const btn = document.getElementById('btnGenerate');
         btn.disabled = true;
-        document.getElementById('vizProcessTitle').textContent = modelLabel + ' is repainting your building...';
+        document.getElementById('vizProcessTitle').textContent = processMsg;
         document.getElementById('vizProcessTime').textContent = 'Generating 3 AI variations \u2014 this takes ' + timeEstimate + '. Auto-fallback enabled if primary model is unavailable.';
         document.getElementById('vizProcessing').classList.remove('hidden');
         document.getElementById('vizResults').classList.add('hidden');

@@ -10,6 +10,7 @@
  */
 
 const express = require('express');
+const http = require('http');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
@@ -20,6 +21,7 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
+const { Server: SocketIO } = require('socket.io');
 
 // Import middleware
 const { initPool, requirePermission, requireAnyPermission, requireAuth, requireRole, getUserPermissions } = require('./middleware/permissionMiddleware');
@@ -38,6 +40,11 @@ const staffRegistrationRoutes = require('./routes/staff-registration');
 const dailyTasksRoutes = require('./routes/daily-tasks');
 const syncScheduler = require('./services/sync-scheduler');
 const whatsappProcessor = require('./services/whatsapp-processor');
+const chatRoutes = require('./routes/chat');
+const notificationRoutes = require('./routes/notifications');
+const estimatePdfRoutes = require('./routes/estimate-pdf');
+const shareRoutes = require('./routes/share');
+const notificationService = require('./services/notification-service');
 
 const app = express();
 
@@ -119,6 +126,11 @@ staffRegistrationRoutes.setPool(pool);
 dailyTasksRoutes.setPool(pool);
 syncScheduler.setPool(pool);
 whatsappProcessor.setPool(pool);
+chatRoutes.setPool(pool);
+notificationRoutes.setPool(pool);
+estimatePdfRoutes.setPool(pool);
+shareRoutes.setPool(pool);
+notificationService.setPool(pool);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -233,6 +245,18 @@ app.use('/api/tasks', tasksRoutes.router);
 app.use('/api/zoho', zohoRoutes.router);
 app.use('/api/staff-registration', staffRegistrationRoutes.router);
 app.use('/api/daily-tasks', dailyTasksRoutes.router);
+app.use('/api/chat', chatRoutes.router);
+app.use('/api/notifications', notificationRoutes.router);
+app.use('/api/estimates', estimatePdfRoutes.router);
+app.use('/api/share', shareRoutes.router);
+
+// Share page routes (serve HTML for public share links)
+app.get('/share/estimate/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'share', 'estimate.html'));
+});
+app.get('/share/design-request/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'share', 'design-request.html'));
+});
 
 // Zoho OAuth callback redirect (Zoho app configured with /oauth/callback)
 app.get('/oauth/callback', (req, res) => {
@@ -1452,28 +1476,26 @@ CRITICAL RULES:
     return `/uploads/visualizations/${filename}`;
 }
 
-// --- Pollinations AI (Kontext) Image Generation ---
+// --- Pollinations AI (Flux - Free Text-to-Image) ---
+// NOTE: Pollinations 'kontext' (img2img) moved to PAID-ONLY in Feb 2026.
+// We use the free 'flux' model for text-to-image building visualization as a fallback.
 async function generateAutoVizPollinations(photoRelPath, combo, customerInfo, brandName) {
-    const appUrl = process.env.APP_PUBLIC_URL;
-    if (!appUrl || appUrl.includes('localhost')) {
-        throw new Error('Pollinations AI requires APP_PUBLIC_URL to be a publicly accessible domain (not localhost). Set APP_PUBLIC_URL in .env to your production URL.');
-    }
-
-    const publicImageUrl = appUrl.replace(/\/$/, '') + photoRelPath;
     const colors = combo.colors;
 
-    // Build color prompt
-    let prompt;
+    // Build a detailed text-to-image prompt describing a painted building with these colors
+    let colorDesc;
     if (combo.type === 'two-color') {
-        prompt = `Edit this building exterior photo. Repaint ONLY the painted wall surfaces with ${colors[0].name} (exact hex color: ${colors[0].hex}). Repaint the trim, pillars, borders, and accent areas with ${colors[1].name} (exact hex color: ${colors[1].hex}). CRITICAL: Keep the sky, ground, vegetation, glass windows, roof tiles, and all non-painted surfaces completely unchanged. The result must look like a professional realistic photograph of the repainted building.`;
+        colorDesc = `The main exterior walls are painted in ${colors[0].name} (hex ${colors[0].hex}), a beautiful ${colors[0].temperature || 'neutral'} tone. The trim, window frames, pillars, and accent borders are painted in ${colors[1].name} (hex ${colors[1].hex}).`;
     } else {
-        prompt = `Edit this building exterior photo. Repaint the main walls with ${colors[0].name} (${colors[0].hex}). Repaint secondary surfaces like pillars and balcony walls with ${colors[1].name} (${colors[1].hex}). Repaint doors and small accents with ${colors[2].name} (${colors[2].hex}). CRITICAL: Keep the sky, ground, vegetation, glass windows, roof tiles, and all non-painted surfaces completely unchanged. The result must look like a professional realistic photograph of the repainted building.`;
+        colorDesc = `The main exterior walls are painted in ${colors[0].name} (hex ${colors[0].hex}), a ${colors[0].temperature || 'neutral'} tone. The secondary surfaces like pillars, balcony walls, and fascia are painted in ${colors[1].name} (hex ${colors[1].hex}). The doors, window frames, and small accent features are painted in ${colors[2].name} (hex ${colors[2].hex}).`;
     }
 
-    const seed = Math.floor(Math.random() * 999999);
-    const apiUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=kontext&image=${encodeURIComponent(publicImageUrl)}&width=1024&height=1024&nologo=true&seed=${seed}`;
+    const prompt = `A photorealistic professional exterior photograph of a modern Indian residential building freshly painted. ${colorDesc} The building has clear architectural details with balconies, windows with glass, a main entrance door, and decorative trim work. Natural daylight, blue sky with light clouds, well-maintained surroundings with some greenery. Shot with a DSLR camera, sharp focus, vibrant but realistic colors. The paint looks freshly applied with a smooth satin finish. No text, no watermarks, no labels.`;
 
-    console.log(`[Pollinations] Generating: ${combo.label}`);
+    const seed = Math.floor(Math.random() * 999999);
+    const apiUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=flux&width=1024&height=768&nologo=true&seed=${seed}&enhance=true`;
+
+    console.log(`[Pollinations:flux] Generating: ${combo.label}`);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
@@ -1509,7 +1531,7 @@ async function generateAutoVizPollinations(photoRelPath, combo, customerInfo, br
             .jpeg({ quality: 92 })
             .toFile(outputPath);
 
-        console.log(`[Pollinations] Done: ${combo.label}`);
+        console.log(`[Pollinations:flux] Done: ${combo.label}`);
         return `/uploads/visualizations/${filename}`;
     } finally {
         clearTimeout(timeoutId);
@@ -1518,18 +1540,16 @@ async function generateAutoVizPollinations(photoRelPath, combo, customerInfo, br
 
 // GET /api/ai-status - check AI model availability
 app.get('/api/ai-status', requireAuth, async (req, res) => {
-    const status = { pollinations: 'unknown', gemini: 'unknown' };
+    const status = {
+        gemini: 'unknown',
+        pollinations: 'unknown',
+        modelInfo: {
+            gemini: { type: 'img2img', description: 'Edits your actual building photo with new colors', free: true, recommended: true },
+            pollinations: { type: 'text2img', description: 'Generates a sample building with selected colors (free unlimited)', free: true, recommended: false }
+        }
+    };
 
-    // Check Pollinations (quick test with a simple prompt)
-    try {
-        const testUrl = 'https://image.pollinations.ai/prompt/test?model=flux&width=64&height=64&nologo=true&seed=1';
-        const pollRes = await fetch(testUrl, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
-        status.pollinations = pollRes.ok ? 'available' : (pollRes.status === 530 ? 'down' : 'error');
-    } catch (e) {
-        status.pollinations = e.name === 'TimeoutError' ? 'slow' : 'down';
-    }
-
-    // Check Gemini
+    // Check Gemini first (primary model)
     if (!geminiAI) {
         status.gemini = 'not_configured';
     } else {
@@ -1538,9 +1558,22 @@ app.get('/api/ai-status', requireAuth, async (req, res) => {
             await model.generateContent('Say OK');
             status.gemini = 'available';
         } catch (e) {
-            status.gemini = (e.message || '').includes('429') || (e.message || '').includes('quota') || (e.message || '').includes('RESOURCE_EXHAUSTED')
-                ? 'quota_exceeded' : 'error';
+            const msg = e.message || '';
+            if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
+                status.gemini = 'quota_exceeded';
+            } else {
+                status.gemini = 'error';
+            }
         }
+    }
+
+    // Check Pollinations (fallback - free flux text-to-image)
+    try {
+        const testUrl = 'https://image.pollinations.ai/prompt/test?model=flux&width=64&height=64&nologo=true&seed=1';
+        const pollRes = await fetch(testUrl, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
+        status.pollinations = pollRes.ok ? 'available' : (pollRes.status === 530 ? 'down' : 'error');
+    } catch (e) {
+        status.pollinations = e.name === 'TimeoutError' ? 'slow' : 'down';
     }
 
     res.json({ success: true, data: status });
@@ -1710,6 +1743,8 @@ app.get('/api/design-requests/:id/visualizations', requireRole('admin', 'manager
 });
 
 // Helper: attempt AI generation for a single combo, with model fallback
+// Primary: Gemini (true img2img - edits actual photo)
+// Fallback: Pollinations flux (free text-to-image - generates sample building)
 async function generateSingleVariation(aiModel, combo, designReq, photoFullPath, catalog, userId) {
     const customerInfo = { name: designReq.name, city: designReq.city || '' };
 
@@ -1723,7 +1758,7 @@ async function generateSingleVariation(aiModel, combo, designReq, photoFullPath,
     };
 
     // Determine fallback model
-    const fallbackModel = aiModel === 'pollinations' ? 'gemini' : 'pollinations';
+    const fallbackModel = aiModel === 'gemini' ? 'pollinations' : 'gemini';
     const canFallbackGemini = fallbackModel === 'gemini' && geminiAI;
     const canFallbackPollinations = fallbackModel === 'pollinations';
 
@@ -1732,17 +1767,19 @@ async function generateSingleVariation(aiModel, combo, designReq, photoFullPath,
     try {
         imageUrl = await tryModel(aiModel);
     } catch (primaryErr) {
-        const isServiceDown = primaryErr.message.includes('530') || primaryErr.message.includes('1033') || primaryErr.message.includes('503');
-        const isQuotaError = primaryErr.message.includes('429') || primaryErr.message.includes('quota') || primaryErr.message.includes('RESOURCE_EXHAUSTED');
-        const shouldFallback = isServiceDown || isQuotaError;
+        const msg = primaryErr.message || '';
+        const isServiceDown = msg.includes('530') || msg.includes('1033') || msg.includes('503');
+        const isQuotaError = msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
+        const isConfigError = msg.includes('not configured');
+        const shouldFallback = isServiceDown || isQuotaError || isConfigError;
 
         if (shouldFallback && (canFallbackGemini || canFallbackPollinations)) {
-            console.log(`[Viz] ${aiModel} failed (${primaryErr.message.slice(0, 80)}), falling back to ${fallbackModel}...`);
+            console.log(`[Viz] ${aiModel} failed (${msg.slice(0, 80)}), falling back to ${fallbackModel}...`);
             try {
                 imageUrl = await tryModel(fallbackModel);
                 usedModel = fallbackModel;
             } catch (fallbackErr) {
-                throw new Error(`Both AI models failed. ${aiModel}: ${primaryErr.message.slice(0, 100)}. ${fallbackModel}: ${fallbackErr.message.slice(0, 100)}`);
+                throw new Error(`Both AI models failed. ${aiModel}: ${msg.slice(0, 100)}. ${fallbackModel}: ${fallbackErr.message.slice(0, 100)}`);
             }
         } else {
             throw primaryErr;
@@ -1755,7 +1792,7 @@ async function generateSingleVariation(aiModel, combo, designReq, photoFullPath,
 // POST /api/design-requests/:id/auto-visualize - generate AI color combinations
 app.post('/api/design-requests/:id/auto-visualize', requireRole('admin', 'manager'), async (req, res) => {
     try {
-        const { brand, aiModel = 'pollinations' } = req.body;
+        const { brand, aiModel = 'gemini' } = req.body;
         if (!brand) return res.status(400).json({ success: false, error: 'brand is required' });
 
         const catalog = paintCatalogs[brand];
@@ -1773,7 +1810,7 @@ app.post('/api/design-requests/:id/auto-visualize', requireRole('admin', 'manage
         const allCombos = selectColorCombinations(catalog);
         const combos = allCombos.slice(0, 3);
 
-        // Delay between calls: Pollinations needs 16s (rate limit), Gemini needs 2s
+        // Delay between calls: Pollinations flux free tier = 15s rate limit, Gemini = 2s
         const delayMs = aiModel === 'pollinations' ? 16000 : 2000;
 
         const variations = [];
@@ -2349,6 +2386,143 @@ app.delete('/api/products/:id', requirePermission('products', 'delete'), async (
 });
 
 // ========================================
+// CUSTOMER AUTH (OTP)
+// ========================================
+
+// In-memory OTP store (production: use Redis or DB)
+const customerOTPs = new Map();
+
+app.post('/api/customer/auth/send-otp', async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone || !/^[6-9]\d{9}$/.test(phone)) {
+            return res.status(400).json({ success: false, message: 'Valid 10-digit phone required' });
+        }
+
+        // Check if customer exists (by phone in customers or estimate_requests)
+        const [customers] = await pool.query(
+            'SELECT id, name FROM customers WHERE phone = ? LIMIT 1',
+            [phone]
+        );
+        const [requests] = await pool.query(
+            'SELECT id, customer_name FROM estimate_requests WHERE customer_phone = ? LIMIT 1',
+            [phone]
+        );
+
+        if (customers.length === 0 && requests.length === 0) {
+            return res.status(404).json({ success: false, message: 'No account found with this phone number. Please submit an estimate request first.' });
+        }
+
+        // Generate 6-digit OTP
+        const otp = String(Math.floor(100000 + Math.random() * 900000));
+        customerOTPs.set(phone, { otp, expires: Date.now() + 5 * 60 * 1000, attempts: 0 });
+
+        // Send OTP via SMS
+        console.log(`[Customer OTP] Phone: ${phone}, OTP: ${otp}`);
+
+        if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
+            const httpModule = require('http');
+            const querystring = require('querystring');
+
+            const message = `Hi, your Quality Colours verification code is ${otp}. Use this code to login to your customer portal. - QUALTQ`;
+
+            const params = querystring.stringify({
+                user: process.env.SMS_USER,
+                password: process.env.SMS_PASSWORD,
+                senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
+                channel: 'Trans',
+                DCS: '0',
+                flashsms: '0',
+                number: '91' + phone,
+                text: message,
+                route: '4'
+            });
+
+            const smsUrl = `http://retailsms.nettyfish.com/api/mt/SendSMS?${params}`;
+
+            httpModule.get(smsUrl, (smsRes) => {
+                let data = '';
+                smsRes.on('data', chunk => { data += chunk; });
+                smsRes.on('end', () => {
+                    console.log('[Customer SMS] Response:', data);
+                });
+            }).on('error', (err) => {
+                console.error('[Customer SMS] Error:', err.message);
+            });
+        }
+
+        res.json({ success: true, message: 'OTP sent successfully' });
+    } catch (error) {
+        console.error('Send OTP error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/customer/auth/verify-otp', async (req, res) => {
+    try {
+        const { phone, otp } = req.body;
+        if (!phone || !otp) {
+            return res.status(400).json({ success: false, message: 'Phone and OTP required' });
+        }
+
+        const stored = customerOTPs.get(phone);
+        if (!stored) {
+            return res.status(400).json({ success: false, message: 'OTP expired. Please request a new one.' });
+        }
+
+        if (stored.attempts >= 5) {
+            customerOTPs.delete(phone);
+            return res.status(429).json({ success: false, message: 'Too many attempts. Request a new OTP.' });
+        }
+
+        if (Date.now() > stored.expires) {
+            customerOTPs.delete(phone);
+            return res.status(400).json({ success: false, message: 'OTP expired. Please request a new one.' });
+        }
+
+        stored.attempts++;
+
+        if (stored.otp !== otp) {
+            return res.status(400).json({ success: false, message: 'Invalid OTP. Please try again.' });
+        }
+
+        customerOTPs.delete(phone);
+
+        // Find customer
+        let customerName = 'Customer';
+        let customerId = null;
+        const [customers] = await pool.query('SELECT id, name FROM customers WHERE phone = ? LIMIT 1', [phone]);
+        if (customers.length > 0) {
+            customerName = customers[0].name;
+            customerId = customers[0].id;
+        } else {
+            const [requests] = await pool.query('SELECT id, customer_name FROM estimate_requests WHERE customer_phone = ? LIMIT 1', [phone]);
+            if (requests.length > 0) {
+                customerName = requests[0].customer_name;
+            }
+        }
+
+        // Generate session token
+        const token = crypto.randomBytes(32).toString('hex');
+
+        // Store session (reuse user_sessions table with a special marker)
+        await pool.query(
+            `INSERT INTO user_sessions (user_id, session_token, expires_at, ip_address, user_agent)
+             VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY), ?, ?)`,
+            [customerId || 0, token, req.ip, req.headers['user-agent'] || '']
+        );
+
+        res.json({
+            success: true,
+            data: { name: customerName, customer_id: customerId, token }
+        });
+    } catch (error) {
+        console.error('Verify OTP error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ========================================
 // CUSTOMERS
 // ========================================
 
@@ -2862,10 +3036,127 @@ app.use((err, req, res, _next) => {
 // START SERVER
 // ========================================
 
+// ========================================
+// HTTP SERVER + SOCKET.IO
+// ========================================
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+// Initialize Socket.io
+const io = new SocketIO(server, {
+    cors: {
+        origin: function (origin, callback) {
+            if (!origin) return callback(null, true);
+            if (allowedOrigins.includes(origin)) return callback(null, true);
+            if (process.env.NODE_ENV !== 'production') {
+                try {
+                    const url = new URL(origin);
+                    const host = url.hostname;
+                    if (host.startsWith('192.168.') || host.startsWith('10.') ||
+                        host.startsWith('172.') || host === 'localhost') {
+                        return callback(null, true);
+                    }
+                } catch (e) {}
+            }
+            return callback(new Error('Not allowed by CORS'));
+        },
+        credentials: true
+    }
+});
+
+// Make io accessible to routes
+app.set('io', io);
+notificationService.setIO(io);
+
+// Socket.io auth middleware
+io.use(async (socket, next) => {
+    try {
+        const token = socket.handshake.auth.token;
+        if (!token) return next(new Error('Authentication required'));
+
+        const [sessions] = await pool.query(
+            `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name
+             FROM user_sessions s JOIN users u ON s.user_id = u.id
+             WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+            [token]
+        );
+
+        if (sessions.length === 0) return next(new Error('Invalid session'));
+
+        socket.user = {
+            id: sessions[0].user_id,
+            username: sessions[0].username,
+            role: sessions[0].role,
+            full_name: sessions[0].full_name
+        };
+        next();
+    } catch (err) {
+        next(new Error('Auth failed'));
+    }
+});
+
+// Socket.io connection handler
+io.on('connection', async (socket) => {
+    const userId = socket.user.id;
+    console.log(`Socket connected: ${socket.user.full_name} (${userId})`);
+
+    // Join user's personal room for notifications
+    socket.join(`user_${userId}`);
+
+    // Join all conversations the user is part of
+    try {
+        const [convos] = await pool.query(
+            'SELECT conversation_id FROM chat_participants WHERE user_id = ?',
+            [userId]
+        );
+        convos.forEach(c => socket.join(`conversation_${c.conversation_id}`));
+    } catch (err) {
+        console.error('Socket join conversations error:', err.message);
+    }
+
+    // Handle joining a specific conversation
+    socket.on('join_conversation', (conversationId) => {
+        socket.join(`conversation_${conversationId}`);
+    });
+
+    // Handle typing indicator
+    socket.on('typing', (data) => {
+        socket.to(`conversation_${data.conversation_id}`).emit('user_typing', {
+            conversation_id: data.conversation_id,
+            user_id: userId,
+            user_name: socket.user.full_name,
+            is_typing: data.is_typing
+        });
+    });
+
+    // Handle mark read
+    socket.on('mark_read', async (data) => {
+        try {
+            await pool.query(
+                'UPDATE chat_participants SET last_read_at = NOW() WHERE conversation_id = ? AND user_id = ?',
+                [data.conversation_id, userId]
+            );
+            socket.to(`conversation_${data.conversation_id}`).emit('message_read', {
+                conversation_id: data.conversation_id,
+                user_id: userId,
+                user_name: socket.user.full_name,
+                read_at: new Date()
+            });
+        } catch (err) {
+            console.error('Socket mark_read error:', err.message);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`Socket disconnected: ${socket.user.full_name}`);
+    });
+});
+
+server.listen(PORT, () => {
     console.log(`QC Business Manager API v2.0.0 running on port ${PORT}`);
-    console.log(`Modules loaded: auth, roles, branches, users, customers, leads, products, estimates, attendance, salary, activities, tasks, settings, zoho-books`);
+    console.log(`Modules loaded: auth, roles, branches, users, customers, leads, products, estimates, attendance, salary, activities, tasks, settings, zoho-books, chat, notifications, pdf, share`);
+    console.log(`Socket.io ready`);
 
     // Start background services after server is ready
     if (process.env.ZOHO_ORGANIZATION_ID) {
