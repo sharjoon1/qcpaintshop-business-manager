@@ -198,18 +198,18 @@ router.post('/', requirePermission('branches', 'add'), async (req, res) => {
             const branchId = result.insertId;
 
             // Auto-create shop_hours_config for all 7 days
-            // day_of_week: 0=Sunday, 1=Monday ... 6=Saturday (TINYINT)
+            // day_of_week: ENUM('monday','tuesday',...,'sunday')
             const defaultOpenTime = open_time || '08:30:00';
             const defaultCloseTime = close_time || '20:30:00';
 
             const dayValues = [
-                [branchId, 1, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Monday
-                [branchId, 2, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Tuesday
-                [branchId, 3, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Wednesday
-                [branchId, 4, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Thursday
-                [branchId, 5, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Friday
-                [branchId, 6, 1, defaultOpenTime, defaultCloseTime, 10.00, 15],  // Saturday
-                [branchId, 0, 0, defaultOpenTime, defaultCloseTime, 0, 15]       // Sunday (closed)
+                [branchId, 'monday',    1, defaultOpenTime, defaultCloseTime, 10.00, 15],
+                [branchId, 'tuesday',   1, defaultOpenTime, defaultCloseTime, 10.00, 15],
+                [branchId, 'wednesday', 1, defaultOpenTime, defaultCloseTime, 10.00, 15],
+                [branchId, 'thursday',  1, defaultOpenTime, defaultCloseTime, 10.00, 15],
+                [branchId, 'friday',    1, defaultOpenTime, defaultCloseTime, 10.00, 15],
+                [branchId, 'saturday',  1, defaultOpenTime, defaultCloseTime, 10.00, 15],
+                [branchId, 'sunday',    0, defaultOpenTime, defaultCloseTime, 0, 15]
             ];
 
             await connection.query(
