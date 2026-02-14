@@ -2424,7 +2424,7 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
             const httpModule = require('http');
             const querystring = require('querystring');
 
-            const message = `Hi, your Quality Colours verification code is ${otp}. Use this code to login to your customer portal. - QUALTQ`;
+            const message = `Hi, your Quality Colours verification code is ${otp}. Use this code to complete registration and view product pricing. - QUALTQ`;
 
             const params = querystring.stringify({
                 user: process.env.SMS_USER,
