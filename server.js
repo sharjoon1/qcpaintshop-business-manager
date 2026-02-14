@@ -2380,8 +2380,7 @@ app.delete('/api/products/:id', requirePermission('products', 'delete'), async (
 // CUSTOMER AUTH (OTP)
 // ========================================
 
-// In-memory OTP store (production: use Redis or DB)
-const customerOTPs = new Map();
+// Customer OTP uses DB (otp_verifications table) so OTPs survive server restarts
 
 app.post('/api/customer/auth/send-otp', async (req, res) => {
     try {
@@ -2404,9 +2403,28 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
             return res.status(404).json({ success: false, message: 'No account found with this phone number. Please submit an estimate request first.' });
         }
 
-        // Generate 6-digit OTP
+        // Rate limit: max 5 OTPs per hour
+        const [rateCheck] = await pool.query(
+            'SELECT COUNT(*) as count FROM otp_verifications WHERE phone = ? AND purpose = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+            [phone, 'Customer Login']
+        );
+        if (rateCheck[0].count >= 5) {
+            return res.status(429).json({ success: false, message: 'Too many OTP requests. Try again after some time.' });
+        }
+
+        // Invalidate old OTPs
+        await pool.query(
+            'UPDATE otp_verifications SET verified = 1 WHERE phone = ? AND purpose = ? AND verified = 0',
+            [phone, 'Customer Login']
+        );
+
+        // Generate 6-digit OTP and store in DB
         const otp = String(Math.floor(100000 + Math.random() * 900000));
-        customerOTPs.set(phone, { otp, expires: Date.now() + 5 * 60 * 1000, attempts: 0 });
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        await pool.query(
+            'INSERT INTO otp_verifications (phone, otp, purpose, expires_at) VALUES (?, ?, ?, ?)',
+            [phone, otp, 'Customer Login', expiresAt]
+        );
 
         // Send OTP via SMS
         console.log(`[Customer OTP] Phone: ${phone}, OTP: ${otp}`);
@@ -2456,28 +2474,29 @@ app.post('/api/customer/auth/verify-otp', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Phone and OTP required' });
         }
 
-        const stored = customerOTPs.get(phone);
-        if (!stored) {
+        // Find the latest unverified OTP from DB
+        const [otpRows] = await pool.query(
+            'SELECT id, otp, expires_at FROM otp_verifications WHERE phone = ? AND purpose = ? AND verified = 0 ORDER BY id DESC LIMIT 1',
+            [phone, 'Customer Login']
+        );
+
+        if (otpRows.length === 0) {
             return res.status(400).json({ success: false, message: 'OTP expired. Please request a new one.' });
         }
 
-        if (stored.attempts >= 5) {
-            customerOTPs.delete(phone);
-            return res.status(429).json({ success: false, message: 'Too many attempts. Request a new OTP.' });
-        }
+        const stored = otpRows[0];
 
-        if (Date.now() > stored.expires) {
-            customerOTPs.delete(phone);
+        if (new Date() > new Date(stored.expires_at)) {
+            await pool.query('UPDATE otp_verifications SET verified = 1 WHERE id = ?', [stored.id]);
             return res.status(400).json({ success: false, message: 'OTP expired. Please request a new one.' });
         }
-
-        stored.attempts++;
 
         if (stored.otp !== otp) {
             return res.status(400).json({ success: false, message: 'Invalid OTP. Please try again.' });
         }
 
-        customerOTPs.delete(phone);
+        // Mark OTP as verified
+        await pool.query('UPDATE otp_verifications SET verified = 1 WHERE id = ?', [stored.id]);
 
         // Find customer
         let customerName = 'Customer';
@@ -2493,15 +2512,8 @@ app.post('/api/customer/auth/verify-otp', async (req, res) => {
             }
         }
 
-        // Generate session token
+        // Generate session token (no DB storage needed - customer pages use localStorage only)
         const token = crypto.randomBytes(32).toString('hex');
-
-        // Store session (reuse user_sessions table with a special marker)
-        await pool.query(
-            `INSERT INTO user_sessions (user_id, session_token, expires_at, ip_address, user_agent)
-             VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY), ?, ?)`,
-            [customerId || 0, token, req.ip, req.headers['user-agent'] || '']
-        );
 
         res.json({
             success: true,
