@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <title>Design Request - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<!-- Top Bar -->
+<div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+        <img src="/icons/icon-72x72.png" alt="QC" style="height: 28px;">
+        <span class="font-semibold text-sm" id="topBizName">Quality Colours</span>
+    </div>
+</div>
+
+<!-- Loading -->
+<div id="loadingState" class="flex items-center justify-center py-20">
+    <svg class="w-10 h-10 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+</div>
+
+<!-- Error State -->
+<div id="errorState" class="hidden max-w-lg mx-auto mt-20 text-center p-8">
+    <div class="text-6xl mb-4">🔗</div>
+    <h2 class="text-xl font-bold text-gray-800 mb-2">Link Expired or Invalid</h2>
+    <p class="text-gray-500">This share link is no longer valid. Please request a new link from the sender.</p>
+</div>
+
+<!-- Content -->
+<div id="mainContent" class="hidden max-w-3xl mx-auto my-6 px-4">
+    <div class="bg-white shadow-xl rounded-xl overflow-hidden">
+        <!-- Header -->
+        <div class="p-6 border-b-4 border-purple-600 bg-gradient-to-r from-purple-50 to-indigo-50">
+            <h1 class="text-2xl font-bold text-purple-900">Design Request</h1>
+            <p class="text-sm text-gray-600 mt-1">Request Details</p>
+        </div>
+
+        <!-- Customer Info -->
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b">
+            <div>
+                <label class="text-xs font-semibold text-gray-500 uppercase">Customer Name</label>
+                <p class="font-bold text-gray-800" id="drCustName"></p>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-gray-500 uppercase">Phone</label>
+                <p class="text-gray-800" id="drCustPhone"></p>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-gray-500 uppercase">Location</label>
+                <p class="text-gray-800" id="drLocation"></p>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-gray-500 uppercase">Status</label>
+                <p id="drStatus"></p>
+            </div>
+        </div>
+
+        <!-- Request Details -->
+        <div class="p-6 border-b">
+            <label class="text-xs font-semibold text-gray-500 uppercase">Request Details</label>
+            <p class="text-gray-800 mt-1 whitespace-pre-line" id="drDetails"></p>
+        </div>
+
+        <!-- Photos -->
+        <div class="p-6" id="photosSection" style="display: none;">
+            <label class="text-xs font-semibold text-gray-500 uppercase mb-3 block">Photos</label>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="photosGrid"></div>
+        </div>
+    </div>
+
+    <div class="text-center py-4 text-xs text-gray-400">
+        Shared via Quality Colours Business Manager
+    </div>
+</div>
+
+<script>
+const token = window.location.pathname.split('/').pop();
+
+async function loadSharedDesignRequest() {
+    try {
+        const r = await fetch(`/api/share/public/${token}`);
+        if (!r.ok) throw new Error('Invalid link');
+        const result = await r.json();
+        if (!result.success) throw new Error(result.message);
+
+        const { resource, branding } = result.data;
+
+        document.getElementById('topBizName').textContent = branding.business_name || 'Quality Colours';
+        document.getElementById('drCustName').textContent = resource.customer_name || '';
+        document.getElementById('drCustPhone').textContent = resource.customer_phone || '';
+        document.getElementById('drLocation').textContent = resource.location || resource.customer_address || '';
+        document.getElementById('drDetails').textContent = resource.request_details || resource.notes || '';
+
+        const statusMap = { 'new': 'New', 'contacted': 'Under Review', 'quote_sent': 'Quote Sent', 'accepted': 'Accepted', 'rejected': 'Rejected', 'completed': 'Completed' };
+        const statusColors = { 'new': 'bg-blue-100 text-blue-800', 'contacted': 'bg-yellow-100 text-yellow-800', 'quote_sent': 'bg-purple-100 text-purple-800', 'accepted': 'bg-green-100 text-green-800', 'completed': 'bg-green-100 text-green-800' };
+        const status = resource.status || 'new';
+        document.getElementById('drStatus').innerHTML = `<span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColors[status] || 'bg-gray-100 text-gray-800'}">${statusMap[status] || status}</span>`;
+
+        // Photos
+        const photos = resource.photos || resource.photo_urls;
+        if (photos) {
+            let photoArr = [];
+            try { photoArr = typeof photos === 'string' ? JSON.parse(photos) : photos; } catch {}
+            if (photoArr.length > 0) {
+                document.getElementById('photosGrid').innerHTML = photoArr.map(url =>
+                    `<img src="${url}" class="w-full h-40 object-cover rounded-lg shadow" onclick="window.open('${url}', '_blank')" style="cursor: pointer;">`
+                ).join('');
+                document.getElementById('photosSection').style.display = 'block';
+            }
+        }
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('mainContent').classList.remove('hidden');
+        document.title = `Design Request - ${branding.business_name || 'Quality Colours'}`;
+    } catch (err) {
+        console.error('Load error:', err);
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('errorState').classList.remove('hidden');
+    }
+}
+
+loadSharedDesignRequest();
+</script>
+</body>
+</html>

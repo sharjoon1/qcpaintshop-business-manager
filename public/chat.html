@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en" data-page="chat">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Chat - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .chat-container { display: flex; height: calc(100vh - 70px); overflow: hidden; }
+        .chat-sidebar { width: 320px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; background: #fff; flex-shrink: 0; }
+        .chat-main { flex: 1; display: flex; flex-direction: column; background: #f8fafc; }
+        .conv-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; gap: 12px; align-items: center; transition: background 0.15s; }
+        .conv-item:hover, .conv-item.active { background: #f0f4ff; }
+        .conv-avatar { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+        .conv-info { flex: 1; min-width: 0; }
+        .conv-name { font-weight: 600; font-size: 0.875rem; color: #1e293b; }
+        .conv-last { font-size: 0.75rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .conv-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+        .conv-time { font-size: 0.6875rem; color: #94a3b8; }
+        .conv-unread { background: #667eea; color: white; font-size: 0.625rem; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+
+        .msg-list { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+        .msg-bubble { max-width: 70%; padding: 10px 14px; border-radius: 16px; font-size: 0.875rem; line-height: 1.4; position: relative; word-wrap: break-word; }
+        .msg-sent { background: #667eea; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg-received { background: white; color: #1e293b; align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+        .msg-sender { font-size: 0.6875rem; font-weight: 600; color: #667eea; margin-bottom: 2px; }
+        .msg-time { font-size: 0.625rem; margin-top: 4px; opacity: 0.7; text-align: right; }
+        .msg-read-check { display: inline-block; margin-left: 4px; }
+
+        .chat-input-bar { padding: 12px 16px; border-top: 1px solid #e5e7eb; background: white; display: flex; gap: 8px; align-items: flex-end; }
+        .chat-input-bar textarea { flex: 1; border: 1px solid #e5e7eb; border-radius: 20px; padding: 10px 16px; font-size: 0.875rem; resize: none; max-height: 120px; outline: none; font-family: inherit; }
+        .chat-input-bar textarea:focus { border-color: #667eea; }
+        .send-btn { background: #667eea; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; }
+        .send-btn:hover { background: #5a6fd6; }
+        .send-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+
+        .typing-indicator { font-size: 0.75rem; color: #94a3b8; padding: 4px 16px; font-style: italic; min-height: 20px; }
+        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; gap: 12px; }
+        .empty-state svg { width: 64px; height: 64px; stroke: #cbd5e1; }
+
+        .chat-header { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; background: white; display: flex; align-items: center; gap: 12px; }
+        .chat-header-back { display: none; background: none; border: none; cursor: pointer; padding: 4px; }
+        .chat-header-back svg { width: 20px; height: 20px; stroke: #64748b; }
+
+        .new-chat-modal { position: fixed; inset: 0; z-index: 1200; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; }
+        .new-chat-modal.show { display: flex; }
+        .new-chat-modal-content { background: white; border-radius: 16px; width: 90%; max-width: 420px; max-height: 70vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        @media (max-width: 768px) {
+            .chat-sidebar { width: 100%; position: absolute; inset: 0; z-index: 10; }
+            .chat-main { width: 100%; position: absolute; inset: 0; z-index: 10; display: none; }
+            .chat-main.visible { display: flex; }
+            .chat-sidebar.hidden { display: none; }
+            .chat-header-back { display: block; }
+            .chat-container { position: relative; }
+        }
+    </style>
+    <script src="/universal-nav-loader.js"></script>
+</head>
+<body class="bg-gray-50" data-page="chat">
+
+<div class="chat-container" id="chatContainer">
+    <!-- Conversation List -->
+    <div class="chat-sidebar" id="chatSidebar">
+        <div style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-size: 1.125rem; font-weight: 700; color: #1e293b;">Messages</h2>
+            <button onclick="showNewChatModal()" style="background: #667eea; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;" title="New conversation">+</button>
+        </div>
+        <div style="padding: 8px 12px;">
+            <input type="text" id="convSearch" placeholder="Search conversations..." onkeyup="filterConversations()" style="width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.8125rem; outline: none;">
+        </div>
+        <div id="convList" style="flex: 1; overflow-y: auto;">
+            <div class="empty-state" style="padding: 2rem;">
+                <p>Loading conversations...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Thread -->
+    <div class="chat-main" id="chatMain">
+        <div id="chatEmptyState" class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <p style="font-size: 0.9375rem; font-weight: 500;">Select a conversation</p>
+            <p style="font-size: 0.8125rem;">Choose from your existing conversations or start a new one</p>
+        </div>
+        <div id="chatThread" style="display: none; flex: 1; flex-direction: column;">
+            <div class="chat-header">
+                <button class="chat-header-back" onclick="backToList()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                </button>
+                <div class="conv-avatar" id="threadAvatar">?</div>
+                <div>
+                    <div style="font-weight: 600; font-size: 0.9375rem; color: #1e293b;" id="threadName">Conversation</div>
+                    <div class="typing-indicator" id="typingIndicator"></div>
+                </div>
+            </div>
+            <div class="msg-list" id="msgList"></div>
+            <div class="chat-input-bar">
+                <textarea id="msgInput" rows="1" placeholder="Type a message..." onkeydown="handleMsgKeydown(event)" oninput="handleTyping()"></textarea>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Chat Modal -->
+<div class="new-chat-modal" id="newChatModal">
+    <div class="new-chat-modal-content">
+        <div style="padding: 16px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-weight: 600; font-size: 1rem;">New Conversation</h3>
+            <button onclick="hideNewChatModal()" style="background: none; border: none; cursor: pointer; font-size: 1.25rem; color: #94a3b8;">&times;</button>
+        </div>
+        <div style="padding: 12px 16px;">
+            <input type="text" id="userSearch" placeholder="Search users..." onkeyup="filterUsers()" style="width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 0.8125rem; outline: none;">
+        </div>
+        <div id="userList" style="flex: 1; overflow-y: auto; max-height: 300px; padding: 0 8px 8px;"></div>
+    </div>
+</div>
+
+<script>
+const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+let conversations = [];
+let activeConvId = null;
+let allUsers = [];
+let typingTimeout = null;
+
+// ========================================
+// CONVERSATIONS
+// ========================================
+
+async function loadConversations() {
+    try {
+        const r = await fetch('/api/chat/conversations', { headers: getAuthHeaders() });
+        const result = await r.json();
+        conversations = result.data || [];
+        renderConversations();
+
+        // Auto-open from URL
+        const params = new URLSearchParams(window.location.search);
+        const convId = params.get('conversation');
+        if (convId) openConversation(parseInt(convId));
+    } catch (err) {
+        console.error('Load conversations error:', err);
+    }
+}
+
+function renderConversations() {
+    const list = document.getElementById('convList');
+    if (conversations.length === 0) {
+        list.innerHTML = '<div class="empty-state" style="padding: 2rem;"><p style="font-size: 0.8125rem;">No conversations yet</p></div>';
+        return;
+    }
+
+    list.innerHTML = conversations.map(c => {
+        const initials = (c.title || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+        const time = c.last_message_at ? formatTimeAgoChat(c.last_message_at) : '';
+        const lastMsg = c.last_message ? (c.last_message.length > 40 ? c.last_message.substring(0, 40) + '...' : c.last_message) : 'No messages yet';
+        const isActive = c.id === activeConvId;
+        return `<div class="conv-item ${isActive ? 'active' : ''}" onclick="openConversation(${c.id})" data-conv-id="${c.id}" data-name="${(c.title || '').toLowerCase()}">
+            <div class="conv-avatar">${initials}</div>
+            <div class="conv-info">
+                <div class="conv-name">${escHtml(c.title || 'Unknown')}</div>
+                <div class="conv-last">${escHtml(lastMsg)}</div>
+            </div>
+            <div class="conv-meta">
+                <span class="conv-time">${time}</span>
+                ${c.unread_count > 0 ? `<span class="conv-unread">${c.unread_count}</span>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function filterConversations() {
+    const q = document.getElementById('convSearch').value.toLowerCase();
+    document.querySelectorAll('.conv-item').forEach(el => {
+        el.style.display = el.dataset.name.includes(q) ? '' : 'none';
+    });
+}
+
+// ========================================
+// MESSAGE THREAD
+// ========================================
+
+async function openConversation(convId) {
+    activeConvId = convId;
+    const conv = conversations.find(c => c.id === convId);
+
+    // Update UI
+    document.getElementById('chatEmptyState').style.display = 'none';
+    document.getElementById('chatThread').style.display = 'flex';
+    document.getElementById('chatMain').classList.add('visible');
+    document.getElementById('chatSidebar').classList.add('hidden');
+
+    if (conv) {
+        document.getElementById('threadName').textContent = conv.title || 'Conversation';
+        const initials = (conv.title || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+        document.getElementById('threadAvatar').textContent = initials;
+    }
+
+    // Highlight active
+    document.querySelectorAll('.conv-item').forEach(el => {
+        el.classList.toggle('active', parseInt(el.dataset.convId) === convId);
+    });
+
+    // Join socket room
+    const socket = typeof getSocket === 'function' ? getSocket() : null;
+    if (socket) socket.emit('join_conversation', convId);
+
+    await loadMessages(convId);
+
+    // Mark as read
+    fetch(`/api/chat/conversations/${convId}/read`, { method: 'POST', headers: getAuthHeaders() }).catch(() => {});
+}
+
+async function loadMessages(convId) {
+    try {
+        const r = await fetch(`/api/chat/conversations/${convId}/messages`, { headers: getAuthHeaders() });
+        const result = await r.json();
+        renderMessages(result.data || []);
+    } catch (err) {
+        console.error('Load messages error:', err);
+    }
+}
+
+function renderMessages(messages) {
+    const list = document.getElementById('msgList');
+    if (messages.length === 0) {
+        list.innerHTML = '<div class="empty-state" style="padding: 2rem;"><p style="font-size: 0.8125rem;">No messages yet. Start the conversation!</p></div>';
+        return;
+    }
+
+    list.innerHTML = messages.map(m => {
+        const isSent = m.sender_id === currentUser.id;
+        const readBy = (m.read_by || []).filter(r => r.user_id !== m.sender_id);
+        const readCheck = isSent ? (readBy.length > 0 ? '<span class="msg-read-check" style="color: #93c5fd;">✓✓</span>' : '<span class="msg-read-check" style="opacity:0.5;">✓</span>') : '';
+        const time = new Date(m.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        return `<div class="msg-bubble ${isSent ? 'msg-sent' : 'msg-received'}">
+            ${!isSent ? `<div class="msg-sender">${escHtml(m.sender_name || '')}</div>` : ''}
+            <div>${escHtml(m.content)}</div>
+            <div class="msg-time">${time} ${readCheck}</div>
+        </div>`;
+    }).join('');
+
+    // Scroll to bottom
+    list.scrollTop = list.scrollHeight;
+}
+
+async function sendMessage() {
+    const input = document.getElementById('msgInput');
+    const content = input.value.trim();
+    if (!content || !activeConvId) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    document.getElementById('sendBtn').disabled = true;
+
+    try {
+        const r = await fetch(`/api/chat/conversations/${activeConvId}/messages`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ content })
+        });
+        const result = await r.json();
+        if (result.success) {
+            // Message will arrive via socket, but also add immediately
+            appendMessage(result.data);
+            loadConversations(); // Refresh sidebar
+        }
+    } catch (err) {
+        console.error('Send message error:', err);
+    }
+}
+
+function appendMessage(m) {
+    const list = document.getElementById('msgList');
+    // Clear empty state if present
+    const empty = list.querySelector('.empty-state');
+    if (empty) empty.remove();
+
+    const isSent = m.sender_id === currentUser.id;
+    const time = new Date(m.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const div = document.createElement('div');
+    div.className = `msg-bubble ${isSent ? 'msg-sent' : 'msg-received'}`;
+    div.innerHTML = `${!isSent ? `<div class="msg-sender">${escHtml(m.sender_name || '')}</div>` : ''}
+        <div>${escHtml(m.content)}</div>
+        <div class="msg-time">${time}</div>`;
+    list.appendChild(div);
+    list.scrollTop = list.scrollHeight;
+}
+
+function handleMsgKeydown(e) {
+    const btn = document.getElementById('sendBtn');
+    setTimeout(() => {
+        btn.disabled = !document.getElementById('msgInput').value.trim();
+    }, 10);
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+}
+
+function handleTyping() {
+    const socket = typeof getSocket === 'function' ? getSocket() : null;
+    if (!socket || !activeConvId) return;
+    socket.emit('typing', { conversation_id: activeConvId, is_typing: true });
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        socket.emit('typing', { conversation_id: activeConvId, is_typing: false });
+    }, 2000);
+}
+
+// ========================================
+// NEW CHAT MODAL
+// ========================================
+
+function showNewChatModal() {
+    document.getElementById('newChatModal').classList.add('show');
+    loadUsers();
+}
+
+function hideNewChatModal() {
+    document.getElementById('newChatModal').classList.remove('show');
+}
+
+async function loadUsers() {
+    try {
+        const r = await fetch('/api/chat/users', { headers: getAuthHeaders() });
+        const result = await r.json();
+        allUsers = result.data || [];
+        renderUsers(allUsers);
+    } catch (err) {
+        console.error('Load users error:', err);
+    }
+}
+
+function renderUsers(users) {
+    const list = document.getElementById('userList');
+    list.innerHTML = users.map(u => {
+        const initial = (u.full_name || u.username || '?')[0].toUpperCase();
+        return `<div onclick="startConversation(${u.id})" style="padding: 10px 12px; cursor: pointer; display: flex; gap: 10px; align-items: center; border-radius: 8px; transition: background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+            <div class="conv-avatar" style="width: 36px; height: 36px; font-size: 13px;">${initial}</div>
+            <div>
+                <div style="font-weight: 600; font-size: 0.8125rem; color: #1e293b;">${escHtml(u.full_name || u.username)}</div>
+                <div style="font-size: 0.75rem; color: #94a3b8;">${escHtml(u.role || '')}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function filterUsers() {
+    const q = document.getElementById('userSearch').value.toLowerCase();
+    renderUsers(allUsers.filter(u => (u.full_name || u.username || '').toLowerCase().includes(q)));
+}
+
+async function startConversation(userId) {
+    try {
+        const r = await fetch('/api/chat/conversations', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ type: 'direct', participant_ids: [userId] })
+        });
+        const result = await r.json();
+        if (result.success) {
+            hideNewChatModal();
+            await loadConversations();
+            openConversation(result.data.id);
+        }
+    } catch (err) {
+        console.error('Start conversation error:', err);
+    }
+}
+
+function backToList() {
+    document.getElementById('chatMain').classList.remove('visible');
+    document.getElementById('chatSidebar').classList.remove('hidden');
+}
+
+// ========================================
+// SOCKET EVENTS
+// ========================================
+
+window.addEventListener('qc-new-message', function(e) {
+    const msg = e.detail;
+    if (msg.conversation_id === activeConvId && msg.sender_id !== currentUser.id) {
+        appendMessage(msg);
+        // Mark as read
+        fetch(`/api/chat/conversations/${activeConvId}/read`, { method: 'POST', headers: getAuthHeaders() }).catch(() => {});
+    }
+    loadConversations(); // Refresh sidebar
+});
+
+window.addEventListener('qc-user-typing', function(e) {
+    const data = e.detail;
+    if (data.conversation_id === activeConvId) {
+        const el = document.getElementById('typingIndicator');
+        if (data.is_typing) {
+            el.textContent = `${data.user_name} is typing...`;
+        } else {
+            el.textContent = '';
+        }
+    }
+});
+
+window.addEventListener('qc-message-read', function(e) {
+    // Could update read receipts in message bubbles
+    if (e.detail.conversation_id === activeConvId) {
+        loadMessages(activeConvId);
+    }
+});
+
+// ========================================
+// HELPERS
+// ========================================
+
+function escHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatTimeAgoChat(dateStr) {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    if (diff < 60) return 'now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd';
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+// Auto-resize textarea
+document.addEventListener('DOMContentLoaded', () => {
+    const textarea = document.getElementById('msgInput');
+    if (textarea) {
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+    }
+});
+
+// Init
+loadConversations();
+</script>
+</body>
+</html>

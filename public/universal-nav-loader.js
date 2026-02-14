@@ -16,14 +16,27 @@
         RETRY_DELAY: 1000
     };
     
-    // Skip navigation on login pages
-    const isLoginPage = window.location.pathname.includes('/login.html') || 
-                        window.location.pathname.includes('/forgot-password.html');
-    
+    // Skip navigation on login pages and public share pages
+    const isLoginPage = window.location.pathname.includes('/login.html') ||
+                        window.location.pathname.includes('/forgot-password.html') ||
+                        window.location.pathname.startsWith('/share/');
+
     if (isLoginPage) {
-        console.log('⏭️ Skipping navigation on login page');
+        console.log('⏭️ Skipping navigation on login/public page');
         return;
     }
+
+    // Load Socket.io client + socket helper for real-time features
+    (function loadSocketScripts() {
+        const s1 = document.createElement('script');
+        s1.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+        s1.onload = function() {
+            const s2 = document.createElement('script');
+            s2.src = '/js/socket-helper.js';
+            document.head.appendChild(s2);
+        };
+        document.head.appendChild(s1);
+    })();
     
     // State
     let loadAttempts = 0;

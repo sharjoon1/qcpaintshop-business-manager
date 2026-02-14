@@ -344,8 +344,9 @@ function showActions(id) {
     const actions = [
         { label: '👁️ View Details', action: 'viewEstimate' },
         { label: '✏️ Edit Estimate', action: 'editEstimate' },
+        { label: '📱 Share via WhatsApp', action: 'shareWhatsApp' },
+        { label: '📄 Download PDF', action: 'downloadPDF' },
         { label: '📧 Send to Customer', action: 'sendEstimate' },
-        { label: '📥 Download PDF', action: 'downloadPDF' },
         { label: '✅ Mark as Approved', action: 'approveEstimate', show: estimate.status !== 'approved' },
         { label: '📨 Mark as Sent', action: 'markAsSent', show: estimate.status === 'draft' },
         { label: '❌ Mark as Rejected', action: 'rejectEstimate', show: estimate.status !== 'rejected' },
@@ -404,6 +405,9 @@ function handleAction(actionName) {
         case 'duplicateEstimate':
             duplicateEstimate(id);
             break;
+        case 'shareWhatsApp':
+            shareWhatsApp(id);
+            break;
         case 'deleteEstimate':
             deleteEstimate(id);
             break;
@@ -416,14 +420,52 @@ function closeActionsModal() {
 }
 
 // Action functions
-function sendEstimate(id) {
-    // TODO: Implement send via WhatsApp/Email
-    alert('📧 Send estimate via WhatsApp/Email - Coming in Day 3!');
+async function sendEstimate(id) {
+    await shareWhatsApp(id);
+}
+
+async function shareWhatsApp(id) {
+    try {
+        const r = await fetch('/api/share/whatsapp', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ resource_type: 'estimate', resource_id: id })
+        });
+        const result = await r.json();
+        if (result.success && result.data.whatsapp_url) {
+            window.open(result.data.whatsapp_url, '_blank');
+        } else {
+            alert(result.message || 'Failed to generate share link');
+        }
+    } catch (err) {
+        console.error('WhatsApp share error:', err);
+        alert('Failed to share. Please try again.');
+    }
 }
 
 function downloadPDF(id) {
-    // Open estimate in new tab for printing/PDF
-    window.open(`/estimate-view.html?id=${id}`, '_blank');
+    const token = localStorage.getItem('auth_token');
+    const ua = navigator.userAgent || '';
+    if (ua.includes('QCManagerApp')) {
+        window.location.href = `/api/estimates/${id}/pdf?token=${token}`;
+    } else {
+        fetch(`/api/estimates/${id}/pdf`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        }).then(r => {
+            if (!r.ok) throw new Error('PDF generation failed');
+            return r.blob();
+        }).then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Estimate-${id}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }).catch(err => {
+            console.error('PDF download error:', err);
+            alert('Failed to download PDF');
+        });
+    }
 }
 
 async function changeStatus(id, newStatus) {
