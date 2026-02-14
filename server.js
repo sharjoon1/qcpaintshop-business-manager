@@ -1516,6 +1516,36 @@ async function generateAutoVizPollinations(photoRelPath, combo, customerInfo, br
     }
 }
 
+// GET /api/ai-status - check AI model availability
+app.get('/api/ai-status', requireAuth, async (req, res) => {
+    const status = { pollinations: 'unknown', gemini: 'unknown' };
+
+    // Check Pollinations (quick test with a simple prompt)
+    try {
+        const testUrl = 'https://image.pollinations.ai/prompt/test?model=flux&width=64&height=64&nologo=true&seed=1';
+        const pollRes = await fetch(testUrl, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
+        status.pollinations = pollRes.ok ? 'available' : (pollRes.status === 530 ? 'down' : 'error');
+    } catch (e) {
+        status.pollinations = e.name === 'TimeoutError' ? 'slow' : 'down';
+    }
+
+    // Check Gemini
+    if (!geminiAI) {
+        status.gemini = 'not_configured';
+    } else {
+        try {
+            const model = geminiAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp' });
+            await model.generateContent('Say OK');
+            status.gemini = 'available';
+        } catch (e) {
+            status.gemini = (e.message || '').includes('429') || (e.message || '').includes('quota') || (e.message || '').includes('RESOURCE_EXHAUSTED')
+                ? 'quota_exceeded' : 'error';
+        }
+    }
+
+    res.json({ success: true, data: status });
+});
+
 // GET /api/paint-colors/brands - list available paint brands
 app.get('/api/paint-colors/brands', requireAuth, (req, res) => {
     const brands = Object.values(paintCatalogs).map(c => ({
@@ -1679,6 +1709,49 @@ app.get('/api/design-requests/:id/visualizations', requireRole('admin', 'manager
     }
 });
 
+// Helper: attempt AI generation for a single combo, with model fallback
+async function generateSingleVariation(aiModel, combo, designReq, photoFullPath, catalog, userId) {
+    const customerInfo = { name: designReq.name, city: designReq.city || '' };
+
+    const tryModel = async (model) => {
+        if (model === 'pollinations') {
+            return await generateAutoVizPollinations(designReq.photo_path, combo, customerInfo, catalog.brand);
+        } else {
+            const photoBuffer = await sharp(photoFullPath).resize(1200, null, { withoutEnlargement: true }).toBuffer();
+            return await generateAutoViz(photoBuffer, combo, customerInfo, catalog.brand);
+        }
+    };
+
+    // Determine fallback model
+    const fallbackModel = aiModel === 'pollinations' ? 'gemini' : 'pollinations';
+    const canFallbackGemini = fallbackModel === 'gemini' && geminiAI;
+    const canFallbackPollinations = fallbackModel === 'pollinations';
+
+    let usedModel = aiModel;
+    let imageUrl;
+    try {
+        imageUrl = await tryModel(aiModel);
+    } catch (primaryErr) {
+        const isServiceDown = primaryErr.message.includes('530') || primaryErr.message.includes('1033') || primaryErr.message.includes('503');
+        const isQuotaError = primaryErr.message.includes('429') || primaryErr.message.includes('quota') || primaryErr.message.includes('RESOURCE_EXHAUSTED');
+        const shouldFallback = isServiceDown || isQuotaError;
+
+        if (shouldFallback && (canFallbackGemini || canFallbackPollinations)) {
+            console.log(`[Viz] ${aiModel} failed (${primaryErr.message.slice(0, 80)}), falling back to ${fallbackModel}...`);
+            try {
+                imageUrl = await tryModel(fallbackModel);
+                usedModel = fallbackModel;
+            } catch (fallbackErr) {
+                throw new Error(`Both AI models failed. ${aiModel}: ${primaryErr.message.slice(0, 100)}. ${fallbackModel}: ${fallbackErr.message.slice(0, 100)}`);
+            }
+        } else {
+            throw primaryErr;
+        }
+    }
+
+    return { imageUrl, usedModel };
+}
+
 // POST /api/design-requests/:id/auto-visualize - generate AI color combinations
 app.post('/api/design-requests/:id/auto-visualize', requireRole('admin', 'manager'), async (req, res) => {
     try {
@@ -1696,36 +1769,24 @@ app.post('/api/design-requests/:id/auto-visualize', requireRole('admin', 'manage
         const photoFullPath = path.join(__dirname, 'public', designReq.photo_path);
         if (!fs.existsSync(photoFullPath)) return res.status(404).json({ success: false, error: 'Original photo not found' });
 
-        const customerInfo = { name: designReq.name, city: designReq.city || '' };
-        const isGemini = aiModel === 'gemini';
-        const isPollinations = aiModel === 'pollinations';
-
-        // Prepare photo buffer for Gemini (Pollinations uses URL instead)
-        let photoBuffer;
-        if (isGemini) {
-            photoBuffer = await sharp(photoFullPath).resize(1200, null, { withoutEnlargement: true }).toBuffer();
-        }
-
         // Select color combinations (3 variations)
         const allCombos = selectColorCombinations(catalog);
         const combos = allCombos.slice(0, 3);
 
         // Delay between calls: Pollinations needs 16s (rate limit), Gemini needs 2s
-        const delayMs = isPollinations ? 16000 : 2000;
+        const delayMs = aiModel === 'pollinations' ? 16000 : 2000;
 
         const variations = [];
         const errors = [];
+        let actualModel = aiModel;
         for (let i = 0; i < combos.length; i++) {
             const combo = combos[i];
             try {
                 console.log(`[Viz:${aiModel}] Generating ${i + 1}/${combos.length}: ${combo.label}...`);
 
-                let imageUrl;
-                if (isPollinations) {
-                    imageUrl = await generateAutoVizPollinations(designReq.photo_path, combo, customerInfo, catalog.brand);
-                } else {
-                    imageUrl = await generateAutoViz(photoBuffer, combo, customerInfo, catalog.brand);
-                }
+                const result = await generateSingleVariation(aiModel, combo, designReq, photoFullPath, catalog, req.user.id);
+                const imageUrl = result.imageUrl;
+                actualModel = result.usedModel;
 
                 // Save to DB
                 const colorCodes = combo.colors.map(c => c.code).join(' + ');
@@ -1738,7 +1799,7 @@ app.post('/api/design-requests/:id/auto-visualize', requireRole('admin', 'manage
 
                 variations.push({ type: combo.type, label: combo.label, description: combo.description, imageUrl,
                     colors: combo.colors.map(c => ({ code: c.code, name: c.name, hex: c.hex, role: c.role })) });
-                console.log(`[Viz:${aiModel}] Done: ${combo.label}`);
+                console.log(`[Viz:${actualModel}] Done: ${combo.label}`);
 
                 // Rate-limit delay between API calls
                 if (i < combos.length - 1) await new Promise(r => setTimeout(r, delayMs));
@@ -1750,12 +1811,33 @@ app.post('/api/design-requests/:id/auto-visualize', requireRole('admin', 'manage
 
         if (!variations.length) {
             const errMsg = errors[0] || 'Unknown error';
-            if (errMsg.includes('429') || errMsg.includes('quota')) {
-                throw new Error('API quota exceeded. Please try again later or switch to a different AI model.');
+            // Classify the error for the frontend
+            let errorCode = 'GENERATION_FAILED';
+            let userMessage = 'Generation failed: ' + errMsg;
+
+            if (errMsg.includes('530') || errMsg.includes('1033') || errMsg.includes('503')) {
+                errorCode = 'SERVICE_DOWN';
+                userMessage = 'AI service is temporarily unavailable. Both Pollinations and Gemini APIs are currently down. Please try again in a few minutes.';
+            } else if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+                errorCode = 'QUOTA_EXCEEDED';
+                userMessage = 'API quota exceeded on both AI models. Please try again later.';
+            } else if (errMsg.includes('Both AI models failed')) {
+                errorCode = 'BOTH_FAILED';
+                userMessage = errMsg;
             }
-            throw new Error('Generation failed: ' + errMsg);
+
+            return res.status(503).json({ success: false, error: userMessage, errorCode });
         }
-        res.json({ success: true, variations, aiModel, partialErrors: errors.length ? errors : undefined });
+
+        const fallbackUsed = actualModel !== aiModel;
+        res.json({
+            success: true,
+            variations,
+            aiModel: actualModel,
+            fallbackUsed,
+            fallbackNote: fallbackUsed ? `Switched from ${aiModel} to ${actualModel} (original model was unavailable)` : undefined,
+            partialErrors: errors.length ? errors : undefined
+        });
     } catch (err) {
         console.error('Auto-visualize error:', err);
         res.status(500).json({ success: false, error: err.message });

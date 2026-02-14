@@ -19,6 +19,21 @@ let pool;
 // Zoho Books API base (India datacenter)
 const API_BASE = 'https://www.zohoapis.in/books/v3';
 
+/**
+ * Convert Zoho datetime (ISO 8601 with timezone) to MySQL DATETIME format
+ * e.g. '2024-10-19T17:25:44+0530' -> '2024-10-19 17:25:44'
+ */
+function toMySQLDatetime(zohoDatetime) {
+    if (!zohoDatetime) return null;
+    try {
+        const d = new Date(zohoDatetime);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().slice(0, 19).replace('T', ' ');
+    } catch (e) {
+        return null;
+    }
+}
+
 function setPool(dbPool) {
     pool = dbPool;
     zohoOAuth.setPool(dbPool);
@@ -304,7 +319,7 @@ async function syncInvoices(triggeredBy = null) {
                         inv.sub_total || 0, inv.tax_total || 0,
                         inv.total || 0, inv.balance || 0,
                         mapZohoStatus(inv.status), inv.customer_name,
-                        inv.created_time, inv.last_modified_time
+                        toMySQLDatetime(inv.created_time), toMySQLDatetime(inv.last_modified_time)
                     ]);
                     totalSynced++;
                 } catch (e) {
@@ -1137,7 +1152,7 @@ async function syncLocationStock(triggeredBy = null) {
 
     try {
         // Get active items from local cache
-        const [items] = await pool.query(`SELECT zoho_item_id, zoho_item_name, zoho_sku FROM zoho_items_map WHERE zoho_status = 'active'`);
+        const [items] = await pool.query(`SELECT zoho_item_id, zoho_item_name, zoho_sku FROM zoho_items_map WHERE zoho_status = 'active' OR zoho_status IS NULL`);
         if (items.length === 0) {
             throw new Error('No items in cache. Run item sync first.');
         }

@@ -604,7 +604,8 @@
                     throw new Error(errData.message || 'Sync failed');
                 }
                 var data = await resp.json();
-                showToast('Items synced successfully' + (data.count ? ' (' + data.count + ' items)' : ''), 'success');
+                var synced = (data.data && data.data.synced) || data.count || '';
+                showToast('Items synced successfully' + (synced ? ' (' + synced + ' items)' : ''), 'success');
                 currentPage = 1;
                 selectedItemIds.clear();
                 updateBulkBar();
@@ -733,7 +734,8 @@
                 }
 
                 var data = await resp.json();
-                showToast('Bulk update job created successfully' + (data.jobId ? ' (Job #' + data.jobId + ')' : ''), 'success');
+                var jobId = (data.data && data.data.job_id) || data.jobId || '';
+                showToast('Bulk update job created successfully' + (jobId ? ' (Job #' + jobId + ')' : ''), 'success');
                 closeBulkModal();
                 selectedItemIds.clear();
                 updateBulkBar();

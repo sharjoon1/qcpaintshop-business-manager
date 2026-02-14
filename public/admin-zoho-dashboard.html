@@ -754,6 +754,15 @@
             }
         } catch (error) {
             console.error('Failed to load connection status:', error);
+            var banner = document.getElementById('connectionBanner');
+            banner.className = 'mb-4 rounded-lg p-4 border bg-red-50 border-red-300';
+            banner.innerHTML = '<div class="flex items-center gap-3">' +
+                '<svg class="w-5 h-5 text-red-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
+                '</svg>' +
+                '<p class="text-sm font-medium text-red-800">Failed to check Zoho connection: ' + error.message + '</p>' +
+                '</div>';
+            banner.classList.remove('hidden');
         }
     }
 
@@ -1038,12 +1047,16 @@
                 return;
             }
 
-            if (!response.ok) throw new Error('Failed to load API usage');
+            if (!response.ok) throw new Error('Failed to load API usage (HTTP ' + response.status + ')');
 
             var result = await response.json();
 
             if (result.success && result.data) {
                 renderApiUsage(result.data);
+            } else {
+                console.warn('API usage returned no data:', result.message || 'Unknown');
+                // Show defaults so UI isn't stuck
+                renderApiUsage({ daily: {}, rate: {}, top_callers: [], recent_activity: [], sync_lock: {}, hourly_breakdown: [], recent_syncs: [], active_bulk_jobs: [] });
             }
         } catch (error) {
             console.error('Failed to load API usage:', error);
@@ -1100,7 +1113,7 @@
 
         // === Calls Per Minute Bar Chart ===
         var cpm = rate.calls_per_minute || [];
-        var maxCount = Math.max(1, ...cpm.map(function(c) { return c.count; }));
+        var maxCount = cpm.length > 0 ? Math.max(1, ...cpm.map(function(c) { return c.count; })) : 1;
         var barChart = document.getElementById('rateBarChart');
         var barLabels = document.getElementById('rateBarLabels');
 
