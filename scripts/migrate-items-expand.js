@@ -52,7 +52,8 @@ async function migrate() {
             { name: 'zoho_isbn', type: 'VARCHAR(50)', after: 'zoho_ean' },
             { name: 'zoho_part_number', type: 'VARCHAR(50)', after: 'zoho_isbn' },
             { name: 'zoho_cf_product_name', type: 'VARCHAR(255)', after: 'zoho_part_number' },
-            { name: 'zoho_cf_dpl', type: 'VARCHAR(255)', after: 'zoho_cf_product_name' }
+            { name: 'zoho_cf_dpl', type: 'VARCHAR(255)', after: 'zoho_cf_product_name' },
+            { name: 'zoho_status', type: "VARCHAR(20) DEFAULT 'active'", after: 'zoho_cf_dpl' }
         ];
 
         let added = 0;

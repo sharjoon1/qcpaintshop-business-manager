@@ -215,6 +215,7 @@
                                     <div class="peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 bg-white border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-medium transition hover:border-indigo-400">
                                         Pollinations AI
                                         <span class="block text-[10px] font-normal opacity-75">Free - No Limits</span>
+                                        <span id="pollinationsStatus" class="block"></span>
                                     </div>
                                 </label>
                                 <label class="flex-1 cursor-pointer">
@@ -222,6 +223,7 @@
                                     <div class="peer-checked:bg-purple-600 peer-checked:text-white peer-checked:border-purple-600 bg-white border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-medium transition hover:border-purple-400">
                                         Gemini AI
                                         <span class="block text-[10px] font-normal opacity-75">Paid - High Quality</span>
+                                        <span id="geminiStatus" class="block"></span>
                                     </div>
                                 </label>
                             </div>
@@ -281,6 +283,7 @@
     let currentRequestData = null;
     let searchTimeout = null;
     let generatedVariations = [];
+    let aiStatus = { pollinations: 'unknown', gemini: 'unknown' };
 
     function debounceSearch() {
         clearTimeout(searchTimeout);
@@ -427,6 +430,64 @@
 
     // ===== AI COLOR VISUALIZER =====
 
+    // Show inline error banner in the visualizer (replaces alert)
+    function showVizError(message, type = 'error') {
+        const container = document.getElementById('vizProcessing').parentElement;
+        // Remove existing error banners
+        container.querySelectorAll('.viz-error-banner').forEach(el => el.remove());
+
+        const colors = {
+            error: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: 'text-red-400' },
+            warning: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', icon: 'text-yellow-400' },
+            info: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: 'text-blue-400' }
+        };
+        const c = colors[type] || colors.error;
+
+        const banner = document.createElement('div');
+        banner.className = `viz-error-banner ${c.bg} ${c.border} border rounded-xl p-4 mb-5`;
+        banner.innerHTML = `
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 ${c.icon} shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                </svg>
+                <div class="${c.text} text-sm">${message}</div>
+            </div>
+            <button onclick="this.parentElement.remove()" class="absolute top-2 right-3 ${c.icon} hover:${c.text} text-lg">&times;</button>
+        `;
+        banner.style.position = 'relative';
+        // Insert before processing/results
+        const processingEl = document.getElementById('vizProcessing');
+        processingEl.parentElement.insertBefore(banner, processingEl);
+    }
+
+    // Check AI model availability
+    async function checkAiStatus() {
+        try {
+            const res = await apiFetch('/api/ai-status');
+            if (res.success) {
+                aiStatus = res.data;
+                updateAiStatusUI();
+            }
+        } catch (err) { console.warn('AI status check failed:', err); }
+    }
+
+    function updateAiStatusUI() {
+        const statusLabels = {
+            available: '<span class="text-green-600 text-[10px]">Online</span>',
+            down: '<span class="text-red-600 text-[10px]">Offline</span>',
+            slow: '<span class="text-yellow-600 text-[10px]">Slow</span>',
+            error: '<span class="text-red-600 text-[10px]">Error</span>',
+            quota_exceeded: '<span class="text-orange-600 text-[10px]">Quota Full</span>',
+            not_configured: '<span class="text-gray-400 text-[10px]">Not Set Up</span>',
+            unknown: '<span class="text-gray-400 text-[10px]">Checking...</span>'
+        };
+
+        const polStatus = document.getElementById('pollinationsStatus');
+        const gemStatus = document.getElementById('geminiStatus');
+        if (polStatus) polStatus.innerHTML = statusLabels[aiStatus.pollinations] || statusLabels.unknown;
+        if (gemStatus) gemStatus.innerHTML = statusLabels[aiStatus.gemini] || statusLabels.unknown;
+    }
+
     async function openVisualizer() {
         if (!currentRequestData || !currentRequestData.photo_path) {
             return alert('No photo available for this request');
@@ -441,8 +502,11 @@
         document.getElementById('vizOriginal').src = currentRequestData.photo_path;
         document.getElementById('vizOriginalWrap').classList.remove('hidden');
 
-        // Load brands
-        await loadBrands();
+        // Remove previous error banners
+        document.querySelectorAll('.viz-error-banner').forEach(el => el.remove());
+
+        // Load brands and check AI status
+        await Promise.all([loadBrands(), checkAiStatus()]);
         document.getElementById('vizModal').classList.remove('hidden');
     }
 
@@ -474,7 +538,7 @@
         radio.addEventListener('change', () => {
             const hint = document.getElementById('vizModelHint');
             if (radio.value === 'gemini') {
-                hint.textContent = 'Gemini AI (Nano Banana) detects building zones and applies 3 professionally curated color combinations';
+                hint.textContent = 'Gemini AI detects building zones and applies 3 professionally curated color combinations';
             } else {
                 hint.textContent = 'Pollinations AI (Kontext) detects building zones and applies 3 professionally curated color combinations';
             }
@@ -486,14 +550,17 @@
         if (!brand) return alert('Please select a paint brand');
         if (!currentRequestId) return;
 
+        // Remove previous error banners
+        document.querySelectorAll('.viz-error-banner').forEach(el => el.remove());
+
         const aiModel = getSelectedAiModel();
-        const modelLabel = aiModel === 'gemini' ? 'Gemini AI (Nano Banana)' : 'Pollinations AI (Kontext)';
-        const timeEstimate = aiModel === 'pollinations' ? '60-90 seconds' : '30-60 seconds';
+        const modelLabel = aiModel === 'gemini' ? 'Gemini AI' : 'Pollinations AI (Kontext)';
+        const timeEstimate = '30-90 seconds';
 
         const btn = document.getElementById('btnGenerate');
         btn.disabled = true;
         document.getElementById('vizProcessTitle').textContent = modelLabel + ' is repainting your building...';
-        document.getElementById('vizProcessTime').textContent = 'Generating 3 AI variations — this takes ' + timeEstimate;
+        document.getElementById('vizProcessTime').textContent = 'Generating 3 AI variations \u2014 this takes ' + timeEstimate + '. Auto-fallback enabled if primary model is unavailable.';
         document.getElementById('vizProcessing').classList.remove('hidden');
         document.getElementById('vizResults').classList.add('hidden');
 
@@ -510,20 +577,44 @@
                 generatedVariations = res.variations;
                 renderVariations(res.variations);
                 document.getElementById('vizResults').classList.remove('hidden');
+
+                // Show fallback notification if model switched
+                if (res.fallbackUsed) {
+                    showVizError(
+                        `<strong>Model switched:</strong> ${res.fallbackNote}. Results generated successfully with ${res.aiModel}.`,
+                        'info'
+                    );
+                }
+
                 if (res.partialErrors) {
                     console.warn('Some variations failed:', res.partialErrors);
                 }
             } else {
                 const err = res.error || 'Generation failed';
-                if (err.includes('quota') || err.includes('429')) {
-                    alert('API Quota Exceeded\n\nThe Gemini API plan has limited image generations. Please try Pollinations AI (free) or try again later.');
+                const errCode = res.errorCode || '';
+
+                if (errCode === 'SERVICE_DOWN') {
+                    showVizError(
+                        `<strong>AI Services Temporarily Unavailable</strong><br>` +
+                        `Both Pollinations and Gemini AI are currently experiencing issues. ` +
+                        `This is usually temporary. Please try again in a few minutes.<br>` +
+                        `<button onclick="generateVariations()" class="mt-2 text-xs bg-white border border-red-300 px-3 py-1 rounded hover:bg-red-50">Retry Now</button>`
+                    );
+                } else if (errCode === 'QUOTA_EXCEEDED') {
+                    showVizError(
+                        `<strong>API Quota Exceeded</strong><br>` +
+                        `Both AI models have hit their usage limits. ` +
+                        `Please try again later or check your API key quotas.`,
+                        'warning'
+                    );
                 } else {
-                    alert(err);
+                    showVizError(`<strong>Generation Failed</strong><br>${esc(err)}`);
                 }
             }
         } catch (err) {
             document.getElementById('vizProcessing').classList.add('hidden');
-            alert('Error: ' + err.message);
+            showVizError(`<strong>Connection Error</strong><br>${esc(err.message)}<br>
+                <button onclick="generateVariations()" class="mt-2 text-xs bg-white border border-red-300 px-3 py-1 rounded hover:bg-red-50">Retry</button>`);
         } finally {
             btn.disabled = false;
         }
