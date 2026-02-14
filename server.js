@@ -2406,7 +2406,7 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
         // Rate limit: max 5 OTPs per hour
         const [rateCheck] = await pool.query(
             'SELECT COUNT(*) as count FROM otp_verifications WHERE phone = ? AND purpose = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
-            [phone, 'Customer Login']
+            [phone, 'login']
         );
         if (rateCheck[0].count >= 5) {
             return res.status(429).json({ success: false, message: 'Too many OTP requests. Try again after some time.' });
@@ -2415,7 +2415,7 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
         // Invalidate old OTPs
         await pool.query(
             'UPDATE otp_verifications SET verified = 1 WHERE phone = ? AND purpose = ? AND verified = 0',
-            [phone, 'Customer Login']
+            [phone, 'login']
         );
 
         // Generate 6-digit OTP and store in DB
@@ -2423,7 +2423,7 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
         await pool.query(
             'INSERT INTO otp_verifications (phone, otp, purpose, expires_at) VALUES (?, ?, ?, ?)',
-            [phone, otp, 'Customer Login', expiresAt]
+            [phone, otp, 'login', expiresAt]
         );
 
         // Send OTP via SMS
@@ -2477,7 +2477,7 @@ app.post('/api/customer/auth/verify-otp', async (req, res) => {
         // Find the latest unverified OTP from DB
         const [otpRows] = await pool.query(
             'SELECT id, otp, expires_at FROM otp_verifications WHERE phone = ? AND purpose = ? AND verified = 0 ORDER BY id DESC LIMIT 1',
-            [phone, 'Customer Login']
+            [phone, 'login']
         );
 
         if (otpRows.length === 0) {
