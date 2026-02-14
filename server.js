@@ -2405,7 +2405,7 @@ app.post('/api/customer/auth/send-otp', async (req, res) => {
             [phone]
         );
         const [requests] = await pool.query(
-            'SELECT id, customer_name FROM estimate_requests WHERE customer_phone = ? LIMIT 1',
+            'SELECT id, customer_name FROM estimate_requests WHERE phone = ? LIMIT 1',
             [phone]
         );
 
@@ -2496,7 +2496,7 @@ app.post('/api/customer/auth/verify-otp', async (req, res) => {
             customerName = customers[0].name;
             customerId = customers[0].id;
         } else {
-            const [requests] = await pool.query('SELECT id, customer_name FROM estimate_requests WHERE customer_phone = ? LIMIT 1', [phone]);
+            const [requests] = await pool.query('SELECT id, customer_name FROM estimate_requests WHERE phone = ? LIMIT 1', [phone]);
             if (requests.length > 0) {
                 customerName = requests[0].customer_name;
             }
