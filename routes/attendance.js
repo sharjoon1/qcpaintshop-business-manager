@@ -1509,6 +1509,88 @@ router.post('/admin/mark', requirePermission('attendance', 'manage'), async (req
 });
 
 /**
+ * POST /api/attendance/admin/force-clockout
+ * Admin: Force clock out a staff member
+ */
+router.post('/admin/force-clockout', requirePermission('attendance', 'manage'), async (req, res) => {
+    try {
+        const adminId = req.user.id;
+        const { attendance_id, notes } = req.body;
+
+        if (!attendance_id) {
+            return res.status(400).json({ success: false, message: 'attendance_id is required' });
+        }
+
+        // Get the attendance record
+        const [records] = await pool.query(
+            `SELECT a.*, u.full_name FROM staff_attendance a
+             JOIN users u ON a.user_id = u.id WHERE a.id = ?`,
+            [attendance_id]
+        );
+
+        if (records.length === 0) {
+            return res.status(404).json({ success: false, message: 'Attendance record not found' });
+        }
+
+        const record = records[0];
+
+        if (record.clock_out_time) {
+            return res.status(400).json({ success: false, message: 'Staff already clocked out' });
+        }
+
+        const now = new Date();
+        const breakMinutes = record.break_duration_minutes || 0;
+        const workingMinutes = Math.round(((now - new Date(record.clock_in_time)) / 1000 / 60) - breakMinutes);
+        const adminNote = `\n[Forced clock-out by admin ID:${adminId}]${notes ? ' ' + notes : ''}`;
+
+        // End active break if any
+        await pool.query(
+            `UPDATE staff_attendance
+             SET break_end_time = ?,
+                 break_duration_minutes = TIMESTAMPDIFF(MINUTE, break_start_time, ?)
+             WHERE id = ? AND break_start_time IS NOT NULL AND break_end_time IS NULL`,
+            [now, now, attendance_id]
+        );
+
+        // Clock out
+        await pool.query(
+            `UPDATE staff_attendance
+             SET clock_out_time = ?, total_working_minutes = ?,
+                 notes = CONCAT(COALESCE(notes, ''), ?)
+             WHERE id = ?`,
+            [now, workingMinutes, adminNote, attendance_id]
+        );
+
+        // Notify the staff member
+        try {
+            const notificationService = require('../services/notification-service');
+            await notificationService.send(record.user_id, {
+                type: 'force_clockout',
+                title: 'Clocked Out by Admin',
+                body: `You have been clocked out by admin.${notes ? ' Reason: ' + notes : ''}`,
+                data: { type: 'force_clockout', attendance_id: parseInt(attendance_id) }
+            });
+        } catch (notifErr) {
+            console.error('Force clockout notification error:', notifErr.message);
+        }
+
+        res.json({
+            success: true,
+            message: `${record.full_name} has been clocked out`,
+            data: {
+                attendance_id,
+                clock_out_time: now,
+                total_working_minutes: workingMinutes
+            }
+        });
+
+    } catch (error) {
+        console.error('Force clockout error:', error);
+        res.status(500).json({ success: false, message: 'Failed to force clock out' });
+    }
+});
+
+/**
  * GET /api/attendance/admin/today-summary
  * Consolidated stats for admin dashboard
  */

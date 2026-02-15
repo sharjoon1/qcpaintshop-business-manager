@@ -45,6 +45,7 @@ const notificationRoutes = require('./routes/notifications');
 const estimatePdfRoutes = require('./routes/estimate-pdf');
 const shareRoutes = require('./routes/share');
 const notificationService = require('./services/notification-service');
+const autoClockout = require('./services/auto-clockout');
 
 const app = express();
 
@@ -131,6 +132,7 @@ notificationRoutes.setPool(pool);
 estimatePdfRoutes.setPool(pool);
 shareRoutes.setPool(pool);
 notificationService.setPool(pool);
+autoClockout.setPool(pool);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -3187,6 +3189,7 @@ const io = new SocketIO(server, {
 // Make io accessible to routes
 app.set('io', io);
 notificationService.setIO(io);
+autoClockout.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {
@@ -3278,13 +3281,15 @@ server.listen(PORT, () => {
     console.log(`Socket.io ready`);
 
     // Start background services after server is ready
+    autoClockout.start();
+
     if (process.env.ZOHO_ORGANIZATION_ID) {
         syncScheduler.start().catch(err => {
             console.error('Failed to start sync scheduler:', err.message);
         });
         whatsappProcessor.start();
-        console.log('Background services started: sync-scheduler, whatsapp-processor');
+        console.log('Background services started: sync-scheduler, whatsapp-processor, auto-clockout');
     } else {
-        console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - background services skipped');
+        console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
     }
 });
