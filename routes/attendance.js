@@ -943,7 +943,7 @@ router.get('/permission/my-requests', requireAuth, async (req, res) => {
             SELECT ap.*, 
                    reviewer.full_name as reviewed_by_name
             FROM attendance_permissions ap
-            LEFT JOIN users reviewer ON ap.approved_by = reviewer.id
+            LEFT JOIN users reviewer ON ap.reviewed_by = reviewer.id
             WHERE ap.user_id = ?
         `;
         
@@ -992,7 +992,7 @@ router.get('/permission/all', requirePermission('attendance', 'approve'), async 
             JOIN users u ON ap.user_id = u.id
             LEFT JOIN staff_attendance sa ON ap.attendance_id = sa.id
             LEFT JOIN branches b ON sa.branch_id = b.id
-            LEFT JOIN users reviewer ON ap.approved_by = reviewer.id
+            LEFT JOIN users reviewer ON ap.reviewed_by = reviewer.id
             WHERE 1=1
         `;
 
@@ -1114,7 +1114,7 @@ router.put('/permission/:id/approve', requirePermission('attendance', 'approve')
         // Update permission status
         await pool.query(
             `UPDATE attendance_permissions
-             SET status = 'approved', approved_by = ?, approved_at = ?, review_notes = ?
+             SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_notes = ?
              WHERE id = ?`,
             [reviewerId, now, review_notes, permissionId]
         );
@@ -1202,7 +1202,7 @@ router.put('/permission/:id/reject', requirePermission('attendance', 'approve'),
         // Update permission status
         await pool.query(
             `UPDATE attendance_permissions
-             SET status = 'rejected', approved_by = ?, approved_at = ?, rejection_reason = ?, review_notes = ?
+             SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, rejection_reason = ?, review_notes = ?
              WHERE id = ?`,
             [reviewerId, now, review_notes, review_notes, permissionId]
         );
