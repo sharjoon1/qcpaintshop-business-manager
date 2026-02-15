@@ -23,18 +23,20 @@
     <div class="max-w-md w-full">
         <!-- Logo & Title -->
         <div class="text-center mb-8">
-            <div id="loginLogo" class="bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg" style="width: 180px; height: auto; padding: 12px;">
-                <img id="loginLogoImg" src="/icons/icon-192x192.png" alt="Quality Colours" style="width: 100%; height: auto; border-radius: 8px;">
+            <div id="loginLogo" class="bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg" style="width: 180px; height: auto; padding: 12px; min-height: 80px;">
+                <img id="loginLogoImg" src="" alt="Quality Colours" style="width: 100%; height: auto; border-radius: 8px; display: none;" onload="this.style.display='block'">
             </div>
             <h1 class="text-3xl font-bold text-white mb-2" id="loginTitle">Quality Colours</h1>
             <p class="text-purple-200">Business Manager Login</p>
         </div>
         <script>
-            // Load company logo from settings
+            // Load company logo from admin panel settings
             fetch('/api/public/site-info').then(r => r.json()).then(data => {
                 if (data.success && data.data) {
                     if (data.data.business_logo) {
-                        document.getElementById('loginLogoImg').src = '/' + data.data.business_logo;
+                        const logo = data.data.business_logo;
+                        // business_logo may be "/uploads/..." or "uploads/..." - normalize
+                        document.getElementById('loginLogoImg').src = logo.startsWith('/') ? logo : '/' + logo;
                     }
                     if (data.data.business_name) {
                         document.getElementById('loginTitle').textContent = data.data.business_name;
