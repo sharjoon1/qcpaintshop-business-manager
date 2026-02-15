@@ -58,7 +58,7 @@ async function migrate() {
         // 2. Update shop_hours_config open times to 08:30
         console.log('2. Updating shop_hours_config open times to 08:30...');
         const [shopResult] = await conn.query(
-            `UPDATE shop_hours_config SET open_time = '08:30:00' WHERE day_of_week != 'sunday'`
+            `UPDATE shop_hours_config SET open_time = '08:30:00'`
         );
         console.log(`   Updated ${shopResult.affectedRows} rows\n`);
 
