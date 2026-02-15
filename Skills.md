@@ -872,6 +872,19 @@ node scripts/generate-screenshots.js      # Generate 6 Play Store screenshots (1
 node scripts/generate-feature-graphic.js   # Generate Play Store feature graphic (1024x500)
 ```
 
+### Play Store Release Commands (from qcpaintshop-android/)
+```bash
+# Build release AAB
+./gradlew bundleStaffRelease
+# Build release APK (for direct install)
+./gradlew assembleStaffRelease
+
+# Upload to Play Store (tracks: internal, alpha, beta, production)
+node upload-to-play.js ../google-services/QCStaff-vX.X.X-release.aab internal
+# Promote between tracks
+node promote-release.js internal production
+```
+
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
@@ -927,7 +940,7 @@ node scripts/generate-feature-graphic.js   # Generate Play Store feature graphic
 - Play Store assets generated: 6 screenshots, feature graphic, 512x512 icon
 - Release AAB v3.2.0 built for Play Store submission
 
-### Android App v3.2.0
+### Android App v3.2.2 (2026-02-15) - Play Store Submission
 - **Two flavors**: QC Staff (`com.qcpaintshop.staff`) + QC Customer (`com.qcpaintshop.customer`)
 - compileSdk 35, targetSdk 35, minSdk 24
 - Firebase Cloud Messaging for push notifications
@@ -937,6 +950,14 @@ node scripts/generate-feature-graphic.js   # Generate Play Store feature graphic
 - ProGuard/R8 minification enabled
 - Privacy policy at `/privacy-policy.html`
 - Play Store assets ready in `google-services/` folder
+- **Google Play Developer API** integrated for automated uploads
+  - Service account: `qualitycolours1@gmail.com` (Play Console)
+  - Firebase: `sharjoon1@gmail.com` (separate, linked as editor)
+  - Upload script: `qcpaintshop-android/upload-to-play.js`
+  - Promote script: `qcpaintshop-android/promote-release.js`
+  - Service account key: `google-services/play-api-key.json`
+- Store listing: `google-services/store-listing.txt` (descriptions, release notes, category)
+- **v3.2.2 (versionCode 7)** submitted to Play Store production — in review
 
 ---
 
@@ -961,4 +982,4 @@ node scripts/generate-feature-graphic.js   # Generate Play Store feature graphic
 ---
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Generated: 2026-02-15 | Maintained by: Development Team*
+*Last Updated: 2026-02-15 | Version: 3.2.2 | Maintained by: Development Team*
