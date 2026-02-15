@@ -812,10 +812,10 @@
 
             // Determine re-clock-in section
             let reclockinSection = '';
-            if (data.allow_reclockin === 1) {
-                // Admin approved - show clock in again button
+            if (data.allow_reclockin === 1 || reclockinStatus === 'approved') {
+                // Admin approved - show clock in again button (navigate to clock-in page)
                 reclockinSection = `
-                    <button onclick="location.reload()" style="width: 100%; margin-top: 16px; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #10b981, #059669); color: white; box-shadow: 0 4px 15px rgba(16,185,129,0.4);">
+                    <button onclick="window.location.href='clock-in.html'" style="width: 100%; margin-top: 16px; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #10b981, #059669); color: white; box-shadow: 0 4px 15px rgba(16,185,129,0.4);">
                         Clock In Again (Overtime)
                     </button>`;
             } else if (reclockinStatus === 'pending') {
@@ -824,11 +824,6 @@
                         <span style="color: #92400e; font-weight: 600;">Re-Clock-In Request Pending</span>
                         <p style="color: #a16207; font-size: 13px; margin-top: 4px;">Waiting for admin approval</p>
                     </div>`;
-            } else if (reclockinStatus === 'approved') {
-                reclockinSection = `
-                    <button onclick="location.reload()" style="width: 100%; margin-top: 16px; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #10b981, #059669); color: white; box-shadow: 0 4px 15px rgba(16,185,129,0.4);">
-                        Clock In Again (Overtime)
-                    </button>`;
             } else if (reclockinStatus === 'rejected') {
                 reclockinSection = `
                     <div style="margin-top: 16px; padding: 14px; background: #fee2e2; border-radius: 12px; text-align: center;">
