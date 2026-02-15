@@ -72,8 +72,21 @@ async function migrate() {
             console.log('   attendance_permissions.request_type column not found\n');
         }
 
-        // 3. Add is_reclockin column
-        console.log('3. Checking staff_attendance.is_reclockin column...');
+        // 3. Drop unique_user_date constraint (allows multiple records per day for re-clockin)
+        console.log('3. Checking unique_user_date constraint...');
+        const [indexRows] = await conn.query(
+            `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'staff_attendance' AND INDEX_NAME = 'unique_user_date'`
+        );
+        if (indexRows.length > 0) {
+            await conn.query('ALTER TABLE staff_attendance DROP INDEX unique_user_date');
+            console.log('   Dropped unique_user_date constraint\n');
+        } else {
+            console.log('   Constraint already removed, skipping\n');
+        }
+
+        // 4. Add is_reclockin column
+        console.log('4. Checking staff_attendance.is_reclockin column...');
         const [reCols] = await conn.query(
             `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'staff_attendance' AND COLUMN_NAME = 'is_reclockin'`
@@ -85,8 +98,8 @@ async function migrate() {
             console.log('   Column already exists, skipping\n');
         }
 
-        // 4. Add is_overtime column
-        console.log('4. Checking staff_attendance.is_overtime column...');
+        // 5. Add is_overtime column
+        console.log('5. Checking staff_attendance.is_overtime column...');
         const [otCols] = await conn.query(
             `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'staff_attendance' AND COLUMN_NAME = 'is_overtime'`
