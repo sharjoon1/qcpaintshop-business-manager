@@ -292,26 +292,44 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
 
         // Check if already clocked in today
         const [existing] = await pool.query(
-            'SELECT id, clock_out_time, allow_reclockin FROM staff_attendance WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1',
+            'SELECT id, clock_out_time, allow_reclockin, total_working_minutes, expected_hours FROM staff_attendance WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1',
             [userId, today]
         );
 
+        let isReclockin = false;
+        let previousRecordId = null;
+        let previousWorkedMinutes = 0;
+
         if (existing.length > 0) {
             const lastRecord = existing[0];
-            // Allow re-clock-in if clocked out AND admin approved
-            if (lastRecord.clock_out_time && lastRecord.allow_reclockin === 1) {
-                // Reset the flag so it can't be used again
-                await pool.query(
-                    'UPDATE staff_attendance SET allow_reclockin = 0 WHERE id = ?',
-                    [lastRecord.id]
-                );
-                // Continue to create new record below
-            } else if (lastRecord.clock_out_time && !lastRecord.allow_reclockin) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'You have already clocked out today. Request re-clock-in for overtime.',
-                    code: 'ALREADY_CLOCKED_OUT'
-                });
+
+            if (lastRecord.clock_out_time) {
+                // Clocked out - check if re-clock-in is allowed
+                let reclockinAllowed = lastRecord.allow_reclockin === 1;
+
+                // Fallback: check permissions table if flag not set
+                if (!reclockinAllowed) {
+                    const [approvedPerm] = await pool.query(
+                        `SELECT id FROM attendance_permissions
+                         WHERE user_id = ? AND request_type = 're_clockin' AND request_date = ? AND status = 'approved'
+                         ORDER BY id DESC LIMIT 1`,
+                        [userId, today]
+                    );
+                    reclockinAllowed = approvedPerm.length > 0;
+                }
+
+                if (reclockinAllowed) {
+                    isReclockin = true;
+                    previousRecordId = lastRecord.id;
+                    previousWorkedMinutes = lastRecord.total_working_minutes || 0;
+                    // Continue to create new record below
+                } else {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'You have already clocked out today. Request re-clock-in first.',
+                        code: 'ALREADY_CLOCKED_OUT'
+                    });
+                }
             } else {
                 return res.status(400).json({
                     success: false,
@@ -320,27 +338,40 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
                 });
             }
         }
-        
+
         // Get shop hours
         const shopHours = await getShopHours(branchId, today);
-        
-        // Check if late
+
+        // Check if late (skip for re-clock-in)
         const currentTime = now.toTimeString().split(' ')[0];
-        const late = isLateArrival(currentTime, shopHours.open_time, shopHours.late_threshold_minutes);
-        
+        const late = isReclockin ? false : isLateArrival(currentTime, shopHours.open_time, shopHours.late_threshold_minutes);
+
+        // Determine if this re-clock-in counts as overtime
+        const expectedMinutes = parseFloat(shopHours.expected_hours) * 60;
+        const isOvertime = isReclockin && previousWorkedMinutes >= expectedMinutes;
+
         // Save photo
         const photoPath = await saveAttendancePhoto(photo.buffer, userId, 'clock-in');
-        
+
         // Create attendance record
         const [result] = await pool.query(
             `INSERT INTO staff_attendance
              (user_id, branch_id, date, clock_in_time, clock_in_photo,
               clock_in_lat, clock_in_lng, clock_in_address,
-              is_late, expected_hours, status, clock_in_distance)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', ?)`,
+              is_late, expected_hours, status, clock_in_distance, is_reclockin, is_overtime)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', ?, ?, ?)`,
             [userId, branchId, today, now, photoPath, latitude, longitude,
-             address, late ? 1 : 0, shopHours.expected_hours, clockInDistance]
+             address, late ? 1 : 0, shopHours.expected_hours, clockInDistance,
+             isReclockin ? 1 : 0, isOvertime ? 1 : 0]
         );
+
+        // Reset allow_reclockin flag AFTER successful record creation
+        if (isReclockin && previousRecordId) {
+            await pool.query(
+                'UPDATE staff_attendance SET allow_reclockin = 0 WHERE id = ?',
+                [previousRecordId]
+            );
+        }
         
         const attendanceId = result.insertId;
         
@@ -622,8 +653,9 @@ router.get('/today', requireAuth, async (req, res) => {
 
         const attendance = rows[0];
 
-        // Check for pending re-clockin request
+        // Check for pending re-clockin request and total day minutes
         let reclockinStatus = null;
+        let dayTotalMinutes = 0;
         if (attendance.clock_out_time) {
             const [reclockin] = await pool.query(
                 `SELECT status FROM attendance_permissions
@@ -634,6 +666,13 @@ router.get('/today', requireAuth, async (req, res) => {
             if (reclockin.length > 0) {
                 reclockinStatus = reclockin[0].status;
             }
+
+            // Sum total working minutes across all records today
+            const [dayTotal] = await pool.query(
+                'SELECT COALESCE(SUM(total_working_minutes), 0) as total FROM staff_attendance WHERE user_id = ? AND date = ?',
+                [userId, today]
+            );
+            dayTotalMinutes = dayTotal[0].total;
         }
 
         res.json({
@@ -641,6 +680,7 @@ router.get('/today', requireAuth, async (req, res) => {
             has_clocked_in: true,
             has_clocked_out: !!attendance.clock_out_time,
             reclockin_status: reclockinStatus,
+            day_total_minutes: dayTotalMinutes,
             data: attendance
         });
         

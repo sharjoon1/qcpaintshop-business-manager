@@ -72,6 +72,32 @@ async function migrate() {
             console.log('   attendance_permissions.request_type column not found\n');
         }
 
+        // 3. Add is_reclockin column
+        console.log('3. Checking staff_attendance.is_reclockin column...');
+        const [reCols] = await conn.query(
+            `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'staff_attendance' AND COLUMN_NAME = 'is_reclockin'`
+        );
+        if (reCols.length === 0) {
+            await conn.query('ALTER TABLE staff_attendance ADD COLUMN is_reclockin TINYINT DEFAULT 0');
+            console.log('   Added is_reclockin column\n');
+        } else {
+            console.log('   Column already exists, skipping\n');
+        }
+
+        // 4. Add is_overtime column
+        console.log('4. Checking staff_attendance.is_overtime column...');
+        const [otCols] = await conn.query(
+            `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'staff_attendance' AND COLUMN_NAME = 'is_overtime'`
+        );
+        if (otCols.length === 0) {
+            await conn.query('ALTER TABLE staff_attendance ADD COLUMN is_overtime TINYINT DEFAULT 0');
+            console.log('   Added is_overtime column\n');
+        } else {
+            console.log('   Column already exists, skipping\n');
+        }
+
         console.log('Migration completed successfully!');
 
     } catch (error) {
