@@ -205,21 +205,77 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
             });
         }
 
-        const branchId = branch_id || req.user.branch_id;
         const today = new Date().toISOString().split('T')[0];
         const now = new Date();
 
-        // Check geo-fence
-        const geoCheck = await checkGeoFence(branchId, latitude, longitude);
-        if (!geoCheck.allowed) {
-            return res.status(400).json({
-                success: false,
-                message: `You are ${geoCheck.distance}m away from the branch. Must be within ${geoCheck.radius}m to clock in.`,
-                code: 'OUTSIDE_GEOFENCE',
-                distance: geoCheck.distance,
-                radius: geoCheck.radius
-            });
+        // Check if user has geo-fence enabled
+        const [userRows] = await pool.query(
+            'SELECT geo_fence_enabled FROM users WHERE id = ?', [userId]
+        );
+        const geoFenceEnabled = userRows.length > 0 ? userRows[0].geo_fence_enabled : true;
+
+        // Get all assigned branches for multi-branch support
+        const [assignedBranches] = await pool.query(
+            `SELECT ub.branch_id, ub.is_primary, b.name, b.latitude, b.longitude, b.geo_fence_radius
+             FROM user_branches ub
+             JOIN branches b ON ub.branch_id = b.id
+             WHERE ub.user_id = ?`,
+            [userId]
+        );
+
+        let effectiveBranchId = branch_id || req.user.branch_id;
+
+        // Multi-branch geo-fence check
+        if (geoFenceEnabled && assignedBranches.length > 0) {
+            let closestBranch = null;
+            let closestDistance = Infinity;
+
+            for (const branch of assignedBranches) {
+                if (!branch.latitude || !branch.longitude) continue;
+                const dist = calculateDistance(
+                    parseFloat(latitude), parseFloat(longitude),
+                    parseFloat(branch.latitude), parseFloat(branch.longitude)
+                );
+                const radius = branch.geo_fence_radius || 500;
+                if (dist <= radius) {
+                    // Within this branch's fence - use nearest match
+                    if (dist < closestDistance) {
+                        closestDistance = dist;
+                        closestBranch = branch;
+                    }
+                }
+            }
+
+            if (closestBranch) {
+                effectiveBranchId = closestBranch.branch_id;
+            } else {
+                // Not within any assigned branch fence
+                const primaryBranch = assignedBranches.find(b => b.is_primary) || assignedBranches[0];
+                const geoCheck = await checkGeoFence(primaryBranch.branch_id, latitude, longitude);
+                return res.status(400).json({
+                    success: false,
+                    message: `You are ${geoCheck.distance}m away from the nearest branch. Must be within the geo-fence to clock in.`,
+                    code: 'OUTSIDE_GEOFENCE',
+                    distance: geoCheck.distance,
+                    radius: geoCheck.radius
+                });
+            }
+        } else if (geoFenceEnabled) {
+            // Fallback: single branch check (no user_branches rows)
+            const geoCheck = await checkGeoFence(effectiveBranchId, latitude, longitude);
+            if (!geoCheck.allowed) {
+                return res.status(400).json({
+                    success: false,
+                    message: `You are ${geoCheck.distance}m away from the branch. Must be within ${geoCheck.radius}m to clock in.`,
+                    code: 'OUTSIDE_GEOFENCE',
+                    distance: geoCheck.distance,
+                    radius: geoCheck.radius
+                });
+            }
         }
+        // If geo_fence_enabled is false, skip geo-fence check entirely
+
+        const branchId = effectiveBranchId;
 
         // Check if already clocked in today
         const [existing] = await pool.query(
@@ -365,7 +421,7 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
             `SELECT a.*, shc.close_time, shc.expected_hours
              FROM staff_attendance a
              JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
-                AND shc.day_of_week = DAYOFWEEK(a.date) - 1
+                AND shc.day_of_week = LOWER(DAYNAME(a.date))
              WHERE a.user_id = ? AND a.date = ?`,
             [userId, today]
         );
@@ -388,16 +444,24 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
             });
         }
 
-        // Check geo-fence
-        const geoCheck = await checkGeoFence(record.branch_id, latitude, longitude);
-        if (!geoCheck.allowed) {
-            return res.status(400).json({
-                success: false,
-                message: `You are ${geoCheck.distance}m away from the branch. Must be within ${geoCheck.radius}m to clock out.`,
-                code: 'OUTSIDE_GEOFENCE',
-                distance: geoCheck.distance,
-                radius: geoCheck.radius
-            });
+        // Check if user has geo-fence enabled
+        const [userGeoRows] = await pool.query(
+            'SELECT geo_fence_enabled FROM users WHERE id = ?', [userId]
+        );
+        const geoFenceEnabledOut = userGeoRows.length > 0 ? userGeoRows[0].geo_fence_enabled : true;
+
+        if (geoFenceEnabledOut) {
+            // Check geo-fence against clock-in branch
+            const geoCheck = await checkGeoFence(record.branch_id, latitude, longitude);
+            if (!geoCheck.allowed) {
+                return res.status(400).json({
+                    success: false,
+                    message: `You are ${geoCheck.distance}m away from the branch. Must be within ${geoCheck.radius}m to clock out.`,
+                    code: 'OUTSIDE_GEOFENCE',
+                    distance: geoCheck.distance,
+                    radius: geoCheck.radius
+                });
+            }
         }
 
         // Save photo
@@ -493,11 +557,11 @@ router.get('/today', requireAuth, async (req, res) => {
              JOIN users u ON a.user_id = u.id
              JOIN branches b ON a.branch_id = b.id
              LEFT JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
-                AND shc.day_of_week = DAYOFWEEK(a.date) - 1
+                AND shc.day_of_week = LOWER(DAYNAME(a.date))
              WHERE a.user_id = ? AND a.date = ?`,
             [userId, today]
         );
-        
+
         if (rows.length === 0) {
             // No attendance yet - return shop hours
             const branchId = req.user.branch_id;
@@ -687,7 +751,7 @@ router.post('/break-end', requireAuth, upload.single('photo'), async (req, res) 
             `SELECT a.*, shc.break_min_minutes, shc.break_max_minutes
              FROM staff_attendance a
              JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
-                AND shc.day_of_week = DAYOFWEEK(a.date) - 1
+                AND shc.day_of_week = LOWER(DAYNAME(a.date))
              WHERE a.user_id = ? AND a.date = ?`,
             [userId, today]
         );
@@ -1489,6 +1553,43 @@ router.get('/geofence-check', requireAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Valid GPS coordinates required' });
         }
 
+        // Check if user has geo-fence enabled
+        const [userGeoRows] = await pool.query(
+            'SELECT geo_fence_enabled FROM users WHERE id = ?', [req.user.id]
+        );
+        const geoFenceEnabled = userGeoRows.length > 0 ? userGeoRows[0].geo_fence_enabled : true;
+
+        if (!geoFenceEnabled) {
+            return res.json({
+                success: true,
+                data: { allowed: true, distance: null, radius: null, geo_fence_disabled: true }
+            });
+        }
+
+        // Check against all assigned branches
+        const [assignedBranches] = await pool.query(
+            `SELECT ub.branch_id, b.name, b.latitude, b.longitude, b.geo_fence_radius
+             FROM user_branches ub
+             JOIN branches b ON ub.branch_id = b.id
+             WHERE ub.user_id = ?`,
+            [req.user.id]
+        );
+
+        if (assignedBranches.length > 0) {
+            let bestResult = { allowed: false, distance: Infinity, radius: 0 };
+            for (const branch of assignedBranches) {
+                const result = await checkGeoFence(branch.branch_id, latitude, longitude);
+                if (result.allowed) {
+                    return res.json({ success: true, data: { allowed: true, distance: result.distance, radius: result.radius, branch_name: branch.name } });
+                }
+                if (result.distance !== null && result.distance < bestResult.distance) {
+                    bestResult = { ...result, branch_name: branch.name };
+                }
+            }
+            return res.json({ success: true, data: bestResult });
+        }
+
+        // Fallback: single branch
         const branchId = req.user.branch_id;
         const result = await checkGeoFence(branchId, latitude, longitude);
 
