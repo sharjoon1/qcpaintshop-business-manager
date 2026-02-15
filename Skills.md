@@ -972,6 +972,25 @@ node promote-release.js internal production
 - Store listing: `google-services/store-listing.txt` (descriptions, release notes, category)
 - **v3.2.2 (versionCode 7)** submitted to Play Store production — in review
 
+### v3.3.0 (2026-02-16) - Attendance Fixes & Web Push
+- **Break photo ENUM fix**: Added `break_start`/`break_end` to `attendance_photos.photo_type` ENUM (was causing break photo insert failure with "Data truncated")
+- **Approve/Reject SQL fix**: Reverted `approved_by`/`approved_at` back to `reviewed_by`/`reviewed_at` (matches actual DB schema)
+- **Web Push subscription**: Auth-helper now auto-subscribes to Web Push on login (non-Android browsers)
+- **VAPID key endpoint**: `GET /api/notifications/push/vapid-key` returns public key for browser push subscription
+- **VAPID keys**: Generated and deployed to production `.env`
+- **Service Worker**: Push + notificationclick handlers for displaying browser notifications with deep-link routing
+- **FCM data-only messages**: Changed FCM payload to data-only (ensures `onMessageReceived()` always fires on Android)
+- **Android notification sound**: Added sound URI + AudioAttributes on notification channel
+- **Distance tracking**: Clock-in/out distance always computed and stored (regardless of geo-fence setting)
+- **Admin photo viewer**: Direct endpoint `GET /api/attendance/record/:id` for reliable photo loading
+- **Break double-submit prevention**: `breakSubmitting` flag + button disable during submission
+- Android app v3.3.0 (versionCode 8) built and uploaded to Play Store internal track
+- Migration: `scripts/migrate-fix-break-enum.js` (ENUM fix + VAPID key generation)
+- Migration: `scripts/migrate-login-attendance-update.js` (distance columns + review_notes)
+- **Auto clock-out scheduler** (`services/auto-clockout.js`): Runs every 15 min, clocks out staff after 10h (weekdays) or 5h (Sunday), ends active breaks, notifies via Socket.io
+- **Admin forced clock-out**: `POST /api/attendance/admin/force-clockout` + "Clock Out" button in Live Today table for staff still clocked in
+- Notifies staff on forced clock-out
+
 ---
 
 ## 9. KNOWN ISSUES & ROADMAP
@@ -995,4 +1014,4 @@ node promote-release.js internal production
 ---
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-02-15 | Version: 3.2.2 | Maintained by: Development Team*
+*Last Updated: 2026-02-16 | Version: 3.3.0 | Maintained by: Development Team*
