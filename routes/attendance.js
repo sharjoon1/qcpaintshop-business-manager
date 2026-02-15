@@ -277,6 +277,19 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
 
         const branchId = effectiveBranchId;
 
+        // Always compute distance from branch for reporting
+        let clockInDistance = null;
+        const [branchGeo] = await pool.query(
+            'SELECT latitude, longitude FROM branches WHERE id = ?',
+            [branchId]
+        );
+        if (branchGeo.length > 0 && branchGeo[0].latitude && branchGeo[0].longitude) {
+            clockInDistance = Math.round(calculateDistance(
+                parseFloat(latitude), parseFloat(longitude),
+                parseFloat(branchGeo[0].latitude), parseFloat(branchGeo[0].longitude)
+            ));
+        }
+
         // Check if already clocked in today
         const [existing] = await pool.query(
             'SELECT id FROM staff_attendance WHERE user_id = ? AND date = ?',
@@ -303,13 +316,13 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
         
         // Create attendance record
         const [result] = await pool.query(
-            `INSERT INTO staff_attendance 
-             (user_id, branch_id, date, clock_in_time, clock_in_photo, 
-              clock_in_lat, clock_in_lng, clock_in_address, 
-              is_late, expected_hours, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present')`,
-            [userId, branchId, today, now, photoPath, latitude, longitude, 
-             address, late ? 1 : 0, shopHours.expected_hours]
+            `INSERT INTO staff_attendance
+             (user_id, branch_id, date, clock_in_time, clock_in_photo,
+              clock_in_lat, clock_in_lng, clock_in_address,
+              is_late, expected_hours, status, clock_in_distance)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', ?)`,
+            [userId, branchId, today, now, photoPath, latitude, longitude,
+             address, late ? 1 : 0, shopHours.expected_hours, clockInDistance]
         );
         
         const attendanceId = result.insertId;
@@ -464,9 +477,22 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
             }
         }
 
+        // Compute distance from branch for reporting
+        let clockOutDistance = null;
+        const [branchGeoOut] = await pool.query(
+            'SELECT latitude, longitude FROM branches WHERE id = ?',
+            [record.branch_id]
+        );
+        if (branchGeoOut.length > 0 && branchGeoOut[0].latitude && branchGeoOut[0].longitude) {
+            clockOutDistance = Math.round(calculateDistance(
+                parseFloat(latitude), parseFloat(longitude),
+                parseFloat(branchGeoOut[0].latitude), parseFloat(branchGeoOut[0].longitude)
+            ));
+        }
+
         // Save photo
         const photoPath = await saveAttendancePhoto(photo.buffer, userId, 'clock-out');
-        
+
         // Calculate working minutes
         const workingMinutes = calculateWorkingMinutes(
             record.clock_in_time, 
@@ -482,12 +508,12 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
         
         // Update attendance
         await pool.query(
-            `UPDATE staff_attendance 
-             SET clock_out_time = ?, clock_out_photo = ?, 
+            `UPDATE staff_attendance
+             SET clock_out_time = ?, clock_out_photo = ?,
                  clock_out_lat = ?, clock_out_lng = ?, clock_out_address = ?,
-                 total_working_minutes = ?, is_early_checkout = ?
+                 total_working_minutes = ?, is_early_checkout = ?, clock_out_distance = ?
              WHERE id = ?`,
-            [now, photoPath, latitude, longitude, address, workingMinutes, isEarly ? 1 : 0, record.id]
+            [now, photoPath, latitude, longitude, address, workingMinutes, isEarly ? 1 : 0, clockOutDistance, record.id]
         );
         
         // Save photo record
@@ -917,7 +943,7 @@ router.get('/permission/my-requests', requireAuth, async (req, res) => {
             SELECT ap.*, 
                    reviewer.full_name as reviewed_by_name
             FROM attendance_permissions ap
-            LEFT JOIN users reviewer ON ap.reviewed_by = reviewer.id
+            LEFT JOIN users reviewer ON ap.approved_by = reviewer.id
             WHERE ap.user_id = ?
         `;
         
@@ -966,7 +992,7 @@ router.get('/permission/all', requirePermission('attendance', 'approve'), async 
             JOIN users u ON ap.user_id = u.id
             LEFT JOIN staff_attendance sa ON ap.attendance_id = sa.id
             LEFT JOIN branches b ON sa.branch_id = b.id
-            LEFT JOIN users reviewer ON ap.reviewed_by = reviewer.id
+            LEFT JOIN users reviewer ON ap.approved_by = reviewer.id
             WHERE 1=1
         `;
 
@@ -1087,28 +1113,28 @@ router.put('/permission/:id/approve', requirePermission('attendance', 'approve')
         
         // Update permission status
         await pool.query(
-            `UPDATE attendance_permissions 
-             SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_notes = ?
+            `UPDATE attendance_permissions
+             SET status = 'approved', approved_by = ?, approved_at = ?, review_notes = ?
              WHERE id = ?`,
             [reviewerId, now, review_notes, permissionId]
         );
-        
+
         // If attendance exists, update working minutes
         if (permission.attendance_id && permission.duration_minutes) {
             const currentMinutes = permission.total_working_minutes || 0;
             const newMinutes = currentMinutes + permission.duration_minutes;
-            
+
             await pool.query(
                 'UPDATE staff_attendance SET total_working_minutes = ? WHERE id = ?',
                 [newMinutes, permission.attendance_id]
             );
         }
-        
+
         // Notify requesting staff
         try {
-            await notificationService.send(permission.staff_id, {
+            await notificationService.send(permission.user_id, {
                 type: 'permission_approved', title: 'Permission Approved',
-                body: `Your ${permission.permission_type || 'attendance'} permission request has been approved.`,
+                body: `Your ${permission.request_type || 'attendance'} permission request has been approved.`,
                 data: { type: 'permission_approved', permission_id: parseInt(permissionId) }
             });
         } catch (notifErr) { console.error('Permission approve notification error:', notifErr.message); }
@@ -1175,19 +1201,19 @@ router.put('/permission/:id/reject', requirePermission('attendance', 'approve'),
         
         // Update permission status
         await pool.query(
-            `UPDATE attendance_permissions 
-             SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_notes = ?
+            `UPDATE attendance_permissions
+             SET status = 'rejected', approved_by = ?, approved_at = ?, rejection_reason = ?, review_notes = ?
              WHERE id = ?`,
-            [reviewerId, now, review_notes, permissionId]
+            [reviewerId, now, review_notes, review_notes, permissionId]
         );
-        
+
         // No working minutes adjustment for rejection
-        
+
         // Notify requesting staff
         try {
-            await notificationService.send(permission.staff_id, {
+            await notificationService.send(permission.user_id, {
                 type: 'permission_rejected', title: 'Permission Rejected',
-                body: `Your ${permission.permission_type || 'attendance'} permission request was rejected. Reason: ${review_notes}`,
+                body: `Your ${permission.request_type || 'attendance'} permission request was rejected. Reason: ${review_notes}`,
                 data: { type: 'permission_rejected', permission_id: parseInt(permissionId) }
             });
         } catch (notifErr) { console.error('Permission reject notification error:', notifErr.message); }
@@ -1701,6 +1727,34 @@ router.get('/geofence-violations', requirePermission('attendance', 'view'), asyn
     } catch (error) {
         console.error('Geofence violations list error:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch violations' });
+    }
+});
+
+/**
+ * GET /api/attendance/record/:id
+ * Get a single attendance record with full details (for admin photo viewer)
+ */
+router.get('/record/:id', requirePermission('attendance', 'view'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT a.*,
+                    u.full_name, u.username,
+                    b.name as branch_name
+             FROM staff_attendance a
+             JOIN users u ON a.user_id = u.id
+             JOIN branches b ON a.branch_id = b.id
+             WHERE a.id = ?`,
+            [req.params.id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Attendance record not found' });
+        }
+
+        res.json({ success: true, data: rows[0] });
+    } catch (error) {
+        console.error('Get attendance record error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get attendance record' });
     }
 });
 

@@ -136,8 +136,7 @@ async function sendFCM(fcmToken, { title, body, data }) {
 
     const payload = JSON.stringify({
         to: fcmToken,
-        notification: { title, body, icon: '/icons/icon-192x192.png' },
-        data: { ...data, type: data?.type || 'notification' }
+        data: { title, body, ...(data || {}), type: data?.type || 'notification' }
     });
 
     return new Promise((resolve, reject) => {

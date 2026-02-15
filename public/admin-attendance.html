@@ -433,13 +433,14 @@
                                     <th>Clock Out</th>
                                     <th>Break</th>
                                     <th>Working Hours</th>
+                                    <th>Distance</th>
                                     <th>Status</th>
                                     <th>Late</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="liveTableBody">
-                                <tr><td colspan="9" class="text-center py-8 text-gray-400">Loading...</td></tr>
+                                <tr><td colspan="10" class="text-center py-8 text-gray-400">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -826,7 +827,7 @@
             const date = document.getElementById('liveDate').value;
             const branchId = document.getElementById('liveBranch').value;
             const tbody = document.getElementById('liveTableBody');
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">Loading...</td></tr>';
 
             try {
                 let url = `/api/attendance/report?date=${date}`;
@@ -836,13 +837,13 @@
                 const data = await res.json();
 
                 if (!data.success) {
-                    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-gray-400">${escapeHtml(data.message)}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-gray-400">${escapeHtml(data.message)}</td></tr>`;
                     return;
                 }
 
                 const rows = data.attendance || [];
                 if (rows.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No attendance records for this date</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No attendance records for this date</td></tr>';
                     return;
                 }
 
@@ -854,6 +855,14 @@
                     const statusClass = r.status || 'absent';
                     const dayStatus = r.day_status || r.status;
 
+                    // Format distance
+                    let distDisplay = '--';
+                    if (r.clock_in_distance != null) {
+                        distDisplay = r.clock_in_distance >= 1000
+                            ? `${(r.clock_in_distance / 1000).toFixed(1)}km`
+                            : `${r.clock_in_distance}m`;
+                    }
+
                     return `<tr>
                         <td class="font-semibold">${escapeHtml(r.full_name)}</td>
                         <td>${escapeHtml(r.branch_name)}</td>
@@ -861,6 +870,7 @@
                         <td>${clockOut}</td>
                         <td>${breakDur}</td>
                         <td>${workHrs}</td>
+                        <td>${distDisplay}</td>
                         <td><span class="badge badge-${statusClass}">${statusClass}</span></td>
                         <td>${r.is_late ? '<span class="badge badge-late">LATE</span>' : '-'}</td>
                         <td>
@@ -871,7 +881,7 @@
 
             } catch (e) {
                 console.error('Load live attendance error:', e);
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-red-500">Failed to load attendance data</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-red-500">Failed to load attendance data</td></tr>';
             }
         }
 
@@ -1196,26 +1206,35 @@
         // ========================================
         // PHOTO VIEWER
         // ========================================
+        function formatDistance(meters) {
+            if (meters == null) return '';
+            return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${meters}m`;
+        }
+
         async function viewPhotos(attendanceId) {
             const content = document.getElementById('photoContent');
             content.innerHTML = '<div class="text-center py-8 text-gray-400">Loading photos...</div>';
             openModal('photoModal');
 
             try {
-                // Get attendance photos
-                const token = localStorage.getItem('auth_token');
-                const res = await fetch(`/api/attendance/report?date=${document.getElementById('liveDate').value}`, {
+                const res = await fetch(`/api/attendance/record/${attendanceId}`, {
                     headers: getAuthHeaders()
                 });
                 const data = await res.json();
-                const record = (data.attendance || []).find(r => r.id === attendanceId);
 
-                if (!record) {
+                if (!data.success || !data.data) {
                     content.innerHTML = '<div class="text-center py-8 text-gray-400">Record not found</div>';
                     return;
                 }
 
+                const record = data.data;
                 let html = '';
+
+                // Staff name header
+                html += `<div class="col-span-1 sm:col-span-2 mb-2">
+                    <p class="font-bold text-gray-900">${escapeHtml(record.full_name)}</p>
+                    <p class="text-xs text-gray-500">${escapeHtml(record.branch_name)} &mdash; ${formatDate(record.date)}</p>
+                </div>`;
 
                 if (record.clock_in_photo) {
                     html += `
@@ -1224,6 +1243,7 @@
                             <img src="/${record.clock_in_photo}" alt="Clock In" style="width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover;"
                                  onerror="this.parentElement.innerHTML='<div class=\\'text-center py-8 text-gray-400\\'>Photo not available</div>'">
                             <p class="text-xs text-gray-500 text-center mt-2">${formatTime(record.clock_in_time)}</p>
+                            ${record.clock_in_distance != null ? `<p class="text-xs text-blue-600 text-center">${formatDistance(record.clock_in_distance)} from branch</p>` : ''}
                             ${record.clock_in_address ? `<p class="text-xs text-gray-400 text-center">${escapeHtml(record.clock_in_address)}</p>` : ''}
                         </div>`;
                 }
@@ -1235,6 +1255,7 @@
                             <img src="/${record.clock_out_photo}" alt="Clock Out" style="width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover;"
                                  onerror="this.parentElement.innerHTML='<div class=\\'text-center py-8 text-gray-400\\'>Photo not available</div>'">
                             <p class="text-xs text-gray-500 text-center mt-2">${formatTime(record.clock_out_time)}</p>
+                            ${record.clock_out_distance != null ? `<p class="text-xs text-blue-600 text-center">${formatDistance(record.clock_out_distance)} from branch</p>` : ''}
                             ${record.clock_out_address ? `<p class="text-xs text-gray-400 text-center">${escapeHtml(record.clock_out_address)}</p>` : ''}
                         </div>`;
                 }
@@ -1246,7 +1267,6 @@
                             <img src="/${record.break_start_photo}" alt="Break Start" style="width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover;"
                                  onerror="this.parentElement.innerHTML='<div class=\\'text-center py-8 text-gray-400\\'>Photo not available</div>'">
                             <p class="text-xs text-gray-500 text-center mt-2">${record.break_start_time ? formatTime(record.break_start_time) : ''}</p>
-                            ${record.break_start_address ? `<p class="text-xs text-gray-400 text-center">${escapeHtml(record.break_start_address)}</p>` : ''}
                         </div>`;
                 }
 
@@ -1257,12 +1277,11 @@
                             <img src="/${record.break_end_photo}" alt="Break End" style="width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover;"
                                  onerror="this.parentElement.innerHTML='<div class=\\'text-center py-8 text-gray-400\\'>Photo not available</div>'">
                             <p class="text-xs text-gray-500 text-center mt-2">${record.break_end_time ? formatTime(record.break_end_time) : ''}</p>
-                            ${record.break_end_address ? `<p class="text-xs text-gray-400 text-center">${escapeHtml(record.break_end_address)}</p>` : ''}
                         </div>`;
                 }
 
-                if (!html) {
-                    html = '<div class="text-center py-8 text-gray-400 col-span-2">No photos available for this record</div>';
+                if (!record.clock_in_photo && !record.clock_out_photo && !record.break_start_photo && !record.break_end_photo) {
+                    html += '<div class="text-center py-8 text-gray-400 col-span-2">No photos available for this record</div>';
                 }
 
                 content.innerHTML = html;
