@@ -313,6 +313,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Branch-based geo-fencing (configurable radius per branch)
 - Automatic nearest-branch detection on clock-in (uses GPS to match assigned branches)
 - Geo-fence violation logging
+- **Geo-fence auto clock-out**: staff 300m+ from branch → auto clocked out with notification
 - Late detection (configurable threshold per branch, shop opens 08:30 AM)
 - Work hours calculation
 - Pages: `staff/clock-in.html`, `staff/clock-out.html`
@@ -329,6 +330,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Admin approval/rejection workflow with `review_notes` column
 - DB columns: `approved_by`, `approved_at`, `rejection_reason`, `review_notes`
 - Notification sent to staff on approval/rejection (via `user_id` + `request_type`)
+- **Re-clock-in request**: After clock-out, staff can request overtime. Admin approves → `allow_reclockin = 1` → staff clocks in again creating new attendance record. Types: `late_arrival`, `early_checkout`, `extended_break`, `re_clockin`
 - Page: `staff/permission-request.html`
 
 **Admin Features**
@@ -990,6 +992,10 @@ node promote-release.js internal production
 - **Auto clock-out scheduler** (`services/auto-clockout.js`): Runs every 15 min, clocks out staff after 10h (weekdays) or 5h (Sunday), ends active breaks, notifies via Socket.io
 - **Admin forced clock-out**: `POST /api/attendance/admin/force-clockout` + "Clock Out" button in Live Today table for staff still clocked in
 - Notifies staff on forced clock-out
+- **Break photo preview fix**: Moved `breakPreview` img out of camera container into separate `breakPhotoPreview` div (matches clock-in pattern)
+- **Geo-fence auto clock-out**: `POST /api/attendance/geo-auto-clockout` — when staff moves 300m+ from branch, auto clocks out, ends active break, notifies. Frontend trigger in `startGeoFenceMonitoring()` with `geoAutoClockoutTriggered` flag to prevent duplicates
+- **Re-clock-in request system**: Staff can request to clock in again after clock-out (for overtime). `POST /api/attendance/permission/request-reclockin` creates `re_clockin` permission. Admin approves → sets `allow_reclockin = 1` on attendance record → staff can create new attendance record. `/api/attendance/today` returns `reclockin_status` for UI state management
+- Migration: `scripts/migrate-reclockin.js` (adds `allow_reclockin` column to `staff_attendance`)
 
 ---
 

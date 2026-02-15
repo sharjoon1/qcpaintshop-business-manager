@@ -292,16 +292,33 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
 
         // Check if already clocked in today
         const [existing] = await pool.query(
-            'SELECT id FROM staff_attendance WHERE user_id = ? AND date = ?',
+            'SELECT id, clock_out_time, allow_reclockin FROM staff_attendance WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1',
             [userId, today]
         );
-        
+
         if (existing.length > 0) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'You have already clocked in today',
-                code: 'ALREADY_CLOCKED_IN'
-            });
+            const lastRecord = existing[0];
+            // Allow re-clock-in if clocked out AND admin approved
+            if (lastRecord.clock_out_time && lastRecord.allow_reclockin === 1) {
+                // Reset the flag so it can't be used again
+                await pool.query(
+                    'UPDATE staff_attendance SET allow_reclockin = 0 WHERE id = ?',
+                    [lastRecord.id]
+                );
+                // Continue to create new record below
+            } else if (lastRecord.clock_out_time && !lastRecord.allow_reclockin) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You have already clocked out today. Request re-clock-in for overtime.',
+                    code: 'ALREADY_CLOCKED_OUT'
+                });
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You have already clocked in today',
+                    code: 'ALREADY_CLOCKED_IN'
+                });
+            }
         }
         
         // Get shop hours
@@ -584,7 +601,8 @@ router.get('/today', requireAuth, async (req, res) => {
              JOIN branches b ON a.branch_id = b.id
              LEFT JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
                 AND shc.day_of_week = LOWER(DAYNAME(a.date))
-             WHERE a.user_id = ? AND a.date = ?`,
+             WHERE a.user_id = ? AND a.date = ?
+             ORDER BY a.id DESC LIMIT 1`,
             [userId, today]
         );
 
@@ -592,7 +610,7 @@ router.get('/today', requireAuth, async (req, res) => {
             // No attendance yet - return shop hours
             const branchId = req.user.branch_id;
             const shopHours = await getShopHours(branchId, today);
-            
+
             return res.json({
                 success: true,
                 has_clocked_in: false,
@@ -600,13 +618,28 @@ router.get('/today', requireAuth, async (req, res) => {
                 message: 'No attendance record for today'
             });
         }
-        
+
         const attendance = rows[0];
-        
+
+        // Check for pending re-clockin request
+        let reclockinStatus = null;
+        if (attendance.clock_out_time) {
+            const [reclockin] = await pool.query(
+                `SELECT status FROM attendance_permissions
+                 WHERE user_id = ? AND request_type = 're_clockin' AND request_date = ?
+                 ORDER BY id DESC LIMIT 1`,
+                [userId, today]
+            );
+            if (reclockin.length > 0) {
+                reclockinStatus = reclockin[0].status;
+            }
+        }
+
         res.json({
             success: true,
             has_clocked_in: true,
             has_clocked_out: !!attendance.clock_out_time,
+            reclockin_status: reclockinStatus,
             data: attendance
         });
         
@@ -885,10 +918,10 @@ router.post('/permission/request', requireAuth, async (req, res) => {
             });
         }
         
-        if (!['late_arrival', 'early_checkout', 'extended_break'].includes(request_type)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Invalid request type' 
+        if (!['late_arrival', 'early_leave', 'leave', 'half_day', 're_clockin'].includes(request_type)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid request type'
             });
         }
         
@@ -927,6 +960,84 @@ router.post('/permission/request', requireAuth, async (req, res) => {
             success: false, 
             message: 'Failed to submit permission request' 
         });
+    }
+});
+
+/**
+ * POST /api/attendance/permission/request-reclockin
+ * Submit a re-clock-in request (for overtime after clock-out)
+ */
+router.post('/permission/request-reclockin', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { reason } = req.body;
+        const today = new Date().toISOString().split('T')[0];
+
+        if (!reason || !reason.trim()) {
+            return res.status(400).json({ success: false, message: 'Reason is required' });
+        }
+
+        // Check for existing clocked-out record today
+        const [attendance] = await pool.query(
+            'SELECT id FROM staff_attendance WHERE user_id = ? AND date = ? AND clock_out_time IS NOT NULL ORDER BY id DESC LIMIT 1',
+            [userId, today]
+        );
+
+        if (attendance.length === 0) {
+            return res.status(400).json({ success: false, message: 'No clocked-out record found for today' });
+        }
+
+        const attendanceId = attendance[0].id;
+
+        // Check for existing pending re-clockin request
+        const [existing] = await pool.query(
+            `SELECT id FROM attendance_permissions
+             WHERE user_id = ? AND request_type = 're_clockin' AND request_date = ? AND status = 'pending'`,
+            [userId, today]
+        );
+
+        if (existing.length > 0) {
+            return res.status(400).json({ success: false, message: 'You already have a pending re-clock-in request' });
+        }
+
+        // Create re-clockin permission request
+        const [result] = await pool.query(
+            `INSERT INTO attendance_permissions
+             (user_id, attendance_id, request_type, request_date, reason, requested_by, status)
+             VALUES (?, ?, 're_clockin', ?, ?, ?, 'pending')`,
+            [userId, attendanceId, today, reason.trim(), userId]
+        );
+
+        // Notify admins
+        try {
+            const [admins] = await pool.query(
+                `SELECT u.id FROM users u
+                 JOIN user_roles ur ON u.id = ur.user_id
+                 JOIN roles r ON ur.role_id = r.id
+                 WHERE r.name IN ('admin', 'super_admin') AND u.is_active = 1`
+            );
+            const staffName = req.user.full_name || req.user.username || 'Staff';
+            for (const admin of admins) {
+                await notificationService.send(admin.id, {
+                    type: 'reclockin_request',
+                    title: 'Re-Clock-In Request',
+                    body: `${staffName} is requesting to clock in again for overtime.`,
+                    data: { type: 'reclockin_request', permission_id: result.insertId }
+                }).catch(() => {});
+            }
+        } catch (notifErr) {
+            console.error('Re-clockin notification error:', notifErr.message);
+        }
+
+        res.json({
+            success: true,
+            message: 'Re-clock-in request submitted',
+            data: { permission_id: result.insertId, status: 'pending' }
+        });
+
+    } catch (error) {
+        console.error('Re-clockin request error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit re-clock-in request' });
     }
 });
 
@@ -1119,8 +1230,16 @@ router.put('/permission/:id/approve', requirePermission('attendance', 'approve')
             [reviewerId, now, review_notes, permissionId]
         );
 
-        // If attendance exists, update working minutes
-        if (permission.attendance_id && permission.duration_minutes) {
+        // Handle re-clockin approval: set allow_reclockin flag
+        if (permission.request_type === 're_clockin' && permission.attendance_id) {
+            await pool.query(
+                'UPDATE staff_attendance SET allow_reclockin = 1 WHERE id = ?',
+                [permission.attendance_id]
+            );
+        }
+
+        // If attendance exists, update working minutes (for non-reclockin types)
+        if (permission.attendance_id && permission.duration_minutes && permission.request_type !== 're_clockin') {
             const currentMinutes = permission.total_working_minutes || 0;
             const newMinutes = currentMinutes + permission.duration_minutes;
 
@@ -1131,10 +1250,13 @@ router.put('/permission/:id/approve', requirePermission('attendance', 'approve')
         }
 
         // Notify requesting staff
+        const notifBody = permission.request_type === 're_clockin'
+            ? 'Your re-clock-in request has been approved! You can now clock in again.'
+            : `Your ${(permission.request_type || 'attendance').replace(/_/g, ' ')} permission request has been approved.`;
         try {
             await notificationService.send(permission.user_id, {
                 type: 'permission_approved', title: 'Permission Approved',
-                body: `Your ${permission.request_type || 'attendance'} permission request has been approved.`,
+                body: notifBody,
                 data: { type: 'permission_approved', permission_id: parseInt(permissionId) }
             });
         } catch (notifErr) { console.error('Permission approve notification error:', notifErr.message); }
@@ -1712,6 +1834,113 @@ router.get('/geofence-check', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Geofence check error:', error);
         res.status(500).json({ success: false, message: 'Failed to check geofence' });
+    }
+});
+
+/**
+ * POST /api/attendance/geo-auto-clockout
+ * Auto clock-out staff who are 300m+ from branch
+ */
+router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const branchId = req.user.branch_id;
+        const { latitude, longitude } = req.body;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({ success: false, message: 'Location required' });
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // Get today's active attendance record
+        const [records] = await pool.query(
+            `SELECT a.*, b.latitude as branch_lat, b.longitude as branch_lng
+             FROM staff_attendance a
+             JOIN branches b ON a.branch_id = b.id
+             WHERE a.user_id = ? AND a.date = ? AND a.clock_out_time IS NULL
+             ORDER BY a.id DESC LIMIT 1`,
+            [userId, today]
+        );
+
+        if (records.length === 0) {
+            return res.status(400).json({ success: false, message: 'No active clock-in record found' });
+        }
+
+        const record = records[0];
+
+        // Calculate distance from branch
+        const distance = Math.round(calculateDistance(
+            parseFloat(latitude), parseFloat(longitude),
+            parseFloat(record.branch_lat), parseFloat(record.branch_lng)
+        ));
+
+        if (distance < 300) {
+            return res.status(400).json({
+                success: false,
+                message: 'Still within branch area',
+                distance
+            });
+        }
+
+        const now = new Date();
+
+        // End active break if any
+        await pool.query(
+            `UPDATE staff_attendance
+             SET break_end_time = ?,
+                 break_duration_minutes = TIMESTAMPDIFF(MINUTE, break_start_time, ?)
+             WHERE id = ? AND break_start_time IS NOT NULL AND break_end_time IS NULL`,
+            [now, now, record.id]
+        );
+
+        // Re-fetch break duration after ending break
+        const [updated] = await pool.query(
+            'SELECT break_duration_minutes FROM staff_attendance WHERE id = ?',
+            [record.id]
+        );
+        const breakMinutes = (updated[0] && updated[0].break_duration_minutes) || record.break_duration_minutes || 0;
+
+        // Calculate working minutes
+        const workingMinutes = Math.round(((now - new Date(record.clock_in_time)) / 1000 / 60) - breakMinutes);
+        const geoNote = `\n[Auto clock-out: ${distance}m from branch at ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}]`;
+
+        // Clock out
+        await pool.query(
+            `UPDATE staff_attendance
+             SET clock_out_time = ?, total_working_minutes = ?,
+                 clock_out_lat = ?, clock_out_lng = ?, clock_out_distance = ?,
+                 notes = CONCAT(COALESCE(notes, ''), ?)
+             WHERE id = ?`,
+            [now, workingMinutes, latitude, longitude, distance, geoNote, record.id]
+        );
+
+        // Notify staff
+        try {
+            await notificationService.send(userId, {
+                type: 'geo_auto_clockout',
+                title: 'Auto Clock-Out',
+                body: `You were automatically clocked out because you are ${distance}m from your branch.`,
+                data: { type: 'geo_auto_clockout', attendance_id: record.id, distance }
+            });
+        } catch (notifErr) {
+            console.error('Geo auto clockout notification error:', notifErr.message);
+        }
+
+        res.json({
+            success: true,
+            message: `Auto clocked out - ${distance}m from branch`,
+            data: {
+                attendance_id: record.id,
+                clock_out_time: now,
+                distance,
+                total_working_minutes: workingMinutes
+            }
+        });
+
+    } catch (error) {
+        console.error('Geo auto clockout error:', error);
+        res.status(500).json({ success: false, message: 'Failed to auto clock out' });
     }
 });
 

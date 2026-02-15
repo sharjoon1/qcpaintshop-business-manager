@@ -200,7 +200,11 @@
 
         .badge-late_arrival { background: #fef3c7; color: #92400e; }
         .badge-early_checkout { background: #fed7aa; color: #9a3412; }
+        .badge-early_leave { background: #fed7aa; color: #9a3412; }
         .badge-extended_break { background: #dbeafe; color: #1e40af; }
+        .badge-leave { background: #dbeafe; color: #1e40af; }
+        .badge-half_day { background: #fef3c7; color: #92400e; }
+        .badge-re_clockin { background: #ede9fe; color: #6b21a8; }
 
         .tab-bar {
             display: flex;
@@ -914,7 +918,8 @@
                 }
 
                 container.innerHTML = requests.map(r => {
-                    const typeLabel = (r.request_type || '').replace(/_/g, ' ');
+                    const typeLabelMap = { late_arrival: 'Late Arrival', early_checkout: 'Early Checkout', early_leave: 'Early Leave', extended_break: 'Extended Break', leave: 'Leave', half_day: 'Half Day', re_clockin: 'Re Clock-In' };
+                    const typeLabel = typeLabelMap[r.request_type] || (r.request_type || '').replace(/_/g, ' ');
                     const requestedDate = formatDate(r.request_date);
                     const requestedAt = r.requested_at ? formatDate(r.requested_at) + ' ' + formatTime(r.requested_at) : '--';
 
