@@ -1,9 +1,9 @@
 # QC Paint Shop Business Manager - System Skills & Capabilities
 
 > **Platform**: act.qcpaintshop.com
-> **Version**: 2.0.0
+> **Version**: 3.2.0
 > **Last Updated**: 2026-02-15
-> **Total Codebase**: ~18,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
+> **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
 
@@ -79,10 +79,13 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 
 **Staff Registration (Self-Service)**
 - Public registration form with OTP verification (SMS + Email)
-- Multi-step form: Personal Info -> Address -> Aadhar KYC -> Bank Details
+- Multi-step form: Personal Info -> Address -> Aadhar/PAN KYC -> Bank Details
+- PAN number collection (optional, validated format: ABCDE1234F)
 - Admin approval workflow with offer letter generation (PDF)
 - Offer letter sent via email (SMTP)
 - Duplicate phone/username checks
+- Admin notification on new registration submission
+- Admin notification on registration approval
 - Pages: `staff-register.html`, `admin-staff-registrations.html`
 
 **Role-Based Permissions**
@@ -197,13 +200,19 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Create, view, edit, deactivate staff members
 - Profile fields: username, email, phone, full_name, role, branch_id, status
 - Extended profile: date_of_birth, address (door_no, street, city, state, pincode)
-- KYC: Aadhar number, Aadhar proof upload (image/PDF)
+- KYC documents: Aadhar number + proof, PAN number + proof (image/PDF upload)
+- KYC status tracking: `incomplete` → `complete` → `verified` (auto-computed)
+- KYC auto-computation: checks Aadhar + PAN + bank details, updates status on every profile save
+- KYC status badge displayed on profile page and admin staff list
 - Emergency contact: name, phone
 - Bank details: account_name, bank_name, account_number, IFSC, UPI ID
 - Profile picture upload with resize
 - Self-profile update endpoint
+- PAN proof upload endpoint: `POST /api/upload/pan-proof`
+- Admin profile update with email + in-app notification to affected user
 - Last login tracking
 - Soft-delete (deactivate) with session cleanup
+- Staff list shows profile avatar and KYC status column
 - Pages: `admin-staff.html`, `admin-profile.html`
 
 ---
@@ -313,6 +322,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Staff can request permissions (leave/early departure)
 - Admin approval/rejection workflow
 - Reason and notes tracking
+- Notification sent to staff on approval/rejection
 - Page: `staff/permission-request.html`
 
 **Admin Features**
@@ -321,7 +331,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Attendance report with date range filtering
 - Manual attendance marking (admin override)
 - Geo-fence violation viewer
-- Photo viewer for clock-in/out/break photos
+- Photo viewer for clock-in/out/break start/break end photos
 - Pages: `admin-attendance.html`, `admin-geofence-logs.html`, `staff/history.html`
 
 ---
@@ -343,17 +353,20 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Adjustments (bonus, penalty, custom)
 - Individual and bulk calculation
 - Status: calculated -> approved -> paid
+- Notification sent to staff on salary approval
 - Page: `admin-salary-monthly.html`
 
 **Salary Payments**
 - Record payments with method (cash, bank_transfer, UPI, cheque)
 - Transaction reference tracking
 - Payment status management
+- Notification sent to staff on payment recording
 - Page: `admin-salary-payments.html`
 
 **Salary Advances**
 - Staff can request advances (with reason and repayment plan)
 - Admin approval/rejection workflow
+- Notification sent to staff on advance approval/rejection
 - Payment recording
 - Advance deduction in monthly salary
 - Summary statistics
@@ -371,6 +384,8 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 **Staff Tasks (Admin-Assigned)**
 - Task creation with title, description, priority, due date
 - Assignment to individual staff or bulk assignment
+- Notification sent to staff on task assignment
+- Notification sent to assigner on task completion
 - Status workflow: pending -> in_progress -> completed -> cancelled
 - Progress tracking (percentage)
 - Task updates with notes
@@ -431,11 +446,21 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Page: `chat.html`
 
 **In-App Notifications**
-- Notification types: chat_message, task_assigned, estimate_status, etc.
 - Real-time delivery via Socket.io
 - Mark as read (individual and bulk)
 - Unread count badge
 - Notification bell in header (`header-v2.html`)
+- Notification types across all modules:
+  - `task_assigned` - New task assigned to staff
+  - `task_completed` - Assigned task completed by staff
+  - `permission_approved` / `permission_rejected` - Attendance permission decisions
+  - `salary_generated` - Monthly salary approved
+  - `salary_paid` - Salary payment recorded
+  - `advance_approved` / `advance_rejected` - Salary advance decisions
+  - `new_registration` - New staff registration submitted (to admins)
+  - `profile_updated` - Admin updated staff profile (+ email notification)
+  - `chat_message` - New chat message received
+  - `estimate_status` - Estimate status changes
 
 **Push Notifications**
 - Web Push via VAPID keys
@@ -468,6 +493,8 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Page: `admin-dashboard.html`
 
 **Staff Dashboard**
+- Personalized greeting with user's first name ("Hi, John")
+- Profile avatar display (photo or initials fallback)
 - Personal attendance status
 - Assigned tasks
 - Quick action buttons
@@ -496,12 +523,34 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Release signing (JKS keystore)
 
 ### Source Files
-- `MainActivity.kt` - Main WebView activity
+- `MainActivity.kt` - Main WebView activity (530 lines)
 - `Constants.kt` - URLs and config from BuildConfig
-- `SplashActivity.kt` - Splash screen
-- `QCJavaScriptInterface.kt` - JS bridge
-- `QCFirebaseMessagingService.kt` - FCM handler
-- `NetworkUtils.kt` - Connectivity helper
+- `QCWebViewClient.kt` - WebView client handling
+- `QCWebChromeClient.kt` - Chrome client for file uploads
+- `QCFirebaseMessagingService.kt` - FCM handler with deep linking
+- `NetworkMonitor.kt` - Network connectivity detection
+
+### Play Store Readiness
+- **Release signing**: `qcpaintshop-release.jks` keystore configured
+- **ProGuard/R8**: Code obfuscation + resource shrinking enabled
+- **Network security**: HTTPS-only in production, cleartext disabled
+- **In-App Updates**: Google Play In-App Updates library (v2.1.0)
+- **Deep Linking**: App Links with `autoVerify="true"` for `act.qcpaintshop.com`
+- **Privacy Policy**: `public/privacy-policy.html` (effective 2026-02-12)
+
+### Play Store Assets (`google-services/` folder)
+
+| Asset | File | Dimensions |
+|-------|------|-----------|
+| App Icon | `QCStaff-icon-512x512.png` | 512x512 |
+| Feature Graphic | `QCStaff-feature-graphic-1024x500.png` | 1024x500 |
+| Screenshot 1 - Login | `01-login.png` | 1080x1920 |
+| Screenshot 2 - Dashboard | `02-dashboard.png` | 1080x1920 |
+| Screenshot 3 - Attendance | `03-attendance.png` | 1080x1920 |
+| Screenshot 4 - Tasks | `04-tasks.png` | 1080x1920 |
+| Screenshot 5 - Salary | `05-salary.png` | 1080x1920 |
+| Screenshot 6 - Chat | `06-chat.png` | 1080x1920 |
+| Release AAB v3.2.0 | `QCStaff-v3.2.0-release.aab` | 2.8 MB |
 
 ---
 
@@ -519,7 +568,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | **Firebase FCM** | Android push notifications | HTTPS (server key) |
 | **Web Push** | Browser push notifications | VAPID |
 
-### 4.2 Database Tables (~50+)
+### 4.2 Database Tables (~55+)
 
 **Core**: `users`, `user_sessions`, `branches`, `customers`, `customer_types`, `settings`
 **Products**: `products`, `brands`, `categories`, `pack_sizes`
@@ -543,6 +592,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Business Logo | `uploads/logos/` | 2 MB | Images |
 | Profile Picture | `uploads/profiles/` | 5 MB | Images |
 | Aadhar Proof | `uploads/aadhar/` | 5 MB | Images, PDF |
+| PAN Proof | `uploads/aadhar/` | 5 MB | Images, PDF |
 | Design Requests | `uploads/design-requests/` | 10 MB | Images (compressed to 1200px) |
 | Clock-In Photos | `uploads/attendance/clock-in/` | 5 MB | Images |
 | Clock-Out Photos | `uploads/attendance/clock-out/` | 5 MB | Images |
@@ -574,6 +624,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | **Rate Limiter** | `services/zoho-rate-limiter.js` | Zoho API throttling |
 | **Purchase Suggestions** | `services/purchase-suggestion.js` | Reorder calculation engine |
 | **Notification Service** | `services/notification-service.js` | Multi-channel notification dispatch |
+| **Email Service** | `services/email-service.js` | Shared branded email sending (SMTP/Nodemailer) |
 
 ---
 
@@ -734,7 +785,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Notifications | `/api/notifications/*` | 6 | `routes/notifications.js` |
 | Estimate PDF | `/api/estimates/:id/pdf` | 1 | `routes/estimate-pdf.js` |
 | Share | `/api/share/*` | 4 | `routes/share.js` |
-| Uploads | `/api/upload/*` | 3 | `server.js` |
+| Uploads | `/api/upload/*` | 4 | `server.js` |
 | Health | `/health`, `/api/test` | 2 | `server.js` |
 
 ---
@@ -812,6 +863,13 @@ node scripts/migrate-zoho-features.js
 node scripts/migrate-items-expand.js
 node scripts/migrate-purchase-suggestions.js
 node scripts/migrate-chat-notifications-share.js
+node scripts/migrate-staff-upgrade.js
+```
+
+### Utility Scripts
+```bash
+node scripts/generate-screenshots.js      # Generate 6 Play Store screenshots (1080x1920)
+node scripts/generate-feature-graphic.js   # Generate Play Store feature graphic (1024x500)
 ```
 
 ---
@@ -856,6 +914,29 @@ node scripts/migrate-chat-notifications-share.js
 - Added missing `state`, `pincode`, `email`, `gst_number` columns to branches table
 - Fixed `day_of_week` ENUM mismatch in shop_hours_config (integers -> day names)
 - Branch creation with auto-generated shop hours now working
+
+### 2026-02-15 - Staff Upgrade: PAN/KYC, Email Service & Notifications
+- PAN card number + proof upload added to users & staff_registrations
+- KYC status tracking (incomplete/complete/verified) with auto-computation
+- KYC status badge on profile page and admin staff list
+- Shared email service extracted (`services/email-service.js`)
+- Notifications added across all modules: tasks, attendance permissions, salary, advances, registrations, profile updates
+- Staff dashboard: personalized greeting + profile avatar
+- Admin attendance: break start/end photo display
+- Admin staff list: profile avatars + KYC status column
+- Play Store assets generated: 6 screenshots, feature graphic, 512x512 icon
+- Release AAB v3.2.0 built for Play Store submission
+
+### Android App v3.2.0
+- **Two flavors**: QC Staff (`com.qcpaintshop.staff`) + QC Customer (`com.qcpaintshop.customer`)
+- compileSdk 35, targetSdk 35, minSdk 24
+- Firebase Cloud Messaging for push notifications
+- In-App Updates (Google Play Core)
+- Deep linking with App Links verification
+- Release signing with JKS keystore
+- ProGuard/R8 minification enabled
+- Privacy policy at `/privacy-policy.html`
+- Play Store assets ready in `google-services/` folder
 
 ---
 
