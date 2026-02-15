@@ -78,6 +78,15 @@ router.post('/read-all', requireAuth, async (req, res) => {
     }
 });
 
+// GET /api/notifications/push/vapid-key - Get VAPID public key for web push
+router.get('/push/vapid-key', (req, res) => {
+    const key = process.env.VAPID_PUBLIC_KEY;
+    if (!key) {
+        return res.json({ success: false, message: 'Web push not configured' });
+    }
+    res.json({ success: true, key });
+});
+
 // POST /api/push/subscribe - Register push subscription
 router.post('/push/subscribe', requireAuth, async (req, res) => {
     try {

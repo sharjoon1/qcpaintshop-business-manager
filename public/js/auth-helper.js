@@ -103,18 +103,92 @@ function isAndroidApp() {
 }
 
 /**
- * Register service worker for PWA / offline support
+ * Register service worker for PWA / offline support + web push
  */
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
             .then(function(reg) {
                 console.log('SW registered, scope:', reg.scope);
+                // Subscribe to web push if logged in and not in Android WebView
+                if (isAuthenticated() && !isAndroidApp()) {
+                    subscribeWebPush(reg);
+                }
             })
             .catch(function(err) {
                 console.warn('SW registration failed:', err);
             });
     }
+}
+
+/**
+ * Subscribe to Web Push notifications
+ */
+async function subscribeWebPush(registration) {
+    try {
+        // Check if already subscribed
+        const existing = await registration.pushManager.getSubscription();
+        if (existing) {
+            console.log('Web push already subscribed');
+            return;
+        }
+
+        // Fetch VAPID public key from server
+        const res = await fetch('/api/notifications/push/vapid-key');
+        const data = await res.json();
+        if (!data.success || !data.key) {
+            console.log('No VAPID key available, skipping web push');
+            return;
+        }
+
+        // Convert VAPID key from base64url to Uint8Array
+        const vapidKey = urlBase64ToUint8Array(data.key);
+
+        // Subscribe
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: vapidKey
+        });
+
+        const subJson = subscription.toJSON();
+
+        // Send subscription to server
+        await fetch('/api/notifications/push/subscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('auth_token')
+            },
+            body: JSON.stringify({
+                type: 'web',
+                endpoint: subJson.endpoint,
+                p256dh: subJson.keys.p256dh,
+                auth_key: subJson.keys.auth
+            })
+        });
+
+        console.log('Web push subscribed successfully');
+    } catch (err) {
+        if (err.name === 'NotAllowedError') {
+            console.log('Push notification permission denied');
+        } else {
+            console.warn('Web push subscription failed:', err);
+        }
+    }
+}
+
+/**
+ * Convert base64url string to Uint8Array for VAPID key
+ */
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
 }
 
 // Register service worker on load
