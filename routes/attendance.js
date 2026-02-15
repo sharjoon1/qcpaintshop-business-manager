@@ -40,6 +40,23 @@ function setPool(dbPool) {
 // ========================================
 
 /**
+ * Get today's date in IST (UTC+5:30) as YYYY-MM-DD string
+ */
+function getTodayIST() {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(now.getTime() + istOffset);
+    return istDate.toISOString().split('T')[0];
+}
+
+/**
+ * Get current IST Date object
+ */
+function getNowIST() {
+    return new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
+}
+
+/**
  * Compress and save photo
  */
 async function saveAttendancePhoto(buffer, userId, type) {
@@ -205,7 +222,7 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
             });
         }
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayIST();
         const now = new Date();
 
         // Check if user has geo-fence enabled
@@ -474,7 +491,7 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
             });
         }
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayIST();
         const now = new Date();
 
         // Get today's attendance
@@ -621,7 +638,7 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
 router.get('/today', requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayIST();
         
         const [rows] = await pool.query(
             `SELECT a.*,
@@ -755,7 +772,7 @@ router.post('/break-start', requireAuth, upload.single('photo'), async (req, res
         const userId = req.user.id;
         const { latitude, longitude } = req.body;
         const photo = req.file;
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayIST();
         const now = new Date();
 
         if (!photo) {
@@ -844,7 +861,7 @@ router.post('/break-end', requireAuth, upload.single('photo'), async (req, res) 
         const userId = req.user.id;
         const { latitude, longitude } = req.body;
         const photo = req.file;
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayIST();
         const now = new Date();
 
         if (!photo) {
@@ -1023,7 +1040,7 @@ router.post('/permission/request-reclockin', requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
         const { reason } = req.body;
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayIST();
 
         if (!reason || !reason.trim()) {
             return res.status(400).json({ success: false, message: 'Reason is required' });
@@ -1539,7 +1556,7 @@ router.get('/user/:userId/month/:month', requirePermission('attendance', 'view')
 router.get('/report', requirePermission('attendance', 'view'), async (req, res) => {
     try {
         const { date, branch_id, status } = req.query;
-        const reportDate = date || new Date().toISOString().split('T')[0];
+        const reportDate = date || getTodayIST();
         
         let query = `
             SELECT a.*, 
@@ -1770,7 +1787,7 @@ router.post('/admin/force-clockout', requirePermission('attendance', 'manage'), 
  */
 router.get('/admin/today-summary', requirePermission('attendance', 'view'), async (req, res) => {
     try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayIST();
 
         // Get total active staff
         const [staffRows] = await pool.query(
@@ -1903,7 +1920,7 @@ router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Location required' });
         }
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayIST();
 
         // Get today's active attendance record
         const [records] = await pool.query(

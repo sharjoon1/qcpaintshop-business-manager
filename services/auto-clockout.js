@@ -18,8 +18,10 @@ async function runAutoClockout() {
 
     try {
         const now = new Date();
-        const today = now.toISOString().split('T')[0];
-        const dayName = now.toLocaleString('en-US', { weekday: 'long' }).toLowerCase();
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const istNow = new Date(now.getTime() + istOffset);
+        const today = istNow.toISOString().split('T')[0];
+        const dayName = istNow.toLocaleString('en-US', { weekday: 'long' }).toLowerCase();
         const isSunday = dayName === 'sunday';
         const maxMinutes = isSunday ? 300 : 600; // 5h or 10h
 

@@ -23,14 +23,25 @@
     <div class="max-w-md w-full">
         <!-- Logo & Title -->
         <div class="text-center mb-8">
-            <div class="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <svg class="w-12 h-12 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                </svg>
+            <div id="loginLogo" class="bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg" style="width: 180px; height: auto; padding: 12px;">
+                <img id="loginLogoImg" src="/icons/icon-192x192.png" alt="Quality Colours" style="width: 100%; height: auto; border-radius: 8px;">
             </div>
-            <h1 class="text-3xl font-bold text-white mb-2">Quality Colours</h1>
+            <h1 class="text-3xl font-bold text-white mb-2" id="loginTitle">Quality Colours</h1>
             <p class="text-purple-200">Business Manager Login</p>
         </div>
+        <script>
+            // Load company logo from settings
+            fetch('/api/public/site-info').then(r => r.json()).then(data => {
+                if (data.success && data.data) {
+                    if (data.data.business_logo) {
+                        document.getElementById('loginLogoImg').src = '/' + data.data.business_logo;
+                    }
+                    if (data.data.business_name) {
+                        document.getElementById('loginTitle').textContent = data.data.business_name;
+                    }
+                }
+            }).catch(() => {});
+        </script>
 
         <!-- Login Card -->
         <div class="card p-8">
