@@ -109,6 +109,39 @@ async function migrate() {
         `);
         console.log(`   Inserted ${populateResult.affectedRows} rows\n`);
 
+        // 6. Add clock_in_distance and clock_out_distance columns to staff_attendance
+        console.log('6. Adding distance columns to staff_attendance...');
+        for (const col of ['clock_in_distance', 'clock_out_distance']) {
+            try {
+                await conn.query(
+                    `ALTER TABLE staff_attendance ADD COLUMN ${col} INT DEFAULT NULL`
+                );
+                console.log(`   Added column: ${col}`);
+            } catch (e) {
+                if (e.code === 'ER_DUP_FIELDNAME') {
+                    console.log(`   Column ${col} already exists, skipping`);
+                } else {
+                    throw e;
+                }
+            }
+        }
+        console.log('');
+
+        // 7. Add review_notes column to attendance_permissions
+        console.log('7. Adding review_notes column to attendance_permissions...');
+        try {
+            await conn.query(
+                `ALTER TABLE attendance_permissions ADD COLUMN review_notes TEXT DEFAULT NULL`
+            );
+            console.log('   Added column: review_notes\n');
+        } catch (e) {
+            if (e.code === 'ER_DUP_FIELDNAME') {
+                console.log('   Column review_notes already exists, skipping\n');
+            } else {
+                throw e;
+            }
+        }
+
         console.log('Migration completed successfully!');
 
     } catch (error) {

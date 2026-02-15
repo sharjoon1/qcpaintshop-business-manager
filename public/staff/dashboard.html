@@ -949,8 +949,13 @@
         let breakLat = null;
         let breakLng = null;
         let isBreakAction = ''; // 'start' or 'end'
+        let breakSubmitting = false;
 
         function toggleBreak() {
+            if (breakSubmitting) {
+                showToast('Please wait, processing...', 'warning');
+                return;
+            }
             const isBreakStarted = document.getElementById('breakBtnText').textContent === 'End Break';
             isBreakAction = isBreakStarted ? 'end' : 'start';
             document.getElementById('breakPanelTitle').textContent = isBreakStarted ? 'End Break Photo' : 'Start Break Photo';
@@ -1013,9 +1018,13 @@
 
         function captureBreakPhoto() {
             const video = document.getElementById('breakVideo');
+            if (!video.videoWidth || video.videoWidth === 0) {
+                showToast('Camera not ready. Please wait a moment.', 'warning');
+                return;
+            }
             const canvas = document.getElementById('breakCanvas');
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
             ctx.translate(canvas.width, 0);
             ctx.scale(-1, 1);
@@ -1035,6 +1044,7 @@
         }
 
         async function submitBreakPhoto() {
+            if (breakSubmitting) return;
             if (!breakPhotoBlob) {
                 showToast('Please capture a photo first', 'error');
                 return;
@@ -1045,9 +1055,12 @@
                 return;
             }
 
+            breakSubmitting = true;
             const btn = document.getElementById('breakSubmitBtn');
+            const breakBtn = document.getElementById('breakBtn');
             btn.disabled = true;
             btn.textContent = 'Submitting...';
+            breakBtn.disabled = true;
 
             const token = localStorage.getItem('auth_token');
             const endpoint = isBreakAction === 'end' ? 'break-end' : 'break-start';
@@ -1087,8 +1100,10 @@
                 showToast('Failed to process. Please try again.', 'error');
             }
 
+            breakSubmitting = false;
             btn.disabled = false;
             btn.textContent = 'Submit';
+            breakBtn.disabled = false;
         }
 
         // ========================================

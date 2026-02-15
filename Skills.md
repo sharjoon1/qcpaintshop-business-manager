@@ -307,6 +307,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 **Clock In/Out**
 - Photo capture on clock-in and clock-out (mandatory)
 - GPS location capture with geo-fence validation
+- **Distance tracking**: always computes distance from branch (even when geo-fence is OFF), stored as `clock_in_distance` / `clock_out_distance` in meters
 - Multi-branch support: staff can be assigned to multiple branches and clock in at any assigned location
 - Per-staff geo-fence toggle: admin can disable geo-fence for individual staff members
 - Branch-based geo-fencing (configurable radius per branch)
@@ -320,23 +321,27 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Break start/end with photo proof
 - Break duration tracking
 - Break time validation against branch config
+- Double-submit protection (`breakSubmitting` flag prevents duplicate requests)
+- Video readiness check before capture (validates camera stream active)
 
 **Permission Requests**
 - Staff can request permissions (leave/early departure)
-- Admin approval/rejection workflow
-- Reason and notes tracking
-- Notification sent to staff on approval/rejection
+- Admin approval/rejection workflow with `review_notes` column
+- DB columns: `approved_by`, `approved_at`, `rejection_reason`, `review_notes`
+- Notification sent to staff on approval/rejection (via `user_id` + `request_type`)
 - Page: `staff/permission-request.html`
 
 **Admin Features**
 - Today's attendance summary (present, absent, late, on-break)
 - Monthly attendance report per user
 - Attendance report with date range filtering
+- **Distance column** in Live Today table (shows meters/km from branch)
 - Manual attendance marking (admin override)
 - Geo-fence toggle per staff (ON/OFF) in staff management
 - Multi-branch assignment with primary branch selection
 - Geo-fence violation viewer
-- Photo viewer for clock-in/out/break start/break end photos
+- **Direct photo viewer**: `GET /api/attendance/record/:id` endpoint fetches single record with all photo paths, distance, GPS info
+- Photo viewer shows all 4 types (clock-in, clock-out, break-start, break-end) with timestamps and distance
 - Pages: `admin-attendance.html`, `admin-geofence-logs.html`, `staff/history.html`, `admin-staff.html`
 
 ---
@@ -469,7 +474,9 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 
 **Push Notifications**
 - Web Push via VAPID keys
-- FCM (Firebase Cloud Messaging) for Android
+- **Service Worker** (`sw.js`): `push` event handler displays notifications with vibration, `notificationclick` handler opens deep-linked URLs
+- **FCM data-only messages**: `notification-service.js` sends FCM as data-only payload (no `notification` block) to ensure `onMessageReceived()` is always called on Android
+- **Android notification channel** has explicit sound URI + `AudioAttributes` for reliable sound on Android 8+
 - Push subscription management (subscribe/unsubscribe)
 - Auto-cleanup of stale subscriptions (410/404)
 - Background notification delivery (non-blocking)
@@ -869,6 +876,7 @@ node scripts/migrate-items-expand.js
 node scripts/migrate-purchase-suggestions.js
 node scripts/migrate-chat-notifications-share.js
 node scripts/migrate-staff-upgrade.js
+node scripts/migrate-login-attendance-update.js  # Geo-fence toggle, multi-branch, distance columns, review_notes
 ```
 
 ### Utility Scripts
