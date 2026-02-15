@@ -452,7 +452,8 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
              FROM staff_attendance a
              JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
                 AND shc.day_of_week = LOWER(DAYNAME(a.date))
-             WHERE a.user_id = ? AND a.date = ?`,
+             WHERE a.user_id = ? AND a.date = ?
+             ORDER BY a.id DESC LIMIT 1`,
             [userId, today]
         );
 
@@ -724,9 +725,9 @@ router.post('/break-start', requireAuth, upload.single('photo'), async (req, res
             return res.status(400).json({ success: false, message: 'Valid GPS location is required' });
         }
 
-        // Get today's attendance
+        // Get today's latest attendance (ORDER BY id DESC for re-clockin support)
         const [attendance] = await pool.query(
-            'SELECT * FROM staff_attendance WHERE user_id = ? AND date = ?',
+            'SELECT * FROM staff_attendance WHERE user_id = ? AND date = ? AND clock_out_time IS NULL ORDER BY id DESC LIMIT 1',
             [userId, today]
         );
 
@@ -805,13 +806,14 @@ router.post('/break-end', requireAuth, upload.single('photo'), async (req, res) 
             return res.status(400).json({ success: false, message: 'Valid GPS location is required' });
         }
 
-        // Get today's attendance with shop hours
+        // Get today's latest active attendance with shop hours (ORDER BY id DESC for re-clockin support)
         const [attendance] = await pool.query(
             `SELECT a.*, shc.break_min_minutes, shc.break_max_minutes
              FROM staff_attendance a
              JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
                 AND shc.day_of_week = LOWER(DAYNAME(a.date))
-             WHERE a.user_id = ? AND a.date = ?`,
+             WHERE a.user_id = ? AND a.date = ? AND a.clock_out_time IS NULL
+             ORDER BY a.id DESC LIMIT 1`,
             [userId, today]
         );
 

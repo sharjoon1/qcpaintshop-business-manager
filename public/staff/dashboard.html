@@ -1121,15 +1121,17 @@
             ctx.drawImage(video, 0, 0);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
 
+            // Show preview using data URL (no CSP issues with blob: URLs)
+            const preview = document.getElementById('breakPreview');
+            preview.src = canvas.toDataURL('image/jpeg', 0.8);
+            document.getElementById('breakCameraContainer').style.display = 'none';
+            document.getElementById('breakPhotoPreview').style.display = 'block';
+            document.getElementById('breakCaptureBtn').style.display = 'none';
+            document.getElementById('breakSubmitBtn').style.display = 'block';
+            stopBreakCamera();
+
             canvas.toBlob((blob) => {
                 breakPhotoBlob = blob;
-                const preview = document.getElementById('breakPreview');
-                preview.src = URL.createObjectURL(blob);
-                document.getElementById('breakCameraContainer').style.display = 'none';
-                document.getElementById('breakPhotoPreview').style.display = 'block';
-                document.getElementById('breakCaptureBtn').style.display = 'none';
-                document.getElementById('breakSubmitBtn').style.display = 'block';
-                stopBreakCamera();
             }, 'image/jpeg', 0.8);
         }
 
