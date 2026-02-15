@@ -765,7 +765,7 @@
                 document.getElementById('loadingState').style.display = 'none';
 
                 if (data.data && data.data.clock_out_time) {
-                    showClockedOutState(data.data, data.reclockin_status);
+                    showClockedOutState(data.data, data.reclockin_status, data.day_total_minutes);
                 } else if (data.has_clocked_in) {
                     showClockedInState(data.data);
                 } else {
@@ -797,7 +797,7 @@
         }
 
         // Show clocked out state
-        function showClockedOutState(data, reclockinStatus) {
+        function showClockedOutState(data, reclockinStatus, dayTotalMinutes) {
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
@@ -811,12 +811,17 @@
             document.getElementById('notClockedInState').style.display = 'none';
 
             // Determine re-clock-in section
+            const expectedMinutes = parseFloat(data.expected_hours || 0) * 60;
+            const hoursCompleted = (dayTotalMinutes || 0) >= expectedMinutes;
+            const reclockinLabel = hoursCompleted ? 'Clock In Again (Overtime)' : 'Continue Working';
+            const requestLabel = hoursCompleted ? 'Request Re-Clock-In (Overtime)' : 'Request Re-Clock-In';
+
             let reclockinSection = '';
             if (data.allow_reclockin === 1 || reclockinStatus === 'approved') {
                 // Admin approved - show clock in again button (navigate to clock-in page)
                 reclockinSection = `
                     <button onclick="window.location.href='clock-in.html'" style="width: 100%; margin-top: 16px; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #10b981, #059669); color: white; box-shadow: 0 4px 15px rgba(16,185,129,0.4);">
-                        Clock In Again (Overtime)
+                        ${reclockinLabel}
                     </button>`;
             } else if (reclockinStatus === 'pending') {
                 reclockinSection = `
@@ -834,10 +839,10 @@
                 reclockinSection = `
                     <div id="reclockinSection" style="margin-top: 20px;">
                         <button id="reclockinBtn" onclick="showReclockinForm()" style="width: 100%; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; border: 2px solid #8b5cf6; cursor: pointer; background: white; color: #7c3aed;">
-                            Request Re-Clock-In (Overtime)
+                            ${requestLabel}
                         </button>
                         <div id="reclockinForm" style="display: none; margin-top: 12px;">
-                            <textarea id="reclockinReason" placeholder="Reason for overtime (e.g. urgent task, client meeting...)" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; resize: none; min-height: 80px; font-family: inherit;"></textarea>
+                            <textarea id="reclockinReason" placeholder="Reason for re-clock-in (e.g. incomplete hours, urgent task...)" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; resize: none; min-height: 80px; font-family: inherit;"></textarea>
                             <div style="display: flex; gap: 10px; margin-top: 10px;">
                                 <button onclick="hideReclockinForm()" style="flex: 1; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; background: #f3f4f6; color: #374151;">Cancel</button>
                                 <button onclick="submitReclockinRequest()" id="reclockinSubmitBtn" style="flex: 1; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Submit</button>
