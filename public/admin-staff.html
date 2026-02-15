@@ -76,7 +76,8 @@
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">KYC</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Username</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Phone</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Branch</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Branches</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Geo-Fence</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
                             <th class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Actions</th>
                         </tr>
@@ -129,10 +130,28 @@
                         </div>
                         
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Branch *</label>
-                            <select id="branchId" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
-                                <option value="">-- Select Branch --</option>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Assigned Branches *</label>
+                            <div id="branchCheckboxes" class="border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Select one or more branches</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Primary Branch *</label>
+                            <select id="primaryBranch" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                                <option value="">-- Select Primary Branch --</option>
                             </select>
+                            <p class="text-xs text-gray-500 mt-1">Main branch for this staff member</p>
+                        </div>
+
+                        <div>
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input type="checkbox" id="geoFenceEnabled" checked class="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700">Geo-Fence Enabled</span>
+                                    <p class="text-xs text-gray-500">Require GPS within branch radius to clock in/out</p>
+                                </div>
+                            </label>
                         </div>
                         
                         <div>
@@ -180,9 +199,7 @@
                 const branchData = await branchRes.json();
                 branches = branchData.success ? branchData.data : branchData;
                 
-                const branchSelect = document.getElementById('branchId');
-                branchSelect.innerHTML = '<option value="">-- Select Branch --</option>' +
-                    branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+                renderBranchCheckboxes();
                 
                 // Load roles (only staff-type roles for staff assignment)
                 try {
@@ -255,12 +272,16 @@
             const tbody = document.getElementById('staffTableBody');
             
             if (allStaff.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No staff members found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-500">No staff members found</td></tr>';
                 return;
             }
             
             tbody.innerHTML = allStaff.map(staff => {
-                const branch = branches.find(b => b.id == staff.branch_id);
+                const assignedBranches = staff.assigned_branches || [];
+                const branchDisplay = assignedBranches.length > 0
+                    ? assignedBranches.map(ab => ab.is_primary ? `<strong>${ab.branch_name}</strong>` : ab.branch_name).join(', ')
+                    : (branches.find(b => b.id == staff.branch_id)?.name || 'N/A');
+                const geoEnabled = staff.geo_fence_enabled !== undefined ? staff.geo_fence_enabled : true;
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 text-sm">${staff.id}</td>
@@ -281,7 +302,12 @@
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-700">${staff.username}</td>
                         <td class="px-4 py-3 text-sm text-gray-700">${staff.phone || '-'}</td>
-                        <td class="px-4 py-3 text-sm text-gray-700">${branch ? branch.name : 'N/A'}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${branchDisplay}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 text-xs rounded-full ${geoEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
+                                ${geoEnabled ? 'ON' : 'OFF'}
+                            </span>
+                        </td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-1 text-xs rounded-full ${getStatusClass(staff.status)}">
                                 ${getStatusText(staff.status)}
@@ -327,19 +353,49 @@
             return texts[status] || 'Incomplete';
         }
 
+        function renderBranchCheckboxes() {
+            const container = document.getElementById('branchCheckboxes');
+            container.innerHTML = branches.map(b => `
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" value="${b.id}" onchange="updatePrimaryBranchSelect()" class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                    <span class="text-sm text-gray-700">${b.name}</span>
+                </label>
+            `).join('');
+        }
+
+        function updatePrimaryBranchSelect() {
+            const checkedIds = [];
+            document.querySelectorAll('#branchCheckboxes input[type="checkbox"]:checked').forEach(cb => {
+                checkedIds.push(parseInt(cb.value));
+            });
+            const select = document.getElementById('primaryBranch');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">-- Select Primary Branch --</option>' +
+                branches.filter(b => checkedIds.includes(b.id)).map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+            // Restore selection if still valid
+            if (checkedIds.includes(parseInt(currentVal))) {
+                select.value = currentVal;
+            } else if (checkedIds.length === 1) {
+                select.value = checkedIds[0];
+            }
+        }
+
         function openAddModal() {
             editingStaffId = null;
             document.getElementById('modalTitle').textContent = 'Add New Staff';
             document.getElementById('staffForm').reset();
             document.getElementById('staffId').value = '';
             document.getElementById('password').required = true;
+            document.getElementById('geoFenceEnabled').checked = true;
+            document.querySelectorAll('#branchCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
+            updatePrimaryBranchSelect();
             document.getElementById('staffModal').classList.remove('hidden');
         }
 
         function editStaff(id) {
             const staff = allStaff.find(s => s.id == id);
             if (!staff) return;
-            
+
             editingStaffId = id;
             document.getElementById('modalTitle').textContent = 'Edit Staff';
             document.getElementById('staffId').value = staff.id;
@@ -347,14 +403,26 @@
             document.getElementById('username').value = staff.username;
             document.getElementById('email').value = staff.email;
             document.getElementById('phone').value = staff.phone || '';
-            document.getElementById('branchId').value = staff.branch_id || '';
+
+            // Set branch checkboxes
+            const assignedIds = (staff.assigned_branches || []).map(ab => ab.branch_id);
+            if (assignedIds.length === 0 && staff.branch_id) assignedIds.push(staff.branch_id);
+            document.querySelectorAll('#branchCheckboxes input[type="checkbox"]').forEach(cb => {
+                cb.checked = assignedIds.includes(parseInt(cb.value));
+            });
+            updatePrimaryBranchSelect();
+            document.getElementById('primaryBranch').value = staff.branch_id || '';
+
+            // Geo-fence toggle
+            document.getElementById('geoFenceEnabled').checked = staff.geo_fence_enabled !== undefined ? !!staff.geo_fence_enabled : true;
+
             // Match role by name since users table stores role as text, not role_id
             const matchedRole = roles.find(r => r.name.toLowerCase() === (staff.role || '').toLowerCase());
             document.getElementById('roleId').value = matchedRole ? matchedRole.id : '';
             document.getElementById('status').value = staff.status;
             document.getElementById('password').required = false;
             document.getElementById('password').value = '';
-            
+
             document.getElementById('staffModal').classList.remove('hidden');
         }
 
@@ -368,12 +436,29 @@
             const selectedRoleId = document.getElementById('roleId').value;
             const selectedRole = roles.find(r => r.id == selectedRoleId);
 
+            // Gather selected branch IDs
+            const selectedBranchIds = [];
+            document.querySelectorAll('#branchCheckboxes input[type="checkbox"]:checked').forEach(cb => {
+                selectedBranchIds.push(parseInt(cb.value));
+            });
+            if (selectedBranchIds.length === 0) {
+                alert('Please select at least one branch');
+                return;
+            }
+            const primaryBranchId = document.getElementById('primaryBranch').value;
+            if (!primaryBranchId) {
+                alert('Please select a primary branch');
+                return;
+            }
+
             const staffData = {
                 full_name: document.getElementById('fullName').value,
                 username: document.getElementById('username').value,
                 email: document.getElementById('email').value,
                 phone: document.getElementById('phone').value || null,
-                branch_id: document.getElementById('branchId').value,
+                branch_id: parseInt(primaryBranchId),
+                branch_ids: selectedBranchIds,
+                geo_fence_enabled: document.getElementById('geoFenceEnabled').checked,
                 status: document.getElementById('status').value,
                 role: selectedRole ? selectedRole.name.toLowerCase() : 'staff'
             };

@@ -1975,7 +1975,7 @@ app.delete('/api/categories/:id', requirePermission('categories', 'delete'), asy
 app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
     try {
         const { role, branch_id, status } = req.query;
-        let query = `SELECT id, username, email, full_name, phone, role, branch_id, status, created_at, last_login, profile_image_url, kyc_status FROM users WHERE 1=1`;
+        let query = `SELECT id, username, email, full_name, phone, role, branch_id, geo_fence_enabled, status, created_at, last_login, profile_image_url, kyc_status FROM users WHERE 1=1`;
         const params = [];
 
         if (role) { query += ' AND role = ?'; params.push(role); }
@@ -1984,6 +1984,27 @@ app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
 
         query += ' ORDER BY created_at DESC';
         const [rows] = await pool.query(query, params);
+
+        // Fetch assigned branches for all users
+        const [allUserBranches] = await pool.query(
+            `SELECT ub.user_id, ub.branch_id, ub.is_primary, b.name as branch_name
+             FROM user_branches ub
+             JOIN branches b ON ub.branch_id = b.id
+             ORDER BY ub.is_primary DESC, b.name ASC`
+        );
+
+        // Group branches by user_id
+        const branchMap = {};
+        for (const ub of allUserBranches) {
+            if (!branchMap[ub.user_id]) branchMap[ub.user_id] = [];
+            branchMap[ub.user_id].push(ub);
+        }
+
+        // Attach assigned_branches to each user
+        for (const user of rows) {
+            user.assigned_branches = branchMap[user.id] || [];
+        }
+
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -2156,7 +2177,7 @@ app.post('/api/upload/pan-proof', requireAuth, uploadAadhar.single('pan_proof'),
 
 app.put('/api/users/:id', requirePermission('staff', 'edit'), async (req, res) => {
     try {
-        const { username, email, password, full_name, phone, role, branch_id, status, profile_image_url } = req.body;
+        const { username, email, password, full_name, phone, role, branch_id, status, profile_image_url, geo_fence_enabled, branch_ids } = req.body;
         const userId = req.params.id;
 
         const setClauses = [];
@@ -2168,6 +2189,7 @@ app.put('/api/users/:id', requirePermission('staff', 'edit'), async (req, res) =
         if (phone !== undefined) { setClauses.push('phone = ?'); params.push(phone); }
         if (role !== undefined) { setClauses.push('role = ?'); params.push(role); }
         if (branch_id !== undefined) { setClauses.push('branch_id = ?'); params.push(branch_id); }
+        if (geo_fence_enabled !== undefined) { setClauses.push('geo_fence_enabled = ?'); params.push(geo_fence_enabled ? 1 : 0); }
         if (status !== undefined) { setClauses.push('status = ?'); params.push(status); }
         if (profile_image_url !== undefined) { setClauses.push('profile_image_url = ?'); params.push(profile_image_url); }
 
@@ -2177,15 +2199,31 @@ app.put('/api/users/:id', requirePermission('staff', 'edit'), async (req, res) =
             params.push(password_hash);
         }
 
-        if (setClauses.length === 0) {
+        if (setClauses.length === 0 && !branch_ids) {
             return res.status(400).json({ error: 'No fields to update' });
         }
 
         // Accept pan_number if provided
         if (req.body.pan_number !== undefined) { setClauses.push('pan_number = ?'); params.push(req.body.pan_number); }
 
-        params.push(userId);
-        await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, params);
+        if (setClauses.length > 0) {
+            params.push(userId);
+            await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, params);
+        }
+
+        // Sync user_branches if branch_ids provided
+        if (branch_ids && Array.isArray(branch_ids)) {
+            const primaryBranchId = branch_id || null;
+            // Remove existing assignments
+            await pool.query('DELETE FROM user_branches WHERE user_id = ?', [userId]);
+            // Insert new assignments
+            for (const bid of branch_ids) {
+                await pool.query(
+                    'INSERT INTO user_branches (user_id, branch_id, is_primary) VALUES (?, ?, ?)',
+                    [userId, bid, bid == primaryBranchId ? 1 : 0]
+                );
+            }
+        }
 
         // Recompute KYC status after update
         await computeKycStatus(userId);

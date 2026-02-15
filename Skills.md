@@ -1,7 +1,7 @@
 # QC Paint Shop Business Manager - System Skills & Capabilities
 
 > **Platform**: act.qcpaintshop.com
-> **Version**: 3.2.0
+> **Version**: 3.3.0
 > **Last Updated**: 2026-02-15
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
@@ -63,7 +63,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 ### 2.1 Authentication & Authorization
 
 **Staff Authentication**
-- Login via username/email/phone + password (bcrypt hashed)
+- Login via mobile number/email/username + password (bcrypt hashed)
 - Session tokens (32-byte hex) stored in `user_sessions` table
 - Token expiry: 24h default, 720h (30 days) with "Remember Me"
 - Password reset via email (temporary password)
@@ -307,9 +307,12 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 **Clock In/Out**
 - Photo capture on clock-in and clock-out (mandatory)
 - GPS location capture with geo-fence validation
-- Branch-based geo-fencing (configurable radius)
+- Multi-branch support: staff can be assigned to multiple branches and clock in at any assigned location
+- Per-staff geo-fence toggle: admin can disable geo-fence for individual staff members
+- Branch-based geo-fencing (configurable radius per branch)
+- Automatic nearest-branch detection on clock-in (uses GPS to match assigned branches)
 - Geo-fence violation logging
-- Late detection (configurable threshold per branch)
+- Late detection (configurable threshold per branch, shop opens 08:30 AM)
 - Work hours calculation
 - Pages: `staff/clock-in.html`, `staff/clock-out.html`
 
@@ -330,9 +333,11 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Monthly attendance report per user
 - Attendance report with date range filtering
 - Manual attendance marking (admin override)
+- Geo-fence toggle per staff (ON/OFF) in staff management
+- Multi-branch assignment with primary branch selection
 - Geo-fence violation viewer
 - Photo viewer for clock-in/out/break start/break end photos
-- Pages: `admin-attendance.html`, `admin-geofence-logs.html`, `staff/history.html`
+- Pages: `admin-attendance.html`, `admin-geofence-logs.html`, `staff/history.html`, `admin-staff.html`
 
 ---
 
@@ -573,7 +578,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 **Core**: `users`, `user_sessions`, `branches`, `customers`, `customer_types`, `settings`
 **Products**: `products`, `brands`, `categories`, `pack_sizes`
 **Estimates**: `estimates`, `estimate_items`, `estimate_status_history`, `estimate_requests`
-**Attendance**: `staff_attendance`, `attendance_breaks`, `permission_requests`, `shop_hours_config`, `geofence_violations`
+**Attendance**: `staff_attendance`, `attendance_breaks`, `permission_requests`, `shop_hours_config`, `geofence_violations`, `user_branches`
 **Salary**: `salary_config`, `monthly_salary`, `salary_payments`, `salary_advances`
 **Tasks**: `staff_tasks`, `task_updates`, `daily_task_templates`, `daily_task_responses`, `daily_task_materials`
 **Leads**: `leads`, `lead_followups`
