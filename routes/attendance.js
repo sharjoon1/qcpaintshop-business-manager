@@ -741,7 +741,7 @@ router.post('/break-start', requireAuth, upload.single('photo'), async (req, res
 
         const record = attendance[0];
 
-        if (record.break_start_time) {
+        if (record.break_start_time && !record.break_end_time) {
             return res.status(400).json({
                 success: false,
                 message: 'Break already started',
@@ -749,15 +749,23 @@ router.post('/break-start', requireAuth, upload.single('photo'), async (req, res
             });
         }
 
+        // If previous break was completed, accumulate duration and reset for new break
+        let previousBreakMinutes = 0;
+        if (record.break_start_time && record.break_end_time) {
+            previousBreakMinutes = record.break_duration_minutes || 0;
+        }
+
         // Save break photo
         const photoPath = await saveAttendancePhoto(photo.buffer, userId, 'break');
 
-        // Update attendance with break start + photo + GPS
+        // Update attendance with break start + photo + GPS (reset end fields for new break)
         await pool.query(
             `UPDATE staff_attendance SET break_start_time = ?,
-             break_start_photo = ?, break_start_lat = ?, break_start_lng = ?
+             break_start_photo = ?, break_start_lat = ?, break_start_lng = ?,
+             break_end_time = NULL, break_end_photo = NULL, break_end_lat = NULL, break_end_lng = NULL,
+             break_duration_minutes = ?
              WHERE id = ?`,
-            [now, photoPath, latitude, longitude, record.id]
+            [now, photoPath, latitude, longitude, previousBreakMinutes, record.id]
         );
 
         // Save photo record
@@ -843,9 +851,11 @@ router.post('/break-end', requireAuth, upload.single('photo'), async (req, res) 
             });
         }
 
-        // Calculate break duration
+        // Calculate break duration (accumulate with previous breaks)
         const breakStart = new Date(record.break_start_time);
-        const breakDuration = Math.floor((now - breakStart) / 1000 / 60);
+        const thisBreakMinutes = Math.floor((now - breakStart) / 1000 / 60);
+        const previousBreakMinutes = record.break_duration_minutes || 0;
+        const breakDuration = previousBreakMinutes + thisBreakMinutes;
 
         // Check if break is too short or too long
         const warnings = [];
