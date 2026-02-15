@@ -385,6 +385,11 @@
                 </div>
             </div>
 
+            <div class="form-group">
+                <label>PAN Number <span class="optional-tag">(Optional)</span></label>
+                <input type="text" id="panNumber" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform: uppercase;">
+            </div>
+
             <button onclick="goToStep(5)">Review & Submit</button>
             <button class="btn-back" onclick="goToStep(3)">Back</button>
         </div>
@@ -755,6 +760,16 @@
                 if (pincode) formData.append('pincode', pincode);
                 const aadhar = document.getElementById('aadharNumber').value.trim();
                 if (aadhar) formData.append('aadhar_number', aadhar);
+                const pan = document.getElementById('panNumber').value.trim().toUpperCase();
+                if (pan) {
+                    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
+                        showToast('Invalid PAN format (e.g. ABCDE1234F)', 'error');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalText;
+                        return;
+                    }
+                    formData.append('pan_number', pan);
+                }
                 const eName = document.getElementById('emergencyName').value.trim();
                 if (eName) formData.append('emergency_contact_name', eName);
                 const ePhone = document.getElementById('emergencyPhone').value.trim();

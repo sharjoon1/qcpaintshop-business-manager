@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const notificationService = require('../services/notification-service');
 
 // Database connection (imported from main app)
 let pool;
@@ -529,6 +530,15 @@ router.post('/', requirePermission('tasks', 'assign'), async (req, res) => {
             VALUES (?, ?, 'status_change', 'pending', 'Task created and assigned', NOW())
         `, [result.insertId, req.user.id]);
 
+        // Notify assigned user
+        try {
+            await notificationService.send(assigned_to, {
+                type: 'task_assigned', title: 'New Task Assigned',
+                body: `You have been assigned: ${title}`,
+                data: { type: 'task_assigned', task_id: result.insertId, task_number: taskNumber }
+            });
+        } catch (notifErr) { console.error('Task notification error:', notifErr.message); }
+
         res.status(201).json({
             success: true,
             message: 'Task created and assigned successfully',
@@ -755,6 +765,19 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
             INSERT INTO task_updates (task_id, user_id, update_type, old_status, new_status, comment, created_at)
             VALUES (?, ?, 'status_change', ?, ?, ?, NOW())
         `, [taskId, userId, oldStatus, status, staff_notes || `Status changed to ${status}`]);
+
+        // Notify assigner when task is completed
+        if (status === 'completed' && task.assigned_by && task.assigned_by !== userId) {
+            try {
+                const [assignedUser] = await pool.query('SELECT full_name FROM users WHERE id = ?', [task.assigned_to]);
+                const staffName = assignedUser.length > 0 ? assignedUser[0].full_name : 'Staff';
+                await notificationService.send(task.assigned_by, {
+                    type: 'task_completed', title: 'Task Completed',
+                    body: `${staffName} has completed: ${task.title}`,
+                    data: { type: 'task_completed', task_id: taskId, task_number: task.task_number }
+                });
+            } catch (notifErr) { console.error('Task completion notification error:', notifErr.message); }
+        }
 
         res.json({
             success: true,
@@ -1135,6 +1158,15 @@ router.post('/bulk-assign', requirePermission('tasks', 'assign'), async (req, re
                     INSERT INTO task_updates (task_id, user_id, update_type, new_status, comment, created_at)
                     VALUES (?, ?, 'status_change', 'pending', 'Task created via bulk assignment', NOW())
                 `, [result.insertId, req.user.id]);
+
+                // Notify assigned user
+                try {
+                    await notificationService.send(task.assigned_to, {
+                        type: 'task_assigned', title: 'New Task Assigned',
+                        body: `You have been assigned: ${task.title}`,
+                        data: { type: 'task_assigned', task_id: result.insertId, task_number: taskNumber }
+                    });
+                } catch (notifErr) { console.error('Bulk task notification error:', notifErr.message); }
 
                 results.push({
                     id: result.insertId,

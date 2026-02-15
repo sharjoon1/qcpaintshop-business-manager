@@ -10,8 +10,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
-const nodemailer = require('nodemailer');
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const emailService = require('../services/email-service');
+const notificationService = require('../services/notification-service');
 
 let pool;
 
@@ -40,62 +41,8 @@ const uploadAadhar = multer({
     }
 });
 
-// ========================================
-// HELPER: Create email transporter
-// ========================================
-function createTransporter() {
-    if (!process.env.SMTP_HOST) return null;
-    return nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASSWORD
-        }
-    });
-}
-
-function getMailFrom() {
-    return `"${process.env.MAIL_FROM_NAME || 'Quality Colours'}" <${process.env.MAIL_FROM || process.env.SMTP_USER}>`;
-}
-
-// ========================================
-// HELPER: Send branded email
-// ========================================
-async function sendEmail(to, subject, bodyHtml, attachments) {
-    const transporter = createTransporter();
-    if (!transporter) {
-        console.log('[Staff Reg] SMTP not configured, skipping email to:', to);
-        return false;
-    }
-    try {
-        await transporter.sendMail({
-            from: getMailFrom(),
-            to,
-            subject,
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-                        <h1 style="color: white; margin: 0; font-size: 24px;">Quality Colours</h1>
-                        <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0; font-size: 13px;">Business Manager</p>
-                    </div>
-                    <div style="background: #f9fafb; padding: 30px;">
-                        ${bodyHtml}
-                    </div>
-                    <div style="background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #9ca3af;">
-                        Quality Colours Paint Shop &bull; Thanjavur, Tamil Nadu
-                    </div>
-                </div>
-            `,
-            attachments: attachments || []
-        });
-        return true;
-    } catch (err) {
-        console.error('[Staff Reg] Email send error:', err.message);
-        return false;
-    }
-}
+// sendEmail is now provided by the shared email service (services/email-service.js)
+const sendEmail = emailService.send;
 
 // ========================================
 // PUBLIC: Check phone/email availability
@@ -139,7 +86,7 @@ router.post('/register', uploadAadhar.single('aadhar_proof'), async (req, res) =
         const {
             full_name, email, phone, password, password_confirm, otp_id,
             date_of_birth, door_no, street, city, state, pincode,
-            aadhar_number, emergency_contact_name, emergency_contact_phone
+            aadhar_number, pan_number, emergency_contact_name, emergency_contact_phone
         } = req.body;
 
         // Validate required fields
@@ -207,15 +154,15 @@ router.post('/register', uploadAadhar.single('aadhar_proof'), async (req, res) =
             INSERT INTO staff_registrations (
                 full_name, email, phone, password_hash,
                 date_of_birth, door_no, street, city, state, pincode,
-                aadhar_number, aadhar_proof_url,
+                aadhar_number, aadhar_proof_url, pan_number,
                 emergency_contact_name, emergency_contact_phone,
                 phone_verified, otp_id, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, 'pending')
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, 'pending')
         `, [
             full_name, email, phone, hashedPassword,
             date_of_birth || null, door_no || null, street || null,
             city || null, state || 'Tamil Nadu', pincode || null,
-            aadhar_number || null, aadharProofUrl,
+            aadhar_number || null, aadharProofUrl, pan_number || null,
             emergency_contact_name || null, emergency_contact_phone || null,
             otp_id
         ]);
@@ -231,6 +178,17 @@ router.post('/register', uploadAadhar.single('aadhar_proof'), async (req, res) =
             <p>You will receive an email notification once your registration has been reviewed by our team.</p>
             <p style="color: #6b7280; font-size: 13px;">If you did not submit this registration, please ignore this email.</p>
         `);
+
+        // Notify all admins of new registration
+        try {
+            const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+            if (admins.length > 0) {
+                await notificationService.sendToMany(
+                    admins.map(a => a.id),
+                    { type: 'new_registration', title: 'New Staff Registration', body: `${full_name} has submitted a registration for review.`, data: { type: 'new_registration', registration_id: result.insertId } }
+                );
+            }
+        } catch (notifErr) { console.error('Registration notification error:', notifErr.message); }
 
         res.status(201).json({
             success: true,
@@ -392,13 +350,15 @@ router.post('/registrations/:id/approve', requireAuth, requirePermission('staff_
         const [userResult] = await connection.query(`
             INSERT INTO users (username, password_hash, full_name, email, phone, role, branch_id, status, date_of_birth,
                               door_no, street, city, state, pincode, aadhar_number, aadhar_proof_url,
+                              pan_number, pan_proof_url,
                               emergency_contact_name, emergency_contact_phone)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             reg.phone, reg.password_hash, reg.full_name, reg.email, reg.phone,
             assigned_role, assigned_branch_id,
             reg.date_of_birth, reg.door_no, reg.street, reg.city, reg.state, reg.pincode,
             reg.aadhar_number, reg.aadhar_proof_url,
+            reg.pan_number || null, reg.pan_proof_url || null,
             reg.emergency_contact_name, reg.emergency_contact_phone
         ]);
 
@@ -442,6 +402,17 @@ router.post('/registrations/:id/approve', requireAuth, requirePermission('staff_
             offerLetterPath, userId, req.params.id]);
 
         await connection.commit();
+
+        // Notify all admins of approval
+        try {
+            const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active' AND id != ?", [req.user.id]);
+            if (admins.length > 0) {
+                await notificationService.sendToMany(
+                    admins.map(a => a.id),
+                    { type: 'new_registration', title: 'Registration Approved', body: `${reg.full_name} has been approved as ${assigned_role}.`, data: { type: 'new_registration', registration_id: req.params.id } }
+                );
+            }
+        } catch (notifErr) { console.error('Approval notification error:', notifErr.message); }
 
         // Send approval email (outside transaction)
         const totalSalary = parseFloat(monthly_salary) + parseFloat(transport_allowance) + parseFloat(food_allowance) + parseFloat(other_allowance);

@@ -417,7 +417,7 @@ app.get('/api/auth/me', async (req, res) => {
             const [fullUser] = await pool.query(
                 `SELECT id, username, full_name, email, role, branch_id, phone, profile_image_url, created_at,
                         date_of_birth, door_no, street, city, state, pincode,
-                        aadhar_number, aadhar_proof_url,
+                        aadhar_number, aadhar_proof_url, pan_number, pan_proof_url, kyc_status,
                         emergency_contact_name, emergency_contact_phone,
                         bank_account_name, bank_name, bank_account_number, bank_ifsc_code, upi_id
                  FROM users WHERE id = ?`, [session.user_id]
@@ -1975,7 +1975,7 @@ app.delete('/api/categories/:id', requirePermission('categories', 'delete'), asy
 app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
     try {
         const { role, branch_id, status } = req.query;
-        let query = `SELECT id, username, email, full_name, phone, role, branch_id, status, created_at, last_login, profile_image_url FROM users WHERE 1=1`;
+        let query = `SELECT id, username, email, full_name, phone, role, branch_id, status, created_at, last_login, profile_image_url, kyc_status FROM users WHERE 1=1`;
         const params = [];
 
         if (role) { query += ' AND role = ?'; params.push(role); }
@@ -2070,6 +2070,7 @@ app.put('/api/users/profile/me', requireAuth, async (req, res) => {
 
         // KYC
         if (aadhar_number !== undefined) { setClauses.push('aadhar_number = ?'); params.push(aadhar_number || null); }
+        if (req.body.pan_number !== undefined) { setClauses.push('pan_number = ?'); params.push(req.body.pan_number || null); }
 
         // Emergency contact
         if (emergency_contact_name !== undefined) { setClauses.push('emergency_contact_name = ?'); params.push(emergency_contact_name || null); }
@@ -2089,12 +2090,37 @@ app.put('/api/users/profile/me', requireAuth, async (req, res) => {
         params.push(userId);
         await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, params);
 
+        // Recompute KYC status after profile update
+        await computeKycStatus(userId);
+
         res.json({ success: true, message: 'Profile updated successfully' });
     } catch (err) {
         console.error('Update profile error:', err);
         res.status(500).json({ error: err.message });
     }
 });
+
+// KYC status helper - checks aadhar + pan + bank details
+async function computeKycStatus(userId) {
+    try {
+        const [rows] = await pool.query(
+            `SELECT aadhar_number, aadhar_proof_url, pan_number, pan_proof_url,
+                    bank_account_number, bank_ifsc_code, kyc_status
+             FROM users WHERE id = ?`, [userId]
+        );
+        if (rows.length === 0) return;
+        const u = rows[0];
+        const isComplete = u.aadhar_number && u.aadhar_proof_url
+            && u.pan_number && u.pan_proof_url
+            && u.bank_account_number && u.bank_ifsc_code;
+        const newStatus = u.kyc_status === 'verified' ? 'verified' : (isComplete ? 'complete' : 'incomplete');
+        if (newStatus !== u.kyc_status) {
+            await pool.query('UPDATE users SET kyc_status = ? WHERE id = ?', [newStatus, userId]);
+        }
+    } catch (err) {
+        console.error('KYC status compute error:', err.message);
+    }
+}
 
 // Upload Aadhar proof (self-service)
 app.post('/api/upload/aadhar', requireAuth, uploadAadhar.single('aadhar_proof'), async (req, res) => {
@@ -2104,10 +2130,27 @@ app.post('/api/upload/aadhar', requireAuth, uploadAadhar.single('aadhar_proof'),
         }
         const aadharUrl = `/uploads/aadhar/${req.file.filename}`;
         await pool.query('UPDATE users SET aadhar_proof_url = ? WHERE id = ?', [aadharUrl, req.user.id]);
+        await computeKycStatus(req.user.id);
         res.json({ success: true, aadhar_proof_url: aadharUrl });
     } catch (err) {
         console.error('Aadhar upload error:', err);
         res.status(500).json({ success: false, message: 'Failed to upload Aadhar proof' });
+    }
+});
+
+// Upload PAN proof (self-service) - reuses aadhar upload config (same image/PDF filter)
+app.post('/api/upload/pan-proof', requireAuth, uploadAadhar.single('pan_proof'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+        const panUrl = `/uploads/aadhar/${req.file.filename}`;
+        await pool.query('UPDATE users SET pan_proof_url = ? WHERE id = ?', [panUrl, req.user.id]);
+        await computeKycStatus(req.user.id);
+        res.json({ success: true, pan_proof_url: panUrl });
+    } catch (err) {
+        console.error('PAN proof upload error:', err);
+        res.status(500).json({ success: false, message: 'Failed to upload PAN proof' });
     }
 });
 
@@ -2138,8 +2181,43 @@ app.put('/api/users/:id', requirePermission('staff', 'edit'), async (req, res) =
             return res.status(400).json({ error: 'No fields to update' });
         }
 
+        // Accept pan_number if provided
+        if (req.body.pan_number !== undefined) { setClauses.push('pan_number = ?'); params.push(req.body.pan_number); }
+
         params.push(userId);
         await pool.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, params);
+
+        // Recompute KYC status after update
+        await computeKycStatus(userId);
+
+        // Notify user if admin changed their role, status, or branch
+        if ((role !== undefined || status !== undefined || branch_id !== undefined) && parseInt(userId) !== req.user.id) {
+            try {
+                const changes = [];
+                if (role) changes.push(`Role: ${role}`);
+                if (status) changes.push(`Status: ${status}`);
+                if (branch_id) changes.push('Branch updated');
+                const notificationService = require('./services/notification-service');
+                await notificationService.send(parseInt(userId), {
+                    type: 'profile_updated', title: 'Profile Updated',
+                    body: `Your profile has been updated. ${changes.join(', ')}`,
+                    data: { type: 'profile_updated' }
+                });
+                // Send email notification
+                const [updatedUser] = await pool.query('SELECT email, full_name FROM users WHERE id = ?', [userId]);
+                if (updatedUser.length > 0 && updatedUser[0].email) {
+                    const emailService = require('./services/email-service');
+                    await emailService.send(updatedUser[0].email, 'Profile Updated - Quality Colours', `
+                        <h2 style="color: #333;">Hello ${updatedUser[0].full_name},</h2>
+                        <p>Your profile has been updated by an administrator.</p>
+                        <div style="background: white; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                            <p style="margin: 0; color: #4b5563;">${changes.join('<br>')}</p>
+                        </div>
+                        <p>If you have any questions, please contact your manager.</p>
+                    `);
+                }
+            } catch (notifErr) { console.error('Profile update notification error:', notifErr.message); }
+        }
 
         res.json({ success: true, message: 'User updated successfully' });
     } catch (err) {
