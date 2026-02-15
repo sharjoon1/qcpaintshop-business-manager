@@ -660,7 +660,9 @@
         <div id="breakCameraContainer" style="position: relative; border-radius: 12px; overflow: hidden; background: #000; margin-bottom: 16px;">
             <video id="breakVideo" autoplay playsinline style="width: 100%; display: block; transform: scaleX(-1);"></video>
             <canvas id="breakCanvas" style="display: none;"></canvas>
-            <img id="breakPreview" style="display: none; width: 100%; border-radius: 12px;">
+        </div>
+        <div id="breakPhotoPreview" style="display: none; margin-bottom: 16px;">
+            <img id="breakPreview" style="width: 100%; border-radius: 12px;">
         </div>
         <div id="breakGpsStatus" style="font-size: 13px; color: #6b7280; text-align: center; margin-bottom: 12px;">Getting location...</div>
         <div style="display: flex; gap: 12px;">
@@ -763,7 +765,7 @@
                 document.getElementById('loadingState').style.display = 'none';
 
                 if (data.data && data.data.clock_out_time) {
-                    showClockedOutState(data.data);
+                    showClockedOutState(data.data, data.reclockin_status);
                 } else if (data.has_clocked_in) {
                     showClockedInState(data.data);
                 } else {
@@ -795,7 +797,7 @@
         }
 
         // Show clocked out state
-        function showClockedOutState(data) {
+        function showClockedOutState(data, reclockinStatus) {
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
@@ -807,6 +809,47 @@
 
             document.getElementById('clockedInState').style.display = 'none';
             document.getElementById('notClockedInState').style.display = 'none';
+
+            // Determine re-clock-in section
+            let reclockinSection = '';
+            if (data.allow_reclockin === 1) {
+                // Admin approved - show clock in again button
+                reclockinSection = `
+                    <button onclick="location.reload()" style="width: 100%; margin-top: 16px; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #10b981, #059669); color: white; box-shadow: 0 4px 15px rgba(16,185,129,0.4);">
+                        Clock In Again (Overtime)
+                    </button>`;
+            } else if (reclockinStatus === 'pending') {
+                reclockinSection = `
+                    <div style="margin-top: 16px; padding: 14px; background: #fef3c7; border-radius: 12px; text-align: center;">
+                        <span style="color: #92400e; font-weight: 600;">Re-Clock-In Request Pending</span>
+                        <p style="color: #a16207; font-size: 13px; margin-top: 4px;">Waiting for admin approval</p>
+                    </div>`;
+            } else if (reclockinStatus === 'approved') {
+                reclockinSection = `
+                    <button onclick="location.reload()" style="width: 100%; margin-top: 16px; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #10b981, #059669); color: white; box-shadow: 0 4px 15px rgba(16,185,129,0.4);">
+                        Clock In Again (Overtime)
+                    </button>`;
+            } else if (reclockinStatus === 'rejected') {
+                reclockinSection = `
+                    <div style="margin-top: 16px; padding: 14px; background: #fee2e2; border-radius: 12px; text-align: center;">
+                        <span style="color: #991b1b; font-weight: 600;">Re-Clock-In Request Rejected</span>
+                    </div>`;
+            } else {
+                // No request yet - show request button
+                reclockinSection = `
+                    <div id="reclockinSection" style="margin-top: 20px;">
+                        <button id="reclockinBtn" onclick="showReclockinForm()" style="width: 100%; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; border: 2px solid #8b5cf6; cursor: pointer; background: white; color: #7c3aed;">
+                            Request Re-Clock-In (Overtime)
+                        </button>
+                        <div id="reclockinForm" style="display: none; margin-top: 12px;">
+                            <textarea id="reclockinReason" placeholder="Reason for overtime (e.g. urgent task, client meeting...)" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; resize: none; min-height: 80px; font-family: inherit;"></textarea>
+                            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                <button onclick="hideReclockinForm()" style="flex: 1; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; background: #f3f4f6; color: #374151;">Cancel</button>
+                                <button onclick="submitReclockinRequest()" id="reclockinSubmitBtn" style="flex: 1; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Submit</button>
+                            </div>
+                        </div>
+                    </div>`;
+            }
 
             document.getElementById('loadingState').innerHTML = `
                 <div style="text-align: center; padding: 40px; max-width: 400px; margin: 0 auto;">
@@ -823,10 +866,56 @@
                             <span style="font-weight: 600;">${new Date(data.clock_out_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                     </div>
-                    <p style="color: #6b7280; font-size: 14px;">See you tomorrow! &#128075;</p>
+                    <p style="color: #6b7280; font-size: 14px;">See you tomorrow!</p>
+                    ${reclockinSection}
                 </div>
             `;
             document.getElementById('loadingState').style.display = 'block';
+        }
+
+        function showReclockinForm() {
+            document.getElementById('reclockinBtn').style.display = 'none';
+            document.getElementById('reclockinForm').style.display = 'block';
+        }
+
+        function hideReclockinForm() {
+            document.getElementById('reclockinForm').style.display = 'none';
+            document.getElementById('reclockinBtn').style.display = 'block';
+        }
+
+        async function submitReclockinRequest() {
+            const reason = document.getElementById('reclockinReason').value.trim();
+            if (!reason) {
+                showToast('Please provide a reason for overtime', 'error');
+                return;
+            }
+            const btn = document.getElementById('reclockinSubmitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/attendance/permission/request-reclockin', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ reason })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Re-clock-in request submitted!', 'success');
+                    await loadTodayAttendance();
+                } else {
+                    showToast(data.message || 'Failed to submit request', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Submit';
+                }
+            } catch (err) {
+                showToast('Network error. Please try again.', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Submit';
+            }
         }
 
         // Show clocked in state
@@ -968,7 +1057,8 @@
         function showBreakPanel() {
             document.getElementById('breakBackdrop').classList.add('active');
             document.getElementById('breakPanel').classList.add('active');
-            document.getElementById('breakPreview').style.display = 'none';
+            document.getElementById('breakCameraContainer').style.display = 'block';
+            document.getElementById('breakPhotoPreview').style.display = 'none';
             document.getElementById('breakVideo').style.display = 'block';
             document.getElementById('breakCaptureBtn').style.display = 'block';
             document.getElementById('breakSubmitBtn').style.display = 'none';
@@ -1035,8 +1125,8 @@
                 breakPhotoBlob = blob;
                 const preview = document.getElementById('breakPreview');
                 preview.src = URL.createObjectURL(blob);
-                preview.style.display = 'block';
-                video.style.display = 'none';
+                document.getElementById('breakCameraContainer').style.display = 'none';
+                document.getElementById('breakPhotoPreview').style.display = 'block';
                 document.getElementById('breakCaptureBtn').style.display = 'none';
                 document.getElementById('breakSubmitBtn').style.display = 'block';
                 stopBreakCamera();
@@ -1287,6 +1377,7 @@
         // ========================================
         let geoWatchId = null;
         let isOutsideFence = false;
+        let geoAutoClockoutTriggered = false;
 
         function startGeoFenceMonitoring() {
             if (!navigator.geolocation) return;
@@ -1317,6 +1408,10 @@
                                     // Vibrate if supported
                                     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                                 }
+                                // Auto clock-out if 300m+ away
+                                if (data.data.distance >= 300 && !geoAutoClockoutTriggered) {
+                                    triggerGeoAutoClockout(pos.coords.latitude, pos.coords.longitude, data.data.distance);
+                                }
                             } else {
                                 // Inside fence
                                 if (isOutsideFence) {
@@ -1333,6 +1428,33 @@
                 null,
                 { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
             );
+        }
+
+        async function triggerGeoAutoClockout(lat, lng, distance) {
+            geoAutoClockoutTriggered = true;
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/attendance/geo-auto-clockout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ latitude: lat, longitude: lng })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Auto clocked out - you are ${distance}m from branch`, 'warning');
+                    stopGeoFenceMonitoring();
+                    await loadTodayAttendance();
+                } else {
+                    // Reset flag if server says not applicable
+                    geoAutoClockoutTriggered = false;
+                }
+            } catch (err) {
+                console.error('Geo auto clockout error:', err);
+                geoAutoClockoutTriggered = false;
+            }
         }
 
         function stopGeoFenceMonitoring() {
