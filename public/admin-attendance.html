@@ -875,6 +875,7 @@
                         <td>${r.is_late ? '<span class="badge badge-late">LATE</span>' : '-'}</td>
                         <td>
                             ${r.clock_in_time ? `<button class="action-btn-sm btn-primary" onclick="viewPhotos(${r.id})" title="View Photos">Photos</button>` : '-'}
+                            ${r.clock_in_time && !r.clock_out_time ? ` <button class="action-btn-sm btn-danger" onclick="forceClockOut(${r.id}, '${escapeHtml(r.full_name)}')" title="Force Clock Out">Clock Out</button>` : ''}
                         </td>
                     </tr>`;
                 }).join('');
@@ -1200,6 +1201,34 @@
             } catch (e) {
                 console.error('Load activity report error:', e);
                 container.innerHTML = '<div class="empty-state"><p class="text-red-500">Failed to load activity report</p></div>';
+            }
+        }
+
+        // ========================================
+        // FORCE CLOCK OUT
+        // ========================================
+        async function forceClockOut(attendanceId, staffName) {
+            const reason = prompt(`Force clock out ${staffName}?\n\nEnter reason (optional):`);
+            if (reason === null) return; // cancelled
+
+            try {
+                const res = await fetch('/api/attendance/admin/force-clockout', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ attendance_id: attendanceId, notes: reason || '' })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`${staffName} has been clocked out`, 'success');
+                    loadLiveAttendance();
+                    loadSummaryStats();
+                } else {
+                    showToast(data.message || 'Failed to clock out', 'error');
+                }
+            } catch (e) {
+                console.error('Force clockout error:', e);
+                showToast('Failed to force clock out', 'error');
             }
         }
 
