@@ -10,6 +10,7 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs').promises;
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const notificationService = require('../services/notification-service');
 
 // Configure multer for photo uploads
 const storage = multer.memoryStorage();
@@ -1039,6 +1040,15 @@ router.put('/permission/:id/approve', requirePermission('attendance', 'approve')
             );
         }
         
+        // Notify requesting staff
+        try {
+            await notificationService.send(permission.staff_id, {
+                type: 'permission_approved', title: 'Permission Approved',
+                body: `Your ${permission.permission_type || 'attendance'} permission request has been approved.`,
+                data: { type: 'permission_approved', permission_id: parseInt(permissionId) }
+            });
+        } catch (notifErr) { console.error('Permission approve notification error:', notifErr.message); }
+
         res.json({
             success: true,
             message: 'Permission approved successfully',
@@ -1048,7 +1058,7 @@ router.put('/permission/:id/approve', requirePermission('attendance', 'approve')
                 approved_at: now
             }
         });
-        
+
     } catch (error) {
         console.error('Approve permission error:', error);
         res.status(500).json({ 
@@ -1109,6 +1119,15 @@ router.put('/permission/:id/reject', requirePermission('attendance', 'approve'),
         
         // No working minutes adjustment for rejection
         
+        // Notify requesting staff
+        try {
+            await notificationService.send(permission.staff_id, {
+                type: 'permission_rejected', title: 'Permission Rejected',
+                body: `Your ${permission.permission_type || 'attendance'} permission request was rejected. Reason: ${review_notes}`,
+                data: { type: 'permission_rejected', permission_id: parseInt(permissionId) }
+            });
+        } catch (notifErr) { console.error('Permission reject notification error:', notifErr.message); }
+
         res.json({
             success: true,
             message: 'Permission rejected',
@@ -1119,7 +1138,7 @@ router.put('/permission/:id/reject', requirePermission('attendance', 'approve'),
                 reason: review_notes
             }
         });
-        
+
     } catch (error) {
         console.error('Reject permission error:', error);
         res.status(500).json({ 

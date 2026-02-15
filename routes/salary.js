@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth, requireRole } = require('../middleware/permissionMiddleware');
+const notificationService = require('../services/notification-service');
 
 // Database connection (imported from main app)
 let pool;
@@ -790,15 +791,29 @@ router.put('/monthly/:id/approve', requireAuth, requirePermission('salary', 'app
     try {
         const { notes } = req.body;
         
+        // Get salary record before update to know which user
+        const [salaryRec] = await pool.query('SELECT user_id FROM monthly_salaries WHERE id = ?', [req.params.id]);
+
         await pool.query(`
-            UPDATE monthly_salaries 
+            UPDATE monthly_salaries
             SET status = 'approved',
                 approved_by = ?,
                 approved_at = NOW(),
                 notes = CONCAT(COALESCE(notes, ''), '\n\nApproval: ', ?)
             WHERE id = ?
         `, [req.user.id, notes || 'Approved', req.params.id]);
-        
+
+        // Notify user salary approved
+        if (salaryRec.length > 0) {
+            try {
+                await notificationService.send(salaryRec[0].user_id, {
+                    type: 'salary_generated', title: 'Salary Approved',
+                    body: 'Your monthly salary has been approved.',
+                    data: { type: 'salary_generated', monthly_salary_id: parseInt(req.params.id) }
+                });
+            } catch (notifErr) { console.error('Salary approve notification error:', notifErr.message); }
+        }
+
         res.json({
             success: true,
             message: 'Salary approved successfully'
@@ -938,6 +953,15 @@ router.post('/payments', requireAuth, requirePermission('salary', 'manage'), asy
             WHERE id = ?
         `, [totalPaid, paymentStatus, payment_date, payment_method, payment_reference, monthly_salary_id]);
         
+        // Notify user of payment
+        try {
+            await notificationService.send(user_id, {
+                type: 'salary_paid', title: 'Salary Payment Received',
+                body: `Payment of ₹${parseFloat(amount_paid).toLocaleString('en-IN')} has been recorded.`,
+                data: { type: 'salary_paid', payment_id: result.insertId, amount: amount_paid }
+            });
+        } catch (notifErr) { console.error('Payment notification error:', notifErr.message); }
+
         res.json({
             success: true,
             message: 'Payment recorded successfully',
@@ -947,7 +971,7 @@ router.post('/payments', requireAuth, requirePermission('salary', 'manage'), asy
                 payment_status: paymentStatus
             }
         });
-        
+
     } catch (error) {
         console.error('Error recording payment:', error);
         res.status(500).json({
@@ -1298,6 +1322,15 @@ router.put('/advances/:id/approve', requireAuth, requirePermission('salary', 'ap
             [req.user.id, notes || null, id]
         );
 
+        // Notify requesting user
+        try {
+            await notificationService.send(advance[0].user_id, {
+                type: 'advance_approved', title: 'Advance Approved',
+                body: `Your salary advance request of ₹${parseFloat(advance[0].amount).toLocaleString('en-IN')} has been approved.`,
+                data: { type: 'advance_approved', advance_id: parseInt(id) }
+            });
+        } catch (notifErr) { console.error('Advance approve notification error:', notifErr.message); }
+
         res.json({ success: true, message: 'Advance approved' });
     } catch (error) {
         console.error('Error approving advance:', error);
@@ -1329,6 +1362,15 @@ router.put('/advances/:id/reject', requireAuth, requirePermission('salary', 'app
             `UPDATE salary_advances SET status = 'rejected', rejected_by = ?, rejected_at = NOW(), rejection_reason = ? WHERE id = ?`,
             [req.user.id, rejection_reason, id]
         );
+
+        // Notify requesting user
+        try {
+            await notificationService.send(advance[0].user_id, {
+                type: 'advance_rejected', title: 'Advance Rejected',
+                body: `Your salary advance request has been rejected. Reason: ${rejection_reason}`,
+                data: { type: 'advance_rejected', advance_id: parseInt(id) }
+            });
+        } catch (notifErr) { console.error('Advance reject notification error:', notifErr.message); }
 
         res.json({ success: true, message: 'Advance rejected' });
     } catch (error) {

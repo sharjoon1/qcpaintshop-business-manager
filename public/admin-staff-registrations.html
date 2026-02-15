@@ -158,14 +158,15 @@
                     </div>
                 </div>
 
-                <!-- Aadhar Section -->
+                <!-- KYC Documents -->
                 <div class="mb-6">
-                    <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">Aadhar Details</h4>
-                    <div class="text-sm mb-2">
-                        <span class="text-gray-500">Number:</span> <strong id="mAadhar"></strong>
+                    <h4 class="text-sm font-semibold text-purple-600 uppercase mb-3">KYC Documents</h4>
+                    <div class="grid grid-cols-2 gap-3 text-sm mb-2">
+                        <div><span class="text-gray-500">Aadhar Number:</span><br><strong id="mAadhar"></strong></div>
+                        <div><span class="text-gray-500">PAN Number:</span><br><strong id="mPan"></strong></div>
                     </div>
-                    <div id="mAadharProofContainer" class="hidden">
-                        <a id="mAadharProofLink" href="#" target="_blank" class="text-purple-600 hover:underline text-sm">View Document</a>
+                    <div id="mAadharProofContainer" class="hidden mb-2">
+                        <a id="mAadharProofLink" href="#" target="_blank" class="text-purple-600 hover:underline text-sm">View Aadhar Document</a>
                         <div class="mt-2">
                             <img id="mAadharProofImg" class="aadhar-viewer hidden" alt="Aadhar proof">
                         </div>
@@ -743,8 +744,9 @@
             document.getElementById('mEmergency').textContent =
                 r.emergency_contact_name ? `${r.emergency_contact_name} - ${r.emergency_contact_phone || 'No phone'}` : 'Not provided';
 
-            // Aadhar
+            // KYC - Aadhar
             document.getElementById('mAadhar').textContent = r.aadhar_number || 'Not provided';
+            document.getElementById('mPan').textContent = r.pan_number || 'Not provided';
             const proofContainer = document.getElementById('mAadharProofContainer');
             if (r.aadhar_proof_url) {
                 proofContainer.classList.remove('hidden');

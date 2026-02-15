@@ -1239,6 +1239,28 @@
                         </div>`;
                 }
 
+                if (record.break_start_photo) {
+                    html += `
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2 text-center">Break Start Photo</h4>
+                            <img src="/${record.break_start_photo}" alt="Break Start" style="width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover;"
+                                 onerror="this.parentElement.innerHTML='<div class=\\'text-center py-8 text-gray-400\\'>Photo not available</div>'">
+                            <p class="text-xs text-gray-500 text-center mt-2">${record.break_start_time ? formatTime(record.break_start_time) : ''}</p>
+                            ${record.break_start_address ? `<p class="text-xs text-gray-400 text-center">${escapeHtml(record.break_start_address)}</p>` : ''}
+                        </div>`;
+                }
+
+                if (record.break_end_photo) {
+                    html += `
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2 text-center">Break End Photo</h4>
+                            <img src="/${record.break_end_photo}" alt="Break End" style="width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover;"
+                                 onerror="this.parentElement.innerHTML='<div class=\\'text-center py-8 text-gray-400\\'>Photo not available</div>'">
+                            <p class="text-xs text-gray-500 text-center mt-2">${record.break_end_time ? formatTime(record.break_end_time) : ''}</p>
+                            ${record.break_end_address ? `<p class="text-xs text-gray-400 text-center">${escapeHtml(record.break_end_address)}</p>` : ''}
+                        </div>`;
+                }
+
                 if (!html) {
                     html = '<div class="text-center py-8 text-gray-400 col-span-2">No photos available for this record</div>';
                 }
