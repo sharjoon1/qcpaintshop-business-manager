@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Website Management - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+</head>
+<body class="bg-gray-50">
+<div class="max-w-6xl mx-auto p-4 sm:p-6">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Website Management</h1>
+            <p class="text-gray-600 text-sm mt-1">Manage your public website content</p>
+        </div>
+        <a href="/" target="_blank" class="bg-purple-600 text-white px-5 py-2.5 rounded-lg hover:bg-purple-700 font-semibold text-sm flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            View Website
+        </a>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="border-b border-gray-200 bg-gray-50">
+            <div class="flex overflow-x-auto">
+                <button onclick="showTab('hero')" id="tab-hero" class="tab-btn px-5 py-3.5 text-sm font-semibold border-b-2 border-purple-600 text-purple-600 whitespace-nowrap">Hero & About</button>
+                <button onclick="showTab('services')" id="tab-services" class="tab-btn px-5 py-3.5 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900 whitespace-nowrap">Services</button>
+                <button onclick="showTab('features')" id="tab-features" class="tab-btn px-5 py-3.5 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900 whitespace-nowrap">Why Choose Us</button>
+                <button onclick="showTab('testimonials')" id="tab-testimonials" class="tab-btn px-5 py-3.5 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900 whitespace-nowrap">Testimonials</button>
+                <button onclick="showTab('gallery')" id="tab-gallery" class="tab-btn px-5 py-3.5 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900 whitespace-nowrap">Gallery</button>
+                <button onclick="showTab('social')" id="tab-social" class="tab-btn px-5 py-3.5 text-sm font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-900 whitespace-nowrap">Social & Footer</button>
+            </div>
+        </div>
+
+        <!-- TAB: Hero & About -->
+        <div id="panel-hero" class="tab-panel p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Hero Section</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Title (English)</label><input id="s_hero_title" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Title (Tamil)</label><input id="s_hero_title_tamil" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Subtitle (English)</label><input id="s_hero_subtitle" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Subtitle (Tamil)</label><input id="s_hero_subtitle_tamil" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">CTA Button 1 Text</label><input id="s_hero_cta1_text" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">CTA Button 1 Link</label><input id="s_hero_cta1_link" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">CTA Button 2 Text</label><input id="s_hero_cta2_text" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">CTA Button 2 Link</label><input id="s_hero_cta2_link" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+            </div>
+            <h2 class="text-lg font-bold text-gray-800 mb-4">About Section</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Title (English)</label><input id="s_about_title" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Title (Tamil)</label><input id="s_about_title_tamil" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div class="md:col-span-2"><label class="block text-sm font-semibold text-gray-700 mb-1">Description (English)</label><textarea id="s_about_description" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea></div>
+                <div class="md:col-span-2"><label class="block text-sm font-semibold text-gray-700 mb-1">Description (Tamil)</label><textarea id="s_about_description_tamil" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea></div>
+            </div>
+            <button onclick="saveSettings()" class="bg-purple-600 text-white px-6 py-2.5 rounded-lg hover:bg-purple-700 font-semibold text-sm">Save Settings</button>
+        </div>
+
+        <!-- TAB: Services -->
+        <div id="panel-services" class="tab-panel hidden p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-gray-800">Services</h2>
+                <button onclick="openCrudModal('services')" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold text-sm">+ Add Service</button>
+            </div>
+            <div id="servicesList" class="space-y-3"></div>
+        </div>
+
+        <!-- TAB: Features -->
+        <div id="panel-features" class="tab-panel hidden p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-gray-800">Why Choose Us Features</h2>
+                <button onclick="openCrudModal('features')" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold text-sm">+ Add Feature</button>
+            </div>
+            <div id="featuresList" class="space-y-3"></div>
+        </div>
+
+        <!-- TAB: Testimonials -->
+        <div id="panel-testimonials" class="tab-panel hidden p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-gray-800">Testimonials</h2>
+                <button onclick="openCrudModal('testimonials')" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold text-sm">+ Add Testimonial</button>
+            </div>
+            <div id="testimonialsList" class="space-y-3"></div>
+        </div>
+
+        <!-- TAB: Gallery -->
+        <div id="panel-gallery" class="tab-panel hidden p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-gray-800">Gallery</h2>
+                <button onclick="openGalleryUpload()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold text-sm">+ Upload Image</button>
+            </div>
+            <div id="galleryGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+        </div>
+
+        <!-- TAB: Social & Footer -->
+        <div id="panel-social" class="tab-panel hidden p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Social Media Links</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">WhatsApp Number</label><input id="s_social_whatsapp" placeholder="919876543210" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Instagram URL</label><input id="s_social_instagram" placeholder="https://instagram.com/..." class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Facebook URL</label><input id="s_social_facebook" placeholder="https://facebook.com/..." class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">YouTube URL</label><input id="s_social_youtube" placeholder="https://youtube.com/..." class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+            </div>
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Footer & Design Request</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="md:col-span-2"><label class="block text-sm font-semibold text-gray-700 mb-1">Footer Tagline (English)</label><input id="s_footer_tagline" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div class="md:col-span-2"><label class="block text-sm font-semibold text-gray-700 mb-1">Footer Tagline (Tamil)</label><input id="s_footer_tagline_tamil" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Design Request Response Time</label><input id="s_design_request_response_time" placeholder="24 hours" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+            </div>
+            <button onclick="saveSettings()" class="bg-purple-600 text-white px-6 py-2.5 rounded-lg hover:bg-purple-700 font-semibold text-sm">Save Settings</button>
+        </div>
+    </div>
+</div>
+
+<!-- CRUD Modal -->
+<div id="crudModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="crudModalTitle" class="text-lg font-bold text-gray-800"></h3>
+            <button onclick="closeCrudModal()" class="text-gray-400 hover:text-gray-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <div id="crudModalBody"></div>
+    </div>
+</div>
+
+<!-- Gallery Upload Modal -->
+<div id="galleryUploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-gray-800">Upload Gallery Image</h3>
+            <button onclick="closeGalleryUpload()" class="text-gray-400 hover:text-gray-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Image</label>
+                <input type="file" id="galleryFileInput" accept="image/*" class="w-full border rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Caption</label>
+                <input id="galleryCaption" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Optional caption">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Category</label>
+                <select id="galleryCategory" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="general">General</option>
+                    <option value="interior">Interior</option>
+                    <option value="exterior">Exterior</option>
+                    <option value="texture">Texture</option>
+                </select>
+            </div>
+            <button onclick="uploadGalleryImage()" id="galleryUploadBtn" class="w-full bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 font-semibold text-sm">Upload</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const API = '/api/website';
+const headers = () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('auth_token') });
+const authHeaders = () => ({ 'Authorization': 'Bearer ' + localStorage.getItem('auth_token') });
+
+let currentSettings = {};
+let currentData = { services: [], features: [], testimonials: [], gallery: [] };
+
+// Icon options for services/features
+const iconOptions = [
+    { value: 'home', label: 'Home' },
+    { value: 'building', label: 'Building' },
+    { value: 'texture', label: 'Texture/Paint' },
+    { value: 'lightbulb', label: 'Lightbulb' },
+    { value: 'check-circle', label: 'Check Circle' },
+    { value: 'users', label: 'Users/Team' },
+    { value: 'badge-check', label: 'Badge/Award' },
+    { value: 'star', label: 'Star' },
+    { value: 'shield', label: 'Shield' },
+    { value: 'clock', label: 'Clock' },
+    { value: 'truck', label: 'Delivery' },
+    { value: 'phone', label: 'Phone' }
+];
+const colorOptions = ['green', 'blue', 'purple', 'amber', 'red', 'cyan', 'pink'];
+
+// Tab switching
+function showTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('border-purple-600', 'text-purple-600'); b.classList.add('border-transparent', 'text-gray-600'); });
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.getElementById('tab-' + name).classList.add('border-purple-600', 'text-purple-600');
+    document.getElementById('tab-' + name).classList.remove('border-transparent', 'text-gray-600');
+    document.getElementById('panel-' + name).classList.remove('hidden');
+}
+
+// Load all data
+async function loadAll() {
+    try {
+        // Load settings from public content endpoint
+        const contentRes = await fetch(API + '/content').then(r => r.json());
+        if (contentRes.success) {
+            currentSettings = contentRes.data.settings || {};
+            populateSettings();
+        }
+
+        // Load admin data for each section
+        const [sRes, fRes, tRes, gRes] = await Promise.all([
+            fetch(API + '/services', { headers: authHeaders() }).then(r => r.json()),
+            fetch(API + '/features', { headers: authHeaders() }).then(r => r.json()),
+            fetch(API + '/testimonials', { headers: authHeaders() }).then(r => r.json()),
+            fetch(API + '/gallery-admin', { headers: authHeaders() }).then(r => r.json())
+        ]);
+
+        currentData.services = sRes.success ? sRes.data : [];
+        currentData.features = fRes.success ? fRes.data : [];
+        currentData.testimonials = tRes.success ? tRes.data : [];
+        currentData.gallery = gRes.success ? gRes.data : [];
+
+        renderServices();
+        renderFeatures();
+        renderTestimonials();
+        renderGallery();
+    } catch (err) {
+        console.error('Load error:', err);
+    }
+}
+
+function populateSettings() {
+    const keys = ['hero_title','hero_title_tamil','hero_subtitle','hero_subtitle_tamil','hero_cta1_text','hero_cta1_link','hero_cta2_text','hero_cta2_link','about_title','about_title_tamil','about_description','about_description_tamil','footer_tagline','footer_tagline_tamil','social_whatsapp','social_instagram','social_facebook','social_youtube','design_request_response_time'];
+    keys.forEach(k => {
+        const el = document.getElementById('s_' + k);
+        if (el) el.value = currentSettings[k] || '';
+    });
+}
+
+async function saveSettings() {
+    const keys = ['hero_title','hero_title_tamil','hero_subtitle','hero_subtitle_tamil','hero_cta1_text','hero_cta1_link','hero_cta2_text','hero_cta2_link','about_title','about_title_tamil','about_description','about_description_tamil','footer_tagline','footer_tagline_tamil','social_whatsapp','social_instagram','social_facebook','social_youtube','design_request_response_time'];
+    const settings = {};
+    keys.forEach(k => {
+        const el = document.getElementById('s_' + k);
+        if (el) settings[k] = el.value;
+    });
+
+    try {
+        const res = await fetch(API + '/settings', { method: 'PUT', headers: headers(), body: JSON.stringify({ settings }) });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Settings saved successfully!', 'success');
+        } else {
+            showToast(data.error || 'Failed to save', 'error');
+        }
+    } catch (err) {
+        showToast('Network error', 'error');
+    }
+}
+
+// ==================== SERVICES ====================
+function renderServices() {
+    const el = document.getElementById('servicesList');
+    if (!currentData.services.length) { el.innerHTML = '<p class="text-gray-500 text-center py-8">No services yet. Add your first service.</p>'; return; }
+    el.innerHTML = currentData.services.map(s => `
+        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4 ${s.status === 'inactive' ? 'opacity-50' : ''}">
+            <div class="flex-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-bold text-gray-800">${esc(s.title)}</span>
+                    ${s.title_tamil ? `<span class="text-xs text-gray-500">(${esc(s.title_tamil)})</span>` : ''}
+                    <span class="text-xs bg-gray-200 rounded px-2 py-0.5">${esc(s.icon)}</span>
+                    ${s.status === 'inactive' ? '<span class="text-xs bg-red-100 text-red-700 rounded px-2 py-0.5">Inactive</span>' : ''}
+                </div>
+                ${s.description ? `<p class="text-xs text-gray-600 mt-1">${esc(s.description).substring(0, 100)}...</p>` : ''}
+            </div>
+            <div class="flex items-center gap-2 ml-4">
+                <button onclick="editService(${s.id})" class="text-blue-600 hover:text-blue-800 text-sm font-semibold">Edit</button>
+                <button onclick="deleteItem('services', ${s.id})" class="text-red-600 hover:text-red-800 text-sm font-semibold">Delete</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function editService(id) {
+    const s = currentData.services.find(x => x.id === id);
+    if (!s) return;
+    openCrudModal('services', s);
+}
+
+// ==================== FEATURES ====================
+function renderFeatures() {
+    const el = document.getElementById('featuresList');
+    if (!currentData.features.length) { el.innerHTML = '<p class="text-gray-500 text-center py-8">No features yet. Add your first feature.</p>'; return; }
+    el.innerHTML = currentData.features.map(f => `
+        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4 ${f.status === 'inactive' ? 'opacity-50' : ''}">
+            <div class="flex-1">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-${f.color}-500 inline-block"></span>
+                    <span class="text-sm font-bold text-gray-800">${esc(f.title)}</span>
+                    ${f.title_tamil ? `<span class="text-xs text-gray-500">(${esc(f.title_tamil)})</span>` : ''}
+                    ${f.status === 'inactive' ? '<span class="text-xs bg-red-100 text-red-700 rounded px-2 py-0.5">Inactive</span>' : ''}
+                </div>
+                ${f.description ? `<p class="text-xs text-gray-600 mt-1">${esc(f.description).substring(0, 100)}...</p>` : ''}
+            </div>
+            <div class="flex items-center gap-2 ml-4">
+                <button onclick="editFeature(${f.id})" class="text-blue-600 hover:text-blue-800 text-sm font-semibold">Edit</button>
+                <button onclick="deleteItem('features', ${f.id})" class="text-red-600 hover:text-red-800 text-sm font-semibold">Delete</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function editFeature(id) {
+    const f = currentData.features.find(x => x.id === id);
+    if (!f) return;
+    openCrudModal('features', f);
+}
+
+// ==================== TESTIMONIALS ====================
+function renderTestimonials() {
+    const el = document.getElementById('testimonialsList');
+    if (!currentData.testimonials.length) { el.innerHTML = '<p class="text-gray-500 text-center py-8">No testimonials yet. Add your first testimonial.</p>'; return; }
+    el.innerHTML = currentData.testimonials.map(t => `
+        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4 ${t.status === 'inactive' ? 'opacity-50' : ''}">
+            <div class="flex-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-bold text-gray-800">${esc(t.customer_name)}</span>
+                    ${t.customer_role ? `<span class="text-xs text-gray-500">- ${esc(t.customer_role)}</span>` : ''}
+                    <span class="text-yellow-500 text-xs">${'★'.repeat(t.rating)}${'☆'.repeat(5 - t.rating)}</span>
+                    ${t.status === 'inactive' ? '<span class="text-xs bg-red-100 text-red-700 rounded px-2 py-0.5">Inactive</span>' : ''}
+                </div>
+                <p class="text-xs text-gray-600 mt-1">"${esc(t.testimonial_text).substring(0, 120)}..."</p>
+            </div>
+            <div class="flex items-center gap-2 ml-4">
+                <button onclick="editTestimonial(${t.id})" class="text-blue-600 hover:text-blue-800 text-sm font-semibold">Edit</button>
+                <button onclick="deleteItem('testimonials', ${t.id})" class="text-red-600 hover:text-red-800 text-sm font-semibold">Delete</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function editTestimonial(id) {
+    const t = currentData.testimonials.find(x => x.id === id);
+    if (!t) return;
+    openCrudModal('testimonials', t);
+}
+
+// ==================== GALLERY ====================
+function renderGallery() {
+    const el = document.getElementById('galleryGrid');
+    if (!currentData.gallery.length) { el.innerHTML = '<p class="text-gray-500 text-center py-8 col-span-full">No gallery images yet. Upload your first image.</p>'; return; }
+    el.innerHTML = currentData.gallery.map(g => `
+        <div class="relative group rounded-lg overflow-hidden shadow ${g.status === 'inactive' ? 'opacity-50' : ''}">
+            <img src="${esc(g.image_url)}" alt="${esc(g.caption || '')}" class="w-full h-40 object-cover">
+            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <button onclick="editGalleryItem(${g.id})" class="bg-white text-gray-800 px-3 py-1 rounded text-xs font-semibold mr-2">Edit</button>
+                <button onclick="deleteItem('gallery-admin', ${g.id})" class="bg-red-500 text-white px-3 py-1 rounded text-xs font-semibold">Delete</button>
+            </div>
+            <div class="p-2">
+                <p class="text-xs text-gray-700 truncate">${esc(g.caption || 'No caption')}</p>
+                <span class="text-xs bg-gray-200 rounded px-1.5 py-0.5">${esc(g.category)}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function editGalleryItem(id) {
+    const g = currentData.gallery.find(x => x.id === id);
+    if (!g) return;
+    openCrudModal('gallery', g);
+}
+
+// ==================== CRUD MODAL ====================
+let editingId = null;
+let editingType = null;
+
+function openCrudModal(type, item = null) {
+    editingType = type;
+    editingId = item ? item.id : null;
+    const title = (item ? 'Edit ' : 'Add ') + { services: 'Service', features: 'Feature', testimonials: 'Testimonial', gallery: 'Gallery Item' }[type];
+    document.getElementById('crudModalTitle').textContent = title;
+
+    let html = '';
+    if (type === 'services') {
+        html = `
+            <div class="space-y-3">
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Title (English) *</label><input id="crud_title" value="${esc(item?.title || '')}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Title (Tamil)</label><input id="crud_title_tamil" value="${esc(item?.title_tamil || '')}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Description (English)</label><textarea id="crud_description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">${esc(item?.description || '')}</textarea></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Description (Tamil)</label><textarea id="crud_description_tamil" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">${esc(item?.description_tamil || '')}</textarea></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Icon</label><select id="crud_icon" class="w-full border rounded-lg px-3 py-2 text-sm">${iconOptions.map(o => `<option value="${o.value}" ${item?.icon === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}</select></div>
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Sort Order</label><input type="number" id="crud_sort_order" value="${item?.sort_order || 0}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                </div>
+                ${item ? `<div><label class="block text-sm font-semibold text-gray-700 mb-1">Status</label><select id="crud_status" class="w-full border rounded-lg px-3 py-2 text-sm"><option value="active" ${item.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${item.status === 'inactive' ? 'selected' : ''}>Inactive</option></select></div>` : ''}
+                <button onclick="saveCrud()" class="w-full bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 font-semibold text-sm">${item ? 'Update' : 'Add'} Service</button>
+            </div>`;
+    } else if (type === 'features') {
+        html = `
+            <div class="space-y-3">
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Title (English) *</label><input id="crud_title" value="${esc(item?.title || '')}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Title (Tamil)</label><input id="crud_title_tamil" value="${esc(item?.title_tamil || '')}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Description (English)</label><textarea id="crud_description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">${esc(item?.description || '')}</textarea></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Description (Tamil)</label><textarea id="crud_description_tamil" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">${esc(item?.description_tamil || '')}</textarea></div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Icon</label><select id="crud_icon" class="w-full border rounded-lg px-3 py-2 text-sm">${iconOptions.map(o => `<option value="${o.value}" ${item?.icon === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}</select></div>
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Color</label><select id="crud_color" class="w-full border rounded-lg px-3 py-2 text-sm">${colorOptions.map(c => `<option value="${c}" ${item?.color === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Sort Order</label><input type="number" id="crud_sort_order" value="${item?.sort_order || 0}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                </div>
+                ${item ? `<div><label class="block text-sm font-semibold text-gray-700 mb-1">Status</label><select id="crud_status" class="w-full border rounded-lg px-3 py-2 text-sm"><option value="active" ${item.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${item.status === 'inactive' ? 'selected' : ''}>Inactive</option></select></div>` : ''}
+                <button onclick="saveCrud()" class="w-full bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 font-semibold text-sm">${item ? 'Update' : 'Add'} Feature</button>
+            </div>`;
+    } else if (type === 'testimonials') {
+        html = `
+            <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Customer Name *</label><input id="crud_customer_name" value="${esc(item?.customer_name || '')}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Role</label><input id="crud_customer_role" value="${esc(item?.customer_role || '')}" placeholder="e.g. Homeowner" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                </div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Testimonial Text (English) *</label><textarea id="crud_testimonial_text" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm">${esc(item?.testimonial_text || '')}</textarea></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Testimonial Text (Tamil)</label><textarea id="crud_testimonial_text_tamil" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm">${esc(item?.testimonial_text_tamil || '')}</textarea></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Rating (1-5)</label><select id="crud_rating" class="w-full border rounded-lg px-3 py-2 text-sm">${[5,4,3,2,1].map(r => `<option value="${r}" ${(item?.rating || 5) == r ? 'selected' : ''}>${'★'.repeat(r)}${'☆'.repeat(5-r)}</option>`).join('')}</select></div>
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Sort Order</label><input type="number" id="crud_sort_order" value="${item?.sort_order || 0}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                </div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Photo URL (optional)</label><input id="crud_customer_photo" value="${esc(item?.customer_photo || '')}" placeholder="Upload via Gallery tab or paste URL" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                ${item ? `<div><label class="block text-sm font-semibold text-gray-700 mb-1">Status</label><select id="crud_status" class="w-full border rounded-lg px-3 py-2 text-sm"><option value="active" ${item.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${item.status === 'inactive' ? 'selected' : ''}>Inactive</option></select></div>` : ''}
+                <button onclick="saveCrud()" class="w-full bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 font-semibold text-sm">${item ? 'Update' : 'Add'} Testimonial</button>
+            </div>`;
+    } else if (type === 'gallery') {
+        html = `
+            <div class="space-y-3">
+                ${item?.image_url ? `<img src="${esc(item.image_url)}" class="w-full h-40 object-cover rounded-lg">` : ''}
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Caption</label><input id="crud_caption" value="${esc(item?.caption || '')}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Category</label><select id="crud_category" class="w-full border rounded-lg px-3 py-2 text-sm"><option value="general" ${item?.category === 'general' ? 'selected' : ''}>General</option><option value="interior" ${item?.category === 'interior' ? 'selected' : ''}>Interior</option><option value="exterior" ${item?.category === 'exterior' ? 'selected' : ''}>Exterior</option><option value="texture" ${item?.category === 'texture' ? 'selected' : ''}>Texture</option></select></div>
+                    <div><label class="block text-sm font-semibold text-gray-700 mb-1">Sort Order</label><input type="number" id="crud_sort_order" value="${item?.sort_order || 0}" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+                </div>
+                ${item ? `<div><label class="block text-sm font-semibold text-gray-700 mb-1">Status</label><select id="crud_status" class="w-full border rounded-lg px-3 py-2 text-sm"><option value="active" ${item.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${item.status === 'inactive' ? 'selected' : ''}>Inactive</option></select></div>` : ''}
+                <button onclick="saveCrud()" class="w-full bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 font-semibold text-sm">Update Gallery Item</button>
+            </div>`;
+        editingType = 'gallery';
+    }
+
+    document.getElementById('crudModalBody').innerHTML = html;
+    document.getElementById('crudModal').classList.remove('hidden');
+}
+
+function closeCrudModal() { document.getElementById('crudModal').classList.add('hidden'); editingId = null; editingType = null; }
+
+async function saveCrud() {
+    let body = {};
+    const endpoint = editingType === 'gallery' ? 'gallery-admin' : editingType;
+
+    if (editingType === 'services' || editingType === 'features') {
+        body.title = document.getElementById('crud_title').value.trim();
+        if (!body.title) return showToast('Title is required', 'error');
+        body.title_tamil = document.getElementById('crud_title_tamil').value.trim();
+        body.description = document.getElementById('crud_description').value.trim();
+        body.description_tamil = document.getElementById('crud_description_tamil').value.trim();
+        body.icon = document.getElementById('crud_icon').value;
+        body.sort_order = parseInt(document.getElementById('crud_sort_order').value) || 0;
+        if (editingType === 'features') body.color = document.getElementById('crud_color').value;
+    } else if (editingType === 'testimonials') {
+        body.customer_name = document.getElementById('crud_customer_name').value.trim();
+        if (!body.customer_name) return showToast('Customer name is required', 'error');
+        body.customer_role = document.getElementById('crud_customer_role').value.trim();
+        body.testimonial_text = document.getElementById('crud_testimonial_text').value.trim();
+        if (!body.testimonial_text) return showToast('Testimonial text is required', 'error');
+        body.testimonial_text_tamil = document.getElementById('crud_testimonial_text_tamil').value.trim();
+        body.rating = parseInt(document.getElementById('crud_rating').value) || 5;
+        body.sort_order = parseInt(document.getElementById('crud_sort_order').value) || 0;
+        body.customer_photo = document.getElementById('crud_customer_photo').value.trim();
+    } else if (editingType === 'gallery') {
+        const g = currentData.gallery.find(x => x.id === editingId);
+        body.image_url = g.image_url;
+        body.caption = document.getElementById('crud_caption').value.trim();
+        body.category = document.getElementById('crud_category').value;
+        body.sort_order = parseInt(document.getElementById('crud_sort_order').value) || 0;
+    }
+
+    if (editingId) {
+        const statusEl = document.getElementById('crud_status');
+        if (statusEl) body.status = statusEl.value;
+    }
+
+    try {
+        const method = editingId ? 'PUT' : 'POST';
+        const url = editingId ? `${API}/${endpoint}/${editingId}` : `${API}/${endpoint}`;
+        const res = await fetch(url, { method, headers: headers(), body: JSON.stringify(body) });
+        const data = await res.json();
+        if (data.success) {
+            showToast(editingId ? 'Updated successfully!' : 'Added successfully!', 'success');
+            closeCrudModal();
+            loadAll();
+        } else {
+            showToast(data.error || 'Failed', 'error');
+        }
+    } catch (err) {
+        showToast('Network error', 'error');
+    }
+}
+
+async function deleteItem(type, id) {
+    if (!confirm('Are you sure you want to delete this item?')) return;
+    try {
+        const res = await fetch(`${API}/${type}/${id}`, { method: 'DELETE', headers: authHeaders() });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Deleted successfully', 'success');
+            loadAll();
+        } else {
+            showToast(data.error || 'Failed to delete', 'error');
+        }
+    } catch (err) {
+        showToast('Network error', 'error');
+    }
+}
+
+// ==================== GALLERY UPLOAD ====================
+function openGalleryUpload() { document.getElementById('galleryUploadModal').classList.remove('hidden'); }
+function closeGalleryUpload() { document.getElementById('galleryUploadModal').classList.add('hidden'); document.getElementById('galleryFileInput').value = ''; document.getElementById('galleryCaption').value = ''; }
+
+async function uploadGalleryImage() {
+    const fileInput = document.getElementById('galleryFileInput');
+    if (!fileInput.files.length) return showToast('Please select an image', 'error');
+
+    const btn = document.getElementById('galleryUploadBtn');
+    btn.disabled = true; btn.textContent = 'Uploading...';
+
+    try {
+        // 1. Upload image
+        const fd = new FormData();
+        fd.append('image', fileInput.files[0]);
+        const uploadRes = await fetch(API + '/upload', { method: 'POST', headers: authHeaders(), body: fd });
+        const uploadData = await uploadRes.json();
+
+        if (!uploadData.success) throw new Error(uploadData.error || 'Upload failed');
+
+        // 2. Create gallery entry
+        const galleryBody = {
+            image_url: uploadData.url,
+            caption: document.getElementById('galleryCaption').value.trim(),
+            category: document.getElementById('galleryCategory').value
+        };
+        const createRes = await fetch(API + '/gallery-admin', { method: 'POST', headers: headers(), body: JSON.stringify(galleryBody) });
+        const createData = await createRes.json();
+
+        if (createData.success) {
+            showToast('Image uploaded successfully!', 'success');
+            closeGalleryUpload();
+            loadAll();
+        } else {
+            showToast(createData.error || 'Failed to save', 'error');
+        }
+    } catch (err) {
+        showToast(err.message || 'Upload failed', 'error');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Upload';
+    }
+}
+
+// ==================== HELPERS ====================
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function showToast(msg, type = 'success') {
+    const t = document.createElement('div');
+    t.className = `fixed top-4 right-4 z-[100] px-6 py-3 rounded-lg shadow-lg text-white font-semibold text-sm transition-all ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+// Init
+loadAll();
+</script>
+</body>
+</html>

@@ -47,6 +47,7 @@ const estimatePdfRoutes = require('./routes/estimate-pdf');
 const shareRoutes = require('./routes/share');
 const notificationService = require('./services/notification-service');
 const autoClockout = require('./services/auto-clockout');
+const websiteRoutes = require('./routes/website');
 
 const app = express();
 
@@ -135,6 +136,7 @@ estimatePdfRoutes.setPool(pool);
 shareRoutes.setPool(pool);
 notificationService.setPool(pool);
 autoClockout.setPool(pool);
+websiteRoutes.setPool(pool);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -151,6 +153,7 @@ const uploadDirs = [
     'public/uploads/visualizations',
     'public/uploads/aadhar',
     'public/uploads/daily-tasks',
+    'public/uploads/website',
     'uploads/attendance/break'
 ];
 uploadDirs.forEach(dir => {
@@ -253,6 +256,7 @@ app.use('/api/chat', chatRoutes.router);
 app.use('/api/notifications', notificationRoutes.router);
 app.use('/api/estimates', estimatePdfRoutes.router);
 app.use('/api/share', shareRoutes.router);
+app.use('/api/website', websiteRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
