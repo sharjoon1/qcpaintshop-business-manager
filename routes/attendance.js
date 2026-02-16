@@ -1080,10 +1080,7 @@ router.post('/permission/request-reclockin', requireAuth, async (req, res) => {
         // Notify admins
         try {
             const [admins] = await pool.query(
-                `SELECT u.id FROM users u
-                 JOIN user_roles ur ON u.id = ur.user_id
-                 JOIN roles r ON ur.role_id = r.id
-                 WHERE r.name IN ('admin', 'super_admin') AND u.is_active = 1`
+                `SELECT id FROM users WHERE role = 'admin' AND status = 'active'`
             );
             const staffName = req.user.full_name || req.user.username || 'Staff';
             for (const admin of admins) {
