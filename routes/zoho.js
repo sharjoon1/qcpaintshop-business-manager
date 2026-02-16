@@ -37,6 +37,37 @@ const purchaseSuggestion = require('../services/purchase-suggestion');
 
 let pool;
 
+// === DEBOUNCE & CACHE ===
+// Prevents rapid-fire sync clicks from wasting API calls
+const _syncDebounce = {}; // { operationKey: lastCallTimestamp }
+const SYNC_DEBOUNCE_MS = 30000; // 30 seconds between same sync type
+
+function isSyncDebounced(operation) {
+    const now = Date.now();
+    const lastCall = _syncDebounce[operation];
+    if (lastCall && (now - lastCall) < SYNC_DEBOUNCE_MS) {
+        const waitSec = Math.ceil((SYNC_DEBOUNCE_MS - (now - lastCall)) / 1000);
+        return waitSec;
+    }
+    _syncDebounce[operation] = now;
+    return 0;
+}
+
+// In-memory cache for expensive API responses
+const _apiCache = {}; // { key: { data, timestamp } }
+
+function getCached(key, maxAgeMs = 300000) { // 5 min default
+    const entry = _apiCache[key];
+    if (entry && (Date.now() - entry.timestamp) < maxAgeMs) {
+        return entry.data;
+    }
+    return null;
+}
+
+function setCache(key, data) {
+    _apiCache[key] = { data, timestamp: Date.now() };
+}
+
 function setPool(dbPool) {
     pool = dbPool;
     zohoOAuth.setPool(dbPool);
@@ -161,12 +192,29 @@ router.get('/api-usage', requirePermission('zoho', 'view'), async (req, res) => 
             ORDER BY created_at DESC LIMIT 5
         `);
 
+        // Get today's sync count from log for cross-reference
+        const [[syncCounts]] = await pool.query(`
+            SELECT
+                COUNT(*) as total_syncs_today,
+                SUM(records_synced) as total_records_today,
+                COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_syncs_today
+            FROM zoho_sync_log
+            WHERE DATE(started_at) = CURDATE()
+        `);
+
         res.json({
             success: true,
             data: {
                 ...usageStats,
                 recent_syncs: recentSyncs,
-                active_bulk_jobs: activeBulkJobs
+                active_bulk_jobs: activeBulkJobs,
+                sync_summary_today: syncCounts,
+                tracking_info: {
+                    method: 'central_http_tracking',
+                    description: 'All API calls tracked at HTTP layer (apiGet/apiPost/apiPut/apiDelete)',
+                    db_persisted: usageStats.daily.persisted_to_db,
+                    note: 'Daily count persists across server restarts via DB'
+                }
             }
         });
     } catch (error) {
@@ -184,6 +232,8 @@ router.get('/api-usage', requirePermission('zoho', 'view'), async (req, res) => 
  */
 router.post('/sync/full', requirePermission('zoho', 'sync'), async (req, res) => {
     try {
+        const rateLimiter = require('../services/zoho-rate-limiter');
+
         // Check if a sync is already running
         const [running] = await pool.query(
             `SELECT id FROM zoho_sync_log WHERE status IN ('started','in_progress') AND started_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE) LIMIT 1`
@@ -192,8 +242,16 @@ router.post('/sync/full', requirePermission('zoho', 'sync'), async (req, res) =>
             return res.status(409).json({ success: false, message: 'A sync is already in progress' });
         }
 
+        // Check API quota before starting
+        const quotaStatus = rateLimiter.getStatus();
+        if (quotaStatus.daily_percentage >= 90) {
+            return res.status(429).json({
+                success: false,
+                message: `API quota at ${quotaStatus.daily_percentage}% (${quotaStatus.daily_used}/${quotaStatus.daily_limit}). Full sync requires ~300+ API calls. Consider waiting until tomorrow or using a quick sync.`
+            });
+        }
+
         // Check sync lock
-        const rateLimiter = require('../services/zoho-rate-limiter');
         if (!rateLimiter.tryAcquireSyncLock('fullSync')) {
             const lockInfo = rateLimiter.getSyncLockStatus();
             return res.status(409).json({
@@ -212,7 +270,8 @@ router.post('/sync/full', requirePermission('zoho', 'sync'), async (req, res) =>
 
         res.json({
             success: true,
-            message: 'Full sync started. Check /api/zoho/sync/log for progress.'
+            message: 'Full sync started. Check /api/zoho/sync/log for progress.',
+            api_usage: { used: quotaStatus.daily_used, limit: quotaStatus.daily_limit, percentage: quotaStatus.daily_percentage }
         });
     } catch (error) {
         console.error('[Zoho] Sync error:', error.message);
@@ -221,10 +280,14 @@ router.post('/sync/full', requirePermission('zoho', 'sync'), async (req, res) =>
 });
 
 /**
- * POST /api/zoho/sync/invoices
+ * POST /api/zoho/sync/invoices - Debounced (30s cooldown)
  */
 router.post('/sync/invoices', requirePermission('zoho', 'sync'), async (req, res) => {
     try {
+        const wait = isSyncDebounced('sync_invoices');
+        if (wait > 0) {
+            return res.status(429).json({ success: false, message: `Please wait ${wait}s before syncing invoices again` });
+        }
         const result = await zohoAPI.syncInvoices(req.user.id);
         res.json({ success: true, data: result });
     } catch (error) {
@@ -233,10 +296,14 @@ router.post('/sync/invoices', requirePermission('zoho', 'sync'), async (req, res
 });
 
 /**
- * POST /api/zoho/sync/customers
+ * POST /api/zoho/sync/customers - Debounced (30s cooldown)
  */
 router.post('/sync/customers', requirePermission('zoho', 'sync'), async (req, res) => {
     try {
+        const wait = isSyncDebounced('sync_customers');
+        if (wait > 0) {
+            return res.status(429).json({ success: false, message: `Please wait ${wait}s before syncing customers again` });
+        }
         const result = await zohoAPI.syncCustomers(req.user.id);
         res.json({ success: true, data: result });
     } catch (error) {
@@ -245,10 +312,14 @@ router.post('/sync/customers', requirePermission('zoho', 'sync'), async (req, re
 });
 
 /**
- * POST /api/zoho/sync/payments
+ * POST /api/zoho/sync/payments - Debounced (30s cooldown)
  */
 router.post('/sync/payments', requirePermission('zoho', 'sync'), async (req, res) => {
     try {
+        const wait = isSyncDebounced('sync_payments');
+        if (wait > 0) {
+            return res.status(429).json({ success: false, message: `Please wait ${wait}s before syncing payments again` });
+        }
         const result = await zohoAPI.syncPayments(req.user.id);
         res.json({ success: true, data: result });
     } catch (error) {
@@ -352,9 +423,8 @@ router.get('/invoices/:id', requirePermission('zoho', 'invoices'), async (req, r
         // Only fetch fresh from Zoho if explicitly requested (saves API calls)
         if (req.query.fresh === 'true') {
             try {
-                const rateLimiter = require('../services/zoho-rate-limiter');
-                await rateLimiter.acquire('getInvoiceDetail', { priority: 'high' });
-                const zohoData = await zohoAPI.getInvoice(local[0].zoho_invoice_id);
+                // Rate limiting handled centrally in apiGet; pass priority for reserve access
+                const zohoData = await zohoAPI.getInvoice(local[0].zoho_invoice_id, { caller: 'getInvoiceDetail', priority: 'high' });
                 return res.json({
                     success: true,
                     data: { ...local[0], zoho_detail: zohoData.invoice || null }
@@ -928,10 +998,14 @@ router.get('/locations', requirePermission('zoho', 'view'), async (req, res) => 
 });
 
 /**
- * POST /api/zoho/locations/sync - Sync locations from Zoho
+ * POST /api/zoho/locations/sync - Sync locations from Zoho (debounced 30s)
  */
 router.post('/locations/sync', requirePermission('zoho', 'sync'), async (req, res) => {
     try {
+        const wait = isSyncDebounced('sync_locations');
+        if (wait > 0) {
+            return res.status(429).json({ success: false, message: `Please wait ${wait}s before syncing locations again` });
+        }
         const result = await zohoAPI.syncLocations(req.user.id);
         const count = result.synced || 0;
         res.json({
@@ -1100,6 +1174,18 @@ router.get('/stock/:itemId', requirePermission('zoho', 'view'), async (req, res)
  */
 router.post('/stock/sync', requirePermission('zoho', 'sync'), async (req, res) => {
     try {
+        const rateLimiter = require('../services/zoho-rate-limiter');
+        const quotaStatus = rateLimiter.getStatus();
+
+        // Check API quota before starting heavy stock sync
+        if (quotaStatus.daily_percentage >= 85) {
+            return res.status(429).json({
+                success: false,
+                message: `API quota at ${quotaStatus.daily_percentage}% (${quotaStatus.daily_used}/${quotaStatus.daily_limit}). Stock sync requires ~300+ API calls. Please wait until tomorrow.`,
+                api_usage: { used: quotaStatus.daily_used, limit: quotaStatus.daily_limit, percentage: quotaStatus.daily_percentage }
+            });
+        }
+
         const [running] = await pool.query(
             `SELECT id FROM zoho_sync_log WHERE sync_type = 'stock' AND status IN ('started','in_progress') AND started_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE) LIMIT 1`
         );
@@ -1107,7 +1193,6 @@ router.post('/stock/sync', requirePermission('zoho', 'sync'), async (req, res) =
             return res.status(409).json({ success: false, message: 'Stock sync already in progress' });
         }
 
-        const rateLimiter = require('../services/zoho-rate-limiter');
         if (!rateLimiter.tryAcquireSyncLock('stockSync')) {
             const lockInfo = rateLimiter.getSyncLockStatus();
             return res.status(409).json({
@@ -1122,7 +1207,11 @@ router.post('/stock/sync', requirePermission('zoho', 'sync'), async (req, res) =
             rateLimiter.releaseSyncLock('stockSync');
         });
 
-        res.json({ success: true, message: 'Stock sync started. Check sync log for progress.' });
+        res.json({
+            success: true,
+            message: 'Stock sync started. Check sync log for progress.',
+            api_usage: { used: quotaStatus.daily_used, limit: quotaStatus.daily_limit, percentage: quotaStatus.daily_percentage }
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -1177,11 +1266,20 @@ router.post('/inventory-adjustments', requirePermission('zoho', 'manage'), async
 
 /**
  * GET /api/zoho/inventory-adjustments - List inventory adjustments from Zoho
+ * Cached for 5 minutes to avoid redundant API calls
  */
 router.get('/inventory-adjustments', requirePermission('zoho', 'view'), async (req, res) => {
     try {
+        const cacheKey = 'inv_adjustments_' + JSON.stringify(req.query);
+        const cached = getCached(cacheKey, 300000); // 5 min cache
+        if (cached) {
+            return res.json({ success: true, data: cached, cached: true });
+        }
+
         const result = await zohoAPI.getInventoryAdjustments(req.query);
-        res.json({ success: true, data: result.inventory_adjustments || [] });
+        const data = result.inventory_adjustments || [];
+        setCache(cacheKey, data);
+        res.json({ success: true, data });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -1257,10 +1355,14 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
 });
 
 /**
- * POST /api/zoho/sync/items - Sync items from Zoho
+ * POST /api/zoho/sync/items - Sync items from Zoho (debounced 30s)
  */
 router.post('/sync/items', requirePermission('zoho', 'sync'), async (req, res) => {
     try {
+        const wait = isSyncDebounced('sync_items');
+        if (wait > 0) {
+            return res.status(429).json({ success: false, message: `Please wait ${wait}s before syncing items again` });
+        }
         const result = await zohoAPI.syncItems(req.user.id);
         res.json({ success: true, data: result });
     } catch (error) {
@@ -1430,9 +1532,8 @@ router.post('/items/bulk-jobs/:id/retry', requirePermission('zoho', 'bulk_update
  */
 router.get('/items/:id', requirePermission('zoho', 'view'), async (req, res) => {
     try {
-        const rateLimiter = require('../services/zoho-rate-limiter');
-        await rateLimiter.acquire('getItemDetail', { priority: 'high' });
-        const zohoData = await zohoAPI.getItem(req.params.id);
+        // Rate limiting handled centrally in apiGet; pass priority for reserve access
+        const zohoData = await zohoAPI.getItem(req.params.id, { caller: 'getItemDetail', priority: 'high' });
         res.json({ success: true, data: zohoData.item || zohoData });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -1782,10 +1883,14 @@ router.post('/reorder/check', requirePermission('zoho', 'reorder'), async (req, 
 // ========================================
 
 /**
- * POST /api/zoho/purchase-suggestions/calculate - Run full calculation
+ * POST /api/zoho/purchase-suggestions/calculate - Run full calculation (debounced 60s)
  */
 router.post('/purchase-suggestions/calculate', requirePermission('zoho', 'reorder'), async (req, res) => {
     try {
+        const wait = isSyncDebounced('purchase_calc');
+        if (wait > 0) {
+            return res.status(429).json({ success: false, message: `Please wait ${wait}s before recalculating` });
+        }
         const result = await purchaseSuggestion.runFullCalculation(req.user.id);
         res.json({ success: true, data: result });
     } catch (error) {

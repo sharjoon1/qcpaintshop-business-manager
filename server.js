@@ -40,6 +40,7 @@ const staffRegistrationRoutes = require('./routes/staff-registration');
 const dailyTasksRoutes = require('./routes/daily-tasks');
 const syncScheduler = require('./services/sync-scheduler');
 const whatsappProcessor = require('./services/whatsapp-processor');
+const rateLimiter = require('./services/zoho-rate-limiter');
 const chatRoutes = require('./routes/chat');
 const notificationRoutes = require('./routes/notifications');
 const estimatePdfRoutes = require('./routes/estimate-pdf');
@@ -127,6 +128,7 @@ staffRegistrationRoutes.setPool(pool);
 dailyTasksRoutes.setPool(pool);
 syncScheduler.setPool(pool);
 whatsappProcessor.setPool(pool);
+rateLimiter.setPool(pool); // Enable DB persistence for API call tracking
 chatRoutes.setPool(pool);
 notificationRoutes.setPool(pool);
 estimatePdfRoutes.setPool(pool);
@@ -3293,3 +3295,18 @@ server.listen(PORT, () => {
         console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
     }
 });
+
+// Graceful shutdown - persist API usage counter before exit
+async function gracefulShutdown(signal) {
+    console.log(`\n${signal} received. Persisting API usage data...`);
+    try {
+        await rateLimiter.flush();
+        console.log('API usage data persisted to DB.');
+    } catch (err) {
+        console.error('Failed to persist API usage:', err.message);
+    }
+    process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
