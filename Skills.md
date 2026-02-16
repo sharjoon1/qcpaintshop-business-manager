@@ -2,7 +2,7 @@
 
 > **Platform**: act.qcpaintshop.com
 > **Version**: 3.3.0
-> **Last Updated**: 2026-02-15
+> **Last Updated**: 2026-02-16
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
@@ -496,7 +496,54 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 
 ---
 
-### 2.17 Dashboard & Reports
+### 2.17 Website Content Management
+
+**Admin-Controlled Public Website**
+- All public landing page content is dynamically loaded from database
+- Single public API endpoint (`GET /api/website/content`) returns all content in one call
+- Admin CRUD for all website sections via `admin-website.html`
+
+**Database Tables**:
+- `website_services` - Services with icon, title (EN+Tamil), description, sort_order
+- `website_features` - "Why Choose Us" items with icon, color, title (EN+Tamil), description
+- `website_testimonials` - Customer testimonials (name, role, text, rating, photo)
+- `website_gallery` - Portfolio images (image_url, caption, category, sort_order)
+
+**Settings Keys** (stored in existing `settings` table):
+- Hero section: `hero_title`, `hero_title_tamil`, `hero_subtitle`, `hero_subtitle_tamil`, `hero_cta1_text`, `hero_cta1_link`, `hero_cta2_text`, `hero_cta2_link`
+- About section: `about_title`, `about_title_tamil`, `about_description`, `about_description_tamil`
+- Footer: `footer_tagline`, `footer_tagline_tamil`
+- Social: `social_whatsapp`, `social_instagram`, `social_facebook`, `social_youtube`
+- Design request: `design_request_response_time`
+
+**Public Landing Page Sections** (all dynamic):
+1. Sticky navigation with scroll effect
+2. Hero section with animated logo, dynamic CTAs
+3. Quick access cards (estimate, customer, staff portals)
+4. About Us with company stats
+5. Services (from `website_services`)
+6. Brands ticker (from existing brands API)
+7. Branches with contact details
+8. Gallery with category filters + lightbox
+9. Testimonials carousel
+10. Color design request form with response time badge
+11. Why Choose Us features (from `website_features`)
+12. Footer with social links, quick links, contact info
+
+**API Routes** (`routes/website.js`):
+- `GET /api/website/content` (public) - All content in one call
+- `GET /api/website/gallery` (public) - Gallery with category filter
+- CRUD: `/api/website/services`, `/api/website/features`, `/api/website/testimonials`, `/api/website/gallery-admin`
+- `PUT /api/website/settings` - Bulk settings update
+- `POST /api/website/upload` - Image upload (Sharp compression)
+
+**Image Upload**: `public/uploads/website/` (Sharp: 1200x1200, JPEG 80%)
+**Migration**: `scripts/migrate-website-content.js`
+**Pages**: `index.html` (public), `admin-website.html` (admin)
+
+---
+
+### 2.18 Dashboard & Reports
 
 **Admin Dashboard**
 - Total users, customers, products, estimates
@@ -582,7 +629,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | **Firebase FCM** | Android push notifications | HTTPS (server key) |
 | **Web Push** | Browser push notifications | VAPID |
 
-### 4.2 Database Tables (~55+)
+### 4.2 Database Tables (~59+)
 
 **Core**: `users`, `user_sessions`, `branches`, `customers`, `customer_types`, `settings`
 **Products**: `products`, `brands`, `categories`, `pack_sizes`
@@ -598,6 +645,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 **Notifications**: `notifications`, `push_subscriptions`
 **Share**: `share_tokens`
 **Design**: `color_design_requests`, `design_visualizations`
+**Website**: `website_services`, `website_features`, `website_testimonials`, `website_gallery`
 
 ### 4.3 File Upload System
 
@@ -614,6 +662,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Daily Task Photos | `uploads/daily-tasks/` | 5 MB | Images |
 | AI Visualizations | `uploads/visualizations/` | Generated | JPEG |
 | Documents | `uploads/documents/` | - | Various |
+| Website Content | `uploads/website/` | 10 MB | Images (compressed to 1200px) |
 
 ### 4.4 Real-time Features (Socket.io)
 
@@ -647,7 +696,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 ### Public Pages (No Auth)
 | Page | File | Purpose |
 |------|------|---------|
-| Landing | `index.html` | Landing / redirect |
+| Landing | `index.html` | Professional corporate landing page (fully dynamic) |
 | Login | `login.html` | Staff login |
 | Register | `register.html` | User registration with OTP |
 | Forgot Password | `forgot-password.html` | Password reset via email |
@@ -704,6 +753,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Salary Reports | `admin-salary-reports.html` | Payroll reports |
 | Reports | `admin-reports.html` | Business reports |
 | Settings | `admin-settings.html` | System settings |
+| Website Management | `admin-website.html` | Public website content CRUD (hero, services, features, testimonials, gallery, social) |
 | Profile | `admin-profile.html` | Admin profile |
 
 ### Zoho Pages
@@ -996,6 +1046,9 @@ node promote-release.js internal production
 - **Geo-fence auto clock-out**: `POST /api/attendance/geo-auto-clockout` — when staff moves 300m+ from branch, auto clocks out, ends active break, notifies. Frontend trigger in `startGeoFenceMonitoring()` with `geoAutoClockoutTriggered` flag to prevent duplicates
 - **Re-clock-in request system**: Staff can request to clock in again after clock-out (for overtime). `POST /api/attendance/permission/request-reclockin` creates `re_clockin` permission. Admin approves → sets `allow_reclockin = 1` on attendance record → staff can create new attendance record. `/api/attendance/today` returns `reclockin_status` for UI state management
 - Migration: `scripts/migrate-reclockin.js` (adds `allow_reclockin` column to `staff_attendance`)
+- **IST Timezone**: All attendance date calculations use IST (UTC+5:30) via `getTodayIST()` and `getNowIST()` helpers in `routes/attendance.js` and `services/auto-clockout.js`. Calendar day runs 12:00 AM to 11:59:59 PM IST.
+- **Dynamic login logo**: `public/login.html` loads company logo from `/api/public/site-info` (set via admin panel)
+- **Staff salary navigation**: Salary tab added to bottom nav on all staff pages (dashboard, history, permission-request). Backend salary routes (`/api/salary/my-config`, `/my-monthly`, `/my-payments`) use `requireAuth` only — no role restriction.
 
 ---
 

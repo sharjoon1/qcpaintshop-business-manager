@@ -68,8 +68,9 @@ function getConfig(key, defaultValue) {
 // ========================================
 
 /**
- * Execute a sync cycle
- * Called by cron or manually
+ * Execute a sync cycle - uses quickSync for frequent polling (customers + invoices + payments only)
+ * Stock sync is handled separately by executeStockSync on a longer interval.
+ * This reduces API consumption from ~300+ calls to ~8-15 calls per cycle.
  */
 async function executeSyncCycle() {
     if (!pool) {
@@ -98,27 +99,33 @@ async function executeSyncCycle() {
             return;
         }
 
-        // Check daily quota before starting heavy operation
-        const quotaCheck = rateLimiter.canStartHeavyOperation(200);
+        // Check daily quota - quickSync only needs ~15 calls
+        const quotaCheck = rateLimiter.canStartHeavyOperation(20);
         if (!quotaCheck.safe) {
             console.log(`[Scheduler] Skipping auto-sync: ${quotaCheck.reason}`);
             return;
         }
 
+        // Check circuit breaker
+        if (rateLimiter.isCircuitOpen()) {
+            console.log(`[Scheduler] Circuit breaker open - skipping auto-sync to preserve API quota`);
+            return;
+        }
+
         // Acquire sync lock to prevent overlap with bulk jobs / stock sync
-        if (!rateLimiter.tryAcquireSyncLock('fullSync')) {
+        if (!rateLimiter.tryAcquireSyncLock('quickSync')) {
             console.log(`[Scheduler] Skipping auto-sync: ${rateLimiter.getSyncLockStatus().operation} is running`);
             return;
         }
 
-        console.log('[Scheduler] Starting auto-sync cycle...');
+        console.log('[Scheduler] Starting quick sync cycle (customers, invoices, payments)...');
 
         try {
-            // Run full sync (customers -> invoices -> payments)
-            const result = await zohoAPI.fullSync(null); // null = system-triggered
-            console.log(`[Scheduler] Auto-sync completed. Results:`, JSON.stringify(result.results || {}));
+            // Use quickSync instead of fullSync - saves ~300 API calls per cycle
+            const result = await zohoAPI.quickSync(null); // null = system-triggered
+            console.log(`[Scheduler] Quick sync completed. Results:`, JSON.stringify(result.results || {}));
         } finally {
-            rateLimiter.releaseSyncLock('fullSync');
+            rateLimiter.releaseSyncLock('quickSync');
         }
 
     } catch (error) {
@@ -128,7 +135,7 @@ async function executeSyncCycle() {
         try {
             await pool.query(
                 `INSERT INTO zoho_sync_log (sync_type, direction, status, error_message, started_at, completed_at)
-                 VALUES ('full', 'zoho_to_local', 'failed', ?, NOW(), NOW())`,
+                 VALUES ('quick', 'zoho_to_local', 'failed', ?, NOW(), NOW())`,
                 [`Auto-sync scheduler error: ${error.message}`]
             );
         } catch (logErr) {
@@ -138,7 +145,8 @@ async function executeSyncCycle() {
 }
 
 /**
- * Execute stock sync cycle (every 2 hours by default)
+ * Execute stock sync cycle (every 4 hours by default)
+ * This is the heavy operation that fetches per-item stock levels
  */
 async function executeStockSync() {
     if (!pool) return;
@@ -147,6 +155,12 @@ async function executeStockSync() {
         await loadConfig();
 
         if (getConfig('stock_sync_enabled', 'true') !== 'true') {
+            return;
+        }
+
+        // Check circuit breaker first
+        if (rateLimiter.isCircuitOpen()) {
+            console.log(`[Scheduler] Circuit breaker open - skipping stock sync to preserve API quota`);
             return;
         }
 
@@ -179,14 +193,20 @@ async function executeStockSync() {
                 console.error('[Scheduler] Locations sync failed:', e.message);
             }
 
-            try {
-                await zohoAPI.syncLocationStock(null);
-                console.log('[Scheduler] Stock sync completed');
-            } catch (e) {
-                console.error('[Scheduler] Stock sync failed:', e.message);
+            // Re-check quota after items/locations sync
+            const postQuotaCheck = rateLimiter.canStartHeavyOperation(200);
+            if (!postQuotaCheck.safe) {
+                console.log(`[Scheduler] Skipping location stock sync: ${postQuotaCheck.reason}`);
+            } else {
+                try {
+                    await zohoAPI.syncLocationStock(null);
+                    console.log('[Scheduler] Stock sync completed');
+                } catch (e) {
+                    console.error('[Scheduler] Stock sync failed:', e.message);
+                }
             }
 
-            // Run reorder check after stock sync
+            // Run reorder check after stock sync (no API calls, just DB queries)
             try {
                 if (getConfig('reorder_alerts_enabled', 'true') === 'true') {
                     const result = await zohoAPI.checkReorderAlerts();
@@ -333,11 +353,11 @@ async function start() {
         await loadConfig();
 
         const syncEnabled = getConfig('sync_enabled', 'true') === 'true';
-        const intervalMinutes = getConfig('sync_interval_minutes', '30');
+        const intervalMinutes = getConfig('sync_interval_minutes', '60'); // Changed default: 60 min (was 30)
         const dailyEnabled = getConfig('daily_report_enabled', 'false') === 'true';
         const dailyTime = getConfig('daily_report_time', '09:00');
 
-        console.log(`[Scheduler] Starting... sync_enabled=${syncEnabled}, interval=${intervalMinutes}min`);
+        console.log(`[Scheduler] Starting... sync_enabled=${syncEnabled}, interval=${intervalMinutes}min (quick sync, no stock)`);
 
         // Auto-sync cron job
         if (syncEnabled) {
@@ -372,17 +392,29 @@ async function start() {
             }
         }
 
-        // Stock sync cron job (every N hours)
+        // Stock sync cron job - prefer off-peak hours to preserve daytime quota
+        // Off-peak schedule: 2 AM, 6 AM, 12 PM, 6 PM IST (4 times/day during less busy periods)
+        // Falls back to every N hours if custom interval is set
         const stockSyncEnabled = getConfig('stock_sync_enabled', 'true') === 'true';
-        const stockSyncHours = parseInt(getConfig('stock_sync_interval_hours', '2')) || 2;
+        const stockSyncHours = parseInt(getConfig('stock_sync_interval_hours', '4')) || 4;
         if (stockSyncEnabled) {
-            const stockCron = `0 */${stockSyncHours} * * *`;
+            let stockCron;
+            if (stockSyncHours === 4) {
+                // Default: use off-peak schedule (2 AM, 6 AM, 12 PM, 6 PM)
+                stockCron = '0 2,6,12,18 * * *';
+            } else if (stockSyncHours === 6) {
+                // 6-hour interval: early morning and afternoon
+                stockCron = '0 3,9,15,21 * * *';
+            } else {
+                stockCron = `0 */${stockSyncHours} * * *`;
+            }
+
             if (cron.validate(stockCron)) {
                 stockSyncJob = cron.schedule(stockCron, executeStockSync, {
                     scheduled: true,
                     timezone: 'Asia/Kolkata'
                 });
-                console.log(`[Scheduler] Stock sync job scheduled: ${stockCron} (every ${stockSyncHours}h)`);
+                console.log(`[Scheduler] Stock sync job scheduled: ${stockCron} (heavy operation, off-peak preferred)`);
             }
         }
 
@@ -448,21 +480,23 @@ function getStatus() {
     return {
         running: isRunning,
         sync_enabled: getConfig('sync_enabled', 'true') === 'true',
-        sync_interval_minutes: getConfig('sync_interval_minutes', '30'),
+        sync_interval_minutes: getConfig('sync_interval_minutes', '60'),
+        sync_mode: 'quick', // Quick sync (no stock) for frequent polling
         sync_job_active: syncJob !== null,
         daily_report_active: dailyReportJob !== null,
         stock_sync_active: stockSyncJob !== null,
         bulk_processor_active: bulkJobProcessor !== null,
         last_sync_attempt: lastSyncAttempt,
         next_sync_time: nextSyncTime,
+        api_usage: rateLimiter.getStatus(),
         config: {
             sync_enabled: getConfig('sync_enabled', 'true'),
-            sync_interval_minutes: getConfig('sync_interval_minutes', '30'),
+            sync_interval_minutes: getConfig('sync_interval_minutes', '60'),
             daily_report_enabled: getConfig('daily_report_enabled', 'false'),
             daily_report_time: getConfig('daily_report_time', '09:00'),
             whatsapp_enabled: getConfig('whatsapp_enabled', 'false'),
             stock_sync_enabled: getConfig('stock_sync_enabled', 'true'),
-            stock_sync_interval_hours: getConfig('stock_sync_interval_hours', '2'),
+            stock_sync_interval_hours: getConfig('stock_sync_interval_hours', '4'),
             reorder_alerts_enabled: getConfig('reorder_alerts_enabled', 'true')
         }
     };

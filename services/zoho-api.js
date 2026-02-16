@@ -13,6 +13,7 @@
 
 const https = require('https');
 const zohoOAuth = require('./zoho-oauth');
+const rateLimiter = require('./zoho-rate-limiter');
 
 let pool;
 
@@ -55,10 +56,12 @@ async function getInvoices(params = {}) {
 
 /**
  * Get single invoice by Zoho ID
+ * @param {string} invoiceId - Zoho invoice ID
+ * @param {Object} apiOptions - { caller, priority } passed to apiGet
  */
-async function getInvoice(invoiceId) {
+async function getInvoice(invoiceId, apiOptions = {}) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
-    return await apiGet(`/invoices/${invoiceId}`, { organization_id: orgId });
+    return await apiGet(`/invoices/${invoiceId}`, { organization_id: orgId }, apiOptions);
 }
 
 /**
@@ -78,16 +81,12 @@ async function getOverdueInvoices() {
 
 /**
  * Get unpaid invoices (sent + overdue + partially_paid)
+ * Optimized: uses 'unpaid' status filter (1 API call instead of 3)
  */
 async function getUnpaidInvoices() {
-    const results = [];
-    for (const status of ['sent', 'overdue', 'partially_paid']) {
-        const response = await getInvoices({ status });
-        if (response.invoices) {
-            results.push(...response.invoices);
-        }
-    }
-    return results;
+    // Zoho Books supports 'unpaid' as a status filter that covers sent+overdue+partially_paid
+    const response = await getInvoices({ status: 'unpaid', sort_column: 'due_date', sort_order: 'A' });
+    return response.invoices || [];
 }
 
 // ========================================
@@ -177,10 +176,12 @@ async function getItems(params = {}) {
 
 /**
  * Get single item
+ * @param {string} itemId - Zoho item ID
+ * @param {Object} apiOptions - { caller, priority } passed to apiGet
  */
-async function getItem(itemId) {
+async function getItem(itemId, apiOptions = {}) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
-    return await apiGet(`/items/${itemId}`, { organization_id: orgId });
+    return await apiGet(`/items/${itemId}`, { organization_id: orgId }, apiOptions);
 }
 
 // ========================================
@@ -582,6 +583,55 @@ async function fullSync(triggeredBy = null) {
     }
 }
 
+/**
+ * Quick sync - customers + invoices + payments only (NO items/stock)
+ * Uses ~8-15 API calls vs 300+ for fullSync
+ * Suitable for frequent background polling (every 30-60 min)
+ */
+async function quickSync(triggeredBy = null) {
+    const [logResult] = await pool.query(
+        `INSERT INTO zoho_sync_log (sync_type, direction, status, triggered_by) VALUES ('quick', 'zoho_to_local', 'started', ?)`,
+        [triggeredBy]
+    );
+    const syncId = logResult.insertId;
+
+    try {
+        const results = {};
+
+        console.log('[ZohoSync] Starting quick sync (customers, invoices, payments)...');
+
+        results.customers = await syncCustomers(triggeredBy);
+        console.log(`[ZohoSync] Customers synced: ${results.customers.synced}`);
+
+        results.invoices = await syncInvoices(triggeredBy);
+        console.log(`[ZohoSync] Invoices synced: ${results.invoices.synced}`);
+
+        results.payments = await syncPayments(triggeredBy);
+        console.log(`[ZohoSync] Payments synced: ${results.payments.synced}`);
+
+        const totalSynced = results.customers.synced + results.invoices.synced + results.payments.synced;
+
+        await pool.query(
+            `UPDATE zoho_sync_log SET status = 'completed', records_synced = ?, records_total = ?, completed_at = NOW() WHERE id = ?`,
+            [totalSynced, totalSynced, syncId]
+        );
+
+        await pool.query(
+            `UPDATE zoho_config SET config_value = NOW() WHERE config_key = 'last_quick_sync'`
+        );
+
+        console.log(`[ZohoSync] Quick sync completed. Total records: ${totalSynced}`);
+        return { success: true, results };
+
+    } catch (error) {
+        await pool.query(
+            `UPDATE zoho_sync_log SET status = 'failed', error_message = ?, completed_at = NOW() WHERE id = ?`,
+            [error.message, syncId]
+        );
+        throw error;
+    }
+}
+
 // ========================================
 // DASHBOARD HELPERS
 // ========================================
@@ -650,9 +700,28 @@ function mapZohoStatus(zohoStatus) {
 }
 
 /**
- * HTTP GET to Zoho Books API
+ * Derive a human-readable caller name from HTTP method + endpoint
+ * e.g., 'GET', '/invoices' -> 'GET /invoices'
+ * e.g., 'GET', '/items/12345' -> 'GET /items/:id'
  */
-async function apiGet(endpoint, params = {}) {
+function _deriveCallerName(method, endpoint) {
+    const path = endpoint.split('?')[0];
+    // Replace numeric IDs with :id for grouping
+    const normalized = path.replace(/\/\d[\d]*/g, '/:id');
+    return `${method} ${normalized}`;
+}
+
+/**
+ * HTTP GET to Zoho Books API
+ * @param {string} endpoint - API endpoint path
+ * @param {Object} params - Query parameters
+ * @param {Object} apiOptions - { caller: string, priority: 'high'|'normal' }
+ */
+async function apiGet(endpoint, params = {}, apiOptions = {}) {
+    // Central rate limiting + tracking for ALL API calls
+    const caller = apiOptions.caller || _deriveCallerName('GET', endpoint);
+    await rateLimiter.acquire(caller, { priority: apiOptions.priority || 'normal' });
+
     const token = await zohoOAuth.getAccessToken();
     const queryStr = Object.entries(params)
         .filter(([, v]) => v !== undefined && v !== null)
@@ -705,8 +774,14 @@ async function apiGet(endpoint, params = {}) {
 
 /**
  * HTTP PUT to Zoho Books API
+ * @param {string} endpoint - API endpoint path
+ * @param {Object} body - Request body
+ * @param {Object} apiOptions - { caller: string, priority: 'high'|'normal' }
  */
-async function apiPut(endpoint, body = {}) {
+async function apiPut(endpoint, body = {}, apiOptions = {}) {
+    const caller = apiOptions.caller || _deriveCallerName('PUT', endpoint);
+    await rateLimiter.acquire(caller, { priority: apiOptions.priority || 'normal' });
+
     const token = await zohoOAuth.getAccessToken();
     const url = `${API_BASE}${endpoint}`;
     const putData = JSON.stringify(body);
@@ -754,8 +829,14 @@ async function apiPut(endpoint, body = {}) {
 
 /**
  * HTTP DELETE to Zoho Books API
+ * @param {string} endpoint - API endpoint path
+ * @param {Object} params - Query parameters
+ * @param {Object} apiOptions - { caller: string, priority: 'high'|'normal' }
  */
-async function apiDelete(endpoint, params = {}) {
+async function apiDelete(endpoint, params = {}, apiOptions = {}) {
+    const caller = apiOptions.caller || _deriveCallerName('DELETE', endpoint);
+    await rateLimiter.acquire(caller, { priority: apiOptions.priority || 'normal' });
+
     const token = await zohoOAuth.getAccessToken();
     const queryStr = Object.entries(params)
         .filter(([, v]) => v !== undefined && v !== null)
@@ -805,8 +886,14 @@ async function apiDelete(endpoint, params = {}) {
 
 /**
  * HTTP POST to Zoho Books API
+ * @param {string} endpoint - API endpoint path
+ * @param {Object} body - Request body
+ * @param {Object} apiOptions - { caller: string, priority: 'high'|'normal' }
  */
-async function apiPost(endpoint, body = {}) {
+async function apiPost(endpoint, body = {}, apiOptions = {}) {
+    const caller = apiOptions.caller || _deriveCallerName('POST', endpoint);
+    await rateLimiter.acquire(caller, { priority: apiOptions.priority || 'normal' });
+
     const token = await zohoOAuth.getAccessToken();
     const url = `${API_BASE}${endpoint}`;
     const postData = JSON.stringify(body);
@@ -856,51 +943,67 @@ async function apiPost(endpoint, body = {}) {
 // FEATURE 2: LOCATIONS & STOCK
 // ========================================
 
-const rateLimiter = require('./zoho-rate-limiter');
+// Cache for the working locations endpoint (avoids wasting 2-3 API calls on retry)
+let _locationsEndpointCache = null; // 'warehouses' | 'warehouses_no_org' | 'locations' | null
 
 /**
  * Get locations/warehouses from Zoho Books
- * Tries /settings/warehouses first (Zoho Books inventory), falls back to /locations
+ * Caches which endpoint works to avoid wasting API calls on subsequent calls.
+ * First call: tries endpoints until one works (1-3 API calls)
+ * Subsequent calls: uses cached endpoint (1 API call)
  */
 async function getLocations() {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
 
+    // If we know which endpoint works, use it directly (saves 1-2 API calls)
+    if (_locationsEndpointCache === 'warehouses') {
+        const response = await apiGet('/settings/warehouses', { organization_id: orgId }, { caller: 'getLocations' });
+        return { locations: response.warehouses || [] };
+    }
+    if (_locationsEndpointCache === 'locations') {
+        const response = await apiGet('/locations', { organization_id: orgId }, { caller: 'getLocations' });
+        return response;
+    }
+    if (_locationsEndpointCache === 'warehouses_no_org') {
+        const response = await apiGet('/settings/warehouses', {}, { caller: 'getLocations' });
+        return { locations: response.warehouses || [] };
+    }
+
+    // First time: discover which endpoint works
     // Try /settings/warehouses (Zoho Books multi-location inventory)
     try {
-        console.log('[ZohoAPI] Trying /settings/warehouses...');
-        const response = await apiGet('/settings/warehouses', { organization_id: orgId });
-        console.log('[ZohoAPI] Warehouses response keys:', Object.keys(response));
+        const response = await apiGet('/settings/warehouses', { organization_id: orgId }, { caller: 'getLocations.discover' });
         if (response.warehouses && response.warehouses.length > 0) {
-            console.log(`[ZohoAPI] Found ${response.warehouses.length} warehouses`);
+            _locationsEndpointCache = 'warehouses';
+            console.log(`[ZohoAPI] Discovered locations endpoint: /settings/warehouses (${response.warehouses.length} locations)`);
             return { locations: response.warehouses };
         }
     } catch (e) {
-        console.log('[ZohoAPI] /settings/warehouses failed:', e.message);
+        // Try next endpoint
     }
 
     // Try /locations
     try {
-        console.log('[ZohoAPI] Trying /locations...');
-        const response = await apiGet('/locations', { organization_id: orgId });
-        console.log('[ZohoAPI] Locations response keys:', Object.keys(response));
+        const response = await apiGet('/locations', { organization_id: orgId }, { caller: 'getLocations.discover' });
         if (response.locations && response.locations.length > 0) {
-            console.log(`[ZohoAPI] Found ${response.locations.length} locations`);
+            _locationsEndpointCache = 'locations';
+            console.log(`[ZohoAPI] Discovered locations endpoint: /locations (${response.locations.length} locations)`);
             return response;
         }
     } catch (e) {
-        console.log('[ZohoAPI] /locations failed:', e.message);
+        // Try next endpoint
     }
 
-    // Try /settings/warehouses without org_id in query (some APIs want it in header)
+    // Try /settings/warehouses without org_id
     try {
-        console.log('[ZohoAPI] Trying /settings/warehouses (no org param)...');
-        const response = await apiGet('/settings/warehouses', {});
-        console.log('[ZohoAPI] Warehouses (no org) response keys:', Object.keys(response));
+        const response = await apiGet('/settings/warehouses', {}, { caller: 'getLocations.discover' });
         if (response.warehouses) {
+            _locationsEndpointCache = 'warehouses_no_org';
+            console.log(`[ZohoAPI] Discovered locations endpoint: /settings/warehouses (no org)`);
             return { locations: response.warehouses };
         }
     } catch (e) {
-        console.log('[ZohoAPI] /settings/warehouses (no org) failed:', e.message);
+        // All failed
     }
 
     console.log('[ZohoAPI] No locations found from any endpoint');
@@ -1008,7 +1111,7 @@ async function getItemDetails(itemIds) {
             break;
         }
 
-        await rateLimiter.acquire('getItemDetails');
+        // Rate limiting now handled centrally in apiGet
         try {
             const response = await apiGet(`/items/${itemId}`, { organization_id: orgId });
             if (response.item) {
@@ -1051,7 +1154,7 @@ async function syncItems(triggeredBy = null) {
         await pool.query(`UPDATE zoho_items_map SET zoho_status = 'inactive'`);
 
         while (hasMore) {
-            await rateLimiter.acquire('syncItems');
+            // Rate limiting now handled centrally in apiGet
             const response = await getItems({ page, per_page: 200, status: 'active' });
 
             console.log(`[ZohoSync] Items page ${page}: ${response.items?.length || 0} items returned`);
@@ -1289,7 +1392,7 @@ async function getLocationStockDashboard(filters = {}) {
  */
 async function updateItem(itemId, data) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
-    await rateLimiter.acquire('bulkUpdateItem');
+    // Rate limiting now handled centrally in apiPut
     return await apiPut(`/items/${itemId}?organization_id=${orgId}`, data);
 }
 
@@ -1469,8 +1572,8 @@ async function getInvoicesByLocation(locationId, dateStart, dateEnd) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
     const params = { organization_id: orgId, date_start: dateStart, date_end: dateEnd, per_page: 200 };
     if (locationId) params.location_id = locationId;
-    await rateLimiter.acquire('dailyReport.invoices');
-    return await apiGet('/invoices', params);
+    // Rate limiting now handled centrally in apiGet
+    return await apiGet('/invoices', params, { caller: 'dailyReport.invoices' });
 }
 
 /**
@@ -1480,8 +1583,7 @@ async function getBillsByLocation(locationId, dateStart, dateEnd) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
     const params = { organization_id: orgId, date_start: dateStart, date_end: dateEnd, per_page: 200 };
     if (locationId) params.location_id = locationId;
-    await rateLimiter.acquire('dailyReport.bills');
-    return await apiGet('/bills', params);
+    return await apiGet('/bills', params, { caller: 'dailyReport.bills' });
 }
 
 /**
@@ -1491,8 +1593,7 @@ async function getSalesOrdersByLocation(locationId, dateStart, dateEnd) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
     const params = { organization_id: orgId, date_start: dateStart, date_end: dateEnd, per_page: 200 };
     if (locationId) params.location_id = locationId;
-    await rateLimiter.acquire('dailyReport.salesOrders');
-    return await apiGet('/salesorders', params);
+    return await apiGet('/salesorders', params, { caller: 'dailyReport.salesOrders' });
 }
 
 /**
@@ -1502,8 +1603,7 @@ async function getPurchaseOrdersByLocation(locationId, dateStart, dateEnd) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
     const params = { organization_id: orgId, date_start: dateStart, date_end: dateEnd, per_page: 200 };
     if (locationId) params.location_id = locationId;
-    await rateLimiter.acquire('dailyReport.purchaseOrders');
-    return await apiGet('/purchaseorders', params);
+    return await apiGet('/purchaseorders', params, { caller: 'dailyReport.purchaseOrders' });
 }
 
 /**
@@ -1519,18 +1619,28 @@ async function generateDailyTransactionReport(dateStart, dateEnd, triggeredBy = 
     const syncId = logResult.insertId;
 
     try {
-        // Get locations
+        // Get locations - only fetch per-location data, skip "All Locations" to save 4 API calls
         const [locations] = await pool.query(`SELECT zoho_location_id, zoho_location_name FROM zoho_locations_map WHERE is_active = 1`);
 
-        // Add null for "all/unassigned" location
-        const locationList = [{ zoho_location_id: null, zoho_location_name: 'All Locations' }, ...locations];
+        if (locations.length === 0) {
+            // No locations mapped - just fetch once without location filter
+            locations.push({ zoho_location_id: null, zoho_location_name: 'All Locations' });
+        }
+
         let totalSynced = 0;
 
-        for (const loc of locationList) {
+        // Check daily quota before starting - this will use 4 API calls per location
+        const estimatedCalls = locations.length * 4;
+        const quotaCheck = rateLimiter.canStartHeavyOperation(estimatedCalls);
+        if (!quotaCheck.safe) {
+            throw new Error(`Not enough API quota for transaction report: need ~${estimatedCalls} calls. ${quotaCheck.reason}`);
+        }
+
+        for (const loc of locations) {
             const locId = loc.zoho_location_id;
             const locName = loc.zoho_location_name;
 
-            // Fetch all transaction types
+            // Fetch all transaction types in parallel (4 API calls per location)
             const [invoicesRes, billsRes, soRes, poRes] = await Promise.all([
                 getInvoicesByLocation(locId, dateStart, dateEnd).catch(() => ({ invoices: [] })),
                 getBillsByLocation(locId, dateStart, dateEnd).catch(() => ({ bills: [] })),
@@ -1802,7 +1912,7 @@ async function resolveAlert(alertId, userId, notes) {
  */
 async function createInventoryAdjustment(adjustmentData) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
-    await rateLimiter.acquire('inventoryAdjustment');
+    // Rate limiting now handled centrally in apiPost
     return await apiPost(`/inventoryadjustments?organization_id=${orgId}`, adjustmentData);
 }
 
@@ -1851,6 +1961,7 @@ module.exports = {
     syncLocations,
     syncLocationStock,
     fullSync,
+    quickSync,
     // Dashboard
     getDashboardStats,
     getLocationStockDashboard,

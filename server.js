@@ -40,12 +40,14 @@ const staffRegistrationRoutes = require('./routes/staff-registration');
 const dailyTasksRoutes = require('./routes/daily-tasks');
 const syncScheduler = require('./services/sync-scheduler');
 const whatsappProcessor = require('./services/whatsapp-processor');
+const rateLimiter = require('./services/zoho-rate-limiter');
 const chatRoutes = require('./routes/chat');
 const notificationRoutes = require('./routes/notifications');
 const estimatePdfRoutes = require('./routes/estimate-pdf');
 const shareRoutes = require('./routes/share');
 const notificationService = require('./services/notification-service');
 const autoClockout = require('./services/auto-clockout');
+const websiteRoutes = require('./routes/website');
 
 const app = express();
 
@@ -127,12 +129,14 @@ staffRegistrationRoutes.setPool(pool);
 dailyTasksRoutes.setPool(pool);
 syncScheduler.setPool(pool);
 whatsappProcessor.setPool(pool);
+rateLimiter.setPool(pool); // Enable DB persistence for API call tracking
 chatRoutes.setPool(pool);
 notificationRoutes.setPool(pool);
 estimatePdfRoutes.setPool(pool);
 shareRoutes.setPool(pool);
 notificationService.setPool(pool);
 autoClockout.setPool(pool);
+websiteRoutes.setPool(pool);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -149,6 +153,7 @@ const uploadDirs = [
     'public/uploads/visualizations',
     'public/uploads/aadhar',
     'public/uploads/daily-tasks',
+    'public/uploads/website',
     'uploads/attendance/break'
 ];
 uploadDirs.forEach(dir => {
@@ -251,6 +256,7 @@ app.use('/api/chat', chatRoutes.router);
 app.use('/api/notifications', notificationRoutes.router);
 app.use('/api/estimates', estimatePdfRoutes.router);
 app.use('/api/share', shareRoutes.router);
+app.use('/api/website', websiteRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3293,3 +3299,18 @@ server.listen(PORT, () => {
         console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
     }
 });
+
+// Graceful shutdown - persist API usage counter before exit
+async function gracefulShutdown(signal) {
+    console.log(`\n${signal} received. Persisting API usage data...`);
+    try {
+        await rateLimiter.flush();
+        console.log('API usage data persisted to DB.');
+    } catch (err) {
+        console.error('Failed to persist API usage:', err.message);
+    }
+    process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
