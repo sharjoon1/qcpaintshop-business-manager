@@ -287,7 +287,7 @@ async function migrate() {
         try {
             await pool.query(`
                 ALTER TABLE zoho_sync_log MODIFY COLUMN sync_type
-                ENUM('invoices','payments','customers','items','reports','full','locations','stock','transactions','reorder') NOT NULL
+                ENUM('invoices','payments','customers','items','reports','full','quick','locations','stock','transactions','reorder') NOT NULL
             `);
             console.log('   ✅ zoho_sync_log sync_type expanded');
         } catch (e) {
