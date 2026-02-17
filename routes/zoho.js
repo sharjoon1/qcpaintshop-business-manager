@@ -152,14 +152,76 @@ router.get('/status', requirePermission('zoho', 'view'), async (req, res) => {
 });
 
 /**
- * GET /api/zoho/dashboard - Dashboard statistics
+ * GET /api/zoho/dashboard - Dashboard statistics (with optional date filtering)
+ * Query params: from_date, to_date (YYYY-MM-DD), compare (true/false)
  */
 router.get('/dashboard', requirePermission('zoho', 'view'), async (req, res) => {
     try {
-        const stats = await zohoAPI.getDashboardStats();
+        const { from_date, to_date, compare } = req.query;
+        const stats = await zohoAPI.getDashboardStats(
+            from_date || null,
+            to_date || null,
+            compare === 'true'
+        );
         res.json({ success: true, data: stats });
     } catch (error) {
         console.error('[Zoho] Dashboard error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * GET /api/zoho/dashboard/trend - Dashboard trend data for chart visualization
+ * Query params: from_date, to_date (YYYY-MM-DD), granularity (day/week/month)
+ */
+router.get('/dashboard/trend', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const { from_date, to_date, granularity } = req.query;
+        if (!from_date || !to_date) {
+            return res.status(400).json({ success: false, message: 'from_date and to_date are required' });
+        }
+        const data = await zohoAPI.getDashboardTrend(from_date, to_date, granularity || 'day');
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('[Zoho] Dashboard trend error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * GET /api/zoho/dashboard/export - Export dashboard stats as CSV
+ * Query params: from_date, to_date (YYYY-MM-DD)
+ */
+router.get('/dashboard/export', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const { from_date, to_date } = req.query;
+        const stats = await zohoAPI.getDashboardStats(from_date || null, to_date || null, false);
+
+        const inv = stats.invoices || {};
+        const pay = stats.payments || {};
+
+        const periodLabel = from_date && to_date ? `${from_date} to ${to_date}` : 'All Time';
+
+        let csv = 'Zoho Books Dashboard Export\n';
+        csv += `Period,${periodLabel}\n`;
+        csv += `Exported At,${new Date().toISOString()}\n\n`;
+        csv += 'Metric,Value\n';
+        csv += `Total Revenue,${inv.total_revenue || 0}\n`;
+        csv += `Outstanding,${inv.total_outstanding || 0}\n`;
+        csv += `Overdue Amount,${inv.overdue_amount || 0}\n`;
+        csv += `Total Collected,${pay.total_collected || 0}\n`;
+        csv += `Total Invoices,${inv.total_invoices || 0}\n`;
+        csv += `Overdue Invoices,${inv.overdue_count || 0}\n`;
+        csv += `Unpaid Invoices,${inv.unpaid_count || 0}\n`;
+        csv += `Paid Invoices,${inv.paid_count || 0}\n`;
+        csv += `Total Payments,${pay.total_payments || 0}\n`;
+
+        const filename = `zoho-dashboard-${from_date || 'all'}-to-${to_date || 'all'}.csv`;
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(csv);
+    } catch (error) {
+        console.error('[Zoho] Dashboard export error:', error.message);
         res.status(500).json({ success: false, message: error.message });
     }
 });

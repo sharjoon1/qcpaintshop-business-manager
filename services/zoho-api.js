@@ -638,29 +638,54 @@ async function quickSync(triggeredBy = null) {
 
 /**
  * Get Zoho dashboard stats from local cache
+ * @param {string|null} fromDate - Start date (YYYY-MM-DD), null for all-time
+ * @param {string|null} toDate - End date (YYYY-MM-DD), null for all-time
+ * @param {boolean} compare - If true, also return previous period stats
  */
-async function getDashboardStats() {
+async function getDashboardStats(fromDate = null, toDate = null, compare = false) {
     if (!pool) throw new Error('Database pool not initialized');
+
+    // Build WHERE clauses for date filtering
+    const invoiceWhere = [];
+    const invoiceParams = [];
+    const paymentWhere = [];
+    const paymentParams = [];
+
+    if (fromDate) {
+        invoiceWhere.push('invoice_date >= ?');
+        invoiceParams.push(fromDate);
+        paymentWhere.push('payment_date >= ?');
+        paymentParams.push(fromDate);
+    }
+    if (toDate) {
+        invoiceWhere.push('invoice_date <= ?');
+        invoiceParams.push(toDate);
+        paymentWhere.push('payment_date <= ?');
+        paymentParams.push(toDate);
+    }
+
+    const invoiceWhereSQL = invoiceWhere.length > 0 ? ' WHERE ' + invoiceWhere.join(' AND ') : '';
+    const paymentWhereSQL = paymentWhere.length > 0 ? ' WHERE ' + paymentWhere.join(' AND ') : '';
 
     const [[invoiceStats]] = await pool.query(`
         SELECT
             COUNT(*) as total_invoices,
-            SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END) as overdue_count,
-            SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count,
-            SUM(CASE WHEN status IN ('sent','overdue','partially_paid') THEN 1 ELSE 0 END) as unpaid_count,
-            SUM(total) as total_revenue,
-            SUM(balance) as total_outstanding,
-            SUM(CASE WHEN status = 'overdue' THEN balance ELSE 0 END) as overdue_amount
-        FROM zoho_invoices
-    `);
+            COALESCE(SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END), 0) as overdue_count,
+            COALESCE(SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END), 0) as paid_count,
+            COALESCE(SUM(CASE WHEN status IN ('sent','overdue','partially_paid') THEN 1 ELSE 0 END), 0) as unpaid_count,
+            COALESCE(SUM(total), 0) as total_revenue,
+            COALESCE(SUM(balance), 0) as total_outstanding,
+            COALESCE(SUM(CASE WHEN status = 'overdue' THEN balance ELSE 0 END), 0) as overdue_amount
+        FROM zoho_invoices${invoiceWhereSQL}
+    `, invoiceParams);
 
     const [[paymentStats]] = await pool.query(`
         SELECT
             COUNT(*) as total_payments,
-            SUM(amount) as total_collected,
-            SUM(CASE WHEN payment_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN amount ELSE 0 END) as collected_last_30_days
-        FROM zoho_payments
-    `);
+            COALESCE(SUM(amount), 0) as total_collected,
+            COALESCE(SUM(CASE WHEN payment_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN amount ELSE 0 END), 0) as collected_last_30_days
+        FROM zoho_payments${paymentWhereSQL}
+    `, paymentParams);
 
     const [[syncStatus]] = await pool.query(`
         SELECT sync_type, status, completed_at
@@ -672,12 +697,124 @@ async function getDashboardStats() {
         SELECT COUNT(*) as total FROM zoho_customers_map
     `);
 
-    return {
+    const result = {
         invoices: invoiceStats,
         payments: paymentStats,
         customers: { total: customerCount?.total || 0 },
         last_sync: syncStatus || null
     };
+
+    // Calculate previous period for comparison
+    if (compare && fromDate && toDate) {
+        const from = new Date(fromDate);
+        const to = new Date(toDate);
+        const durationMs = to.getTime() - from.getTime() + 86400000; // inclusive
+        const prevTo = new Date(from.getTime() - 86400000); // day before fromDate
+        const prevFrom = new Date(prevTo.getTime() - durationMs + 86400000);
+        const prevFromStr = prevFrom.toISOString().split('T')[0];
+        const prevToStr = prevTo.toISOString().split('T')[0];
+
+        const [[prevInvoiceStats]] = await pool.query(`
+            SELECT
+                COUNT(*) as total_invoices,
+                COALESCE(SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END), 0) as overdue_count,
+                COALESCE(SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END), 0) as paid_count,
+                COALESCE(SUM(CASE WHEN status IN ('sent','overdue','partially_paid') THEN 1 ELSE 0 END), 0) as unpaid_count,
+                COALESCE(SUM(total), 0) as total_revenue,
+                COALESCE(SUM(balance), 0) as total_outstanding,
+                COALESCE(SUM(CASE WHEN status = 'overdue' THEN balance ELSE 0 END), 0) as overdue_amount
+            FROM zoho_invoices
+            WHERE invoice_date >= ? AND invoice_date <= ?
+        `, [prevFromStr, prevToStr]);
+
+        const [[prevPaymentStats]] = await pool.query(`
+            SELECT
+                COUNT(*) as total_payments,
+                COALESCE(SUM(amount), 0) as total_collected
+            FROM zoho_payments
+            WHERE payment_date >= ? AND payment_date <= ?
+        `, [prevFromStr, prevToStr]);
+
+        result.previous = {
+            invoices: prevInvoiceStats,
+            payments: prevPaymentStats,
+            period: { from: prevFromStr, to: prevToStr }
+        };
+    }
+
+    return result;
+}
+
+/**
+ * Get dashboard trend data for chart visualization
+ * @param {string} fromDate - Start date (YYYY-MM-DD)
+ * @param {string} toDate - End date (YYYY-MM-DD)
+ * @param {string} granularity - 'day', 'week', or 'month'
+ */
+async function getDashboardTrend(fromDate, toDate, granularity = 'day') {
+    if (!pool) throw new Error('Database pool not initialized');
+
+    let dateExpr, groupBy;
+    if (granularity === 'month') {
+        dateExpr = "DATE_FORMAT(invoice_date, '%Y-%m-01')";
+        groupBy = dateExpr;
+    } else if (granularity === 'week') {
+        dateExpr = "DATE(DATE_SUB(invoice_date, INTERVAL WEEKDAY(invoice_date) DAY))";
+        groupBy = dateExpr;
+    } else {
+        dateExpr = "DATE(invoice_date)";
+        groupBy = dateExpr;
+    }
+
+    const [invoiceTrend] = await pool.query(`
+        SELECT
+            ${dateExpr} as period,
+            COALESCE(SUM(total), 0) as revenue,
+            COALESCE(SUM(balance), 0) as outstanding,
+            COALESCE(SUM(CASE WHEN status = 'overdue' THEN balance ELSE 0 END), 0) as overdue
+        FROM zoho_invoices
+        WHERE invoice_date >= ? AND invoice_date <= ?
+        GROUP BY ${groupBy}
+        ORDER BY period ASC
+    `, [fromDate, toDate]);
+
+    // Payment trend with matching granularity
+    let payDateExpr;
+    if (granularity === 'month') {
+        payDateExpr = "DATE_FORMAT(payment_date, '%Y-%m-01')";
+    } else if (granularity === 'week') {
+        payDateExpr = "DATE(DATE_SUB(payment_date, INTERVAL WEEKDAY(payment_date) DAY))";
+    } else {
+        payDateExpr = "DATE(payment_date)";
+    }
+
+    const [paymentTrend] = await pool.query(`
+        SELECT
+            ${payDateExpr} as period,
+            COALESCE(SUM(amount), 0) as collected
+        FROM zoho_payments
+        WHERE payment_date >= ? AND payment_date <= ?
+        GROUP BY ${payDateExpr}
+        ORDER BY period ASC
+    `, [fromDate, toDate]);
+
+    // Merge invoice and payment trends by period
+    const periodMap = {};
+    invoiceTrend.forEach(row => {
+        const key = row.period instanceof Date ? row.period.toISOString().split('T')[0] : String(row.period);
+        periodMap[key] = { period: key, revenue: parseFloat(row.revenue), outstanding: parseFloat(row.outstanding), overdue: parseFloat(row.overdue), collected: 0 };
+    });
+    paymentTrend.forEach(row => {
+        const key = row.period instanceof Date ? row.period.toISOString().split('T')[0] : String(row.period);
+        if (!periodMap[key]) {
+            periodMap[key] = { period: key, revenue: 0, outstanding: 0, overdue: 0, collected: 0 };
+        }
+        periodMap[key].collected = parseFloat(row.collected);
+    });
+
+    const merged = Object.values(periodMap).sort((a, b) => a.period.localeCompare(b.period));
+
+    return { trend: merged, granularity };
 }
 
 // ========================================
@@ -1964,6 +2101,7 @@ module.exports = {
     quickSync,
     // Dashboard
     getDashboardStats,
+    getDashboardTrend,
     getLocationStockDashboard,
     // Locations
     getLocations,

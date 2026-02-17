@@ -107,6 +107,17 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Disconnect/reconnect capability
 - Pages: `admin-zoho-settings.html`, `admin-zoho-dashboard.html`
 
+**Dashboard Financial Filtering**
+- Time-period filter pills: All Time, Today, Yesterday, This Week, This Month, Prev Month, This Year, Custom
+- Custom date range picker with validation
+- Period comparison mode: shows % change arrows (▲/▼) vs previous equivalent period
+- Inverted coloring for "bad" metrics (overdue up = red, outstanding up = red)
+- Trend chart: Chart.js line chart with Revenue (purple), Collected (green), Overdue (red dashed)
+- Granularity selector: Daily, Weekly, Monthly (auto-selected based on period)
+- CSV export of filtered dashboard stats via `/api/zoho/dashboard/export`
+- API endpoints: `GET /dashboard?from_date&to_date&compare`, `GET /dashboard/trend?from_date&to_date&granularity`, `GET /dashboard/export?from_date&to_date`
+- Backward compatible: no params = all-time (existing behavior)
+
 **Data Sync**
 - Full sync (items + invoices + customers + payments)
 - Individual sync per entity type
@@ -843,7 +854,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 ### Zoho Pages
 | Page | File | Purpose |
 |------|------|---------|
-| Zoho Dashboard | `admin-zoho-dashboard.html` | Sync overview |
+| Zoho Dashboard | `admin-zoho-dashboard.html` | Financial overview with time-period filtering, trend chart, comparison |
 | Zoho Settings | `admin-zoho-settings.html` | OAuth & config |
 | Zoho Items | `admin-zoho-items.html` | Item catalog |
 | Zoho Items Edit | `admin-zoho-items-edit.html` | Bulk item editing |

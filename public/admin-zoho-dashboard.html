@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script>checkAuthOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
@@ -218,6 +219,143 @@
             border-color: #6ee7b7;
             color: #065f46;
         }
+
+        /* Period filter pills */
+        .period-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .period-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: white;
+            color: #4b5563;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .period-pill:hover { border-color: #667eea; color: #667eea; }
+        .period-pill.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+        }
+        .period-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-left: auto;
+        }
+        .compare-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #6b7280;
+            cursor: pointer;
+        }
+        .compare-toggle input { accent-color: #667eea; }
+        .export-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: white;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .export-btn:hover { background: #f9fafb; border-color: #9ca3af; }
+        .custom-range-row {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .custom-range-row.show { display: flex; }
+        .custom-range-row input[type="date"] {
+            padding: 0.35rem 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: #374151;
+        }
+        .custom-range-row .apply-btn {
+            padding: 0.35rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .period-label {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        /* Stat change indicator */
+        .stat-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            font-size: 0.65rem;
+            font-weight: 600;
+            margin-top: 0.25rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+        }
+        .stat-change.up { color: #059669; background: #ecfdf5; }
+        .stat-change.down { color: #dc2626; background: #fef2f2; }
+        .stat-change.neutral { color: #6b7280; background: #f3f4f6; }
+
+        /* Trend chart container */
+        .trend-chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+        .trend-chart-container.show { display: block; }
+        .trend-chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .granularity-select {
+            padding: 0.3rem 0.6rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            color: #374151;
+            background: white;
+        }
+        @media (max-width: 640px) {
+            .period-controls { margin-left: 0; width: 100%; justify-content: flex-start; }
+            .period-bar { gap: 0.35rem; }
+            .period-pill { padding: 0.3rem 0.65rem; font-size: 0.7rem; }
+        }
     </style>
 </head>
 <body class="bg-gray-50" data-page="zoho-dashboard">
@@ -248,6 +386,40 @@
         </div>
     </div>
 
+    <!-- Period Filter Bar -->
+    <div class="period-bar" id="periodBar">
+        <button class="period-pill active" data-period="all" onclick="setPeriod('all')">All Time</button>
+        <button class="period-pill" data-period="today" onclick="setPeriod('today')">Today</button>
+        <button class="period-pill" data-period="yesterday" onclick="setPeriod('yesterday')">Yesterday</button>
+        <button class="period-pill" data-period="this_week" onclick="setPeriod('this_week')">This Week</button>
+        <button class="period-pill" data-period="this_month" onclick="setPeriod('this_month')">This Month</button>
+        <button class="period-pill" data-period="prev_month" onclick="setPeriod('prev_month')">Prev Month</button>
+        <button class="period-pill" data-period="this_year" onclick="setPeriod('this_year')">This Year</button>
+        <button class="period-pill" data-period="custom" onclick="toggleCustomRange()">Custom</button>
+        <div class="period-controls">
+            <label class="compare-toggle">
+                <input type="checkbox" id="compareToggle" onchange="toggleCompare()">
+                Compare
+            </label>
+            <button class="export-btn" onclick="exportDashboardCSV()" title="Export CSV">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Custom Date Range Row -->
+    <div class="custom-range-row" id="customRangeRow">
+        <label class="text-xs text-gray-500 font-medium">From:</label>
+        <input type="date" id="customFromDate">
+        <label class="text-xs text-gray-500 font-medium">To:</label>
+        <input type="date" id="customToDate">
+        <button class="apply-btn" onclick="applyCustomRange()">Apply</button>
+    </div>
+
+    <!-- Active Period Label -->
+    <div id="activePeriodLabel" class="period-label" style="display: none;"></div>
+
     <!-- KPI Stats Grid - Row 1 -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
         <!-- Total Revenue -->
@@ -258,6 +430,7 @@
                         <div class="skeleton" style="width: 80px; height: 28px;"></div>
                     </div>
                     <div class="stat-label">Total Revenue</div>
+                    <div id="changeRevenue" class="stat-change" style="display:none;"></div>
                 </div>
                 <span class="stat-icon">
                     <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -275,6 +448,7 @@
                         <div class="skeleton" style="width: 80px; height: 28px;"></div>
                     </div>
                     <div class="stat-label">Outstanding</div>
+                    <div id="changeOutstanding" class="stat-change" style="display:none;"></div>
                 </div>
                 <span class="stat-icon">
                     <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,6 +466,7 @@
                         <div class="skeleton" style="width: 80px; height: 28px;"></div>
                     </div>
                     <div class="stat-label">Overdue Amount</div>
+                    <div id="changeOverdue" class="stat-change" style="display:none;"></div>
                 </div>
                 <span class="stat-icon">
                     <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -309,6 +484,7 @@
                         <div class="skeleton" style="width: 80px; height: 28px;"></div>
                     </div>
                     <div class="stat-label">Collected</div>
+                    <div id="changeCollected" class="stat-change" style="display:none;"></div>
                 </div>
                 <span class="stat-icon">
                     <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -329,6 +505,7 @@
                         <div class="skeleton" style="width: 50px; height: 24px;"></div>
                     </div>
                     <div class="stat-card-label">Total Invoices</div>
+                    <div id="changeTotalInvoices" class="stat-change" style="display:none;"></div>
                 </div>
                 <span class="stat-icon">
                     <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -346,6 +523,7 @@
                         <div class="skeleton" style="width: 50px; height: 24px;"></div>
                     </div>
                     <div class="stat-card-label">Overdue Invoices</div>
+                    <div id="changeOverdueInvoices" class="stat-change" style="display:none;"></div>
                 </div>
                 <span class="stat-icon">
                     <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -363,6 +541,7 @@
                         <div class="skeleton" style="width: 50px; height: 24px;"></div>
                     </div>
                     <div class="stat-card-label">Unpaid Invoices</div>
+                    <div id="changeUnpaidInvoices" class="stat-change" style="display:none;"></div>
                 </div>
                 <span class="stat-icon">
                     <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -388,6 +567,19 @@
                 </span>
             </div>
         </div>
+    </div>
+
+    <!-- Trend Chart -->
+    <div class="trend-chart-container" id="trendChartContainer">
+        <div class="trend-chart-header">
+            <h3 class="text-lg font-bold text-gray-800">Financial Trend</h3>
+            <select class="granularity-select" id="granularitySelect" onchange="loadTrendData()">
+                <option value="day">Daily</option>
+                <option value="week">Weekly</option>
+                <option value="month">Monthly</option>
+            </select>
+        </div>
+        <canvas id="trendChart" height="100"></canvas>
     </div>
 
     <!-- Main Content Grid: Recent Invoices + Sidebar -->
@@ -821,10 +1013,201 @@
         }
     }
 
+    // ============================
+    // PERIOD FILTER STATE
+    // ============================
+    var currentPeriod = 'all';
+    var currentFromDate = null;
+    var currentToDate = null;
+    var isCompareMode = false;
+    var lastDashboardData = null;
+    var trendChartInstance = null;
+
+    function calcPeriodDates(period) {
+        var today = new Date();
+        var y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
+        var from, to;
+
+        switch (period) {
+            case 'today':
+                from = to = new Date(y, m, d);
+                break;
+            case 'yesterday':
+                from = to = new Date(y, m, d - 1);
+                break;
+            case 'this_week':
+                var dow = today.getDay() || 7; // Mon=1
+                from = new Date(y, m, d - dow + 1);
+                to = today;
+                break;
+            case 'this_month':
+                from = new Date(y, m, 1);
+                to = today;
+                break;
+            case 'prev_month':
+                from = new Date(y, m - 1, 1);
+                to = new Date(y, m, 0); // last day of prev month
+                break;
+            case 'this_year':
+                from = new Date(y, 0, 1);
+                to = today;
+                break;
+            default:
+                return { from: null, to: null };
+        }
+
+        return {
+            from: from.toISOString().split('T')[0],
+            to: to.toISOString().split('T')[0]
+        };
+    }
+
+    function setPeriod(period) {
+        currentPeriod = period;
+
+        // Update pill active state
+        document.querySelectorAll('.period-pill').forEach(function(pill) {
+            pill.classList.toggle('active', pill.dataset.period === period);
+        });
+
+        // Hide custom range if not custom
+        if (period !== 'custom') {
+            document.getElementById('customRangeRow').classList.remove('show');
+        }
+
+        var dates = calcPeriodDates(period);
+        currentFromDate = dates.from;
+        currentToDate = dates.to;
+
+        // Update period label
+        var labelEl = document.getElementById('activePeriodLabel');
+        if (period === 'all') {
+            labelEl.style.display = 'none';
+        } else {
+            var periodNames = { today: 'Today', yesterday: 'Yesterday', this_week: 'This Week', this_month: 'This Month', prev_month: 'Previous Month', this_year: 'This Year', custom: 'Custom Range' };
+            var label = periodNames[period] || period;
+            if (currentFromDate && currentToDate) {
+                label += ': ' + currentFromDate + ' to ' + currentToDate;
+            }
+            labelEl.textContent = label;
+            labelEl.style.display = 'block';
+        }
+
+        // Auto-select granularity
+        autoSelectGranularity(period);
+
+        // Reload data
+        loadDashboardData();
+        if (period !== 'all') {
+            loadTrendData();
+        } else {
+            hideTrendChart();
+        }
+    }
+
+    function toggleCustomRange() {
+        var row = document.getElementById('customRangeRow');
+        row.classList.toggle('show');
+
+        // Update pill state
+        document.querySelectorAll('.period-pill').forEach(function(pill) {
+            pill.classList.toggle('active', pill.dataset.period === 'custom');
+        });
+    }
+
+    function applyCustomRange() {
+        var fromEl = document.getElementById('customFromDate');
+        var toEl = document.getElementById('customToDate');
+        if (!fromEl.value || !toEl.value) {
+            showToast('Please select both From and To dates', 'error');
+            return;
+        }
+        if (fromEl.value > toEl.value) {
+            showToast('From date must be before To date', 'error');
+            return;
+        }
+        currentPeriod = 'custom';
+        currentFromDate = fromEl.value;
+        currentToDate = toEl.value;
+
+        var labelEl = document.getElementById('activePeriodLabel');
+        labelEl.textContent = 'Custom: ' + currentFromDate + ' to ' + currentToDate;
+        labelEl.style.display = 'block';
+
+        autoSelectGranularity('custom');
+        loadDashboardData();
+        loadTrendData();
+    }
+
+    function toggleCompare() {
+        isCompareMode = document.getElementById('compareToggle').checked;
+        loadDashboardData();
+    }
+
+    function autoSelectGranularity(period) {
+        var sel = document.getElementById('granularitySelect');
+        if (period === 'today' || period === 'yesterday') {
+            sel.value = 'day';
+        } else if (period === 'this_week') {
+            sel.value = 'day';
+        } else if (period === 'this_month' || period === 'prev_month') {
+            sel.value = 'day';
+        } else if (period === 'this_year') {
+            sel.value = 'month';
+        } else if (period === 'custom' && currentFromDate && currentToDate) {
+            var diffDays = Math.ceil((new Date(currentToDate) - new Date(currentFromDate)) / 86400000);
+            if (diffDays <= 31) sel.value = 'day';
+            else if (diffDays <= 90) sel.value = 'week';
+            else sel.value = 'month';
+        }
+    }
+
+    function calcChange(current, previous) {
+        var cur = parseFloat(current) || 0;
+        var prev = parseFloat(previous) || 0;
+        if (prev === 0 && cur === 0) return { pct: 0, direction: 'neutral' };
+        if (prev === 0) return { pct: 100, direction: 'up' };
+        var pct = ((cur - prev) / Math.abs(prev)) * 100;
+        return {
+            pct: Math.abs(pct).toFixed(1),
+            direction: pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'neutral'
+        };
+    }
+
+    function renderChangeIndicator(elementId, current, previous, invertColor) {
+        var el = document.getElementById(elementId);
+        if (!el) return;
+
+        if (!isCompareMode || currentPeriod === 'all' || previous === undefined) {
+            el.style.display = 'none';
+            return;
+        }
+
+        var change = calcChange(current, previous);
+        var arrow = change.direction === 'up' ? '\u25B2' : change.direction === 'down' ? '\u25BC' : '\u25AC';
+
+        // For overdue/outstanding, up is bad (red), down is good (green)
+        var dirClass = change.direction;
+        if (invertColor && change.direction !== 'neutral') {
+            dirClass = change.direction === 'up' ? 'down' : 'up';
+        }
+
+        el.className = 'stat-change ' + dirClass;
+        el.innerHTML = arrow + ' ' + change.pct + '%';
+        el.style.display = 'inline-flex';
+    }
+
     // Load dashboard KPI data
     async function loadDashboardData() {
         try {
-            const response = await fetch('/api/zoho/dashboard', {
+            var url = '/api/zoho/dashboard';
+            var params = [];
+            if (currentFromDate) params.push('from_date=' + currentFromDate);
+            if (currentToDate) params.push('to_date=' + currentToDate);
+            if (isCompareMode && currentPeriod !== 'all') params.push('compare=true');
+            if (params.length > 0) url += '?' + params.join('&');
+
+            const response = await fetch(url, {
                 headers: getAuthHeaders()
             });
 
@@ -837,6 +1220,7 @@
 
             if (result.success && result.data) {
                 const data = result.data;
+                lastDashboardData = data;
                 const inv = data.invoices || {};
                 const pay = data.payments || {};
                 const cust = data.customers || {};
@@ -848,10 +1232,31 @@
                 document.getElementById('statCollected').textContent = formatCurrency(pay.total_collected);
 
                 // Row 2 - Count KPIs
-                document.getElementById('statTotalInvoices').textContent = inv.total_count || 0;
+                document.getElementById('statTotalInvoices').textContent = inv.total_invoices || 0;
                 document.getElementById('statOverdueInvoices').textContent = inv.overdue_count || 0;
                 document.getElementById('statUnpaidInvoices').textContent = inv.unpaid_count || 0;
-                document.getElementById('statZohoCustomers').textContent = cust.total_count || 0;
+                document.getElementById('statZohoCustomers').textContent = cust.total || 0;
+
+                // Comparison indicators
+                if (data.previous) {
+                    var prevInv = data.previous.invoices || {};
+                    var prevPay = data.previous.payments || {};
+
+                    renderChangeIndicator('changeRevenue', inv.total_revenue, prevInv.total_revenue, false);
+                    renderChangeIndicator('changeOutstanding', inv.total_outstanding, prevInv.total_outstanding, true);
+                    renderChangeIndicator('changeOverdue', inv.overdue_amount, prevInv.overdue_amount, true);
+                    renderChangeIndicator('changeCollected', pay.total_collected, prevPay.total_collected, false);
+                    renderChangeIndicator('changeTotalInvoices', inv.total_invoices, prevInv.total_invoices, false);
+                    renderChangeIndicator('changeOverdueInvoices', inv.overdue_count, prevInv.overdue_count, true);
+                    renderChangeIndicator('changeUnpaidInvoices', inv.unpaid_count, prevInv.unpaid_count, true);
+                } else {
+                    // Hide all change indicators
+                    ['changeRevenue', 'changeOutstanding', 'changeOverdue', 'changeCollected',
+                     'changeTotalInvoices', 'changeOverdueInvoices', 'changeUnpaidInvoices'].forEach(function(id) {
+                        var el = document.getElementById(id);
+                        if (el) el.style.display = 'none';
+                    });
+                }
             } else {
                 // Set defaults when no data
                 document.getElementById('statRevenue').textContent = '\u20B90';
@@ -873,6 +1278,160 @@
                 document.getElementById(id).textContent = '0';
             });
         }
+    }
+
+    // Load trend chart data
+    async function loadTrendData() {
+        if (!currentFromDate || !currentToDate) return;
+
+        var granularity = document.getElementById('granularitySelect').value;
+
+        try {
+            var url = '/api/zoho/dashboard/trend?from_date=' + currentFromDate + '&to_date=' + currentToDate + '&granularity=' + granularity;
+            var response = await fetch(url, { headers: getAuthHeaders() });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+
+            var result = await response.json();
+            if (result.success && result.data) {
+                renderTrendChart(result.data.trend, granularity);
+                document.getElementById('trendChartContainer').classList.add('show');
+            }
+        } catch (error) {
+            console.error('Failed to load trend data:', error);
+        }
+    }
+
+    function hideTrendChart() {
+        document.getElementById('trendChartContainer').classList.remove('show');
+        if (trendChartInstance) {
+            trendChartInstance.destroy();
+            trendChartInstance = null;
+        }
+    }
+
+    function renderTrendChart(data, granularity) {
+        if (trendChartInstance) {
+            trendChartInstance.destroy();
+            trendChartInstance = null;
+        }
+
+        if (!data || data.length === 0) {
+            hideTrendChart();
+            return;
+        }
+
+        var ctx = document.getElementById('trendChart').getContext('2d');
+        var labels = data.map(function(d) {
+            if (granularity === 'month') {
+                var parts = d.period.split('-');
+                var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                return monthNames[parseInt(parts[1]) - 1] + ' ' + parts[0].slice(2);
+            }
+            return d.period.slice(5); // MM-DD
+        });
+
+        trendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Revenue',
+                        data: data.map(function(d) { return d.revenue; }),
+                        borderColor: '#7c3aed',
+                        backgroundColor: 'rgba(124, 58, 237, 0.08)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: data.length > 30 ? 0 : 3,
+                        pointHoverRadius: 5
+                    },
+                    {
+                        label: 'Collected',
+                        data: data.map(function(d) { return d.collected; }),
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: data.length > 30 ? 0 : 3,
+                        pointHoverRadius: 5
+                    },
+                    {
+                        label: 'Overdue',
+                        data: data.map(function(d) { return d.overdue; }),
+                        borderColor: '#ef4444',
+                        borderWidth: 2,
+                        borderDash: [5, 3],
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: data.length > 30 ? 0 : 3,
+                        pointHoverRadius: 5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, padding: 16, font: { size: 12 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ctx.dataset.label + ': ' + formatCurrency(ctx.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { maxRotation: 45, font: { size: 11 } }
+                    },
+                    y: {
+                        grid: { color: '#f3f4f6' },
+                        ticks: {
+                            font: { size: 11 },
+                            callback: function(val) { return formatCurrency(val); }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Export dashboard data as CSV
+    function exportDashboardCSV() {
+        var url = '/api/zoho/dashboard/export';
+        var params = [];
+        if (currentFromDate) params.push('from_date=' + currentFromDate);
+        if (currentToDate) params.push('to_date=' + currentToDate);
+        if (params.length > 0) url += '?' + params.join('&');
+
+        // Fetch with auth and trigger download
+        fetch(url, { headers: getAuthHeaders() })
+            .then(function(response) {
+                if (!response.ok) throw new Error('Export failed');
+                return response.blob();
+            })
+            .then(function(blob) {
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'zoho-dashboard-' + (currentFromDate || 'all') + '-to-' + (currentToDate || 'all') + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+                showToast('CSV exported successfully', 'success');
+            })
+            .catch(function(err) {
+                console.error('Export error:', err);
+                showToast('Failed to export CSV', 'error');
+            });
     }
 
     // Load recent invoices
