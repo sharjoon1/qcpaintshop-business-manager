@@ -464,13 +464,15 @@ router.put('/:id/hours', requirePermission('branches', 'edit'), async (req, res)
                 h.open_time || '08:30:00',
                 h.close_time || '20:30:00',
                 h.expected_hours !== undefined ? h.expected_hours : 10.00,
-                h.late_threshold_minutes !== undefined ? h.late_threshold_minutes : 15
+                h.late_threshold_minutes !== undefined ? h.late_threshold_minutes : 15,
+                h.break_allowance_minutes !== undefined ? h.break_allowance_minutes : 120,
+                h.break_warning_minutes !== undefined ? h.break_warning_minutes : 90
             ]);
 
             await connection.query(
                 `INSERT INTO shop_hours_config
                  (branch_id, day_of_week, is_working_day, open_time, close_time,
-                  expected_hours, late_threshold_minutes)
+                  expected_hours, late_threshold_minutes, break_allowance_minutes, break_warning_minutes)
                  VALUES ?`,
                 [values]
             );

@@ -319,13 +319,27 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Work hours calculation
 - Pages: `staff/clock-in.html`, `staff/clock-out.html`
 
-**Break Management**
+**Break Management & Enforcement**
 - Break start/end with photo proof
 - Break duration tracking
 - Break time validation against branch config
 - Double-submit protection (`breakSubmitting` flag prevents duplicate requests)
 - Video readiness check before capture (validates camera stream active)
 - **Break geofence exemption**: geofence monitoring is paused during active breaks (no violations, no auto-clockout)
+- **Break enforcement system** (configurable per branch):
+  - Default allowance: 120min, warning threshold: 90min
+  - `break_allowance_minutes` and `break_warning_minutes` stored in `shop_hours_config`
+  - Allowance stored on each attendance record at clock-in for consistency
+  - Warning toast at 90min total break, red alert at 120min (exceeded)
+  - Excess break tracked: `excess_break_minutes`, `break_exceeded`, `effective_working_minutes`
+  - Notifications sent to staff + admin when break limit exceeded
+  - Staff dashboard shows "Break Left" mini-stat (green/amber/red color coding)
+  - Expected clock-out time displayed with excess break adjustment
+  - Admin Live Today table shows color-coded break badges (green <90m, amber 90-120m, red >120m)
+  - Admin stat card: "Break Exceeded" count
+  - Monthly view includes "Excess Break" column
+  - `GET /api/attendance/break-status` endpoint for real-time break status
+  - Migration: `migrations/migrate-break-enforcement.js`
 
 **Outside Work Periods**
 - Staff can declare "Going Outside for Work" with a reason (e.g., client meeting, delivery)

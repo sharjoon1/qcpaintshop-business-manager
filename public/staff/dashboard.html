@@ -413,14 +413,14 @@
                 <div class="mini-stat-value" id="expectedHoursDisplay">10h</div>
                 <div class="mini-stat-label">Expected</div>
             </div>
-            <div class="mini-stat">
-                <div class="mini-stat-icon" style="background: #fef3c7;">
-                    <svg style="width: 18px; height: 18px; color: #f59e0b;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="mini-stat" id="breakLeftStat">
+                <div class="mini-stat-icon" id="breakLeftIcon" style="background: #d1fae5;">
+                    <svg style="width: 18px; height: 18px; color: #10b981;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                 </div>
-                <div class="mini-stat-value" id="breakDisplay">--</div>
-                <div class="mini-stat-label">Break</div>
+                <div class="mini-stat-value" id="breakLeftDisplay">--</div>
+                <div class="mini-stat-label" id="breakLeftLabel">Break Left</div>
             </div>
         </div>
 
@@ -726,6 +726,9 @@
         let breakTimerInterval = null;
         let breakStartTime = null;
         let currentBreakDuration = 0;
+        let breakPolicy = { allowance: 120, warning: 90, used: 0, remaining: 120, exceeded: false, excess: 0 };
+        let breakWarningShown = false;
+        let breakExceededShown = false;
 
         // ========================================
         // TOAST NOTIFICATION SYSTEM
@@ -976,14 +979,13 @@
             // Expected hours
             document.getElementById('expectedHoursDisplay').textContent = `${data.expected_hours}h`;
 
-            // Break display
-            if (data.break_duration_minutes) {
-                document.getElementById('breakDisplay').textContent = `${data.break_duration_minutes}m`;
-            } else if (data.break_start_time && !data.break_end_time) {
-                document.getElementById('breakDisplay').textContent = 'Active';
-            } else {
-                document.getElementById('breakDisplay').textContent = '--';
+            // Store break policy from /today response
+            if (attendanceData && attendanceData.break_policy) {
+                breakPolicy = attendanceData.break_policy;
             }
+
+            // Break Left display
+            updateBreakLeftDisplay();
 
             // Late warning
             if (data.is_late) {
@@ -1006,6 +1008,63 @@
             } else {
                 setOutsideWorkActive(false);
             }
+
+            // Show expected clock-out
+            updateExpectedClockOut(data);
+        }
+
+        function updateBreakLeftDisplay() {
+            const el = document.getElementById('breakLeftDisplay');
+            const icon = document.getElementById('breakLeftIcon');
+            const label = document.getElementById('breakLeftLabel');
+            if (!el) return;
+
+            const remaining = Math.max(0, breakPolicy.allowance - breakPolicy.used - currentBreakDuration);
+            const totalUsed = breakPolicy.used + currentBreakDuration;
+
+            if (totalUsed > breakPolicy.allowance) {
+                const excess = totalUsed - breakPolicy.allowance;
+                el.textContent = `-${excess}m`;
+                el.style.color = '#ef4444';
+                icon.style.background = '#fee2e2';
+                label.textContent = 'Break Excess';
+            } else if (remaining <= 30) {
+                const h = Math.floor(remaining / 60);
+                const m = remaining % 60;
+                el.textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                el.style.color = '#d97706';
+                icon.style.background = '#fef3c7';
+                label.textContent = 'Break Left';
+            } else {
+                const h = Math.floor(remaining / 60);
+                const m = remaining % 60;
+                el.textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                el.style.color = '#10b981';
+                icon.style.background = '#d1fae5';
+                label.textContent = 'Break Left';
+            }
+        }
+
+        function updateExpectedClockOut(data) {
+            if (!data || !data.clock_in_time) return;
+            const clockIn = new Date(data.clock_in_time);
+            const expectedHours = data.expected_hours || 10;
+            const breakAllowance = breakPolicy.allowance || 120;
+            // Expected out = clock in + expected hours + break allowance
+            const expectedOutMs = clockIn.getTime() + (expectedHours * 60 * 60 * 1000) + (breakAllowance * 60 * 1000);
+
+            const totalUsed = breakPolicy.used + currentBreakDuration;
+            const excessBreak = Math.max(0, totalUsed - breakAllowance);
+
+            let expectedOut = new Date(expectedOutMs + (excessBreak * 60 * 1000));
+            const timeStr = expectedOut.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+            const subtitle = document.getElementById('timerSubtitle');
+            if (excessBreak > 0) {
+                subtitle.innerHTML = `Expected out: ${timeStr} <span style="color:#ef4444;">(+${excessBreak}m excess break)</span>`;
+            } else {
+                subtitle.textContent = `Expected out: ${timeStr}`;
+            }
         }
 
         // ========================================
@@ -1027,6 +1086,11 @@
 
                 document.getElementById('workingTimer').textContent =
                     `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+                // Update expected clock-out every minute (when not on active break)
+                if (!breakStartTime && attendanceData && attendanceData.data) {
+                    updateExpectedClockOut(attendanceData.data);
+                }
             };
 
             updateTimer();
@@ -1055,13 +1119,20 @@
                 btn.classList.remove('on-break');
                 timerCard.classList.remove('on-break');
                 document.getElementById('timerLabel').textContent = 'Working Time';
-                document.getElementById('timerSubtitle').textContent = 'Time at work today';
+                // Restore expected clock-out in subtitle
+                if (attendanceData && attendanceData.data) {
+                    updateExpectedClockOut(attendanceData.data);
+                } else {
+                    document.getElementById('timerSubtitle').textContent = 'Time at work today';
+                }
                 durationDisplay.style.display = 'none';
                 if (breakTimerInterval) {
                     clearInterval(breakTimerInterval);
                     breakTimerInterval = null;
                 }
                 currentBreakDuration = 0;
+                // Update break left after break ends
+                updateBreakLeftDisplay();
             }
         }
 
@@ -1076,8 +1147,40 @@
                 currentBreakDuration = Math.floor(diffMs / 1000 / 60);
                 const mins = Math.floor(diffMs / 1000 / 60);
                 const secs = Math.floor((diffMs / 1000) % 60);
-                document.getElementById('breakDurationDisplay').textContent =
-                    `Break: ${mins}m ${secs.toString().padStart(2, '0')}s`;
+
+                const totalUsed = breakPolicy.used + currentBreakDuration;
+                const remaining = Math.max(0, breakPolicy.allowance - totalUsed);
+                const durationEl = document.getElementById('breakDurationDisplay');
+
+                // Color code based on total usage
+                let color = '#d97706'; // default amber
+                if (totalUsed >= breakPolicy.allowance) {
+                    color = '#ef4444'; // red - exceeded
+                    const excess = totalUsed - breakPolicy.allowance;
+                    durationEl.innerHTML = `Break: ${mins}m ${secs.toString().padStart(2, '0')}s <span style="color:#ef4444;font-size:12px;">(${remaining > 0 ? remaining + 'm left' : excess + 'm over limit!'})</span>`;
+                } else if (totalUsed >= breakPolicy.warning) {
+                    color = '#d97706'; // amber - warning zone
+                    durationEl.innerHTML = `Break: ${mins}m ${secs.toString().padStart(2, '0')}s <span style="color:#d97706;font-size:12px;">(${remaining}m left)</span>`;
+                } else {
+                    color = '#059669'; // green - safe
+                    durationEl.innerHTML = `Break: ${mins}m ${secs.toString().padStart(2, '0')}s <span style="color:#059669;font-size:12px;">(${remaining}m left)</span>`;
+                }
+                durationEl.style.color = color;
+
+                // Warning toast at 90min threshold
+                if (totalUsed >= breakPolicy.warning && !breakWarningShown && totalUsed < breakPolicy.allowance) {
+                    breakWarningShown = true;
+                    showToast(`Break warning: ${remaining} minutes remaining`, 'warning');
+                }
+
+                // Exceeded toast at limit
+                if (totalUsed >= breakPolicy.allowance && !breakExceededShown) {
+                    breakExceededShown = true;
+                    showToast('Break limit reached! Excess time will be deducted from working hours', 'error');
+                }
+
+                // Update break left mini-stat in real-time
+                updateBreakLeftDisplay();
             };
 
             updateBreakDisplay();

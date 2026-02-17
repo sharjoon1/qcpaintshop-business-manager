@@ -397,6 +397,10 @@
                     <div class="stat-label">Pending Permissions</div>
                     <div class="stat-value" id="statPendingPerms">-</div>
                 </div>
+                <div class="stat-card" style="--border-color: #dc2626;">
+                    <div class="stat-label">Break Exceeded</div>
+                    <div class="stat-value" id="statBreakExceeded" style="color: #dc2626;">-</div>
+                </div>
             </div>
 
             <!-- Tab Bar -->
@@ -554,6 +558,7 @@
                                     <th>Clock In</th>
                                     <th>Clock Out</th>
                                     <th>Break</th>
+                                    <th>Excess Break</th>
                                     <th>Working Hours</th>
                                     <th>Status</th>
                                 </tr>
@@ -846,6 +851,7 @@
                     document.getElementById('statLate').textContent = s.late;
                     document.getElementById('statOnBreak').textContent = s.on_break;
                     document.getElementById('statPendingPerms').textContent = s.pending_permissions;
+                    document.getElementById('statBreakExceeded').textContent = s.break_exceeded || 0;
                 }
             } catch (e) {
                 console.error('Load summary error:', e);
@@ -882,7 +888,20 @@
                 tbody.innerHTML = rows.map(r => {
                     const clockIn = r.clock_in_time ? formatTime(r.clock_in_time) : '--:--';
                     const clockOut = r.clock_out_time ? formatTime(r.clock_out_time) : '--:--';
-                    const breakDur = r.break_duration_minutes ? `${r.break_duration_minutes}m` : '--';
+                    const breakMins = r.break_duration_minutes || 0;
+                    const breakAllowance = r.break_allowance_minutes || 120;
+                    let breakBadgeClass = '';
+                    let breakBadgeColor = '';
+                    if (breakMins > breakAllowance) {
+                        breakBadgeClass = 'badge'; breakBadgeColor = 'background:#fee2e2;color:#dc2626;';
+                    } else if (breakMins >= 90) {
+                        breakBadgeClass = 'badge'; breakBadgeColor = 'background:#fef3c7;color:#d97706;';
+                    } else if (breakMins > 0) {
+                        breakBadgeClass = 'badge'; breakBadgeColor = 'background:#d1fae5;color:#059669;';
+                    }
+                    const breakDur = breakMins > 0
+                        ? `<span class="${breakBadgeClass}" style="${breakBadgeColor}padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;">${breakMins}m${r.excess_break_minutes > 0 ? ' (+' + r.excess_break_minutes + ')' : ''}</span>`
+                        : '--';
                     const workHrs = r.total_working_minutes ? formatMinutesToHours(r.total_working_minutes) : (r.clock_in_time && !r.clock_out_time ? 'Ongoing' : '--');
                     const statusClass = r.status || 'absent';
                     const dayStatus = r.day_status || r.status;
@@ -1087,7 +1106,12 @@
                     const dayName = r.day_name || '';
                     const clockIn = r.clock_in_time ? formatTime(r.clock_in_time) : '--:--';
                     const clockOut = r.clock_out_time ? formatTime(r.clock_out_time) : '--:--';
-                    const breakDur = r.break_duration_minutes ? `${r.break_duration_minutes}m` : '--';
+                    const breakMins = r.break_duration_minutes || 0;
+                    const breakDur = breakMins > 0 ? `${breakMins}m` : '--';
+                    const excessBreak = r.excess_break_minutes || 0;
+                    const excessDisplay = excessBreak > 0
+                        ? `<span style="color:#dc2626;font-weight:600;">${excessBreak}m</span>`
+                        : '--';
                     const workHrs = r.total_working_minutes ? formatMinutesToHours(r.total_working_minutes) : '--';
                     const statusClass = (r.day_status || r.status || '').toLowerCase();
 
@@ -1097,6 +1121,7 @@
                         <td>${clockIn}</td>
                         <td>${clockOut}</td>
                         <td>${breakDur}</td>
+                        <td>${excessDisplay}</td>
                         <td>${workHrs}</td>
                         <td>
                             <span class="badge badge-${statusClass}">${escapeHtml(r.day_status || r.status)}</span>

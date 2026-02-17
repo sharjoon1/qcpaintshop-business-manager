@@ -160,7 +160,9 @@ async function getShopHours(branchId, date) {
         expected_hours: dayOfWeek === 'sunday' ? 5.00 : 10.00,
         late_threshold_minutes: 15,
         break_min_minutes: 60,
-        break_max_minutes: 120
+        break_max_minutes: 120,
+        break_allowance_minutes: 120,
+        break_warning_minutes: 90
     };
 }
 
@@ -370,16 +372,18 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
         // Save photo
         const photoPath = await saveAttendancePhoto(photo.buffer, userId, 'clock-in');
 
-        // Create attendance record
+        // Create attendance record (include break_allowance_minutes from shop hours)
+        const breakAllowanceForRecord = shopHours.break_allowance_minutes || 120;
         const [result] = await pool.query(
             `INSERT INTO staff_attendance
              (user_id, branch_id, date, clock_in_time, clock_in_photo,
               clock_in_lat, clock_in_lng, clock_in_address,
-              is_late, expected_hours, status, clock_in_distance, is_reclockin, is_overtime)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', ?, ?, ?)`,
+              is_late, expected_hours, status, clock_in_distance, is_reclockin, is_overtime,
+              break_allowance_minutes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', ?, ?, ?, ?)`,
             [userId, branchId, today, now, photoPath, latitude, longitude,
              address, late ? 1 : 0, shopHours.expected_hours, clockInDistance,
-             isReclockin ? 1 : 0, isOvertime ? 1 : 0]
+             isReclockin ? 1 : 0, isOvertime ? 1 : 0, breakAllowanceForRecord]
         );
 
         // Reset allow_reclockin flag AFTER successful record creation
@@ -561,25 +565,35 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
 
         // Calculate working minutes
         const workingMinutes = calculateWorkingMinutes(
-            record.clock_in_time, 
-            now, 
+            record.clock_in_time,
+            now,
             record.break_duration_minutes || 0
         );
-        
+
+        // Calculate break enforcement data
+        const breakAllowance = record.break_allowance_minutes || 120;
+        const totalBreak = record.break_duration_minutes || 0;
+        const excessBreak = Math.max(0, totalBreak - breakAllowance);
+        const breakExceeded = excessBreak > 0 ? 1 : 0;
+        // effective_working_minutes = same as workingMinutes since calculateWorkingMinutes already deducts ALL break
+        const effectiveWorking = workingMinutes;
+
         // Check if early checkout
         const currentTime = now.toTimeString().split(' ')[0];
         const closeTime = new Date(`1970-01-01T${record.close_time}`);
         const currentDateTime = new Date(`1970-01-01T${currentTime}`);
         const isEarly = currentDateTime < closeTime;
-        
-        // Update attendance
+
+        // Update attendance with break enforcement data
         await pool.query(
             `UPDATE staff_attendance
              SET clock_out_time = ?, clock_out_photo = ?,
                  clock_out_lat = ?, clock_out_lng = ?, clock_out_address = ?,
-                 total_working_minutes = ?, is_early_checkout = ?, clock_out_distance = ?
+                 total_working_minutes = ?, is_early_checkout = ?, clock_out_distance = ?,
+                 excess_break_minutes = ?, break_exceeded = ?, effective_working_minutes = ?
              WHERE id = ?`,
-            [now, photoPath, latitude, longitude, address, workingMinutes, isEarly ? 1 : 0, clockOutDistance, record.id]
+            [now, photoPath, latitude, longitude, address, workingMinutes, isEarly ? 1 : 0, clockOutDistance,
+             excessBreak, breakExceeded, effectiveWorking, record.id]
         );
         
         // Save photo record
@@ -644,7 +658,9 @@ router.get('/today', requireAuth, async (req, res) => {
             `SELECT a.*,
                     u.full_name, u.username,
                     b.name as branch_name,
-                    shc.open_time, shc.close_time, shc.expected_hours
+                    shc.open_time, shc.close_time, shc.expected_hours,
+                    shc.break_allowance_minutes as shop_break_allowance,
+                    shc.break_warning_minutes as shop_break_warning
              FROM staff_attendance a
              JOIN users u ON a.user_id = u.id
              JOIN branches b ON a.branch_id = b.id
@@ -704,6 +720,11 @@ router.get('/today', requireAuth, async (req, res) => {
             }
         }
 
+        // Build break policy info
+        const breakAllowance = attendance.break_allowance_minutes || attendance.shop_break_allowance || 120;
+        const breakWarning = attendance.shop_break_warning || 90;
+        const breakUsed = attendance.break_duration_minutes || 0;
+
         res.json({
             success: true,
             has_clocked_in: true,
@@ -711,6 +732,14 @@ router.get('/today', requireAuth, async (req, res) => {
             reclockin_status: reclockinStatus,
             day_total_minutes: dayTotalMinutes,
             outside_work: outsideWork,
+            break_policy: {
+                allowance: breakAllowance,
+                warning: breakWarning,
+                used: breakUsed,
+                remaining: Math.max(0, breakAllowance - breakUsed),
+                exceeded: breakUsed > breakAllowance,
+                excess: Math.max(0, breakUsed - breakAllowance)
+            },
             data: attendance
         });
         
@@ -927,25 +956,66 @@ router.post('/break-end', requireAuth, upload.single('photo'), async (req, res) 
         const previousBreakMinutes = record.break_duration_minutes || 0;
         const breakDuration = previousBreakMinutes + thisBreakMinutes;
 
-        // Check if break is too short or too long
+        // Check break enforcement
+        const shopHours = await getShopHours(record.branch_id, today);
+        const breakAllowance = record.break_allowance_minutes || shopHours.break_allowance_minutes || 120;
+        const breakWarningAt = shopHours.break_warning_minutes || 90;
+
         const warnings = [];
         if (breakDuration < record.break_min_minutes) {
             warnings.push(`Break was shorter than minimum ${record.break_min_minutes} minutes`);
         }
-        if (breakDuration > record.break_max_minutes) {
-            warnings.push(`Break exceeded maximum ${record.break_max_minutes} minutes`);
+
+        let excessMinutes = 0;
+        let breakExceeded = 0;
+        let breakWarningSent = record.break_warning_sent || 0;
+
+        if (breakDuration > breakAllowance) {
+            excessMinutes = breakDuration - breakAllowance;
+            breakExceeded = 1;
+            warnings.push(`Break exceeded allowance by ${excessMinutes} minutes — excess will be deducted from working hours`);
+
+            // Notify staff
+            try {
+                await notificationService.send(userId, {
+                    type: 'break_exceeded',
+                    title: 'Break Limit Exceeded',
+                    body: `Your break exceeded the ${breakAllowance}min allowance by ${excessMinutes}min. Excess time will be deducted from working hours.`,
+                    data: { type: 'break_exceeded', excess_minutes: excessMinutes }
+                });
+            } catch (e) { console.error('Break exceed notification (staff) error:', e.message); }
+
+            // Notify admins
+            try {
+                const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                const [staffUser] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
+                const staffName = staffUser.length > 0 ? staffUser[0].full_name : 'Staff';
+                for (const admin of admins) {
+                    await notificationService.send(admin.id, {
+                        type: 'break_exceeded',
+                        title: 'Break Allowance Exceeded',
+                        body: `${staffName} exceeded break allowance by ${excessMinutes}min (total: ${breakDuration}min).`,
+                        data: { type: 'break_exceeded', staff_name: staffName, excess_minutes: excessMinutes }
+                    }).catch(() => {});
+                }
+            } catch (e) { console.error('Break exceed notification (admin) error:', e.message); }
+        } else if (breakDuration >= breakWarningAt && !breakWarningSent) {
+            breakWarningSent = 1;
+            warnings.push(`Break warning: ${breakAllowance - breakDuration} minutes remaining`);
         }
 
         // Save break photo
         const photoPath = await saveAttendancePhoto(photo.buffer, userId, 'break');
 
-        // Update attendance with break end + photo + GPS
+        // Update attendance with break end + photo + GPS + enforcement data
         await pool.query(
             `UPDATE staff_attendance
              SET break_end_time = ?, break_duration_minutes = ?,
-             break_end_photo = ?, break_end_lat = ?, break_end_lng = ?
+             break_end_photo = ?, break_end_lat = ?, break_end_lng = ?,
+             excess_break_minutes = ?, break_exceeded = ?, break_warning_sent = ?
              WHERE id = ?`,
-            [now, breakDuration, photoPath, latitude, longitude, record.id]
+            [now, breakDuration, photoPath, latitude, longitude,
+             excessMinutes, breakExceeded, breakWarningSent, record.id]
         );
 
         // Save photo record
@@ -976,6 +1046,64 @@ router.post('/break-end', requireAuth, upload.single('photo'), async (req, res) 
             success: false,
             message: 'Failed to end break'
         });
+    }
+});
+
+/**
+ * GET /api/attendance/break-status
+ * Real-time break status for dashboard
+ */
+router.get('/break-status', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const today = getTodayIST();
+
+        const [rows] = await pool.query(
+            `SELECT a.break_duration_minutes, a.break_start_time, a.break_end_time,
+                    a.break_allowance_minutes, a.break_warning_sent, a.break_exceeded,
+                    a.excess_break_minutes,
+                    COALESCE(shc.break_allowance_minutes, 120) as shop_break_allowance,
+                    COALESCE(shc.break_warning_minutes, 90) as shop_break_warning
+             FROM staff_attendance a
+             LEFT JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
+                AND shc.day_of_week = LOWER(DAYNAME(a.date))
+             WHERE a.user_id = ? AND a.date = ? AND a.clock_out_time IS NULL
+             ORDER BY a.id DESC LIMIT 1`,
+            [userId, today]
+        );
+
+        if (rows.length === 0) {
+            return res.json({ success: true, data: null });
+        }
+
+        const record = rows[0];
+        const allowance = record.break_allowance_minutes || record.shop_break_allowance || 120;
+        const warningAt = record.shop_break_warning || 90;
+        let totalUsed = record.break_duration_minutes || 0;
+
+        // If currently on break, add elapsed break time
+        if (record.break_start_time && !record.break_end_time) {
+            const breakStart = new Date(record.break_start_time);
+            const now = new Date();
+            totalUsed += Math.floor((now - breakStart) / 1000 / 60);
+        }
+
+        res.json({
+            success: true,
+            data: {
+                allowance: allowance,
+                warning_at: warningAt,
+                total_used: totalUsed,
+                remaining: Math.max(0, allowance - totalUsed),
+                is_exceeded: totalUsed > allowance,
+                excess_minutes: Math.max(0, totalUsed - allowance),
+                on_break: !!(record.break_start_time && !record.break_end_time)
+            }
+        });
+
+    } catch (error) {
+        console.error('Break status error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get break status' });
     }
 });
 
@@ -1812,7 +1940,8 @@ router.get('/admin/today-summary', requirePermission('attendance', 'view'), asyn
                 COUNT(*) as present,
                 SUM(CASE WHEN is_late = 1 THEN 1 ELSE 0 END) as late,
                 SUM(CASE WHEN break_start_time IS NOT NULL AND break_end_time IS NULL THEN 1 ELSE 0 END) as on_break,
-                SUM(CASE WHEN clock_out_time IS NULL THEN 1 ELSE 0 END) as not_clocked_out
+                SUM(CASE WHEN clock_out_time IS NULL THEN 1 ELSE 0 END) as not_clocked_out,
+                SUM(CASE WHEN break_exceeded = 1 THEN 1 ELSE 0 END) as break_exceeded
              FROM staff_attendance
              WHERE date = ? AND status = 'present'`,
             [today]
@@ -1835,7 +1964,8 @@ router.get('/admin/today-summary', requirePermission('attendance', 'view'), asyn
                 late: stats.late || 0,
                 on_break: stats.on_break || 0,
                 not_clocked_out: stats.not_clocked_out || 0,
-                pending_permissions: permRows[0].pending || 0
+                pending_permissions: permRows[0].pending || 0,
+                break_exceeded: stats.break_exceeded || 0
             }
         });
 
