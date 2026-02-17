@@ -1,0 +1,210 @@
+<!-- Branches & Staff Sub-Navigation Component -->
+<style>
+    .branches-subnav {
+        background: #ffffff;
+        border-bottom: 1px solid #e8ecf1;
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        padding: 0;
+    }
+
+    .branches-subnav-inner {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 1rem;
+        position: relative;
+    }
+
+    /* Desktop: Horizontal scrollable tabs */
+    .branches-subnav-tabs {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: 0.5rem 0;
+    }
+    .branches-subnav-tabs::-webkit-scrollbar { display: none; }
+
+    .branches-subnav-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: #64748b;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        flex-shrink: 0;
+    }
+    .branches-subnav-tab:hover {
+        background: #f1f5f9;
+        color: #334155;
+    }
+    .branches-subnav-tab svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+    }
+    .branches-subnav-tab.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #ffffff;
+        border-color: transparent;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    .branches-subnav-tab.active:hover {
+        background: linear-gradient(135deg, #5a6fd6, #6a4192);
+        color: #ffffff;
+    }
+
+    /* Mobile hamburger toggle */
+    .branches-subnav-toggle {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.625rem 0;
+        width: 100%;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #475569;
+    }
+    .branches-subnav-toggle svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        transition: transform 0.2s ease;
+    }
+    .branches-subnav-toggle.open svg.chevron-icon {
+        transform: rotate(180deg);
+    }
+
+    .branches-subnav-toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .branches-subnav-toggle-label svg {
+        width: 16px;
+        height: 16px;
+        stroke: #667eea;
+    }
+
+    /* Mobile dropdown */
+    .branches-subnav-dropdown {
+        display: none;
+        flex-direction: column;
+        gap: 2px;
+        padding-bottom: 0.5rem;
+    }
+    .branches-subnav-dropdown.show {
+        display: flex;
+    }
+    .branches-subnav-dropdown .branches-subnav-tab {
+        width: 100%;
+        padding: 8px 12px;
+        border-radius: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .branches-subnav-tabs {
+            display: none;
+        }
+        .branches-subnav-toggle {
+            display: flex;
+        }
+    }
+</style>
+
+<nav class="branches-subnav" id="branchesSubnav">
+    <div class="branches-subnav-inner">
+        <!-- Mobile toggle -->
+        <button class="branches-subnav-toggle" id="branchesSubnavToggle" onclick="toggleBranchesSubnav()">
+            <span class="branches-subnav-toggle-label">
+                <svg viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                <span id="branchesSubnavCurrentPage">Branches & Staff</span>
+            </span>
+            <svg class="chevron-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <!-- Mobile dropdown -->
+        <div class="branches-subnav-dropdown" id="branchesSubnavDropdown"></div>
+
+        <!-- Desktop horizontal tabs -->
+        <div class="branches-subnav-tabs" id="branchesSubnavTabs"></div>
+    </div>
+</nav>
+
+<script>
+(function() {
+    var branchesPages = [
+        { page: 'branches', label: 'Branches', href: '/admin-branches.html', icon: '<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>' },
+        { page: 'staff', label: 'Staff', href: '/admin-staff.html', icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>' },
+        { page: 'staff-registrations', label: 'Registrations', href: '/admin-staff-registrations.html', icon: '<path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>' },
+        { page: 'roles', label: 'Roles', href: '/admin-roles.html', icon: '<path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>' },
+        { page: 'permissions', label: 'Permissions', href: '/admin-role-permissions.html', icon: '<path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>' }
+    ];
+
+    var currentPage = document.body.getAttribute('data-page') || document.documentElement.getAttribute('data-page') || '';
+    var currentPageObj = branchesPages.find(function(p) { return p.page === currentPage; });
+
+    var tabsContainer = document.getElementById('branchesSubnavTabs');
+    var dropdownContainer = document.getElementById('branchesSubnavDropdown');
+
+    branchesPages.forEach(function(p) {
+        var isActive = p.page === currentPage;
+        var tabHtml = '<a href="' + p.href + '" class="branches-subnav-tab' + (isActive ? ' active' : '') + '" data-branches-page="' + p.page + '">' +
+            '<svg viewBox="0 0 24 24">' + p.icon + '</svg>' +
+            '<span>' + p.label + '</span>' +
+        '</a>';
+
+        tabsContainer.insertAdjacentHTML('beforeend', tabHtml);
+        dropdownContainer.insertAdjacentHTML('beforeend', tabHtml);
+    });
+
+    if (currentPageObj) {
+        document.getElementById('branchesSubnavCurrentPage').textContent = currentPageObj.label;
+    }
+
+    setTimeout(function() {
+        var activeTab = tabsContainer.querySelector('.branches-subnav-tab.active');
+        if (activeTab) {
+            activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+    }, 100);
+})();
+
+function toggleBranchesSubnav() {
+    var toggle = document.getElementById('branchesSubnavToggle');
+    var dropdown = document.getElementById('branchesSubnavDropdown');
+    toggle.classList.toggle('open');
+    dropdown.classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+    var subnav = document.getElementById('branchesSubnav');
+    if (subnav && !subnav.contains(e.target)) {
+        var toggle = document.getElementById('branchesSubnavToggle');
+        var dropdown = document.getElementById('branchesSubnavDropdown');
+        if (toggle) toggle.classList.remove('open');
+        if (dropdown) dropdown.classList.remove('show');
+    }
+});
+</script>

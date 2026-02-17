@@ -1,0 +1,210 @@
+<!-- Leads & CRM Sub-Navigation Component -->
+<style>
+    .leads-subnav {
+        background: #ffffff;
+        border-bottom: 1px solid #e8ecf1;
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        padding: 0;
+    }
+
+    .leads-subnav-inner {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 1rem;
+        position: relative;
+    }
+
+    /* Desktop: Horizontal scrollable tabs */
+    .leads-subnav-tabs {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: 0.5rem 0;
+    }
+    .leads-subnav-tabs::-webkit-scrollbar { display: none; }
+
+    .leads-subnav-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: #64748b;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        flex-shrink: 0;
+    }
+    .leads-subnav-tab:hover {
+        background: #f1f5f9;
+        color: #334155;
+    }
+    .leads-subnav-tab svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+    }
+    .leads-subnav-tab.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #ffffff;
+        border-color: transparent;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    .leads-subnav-tab.active:hover {
+        background: linear-gradient(135deg, #5a6fd6, #6a4192);
+        color: #ffffff;
+    }
+
+    /* Mobile hamburger toggle */
+    .leads-subnav-toggle {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.625rem 0;
+        width: 100%;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #475569;
+    }
+    .leads-subnav-toggle svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        transition: transform 0.2s ease;
+    }
+    .leads-subnav-toggle.open svg.chevron-icon {
+        transform: rotate(180deg);
+    }
+
+    .leads-subnav-toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .leads-subnav-toggle-label svg {
+        width: 16px;
+        height: 16px;
+        stroke: #667eea;
+    }
+
+    /* Mobile dropdown */
+    .leads-subnav-dropdown {
+        display: none;
+        flex-direction: column;
+        gap: 2px;
+        padding-bottom: 0.5rem;
+    }
+    .leads-subnav-dropdown.show {
+        display: flex;
+    }
+    .leads-subnav-dropdown .leads-subnav-tab {
+        width: 100%;
+        padding: 8px 12px;
+        border-radius: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .leads-subnav-tabs {
+            display: none;
+        }
+        .leads-subnav-toggle {
+            display: flex;
+        }
+    }
+</style>
+
+<nav class="leads-subnav" id="leadsSubnav">
+    <div class="leads-subnav-inner">
+        <!-- Mobile toggle -->
+        <button class="leads-subnav-toggle" id="leadsSubnavToggle" onclick="toggleLeadsSubnav()">
+            <span class="leads-subnav-toggle-label">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                <span id="leadsSubnavCurrentPage">Leads & CRM</span>
+            </span>
+            <svg class="chevron-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <!-- Mobile dropdown -->
+        <div class="leads-subnav-dropdown" id="leadsSubnavDropdown"></div>
+
+        <!-- Desktop horizontal tabs -->
+        <div class="leads-subnav-tabs" id="leadsSubnavTabs"></div>
+    </div>
+</nav>
+
+<script>
+(function() {
+    var leadsPages = [
+        { page: 'leads', label: 'Lead Management', href: '/admin-leads.html', icon: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>' },
+        { page: 'customers', label: 'Customers', href: '/admin-customers.html', icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>' },
+        { page: 'customer-types', label: 'Customer Types', href: '/admin-customer-types.html', icon: '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>' },
+        { page: 'design-requests', label: 'Design Requests', href: '/admin-design-requests.html', icon: '<path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>' },
+        { page: 'estimate-requests', label: 'Estimate Requests', href: '/admin-estimate-requests.html', icon: '<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>' }
+    ];
+
+    var currentPage = document.body.getAttribute('data-page') || document.documentElement.getAttribute('data-page') || '';
+    var currentPageObj = leadsPages.find(function(p) { return p.page === currentPage; });
+
+    var tabsContainer = document.getElementById('leadsSubnavTabs');
+    var dropdownContainer = document.getElementById('leadsSubnavDropdown');
+
+    leadsPages.forEach(function(p) {
+        var isActive = p.page === currentPage;
+        var tabHtml = '<a href="' + p.href + '" class="leads-subnav-tab' + (isActive ? ' active' : '') + '" data-leads-page="' + p.page + '">' +
+            '<svg viewBox="0 0 24 24">' + p.icon + '</svg>' +
+            '<span>' + p.label + '</span>' +
+        '</a>';
+
+        tabsContainer.insertAdjacentHTML('beforeend', tabHtml);
+        dropdownContainer.insertAdjacentHTML('beforeend', tabHtml);
+    });
+
+    if (currentPageObj) {
+        document.getElementById('leadsSubnavCurrentPage').textContent = currentPageObj.label;
+    }
+
+    setTimeout(function() {
+        var activeTab = tabsContainer.querySelector('.leads-subnav-tab.active');
+        if (activeTab) {
+            activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+    }, 100);
+})();
+
+function toggleLeadsSubnav() {
+    var toggle = document.getElementById('leadsSubnavToggle');
+    var dropdown = document.getElementById('leadsSubnavDropdown');
+    toggle.classList.toggle('open');
+    dropdown.classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+    var subnav = document.getElementById('leadsSubnav');
+    if (subnav && !subnav.contains(e.target)) {
+        var toggle = document.getElementById('leadsSubnavToggle');
+        var dropdown = document.getElementById('leadsSubnavDropdown');
+        if (toggle) toggle.classList.remove('open');
+        if (dropdown) dropdown.classList.remove('show');
+    }
+});
+</script>

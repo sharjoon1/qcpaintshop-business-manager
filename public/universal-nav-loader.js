@@ -12,8 +12,37 @@
         SIDEBAR_PATH: '/components/sidebar-complete.html',
         ZOHO_SUBNAV_PATH: '/components/zoho-subnav.html',
         ATTENDANCE_SUBNAV_PATH: '/components/attendance-subnav.html',
+        LEADS_SUBNAV_PATH: '/components/leads-subnav.html',
+        BRANCHES_SUBNAV_PATH: '/components/branches-subnav.html',
+        SALARY_SUBNAV_PATH: '/components/salary-subnav.html',
         RETRY_ATTEMPTS: 3,
         RETRY_DELAY: 1000
+    };
+
+    // Map data-page values to subnav component paths
+    const SUBNAV_MAP = {
+        // Leads & CRM
+        'leads': CONFIG.LEADS_SUBNAV_PATH,
+        'customers': CONFIG.LEADS_SUBNAV_PATH,
+        'customer-types': CONFIG.LEADS_SUBNAV_PATH,
+        'design-requests': CONFIG.LEADS_SUBNAV_PATH,
+        'estimate-requests': CONFIG.LEADS_SUBNAV_PATH,
+        // Branches & Staff
+        'branches': CONFIG.BRANCHES_SUBNAV_PATH,
+        'staff': CONFIG.BRANCHES_SUBNAV_PATH,
+        'staff-registrations': CONFIG.BRANCHES_SUBNAV_PATH,
+        'roles': CONFIG.BRANCHES_SUBNAV_PATH,
+        'permissions': CONFIG.BRANCHES_SUBNAV_PATH,
+        // HR & Attendance (admin pages)
+        'admin-tasks': CONFIG.ATTENDANCE_SUBNAV_PATH,
+        'admin-daily-tasks': CONFIG.ATTENDANCE_SUBNAV_PATH,
+        'geofence-logs': CONFIG.ATTENDANCE_SUBNAV_PATH,
+        // Salary & Payroll
+        'salary-config': CONFIG.SALARY_SUBNAV_PATH,
+        'salary-monthly': CONFIG.SALARY_SUBNAV_PATH,
+        'salary-payments': CONFIG.SALARY_SUBNAV_PATH,
+        'salary-advances': CONFIG.SALARY_SUBNAV_PATH,
+        'salary-reports': CONFIG.SALARY_SUBNAV_PATH,
     };
     
     // Skip navigation on login pages and public share pages
@@ -149,15 +178,26 @@
                 const dataPage = document.body.getAttribute('data-page') || document.documentElement.getAttribute('data-page') || '';
                 const header = document.getElementById('mainHeader');
                 if (header && header.nextSibling) {
+                    let subnavPath = null;
+                    let subnavName = '';
+
+                    // Check prefix-based matches first (existing behavior)
                     if (dataPage.startsWith('zoho-')) {
-                        const subnavLoaded = await loadComponentWithRetry(CONFIG.ZOHO_SUBNAV_PATH, header.nextSibling);
-                        if (subnavLoaded) {
-                            console.log('✅ Zoho sub-navigation loaded');
-                        }
+                        subnavPath = CONFIG.ZOHO_SUBNAV_PATH;
+                        subnavName = 'Zoho';
                     } else if (dataPage.startsWith('attendance-')) {
-                        const subnavLoaded = await loadComponentWithRetry(CONFIG.ATTENDANCE_SUBNAV_PATH, header.nextSibling);
+                        subnavPath = CONFIG.ATTENDANCE_SUBNAV_PATH;
+                        subnavName = 'Attendance';
+                    } else if (SUBNAV_MAP[dataPage]) {
+                        // Fallback to explicit mapping
+                        subnavPath = SUBNAV_MAP[dataPage];
+                        subnavName = dataPage;
+                    }
+
+                    if (subnavPath) {
+                        const subnavLoaded = await loadComponentWithRetry(subnavPath, header.nextSibling);
                         if (subnavLoaded) {
-                            console.log('✅ Attendance sub-navigation loaded');
+                            console.log(`✅ ${subnavName} sub-navigation loaded`);
                         }
                     }
                 }
