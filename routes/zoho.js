@@ -5,6 +5,8 @@
  * Endpoints:
  *   GET    /api/zoho/status           - Connection & sync status
  *   GET    /api/zoho/dashboard        - Dashboard stats
+ *   GET    /api/zoho/dashboard/drilldown - Drill into stat card metrics
+ *   GET    /api/zoho/dashboard/drilldown/export - Export drilldown as CSV
  *   POST   /api/zoho/sync/full        - Trigger full sync
  *   POST   /api/zoho/sync/invoices    - Sync invoices only
  *   POST   /api/zoho/sync/customers   - Sync customers only
@@ -142,7 +144,8 @@ router.get('/status', requirePermission('zoho', 'view'), async (req, res) => {
                 sync_enabled: configMap.sync_enabled === 'true',
                 sync_interval: configMap.sync_interval_minutes || '30',
                 last_full_sync: configMap.last_full_sync || null,
-                recent_syncs: lastSync
+                recent_syncs: lastSync,
+                zoho_org_id: process.env.ZOHO_ORGANIZATION_ID || null
             }
         });
     } catch (error) {
@@ -222,6 +225,225 @@ router.get('/dashboard/export', requirePermission('zoho', 'view'), async (req, r
         res.send(csv);
     } catch (error) {
         console.error('[Zoho] Dashboard export error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * GET /api/zoho/dashboard/drilldown - Drill into a specific stat card metric
+ * Query params: metric (required), from_date, to_date, search, sort, order, page, limit
+ */
+router.get('/dashboard/drilldown', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const { metric, from_date, to_date, search, sort, order = 'DESC', page = 1, limit = 25 } = req.query;
+
+        if (!metric) {
+            return res.status(400).json({ success: false, message: 'metric parameter is required' });
+        }
+
+        // Determine which table and conditions to use
+        const invoiceMetrics = ['revenue', 'outstanding', 'overdue', 'total_invoices', 'overdue_invoices', 'unpaid_invoices'];
+        const paymentMetrics = ['collected'];
+        const isInvoice = invoiceMetrics.includes(metric);
+        const isPayment = paymentMetrics.includes(metric);
+
+        if (!isInvoice && !isPayment) {
+            return res.status(400).json({ success: false, message: 'Invalid metric: ' + metric });
+        }
+
+        let where = 'WHERE 1=1';
+        const params = [];
+
+        if (isInvoice) {
+            // Date filter on invoice_date
+            if (from_date) { where += ' AND zi.invoice_date >= ?'; params.push(from_date); }
+            if (to_date) { where += ' AND zi.invoice_date <= ?'; params.push(to_date); }
+
+            // Metric-specific conditions
+            if (metric === 'outstanding') {
+                where += ' AND zi.balance > 0';
+            } else if (metric === 'overdue' || metric === 'overdue_invoices') {
+                where += " AND zi.status = 'overdue'";
+            } else if (metric === 'unpaid_invoices') {
+                where += " AND zi.status IN ('sent','overdue','partially_paid')";
+            }
+
+            // Search
+            if (search) {
+                where += ' AND (zi.customer_name LIKE ? OR zi.invoice_number LIKE ?)';
+                params.push('%' + search + '%', '%' + search + '%');
+            }
+
+            // Sort
+            const allowedSorts = ['invoice_number', 'customer_name', 'invoice_date', 'due_date', 'total', 'balance', 'status'];
+            const sortCol = allowedSorts.includes(sort) ? sort : 'invoice_date';
+            const sortOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+            const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+
+            // Count + summary
+            const [[counts]] = await pool.query(
+                `SELECT COUNT(*) as total, COALESCE(SUM(zi.total), 0) as total_amount FROM zoho_invoices zi ${where}`, params
+            );
+
+            // Data
+            const [rows] = await pool.query(`
+                SELECT zi.id, zi.zoho_invoice_id, zi.invoice_number, zi.customer_name,
+                       zi.invoice_date, zi.due_date, zi.total, zi.balance, zi.status
+                FROM zoho_invoices zi
+                ${where}
+                ORDER BY zi.${sortCol} ${sortOrder}
+                LIMIT ? OFFSET ?
+            `, [...params, parseInt(limit), offset]);
+
+            res.json({
+                success: true,
+                type: 'invoices',
+                data: rows,
+                pagination: {
+                    total: counts.total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    pages: Math.ceil(counts.total / parseInt(limit))
+                },
+                summary: { total_amount: counts.total_amount, count: counts.total }
+            });
+
+        } else {
+            // Payment metric (collected)
+            if (from_date) { where += ' AND zp.payment_date >= ?'; params.push(from_date); }
+            if (to_date) { where += ' AND zp.payment_date <= ?'; params.push(to_date); }
+
+            if (search) {
+                where += ' AND (zp.customer_name LIKE ? OR zp.payment_number LIKE ?)';
+                params.push('%' + search + '%', '%' + search + '%');
+            }
+
+            const allowedSorts = ['payment_number', 'customer_name', 'payment_date', 'amount', 'payment_mode'];
+            const sortCol = allowedSorts.includes(sort) ? sort : 'payment_date';
+            const sortOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+            const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+
+            const [[counts]] = await pool.query(
+                `SELECT COUNT(*) as total, COALESCE(SUM(zp.amount), 0) as total_amount FROM zoho_payments zp ${where}`, params
+            );
+
+            const [rows] = await pool.query(`
+                SELECT zp.id, zp.zoho_payment_id, zp.payment_number, zp.customer_name,
+                       zp.payment_date, zp.amount, zp.payment_mode, zp.reference_number, zp.description
+                FROM zoho_payments zp
+                ${where}
+                ORDER BY zp.${sortCol} ${sortOrder}
+                LIMIT ? OFFSET ?
+            `, [...params, parseInt(limit), offset]);
+
+            res.json({
+                success: true,
+                type: 'payments',
+                data: rows,
+                pagination: {
+                    total: counts.total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    pages: Math.ceil(counts.total / parseInt(limit))
+                },
+                summary: { total_amount: counts.total_amount, count: counts.total }
+            });
+        }
+    } catch (error) {
+        console.error('[Zoho] Drilldown error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * GET /api/zoho/dashboard/drilldown/export - Export drilldown data as CSV
+ * Same params as drilldown minus page/limit
+ */
+router.get('/dashboard/drilldown/export', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const { metric, from_date, to_date, search, sort, order = 'DESC' } = req.query;
+
+        if (!metric) {
+            return res.status(400).json({ success: false, message: 'metric parameter is required' });
+        }
+
+        const invoiceMetrics = ['revenue', 'outstanding', 'overdue', 'total_invoices', 'overdue_invoices', 'unpaid_invoices'];
+        const isInvoice = invoiceMetrics.includes(metric);
+
+        let where = 'WHERE 1=1';
+        const params = [];
+
+        if (isInvoice) {
+            if (from_date) { where += ' AND zi.invoice_date >= ?'; params.push(from_date); }
+            if (to_date) { where += ' AND zi.invoice_date <= ?'; params.push(to_date); }
+            if (metric === 'outstanding') where += ' AND zi.balance > 0';
+            else if (metric === 'overdue' || metric === 'overdue_invoices') where += " AND zi.status = 'overdue'";
+            else if (metric === 'unpaid_invoices') where += " AND zi.status IN ('sent','overdue','partially_paid')";
+            if (search) {
+                where += ' AND (zi.customer_name LIKE ? OR zi.invoice_number LIKE ?)';
+                params.push('%' + search + '%', '%' + search + '%');
+            }
+
+            const allowedSorts = ['invoice_number', 'customer_name', 'invoice_date', 'due_date', 'total', 'balance', 'status'];
+            const sortCol = allowedSorts.includes(sort) ? sort : 'invoice_date';
+            const sortOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+            const [rows] = await pool.query(`
+                SELECT zi.invoice_number, zi.customer_name, zi.invoice_date, zi.due_date,
+                       zi.total, zi.balance, zi.status
+                FROM zoho_invoices zi ${where}
+                ORDER BY zi.${sortCol} ${sortOrder}
+            `, params);
+
+            let csv = 'Invoice #,Customer,Date,Due Date,Total,Balance,Status\n';
+            rows.forEach(function(r) {
+                csv += '"' + (r.invoice_number || '') + '","' + (r.customer_name || '').replace(/"/g, '""') + '",' +
+                       (r.invoice_date || '') + ',' + (r.due_date || '') + ',' +
+                       (r.total || 0) + ',' + (r.balance || 0) + ',' + (r.status || '') + '\n';
+            });
+
+            const metricLabel = metric.replace(/_/g, '-');
+            const filename = 'zoho-drilldown-' + metricLabel + '-' + (from_date || 'all') + '-to-' + (to_date || 'all') + '.csv';
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+            res.send(csv);
+
+        } else {
+            // Payments
+            if (from_date) { where += ' AND zp.payment_date >= ?'; params.push(from_date); }
+            if (to_date) { where += ' AND zp.payment_date <= ?'; params.push(to_date); }
+            if (search) {
+                where += ' AND (zp.customer_name LIKE ? OR zp.payment_number LIKE ?)';
+                params.push('%' + search + '%', '%' + search + '%');
+            }
+
+            const allowedSorts = ['payment_number', 'customer_name', 'payment_date', 'amount', 'payment_mode'];
+            const sortCol = allowedSorts.includes(sort) ? sort : 'payment_date';
+            const sortOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+            const [rows] = await pool.query(`
+                SELECT zp.payment_number, zp.customer_name, zp.payment_date,
+                       zp.amount, zp.payment_mode, zp.reference_number
+                FROM zoho_payments zp ${where}
+                ORDER BY zp.${sortCol} ${sortOrder}
+            `, params);
+
+            let csv = 'Payment #,Customer,Date,Amount,Mode,Reference\n';
+            rows.forEach(function(r) {
+                csv += '"' + (r.payment_number || '') + '","' + (r.customer_name || '').replace(/"/g, '""') + '",' +
+                       (r.payment_date || '') + ',' + (r.amount || 0) + ',' +
+                       '"' + (r.payment_mode || '') + '","' + (r.reference_number || '') + '"\n';
+            });
+
+            const filename = 'zoho-drilldown-collected-' + (from_date || 'all') + '-to-' + (to_date || 'all') + '.csv';
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+            res.send(csv);
+        }
+    } catch (error) {
+        console.error('[Zoho] Drilldown export error:', error.message);
         res.status(500).json({ success: false, message: error.message });
     }
 });

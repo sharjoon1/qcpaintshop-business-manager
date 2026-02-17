@@ -118,6 +118,19 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - API endpoints: `GET /dashboard?from_date&to_date&compare`, `GET /dashboard/trend?from_date&to_date&granularity`, `GET /dashboard/export?from_date&to_date`
 - Backward compatible: no params = all-time (existing behavior)
 
+**Stat Card Drill-Down**
+- Click any stat card (Revenue, Outstanding, Overdue, Collected, Total Invoices, Overdue Invoices, Unpaid Invoices) to see individual transactions
+- Full-screen slide-in panel with table, search, sort, pagination (25 per page)
+- Invoice metrics show: Invoice #, Customer, Date, Due Date, Total, Balance, Status, View in Zoho
+- Payment metric (Collected) shows: Payment #, Customer, Date, Amount, Mode, Reference, View in Zoho
+- "View in Zoho" links open Zoho Books directly (uses `ZOHO_ORGANIZATION_ID` env var exposed via `/status`)
+- CSV export of drilldown data, print-friendly layout
+- Search filters by customer name or invoice/payment number
+- Column header click sorts, toggle ASC/DESC
+- Close via X button, Escape key, or backdrop click
+- API endpoints: `GET /dashboard/drilldown?metric&from_date&to_date&search&sort&order&page&limit`, `GET /dashboard/drilldown/export?metric&...`
+- Metrics: `revenue`, `outstanding`, `overdue`, `collected`, `total_invoices`, `overdue_invoices`, `unpaid_invoices`
+
 **Data Sync**
 - Full sync (items + invoices + customers + payments)
 - Individual sync per entity type
@@ -854,7 +867,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 ### Zoho Pages
 | Page | File | Purpose |
 |------|------|---------|
-| Zoho Dashboard | `admin-zoho-dashboard.html` | Financial overview with time-period filtering, trend chart, comparison |
+| Zoho Dashboard | `admin-zoho-dashboard.html` | Financial overview with time-period filtering, trend chart, comparison, stat card drilldown |
 | Zoho Settings | `admin-zoho-settings.html` | OAuth & config |
 | Zoho Items | `admin-zoho-items.html` | Item catalog |
 | Zoho Items Edit | `admin-zoho-items-edit.html` | Bulk item editing |

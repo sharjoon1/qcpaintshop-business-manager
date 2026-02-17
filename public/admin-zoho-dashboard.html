@@ -356,6 +356,213 @@
             .period-bar { gap: 0.35rem; }
             .period-pill { padding: 0.3rem 0.65rem; font-size: 0.7rem; }
         }
+
+        /* Drilldown modal */
+        .stat-card[onclick] { cursor: pointer; }
+        .stat-card[onclick]:hover { transform: translateY(-3px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+
+        .drilldown-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: flex-end;
+        }
+        .drilldown-overlay.open { display: flex; }
+
+        .drilldown-panel {
+            background: white;
+            width: 100%;
+            max-width: 72rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            overflow: hidden;
+        }
+        .drilldown-overlay.open .drilldown-panel { transform: translateX(0); }
+
+        .drilldown-header {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+        }
+        .drilldown-header h2 { font-size: 1.125rem; font-weight: 700; color: #1f2937; flex: 1; }
+        .drilldown-header .period-tag {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        .drilldown-close {
+            width: 2rem; height: 2rem;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px;
+            border: none;
+            background: #f3f4f6;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.15s;
+        }
+        .drilldown-close:hover { background: #e5e7eb; color: #1f2937; }
+
+        .drilldown-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid #f3f4f6;
+            flex-wrap: wrap;
+        }
+        .drilldown-search {
+            flex: 1;
+            min-width: 150px;
+            padding: 0.4rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .drilldown-search:focus { border-color: #667eea; }
+        .drilldown-sort-select {
+            padding: 0.4rem 0.6rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            color: #374151;
+            background: white;
+        }
+        .drilldown-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.4rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid #d1d5db;
+            background: white;
+            color: #374151;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .drilldown-btn:hover { background: #f9fafb; border-color: #9ca3af; }
+
+        .drilldown-summary {
+            padding: 0.5rem 1.25rem;
+            font-size: 0.8rem;
+            color: #6b7280;
+            background: #f9fafb;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .drilldown-summary strong { color: #1f2937; font-weight: 700; }
+
+        .drilldown-table-wrap {
+            flex: 1;
+            overflow: auto;
+            padding: 0 1.25rem;
+        }
+        .drilldown-table {
+            width: 100%;
+            min-width: 600px;
+            font-size: 0.8rem;
+            border-collapse: collapse;
+        }
+        .drilldown-table thead { position: sticky; top: 0; z-index: 1; background: white; }
+        .drilldown-table th {
+            padding: 0.65rem 0.5rem;
+            text-align: left;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            border-bottom: 2px solid #e5e7eb;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+        .drilldown-table th:hover { color: #374151; }
+        .drilldown-table th.sorted { color: #667eea; }
+        .drilldown-table th .sort-arrow { font-size: 0.6rem; margin-left: 0.2rem; }
+        .drilldown-table td {
+            padding: 0.6rem 0.5rem;
+            border-bottom: 1px solid #f3f4f6;
+            color: #374151;
+        }
+        .drilldown-table tbody tr:hover { background: #f9fafb; }
+        .drilldown-table .text-right { text-align: right; }
+        .drilldown-table .link-cell { color: #667eea; font-weight: 600; }
+        .drilldown-table .overdue-date { color: #dc2626; }
+        .drilldown-table .zoho-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            font-size: 0.7rem;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .drilldown-table .zoho-link:hover { text-decoration: underline; }
+
+        .drilldown-pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid #e5e7eb;
+        }
+        .drilldown-pagination button {
+            padding: 0.3rem 0.65rem;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            background: white;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .drilldown-pagination button:hover { background: #f3f4f6; }
+        .drilldown-pagination button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .drilldown-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .drilldown-empty {
+            display: none;
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #9ca3af;
+            font-size: 0.85rem;
+        }
+        .drilldown-loading {
+            display: none;
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #9ca3af;
+        }
+
+        @media print {
+            body > *:not(.drilldown-overlay) { display: none !important; }
+            .drilldown-overlay { position: static !important; background: none !important; display: block !important; }
+            .drilldown-panel { transform: none !important; max-width: none !important; height: auto !important; }
+            .drilldown-toolbar, .drilldown-pagination, .drilldown-close { display: none !important; }
+            .drilldown-table-wrap { overflow: visible !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50" data-page="zoho-dashboard">
@@ -423,7 +630,7 @@
     <!-- KPI Stats Grid - Row 1 -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
         <!-- Total Revenue -->
-        <div class="stat-card" style="border-left-color: #7c3aed;">
+        <div class="stat-card" style="border-left-color: #7c3aed;" onclick="openDrilldown('revenue')" title="Click to see invoices">
             <div class="flex justify-between items-start">
                 <div>
                     <div id="statRevenue" class="stat-value">
@@ -441,7 +648,7 @@
         </div>
 
         <!-- Outstanding -->
-        <div class="stat-card" style="border-left-color: #f59e0b;">
+        <div class="stat-card" style="border-left-color: #f59e0b;" onclick="openDrilldown('outstanding')" title="Click to see outstanding invoices">
             <div class="flex justify-between items-start">
                 <div>
                     <div id="statOutstanding" class="stat-value">
@@ -459,7 +666,7 @@
         </div>
 
         <!-- Overdue Amount -->
-        <div class="stat-card" style="border-left-color: #ef4444;">
+        <div class="stat-card" style="border-left-color: #ef4444;" onclick="openDrilldown('overdue')" title="Click to see overdue invoices">
             <div class="flex justify-between items-start">
                 <div>
                     <div id="statOverdue" class="stat-value">
@@ -477,7 +684,7 @@
         </div>
 
         <!-- Collected -->
-        <div class="stat-card" style="border-left-color: #10b981;">
+        <div class="stat-card" style="border-left-color: #10b981;" onclick="openDrilldown('collected')" title="Click to see payments">
             <div class="flex justify-between items-start">
                 <div>
                     <div id="statCollected" class="stat-value">
@@ -498,7 +705,7 @@
     <!-- KPI Stats Grid - Row 2 -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         <!-- Total Invoices -->
-        <div class="card stat-card" style="border-left-color: #6366f1;">
+        <div class="card stat-card" style="border-left-color: #6366f1;" onclick="openDrilldown('total_invoices')" title="Click to see all invoices">
             <div class="flex justify-between items-start">
                 <div>
                     <div class="stat-card-number" id="statTotalInvoices">
@@ -516,7 +723,7 @@
         </div>
 
         <!-- Overdue Invoices -->
-        <div class="card stat-card stat-card-danger">
+        <div class="card stat-card stat-card-danger" onclick="openDrilldown('overdue_invoices')" title="Click to see overdue invoices">
             <div class="flex justify-between items-start">
                 <div>
                     <div class="stat-card-number" id="statOverdueInvoices">
@@ -534,7 +741,7 @@
         </div>
 
         <!-- Unpaid Invoices -->
-        <div class="card stat-card stat-card-warning">
+        <div class="card stat-card stat-card-warning" onclick="openDrilldown('unpaid_invoices')" title="Click to see unpaid invoices">
             <div class="flex justify-between items-start">
                 <div>
                     <div class="stat-card-number" id="statUnpaidInvoices">
@@ -833,6 +1040,50 @@
         </div>
     </div>
 
+</div>
+
+<!-- Drilldown Modal -->
+<div class="drilldown-overlay" id="drilldownModal">
+    <div class="drilldown-panel">
+        <div class="drilldown-header">
+            <svg class="w-5 h-5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h2 id="drilldownTitle">Drilldown</h2>
+            <span class="period-tag" id="drilldownPeriodTag">All Time</span>
+            <button class="drilldown-close" onclick="closeDrilldown()" title="Close">&times;</button>
+        </div>
+        <div class="drilldown-toolbar">
+            <input type="text" class="drilldown-search" id="drilldownSearch" placeholder="Search customer or number..." oninput="debouncedDrilldownSearch()">
+            <select class="drilldown-sort-select" id="drilldownSortSelect" onchange="onDrilldownSortChange()">
+                <!-- Populated dynamically -->
+            </select>
+            <button class="drilldown-btn" onclick="toggleDrilldownOrder()" id="drilldownOrderBtn" title="Toggle sort direction">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>
+                <span id="drilldownOrderLabel">DESC</span>
+            </button>
+            <button class="drilldown-btn" onclick="exportDrilldownCSV()" title="Export CSV">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Export
+            </button>
+            <button class="drilldown-btn" onclick="printDrilldown()" title="Print">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Print
+            </button>
+        </div>
+        <div class="drilldown-summary" id="drilldownSummary"></div>
+        <div class="drilldown-loading" id="drilldownLoading">
+            <div class="skeleton" style="width: 100%; height: 200px; margin: 0 auto;"></div>
+        </div>
+        <div class="drilldown-table-wrap" id="drilldownTableWrap">
+            <table class="drilldown-table">
+                <thead id="drilldownThead"></thead>
+                <tbody id="drilldownTbody"></tbody>
+            </table>
+        </div>
+        <div class="drilldown-empty" id="drilldownEmpty">No transactions found for this metric and period.</div>
+        <div class="drilldown-pagination" id="drilldownPagination"></div>
+    </div>
 </div>
 
 <script>
@@ -1835,6 +2086,359 @@
         }
     });
 
+    // ============================
+    // DRILLDOWN MODAL
+    // ============================
+    var drilldownMetric = null;
+    var drilldownPage = 1;
+    var drilldownSort = null;
+    var drilldownOrder = 'DESC';
+    var drilldownSearch = '';
+    var zohoOrgId = null;
+    var _drilldownSearchTimer = null;
+
+    var DRILLDOWN_TITLES = {
+        revenue: 'Total Revenue',
+        outstanding: 'Outstanding Invoices',
+        overdue: 'Overdue Invoices',
+        collected: 'Payments Collected',
+        total_invoices: 'All Invoices',
+        overdue_invoices: 'Overdue Invoices',
+        unpaid_invoices: 'Unpaid Invoices'
+    };
+
+    var INVOICE_SORT_OPTIONS = [
+        { value: 'invoice_date', label: 'Date' },
+        { value: 'due_date', label: 'Due Date' },
+        { value: 'total', label: 'Total' },
+        { value: 'balance', label: 'Balance' },
+        { value: 'customer_name', label: 'Customer' },
+        { value: 'invoice_number', label: 'Invoice #' },
+        { value: 'status', label: 'Status' }
+    ];
+
+    var PAYMENT_SORT_OPTIONS = [
+        { value: 'payment_date', label: 'Date' },
+        { value: 'amount', label: 'Amount' },
+        { value: 'customer_name', label: 'Customer' },
+        { value: 'payment_number', label: 'Payment #' },
+        { value: 'payment_mode', label: 'Mode' }
+    ];
+
+    function openDrilldown(metric) {
+        drilldownMetric = metric;
+        drilldownPage = 1;
+        drilldownSort = null;
+        drilldownOrder = 'DESC';
+        drilldownSearch = '';
+
+        // UI
+        document.getElementById('drilldownTitle').textContent = DRILLDOWN_TITLES[metric] || metric;
+
+        // Period tag
+        var periodNames = { all: 'All Time', today: 'Today', yesterday: 'Yesterday', this_week: 'This Week', this_month: 'This Month', prev_month: 'Prev Month', this_year: 'This Year', custom: 'Custom' };
+        var tag = document.getElementById('drilldownPeriodTag');
+        tag.textContent = periodNames[currentPeriod] || currentPeriod;
+        if (currentFromDate && currentToDate && currentPeriod !== 'all') {
+            tag.textContent += ' (' + currentFromDate + ' \u2192 ' + currentToDate + ')';
+        }
+
+        // Populate sort select
+        var isPayment = metric === 'collected';
+        var sortOpts = isPayment ? PAYMENT_SORT_OPTIONS : INVOICE_SORT_OPTIONS;
+        var sortSel = document.getElementById('drilldownSortSelect');
+        sortSel.innerHTML = '';
+        sortOpts.forEach(function(opt) {
+            var o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = 'Sort: ' + opt.label;
+            sortSel.appendChild(o);
+        });
+
+        // Clear search
+        document.getElementById('drilldownSearch').value = '';
+        document.getElementById('drilldownOrderLabel').textContent = 'DESC';
+
+        // Show modal
+        var modal = document.getElementById('drilldownModal');
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+
+        loadDrilldownData();
+    }
+
+    function closeDrilldown() {
+        var modal = document.getElementById('drilldownModal');
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+        drilldownMetric = null;
+    }
+
+    // Close on backdrop click
+    document.addEventListener('click', function(e) {
+        var modal = document.getElementById('drilldownModal');
+        if (e.target === modal) closeDrilldown();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && drilldownMetric) closeDrilldown();
+    });
+
+    async function loadDrilldownData() {
+        if (!drilldownMetric) return;
+
+        // Show loading
+        document.getElementById('drilldownLoading').style.display = 'block';
+        document.getElementById('drilldownTableWrap').style.display = 'none';
+        document.getElementById('drilldownEmpty').style.display = 'none';
+        document.getElementById('drilldownPagination').innerHTML = '';
+
+        var url = '/api/zoho/dashboard/drilldown?metric=' + drilldownMetric;
+        if (currentFromDate) url += '&from_date=' + currentFromDate;
+        if (currentToDate) url += '&to_date=' + currentToDate;
+        if (drilldownSearch) url += '&search=' + encodeURIComponent(drilldownSearch);
+        if (drilldownSort) url += '&sort=' + drilldownSort;
+        url += '&order=' + drilldownOrder;
+        url += '&page=' + drilldownPage + '&limit=25';
+
+        try {
+            var response = await fetch(url, { headers: getAuthHeaders() });
+            if (response.status === 401) { window.location.href = '/login.html'; return; }
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+
+            var result = await response.json();
+            document.getElementById('drilldownLoading').style.display = 'none';
+
+            if (result.success && result.data && result.data.length > 0) {
+                renderDrilldownTable(result);
+                renderDrilldownPagination(result.pagination);
+                document.getElementById('drilldownTableWrap').style.display = 'block';
+
+                // Summary
+                var summary = result.summary || {};
+                var summaryEl = document.getElementById('drilldownSummary');
+                summaryEl.innerHTML = '<strong>' + (summary.count || 0) + '</strong> ' +
+                    (result.type === 'payments' ? 'payments' : 'invoices') +
+                    ' totaling <strong>' + formatCurrency(summary.total_amount) + '</strong>';
+            } else {
+                document.getElementById('drilldownEmpty').style.display = 'block';
+                document.getElementById('drilldownSummary').innerHTML = '<strong>0</strong> results found';
+            }
+        } catch (error) {
+            console.error('Drilldown fetch error:', error);
+            document.getElementById('drilldownLoading').style.display = 'none';
+            document.getElementById('drilldownEmpty').style.display = 'block';
+            document.getElementById('drilldownEmpty').textContent = 'Error loading data: ' + error.message;
+        }
+    }
+
+    function renderDrilldownTable(result) {
+        var thead = document.getElementById('drilldownThead');
+        var tbody = document.getElementById('drilldownTbody');
+        var isPayment = result.type === 'payments';
+
+        // Build headers
+        var headers = [];
+        if (isPayment) {
+            headers = [
+                { key: 'payment_number', label: 'Payment #', cls: 'link-cell' },
+                { key: 'customer_name', label: 'Customer' },
+                { key: 'payment_date', label: 'Date' },
+                { key: 'amount', label: 'Amount', cls: 'text-right' },
+                { key: 'payment_mode', label: 'Mode' },
+                { key: 'reference_number', label: 'Reference' },
+                { key: '_actions', label: 'Actions' }
+            ];
+        } else {
+            headers = [
+                { key: 'invoice_number', label: 'Invoice #', cls: 'link-cell' },
+                { key: 'customer_name', label: 'Customer' },
+                { key: 'invoice_date', label: 'Date' },
+                { key: 'due_date', label: 'Due Date' },
+                { key: 'total', label: 'Total', cls: 'text-right' },
+                { key: 'balance', label: 'Balance', cls: 'text-right' },
+                { key: 'status', label: 'Status' },
+                { key: '_actions', label: 'Actions' }
+            ];
+        }
+
+        thead.innerHTML = '<tr>' + headers.map(function(h) {
+            var isSorted = drilldownSort === h.key;
+            var sortedClass = isSorted ? ' sorted' : '';
+            var arrow = '';
+            if (isSorted) arrow = '<span class="sort-arrow">' + (drilldownOrder === 'ASC' ? '\u25B2' : '\u25BC') + '</span>';
+            if (h.key === '_actions') return '<th>' + h.label + '</th>';
+            return '<th class="' + sortedClass + '" onclick="setDrilldownSort(\'' + h.key + '\')">' + h.label + arrow + '</th>';
+        }).join('') + '</tr>';
+
+        // Build rows
+        tbody.innerHTML = '';
+        result.data.forEach(function(row) {
+            var tr = document.createElement('tr');
+            var cells = '';
+
+            if (isPayment) {
+                cells += '<td class="link-cell">' + (row.payment_number || '--') + '</td>';
+                cells += '<td style="max-width:180px" class="truncate">' + (row.customer_name || '--') + '</td>';
+                cells += '<td>' + formatDate(row.payment_date) + '</td>';
+                cells += '<td class="text-right" style="font-weight:600">' + formatCurrency(row.amount) + '</td>';
+                cells += '<td>' + getPaymentModeBadge(row.payment_mode) + '</td>';
+                cells += '<td>' + (row.reference_number || '--') + '</td>';
+                cells += '<td>' + getZohoLink(row.zoho_payment_id, 'payments') + '</td>';
+            } else {
+                cells += '<td class="link-cell">' + (row.invoice_number || '--') + '</td>';
+                cells += '<td style="max-width:180px" class="truncate">' + (row.customer_name || '--') + '</td>';
+                cells += '<td>' + formatDate(row.invoice_date) + '</td>';
+                var dueDateClass = row.status === 'overdue' ? ' overdue-date' : '';
+                cells += '<td class="' + dueDateClass + '">' + formatDate(row.due_date) + '</td>';
+                cells += '<td class="text-right" style="font-weight:600">' + formatCurrency(row.total) + '</td>';
+                var balStr = parseFloat(row.balance) > 0 ? formatCurrency(row.balance) : '<span style="color:#9ca3af">--</span>';
+                cells += '<td class="text-right">' + balStr + '</td>';
+                cells += '<td>' + getStatusBadge(row.status) + '</td>';
+                cells += '<td>' + getZohoLink(row.zoho_invoice_id, 'invoices') + '</td>';
+            }
+
+            tr.innerHTML = cells;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function getPaymentModeBadge(mode) {
+        if (!mode) return '--';
+        var colors = {
+            cash: 'background:#ecfdf5;color:#065f46',
+            bank_transfer: 'background:#dbeafe;color:#1e40af',
+            check: 'background:#fef9c3;color:#854d0e',
+            credit_card: 'background:#f3e8ff;color:#6b21a8'
+        };
+        var style = colors[mode.toLowerCase()] || 'background:#f3f4f6;color:#374151';
+        return '<span class="badge" style="' + style + '">' + mode.replace(/_/g, ' ') + '</span>';
+    }
+
+    function getZohoLink(zohoId, type) {
+        if (!zohoOrgId || !zohoId) return '';
+        var url = 'https://books.zoho.in/app/' + zohoOrgId + '#/' + type + '/' + zohoId;
+        return '<a href="' + url + '" target="_blank" rel="noopener" class="zoho-link">View <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>';
+    }
+
+    function renderDrilldownPagination(pagination) {
+        var container = document.getElementById('drilldownPagination');
+        if (!pagination || pagination.pages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        var html = '';
+        // Prev button
+        html += '<button ' + (pagination.page <= 1 ? 'disabled' : '') + ' onclick="setDrilldownPage(' + (pagination.page - 1) + ')">&laquo;</button>';
+
+        // Page buttons (show max 7)
+        var startPage = Math.max(1, pagination.page - 3);
+        var endPage = Math.min(pagination.pages, startPage + 6);
+        if (endPage - startPage < 6) startPage = Math.max(1, endPage - 6);
+
+        for (var i = startPage; i <= endPage; i++) {
+            html += '<button class="' + (i === pagination.page ? 'active' : '') + '" onclick="setDrilldownPage(' + i + ')">' + i + '</button>';
+        }
+
+        // Next button
+        html += '<button ' + (pagination.page >= pagination.pages ? 'disabled' : '') + ' onclick="setDrilldownPage(' + (pagination.page + 1) + ')">&raquo;</button>';
+
+        container.innerHTML = html;
+    }
+
+    function setDrilldownSort(col) {
+        if (drilldownSort === col) {
+            // Toggle direction
+            drilldownOrder = drilldownOrder === 'ASC' ? 'DESC' : 'ASC';
+        } else {
+            drilldownSort = col;
+            drilldownOrder = 'DESC';
+        }
+        // Update select
+        var sel = document.getElementById('drilldownSortSelect');
+        if (sel.querySelector('option[value="' + col + '"]')) sel.value = col;
+        document.getElementById('drilldownOrderLabel').textContent = drilldownOrder;
+        drilldownPage = 1;
+        loadDrilldownData();
+    }
+
+    function onDrilldownSortChange() {
+        var sel = document.getElementById('drilldownSortSelect');
+        drilldownSort = sel.value;
+        drilldownPage = 1;
+        loadDrilldownData();
+    }
+
+    function toggleDrilldownOrder() {
+        drilldownOrder = drilldownOrder === 'ASC' ? 'DESC' : 'ASC';
+        document.getElementById('drilldownOrderLabel').textContent = drilldownOrder;
+        drilldownPage = 1;
+        loadDrilldownData();
+    }
+
+    function setDrilldownPage(p) {
+        drilldownPage = p;
+        loadDrilldownData();
+    }
+
+    function debouncedDrilldownSearch() {
+        if (_drilldownSearchTimer) clearTimeout(_drilldownSearchTimer);
+        _drilldownSearchTimer = setTimeout(function() {
+            drilldownSearch = document.getElementById('drilldownSearch').value.trim();
+            drilldownPage = 1;
+            loadDrilldownData();
+        }, 400);
+    }
+
+    function exportDrilldownCSV() {
+        var url = '/api/zoho/dashboard/drilldown/export?metric=' + drilldownMetric;
+        if (currentFromDate) url += '&from_date=' + currentFromDate;
+        if (currentToDate) url += '&to_date=' + currentToDate;
+        if (drilldownSearch) url += '&search=' + encodeURIComponent(drilldownSearch);
+        if (drilldownSort) url += '&sort=' + drilldownSort;
+        url += '&order=' + drilldownOrder;
+
+        fetch(url, { headers: getAuthHeaders() })
+            .then(function(response) {
+                if (!response.ok) throw new Error('Export failed');
+                return response.blob();
+            })
+            .then(function(blob) {
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'zoho-drilldown-' + drilldownMetric + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+                showToast('CSV exported', 'success');
+            })
+            .catch(function(err) {
+                showToast('Export failed: ' + err.message, 'error');
+            });
+    }
+
+    function printDrilldown() {
+        window.print();
+    }
+
+    // Fetch zoho org ID on page load (for "View in Zoho" links)
+    async function fetchZohoOrgId() {
+        try {
+            var response = await fetch('/api/zoho/status', { headers: getAuthHeaders() });
+            if (response.ok) {
+                var result = await response.json();
+                if (result.success && result.data && result.data.zoho_org_id) {
+                    zohoOrgId = result.data.zoho_org_id;
+                }
+            }
+        } catch (e) {
+            // Non-critical, View in Zoho links just won't show
+        }
+    }
+
     // Load all data
     function loadAll() {
         loadConnectionStatus();
@@ -1842,6 +2446,7 @@
         loadRecentInvoices();
         loadApiUsage();
         startUsageAutoRefresh();
+        fetchZohoOrgId();
     }
 
     // Initialize
