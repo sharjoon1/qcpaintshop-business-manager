@@ -42,64 +42,46 @@
             gap: 0.5rem;
         }
         
-        /* MOBILE FIRST: Quick Actions - 3 small squares per row */
-        .quick-actions-grid {
+        /* Quick action links */
+        .quick-links-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 0.75rem;
+            gap: 10px;
         }
-        
-        .quick-action-btn {
-            aspect-ratio: 1 / 1;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            cursor: pointer;
-            text-decoration: none;
+        .quick-link {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 0.75rem;
-            transition: all 0.3s;
-            position: relative;
-            border: 2px solid transparent;
+            gap: 8px;
+            padding: 0.75rem 1rem;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #374151;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            transition: all 0.15s;
+            cursor: pointer;
         }
-        
-        .quick-action-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--btn-color, #667eea);
-            border-radius: 12px 12px 0 0;
+        .quick-link:hover {
+            background: #f0f0ff;
+            border-color: #667eea;
+            color: #4338ca;
         }
-        
-        .quick-action-icon {
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
+        .quick-link svg {
+            width: 18px;
+            height: 18px;
+            stroke: #667eea;
+            fill: none;
+            stroke-width: 1.75;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
         }
-        
-        .quick-action-title {
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #1f2937;
-            margin-bottom: 0.25rem;
-            line-height: 1.2;
-        }
-        
-        .quick-action-desc {
-            font-size: 0.65rem;
-            color: #6b7280;
-            line-height: 1.2;
-        }
-        
-        .quick-action-btn:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+        @media (max-width: 640px) {
+            .quick-links-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
         
         /* MOBILE FIRST: Dashboard Cards - 2 squares per row */
@@ -157,115 +139,34 @@
         
         /* TABLET: 640px-767px */
         @media (min-width: 640px) and (max-width: 767px) {
-            .quick-actions-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 1.25rem;
-            }
-
             .data-cards-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 1.25rem;
             }
-
-            .quick-action-btn { padding: 1.25rem; }
-            .quick-action-icon { font-size: 2.5rem; }
             .data-card { padding: 1.5rem; }
         }
 
-        /* DESKTOP: 768px+ (sidebar is pinned, available width is reduced) */
+        /* DESKTOP: 768px+ */
         @media (min-width: 768px) {
             .dashboard-section { margin: 2rem 0; }
+            .section-title { font-size: 1.5rem; margin-bottom: 1.25rem; gap: 0.75rem; }
 
-            .section-title {
-                font-size: 1.5rem;
-                margin-bottom: 1.25rem;
-                gap: 0.75rem;
-            }
-
-            /* DESKTOP: 3 buttons per row (fits well next to pinned sidebar) */
-            .quick-actions-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 1.25rem;
-            }
-
-            .quick-action-btn {
-                aspect-ratio: auto;
-                border-radius: 14px;
-                padding: 1.25rem 1rem;
-            }
-
-            .quick-action-btn::before { height: 4px; }
-
-            .quick-action-icon {
-                font-size: 2.25rem;
-                margin-bottom: 0.5rem;
-            }
-
-            .quick-action-title {
-                font-size: 0.95rem;
-                margin-bottom: 0.35rem;
-            }
-
-            .quick-action-desc { font-size: 0.8rem; }
-
-            .quick-action-btn:hover {
-                transform: translateY(-6px);
-                box-shadow: 0 12px 24px rgba(0,0,0,0.12);
-            }
-
-            /* DESKTOP: 4 cards per row, no forced square */
             .data-cards-grid {
                 grid-template-columns: repeat(4, 1fr);
                 gap: 1.25rem;
             }
-
-            .data-card {
-                aspect-ratio: auto;
-                border-radius: 14px;
-                padding: 1.5rem;
-            }
-
-            .data-card-icon {
-                width: 44px;
-                height: 44px;
-                font-size: 1.5rem;
-            }
-
-            .data-card-value {
-                font-size: 2rem;
-                margin: 0.75rem 0;
-            }
-
+            .data-card { aspect-ratio: auto; border-radius: 14px; padding: 1.5rem; }
+            .data-card-icon { width: 44px; height: 44px; font-size: 1.5rem; }
+            .data-card-value { font-size: 2rem; margin: 0.75rem 0; }
             .data-card-label { font-size: 0.8rem; }
-
-            .data-card:hover {
-                transform: translateY(-6px);
-                box-shadow: 0 10px 20px rgba(0,0,0,0.12);
-            }
+            .data-card:hover { transform: translateY(-6px); box-shadow: 0 10px 20px rgba(0,0,0,0.12); }
         }
 
-        /* LARGE DESKTOP: 1280px+ (more room with wider sidebar) */
+        /* LARGE DESKTOP: 1280px+ */
         @media (min-width: 1280px) {
             .dashboard-section { margin: 2.5rem 0; }
-
-            .section-title {
-                font-size: 1.75rem;
-                margin-bottom: 1.5rem;
-            }
-
-            /* Expand to 6 buttons on xl screens */
-            .quick-actions-grid {
-                grid-template-columns: repeat(6, 1fr);
-                gap: 1.5rem;
-            }
-
-            .quick-action-btn { padding: 1.5rem 1.25rem; }
-            .quick-action-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
-            .quick-action-title { font-size: 1rem; }
-            .quick-action-desc { font-size: 0.85rem; }
-
+            .section-title { font-size: 1.75rem; margin-bottom: 1.5rem; }
             .data-cards-grid { gap: 1.5rem; }
-
             .data-card { padding: 1.75rem; }
             .data-card-icon { width: 48px; height: 48px; font-size: 1.6rem; }
             .data-card-value { font-size: 2.5rem; margin: 1rem 0; }
@@ -328,42 +229,43 @@
             
             <div class="dashboard-section">
                 <h2 class="section-title"><span>⚡</span><span>Quick Actions</span></h2>
-                
-                <div class="quick-actions-grid">
-                    <a href="/estimate-create-new.html" class="quick-action-btn" style="--btn-color: #667eea;">
-                        <div class="quick-action-icon">📝</div>
-                        <div class="quick-action-title">Create Estimate</div>
-                        <div class="quick-action-desc">New quote</div>
+
+                <div class="quick-links-grid">
+                    <button class="quick-link" onclick="toggleSidebar()">
+                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                        <span>All Modules</span>
+                    </button>
+                    <a href="/chat.html" class="quick-link">
+                        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        <span>Chat</span>
                     </a>
-                    
-                    <a href="/admin-products.html" class="quick-action-btn" style="--btn-color: #10b981;">
-                        <div class="quick-action-icon">🎨</div>
-                        <div class="quick-action-title">Products</div>
-                        <div class="quick-action-desc">Manage</div>
+                    <a href="/admin-leads.html" class="quick-link">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                        <span>Leads & CRM</span>
                     </a>
-                    
-                    <a href="/admin-customers.html" class="quick-action-btn" style="--btn-color: #0ea5e9;">
-                        <div class="quick-action-icon">👥</div>
-                        <div class="quick-action-title">Customers</div>
-                        <div class="quick-action-desc">Database</div>
+                    <a href="/admin-staff.html" class="quick-link">
+                        <svg viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        <span>Branches & Staff</span>
                     </a>
-                    
-                    <a href="/staff/clock-in.html" class="quick-action-btn" style="--btn-color: #10b981;">
-                        <div class="quick-action-icon">🟢</div>
-                        <div class="quick-action-title">Clock In</div>
-                        <div class="quick-action-desc">Start day</div>
+                    <a href="/admin-attendance.html" class="quick-link">
+                        <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>HR & Attendance</span>
                     </a>
-                    
-                    <a href="/staff/clock-out.html" class="quick-action-btn" style="--btn-color: #ef4444;">
-                        <div class="quick-action-icon">🔴</div>
-                        <div class="quick-action-title">Clock Out</div>
-                        <div class="quick-action-desc">End day</div>
+                    <a href="/admin-salary-monthly.html" class="quick-link">
+                        <svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                        <span>Salary & Payroll</span>
                     </a>
-                    
-                    <a href="/admin-reports.html" class="quick-action-btn" style="--btn-color: #f59e0b;">
-                        <div class="quick-action-icon">📈</div>
-                        <div class="quick-action-title">Reports</div>
-                        <div class="quick-action-desc">Analytics</div>
+                    <a href="/admin-products.html" class="quick-link">
+                        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                        <span>Products & Inventory</span>
+                    </a>
+                    <a href="/estimates.html" class="quick-link">
+                        <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span>Sales & Estimates</span>
+                    </a>
+                    <a href="/admin-zoho-dashboard.html" class="quick-link">
+                        <svg viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                        <span>Zoho Books</span>
                     </a>
                 </div>
             </div>
