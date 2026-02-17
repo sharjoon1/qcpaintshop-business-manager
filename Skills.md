@@ -572,7 +572,58 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 
 ---
 
-### 2.18 Dashboard & Reports
+### 2.18 Guide Management System
+
+**Full CRUD Documentation Platform** — Admin creates/manages guides with rich text + full HTML, staff browses/searches/favorites them.
+
+**Database Tables**:
+- `guide_categories` - Categories with English + Tamil names, icon, sort_order, is_active
+- `guides` - Full guide content: title (EN+TA), slug, content_type (rich_text/full_html), content_en/ta, summary, language (en/ta/both), status (draft/published), visible_to_staff, featured, view_count
+- `guide_versions` - Automatic version history on every edit (stores previous content)
+- `guide_views` - Per-user view tracking (user_id, guide_id, viewed_at)
+- `guide_favorites` - Staff favorite bookmarks (user_id, guide_id)
+
+**Content Types**:
+1. **Rich Text** (`rich_text`) — Quill.js editor with visual/HTML toggle, stores delta JSON + rendered HTML
+2. **Full HTML** (`full_html`) — Complete standalone HTML documents (like the Tamil attendance guide), rendered in sandboxed iframe with auto-resize
+
+**Admin Features** (`admin-guides.html`):
+- 3 tabs: Guides, Categories, Analytics
+- Quill.js rich text editor (CDN v1.3.7) with visual ↔ HTML source toggle
+- EN + TA content tabs for bilingual guides
+- Category management with Tamil names
+- Guide enable/disable, featured flag, staff visibility toggle
+- Analytics dashboard: total views, active guides, staff reads, popular guides table
+
+**Staff Features** (`staff/guides.html`):
+- Category filter chips (horizontal scrollable)
+- Search with debounce
+- Guide cards with title, Tamil title, summary, language badge, view count, favorite heart
+- Full reading view: iframe for full_html, direct rendering for rich_text
+- Language toggle for bilingual guides
+- Favorites system (toggle heart icon)
+
+**API Routes** (`routes/guides.js`):
+- `GET /api/guides/categories` - List categories (auth required)
+- `POST /api/guides/categories` - Create category (admin)
+- `PUT /api/guides/categories/:id` - Update category (admin)
+- `DELETE /api/guides/categories/:id` - Delete category (admin)
+- `GET /api/guides` - List guides (filters: category_id, status, language, search, staff_view)
+- `GET /api/guides/:id` - Get guide + record view
+- `POST /api/guides` - Create guide (admin)
+- `PUT /api/guides/:id` - Update guide + save version history (admin)
+- `DELETE /api/guides/:id` - Delete guide (admin)
+- `POST /api/guides/:id/favorite` - Toggle favorite (auth)
+- `GET /api/guides/admin/analytics` - Analytics dashboard data (admin)
+
+**Default Categories** (seeded by migration): Attendance, Salary, Tasks & Work, App Guide, Policies, General
+**Migration**: `migrations/migrate-guides-system.js`
+**Pages**: `admin-guides.html` (admin), `staff/guides.html` (staff)
+**Existing Guide**: Tamil attendance guide (`docs/attendance-guide-tamil.html`) auto-imported as full_html guide
+
+---
+
+### 2.19 Dashboard & Reports
 
 **Admin Dashboard**
 - Total users, customers, products, estimates
@@ -737,6 +788,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Offline | `offline.html` | PWA offline page |
 | Share: Estimate | `share/estimate.html` | Public shared estimate view |
 | Share: Design | `share/design-request.html` | Public shared design request |
+| Attendance Guide (Tamil) | `docs/attendance-guide-tamil.html` | Comprehensive Tamil attendance & salary guide |
 
 ### Staff Pages
 | Page | File | Purpose |
@@ -754,6 +806,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Staff Estimates | `staff-estimates.html` | Staff estimate management |
 | Staff Requests | `staff-requests.html` | Staff-facing requests |
 | Customer Requests | `customer-requests.html` | Design request handling |
+| Guides & Help | `staff/guides.html` | Browse/search guides, favorites, reading view |
 
 ### Admin Pages
 | Page | File | Purpose |
@@ -785,6 +838,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Settings | `admin-settings.html` | System settings |
 | Website Management | `admin-website.html` | Public website content CRUD (hero, services, features, testimonials, gallery, social) |
 | Profile | `admin-profile.html` | Admin profile |
+| Guides | `admin-guides.html` | Guide CRUD, categories, analytics (Quill.js editor) |
 
 ### Zoho Pages
 | Page | File | Purpose |
@@ -835,7 +889,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Salary Subnav | `components/salary-subnav.html` | Salary & Payroll section nav |
 | Sales Subnav | `components/sales-subnav.html` | Sales & Estimates section nav |
 | Products Subnav | `components/products-subnav.html` | Products & Inventory section nav |
-| System Subnav | `components/system-subnav.html` | System (Reports, Settings, Profile, Website) section nav |
+| System Subnav | `components/system-subnav.html` | System (Reports, Settings, Profile, Website, Guides) section nav |
 
 ### JavaScript Files
 | File | Purpose |
@@ -885,6 +939,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Notifications | `/api/notifications/*` | 6 | `routes/notifications.js` |
 | Estimate PDF | `/api/estimates/:id/pdf` | 1 | `routes/estimate-pdf.js` |
 | Share | `/api/share/*` | 4 | `routes/share.js` |
+| Guides | `/api/guides/*` | 11 | `routes/guides.js` |
 | Uploads | `/api/upload/*` | 4 | `server.js` |
 | Health | `/health`, `/api/test` | 2 | `server.js` |
 
@@ -1085,6 +1140,18 @@ node promote-release.js internal production
 - **IST Timezone**: All attendance date calculations use IST (UTC+5:30) via `getTodayIST()` and `getNowIST()` helpers in `routes/attendance.js` and `services/auto-clockout.js`. Calendar day runs 12:00 AM to 11:59:59 PM IST.
 - **Dynamic login logo**: `public/login.html` loads company logo from `/api/public/site-info` (set via admin panel)
 - **Staff salary navigation**: Salary tab added to bottom nav on all staff pages (dashboard, history, permission-request). Backend salary routes (`/api/salary/my-config`, `/my-monthly`, `/my-payments`) use `requireAuth` only — no role restriction.
+
+### 2026-02-17 - Attendance Improvements & Guide Management System
+- **6 Attendance Improvements**: Permission request dropdown fix, absent staff list, outside work periods, break geofence exemption, 5-min grace period auto-clockout, staff timeline tab
+- **Break Time Enforcement**: Configurable break allowance (default 120min), warning at 90min, excess tracked, admin notifications, color-coded badges in Live Today
+- **Tamil Attendance Guide**: Comprehensive 1446-line Tamil document covering all attendance features with salary calculation examples
+- **Guide Management System**: Full CRUD platform for documentation
+  - Admin: Quill.js rich text editor, categories, analytics (views, reads, popular guides)
+  - Staff: Category browsing, search, favorites, reading view with iframe for full HTML guides
+  - 5 database tables, 11 API endpoints, 6 default categories seeded
+  - Existing Tamil guide auto-imported into system
+  - Navigation: System subnav + staff sidebar integration
+- Migration: `migrations/migrate-attendance-improvements.js`, `migrations/migrate-break-enforcement.js`, `migrations/migrate-guides-system.js`
 
 ---
 
