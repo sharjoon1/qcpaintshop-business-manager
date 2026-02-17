@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Documentation &amp; Guides - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        .tab-bar {
+            display: flex;
+            gap: 0.25rem;
+            background: white;
+            border-radius: 12px;
+            padding: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            border: none;
+            cursor: pointer;
+            white-space: nowrap;
+            background: transparent;
+            color: #6b7280;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 1.5rem;
+            }
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1.25rem;
+            transition: all 0.3s;
+            border-top: 4px solid var(--border-color, #667eea);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.25rem;
+        }
+
+        .filter-bar {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        .table-container table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table-container th {
+            background: #f9fafb;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .table-container td {
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            color: #1f2937;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .table-container tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .badge-gray { background: #f3f4f6; color: #374151; }
+        .badge-green { background: #d1fae5; color: #065f46; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        .badge-purple { background: #ede9fe; color: #5b21b6; }
+
+        .action-btn-sm {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.375rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            gap: 0.25rem;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .btn-outline-primary {
+            background: transparent;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+
+        .btn-outline-primary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .gradient-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+
+        .gradient-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .gradient-header p {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            margin-top: 0.25rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: #6b7280;
+        }
+
+        .empty-state svg {
+            width: 4rem;
+            height: 4rem;
+            margin: 0 auto 1rem;
+            color: #9ca3af;
+        }
+
+        .empty-state h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        /* Editor Panel */
+        .editor-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            z-index: 9998;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .editor-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .editor-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            z-index: 9999;
+            transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-panel.active {
+            transform: translateX(0);
+        }
+
+        .editor-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .editor-header h3 {
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+
+        .editor-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .editor-footer {
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            gap: 1rem;
+        }
+
+        /* Quill editor styles */
+        .quill-wrapper {
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .quill-wrapper .ql-toolbar {
+            border: none;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+
+        .quill-wrapper .ql-container {
+            border: none;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 0.9375rem;
+        }
+
+        .quill-wrapper .ql-editor {
+            min-height: 250px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .html-editor {
+            width: 100%;
+            min-height: 250px;
+            max-height: 400px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.8125rem;
+            padding: 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            resize: vertical;
+            outline: none;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+
+        .html-editor:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .content-tab-bar {
+            display: flex;
+            gap: 0.25rem;
+            background: #f3f4f6;
+            border-radius: 8px;
+            padding: 0.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .content-tab-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.8125rem;
+            border: none;
+            cursor: pointer;
+            background: transparent;
+            color: #6b7280;
+            transition: all 0.2s;
+        }
+
+        .content-tab-btn:hover {
+            color: #374151;
+        }
+
+        .content-tab-btn.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .content-lang-panel {
+            display: none;
+        }
+
+        .content-lang-panel.active {
+            display: block;
+        }
+
+        .editor-mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .editor-mode-toggle label {
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #6b7280;
+            cursor: pointer;
+        }
+
+        .editor-mode-toggle input[type="checkbox"] {
+            appearance: none;
+            width: 2.5rem;
+            height: 1.375rem;
+            background: #d1d5db;
+            border-radius: 9999px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .editor-mode-toggle input[type="checkbox"]::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 1rem;
+            height: 1rem;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .editor-mode-toggle input[type="checkbox"]:checked {
+            background: #667eea;
+        }
+
+        .editor-mode-toggle input[type="checkbox"]:checked::after {
+            transform: translateX(1.125rem);
+        }
+
+        /* Category inline form */
+        .category-form-inline {
+            background: #f9fafb;
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .category-item {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s;
+        }
+
+        .category-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .category-item-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        .category-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.125rem;
+            flex-shrink: 0;
+        }
+
+        .category-info h4 {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .category-info p {
+            font-size: 0.8125rem;
+            color: #6b7280;
+        }
+
+        .category-meta {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-right: 1rem;
+        }
+
+        .category-meta span {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            padding: 0.875rem 1.25rem;
+            border-radius: 10px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: white;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 3.5s forwards;
+            max-width: 380px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-warning { background: #d97706; }
+        .toast-info { background: #2563eb; }
+
+        @keyframes toastIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes toastOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        /* Form elements */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 640px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.375rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-family: inherit;
+            color: #1f2937;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+        }
+
+        .loading-spinner .spinner {
+            width: 2rem;
+            height: 2rem;
+            border: 3px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive table */
+        @media (max-width: 768px) {
+            .table-container {
+                overflow-x: auto;
+            }
+
+            .table-container table {
+                min-width: 700px;
+            }
+        }
+
+        /* Category edit inline */
+        .category-edit-form {
+            display: none;
+            background: #eff6ff;
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid #bfdbfe;
+        }
+
+        .category-edit-form.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="guides">
+
+<!-- Header -->
+<div id="header-container"></div>
+<script>fetch('/components/header-v2.html').then(r=>r.text()).then(h=>{document.getElementById('header-container').innerHTML=h;if(window.initHeader)initHeader();});</script>
+
+<!-- Subnav -->
+<div id="subnav-container"></div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Main Content -->
+<div class="container mx-auto p-4 sm:p-6" style="max-width: 1280px;">
+
+    <!-- Page Header -->
+    <div class="gradient-header">
+        <h2>Documentation &amp; Guides</h2>
+        <p>Create and manage guides, documentation, and training materials for your staff</p>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('guides')">Guides</button>
+        <button class="tab-btn" onclick="switchTab('categories')">Categories</button>
+        <button class="tab-btn" onclick="switchTab('analytics')">Analytics</button>
+    </div>
+
+    <!-- ==================== TAB 1: GUIDES ==================== -->
+    <div id="tab-guides" class="tab-content active">
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Category</label>
+                    <select id="filterCategory" onchange="loadGuides()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">
+                        <option value="">All Categories</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Status</label>
+                    <select id="filterStatus" onchange="loadGuides()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">
+                        <option value="">All Statuses</option>
+                        <option value="draft">Draft</option>
+                        <option value="published">Published</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Search</label>
+                    <input type="text" id="filterSearch" oninput="debounceSearch()" placeholder="Search guides..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <button onclick="openEditor(null)" class="w-full px-4 py-2 rounded-lg text-sm font-semibold text-white" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                        + New Guide
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guides Table -->
+        <div class="table-container">
+            <div id="guidesLoading" class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+            <div id="guidesEmpty" class="empty-state" style="display:none;">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                <h3>No guides found</h3>
+                <p>Create your first guide to get started</p>
+            </div>
+            <table id="guidesTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Language</th>
+                        <th>Status</th>
+                        <th>Visibility</th>
+                        <th>Views</th>
+                        <th>Updated</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="guidesBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ==================== TAB 2: CATEGORIES ==================== -->
+    <div id="tab-categories" class="tab-content">
+
+        <!-- Add Category Form -->
+        <div class="category-form-inline">
+            <h3 class="text-sm font-bold text-gray-700 mb-3">Add New Category</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Icon (emoji)</label>
+                    <input type="text" id="newCatIcon" placeholder="e.g. 📖" maxlength="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Name (EN)</label>
+                    <input type="text" id="newCatNameEn" placeholder="Category name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Name (TA)</label>
+                    <input type="text" id="newCatNameTa" placeholder="வகை பெயர்" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Sort Order</label>
+                    <input type="number" id="newCatSort" placeholder="0" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <button onclick="saveCategory()" class="w-full px-4 py-2 rounded-lg text-sm font-semibold btn-primary">
+                        Add Category
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories List -->
+        <div id="categoriesLoading" class="loading-spinner">
+            <div class="spinner"></div>
+        </div>
+        <div id="categoriesEmpty" class="empty-state" style="display:none;">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+            </svg>
+            <h3>No categories yet</h3>
+            <p>Add your first category using the form above</p>
+        </div>
+        <div id="categoriesList"></div>
+    </div>
+
+    <!-- ==================== TAB 3: ANALYTICS ==================== -->
+    <div id="tab-analytics" class="tab-content">
+
+        <!-- Stat Cards -->
+        <div class="stats-grid mb-6">
+            <div class="stat-card" style="--border-color: #667eea;">
+                <div class="stat-value" id="analyticsTotal">0</div>
+                <div class="stat-label">Total Guides</div>
+            </div>
+            <div class="stat-card" style="--border-color: #10b981;">
+                <div class="stat-value" id="analyticsPublished">0</div>
+                <div class="stat-label">Published</div>
+            </div>
+            <div class="stat-card" style="--border-color: #8b5cf6;">
+                <div class="stat-value" id="analyticsTotalViews">0</div>
+                <div class="stat-label">Total Views</div>
+            </div>
+            <div class="stat-card" style="--border-color: #f59e0b;">
+                <div class="stat-value" id="analyticsUniqueReaders">0</div>
+                <div class="stat-label">Unique Readers</div>
+            </div>
+        </div>
+
+        <!-- Popular Guides -->
+        <div class="table-container mb-6">
+            <div style="padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb;">
+                <h3 class="text-sm font-bold text-gray-800">Popular Guides</h3>
+            </div>
+            <div id="popularGuidesLoading" class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+            <table id="popularGuidesTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Views</th>
+                        <th>Unique Readers</th>
+                    </tr>
+                </thead>
+                <tbody id="popularGuidesBody"></tbody>
+            </table>
+            <div id="popularGuidesEmpty" class="empty-state" style="display:none; padding: 2rem;">
+                <p>No guide view data available yet</p>
+            </div>
+        </div>
+
+        <!-- Staff Read Counts -->
+        <div class="table-container mb-6">
+            <div style="padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb;">
+                <h3 class="text-sm font-bold text-gray-800">Staff Read Counts</h3>
+            </div>
+            <div id="staffReadsLoading" class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+            <table id="staffReadsTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Staff Name</th>
+                        <th>Guides Read</th>
+                        <th>Total Views</th>
+                        <th>Last Read</th>
+                    </tr>
+                </thead>
+                <tbody id="staffReadsBody"></tbody>
+            </table>
+            <div id="staffReadsEmpty" class="empty-state" style="display:none; padding: 2rem;">
+                <p>No staff reading data available yet</p>
+            </div>
+        </div>
+
+        <!-- Recent Views -->
+        <div class="table-container">
+            <div style="padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb;">
+                <h3 class="text-sm font-bold text-gray-800">Recent Views</h3>
+            </div>
+            <div id="recentViewsLoading" class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+            <table id="recentViewsTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>Guide</th>
+                        <th>Viewed By</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody id="recentViewsBody"></tbody>
+            </table>
+            <div id="recentViewsEmpty" class="empty-state" style="display:none; padding: 2rem;">
+                <p>No recent views yet</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== GUIDE EDITOR PANEL ==================== -->
+<div class="editor-overlay" id="editorOverlay" onclick="closeEditor()"></div>
+<div class="editor-panel" id="editorPanel">
+    <div class="editor-header">
+        <h3 id="editorTitle">New Guide</h3>
+        <button onclick="closeEditor()" style="background:none;border:none;color:white;cursor:pointer;font-size:1.5rem;line-height:1;">&times;</button>
+    </div>
+    <div class="editor-body">
+        <input type="hidden" id="editGuideId" value="">
+
+        <!-- Title EN -->
+        <div class="form-group">
+            <label>Title (English) <span style="color:#ef4444;">*</span></label>
+            <input type="text" id="editTitleEn" placeholder="Enter guide title in English">
+        </div>
+
+        <!-- Title TA -->
+        <div class="form-group">
+            <label>Title (Tamil)</label>
+            <input type="text" id="editTitleTa" placeholder="தமிழில் வழிகாட்டி தலைப்பு">
+        </div>
+
+        <!-- Category & Language -->
+        <div class="form-row">
+            <div class="form-group">
+                <label>Category</label>
+                <select id="editCategory">
+                    <option value="">Select category</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Language</label>
+                <select id="editLanguage">
+                    <option value="en">English</option>
+                    <option value="ta">Tamil</option>
+                    <option value="both">Both (EN + TA)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Summary EN -->
+        <div class="form-group">
+            <label>Summary (English)</label>
+            <textarea id="editSummaryEn" placeholder="Brief summary in English" rows="2"></textarea>
+        </div>
+
+        <!-- Summary TA -->
+        <div class="form-group">
+            <label>Summary (Tamil)</label>
+            <textarea id="editSummaryTa" placeholder="தமிழில் சுருக்கம்" rows="2"></textarea>
+        </div>
+
+        <!-- Content Tabs -->
+        <div class="form-group" style="margin-top: 0.5rem;">
+            <label style="margin-bottom: 0.75rem; font-size: 0.9375rem; font-weight: 700; color: #1f2937;">Content</label>
+
+            <div class="content-tab-bar">
+                <button class="content-tab-btn active" onclick="switchContentTab('en')">English Content</button>
+                <button class="content-tab-btn" onclick="switchContentTab('ta')">Tamil Content</button>
+            </div>
+
+            <!-- English Content -->
+            <div id="contentPanelEn" class="content-lang-panel active">
+                <div class="editor-mode-toggle">
+                    <label>Visual</label>
+                    <input type="checkbox" id="editorModeEn" onchange="toggleEditorMode('en')">
+                    <label>HTML</label>
+                </div>
+                <div id="quillWrapperEn" class="quill-wrapper">
+                    <div id="quillEditorEn"></div>
+                </div>
+                <textarea id="htmlEditorEn" class="html-editor" style="display:none;" placeholder="Enter HTML content for English..."></textarea>
+            </div>
+
+            <!-- Tamil Content -->
+            <div id="contentPanelTa" class="content-lang-panel">
+                <div class="editor-mode-toggle">
+                    <label>Visual</label>
+                    <input type="checkbox" id="editorModeTa" onchange="toggleEditorMode('ta')">
+                    <label>HTML</label>
+                </div>
+                <div id="quillWrapperTa" class="quill-wrapper">
+                    <div id="quillEditorTa"></div>
+                </div>
+                <textarea id="htmlEditorTa" class="html-editor" style="display:none;" placeholder="தமிழ் உள்ளடக்கத்திற்கான HTML-ஐ உள்ளிடவும்..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Editor Footer -->
+    <div class="editor-footer">
+        <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <label class="text-xs font-semibold text-gray-600">Status:</label>
+                <select id="editStatus" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                </select>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.375rem;">
+                <input type="checkbox" id="editVisibleToStaff" checked style="width:1rem; height:1rem; cursor:pointer;">
+                <label for="editVisibleToStaff" class="text-xs font-semibold text-gray-600" style="cursor:pointer;">Visible to Staff</label>
+            </div>
+        </div>
+        <div style="display:flex; gap:0.75rem;">
+            <button onclick="closeEditor()" class="action-btn-sm btn-outline-primary" style="padding:0.5rem 1.25rem;">Cancel</button>
+            <button onclick="saveGuide()" id="saveGuideBtn" class="action-btn-sm btn-primary" style="padding:0.5rem 1.25rem;">
+                Save Guide
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==================== STATE ====================
+    let allGuides = [];
+    let allCategories = [];
+    let quillEn = null;
+    let quillTa = null;
+    let searchTimeout = null;
+
+    // ==================== AUTH ====================
+    function getAuthHeaders() {
+        return {
+            'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
+            'Content-Type': 'application/json'
+        };
+    }
+
+    // ==================== XSS PROTECTION ====================
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ==================== TOAST ====================
+    function showToast(msg, type) {
+        type = type || 'info';
+        var container = document.getElementById('toastContainer');
+        var toast = document.createElement('div');
+        toast.className = 'toast toast-' + type;
+
+        var iconMap = {
+            success: '<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+            error: '<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>',
+            warning: '<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+            info: '<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+        };
+
+        toast.innerHTML = (iconMap[type] || iconMap.info) + ' ' + escapeHtml(msg);
+        container.appendChild(toast);
+
+        setTimeout(function() {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 4000);
+    }
+
+    // ==================== TAB SWITCHING ====================
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+
+        var tabEl = document.getElementById('tab-' + tab);
+        if (tabEl) tabEl.classList.add('active');
+
+        var btns = document.querySelectorAll('.tab-btn');
+        var tabIndex = { 'guides': 0, 'categories': 1, 'analytics': 2 };
+        if (typeof tabIndex[tab] !== 'undefined' && btns[tabIndex[tab]]) {
+            btns[tabIndex[tab]].classList.add('active');
+        }
+
+        if (tab === 'guides') loadGuides();
+        if (tab === 'categories') loadCategories();
+        if (tab === 'analytics') loadAnalytics();
+    }
+
+    // ==================== DEBOUNCE SEARCH ====================
+    function debounceSearch() {
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            loadGuides();
+        }, 300);
+    }
+
+    // ==================== FORMAT DATE ====================
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        var d = new Date(dateStr);
+        var now = new Date();
+        var diffMs = now - d;
+        var diffMins = Math.floor(diffMs / 60000);
+        var diffHours = Math.floor(diffMs / 3600000);
+        var diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return diffMins + 'm ago';
+        if (diffHours < 24) return diffHours + 'h ago';
+        if (diffDays < 7) return diffDays + 'd ago';
+
+        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    // ==================== LOAD GUIDES ====================
+    function loadGuides() {
+        var loading = document.getElementById('guidesLoading');
+        var table = document.getElementById('guidesTable');
+        var empty = document.getElementById('guidesEmpty');
+        var body = document.getElementById('guidesBody');
+
+        loading.style.display = 'flex';
+        table.style.display = 'none';
+        empty.style.display = 'none';
+
+        var params = new URLSearchParams();
+        var catFilter = document.getElementById('filterCategory').value;
+        var statusFilter = document.getElementById('filterStatus').value;
+        var searchFilter = document.getElementById('filterSearch').value.trim();
+
+        if (catFilter) params.append('category_id', catFilter);
+        if (statusFilter) params.append('status', statusFilter);
+        if (searchFilter) params.append('search', searchFilter);
+
+        var url = '/api/guides' + (params.toString() ? '?' + params.toString() : '');
+
+        fetch(url, { headers: getAuthHeaders() })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                loading.style.display = 'none';
+
+                var guides = data.guides || data.data || data || [];
+                if (!Array.isArray(guides)) guides = [];
+                allGuides = guides;
+
+                if (guides.length === 0) {
+                    empty.style.display = 'block';
+                    return;
+                }
+
+                table.style.display = 'table';
+                body.innerHTML = '';
+
+                guides.forEach(function(guide) {
+                    var statusBadge = '';
+                    if (guide.status === 'draft') statusBadge = '<span class="badge badge-gray">Draft</span>';
+                    else if (guide.status === 'published') statusBadge = '<span class="badge badge-green">Published</span>';
+                    else if (guide.status === 'archived') statusBadge = '<span class="badge badge-red">Archived</span>';
+                    else statusBadge = '<span class="badge badge-gray">' + escapeHtml(guide.status || 'Unknown') + '</span>';
+
+                    var langBadge = '';
+                    if (guide.language === 'en') langBadge = '<span class="badge badge-blue">EN</span>';
+                    else if (guide.language === 'ta') langBadge = '<span class="badge badge-purple">TA</span>';
+                    else if (guide.language === 'both') langBadge = '<span class="badge badge-blue">EN</span> <span class="badge badge-purple">TA</span>';
+                    else langBadge = '<span class="badge badge-gray">' + escapeHtml(guide.language || '-') + '</span>';
+
+                    var visibilityBadge = guide.visible_to_staff
+                        ? '<span class="badge badge-green">Staff</span>'
+                        : '<span class="badge badge-gray">Admin</span>';
+
+                    var categoryName = escapeHtml(guide.category_name || guide.category || '-');
+                    var views = guide.view_count || guide.views || 0;
+
+                    var toggleLabel = guide.status === 'published' ? 'Unpublish' : 'Publish';
+                    var toggleClass = guide.status === 'published' ? 'btn-warning' : 'btn-success';
+
+                    var tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td style="font-weight:600; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(guide.title_en || guide.title || '') + '</td>' +
+                        '<td>' + categoryName + '</td>' +
+                        '<td>' + langBadge + '</td>' +
+                        '<td>' + statusBadge + '</td>' +
+                        '<td>' + visibilityBadge + '</td>' +
+                        '<td style="text-align:center;">' + views + '</td>' +
+                        '<td style="white-space:nowrap; color:#6b7280; font-size:0.8125rem;">' + formatDate(guide.updated_at) + '</td>' +
+                        '<td class="text-center" style="white-space:nowrap;">' +
+                            '<button onclick="openEditor(' + guide.id + ')" class="action-btn-sm btn-primary" style="margin-right:4px;" title="Edit">Edit</button>' +
+                            '<button onclick="toggleGuideStatus(' + guide.id + ',\'' + escapeHtml(guide.status) + '\')" class="action-btn-sm ' + toggleClass + '" style="margin-right:4px;" title="' + toggleLabel + '">' + toggleLabel + '</button>' +
+                            '<button onclick="deleteGuide(' + guide.id + ')" class="action-btn-sm btn-danger" title="Delete">Delete</button>' +
+                        '</td>';
+                    body.appendChild(tr);
+                });
+            })
+            .catch(function(err) {
+                loading.style.display = 'none';
+                empty.style.display = 'block';
+                console.error('Error loading guides:', err);
+                showToast('Failed to load guides', 'error');
+            });
+    }
+
+    // ==================== TOGGLE GUIDE STATUS ====================
+    function toggleGuideStatus(id, currentStatus) {
+        var newStatus = currentStatus === 'published' ? 'draft' : 'published';
+        var confirmMsg = newStatus === 'published'
+            ? 'Publish this guide? It will be visible to staff.'
+            : 'Unpublish this guide? It will be hidden from staff.';
+
+        if (!confirm(confirmMsg)) return;
+
+        fetch('/api/guides/' + id, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+            showToast('Guide ' + (newStatus === 'published' ? 'published' : 'unpublished') + ' successfully', 'success');
+            loadGuides();
+        })
+        .catch(function(err) {
+            console.error('Error toggling status:', err);
+            showToast('Failed to update guide status', 'error');
+        });
+    }
+
+    // ==================== DELETE GUIDE ====================
+    function deleteGuide(id) {
+        if (!confirm('Are you sure you want to delete this guide? This action cannot be undone.')) return;
+
+        fetch('/api/guides/' + id, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+            showToast('Guide deleted successfully', 'success');
+            loadGuides();
+        })
+        .catch(function(err) {
+            console.error('Error deleting guide:', err);
+            showToast('Failed to delete guide', 'error');
+        });
+    }
+
+    // ==================== LOAD CATEGORIES ====================
+    function loadCategories() {
+        var loading = document.getElementById('categoriesLoading');
+        var empty = document.getElementById('categoriesEmpty');
+        var list = document.getElementById('categoriesList');
+
+        loading.style.display = 'flex';
+        empty.style.display = 'none';
+        list.innerHTML = '';
+
+        fetch('/api/guides/categories', { headers: getAuthHeaders() })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                loading.style.display = 'none';
+
+                var categories = data.categories || data.data || data || [];
+                if (!Array.isArray(categories)) categories = [];
+                allCategories = categories;
+
+                populateCategoryDropdowns(categories);
+
+                if (categories.length === 0) {
+                    empty.style.display = 'block';
+                    return;
+                }
+
+                categories.forEach(function(cat) {
+                    var item = document.createElement('div');
+                    item.className = 'category-item';
+                    item.id = 'category-item-' + cat.id;
+                    item.innerHTML =
+                        '<div class="category-item-left">' +
+                            '<div class="category-icon">' + escapeHtml(cat.icon || '📄') + '</div>' +
+                            '<div class="category-info">' +
+                                '<h4>' + escapeHtml(cat.name_en || cat.name || '') + '</h4>' +
+                                '<p>' + escapeHtml(cat.name_ta || '') + '</p>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="category-meta">' +
+                            '<span>' + (cat.guide_count || 0) + ' guides</span>' +
+                            '<span>Order: ' + (cat.sort_order || 0) + '</span>' +
+                        '</div>' +
+                        '<div style="display:flex; gap:0.5rem;">' +
+                            '<button onclick="showEditCategory(' + cat.id + ')" class="action-btn-sm btn-primary" title="Edit">Edit</button>' +
+                            '<button onclick="deleteCategory(' + cat.id + ')" class="action-btn-sm btn-danger" title="Delete">Delete</button>' +
+                        '</div>';
+                    list.appendChild(item);
+
+                    // Edit form below the item (hidden by default)
+                    var editForm = document.createElement('div');
+                    editForm.className = 'category-edit-form';
+                    editForm.id = 'category-edit-' + cat.id;
+                    editForm.innerHTML =
+                        '<h4 class="text-sm font-bold text-gray-700 mb-3">Edit Category</h4>' +
+                        '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">' +
+                            '<div>' +
+                                '<label class="block text-xs font-semibold text-gray-600 mb-1">Icon</label>' +
+                                '<input type="text" id="editCatIcon' + cat.id + '" value="' + escapeHtml(cat.icon || '') + '" maxlength="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">' +
+                            '</div>' +
+                            '<div>' +
+                                '<label class="block text-xs font-semibold text-gray-600 mb-1">Name (EN)</label>' +
+                                '<input type="text" id="editCatNameEn' + cat.id + '" value="' + escapeHtml(cat.name_en || cat.name || '') + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">' +
+                            '</div>' +
+                            '<div>' +
+                                '<label class="block text-xs font-semibold text-gray-600 mb-1">Name (TA)</label>' +
+                                '<input type="text" id="editCatNameTa' + cat.id + '" value="' + escapeHtml(cat.name_ta || '') + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">' +
+                            '</div>' +
+                            '<div>' +
+                                '<label class="block text-xs font-semibold text-gray-600 mb-1">Sort Order</label>' +
+                                '<input type="number" id="editCatSort' + cat.id + '" value="' + (cat.sort_order || 0) + '" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none">' +
+                            '</div>' +
+                            '<div style="display:flex; gap:0.5rem;">' +
+                                '<button onclick="updateCategory(' + cat.id + ')" class="flex-1 px-3 py-2 rounded-lg text-sm font-semibold btn-success">Save</button>' +
+                                '<button onclick="hideEditCategory(' + cat.id + ')" class="flex-1 px-3 py-2 rounded-lg text-sm font-semibold" style="background:#e5e7eb; color:#374151;">Cancel</button>' +
+                            '</div>' +
+                        '</div>';
+                    list.appendChild(editForm);
+                });
+            })
+            .catch(function(err) {
+                loading.style.display = 'none';
+                empty.style.display = 'block';
+                console.error('Error loading categories:', err);
+                showToast('Failed to load categories', 'error');
+            });
+    }
+
+    // ==================== POPULATE CATEGORY DROPDOWNS ====================
+    function populateCategoryDropdowns(categories) {
+        var filterDropdown = document.getElementById('filterCategory');
+        var editDropdown = document.getElementById('editCategory');
+
+        // Keep the first option, clear the rest
+        var filterFirst = filterDropdown.options[0];
+        filterDropdown.innerHTML = '';
+        filterDropdown.appendChild(filterFirst);
+
+        var editFirst = editDropdown.options[0];
+        editDropdown.innerHTML = '';
+        editDropdown.appendChild(editFirst);
+
+        categories.forEach(function(cat) {
+            var opt1 = document.createElement('option');
+            opt1.value = cat.id;
+            opt1.textContent = (cat.icon || '') + ' ' + (cat.name_en || cat.name || '');
+            filterDropdown.appendChild(opt1);
+
+            var opt2 = document.createElement('option');
+            opt2.value = cat.id;
+            opt2.textContent = (cat.icon || '') + ' ' + (cat.name_en || cat.name || '');
+            editDropdown.appendChild(opt2);
+        });
+    }
+
+    // ==================== SHOW/HIDE EDIT CATEGORY ====================
+    function showEditCategory(id) {
+        // Hide all other edit forms first
+        document.querySelectorAll('.category-edit-form').forEach(function(f) { f.classList.remove('active'); });
+        var form = document.getElementById('category-edit-' + id);
+        if (form) form.classList.add('active');
+    }
+
+    function hideEditCategory(id) {
+        var form = document.getElementById('category-edit-' + id);
+        if (form) form.classList.remove('active');
+    }
+
+    // ==================== SAVE CATEGORY (CREATE) ====================
+    function saveCategory() {
+        var icon = document.getElementById('newCatIcon').value.trim();
+        var nameEn = document.getElementById('newCatNameEn').value.trim();
+        var nameTa = document.getElementById('newCatNameTa').value.trim();
+        var sortOrder = parseInt(document.getElementById('newCatSort').value) || 0;
+
+        if (!nameEn) {
+            showToast('Category name (EN) is required', 'warning');
+            return;
+        }
+
+        fetch('/api/guides/categories', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                icon: icon || '📄',
+                name_en: nameEn,
+                name_ta: nameTa,
+                sort_order: sortOrder
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+            showToast('Category created successfully', 'success');
+            document.getElementById('newCatIcon').value = '';
+            document.getElementById('newCatNameEn').value = '';
+            document.getElementById('newCatNameTa').value = '';
+            document.getElementById('newCatSort').value = '';
+            loadCategories();
+        })
+        .catch(function(err) {
+            console.error('Error creating category:', err);
+            showToast('Failed to create category', 'error');
+        });
+    }
+
+    // ==================== UPDATE CATEGORY ====================
+    function updateCategory(id) {
+        var icon = document.getElementById('editCatIcon' + id).value.trim();
+        var nameEn = document.getElementById('editCatNameEn' + id).value.trim();
+        var nameTa = document.getElementById('editCatNameTa' + id).value.trim();
+        var sortOrder = parseInt(document.getElementById('editCatSort' + id).value) || 0;
+
+        if (!nameEn) {
+            showToast('Category name (EN) is required', 'warning');
+            return;
+        }
+
+        fetch('/api/guides/categories/' + id, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                icon: icon || '📄',
+                name_en: nameEn,
+                name_ta: nameTa,
+                sort_order: sortOrder
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+            showToast('Category updated successfully', 'success');
+            loadCategories();
+        })
+        .catch(function(err) {
+            console.error('Error updating category:', err);
+            showToast('Failed to update category', 'error');
+        });
+    }
+
+    // ==================== DELETE CATEGORY ====================
+    function deleteCategory(id) {
+        if (!confirm('Delete this category? Guides in this category will become uncategorized.')) return;
+
+        fetch('/api/guides/categories/' + id, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+            showToast('Category deleted successfully', 'success');
+            loadCategories();
+        })
+        .catch(function(err) {
+            console.error('Error deleting category:', err);
+            showToast('Failed to delete category', 'error');
+        });
+    }
+
+    // ==================== LOAD ANALYTICS ====================
+    function loadAnalytics() {
+        // Show all loading states
+        document.getElementById('popularGuidesLoading').style.display = 'flex';
+        document.getElementById('popularGuidesTable').style.display = 'none';
+        document.getElementById('popularGuidesEmpty').style.display = 'none';
+        document.getElementById('staffReadsLoading').style.display = 'flex';
+        document.getElementById('staffReadsTable').style.display = 'none';
+        document.getElementById('staffReadsEmpty').style.display = 'none';
+        document.getElementById('recentViewsLoading').style.display = 'flex';
+        document.getElementById('recentViewsTable').style.display = 'none';
+        document.getElementById('recentViewsEmpty').style.display = 'none';
+
+        fetch('/api/guides/admin/analytics', { headers: getAuthHeaders() })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var analytics = data.analytics || data.data || data || {};
+
+                // Stat cards
+                document.getElementById('analyticsTotal').textContent = analytics.total_guides || 0;
+                document.getElementById('analyticsPublished').textContent = analytics.published_guides || 0;
+                document.getElementById('analyticsTotalViews').textContent = analytics.total_views || 0;
+                document.getElementById('analyticsUniqueReaders').textContent = analytics.unique_readers || 0;
+
+                // Popular guides
+                var popularGuides = analytics.popular_guides || [];
+                document.getElementById('popularGuidesLoading').style.display = 'none';
+                if (popularGuides.length === 0) {
+                    document.getElementById('popularGuidesEmpty').style.display = 'block';
+                } else {
+                    document.getElementById('popularGuidesTable').style.display = 'table';
+                    var popularBody = document.getElementById('popularGuidesBody');
+                    popularBody.innerHTML = '';
+                    popularGuides.forEach(function(g, i) {
+                        var tr = document.createElement('tr');
+                        tr.innerHTML =
+                            '<td style="color:#6b7280;">' + (i + 1) + '</td>' +
+                            '<td style="font-weight:600;">' + escapeHtml(g.title_en || g.title || '') + '</td>' +
+                            '<td>' + escapeHtml(g.category_name || '-') + '</td>' +
+                            '<td style="text-align:center; font-weight:600;">' + (g.view_count || g.views || 0) + '</td>' +
+                            '<td style="text-align:center;">' + (g.unique_readers || 0) + '</td>';
+                        popularBody.appendChild(tr);
+                    });
+                }
+
+                // Staff reads
+                var staffReads = analytics.staff_reads || [];
+                document.getElementById('staffReadsLoading').style.display = 'none';
+                if (staffReads.length === 0) {
+                    document.getElementById('staffReadsEmpty').style.display = 'block';
+                } else {
+                    document.getElementById('staffReadsTable').style.display = 'table';
+                    var staffBody = document.getElementById('staffReadsBody');
+                    staffBody.innerHTML = '';
+                    staffReads.forEach(function(s, i) {
+                        var tr = document.createElement('tr');
+                        tr.innerHTML =
+                            '<td style="color:#6b7280;">' + (i + 1) + '</td>' +
+                            '<td style="font-weight:600;">' + escapeHtml(s.staff_name || s.name || '') + '</td>' +
+                            '<td style="text-align:center;">' + (s.guides_read || 0) + '</td>' +
+                            '<td style="text-align:center; font-weight:600;">' + (s.total_views || 0) + '</td>' +
+                            '<td style="color:#6b7280; font-size:0.8125rem;">' + formatDate(s.last_read_at || s.last_read) + '</td>';
+                        staffBody.appendChild(tr);
+                    });
+                }
+
+                // Recent views
+                var recentViews = analytics.recent_views || [];
+                document.getElementById('recentViewsLoading').style.display = 'none';
+                if (recentViews.length === 0) {
+                    document.getElementById('recentViewsEmpty').style.display = 'block';
+                } else {
+                    document.getElementById('recentViewsTable').style.display = 'table';
+                    var viewsBody = document.getElementById('recentViewsBody');
+                    viewsBody.innerHTML = '';
+                    recentViews.forEach(function(v) {
+                        var tr = document.createElement('tr');
+                        tr.innerHTML =
+                            '<td style="font-weight:600;">' + escapeHtml(v.guide_title || v.title || '') + '</td>' +
+                            '<td>' + escapeHtml(v.staff_name || v.viewer || '') + '</td>' +
+                            '<td style="color:#6b7280; font-size:0.8125rem;">' + formatDate(v.viewed_at || v.created_at) + '</td>';
+                        viewsBody.appendChild(tr);
+                    });
+                }
+            })
+            .catch(function(err) {
+                document.getElementById('popularGuidesLoading').style.display = 'none';
+                document.getElementById('popularGuidesEmpty').style.display = 'block';
+                document.getElementById('staffReadsLoading').style.display = 'none';
+                document.getElementById('staffReadsEmpty').style.display = 'block';
+                document.getElementById('recentViewsLoading').style.display = 'none';
+                document.getElementById('recentViewsEmpty').style.display = 'block';
+                console.error('Error loading analytics:', err);
+                showToast('Failed to load analytics', 'error');
+            });
+    }
+
+    // ==================== QUILL INIT ====================
+    var quillToolbar = [
+        [{ 'header': [1, 2, 3, 4, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['blockquote', 'code-block'],
+        ['link', 'image'],
+        [{ 'align': [] }],
+        ['clean']
+    ];
+
+    function initQuillEditors() {
+        if (quillEn) return; // Already initialized
+
+        quillEn = new Quill('#quillEditorEn', {
+            theme: 'snow',
+            modules: {
+                toolbar: quillToolbar
+            },
+            placeholder: 'Write your guide content in English...'
+        });
+
+        quillTa = new Quill('#quillEditorTa', {
+            theme: 'snow',
+            modules: {
+                toolbar: quillToolbar
+            },
+            placeholder: 'தமிழில் வழிகாட்டி உள்ளடக்கத்தை எழுதுங்கள்...'
+        });
+    }
+
+    // ==================== OPEN EDITOR ====================
+    function openEditor(guideId) {
+        initQuillEditors();
+
+        // Reset form
+        document.getElementById('editGuideId').value = '';
+        document.getElementById('editTitleEn').value = '';
+        document.getElementById('editTitleTa').value = '';
+        document.getElementById('editCategory').value = '';
+        document.getElementById('editLanguage').value = 'en';
+        document.getElementById('editSummaryEn').value = '';
+        document.getElementById('editSummaryTa').value = '';
+        document.getElementById('editStatus').value = 'draft';
+        document.getElementById('editVisibleToStaff').checked = true;
+
+        // Reset Quill editors
+        quillEn.root.innerHTML = '';
+        quillTa.root.innerHTML = '';
+
+        // Reset HTML editors
+        document.getElementById('htmlEditorEn').value = '';
+        document.getElementById('htmlEditorTa').value = '';
+
+        // Reset editor mode toggles
+        document.getElementById('editorModeEn').checked = false;
+        document.getElementById('editorModeTa').checked = false;
+        document.getElementById('quillWrapperEn').style.display = 'block';
+        document.getElementById('htmlEditorEn').style.display = 'none';
+        document.getElementById('quillWrapperTa').style.display = 'block';
+        document.getElementById('htmlEditorTa').style.display = 'none';
+
+        // Reset content tabs
+        switchContentTab('en');
+
+        // Ensure categories are populated in edit dropdown
+        if (allCategories.length > 0) {
+            populateCategoryDropdowns(allCategories);
+        }
+
+        if (guideId) {
+            document.getElementById('editorTitle').textContent = 'Edit Guide';
+            document.getElementById('saveGuideBtn').textContent = 'Update Guide';
+
+            // Fetch guide data
+            fetch('/api/guides/' + guideId, { headers: getAuthHeaders() })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var guide = data.guide || data.data || data || {};
+
+                    document.getElementById('editGuideId').value = guide.id || guideId;
+                    document.getElementById('editTitleEn').value = guide.title_en || guide.title || '';
+                    document.getElementById('editTitleTa').value = guide.title_ta || '';
+                    document.getElementById('editCategory').value = guide.category_id || '';
+                    document.getElementById('editLanguage').value = guide.language || 'en';
+                    document.getElementById('editSummaryEn').value = guide.summary_en || guide.summary || '';
+                    document.getElementById('editSummaryTa').value = guide.summary_ta || '';
+                    document.getElementById('editStatus').value = guide.status || 'draft';
+                    document.getElementById('editVisibleToStaff').checked = guide.visible_to_staff !== false;
+
+                    // Set Quill content
+                    var contentEn = guide.content_en || guide.content || '';
+                    var contentTa = guide.content_ta || '';
+
+                    quillEn.root.innerHTML = contentEn;
+                    quillTa.root.innerHTML = contentTa;
+
+                    // Also set HTML editors
+                    document.getElementById('htmlEditorEn').value = contentEn;
+                    document.getElementById('htmlEditorTa').value = contentTa;
+
+                    showEditorPanel();
+                })
+                .catch(function(err) {
+                    console.error('Error fetching guide:', err);
+                    showToast('Failed to load guide data', 'error');
+                });
+        } else {
+            document.getElementById('editorTitle').textContent = 'New Guide';
+            document.getElementById('saveGuideBtn').textContent = 'Save Guide';
+            showEditorPanel();
+        }
+    }
+
+    // ==================== SHOW/HIDE EDITOR PANEL ====================
+    function showEditorPanel() {
+        document.getElementById('editorOverlay').classList.add('active');
+        // Small delay for transition
+        setTimeout(function() {
+            document.getElementById('editorPanel').classList.add('active');
+        }, 10);
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeEditor() {
+        document.getElementById('editorPanel').classList.remove('active');
+        setTimeout(function() {
+            document.getElementById('editorOverlay').classList.remove('active');
+        }, 350);
+        document.body.style.overflow = '';
+    }
+
+    // ==================== SWITCH CONTENT TAB ====================
+    function switchContentTab(lang) {
+        document.querySelectorAll('.content-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.content-lang-panel').forEach(function(p) { p.classList.remove('active'); });
+
+        if (lang === 'en') {
+            document.querySelectorAll('.content-tab-btn')[0].classList.add('active');
+            document.getElementById('contentPanelEn').classList.add('active');
+        } else {
+            document.querySelectorAll('.content-tab-btn')[1].classList.add('active');
+            document.getElementById('contentPanelTa').classList.add('active');
+        }
+    }
+
+    // ==================== TOGGLE EDITOR MODE ====================
+    function toggleEditorMode(lang) {
+        var checkbox = document.getElementById('editorMode' + lang.charAt(0).toUpperCase() + lang.slice(1));
+        var quillWrapper = document.getElementById('quillWrapper' + lang.charAt(0).toUpperCase() + lang.slice(1));
+        var htmlEditor = document.getElementById('htmlEditor' + lang.charAt(0).toUpperCase() + lang.slice(1));
+        var quillInstance = lang === 'en' ? quillEn : quillTa;
+
+        if (checkbox.checked) {
+            // Switching TO HTML mode: sync Quill content to HTML textarea
+            htmlEditor.value = quillInstance.root.innerHTML;
+            quillWrapper.style.display = 'none';
+            htmlEditor.style.display = 'block';
+        } else {
+            // Switching TO Visual mode: sync HTML textarea to Quill
+            quillInstance.root.innerHTML = htmlEditor.value;
+            htmlEditor.style.display = 'none';
+            quillWrapper.style.display = 'block';
+        }
+    }
+
+    // ==================== GET CONTENT FROM EDITOR ====================
+    function getEditorContent(lang) {
+        var suffix = lang.charAt(0).toUpperCase() + lang.slice(1);
+        var checkbox = document.getElementById('editorMode' + suffix);
+        var quillInstance = lang === 'en' ? quillEn : quillTa;
+        var htmlEditor = document.getElementById('htmlEditor' + suffix);
+
+        if (checkbox.checked) {
+            // HTML mode is active
+            return htmlEditor.value;
+        } else {
+            // Visual mode is active
+            var html = quillInstance.root.innerHTML;
+            // Quill uses <p><br></p> for empty content
+            if (html === '<p><br></p>') return '';
+            return html;
+        }
+    }
+
+    // ==================== SAVE GUIDE ====================
+    function saveGuide() {
+        var guideId = document.getElementById('editGuideId').value;
+        var titleEn = document.getElementById('editTitleEn').value.trim();
+        var titleTa = document.getElementById('editTitleTa').value.trim();
+        var categoryId = document.getElementById('editCategory').value;
+        var language = document.getElementById('editLanguage').value;
+        var summaryEn = document.getElementById('editSummaryEn').value.trim();
+        var summaryTa = document.getElementById('editSummaryTa').value.trim();
+        var status = document.getElementById('editStatus').value;
+        var visibleToStaff = document.getElementById('editVisibleToStaff').checked;
+
+        var contentEn = getEditorContent('en');
+        var contentTa = getEditorContent('ta');
+
+        // Validation
+        if (!titleEn) {
+            showToast('Title (English) is required', 'warning');
+            document.getElementById('editTitleEn').focus();
+            return;
+        }
+
+        var payload = {
+            title_en: titleEn,
+            title_ta: titleTa,
+            category_id: categoryId || null,
+            language: language,
+            summary_en: summaryEn,
+            summary_ta: summaryTa,
+            content_en: contentEn,
+            content_ta: contentTa,
+            status: status,
+            visible_to_staff: visibleToStaff
+        };
+
+        var saveBtn = document.getElementById('saveGuideBtn');
+        var originalText = saveBtn.textContent;
+        saveBtn.textContent = 'Saving...';
+        saveBtn.disabled = true;
+
+        var url = guideId ? '/api/guides/' + guideId : '/api/guides';
+        var method = guideId ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: method,
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            saveBtn.textContent = originalText;
+            saveBtn.disabled = false;
+
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+
+            showToast(guideId ? 'Guide updated successfully' : 'Guide created successfully', 'success');
+            closeEditor();
+            loadGuides();
+        })
+        .catch(function(err) {
+            saveBtn.textContent = originalText;
+            saveBtn.disabled = false;
+            console.error('Error saving guide:', err);
+            showToast('Failed to save guide', 'error');
+        });
+    }
+
+    // ==================== INITIAL LOAD ====================
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load categories first (for dropdowns), then guides
+        fetch('/api/guides/categories', { headers: getAuthHeaders() })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var categories = data.categories || data.data || data || [];
+                if (!Array.isArray(categories)) categories = [];
+                allCategories = categories;
+                populateCategoryDropdowns(categories);
+            })
+            .catch(function(err) {
+                console.error('Error loading categories on init:', err);
+            })
+            .finally(function() {
+                loadGuides();
+            });
+    });
+</script>
+</body>
+</html>
