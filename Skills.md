@@ -2,7 +2,7 @@
 
 > **Platform**: act.qcpaintshop.com
 > **Version**: 3.3.0
-> **Last Updated**: 2026-02-16
+> **Last Updated**: 2026-02-17
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
@@ -313,7 +313,8 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Branch-based geo-fencing (configurable radius per branch)
 - Automatic nearest-branch detection on clock-in (uses GPS to match assigned branches)
 - Geo-fence violation logging
-- **Geo-fence auto clock-out**: staff 300m+ from branch → auto clocked out with notification
+- **Geo-fence auto clock-out**: staff 300m+ from branch → 5-minute grace period → auto clocked out with notification to BOTH staff AND all admins
+- **Auto-clockout tracking**: `auto_clockout_type` (geo/max_hours/admin) and `auto_clockout_distance` columns on attendance record
 - Late detection (configurable threshold per branch, shop opens 08:30 AM)
 - Work hours calculation
 - Pages: `staff/clock-in.html`, `staff/clock-out.html`
@@ -324,17 +325,28 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Break time validation against branch config
 - Double-submit protection (`breakSubmitting` flag prevents duplicate requests)
 - Video readiness check before capture (validates camera stream active)
+- **Break geofence exemption**: geofence monitoring is paused during active breaks (no violations, no auto-clockout)
+
+**Outside Work Periods**
+- Staff can declare "Going Outside for Work" with a reason (e.g., client meeting, delivery)
+- **Geofence exemption**: geofence monitoring is paused during active outside work
+- Tracked in `outside_work_periods` table with start/end times, GPS, duration
+- Outside work minutes accumulated on attendance record (`outside_work_minutes` column)
+- UI: teal-colored button on staff dashboard, pulsing animation when active, elapsed timer
+- Endpoints: `POST /outside-work/start`, `POST /outside-work/end`, `GET /outside-work/status`
+- Server-side: geo-auto-clockout rejects with `OUTSIDE_WORK` code during active outside work
 
 **Permission Requests**
-- Staff can request permissions (leave/early departure)
+- Staff can request permissions: late_arrival, early_checkout, extended_break, leave, half_day, re_clockin, outside_work
 - Admin approval/rejection workflow with `review_notes` column
 - DB columns: `approved_by`, `approved_at`, `rejection_reason`, `review_notes`
 - Notification sent to staff on approval/rejection (via `user_id` + `request_type`)
-- **Re-clock-in request**: After clock-out, staff can request overtime. Admin approves → `allow_reclockin = 1` → staff clocks in again creating new attendance record. Types: `late_arrival`, `early_checkout`, `extended_break`, `re_clockin`
+- **Re-clock-in request**: After clock-out, staff can request overtime. Admin approves → `allow_reclockin = 1` → staff clocks in again creating new attendance record
 - Page: `staff/permission-request.html`
 
 **Admin Features**
 - Today's attendance summary (present, absent, late, on-break)
+- **Absent staff list**: shows staff who haven't clocked in, with name, branch, phone, email (endpoint: `GET /admin/absent-today`)
 - Monthly attendance report per user
 - Attendance report with date range filtering
 - **Distance column** in Live Today table (shows meters/km from branch)
@@ -344,7 +356,10 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Geo-fence violation viewer
 - **Direct photo viewer**: `GET /api/attendance/record/:id` endpoint fetches single record with all photo paths, distance, GPS info
 - Photo viewer shows all 4 types (clock-in, clock-out, break-start, break-end) with timestamps and distance
+- **Staff Timeline**: comprehensive chronological view of all events for a staff member on a date (clock-in/out, breaks, outside work, geofence violations, photos, GPS). Endpoint: `GET /admin/staff-timeline`
+- "View Timeline" button in Live Today table rows opens the timeline tab pre-filtered
 - Pages: `admin-attendance.html`, `admin-geofence-logs.html`, `staff/history.html`, `admin-staff.html`
+- Migration: `migrations/migrate-attendance-improvements.js` (run on server for DB schema changes)
 
 ---
 
@@ -635,7 +650,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 **Core**: `users`, `user_sessions`, `branches`, `customers`, `customer_types`, `settings`
 **Products**: `products`, `brands`, `categories`, `pack_sizes`
 **Estimates**: `estimates`, `estimate_items`, `estimate_status_history`, `estimate_requests`
-**Attendance**: `staff_attendance`, `attendance_breaks`, `permission_requests`, `shop_hours_config`, `geofence_violations`, `user_branches`
+**Attendance**: `staff_attendance`, `attendance_breaks`, `permission_requests`, `shop_hours_config`, `geofence_violations`, `user_branches`, `outside_work_periods`, `attendance_photos`
 **Salary**: `salary_config`, `monthly_salary`, `salary_payments`, `salary_advances`
 **Tasks**: `staff_tasks`, `task_updates`, `daily_task_templates`, `daily_task_responses`, `daily_task_materials`
 **Leads**: `leads`, `lead_followups`

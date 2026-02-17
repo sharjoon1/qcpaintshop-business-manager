@@ -692,12 +692,25 @@ router.get('/today', requireAuth, async (req, res) => {
             dayTotalMinutes = dayTotal[0].total;
         }
 
+        // Check for active outside work period
+        let outsideWork = null;
+        if (!attendance.clock_out_time) {
+            const [owRows] = await pool.query(
+                "SELECT * FROM outside_work_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+                [userId]
+            );
+            if (owRows.length > 0) {
+                outsideWork = owRows[0];
+            }
+        }
+
         res.json({
             success: true,
             has_clocked_in: true,
             has_clocked_out: !!attendance.clock_out_time,
             reclockin_status: reclockinStatus,
             day_total_minutes: dayTotalMinutes,
+            outside_work: outsideWork,
             data: attendance
         });
         
@@ -987,7 +1000,8 @@ router.post('/permission/request', requireAuth, async (req, res) => {
             });
         }
         
-        if (!['late_arrival', 'early_leave', 'leave', 'half_day', 're_clockin'].includes(request_type)) {
+        const validTypes = ['late_arrival', 'early_checkout', 'early_leave', 'extended_break', 'leave', 'half_day', 're_clockin', 'outside_work'];
+        if (!validTypes.includes(request_type)) {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid request type'
@@ -1935,6 +1949,28 @@ router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
 
         const record = records[0];
 
+        // Reject if on break
+        if (record.break_start_time && !record.break_end_time) {
+            return res.status(400).json({
+                success: false,
+                message: 'Staff is on break',
+                code: 'ON_BREAK'
+            });
+        }
+
+        // Reject if outside work period is active
+        const [activeOW] = await pool.query(
+            "SELECT id FROM outside_work_periods WHERE user_id = ? AND status = 'active' LIMIT 1",
+            [userId]
+        );
+        if (activeOW.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Staff is on authorized outside work',
+                code: 'OUTSIDE_WORK'
+            });
+        }
+
         // Calculate distance from branch
         const distance = Math.round(calculateDistance(
             parseFloat(latitude), parseFloat(longitude),
@@ -1951,7 +1987,7 @@ router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
 
         const now = new Date();
 
-        // End active break if any
+        // End active break if any (safety)
         await pool.query(
             `UPDATE staff_attendance
              SET break_end_time = ?,
@@ -1971,14 +2007,15 @@ router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
         const workingMinutes = Math.round(((now - new Date(record.clock_in_time)) / 1000 / 60) - breakMinutes);
         const geoNote = `\n[Auto clock-out: ${distance}m from branch at ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}]`;
 
-        // Clock out
+        // Clock out with auto_clockout tracking
         await pool.query(
             `UPDATE staff_attendance
              SET clock_out_time = ?, total_working_minutes = ?,
                  clock_out_lat = ?, clock_out_lng = ?, clock_out_distance = ?,
+                 auto_clockout_type = 'geo', auto_clockout_distance = ?,
                  notes = CONCAT(COALESCE(notes, ''), ?)
              WHERE id = ?`,
-            [now, workingMinutes, latitude, longitude, distance, geoNote, record.id]
+            [now, workingMinutes, latitude, longitude, distance, distance, geoNote, record.id]
         );
 
         // Notify staff
@@ -1991,6 +2028,23 @@ router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
             });
         } catch (notifErr) {
             console.error('Geo auto clockout notification error:', notifErr.message);
+        }
+
+        // Notify ALL active admins
+        try {
+            const [userInfo] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
+            const staffName = userInfo.length > 0 ? userInfo[0].full_name : 'Staff';
+            const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+            for (const admin of admins) {
+                await notificationService.send(admin.id, {
+                    type: 'geo_auto_clockout_admin',
+                    title: 'Staff Auto Clock-Out',
+                    body: `${staffName} was auto-clocked-out at ${distance}m from branch.`,
+                    data: { type: 'geo_auto_clockout_admin', attendance_id: record.id, user_id: userId, distance }
+                }).catch(() => {});
+            }
+        } catch (notifErr) {
+            console.error('Admin geo clockout notification error:', notifErr.message);
         }
 
         res.json({
@@ -2132,6 +2186,372 @@ router.get('/record/:id', requirePermission('attendance', 'view'), async (req, r
     } catch (error) {
         console.error('Get attendance record error:', error);
         res.status(500).json({ success: false, message: 'Failed to get attendance record' });
+    }
+});
+
+// ========================================
+// ABSENT STAFF ENDPOINT
+// ========================================
+
+/**
+ * GET /api/attendance/admin/absent-today
+ * Get list of staff who have NOT clocked in on a given date
+ */
+router.get('/admin/absent-today', requirePermission('attendance', 'view'), async (req, res) => {
+    try {
+        const { date, branch_id } = req.query;
+        const targetDate = date || getTodayIST();
+
+        let query = `
+            SELECT u.id, u.full_name, u.phone, u.email, b.name as branch_name
+            FROM users u
+            LEFT JOIN branches b ON u.branch_id = b.id
+            LEFT JOIN staff_attendance sa ON u.id = sa.user_id AND sa.date = ?
+            WHERE u.role = 'staff' AND u.status = 'active'
+              AND sa.id IS NULL
+        `;
+        const params = [targetDate];
+
+        if (branch_id) {
+            query += ' AND u.branch_id = ?';
+            params.push(branch_id);
+        }
+
+        query += ' ORDER BY b.name, u.full_name';
+
+        const [rows] = await pool.query(query, params);
+
+        res.json({
+            success: true,
+            date: targetDate,
+            count: rows.length,
+            data: rows
+        });
+    } catch (error) {
+        console.error('Absent today error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get absent staff' });
+    }
+});
+
+// ========================================
+// OUTSIDE WORK ENDPOINTS
+// ========================================
+
+/**
+ * POST /api/attendance/outside-work/start
+ * Start an outside work period (geofence exemption)
+ */
+router.post('/outside-work/start', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { reason, latitude, longitude } = req.body;
+        const today = getTodayIST();
+
+        if (!reason || !reason.trim()) {
+            return res.status(400).json({ success: false, message: 'Reason is required' });
+        }
+
+        // Must be clocked in
+        const [attendance] = await pool.query(
+            'SELECT * FROM staff_attendance WHERE user_id = ? AND date = ? AND clock_out_time IS NULL ORDER BY id DESC LIMIT 1',
+            [userId, today]
+        );
+
+        if (attendance.length === 0) {
+            return res.status(400).json({ success: false, message: 'You must be clocked in to start outside work' });
+        }
+
+        const record = attendance[0];
+
+        // Must not be on break
+        if (record.break_start_time && !record.break_end_time) {
+            return res.status(400).json({ success: false, message: 'Please end your break before starting outside work' });
+        }
+
+        // Must not have active outside work period
+        const [activeOW] = await pool.query(
+            "SELECT id FROM outside_work_periods WHERE user_id = ? AND status = 'active' LIMIT 1",
+            [userId]
+        );
+
+        if (activeOW.length > 0) {
+            return res.status(400).json({ success: false, message: 'You already have an active outside work period' });
+        }
+
+        const now = new Date();
+        const [result] = await pool.query(
+            `INSERT INTO outside_work_periods (attendance_id, user_id, reason, start_time, start_lat, start_lng)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [record.id, userId, reason.trim(), now, latitude || null, longitude || null]
+        );
+
+        res.json({
+            success: true,
+            message: 'Outside work period started. Geofence monitoring paused.',
+            data: { id: result.insertId, start_time: now, reason: reason.trim() }
+        });
+
+    } catch (error) {
+        console.error('Outside work start error:', error);
+        res.status(500).json({ success: false, message: 'Failed to start outside work' });
+    }
+});
+
+/**
+ * POST /api/attendance/outside-work/end
+ * End an active outside work period
+ */
+router.post('/outside-work/end', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { latitude, longitude } = req.body;
+
+        const [active] = await pool.query(
+            "SELECT * FROM outside_work_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+            [userId]
+        );
+
+        if (active.length === 0) {
+            return res.status(400).json({ success: false, message: 'No active outside work period found' });
+        }
+
+        const period = active[0];
+        const now = new Date();
+        const durationMinutes = Math.round((now - new Date(period.start_time)) / 1000 / 60);
+
+        // Update the period
+        await pool.query(
+            `UPDATE outside_work_periods
+             SET end_time = ?, end_lat = ?, end_lng = ?, duration_minutes = ?, status = 'ended'
+             WHERE id = ?`,
+            [now, latitude || null, longitude || null, durationMinutes, period.id]
+        );
+
+        // Accumulate outside work minutes on attendance record
+        await pool.query(
+            'UPDATE staff_attendance SET outside_work_minutes = outside_work_minutes + ? WHERE id = ?',
+            [durationMinutes, period.attendance_id]
+        );
+
+        res.json({
+            success: true,
+            message: `Outside work ended. Duration: ${durationMinutes} minutes. Geofence monitoring resumed.`,
+            data: { id: period.id, duration_minutes: durationMinutes, end_time: now }
+        });
+
+    } catch (error) {
+        console.error('Outside work end error:', error);
+        res.status(500).json({ success: false, message: 'Failed to end outside work' });
+    }
+});
+
+/**
+ * GET /api/attendance/outside-work/status
+ * Get current active outside work period
+ */
+router.get('/outside-work/status', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const [active] = await pool.query(
+            "SELECT * FROM outside_work_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+            [userId]
+        );
+
+        res.json({
+            success: true,
+            active: active.length > 0,
+            data: active.length > 0 ? active[0] : null
+        });
+
+    } catch (error) {
+        console.error('Outside work status error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get outside work status' });
+    }
+});
+
+// ========================================
+// ADMIN STAFF TIMELINE ENDPOINT
+// ========================================
+
+/**
+ * GET /api/attendance/admin/staff-timeline
+ * Comprehensive chronological timeline for a staff member on a given date
+ */
+router.get('/admin/staff-timeline', requirePermission('attendance', 'view'), async (req, res) => {
+    try {
+        const { user_id, date } = req.query;
+
+        if (!user_id || !date) {
+            return res.status(400).json({ success: false, message: 'user_id and date are required' });
+        }
+
+        // Get attendance records for user on this date
+        const [attendanceRows] = await pool.query(
+            `SELECT a.*, u.full_name, b.name as branch_name, b.latitude as branch_lat, b.longitude as branch_lng
+             FROM staff_attendance a
+             JOIN users u ON a.user_id = u.id
+             JOIN branches b ON a.branch_id = b.id
+             WHERE a.user_id = ? AND a.date = ?
+             ORDER BY a.id ASC`,
+            [user_id, date]
+        );
+
+        if (attendanceRows.length === 0) {
+            return res.json({
+                success: true,
+                data: { staff_name: null, date, events: [], summary: null }
+            });
+        }
+
+        const staffName = attendanceRows[0].full_name;
+        const branchName = attendanceRows[0].branch_name;
+        const events = [];
+
+        for (const att of attendanceRows) {
+            // Clock in
+            if (att.clock_in_time) {
+                events.push({
+                    type: 'clock_in',
+                    time: att.clock_in_time,
+                    photo: att.clock_in_photo,
+                    lat: att.clock_in_lat,
+                    lng: att.clock_in_lng,
+                    distance: att.clock_in_distance,
+                    address: att.clock_in_address,
+                    is_late: !!att.is_late,
+                    is_reclockin: !!att.is_reclockin
+                });
+            }
+
+            // Break start
+            if (att.break_start_time) {
+                events.push({
+                    type: 'break_start',
+                    time: att.break_start_time,
+                    photo: att.break_start_photo,
+                    lat: att.break_start_lat,
+                    lng: att.break_start_lng
+                });
+            }
+
+            // Break end
+            if (att.break_end_time) {
+                events.push({
+                    type: 'break_end',
+                    time: att.break_end_time,
+                    photo: att.break_end_photo,
+                    lat: att.break_end_lat,
+                    lng: att.break_end_lng,
+                    duration: att.break_duration_minutes
+                });
+            }
+
+            // Clock out
+            if (att.clock_out_time) {
+                events.push({
+                    type: att.auto_clockout_type ? `auto_clockout_${att.auto_clockout_type}` : 'clock_out',
+                    time: att.clock_out_time,
+                    photo: att.clock_out_photo,
+                    lat: att.clock_out_lat,
+                    lng: att.clock_out_lng,
+                    distance: att.clock_out_distance,
+                    address: att.clock_out_address,
+                    auto_clockout_type: att.auto_clockout_type,
+                    auto_clockout_distance: att.auto_clockout_distance
+                });
+            }
+        }
+
+        // Get outside work periods
+        const attIds = attendanceRows.map(a => a.id);
+        if (attIds.length > 0) {
+            const [outsideWork] = await pool.query(
+                `SELECT * FROM outside_work_periods WHERE attendance_id IN (?) ORDER BY start_time ASC`,
+                [attIds]
+            );
+
+            for (const ow of outsideWork) {
+                events.push({
+                    type: 'outside_work_start',
+                    time: ow.start_time,
+                    lat: ow.start_lat,
+                    lng: ow.start_lng,
+                    reason: ow.reason
+                });
+                if (ow.end_time) {
+                    events.push({
+                        type: 'outside_work_end',
+                        time: ow.end_time,
+                        lat: ow.end_lat,
+                        lng: ow.end_lng,
+                        duration: ow.duration_minutes,
+                        reason: ow.reason
+                    });
+                }
+            }
+        }
+
+        // Get geofence violations
+        const [violations] = await pool.query(
+            `SELECT * FROM geofence_violations WHERE user_id = ? AND DATE(created_at) = ? ORDER BY created_at ASC`,
+            [user_id, date]
+        );
+
+        for (const v of violations) {
+            events.push({
+                type: 'geofence_violation',
+                time: v.created_at,
+                lat: v.latitude,
+                lng: v.longitude,
+                distance: v.distance_from_fence,
+                violation_type: v.violation_type
+            });
+        }
+
+        // Get attendance photos
+        const [photos] = await pool.query(
+            `SELECT * FROM attendance_photos WHERE user_id = ? AND DATE(captured_at) = ? ORDER BY captured_at ASC`,
+            [user_id, date]
+        );
+
+        // Sort events chronologically
+        events.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+        // Compute summary
+        const totalWorkingMinutes = attendanceRows.reduce((sum, a) => sum + (a.total_working_minutes || 0), 0);
+        const totalBreakMinutes = attendanceRows.reduce((sum, a) => sum + (a.break_duration_minutes || 0), 0);
+        const totalOutsideMinutes = attendanceRows.reduce((sum, a) => sum + (a.outside_work_minutes || 0), 0);
+        const violationCount = violations.length;
+
+        res.json({
+            success: true,
+            data: {
+                staff_name: staffName,
+                branch_name: branchName,
+                date,
+                events,
+                photos: photos.map(p => ({
+                    id: p.id,
+                    type: p.photo_type,
+                    path: p.file_path,
+                    time: p.captured_at,
+                    lat: p.latitude,
+                    lng: p.longitude
+                })),
+                summary: {
+                    total_working_minutes: totalWorkingMinutes,
+                    total_break_minutes: totalBreakMinutes,
+                    total_outside_minutes: totalOutsideMinutes,
+                    violation_count: violationCount,
+                    records_count: attendanceRows.length
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Staff timeline error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get staff timeline' });
     }
 });
 

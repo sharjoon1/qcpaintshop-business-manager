@@ -70,6 +70,18 @@
             0%, 100% { box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); }
             50% { box-shadow: 0 4px 30px rgba(245, 158, 11, 0.7); }
         }
+        .outside-work-btn {
+            background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(8, 145, 178, 0.4);
+        }
+        .outside-work-btn.active-outside {
+            animation: pulse-teal 2s ease-in-out infinite;
+        }
+        @keyframes pulse-teal {
+            0%, 100% { box-shadow: 0 4px 15px rgba(8, 145, 178, 0.4); }
+            50% { box-shadow: 0 4px 30px rgba(8, 145, 178, 0.7); }
+        }
         .info-row {
             display: flex;
             justify-content: space-between;
@@ -430,6 +442,17 @@
             <!-- Break duration counter -->
             <div id="breakDurationDisplay" style="display: none; text-align: center; font-size: 14px; font-weight: 600; color: #d97706;"></div>
 
+            <!-- Outside Work Button -->
+            <button class="action-btn outside-work-btn" id="outsideWorkBtn" onclick="toggleOutsideWork()">
+                <svg id="outsideWorkIcon" style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span id="outsideWorkBtnText">Going Outside for Work</span>
+            </button>
+            <!-- Outside work duration counter -->
+            <div id="outsideWorkDurationDisplay" style="display: none; text-align: center; font-size: 14px; font-weight: 600; color: #0891b2;"></div>
+
             <!-- Clock Out Section (Hidden by default) -->
             <div id="clockOutSection" style="display: none; margin-top: 8px;">
                 <button class="action-btn clock-out-btn" onclick="showClockOutPanel()">
@@ -675,6 +698,24 @@
             <button onclick="hideBreakPanel()" style="flex: 1; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: #f3f4f6; color: #374151;">Cancel</button>
             <button id="breakCaptureBtn" onclick="captureBreakPhoto()" style="flex: 1; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">Capture</button>
             <button id="breakSubmitBtn" onclick="submitBreakPhoto()" style="display: none; flex: 1; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #10b981, #059669); color: white;">Submit</button>
+        </div>
+    </div>
+
+    <!-- Outside Work Reason Modal -->
+    <div class="clockout-backdrop" id="outsideWorkBackdrop" onclick="hideOutsideWorkModal()"></div>
+    <div class="break-panel" id="outsideWorkModal">
+        <div style="text-align: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 4px; background: #d1d5db; border-radius: 2px; margin: 0 auto 16px;"></div>
+            <h3 style="font-size: 20px; font-weight: 700; color: #1f2937;">Going Outside for Work</h3>
+            <p style="font-size: 14px; color: #6b7280;">Geofence monitoring will be paused while you're outside</p>
+        </div>
+        <div style="margin-bottom: 16px;">
+            <label style="font-size: 13px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px;">Reason *</label>
+            <textarea id="outsideWorkReason" placeholder="e.g., Client meeting at XYZ location, delivery pickup..." style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 15px; resize: none; min-height: 80px; font-family: inherit;"></textarea>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button onclick="hideOutsideWorkModal()" style="flex: 1; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: #f3f4f6; color: #374151;">Cancel</button>
+            <button id="outsideWorkSubmitBtn" onclick="submitOutsideWorkStart()" style="flex: 1; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #0891b2, #0e7490); color: white;">Confirm</button>
         </div>
     </div>
 
@@ -957,6 +998,13 @@
                 setBreakActive(true);
                 breakStartTime = data.break_start_time;
                 startBreakCounter();
+            }
+
+            // Outside work state
+            if (attendanceData && attendanceData.outside_work) {
+                setOutsideWorkActive(true, attendanceData.outside_work.start_time);
+            } else {
+                setOutsideWorkActive(false);
             }
         }
 
@@ -1383,9 +1431,168 @@
         // ========================================
         // GEO-FENCE MONITORING
         // ========================================
+        // ========================================
+        // OUTSIDE WORK MANAGEMENT
+        // ========================================
+        let outsideWorkActive = false;
+        let outsideWorkStartTime = null;
+        let outsideWorkTimerInterval = null;
+
+        function setOutsideWorkActive(active, startTime) {
+            outsideWorkActive = active;
+            const btn = document.getElementById('outsideWorkBtn');
+            const btnText = document.getElementById('outsideWorkBtnText');
+            const durationDisplay = document.getElementById('outsideWorkDurationDisplay');
+            const breakBtn = document.getElementById('breakBtn');
+
+            if (active) {
+                outsideWorkStartTime = startTime;
+                btnText.textContent = 'Return to Branch';
+                btn.classList.add('active-outside');
+                durationDisplay.style.display = 'block';
+                breakBtn.disabled = true;
+                breakBtn.style.opacity = '0.5';
+                startOutsideWorkTimer();
+            } else {
+                outsideWorkStartTime = null;
+                btnText.textContent = 'Going Outside for Work';
+                btn.classList.remove('active-outside');
+                durationDisplay.style.display = 'none';
+                breakBtn.disabled = false;
+                breakBtn.style.opacity = '1';
+                if (outsideWorkTimerInterval) {
+                    clearInterval(outsideWorkTimerInterval);
+                    outsideWorkTimerInterval = null;
+                }
+            }
+        }
+
+        function startOutsideWorkTimer() {
+            if (outsideWorkTimerInterval) clearInterval(outsideWorkTimerInterval);
+            const display = document.getElementById('outsideWorkDurationDisplay');
+            const update = () => {
+                if (!outsideWorkStartTime) return;
+                const now = new Date();
+                const start = new Date(outsideWorkStartTime);
+                const diffMs = now - start;
+                const mins = Math.floor(diffMs / 1000 / 60);
+                const secs = Math.floor((diffMs / 1000) % 60);
+                display.textContent = `Outside Work: ${mins}m ${secs.toString().padStart(2, '0')}s`;
+            };
+            update();
+            outsideWorkTimerInterval = setInterval(update, 1000);
+        }
+
+        function toggleOutsideWork() {
+            if (outsideWorkActive) {
+                endOutsideWork();
+            } else {
+                showOutsideWorkModal();
+            }
+        }
+
+        function showOutsideWorkModal() {
+            document.getElementById('outsideWorkReason').value = '';
+            document.getElementById('outsideWorkBackdrop').classList.add('active');
+            document.getElementById('outsideWorkModal').classList.add('active');
+        }
+
+        function hideOutsideWorkModal() {
+            document.getElementById('outsideWorkBackdrop').classList.remove('active');
+            document.getElementById('outsideWorkModal').classList.remove('active');
+        }
+
+        async function submitOutsideWorkStart() {
+            const reason = document.getElementById('outsideWorkReason').value.trim();
+            if (!reason) {
+                showToast('Please enter a reason', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('outsideWorkSubmitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Starting...';
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                // Get current location
+                const pos = await new Promise((resolve, reject) =>
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 })
+                ).catch(() => null);
+
+                const body = { reason };
+                if (pos) {
+                    body.latitude = pos.coords.latitude;
+                    body.longitude = pos.coords.longitude;
+                }
+
+                const res = await fetch('/api/attendance/outside-work/start', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    hideOutsideWorkModal();
+                    setOutsideWorkActive(true, data.data.start_time);
+                    showToast('Outside work started. Geofence paused.', 'info');
+                } else {
+                    showToast(data.message || 'Failed to start outside work', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Please try again.', 'error');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Confirm';
+        }
+
+        async function endOutsideWork() {
+            const owBtn = document.getElementById('outsideWorkBtn');
+            owBtn.disabled = true;
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const pos = await new Promise((resolve, reject) =>
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 })
+                ).catch(() => null);
+
+                const body = {};
+                if (pos) {
+                    body.latitude = pos.coords.latitude;
+                    body.longitude = pos.coords.longitude;
+                }
+
+                const res = await fetch('/api/attendance/outside-work/end', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    setOutsideWorkActive(false);
+                    showToast(`Outside work ended (${data.data.duration_minutes}m). Geofence resumed.`, 'success');
+                    loadTodayAttendance();
+                } else {
+                    showToast(data.message || 'Failed to end outside work', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Please try again.', 'error');
+            }
+
+            owBtn.disabled = false;
+        }
+
+        // ========================================
+        // GEO-FENCE MONITORING (with break/outside-work skip + grace period)
+        // ========================================
         let geoWatchId = null;
         let isOutsideFence = false;
         let geoAutoClockoutTriggered = false;
+        let graceViolationStart = null; // timestamp of first 300m+ violation
+        const GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 minutes
 
         function startGeoFenceMonitoring() {
             if (!navigator.geolocation) return;
@@ -1399,6 +1606,19 @@
             geoWatchId = navigator.geolocation.watchPosition(
                 async (pos) => {
                     try {
+                        // Skip geofence enforcement during break
+                        if (attendanceData && attendanceData.data &&
+                            attendanceData.data.break_start_time && !attendanceData.data.break_end_time) {
+                            hideGeofenceAlert();
+                            return;
+                        }
+
+                        // Skip geofence enforcement during outside work
+                        if (outsideWorkActive) {
+                            hideGeofenceAlert();
+                            return;
+                        }
+
                         const token = localStorage.getItem('auth_token');
                         const res = await fetch(
                             `/api/attendance/geofence-check?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}`,
@@ -1416,17 +1636,27 @@
                                     // Vibrate if supported
                                     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                                 }
-                                // Auto clock-out if 300m+ away
+                                // Grace period auto clock-out: only trigger after 5 min at 300m+
                                 if (data.data.distance >= 300 && !geoAutoClockoutTriggered) {
-                                    triggerGeoAutoClockout(pos.coords.latitude, pos.coords.longitude, data.data.distance);
+                                    if (!graceViolationStart) {
+                                        graceViolationStart = Date.now();
+                                        showGeofenceAlert(data.data.distance, data.data.radius, true);
+                                    } else if (Date.now() - graceViolationStart >= GRACE_PERIOD_MS) {
+                                        triggerGeoAutoClockout(pos.coords.latitude, pos.coords.longitude, data.data.distance);
+                                    } else {
+                                        // Update alert with countdown
+                                        const remainSec = Math.ceil((GRACE_PERIOD_MS - (Date.now() - graceViolationStart)) / 1000);
+                                        showGeofenceAlert(data.data.distance, data.data.radius, true, remainSec);
+                                    }
                                 }
                             } else {
-                                // Inside fence
+                                // Inside fence - reset everything
                                 if (isOutsideFence) {
                                     isOutsideFence = false;
                                     hideGeofenceAlert();
                                     logGeofenceViolation(pos.coords.latitude, pos.coords.longitude, data.data.distance, data.data.radius, 'returned');
                                 }
+                                graceViolationStart = null; // reset grace timer
                             }
                         }
                     } catch (err) {
@@ -1440,6 +1670,7 @@
 
         async function triggerGeoAutoClockout(lat, lng, distance) {
             geoAutoClockoutTriggered = true;
+            graceViolationStart = null;
             try {
                 const token = localStorage.getItem('auth_token');
                 const res = await fetch('/api/attendance/geo-auto-clockout', {
@@ -1455,8 +1686,11 @@
                     showToast(`Auto clocked out - you are ${distance}m from branch`, 'warning');
                     stopGeoFenceMonitoring();
                     await loadTodayAttendance();
+                } else if (data.code === 'ON_BREAK' || data.code === 'OUTSIDE_WORK') {
+                    // Server rejected - staff is on break/outside work
+                    geoAutoClockoutTriggered = false;
+                    graceViolationStart = null;
                 } else {
-                    // Reset flag if server says not applicable
                     geoAutoClockoutTriggered = false;
                 }
             } catch (err) {
@@ -1474,10 +1708,17 @@
             isOutsideFence = false;
         }
 
-        function showGeofenceAlert(distance, radius) {
+        function showGeofenceAlert(distance, radius, isGrace, remainSec) {
             const alert = document.getElementById('geofenceAlert');
-            document.getElementById('geofenceAlertText').textContent =
-                `You are ${distance}m away from your branch! (Allowed: ${radius}m)`;
+            let text = `You are ${distance}m away from your branch! (Allowed: ${radius}m)`;
+            if (isGrace && remainSec) {
+                const mins = Math.floor(remainSec / 60);
+                const secs = remainSec % 60;
+                text += ` — Auto clock-out in ${mins}:${secs.toString().padStart(2, '0')}`;
+            } else if (isGrace) {
+                text += ' — Return within 5 minutes or you will be auto-clocked-out!';
+            }
+            document.getElementById('geofenceAlertText').textContent = text;
             alert.style.display = 'block';
         }
 

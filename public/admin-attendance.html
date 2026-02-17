@@ -359,6 +359,8 @@
             from { transform: translateX(0); opacity: 1; }
             to { transform: translateX(100%); opacity: 0; }
         }
+
+        .badge-outside_work { background: #cffafe; color: #0e7490; }
     </style>
 </head>
 <body data-page="attendance-admin">
@@ -403,7 +405,7 @@
                 <button class="tab-btn" onclick="switchTab('permissions')">Permission Requests</button>
                 <button class="tab-btn" onclick="switchTab('monthly')">Monthly View</button>
                 <button class="tab-btn" onclick="switchTab('mark')">Mark Attendance</button>
-                <button class="tab-btn" onclick="switchTab('activity')">Activity Report</button>
+                <button class="tab-btn" onclick="switchTab('timeline')">Staff Timeline</button>
             </div>
 
             <!-- Tab 1: Live Today -->
@@ -426,7 +428,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card mb-4">
                     <div class="table-container">
                         <table>
                             <thead class="gradient-header">
@@ -445,6 +447,30 @@
                             </thead>
                             <tbody id="liveTableBody">
                                 <tr><td colspan="10" class="text-center py-8 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Absent Staff Section -->
+                <div class="card" id="absentStaffCard" style="border-top: 4px solid #ef4444;">
+                    <div style="padding: 1.25rem; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center;">
+                        <h3 class="text-lg font-bold text-gray-900">
+                            Absent Staff <span id="absentCount" class="text-sm font-semibold text-red-600 ml-2"></span>
+                        </h3>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr style="background: #fee2e2;">
+                                    <th style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #991b1b;">Name</th>
+                                    <th style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #991b1b;">Branch</th>
+                                    <th style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #991b1b;">Phone</th>
+                                    <th style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #991b1b;">Email</th>
+                                </tr>
+                            </thead>
+                            <tbody id="absentTableBody">
+                                <tr><td colspan="4" class="text-center py-6 text-gray-400">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -580,31 +606,31 @@
                 </div>
             </div>
 
-            <!-- Tab 5: Activity Report -->
-            <div class="tab-content" id="tab-activity">
+            <!-- Tab 5: Staff Timeline -->
+            <div class="tab-content" id="tab-timeline">
                 <div class="filter-bar">
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Date</label>
-                            <input type="date" id="activityDate" onchange="loadActivityReport()">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Branch</label>
-                            <select id="activityBranch" onchange="loadActivityReport()">
-                                <option value="">All Branches</option>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Staff Member</label>
+                            <select id="timelineStaff">
+                                <option value="">Select Staff</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                            <input type="date" id="timelineDate">
+                        </div>
                         <div class="flex items-end">
-                            <button class="btn btn-primary w-full" onclick="loadActivityReport()">Load Report</button>
+                            <button class="btn btn-primary w-full" onclick="loadStaffTimeline()">Load Timeline</button>
                         </div>
                     </div>
                 </div>
 
-                <div id="activityContainer">
+                <div id="timelineContainer">
                     <div class="empty-state">
-                        <div class="empty-state-icon">&#128202;</div>
-                        <p class="font-semibold text-gray-700 mb-1">Activity Report</p>
-                        <p class="text-sm">Select a date above to view staff activity reports</p>
+                        <div class="empty-state-icon">&#128337;</div>
+                        <p class="font-semibold text-gray-700 mb-1">Staff Timeline</p>
+                        <p class="text-sm">Select a staff member and date above to view their detailed activity timeline</p>
                     </div>
                 </div>
             </div>
@@ -677,7 +703,7 @@
             const currentMonth = today.substring(0, 7);
 
             document.getElementById('liveDate').value = today;
-            document.getElementById('activityDate').value = today;
+            document.getElementById('timelineDate').value = today;
             document.getElementById('markDate').value = today;
             document.getElementById('monthlyMonth').value = currentMonth;
 
@@ -686,6 +712,7 @@
             loadStaffList();
             loadSummaryStats();
             loadLiveAttendance();
+            loadAbsentStaff();
 
             // Auto-refresh every 60 seconds for live view
             autoRefreshInterval = setInterval(() => {
@@ -693,6 +720,7 @@
                 if (activeTab && activeTab.textContent.trim() === 'Live Today') {
                     loadSummaryStats();
                     loadLiveAttendance();
+                    loadAbsentStaff();
                 }
             }, 60000);
         }
@@ -749,9 +777,8 @@
             document.getElementById(`tab-${tab}`).classList.add('active');
 
             // Load data for the tab
-            if (tab === 'live') loadLiveAttendance();
+            if (tab === 'live') { loadLiveAttendance(); loadAbsentStaff(); }
             if (tab === 'permissions') loadPermissions();
-            if (tab === 'activity') loadActivityReport();
         }
 
         function openModal(id) {
@@ -798,6 +825,7 @@
                         staffList.map(s => `<option value="${s.id}">${escapeHtml(s.full_name || s.username)}</option>`).join('');
                     document.getElementById('monthlyStaff').innerHTML = options;
                     document.getElementById('markStaff').innerHTML = options;
+                    document.getElementById('timelineStaff').innerHTML = options;
                 }
             } catch (e) {
                 console.error('Load staff error:', e);
@@ -879,6 +907,7 @@
                         <td>${r.is_late ? '<span class="badge badge-late">LATE</span>' : '-'}</td>
                         <td>
                             ${r.clock_in_time ? `<button class="action-btn-sm btn-primary" onclick="viewPhotos(${r.id})" title="View Photos">Photos</button>` : '-'}
+                            ${r.clock_in_time ? ` <button class="action-btn-sm btn-secondary" onclick="openTimelineFor(${r.user_id}, '${date}')" title="View Timeline">Timeline</button>` : ''}
                             ${r.clock_in_time && !r.clock_out_time ? ` <button class="action-btn-sm btn-danger" onclick="forceClockOut(${r.id}, '${escapeHtml(r.full_name)}')" title="Force Clock Out">Clock Out</button>` : ''}
                         </td>
                     </tr>`;
@@ -1118,22 +1147,81 @@
         }
 
         // ========================================
-        // TAB 5: ACTIVITY REPORT
+        // ABSENT STAFF
         // ========================================
-        async function loadActivityReport() {
-            const date = document.getElementById('activityDate').value;
-            const branchId = document.getElementById('activityBranch').value;
-            const container = document.getElementById('activityContainer');
+        async function loadAbsentStaff() {
+            const date = document.getElementById('liveDate').value;
+            const branchId = document.getElementById('liveBranch').value;
+            const tbody = document.getElementById('absentTableBody');
 
-            if (!date) return;
+            try {
+                let url = `/api/attendance/admin/absent-today?date=${date}`;
+                if (branchId) url += `&branch_id=${branchId}`;
+
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (!data.success) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-gray-400">${escapeHtml(data.message)}</td></tr>`;
+                    return;
+                }
+
+                const rows = data.data || [];
+                document.getElementById('absentCount').textContent = rows.length > 0 ? `(${rows.length})` : '';
+
+                if (rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-gray-400">All staff accounted for today</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = rows.map(r => `
+                    <tr>
+                        <td class="font-semibold">${escapeHtml(r.full_name)}</td>
+                        <td>${escapeHtml(r.branch_name || '--')}</td>
+                        <td>${r.phone ? `<a href="tel:${escapeHtml(r.phone)}" class="text-blue-600">${escapeHtml(r.phone)}</a>` : '--'}</td>
+                        <td>${r.email ? `<a href="mailto:${escapeHtml(r.email)}" class="text-blue-600">${escapeHtml(r.email)}</a>` : '--'}</td>
+                    </tr>
+                `).join('');
+
+            } catch (e) {
+                console.error('Load absent staff error:', e);
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-red-500">Failed to load absent staff</td></tr>';
+            }
+        }
+
+        // ========================================
+        // TAB 5: STAFF TIMELINE
+        // ========================================
+        function openTimelineFor(userId, date) {
+            // Switch to timeline tab
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            const tlBtn = document.querySelector('.tab-btn:last-child');
+            if (tlBtn) tlBtn.classList.add('active');
+            document.getElementById('tab-timeline').classList.add('active');
+
+            // Set filters and load
+            document.getElementById('timelineStaff').value = userId;
+            document.getElementById('timelineDate').value = date;
+            loadStaffTimeline();
+        }
+
+        async function loadStaffTimeline() {
+            const userId = document.getElementById('timelineStaff').value;
+            const date = document.getElementById('timelineDate').value;
+            const container = document.getElementById('timelineContainer');
+
+            if (!userId || !date) {
+                showToast('Please select a staff member and date', 'warning');
+                return;
+            }
 
             container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">Loading...</div></div>';
 
             try {
-                let url = `/api/activities/report/daily?date=${date}`;
-                if (branchId) url += `&branch_id=${branchId}`;
-
-                const res = await fetch(url, { headers: getAuthHeaders() });
+                const res = await fetch(`/api/attendance/admin/staff-timeline?user_id=${userId}&date=${date}`, {
+                    headers: getAuthHeaders()
+                });
                 const data = await res.json();
 
                 if (!data.success) {
@@ -1141,72 +1229,126 @@
                     return;
                 }
 
-                const report = data.activities || data.data || data.report || [];
-
-                if (report.length === 0) {
+                const tl = data.data;
+                if (!tl.events || tl.events.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <div class="empty-state-icon">&#128202;</div>
-                            <p class="font-semibold text-gray-700 mb-1">No activities found</p>
-                            <p class="text-sm">No activities logged for this date</p>
+                            <div class="empty-state-icon">&#128337;</div>
+                            <p class="font-semibold text-gray-700 mb-1">No activity found</p>
+                            <p class="text-sm">${tl.staff_name ? escapeHtml(tl.staff_name) + ' has' : 'Staff has'} no attendance records for ${formatDate(date)}</p>
                         </div>`;
                     return;
                 }
 
-                // Group by user
-                const grouped = {};
-                report.forEach(a => {
-                    const key = a.user_id || a.id;
-                    if (!grouped[key]) {
-                        grouped[key] = {
-                            name: a.full_name || a.user_name || 'Unknown',
-                            branch: a.branch_name || '',
-                            activities: [],
-                            total: 0,
-                            completed: 0,
-                            duration: 0
-                        };
-                    }
-                    grouped[key].activities.push(a);
-                    grouped[key].total++;
-                    if (a.status === 'completed') grouped[key].completed++;
-                    grouped[key].duration += (a.duration_minutes || 0);
-                });
-
-                container.innerHTML = Object.values(grouped).map(g => `
+                // Summary card
+                const s = tl.summary;
+                let html = `
                     <div class="card mb-4" style="padding: 1.25rem;">
                         <div class="flex flex-wrap justify-between items-center mb-3">
                             <div>
-                                <span class="font-bold text-gray-900 text-lg">${escapeHtml(g.name)}</span>
-                                ${g.branch ? `<span class="text-sm text-gray-500 ml-2">${escapeHtml(g.branch)}</span>` : ''}
-                            </div>
-                            <div class="flex gap-3 text-sm">
-                                <span class="font-semibold text-purple-700">${g.total} activities</span>
-                                <span class="font-semibold text-green-700">${g.completed} completed</span>
-                                <span class="font-semibold text-blue-700">${formatMinutesToHours(g.duration)}</span>
+                                <span class="font-bold text-gray-900 text-xl">${escapeHtml(tl.staff_name)}</span>
+                                <span class="text-sm text-gray-500 ml-2">${escapeHtml(tl.branch_name)} &mdash; ${formatDate(date)}</span>
                             </div>
                         </div>
-                        <div class="space-y-2">
-                            ${g.activities.map(a => `
-                                <div style="background: #f9fafb; padding: 0.75rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <span class="font-semibold text-sm">${escapeHtml(a.title || a.activity_type || 'Activity')}</span>
-                                        ${a.description ? `<p class="text-xs text-gray-500 mt-1">${escapeHtml(a.description).substring(0, 100)}</p>` : ''}
-                                    </div>
+                        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+                            <div class="stat-card" style="--border-color: #10b981; padding: 1rem;">
+                                <div class="stat-label">Working</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: #1f2937;">${formatMinutesToHours(s.total_working_minutes)}</div>
+                            </div>
+                            <div class="stat-card" style="--border-color: #f59e0b; padding: 1rem;">
+                                <div class="stat-label">Break</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: #1f2937;">${formatMinutesToHours(s.total_break_minutes)}</div>
+                            </div>
+                            <div class="stat-card" style="--border-color: #0891b2; padding: 1rem;">
+                                <div class="stat-label">Outside Work</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: #1f2937;">${formatMinutesToHours(s.total_outside_minutes)}</div>
+                            </div>
+                            <div class="stat-card" style="--border-color: #ef4444; padding: 1rem;">
+                                <div class="stat-label">Violations</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: #1f2937;">${s.violation_count}</div>
+                            </div>
+                        </div>
+                    </div>`;
+
+                // Timeline events
+                html += '<div class="card" style="padding: 1.25rem;">';
+                html += '<h4 class="font-bold text-gray-900 mb-4">Activity Timeline</h4>';
+                html += '<div style="position: relative; padding-left: 2rem;">';
+
+                // Vertical line
+                html += '<div style="position: absolute; left: 0.75rem; top: 0; bottom: 0; width: 2px; background: #e5e7eb;"></div>';
+
+                for (const ev of tl.events) {
+                    const time = formatTime(ev.time);
+                    const config = getEventConfig(ev.type);
+
+                    html += `
+                        <div style="position: relative; margin-bottom: 1.25rem; padding-left: 1rem;">
+                            <div style="position: absolute; left: -1.35rem; top: 0.25rem; width: 12px; height: 12px; border-radius: 50%; background: ${config.color}; border: 2px solid white; box-shadow: 0 0 0 2px ${config.color};"></div>
+                            <div style="background: #f9fafb; border-left: 3px solid ${config.color}; border-radius: 0 8px 8px 0; padding: 0.875rem;">
+                                <div class="flex flex-wrap justify-between items-start gap-2 mb-1">
                                     <div class="flex items-center gap-2">
-                                        ${a.duration_minutes ? `<span class="text-xs text-gray-500">${a.duration_minutes}m</span>` : ''}
-                                        <span class="badge badge-${a.status || 'pending'}">${a.status || 'pending'}</span>
+                                        <span style="font-size: 1rem;">${config.icon}</span>
+                                        <span class="font-semibold text-gray-900">${config.label}</span>
                                     </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `).join('');
+                                    <span class="text-sm font-semibold text-gray-600">${time}</span>
+                                </div>`;
+
+                    // Additional details
+                    const details = [];
+                    if (ev.distance != null) details.push(`Distance: ${ev.distance}m`);
+                    if (ev.duration != null) details.push(`Duration: ${ev.duration}m`);
+                    if (ev.reason) details.push(`Reason: ${escapeHtml(ev.reason)}`);
+                    if (ev.address) details.push(`${escapeHtml(ev.address)}`);
+                    if (ev.is_late) details.push('<span class="badge badge-late">LATE</span>');
+                    if (ev.is_reclockin) details.push('<span class="badge badge-re_clockin">Re-Clock-In</span>');
+                    if (ev.violation_type) details.push(`Type: ${escapeHtml(ev.violation_type)}`);
+                    if (ev.auto_clockout_type) details.push(`Auto: ${ev.auto_clockout_type} (${ev.auto_clockout_distance}m)`);
+
+                    if (details.length > 0) {
+                        html += `<div class="text-sm text-gray-600 mt-1">${details.join(' &middot; ')}</div>`;
+                    }
+
+                    // Photo thumbnail
+                    if (ev.photo) {
+                        html += `<div style="margin-top: 0.5rem;">
+                            <img src="/${escapeHtml(ev.photo)}" style="width: 80px; height: 60px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid #e5e7eb;"
+                                 onclick="window.open('/${escapeHtml(ev.photo)}', '_blank')"
+                                 onerror="this.style.display='none'">
+                        </div>`;
+                    }
+
+                    // GPS
+                    if (ev.lat && ev.lng) {
+                        html += `<div class="text-xs text-gray-400 mt-1">GPS: ${parseFloat(ev.lat).toFixed(6)}, ${parseFloat(ev.lng).toFixed(6)}</div>`;
+                    }
+
+                    html += `</div></div>`;
+                }
+
+                html += '</div></div>';
+                container.innerHTML = html;
 
             } catch (e) {
-                console.error('Load activity report error:', e);
-                container.innerHTML = '<div class="empty-state"><p class="text-red-500">Failed to load activity report</p></div>';
+                console.error('Load staff timeline error:', e);
+                container.innerHTML = '<div class="empty-state"><p class="text-red-500">Failed to load timeline</p></div>';
             }
+        }
+
+        function getEventConfig(type) {
+            const configs = {
+                clock_in:            { icon: '&#9989;', label: 'Clock In',            color: '#10b981' },
+                clock_out:           { icon: '&#128682;', label: 'Clock Out',          color: '#10b981' },
+                break_start:         { icon: '&#9749;', label: 'Break Start',          color: '#f59e0b' },
+                break_end:           { icon: '&#9749;', label: 'Break End',            color: '#f59e0b' },
+                outside_work_start:  { icon: '&#128205;', label: 'Outside Work Start', color: '#0891b2' },
+                outside_work_end:    { icon: '&#128205;', label: 'Outside Work End',   color: '#0891b2' },
+                geofence_violation:  { icon: '&#9888;&#65039;', label: 'Geofence Violation', color: '#ef4444' },
+                auto_clockout_geo:   { icon: '&#128680;', label: 'Auto Clock-Out (Geo)', color: '#ef4444' },
+                auto_clockout_admin: { icon: '&#128680;', label: 'Auto Clock-Out (Admin)', color: '#ef4444' },
+                auto_clockout_max_hours: { icon: '&#128680;', label: 'Auto Clock-Out (Max Hours)', color: '#ef4444' }
+            };
+            return configs[type] || { icon: '&#128308;', label: type.replace(/_/g, ' '), color: '#6b7280' };
         }
 
         // ========================================
