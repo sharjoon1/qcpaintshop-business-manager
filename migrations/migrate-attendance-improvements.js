@@ -7,6 +7,7 @@
  * 1. Fix attendance_permissions ENUM to include all used types
  * 2. Create outside_work_periods table
  * 3. Add outside_work_minutes, auto_clockout_type, auto_clockout_distance to staff_attendance
+ * 4. Add rejection_reason column to attendance_permissions
  */
 
 const mysql = require('mysql2/promise');
@@ -115,6 +116,22 @@ async function migrate() {
                 ADD COLUMN auto_clockout_distance INT NULL
             `);
             console.log('   OK - auto_clockout_distance added');
+        } catch (err) {
+            if (err.code === 'ER_DUP_FIELDNAME' || err.message.includes('Duplicate column')) {
+                console.log('   SKIP - column already exists');
+            } else {
+                console.error('   ERROR:', err.message);
+            }
+        }
+
+        // 6. Add rejection_reason column to attendance_permissions
+        console.log('6. Adding rejection_reason column to attendance_permissions...');
+        try {
+            await pool.query(`
+                ALTER TABLE attendance_permissions
+                ADD COLUMN rejection_reason TEXT DEFAULT NULL AFTER review_notes
+            `);
+            console.log('   OK - rejection_reason added');
         } catch (err) {
             if (err.code === 'ER_DUP_FIELDNAME' || err.message.includes('Duplicate column')) {
                 console.log('   SKIP - column already exists');
