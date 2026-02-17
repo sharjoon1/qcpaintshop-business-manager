@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quality Colours - Attendance System Guide (Tamil)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --primary: #667eea;
+            --primary-dark: #4f46e5;
+            --gradient-end: #764ba2;
+            --accent: #6366F1;
+            --green: #10b981;
+            --amber: #f59e0b;
+            --red: #ef4444;
+            --dark: #1f2937;
+            --gray: #6b7280;
+            --light-gray: #f3f4f6;
+            --border: #e5e7eb;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans Tamil', sans-serif;
+            color: var(--dark);
+            line-height: 1.8;
+            font-size: 14px;
+            background: #fff;
+        }
+
+        /* Print styles */
+        @media print {
+            body { font-size: 12px; }
+            .page-break { page-break-before: always; }
+            .no-print { display: none !important; }
+            .cover-page { height: 100vh; }
+            section { page-break-inside: avoid; }
+            .calc-box { page-break-inside: avoid; }
+        }
+
+        /* Cover Page */
+        .cover-page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--primary), var(--gradient-end));
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .cover-logo {
+            width: 280px;
+            margin-bottom: 40px;
+            background: white;
+            padding: 20px 30px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .cover-title {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .cover-subtitle {
+            font-size: 20px;
+            font-weight: 400;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+
+        .cover-meta {
+            font-size: 14px;
+            opacity: 0.8;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+
+        .cover-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 24px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 16px;
+        }
+
+        /* Content */
+        .content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 30px;
+        }
+
+        /* Page Header */
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0;
+            border-bottom: 3px solid var(--primary);
+            margin-bottom: 30px;
+        }
+
+        .page-header img {
+            height: 40px;
+        }
+
+        .page-header-text {
+            font-size: 11px;
+            color: var(--gray);
+            text-align: right;
+        }
+
+        /* TOC */
+        .toc {
+            background: var(--light-gray);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 40px;
+        }
+
+        .toc h2 {
+            font-size: 22px;
+            color: var(--primary-dark);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .toc-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 8px 0;
+            border-bottom: 1px dotted var(--border);
+            text-decoration: none;
+            color: var(--dark);
+        }
+
+        .toc-item:hover { color: var(--primary); }
+
+        .toc-num {
+            font-weight: 700;
+            color: var(--primary);
+            margin-right: 10px;
+            min-width: 30px;
+        }
+
+        /* Section */
+        section {
+            margin-bottom: 40px;
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, var(--primary), var(--gradient-end));
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-num {
+            background: rgba(255,255,255,0.25);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 16px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .section-body {
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 24px;
+        }
+
+        h3 {
+            color: var(--primary-dark);
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3:first-child { margin-top: 0; }
+
+        p { margin-bottom: 12px; }
+
+        /* Info boxes */
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid var(--primary);
+            padding: 14px 18px;
+            border-radius: 0 8px 8px 0;
+            margin: 14px 0;
+            font-size: 13px;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border-left: 4px solid var(--amber);
+            padding: 14px 18px;
+            border-radius: 0 8px 8px 0;
+            margin: 14px 0;
+            font-size: 13px;
+        }
+
+        .danger-box {
+            background: #fee2e2;
+            border-left: 4px solid var(--red);
+            padding: 14px 18px;
+            border-radius: 0 8px 8px 0;
+            margin: 14px 0;
+            font-size: 13px;
+        }
+
+        .success-box {
+            background: #d1fae5;
+            border-left: 4px solid var(--green);
+            padding: 14px 18px;
+            border-radius: 0 8px 8px 0;
+            margin: 14px 0;
+            font-size: 13px;
+        }
+
+        /* Calculation boxes */
+        .calc-box {
+            background: #faf5ff;
+            border: 2px solid #e9d5ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+        }
+
+        .calc-box h4 {
+            color: #7c3aed;
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+
+        .calc-formula {
+            background: white;
+            border: 1px solid #e9d5ff;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-family: monospace;
+            font-size: 13px;
+            margin: 8px 0;
+            color: var(--primary-dark);
+        }
+
+        .calc-result {
+            font-weight: 700;
+            color: var(--green);
+            font-size: 15px;
+            margin-top: 8px;
+        }
+
+        .calc-result.negative {
+            color: var(--red);
+        }
+
+        /* Steps */
+        .steps {
+            counter-reset: step;
+            list-style: none;
+            padding: 0;
+        }
+
+        .steps li {
+            counter-increment: step;
+            padding: 10px 0 10px 50px;
+            position: relative;
+            border-left: 2px solid var(--border);
+            margin-left: 16px;
+        }
+
+        .steps li:last-child { border-left: 2px solid transparent; }
+
+        .steps li::before {
+            content: counter(step);
+            position: absolute;
+            left: -14px;
+            top: 8px;
+            width: 28px;
+            height: 28px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            font-size: 13px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Table */
+        .styled-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0;
+            font-size: 13px;
+        }
+
+        .styled-table th {
+            background: linear-gradient(135deg, var(--primary), var(--gradient-end));
+            color: white;
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .styled-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .styled-table tr:nth-child(even) { background: var(--light-gray); }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-green { background: #d1fae5; color: #065f46; }
+        .badge-amber { background: #fef3c7; color: #92400e; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+
+        /* Timeline visual */
+        .timeline-visual {
+            display: flex;
+            align-items: center;
+            background: var(--light-gray);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 14px 0;
+            overflow-x: auto;
+        }
+
+        .timeline-block {
+            text-align: center;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .timeline-arrow {
+            font-size: 18px;
+            color: var(--gray);
+            margin: 0 4px;
+        }
+
+        /* Print button */
+        .print-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, var(--primary), var(--gradient-end));
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 8px 30px rgba(102,126,234,0.4);
+            z-index: 100;
+            font-family: 'Noto Sans Tamil', sans-serif;
+        }
+
+        .print-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(102,126,234,0.5);
+        }
+
+        /* Footer */
+        .doc-footer {
+            text-align: center;
+            padding: 30px;
+            border-top: 2px solid var(--border);
+            margin-top: 40px;
+            color: var(--gray);
+            font-size: 12px;
+        }
+
+        ul { padding-left: 20px; margin: 8px 0; }
+        ul li { margin: 4px 0; }
+
+        strong { color: var(--dark); }
+
+        .highlight { color: var(--primary-dark); font-weight: 700; }
+        .text-green { color: var(--green); }
+        .text-red { color: var(--red); }
+        .text-amber { color: var(--amber); }
+    </style>
+</head>
+<body>
+
+<!-- Print Button -->
+<button class="print-btn no-print" onclick="window.print()">
+    PDF-ஆக சேமிக்க
+</button>
+
+<!-- ===== COVER PAGE ===== -->
+<div class="cover-page">
+    <img src="/uploads/logos/logo-1770737238581-627910713.png" class="cover-logo" alt="Quality Colours Logo">
+    <div class="cover-title">Staff Attendance System</div>
+    <div class="cover-title" style="font-size: 28px; margin-bottom: 8px;">ஊழியர் வருகைப்பதிவு அமைப்பு</div>
+    <div class="cover-subtitle">முழுமையான விளக்கமும் சம்பள கணக்கீடு வழிகாட்டியும்</div>
+    <div class="cover-badge">QC Staff App - Version 3.3</div>
+    <div class="cover-meta">
+        Quality Colours - The Branded Paint Showrooms<br>
+        ஆவண பதிப்பு: 1.0 | பிப்ரவரி 2026
+    </div>
+</div>
+
+<!-- ===== TABLE OF CONTENTS ===== -->
+<div class="content page-break">
+    <div class="page-header">
+        <img src="/uploads/logos/logo-1770737238581-627910713.png" alt="Logo" style="height:36px;">
+        <div class="page-header-text">Quality Colours - Attendance Guide<br>பிப்ரவரி 2026</div>
+    </div>
+
+    <div class="toc">
+        <h2>பொருளடக்கம் (Table of Contents)</h2>
+        <a class="toc-item" href="#s1"><span><span class="toc-num">1</span>வருகைப்பதிவு செயல்முறை (Clock-In Process)</span></a>
+        <a class="toc-item" href="#s2"><span><span class="toc-num">2</span>தாமதமான வருகை (Late Arrival)</span></a>
+        <a class="toc-item" href="#s3"><span><span class="toc-num">3</span>முன்கூட்டியே வெளியேறுதல் (Early Check-Out)</span></a>
+        <a class="toc-item" href="#s4"><span><span class="toc-num">4</span>இடைவேளை விதிகள் (Break Time Rules)</span></a>
+        <a class="toc-item" href="#s5"><span><span class="toc-num">5</span>அனுமதி கோரிக்கைகள் (Permission Requests)</span></a>
+        <a class="toc-item" href="#s6"><span><span class="toc-num">6</span>இருப்பிட கண்காணிப்பு அமைப்பு (Geo-Location System)</span></a>
+        <a class="toc-item" href="#s7"><span><span class="toc-num">7</span>வேலை நேர கணக்கீடு (Working Hours Calculation)</span></a>
+        <a class="toc-item" href="#s8"><span><span class="toc-num">8</span>சம்பள கணக்கீடு (Salary Calculation)</span></a>
+        <a class="toc-item" href="#s9"><span><span class="toc-num">9</span>நிகழ்நேர அம்சங்கள் (Real-Time Features)</span></a>
+        <a class="toc-item" href="#s10"><span><span class="toc-num">10</span>முக்கிய விதிமுறைகள் (Terms & Conditions)</span></a>
+    </div>
+
+    <!-- ===== KEY FACTS SUMMARY ===== -->
+    <div style="background: linear-gradient(135deg, #eff6ff, #faf5ff); border: 2px solid var(--primary); border-radius: 12px; padding: 24px; margin-bottom: 30px;">
+        <h3 style="border: none; color: var(--primary-dark); font-size: 18px; margin: 0 0 16px 0;">முக்கிய தகவல்கள் (Key Facts at a Glance)</h3>
+        <table class="styled-table">
+            <tr><td style="font-weight:600; width:45%;">கடை நேரம் (Shop Hours)</td><td>காலை 8:30 - இரவு 8:30 (12 மணி நேரம்)</td></tr>
+            <tr><td style="font-weight:600;">இடைவேளை அனுமதி (Break Allowance)</td><td>2 மணி நேரம் (120 நிமிடங்கள்)</td></tr>
+            <tr><td style="font-weight:600;">நிகர வேலை நேரம் (Net Working Hours)</td><td><strong>10 மணி நேரம் (600 நிமிடங்கள்)</strong></td></tr>
+            <tr><td style="font-weight:600;">தாமத வரம்பு (Late Threshold)</td><td>கடை திறக்கும் நேரத்திலிருந்து 15 நிமிடங்கள்</td></tr>
+            <tr><td style="font-weight:600;">ஞாயிறு வேலை நேரம் (Sunday Hours)</td><td>5 மணி நேரம்</td></tr>
+            <tr><td style="font-weight:600;">மாதம் வேலை நாட்கள் (Working Days/Month)</td><td>26 நாட்கள்</td></tr>
+        </table>
+    </div>
+
+    <!-- ============================= -->
+    <!-- SECTION 1: CLOCK-IN PROCESS   -->
+    <!-- ============================= -->
+    <section id="s1">
+        <div class="section-header">
+            <div class="section-num">1</div>
+            <div class="section-title">வருகைப்பதிவு செயல்முறை (Clock-In Process)</div>
+        </div>
+        <div class="section-body">
+            <h3>வருகைப்பதிவு எப்படி செய்வது?</h3>
+            <p>ஒவ்வொரு நாளும் வேலைக்கு வரும்போது, QC Staff ஆப்பில் வருகைப்பதிவு (Clock In) செய்ய வேண்டும். இதற்கு <strong>புகைப்படம்</strong> மற்றும் <strong>GPS இருப்பிடம்</strong> தேவை.</p>
+
+            <h3>படிப்படியான வழிமுறை</h3>
+            <ol class="steps">
+                <li><strong>QC Staff App</strong>-ஐ திறக்கவும். உங்கள் Dashboard-ல் "Clock In" பொத்தான் தெரியும்.</li>
+                <li>Clock In பொத்தானை அழுத்தவும். <strong>கேமரா</strong> தானாக திறக்கும்.</li>
+                <li>உங்கள் <strong>முகப்புகைப்படம்</strong> (Selfie) எடுக்கவும். தெளிவான, நேரடி முகப்படம் தேவை.</li>
+                <li>ஆப் தானாகவே உங்கள் <strong>GPS இருப்பிடத்தை</strong> பெறும்.</li>
+                <li>"Submit" பொத்தானை அழுத்தவும். வருகை பதிவாகும்!</li>
+            </ol>
+
+            <h3>GPS இருப்பிட தேவைகள்</h3>
+            <div class="info-box">
+                <strong>முக்கியம்:</strong> நீங்கள் உங்கள் கிளை (Branch) நிர்ணயிக்கப்பட்ட எல்லைக்குள் (Geo-fence) இருக்க வேண்டும். இது பொதுவாக கிளையிலிருந்து <strong>500 மீட்டர்</strong> தூரம்.
+            </div>
+
+            <h3>Geo-fence-க்கு வெளியே இருந்தால் என்ன நடக்கும்?</h3>
+            <div class="danger-box">
+                நீங்கள் நிர்ணயிக்கப்பட்ட எல்லைக்கு வெளியே இருந்தால், ஆப் "You are Xm away from the branch" என்ற செய்தியுடன் Clock In-ஐ <strong>தடுக்கும்</strong>. நீங்கள் கிளைக்கு அருகில் வந்து மீண்டும் முயற்சிக்க வேண்டும்.
+            </div>
+
+            <h3>புகைப்படம் பற்றிய விதிகள்</h3>
+            <ul>
+                <li>புகைப்படம் <strong>கட்டாயம்</strong> - இது இல்லாமல் Clock In செய்ய இயலாது</li>
+                <li>தெளிவான Selfie புகைப்படம் எடுக்கவும்</li>
+                <li>புகைப்படம் அதிகபட்சம் <strong>10 MB</strong> அளவு இருக்கலாம்</li>
+                <li>புகைப்படம் தானாகவே சுருக்கப்பட்டு சேமிக்கப்படும்</li>
+                <li>புகைப்படம் <strong>40 நாட்கள்</strong> பின் தானாக நீக்கப்படும்</li>
+            </ul>
+
+            <div class="timeline-visual">
+                <div class="timeline-block" style="background:#dbeafe;color:#1e40af;">ஆப் திற</div>
+                <div class="timeline-arrow">&#8594;</div>
+                <div class="timeline-block" style="background:#fef3c7;color:#92400e;">Clock In அழுத்து</div>
+                <div class="timeline-arrow">&#8594;</div>
+                <div class="timeline-block" style="background:#e0e7ff;color:#4338ca;">புகைப்படம் எடு</div>
+                <div class="timeline-arrow">&#8594;</div>
+                <div class="timeline-block" style="background:#d1fae5;color:#065f46;">GPS கிடைக்கும்</div>
+                <div class="timeline-arrow">&#8594;</div>
+                <div class="timeline-block" style="background:#d1fae5;color:#065f46;">Submit!</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 2: LATE ARRIVAL       -->
+    <!-- ============================= -->
+    <section id="s2" class="page-break">
+        <div class="section-header">
+            <div class="section-num">2</div>
+            <div class="section-title">தாமதமான வருகை (Late Arrival)</div>
+        </div>
+        <div class="section-body">
+            <h3>தாமதம் எப்போது கணக்கிடப்படும்?</h3>
+            <p>கடை திறக்கும் நேரம் <strong>காலை 8:30</strong>. இதற்கு <strong>15 நிமிடங்கள்</strong> கருணை நேரம் (Grace Period) உண்டு.</p>
+
+            <table class="styled-table">
+                <tr>
+                    <th>Clock In நேரம்</th>
+                    <th>நிலை</th>
+                    <th>விளக்கம்</th>
+                </tr>
+                <tr>
+                    <td>8:30 AM அல்லது முன்பு</td>
+                    <td><span class="badge badge-green">சரியான நேரம்</span></td>
+                    <td>எந்த பிரச்சனையும் இல்லை</td>
+                </tr>
+                <tr>
+                    <td>8:31 AM - 8:45 AM</td>
+                    <td><span class="badge badge-green">Grace Period</span></td>
+                    <td>15 நிமிட கருணை நேரத்தில் - தாமதம் இல்லை</td>
+                </tr>
+                <tr>
+                    <td>8:46 AM அல்லது பிறகு</td>
+                    <td><span class="badge badge-red">தாமதம்!</span></td>
+                    <td>LATE என்று பதிவாகும், சம்பளத்தில் பிடிக்கப்படும்</td>
+                </tr>
+            </table>
+
+            <h3>தாமதம் சம்பளத்தை எப்படி பாதிக்கிறது?</h3>
+            <p>ஒவ்வொரு தாமத நாளுக்கும் <strong>நிர்ணயிக்கப்பட்ட தொகை</strong> (Late Deduction Per Day) பிடிக்கப்படும்.</p>
+
+            <div class="calc-box">
+                <h4>தாமத பிடித்தம் கணக்கீடு</h4>
+                <div class="calc-formula">
+                    தாமத பிடித்தம் = தாமத நாட்கள் &times; ஒரு நாள் தாமத பிடித்த தொகை
+                </div>
+                <p><strong>உதாரணம்:</strong> ஒரு நாள் தாமத பிடித்தம் = &#8377;100 என்றால்:</p>
+                <div class="calc-formula">
+                    மாதத்தில் 5 தாமத நாட்கள் &times; &#8377;100 = <strong>&#8377;500 பிடித்தம்</strong>
+                </div>
+            </div>
+
+            <h3>தாமத அனுமதி (Late Approval)</h3>
+            <p>நீங்கள் தாமதமாக வரும்போது, System தானாகவே ஒரு <strong>"Late Arrival" அனுமதி கோரிக்கை</strong> உருவாக்கும். Admin இதை:</p>
+            <ul>
+                <li><span class="badge badge-green">Approve</span> செய்தால் - அந்த நாள் தாமதம் <strong>பிடிக்கப்படாது</strong></li>
+                <li><span class="badge badge-red">Reject</span> செய்தால் - பிடித்தம் நிலையில் இருக்கும்</li>
+            </ul>
+
+            <div class="warning-box">
+                <strong>கவனம்:</strong> தாமதம் என்பது Clock In நேரத்தை மட்டுமே பாதிக்கும், வேலை நேரத்தை குறைக்காது. ஆனால் தாமதமாக வந்தால் முழு 10 மணி நேரம் வேலை செய்ய வேண்டும், இல்லையெனில் Shortage ஆகும்.
+            </div>
+
+            <h3>தாமதம் + குறைவான வேலை நேரம்: இரட்டை பாதிப்பு</h3>
+            <div class="calc-box">
+                <h4>உதாரணம்: 9:00 AM-க்கு வருகை, 8:30 PM-க்கு வெளியேற்றம்</h4>
+                <div class="calc-formula">
+                    மொத்த நேரம் = 8:30 PM - 9:00 AM = 11 மணி 30 நிமிடம் = 690 நிமிடம்<br>
+                    இடைவேளை போக = 690 - 120 = 570 நிமிடம் (9 மணி 30 நிமிடம்)<br>
+                    தேவை = 600 நிமிடம் (10 மணி நேரம்)<br>
+                    <strong>Shortage = 30 நிமிடம் (குறைவான சம்பளம்)</strong><br>
+                    <strong>+ தாமத பிடித்தம் (Late Deduction) = &#8377;100</strong>
+                </div>
+                <div class="calc-result negative">இரண்டு வழிகளிலும் சம்பளம் குறையும்!</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 3: EARLY CHECK-OUT    -->
+    <!-- ============================= -->
+    <section id="s3" class="page-break">
+        <div class="section-header">
+            <div class="section-num">3</div>
+            <div class="section-title">முன்கூட்டியே வெளியேறுதல் (Early Check-Out)</div>
+        </div>
+        <div class="section-body">
+            <h3>Early Check-Out என்றால் என்ன?</h3>
+            <p>கடை மூடும் நேரம் <strong>இரவு 8:30 PM</strong>-க்கு முன்பே Clock Out செய்தால், அது <strong>Early Check-Out</strong> என்று பதிவாகும்.</p>
+
+            <h3>Early Check-Out சம்பளத்தை எப்படி பாதிக்கிறது?</h3>
+            <p>Early Check-Out நேரடியாக பிடித்தம் செய்யப்படாது. ஆனால், நீங்கள் 10 மணி நேரம் வேலை செய்யவில்லை என்றால், <strong>குறைவான வேலை நேரத்திற்கு குறைவான சம்பளம்</strong> கிடைக்கும்.</p>
+
+            <div class="calc-box">
+                <h4>உதாரணம் 1: சரியான நேரம் - பாதிப்பு இல்லை</h4>
+                <div class="calc-formula">
+                    Clock In: 8:30 AM | Clock Out: 7:30 PM (Early)<br>
+                    மொத்த நேரம் = 11 மணி நேரம் = 660 நிமிடம்<br>
+                    இடைவேளை = 120 நிமிடம்<br>
+                    நிகர வேலை = 660 - 120 = 540 நிமிடம் (9 மணி நேரம்)<br>
+                    தேவை = 600 நிமிடம்
+                </div>
+                <div class="calc-result negative">60 நிமிடம் Shortage - குறைவான சம்பளம் கிடைக்கும்</div>
+            </div>
+
+            <div class="calc-box">
+                <h4>உதாரணம் 2: முன்கூட்டியே வெளியேறல் + அனுமதி</h4>
+                <div class="calc-formula">
+                    Clock In: 8:00 AM | Clock Out: 7:00 PM (Early, Approved)<br>
+                    மொத்த நேரம் = 11 மணி நேரம் = 660 நிமிடம்<br>
+                    இடைவேளை = 120 நிமிடம்<br>
+                    நிகர வேலை = 660 - 120 = 540 நிமிடம்
+                </div>
+                <div class="calc-result negative">அனுமதி கிடைத்தாலும், சம்பளம் வேலை செய்த நேரத்திற்கு மட்டுமே கணக்கிடப்படும் (540 நிமிடம்)</div>
+            </div>
+
+            <div class="info-box">
+                <strong>புரிந்துகொள்ளுங்கள்:</strong> அனுமதி என்பது "முன்கூட்டியே போகலாம்" என்ற ஒப்புதல் மட்டுமே. ஆனால் சம்பளம் <strong>உண்மையில் வேலை செய்த நேரத்தை</strong> அடிப்படையாகக் கொண்டு மட்டுமே கணக்கிடப்படும்.
+            </div>
+
+            <h3>Early Check-Out அனுமதி கோரிக்கை</h3>
+            <p>முன்கூட்டியே வெளியேற வேண்டும் என்றால்:</p>
+            <ol class="steps">
+                <li>Dashboard-ல் "Permission Request" பக்கத்திற்கு செல்லவும்</li>
+                <li>Type-ல் <strong>"Early Leave"</strong> தேர்ந்தெடுக்கவும்</li>
+                <li>காரணம் எழுதவும்</li>
+                <li>Submit செய்யவும். Admin ஒப்புதல் பெறவும்.</li>
+            </ol>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 4: BREAK TIME RULES   -->
+    <!-- ============================= -->
+    <section id="s4" class="page-break">
+        <div class="section-header">
+            <div class="section-num">4</div>
+            <div class="section-title">இடைவேளை விதிகள் (Break Time Rules)</div>
+        </div>
+        <div class="section-body">
+            <h3>இடைவேளை அனுமதி</h3>
+            <p>ஒவ்வொரு நாளும் மொத்தம் <strong>2 மணி நேரம் (120 நிமிடங்கள்)</strong> இடைவேளை எடுக்கலாம். இது Lunch Break மற்றும் மற்ற இடைவேளைகளை உள்ளடக்கியது.</p>
+
+            <table class="styled-table">
+                <tr>
+                    <th>இடைவேளை நிலை</th>
+                    <th>நேரம்</th>
+                    <th>நிறம்</th>
+                    <th>விளக்கம்</th>
+                </tr>
+                <tr>
+                    <td>பாதுகாப்பான நிலை</td>
+                    <td>0 - 89 நிமிடம்</td>
+                    <td><span class="badge badge-green">பச்சை</span></td>
+                    <td>எந்த பிரச்சனையும் இல்லை</td>
+                </tr>
+                <tr>
+                    <td>எச்சரிக்கை நிலை</td>
+                    <td>90 - 119 நிமிடம்</td>
+                    <td><span class="badge badge-amber">மஞ்சள்</span></td>
+                    <td>&#9888; "30 நிமிடங்கள் மட்டுமே மீதமுள்ளது" என்ற எச்சரிக்கை</td>
+                </tr>
+                <tr>
+                    <td>வரம்பு மீறல்!</td>
+                    <td>120+ நிமிடம்</td>
+                    <td><span class="badge badge-red">சிவப்பு</span></td>
+                    <td>&#128680; "Break limit reached!" - சம்பளத்தில் பிடிக்கப்படும்</td>
+                </tr>
+            </table>
+
+            <h3>இடைவேளை எப்படி எடுப்பது?</h3>
+            <ol class="steps">
+                <li><strong>"Start Break"</strong> பொத்தானை அழுத்தவும். கேமரா திறக்கும்.</li>
+                <li><strong>புகைப்படம் எடுக்கவும்</strong> + GPS இருப்பிடம் பதிவாகும்.</li>
+                <li>ஆப் <strong>"On Break"</strong> நிலையில் இருக்கும். நேரம் ஓடிக்கொண்டிருக்கும்.</li>
+                <li>இடைவேளை முடிந்ததும் <strong>"End Break"</strong> பொத்தானை அழுத்தவும்.</li>
+                <li>மீண்டும் <strong>புகைப்படம் எடுக்கவும்</strong>. இடைவேளை பதிவாகும்.</li>
+            </ol>
+
+            <h3>நிகழ்நேர Break Left காட்சி</h3>
+            <p>Dashboard-ல் <strong>"Break Left"</strong> என்ற Mini-Stat இருக்கும்:</p>
+            <div style="display: flex; gap: 12px; margin: 14px 0; flex-wrap: wrap;">
+                <div style="background:#d1fae5;padding:12px 20px;border-radius:10px;text-align:center;">
+                    <div style="font-size:18px;font-weight:700;color:#10b981;">2h 0m</div>
+                    <div style="font-size:11px;color:#065f46;">Break Left</div>
+                    <div style="font-size:10px;color:#6b7280;">(Clock In ஆன உடன்)</div>
+                </div>
+                <div style="background:#d1fae5;padding:12px 20px;border-radius:10px;text-align:center;">
+                    <div style="font-size:18px;font-weight:700;color:#10b981;">1h 0m</div>
+                    <div style="font-size:11px;color:#065f46;">Break Left</div>
+                    <div style="font-size:10px;color:#6b7280;">(60 நிமிட Break பின்)</div>
+                </div>
+                <div style="background:#fef3c7;padding:12px 20px;border-radius:10px;text-align:center;">
+                    <div style="font-size:18px;font-weight:700;color:#d97706;">20m</div>
+                    <div style="font-size:11px;color:#92400e;">Break Left</div>
+                    <div style="font-size:10px;color:#6b7280;">(&#9888; எச்சரிக்கை!)</div>
+                </div>
+                <div style="background:#fee2e2;padding:12px 20px;border-radius:10px;text-align:center;">
+                    <div style="font-size:18px;font-weight:700;color:#ef4444;">-15m</div>
+                    <div style="font-size:11px;color:#991b1b;">Break Excess</div>
+                    <div style="font-size:10px;color:#6b7280;">(&#128680; மீறல்!)</div>
+                </div>
+            </div>
+
+            <h3>2 மணி நேரத்திற்கு மேல் Break எடுத்தால் என்ன நடக்கும்?</h3>
+            <div class="danger-box">
+                <strong>&#128680; முக்கிய எச்சரிக்கை:</strong><br>
+                120 நிமிடங்களுக்கு மேல் இடைவேளை எடுத்தால்:
+                <ul style="margin-top:8px;">
+                    <li>நீங்களுக்கு <strong>சிவப்பு அறிவிப்பு</strong> வரும்: "Break limit reached! Excess time will be deducted"</li>
+                    <li>Admin-க்கு <strong>அறிவிப்பு</strong> அனுப்பப்படும்</li>
+                    <li>கூடுதல் நிமிடங்கள் உங்கள் <strong>வேலை நேரத்தை குறைக்கும்</strong></li>
+                    <li>குறைவான வேலை நேரம் = <strong>குறைவான சம்பளம்</strong></li>
+                </ul>
+            </div>
+
+            <h3>இடைவேளை சம்பள பாதிப்பு - விரிவான கணக்கீடு</h3>
+            <div class="calc-box">
+                <h4>உதாரணம் 1: சரியான இடைவேளை (120 நிமிடம்)</h4>
+                <div class="calc-formula">
+                    Clock In: 8:30 AM | Clock Out: 8:30 PM<br>
+                    மொத்த நேரம் = 12 மணி நேரம் = 720 நிமிடம்<br>
+                    இடைவேளை = 120 நிமிடம் (அனுமதிக்குள்)<br>
+                    நிகர வேலை = 720 - 120 = <strong>600 நிமிடம் (10 மணி) &#10004;</strong>
+                </div>
+                <div class="calc-result">முழு சம்பளம் கிடைக்கும!</div>
+            </div>
+
+            <div class="calc-box">
+                <h4>உதாரணம் 2: மிகையான இடைவேளை (150 நிமிடம்)</h4>
+                <div class="calc-formula">
+                    Clock In: 8:30 AM | Clock Out: 8:30 PM<br>
+                    மொத்த நேரம் = 720 நிமிடம்<br>
+                    இடைவேளை = 150 நிமிடம் (30 நிமிடம் மிகை!)<br>
+                    நிகர வேலை = 720 - 150 = <strong>570 நிமிடம் (9 மணி 30 நிமிடம்)</strong><br>
+                    Shortage = 600 - 570 = <strong>30 நிமிடம் குறைவு</strong><br>
+                    <br>
+                    மாத சம்பளம் = &#8377;26,000 என்றால்:<br>
+                    மணி நேர ஊதியம் = &#8377;26,000 / 260 = &#8377;100/மணி<br>
+                    30 நிமிட இழப்பு = &#8377;100 &times; 0.5 = <strong>&#8377;50 குறைவான சம்பளம்</strong>
+                </div>
+                <div class="calc-result negative">&#8377;50 சம்பளம் குறையும் + Admin-க்கு அறிவிப்பு செல்லும்</div>
+            </div>
+
+            <div class="calc-box">
+                <h4>உதாரணம் 3: அதிக மிகையான இடைவேளை (180 நிமிடம் = 3 மணி நேரம்)</h4>
+                <div class="calc-formula">
+                    Clock In: 8:30 AM | Clock Out: 8:30 PM<br>
+                    இடைவேளை = 180 நிமிடம் (60 நிமிடம் மிகை!)<br>
+                    நிகர வேலை = 720 - 180 = <strong>540 நிமிடம் (9 மணி நேரம்)</strong><br>
+                    Shortage = 60 நிமிடம்<br>
+                    <br>
+                    மணி நேர இழப்பு = &#8377;100 &times; 1 = <strong>&#8377;100 குறைவான சம்பளம்</strong>
+                </div>
+                <div class="calc-result negative">&#8377;100 சம்பளம் குறையும்!</div>
+            </div>
+
+            <h3>Expected Clock-Out நேரம்</h3>
+            <p>Dashboard-ல் Timer கீழே <strong>"Expected out: 8:30 PM"</strong> என்று காட்டும். இடைவேளை மிகையாக இருந்தால்:</p>
+            <div class="warning-box">
+                <strong>Expected out: 8:45 PM (+15m excess break)</strong><br>
+                நீங்கள் 15 நிமிடம் கூடுதலாக வேலை செய்ய வேண்டும் என்பதை நினைவில் கொள்ளுங்கள்!
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 5: PERMISSION REQUESTS -->
+    <!-- ============================= -->
+    <section id="s5" class="page-break">
+        <div class="section-header">
+            <div class="section-num">5</div>
+            <div class="section-title">அனுமதி கோரிக்கைகள் (Permission Requests)</div>
+        </div>
+        <div class="section-body">
+            <h3>அனுமதி வகைகள்</h3>
+            <table class="styled-table">
+                <tr>
+                    <th>வகை</th>
+                    <th>விளக்கம்</th>
+                    <th>சம்பள பாதிப்பு</th>
+                </tr>
+                <tr>
+                    <td><strong>Late Arrival</strong><br>(தாமத வருகை)</td>
+                    <td>தாமதமாக வரும்போது தானாக உருவாகும்</td>
+                    <td>Approve &#8594; தாமத பிடித்தம் இல்லை<br>Reject &#8594; பிடித்தம் உண்டு</td>
+                </tr>
+                <tr>
+                    <td><strong>Early Leave</strong><br>(முன்கூட்டியே வெளியேறல்)</td>
+                    <td>கடை மூடும் முன் போக அனுமதி</td>
+                    <td>வேலை நேரம் குறைவாக இருந்தால் குறைவான சம்பளம்</td>
+                </tr>
+                <tr>
+                    <td><strong>Leave</strong><br>(விடுப்பு)</td>
+                    <td>முழு நாள் விடுப்பு கோரிக்கை</td>
+                    <td>Absent Day &#8594; ஒரு நாள் சம்பள பிடித்தம்</td>
+                </tr>
+                <tr>
+                    <td><strong>Half Day</strong><br>(அரை நாள்)</td>
+                    <td>அரை நாள் வேலை</td>
+                    <td>வேலை செய்த நேரத்திற்கு மட்டும் சம்பளம்</td>
+                </tr>
+                <tr>
+                    <td><strong>Outside Work</strong><br>(வெளி வேலை)</td>
+                    <td>கிளைக்கு வெளியே வேலை (Client visit போன்றவை)</td>
+                    <td>Geo-fence விலக்கு கிடைக்கும், வேலை நேரம் கணக்கில் சேரும்</td>
+                </tr>
+                <tr>
+                    <td><strong>Re-Clock-In</strong><br>(மீண்டும் வருகை)</td>
+                    <td>Clock Out பிறகு மீண்டும் வேலை செய்ய</td>
+                    <td>கூடுதல் வேலை நேரம் சம்பளத்தில் சேரும் (Overtime)</td>
+                </tr>
+                <tr>
+                    <td><strong>Extended Break</strong><br>(நீட்டிக்கப்பட்ட இடைவேளை)</td>
+                    <td>கூடுதல் இடைவேளை நேரம் கோரிக்கை</td>
+                    <td>Admin முடிவு படி</td>
+                </tr>
+            </table>
+
+            <h3>அனுமதி கோரிக்கை செய்வது எப்படி?</h3>
+            <ol class="steps">
+                <li>Dashboard-ல் <strong>"Attendance"</strong> மெனுவிற்கு செல்லவும்</li>
+                <li><strong>"Permission Request"</strong> பக்கத்தில் "New Request" அழுத்தவும்</li>
+                <li>அனுமதி வகை, தேதி, நேரம், காரணம் நிரப்பவும்</li>
+                <li><strong>"Submit"</strong> அழுத்தவும</li>
+                <li>Admin <strong>Approve/Reject</strong> செய்யும் வரை <span class="badge badge-amber">Pending</span> நிலையில் இருக்கும்</li>
+            </ol>
+
+            <div class="info-box">
+                <strong>குறிப்பு:</strong> அனுமதி நிலையை Dashboard-ல் எப்போதும் பார்க்கலாம். Admin முடிவு எடுக்கும்போது அறிவிப்பு வரும்.
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 6: GEO-LOCATION       -->
+    <!-- ============================= -->
+    <section id="s6" class="page-break">
+        <div class="section-header">
+            <div class="section-num">6</div>
+            <div class="section-title">இருப்பிட கண்காணிப்பு அமைப்பு (Geo-Location System)</div>
+        </div>
+        <div class="section-body">
+            <h3>Geo-Fencing என்றால் என்ன?</h3>
+            <p>உங்கள் கிளையைச் சுற்றி ஒரு <strong>மெய்நிகர் எல்லை</strong> (Virtual Boundary) அமைக்கப்பட்டுள்ளது. இதை <strong>Geo-Fence</strong> என்று அழைக்கிறோம். பொதுவாக கிளையிலிருந்து <strong>500 மீட்டர்</strong> தூரம்.</p>
+
+            <h3>Geo-Fence எப்படி செயல்படுகிறது?</h3>
+            <table class="styled-table">
+                <tr>
+                    <th>செயல்</th>
+                    <th>Geo-Fence உள்ளே</th>
+                    <th>Geo-Fence வெளியே</th>
+                </tr>
+                <tr>
+                    <td>Clock In</td>
+                    <td><span class="badge badge-green">அனுமதிக்கப்படும்</span></td>
+                    <td><span class="badge badge-red">தடுக்கப்படும்</span></td>
+                </tr>
+                <tr>
+                    <td>Clock Out</td>
+                    <td><span class="badge badge-green">அனுமதிக்கப்படும்</span></td>
+                    <td><span class="badge badge-red">தடுக்கப்படும்</span></td>
+                </tr>
+                <tr>
+                    <td>வேலை நேரத்தில்</td>
+                    <td><span class="badge badge-green">சாதாரணம்</span></td>
+                    <td><span class="badge badge-amber">5 நிமிட Grace + Auto Clock-Out</span></td>
+                </tr>
+                <tr>
+                    <td>இடைவேளையில்</td>
+                    <td colspan="2"><span class="badge badge-blue">Geo-Fence விலக்கு (கண்காணிப்பு இல்லை)</span></td>
+                </tr>
+            </table>
+
+            <h3>பல கிளை ஒதுக்கீடு (Multi-Branch)</h3>
+            <p>நீங்கள் பல கிளைகளுக்கு ஒதுக்கப்பட்டிருந்தால், System தானாகவே <strong>அருகில் உள்ள கிளையை</strong> கண்டறிந்து, அந்த கிளையில் உங்கள் வருகையை பதிவு செய்யும்.</p>
+
+            <h3>"வெளி வேலை" (Outside Work) பொத்தான்</h3>
+            <p>Client visit, Delivery போன்ற காரணங்களுக்காக கிளையை விட்டு வெளியே செல்ல வேண்டும் என்றால்:</p>
+            <ol class="steps">
+                <li>Dashboard-ல் <strong>"Going Outside for Work"</strong> பொத்தானை அழுத்தவும்</li>
+                <li>காரணம் எழுதவும் (உதா: "Client meeting at XYZ")</li>
+                <li>Submit செய்யவும். Geo-fence கண்காணிப்பு <strong>இடைநிறுத்தப்படும்</strong>.</li>
+                <li>கிளைக்கு திரும்பியதும் <strong>"Return to Branch"</strong> அழுத்தவும்.</li>
+            </ol>
+
+            <h3>Auto Clock-Out விதிகள்</h3>
+            <div class="danger-box">
+                வேலை நேரத்தில் (Break அல்லது Outside Work இல்லாமல்) Geo-fence-க்கு வெளியே சென்றால்:
+                <ul style="margin-top:8px;">
+                    <li><strong>5 நிமிட Grace Period</strong> கொடுக்கப்படும்</li>
+                    <li>5 நிமிடத்திற்குள் திரும்பவில்லை என்றால் <strong>தானாக Clock Out</strong> ஆகும்</li>
+                    <li>Admin-க்கு அறிவிப்பு அனுப்பப்படும்</li>
+                    <li>Auto Clock-Out வகை பதிவு செய்யப்படும் ("geo_violation")</li>
+                </ul>
+            </div>
+
+            <h3>தூர பதிவு (Distance Tracking)</h3>
+            <p>Clock In மற்றும் Clock Out செய்யும்போது கிளையிலிருந்து உங்கள் <strong>தூரம்</strong> பதிவு செய்யப்படும். Admin இதை பார்க்கலாம்.</p>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 7: WORKING HOURS CALC -->
+    <!-- ============================= -->
+    <section id="s7" class="page-break">
+        <div class="section-header">
+            <div class="section-num">7</div>
+            <div class="section-title">வேலை நேர கணக்கீடு (Working Hours Calculation)</div>
+        </div>
+        <div class="section-body">
+            <h3>அடிப்படை சூத்திரம்</h3>
+            <div class="calc-box">
+                <h4>நிகர வேலை நிமிடங்கள்</h4>
+                <div class="calc-formula">
+                    நிகர வேலை நிமிடங்கள் = (Clock Out நேரம் - Clock In நேரம்) - மொத்த இடைவேளை நிமிடங்கள்
+                </div>
+                <p style="margin-top:10px;">
+                    <strong>சாதாரண நாள் (Mon-Sat):</strong> 600 நிமிடம் (10 மணி) = முழு நாள்<br>
+                    <strong>ஞாயிறு:</strong> 300 நிமிடம் (5 மணி) = முழு நாள்
+                </p>
+            </div>
+
+            <h3>காட்சி 1: சரியான நாள் (சிறந்த நிலை)</h3>
+            <div class="calc-box">
+                <h4>சரியான வருகை + சரியான இடைவேளை + சரியான வெளியேற்றம்</h4>
+                <div class="calc-formula">
+                    Clock In: 8:30 AM<br>
+                    Break: 1:00 PM - 3:00 PM (120 நிமிடம்)<br>
+                    Clock Out: 8:30 PM<br>
+                    <br>
+                    மொத்த நேரம் = 8:30 PM - 8:30 AM = 720 நிமிடம்<br>
+                    இடைவேளை = 120 நிமிடம்<br>
+                    <strong>நிகர வேலை = 720 - 120 = 600 நிமிடம் (10 மணி) &#10004;</strong>
+                </div>
+                <div class="calc-result">முழு 10 மணி நேர சம்பளம் கிடைக்கும!</div>
+            </div>
+
+            <h3>காட்சி 2: தாமத வருகை + சரியான வெளியேற்றம்</h3>
+            <div class="calc-box">
+                <h4>தாமதமாக வருகை - குறைவான வேலை நேரம்</h4>
+                <div class="calc-formula">
+                    Clock In: 9:30 AM (1 மணி நேரம் தாமதம்)<br>
+                    Break: 120 நிமிடம்<br>
+                    Clock Out: 8:30 PM<br>
+                    <br>
+                    மொத்த நேரம் = 8:30 PM - 9:30 AM = 660 நிமிடம்<br>
+                    இடைவேளை = 120 நிமிடம்<br>
+                    நிகர வேலை = 660 - 120 = <strong>540 நிமிடம் (9 மணி)</strong><br>
+                    Shortage = 600 - 540 = <strong>60 நிமிடம் குறைவு</strong>
+                </div>
+                <div class="calc-result negative">9 மணி நேர சம்பளம் + தாமத பிடித்தம்</div>
+            </div>
+
+            <h3>காட்சி 3: தாமதம் (Approved) + சரியான வெளியேற்றம்</h3>
+            <div class="calc-box">
+                <h4>அனுமதி பெற்ற தாமதம்</h4>
+                <div class="calc-formula">
+                    Clock In: 9:30 AM (Approved Late)<br>
+                    Break: 120 நிமிடம்<br>
+                    Clock Out: 8:30 PM<br>
+                    <br>
+                    நிகர வேலை = 660 - 120 = <strong>540 நிமிடம்</strong><br>
+                    <br>
+                    &#10004; தாமத பிடித்தம் இல்லை (Approved)<br>
+                    &#10060; ஆனால் சம்பளம் 540 நிமிடத்திற்கு மட்டுமே (9 மணி நேரம்)
+                </div>
+                <div class="calc-result negative">தாமத பிடித்தம் இல்லை, ஆனால் குறைவான வேலை நேர சம்பளம்</div>
+            </div>
+
+            <h3>காட்சி 4: சரியான வருகை + அதிக இடைவேளை</h3>
+            <div class="calc-box">
+                <h4>3 மணி நேர இடைவேளை (1 மணி நேர மிகை)</h4>
+                <div class="calc-formula">
+                    Clock In: 8:30 AM<br>
+                    Break: 180 நிமிடம் (60 நிமிடம் மிகை!)<br>
+                    Clock Out: 8:30 PM<br>
+                    <br>
+                    மொத்த நேரம் = 720 நிமிடம்<br>
+                    இடைவேளை = 180 நிமிடம்<br>
+                    நிகர வேலை = 720 - 180 = <strong>540 நிமிடம் (9 மணி)</strong><br>
+                    மிகை இடைவேளை = 180 - 120 = <strong>60 நிமிடம்</strong>
+                </div>
+                <div class="calc-result negative">540 நிமிட சம்பளம் மட்டுமே (1 மணி நேர இழப்பு)</div>
+            </div>
+
+            <h3>காட்சி 5: அனைத்து பிரச்சனைகளும் ஒன்றாக!</h3>
+            <div class="calc-box">
+                <h4>&#128680; மோசமான நாள்: தாமதம் + அதிக Break + Early Checkout</h4>
+                <div class="calc-formula">
+                    Clock In: 9:00 AM (30 நிமிட தாமதம், Unapproved)<br>
+                    Break: 150 நிமிடம் (30 நிமிட மிகை)<br>
+                    Clock Out: 8:00 PM (30 நிமிடம் முன்கூட்டியே)<br>
+                    <br>
+                    மொத்த நேரம் = 8:00 PM - 9:00 AM = 660 நிமிடம்<br>
+                    இடைவேளை = 150 நிமிடம்<br>
+                    நிகர வேலை = 660 - 150 = <strong>510 நிமிடம் (8.5 மணி)</strong><br>
+                    Shortage = 600 - 510 = <strong>90 நிமிடம் (1.5 மணி) குறைவு</strong><br>
+                    <br>
+                    சம்பளம் = &#8377;26,000/மாதம், மணி நேர ஊதியம் = &#8377;100<br>
+                    <strong>வேலை நேர இழப்பு: 1.5 மணி &times; &#8377;100 = &#8377;150</strong><br>
+                    <strong>தாமத பிடித்தம்: &#8377;100</strong><br>
+                    <strong>மொத்த இழப்பு: &#8377;250 அந்த நாள் மட்டும்!</strong>
+                </div>
+                <div class="calc-result negative">ஒரே நாளில் &#8377;250 இழப்பு!</div>
+            </div>
+
+            <h3>காட்சி 6: Overtime (கூடுதல் வேலை நேரம்)</h3>
+            <div class="calc-box">
+                <h4>10 மணி நேரத்திற்கு மேல் வேலை (Re-Clock-In)</h4>
+                <div class="calc-formula">
+                    Clock In: 8:30 AM | Clock Out: 8:30 PM (நிகர வேலை: 600 நிமிடம்)<br>
+                    Re-Clock-In: 9:00 PM | Second Clock Out: 11:00 PM<br>
+                    கூடுதல் வேலை = 120 நிமிடம் (2 மணி நேரம்)<br>
+                    <br>
+                    Overtime Pay = 2 மணி &times; &#8377;100 &times; 1.5 (Overtime Multiplier) = <strong>&#8377;300</strong>
+                </div>
+                <div class="calc-result">&#8377;300 கூடுதல் சம்பளம் கிடைக்கும!</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 8: SALARY CALCULATION -->
+    <!-- ============================= -->
+    <section id="s8" class="page-break">
+        <div class="section-header">
+            <div class="section-num">8</div>
+            <div class="section-title">சம்பள கணக்கீடு (Salary Calculation)</div>
+        </div>
+        <div class="section-body">
+            <h3>அடிப்படை சூத்திரங்கள்</h3>
+            <div class="calc-box">
+                <h4>மணி நேர ஊதியம் (Hourly Rate)</h4>
+                <div class="calc-formula">
+                    மணி நேர ஊதியம் = மாத சம்பளம் / 260<br>
+                    (260 = 26 நாட்கள் &times; 10 மணி நேரம்)
+                </div>
+            </div>
+
+            <div class="calc-box">
+                <h4>ஒரு நாள் ஊதியம் (Daily Rate)</h4>
+                <div class="calc-formula">
+                    ஒரு நாள் ஊதியம் = மாத சம்பளம் / 26
+                </div>
+            </div>
+
+            <h3>சம்பள கூறுகள்</h3>
+            <table class="styled-table">
+                <tr>
+                    <th>கூறு</th>
+                    <th>கணக்கீடு</th>
+                </tr>
+                <tr>
+                    <td>சாதாரண நேர சம்பளம்<br>(Standard Hours Pay)</td>
+                    <td>சாதாரண வேலை மணிகள் &times; மணி நேர ஊதியம்<br><em>(நாள் ஒன்றுக்கு அதிகபட்சம் 10 மணி)</em></td>
+                </tr>
+                <tr>
+                    <td>ஞாயிறு சம்பளம்<br>(Sunday Pay)</td>
+                    <td>ஞாயிறு வேலை மணிகள் &times; மணி நேர ஊதியம்</td>
+                </tr>
+                <tr>
+                    <td>Overtime சம்பளம்</td>
+                    <td>கூடுதல் மணிகள் &times; மணி நேர ஊதியம் &times; <strong>1.5</strong></td>
+                </tr>
+                <tr>
+                    <td>கொடுப்பனவுகள்<br>(Allowances)</td>
+                    <td>போக்குவரத்து + உணவு + இதர கொடுப்பனவுகள்</td>
+                </tr>
+            </table>
+
+            <div class="calc-box">
+                <h4>மொத்த சம்பள சூத்திரம்</h4>
+                <div class="calc-formula">
+                    மொத்த சம்பளம் (Gross) = சாதாரண சம்பளம் + ஞாயிறு சம்பளம் + Overtime + கொடுப்பனவுகள்<br>
+                    <br>
+                    பிடித்தங்கள் = தாமத பிடித்தம் + விடுப்பு பிடித்தம் + இதர பிடித்தங்கள்<br>
+                    <br>
+                    <strong>நிகர சம்பளம் (Net) = மொத்த சம்பளம் - பிடித்தங்கள்</strong>
+                </div>
+            </div>
+
+            <h3>பிடித்தங்கள் விளக்கம்</h3>
+
+            <div class="calc-box">
+                <h4>1. தாமத பிடித்தம் (Late Deduction)</h4>
+                <div class="calc-formula">
+                    தாமத பிடித்தம் = தாமத நாட்கள் (Unapproved) &times; தாமத பிடித்த தொகை/நாள்
+                </div>
+                <p><em>Approved தாமதங்கள் கணக்கில் சேராது</em></p>
+            </div>
+
+            <div class="calc-box">
+                <h4>2. விடுப்பு/வராமை பிடித்தம் (Absence Deduction)</h4>
+                <div class="calc-formula">
+                    விடுப்பு பிடித்தம் = வராத நாட்கள் &times; மணி நேர ஊதியம் &times; 10<br>
+                    = வராத நாட்கள் &times; ஒரு நாள் ஊதியம்
+                </div>
+            </div>
+
+            <div class="calc-box">
+                <h4>3. மிகை இடைவேளை பாதிப்பு (Excess Break Impact)</h4>
+                <div class="calc-formula">
+                    மிகை இடைவேளை நேரடியாக பிடிக்கப்படாது.<br>
+                    ஆனால் வேலை நேரத்தை குறைக்கும் = குறைவான சம்பளம்<br>
+                    <br>
+                    உதாரணம்: 150 நிமிட Break = 30 நிமிட மிகை<br>
+                    30 நிமிடம் குறைவான வேலை = 30/60 &times; &#8377;100 = <strong>&#8377;50 குறைவான சம்பளம்</strong>
+                </div>
+            </div>
+
+            <h3>முழுமையான மாத உதாரணம்</h3>
+            <div class="calc-box">
+                <h4>உதாரணம்: &#8377;26,000 மாத சம்பளம்</h4>
+                <div class="calc-formula">
+                    மணி நேர ஊதியம் = &#8377;26,000 / 260 = <strong>&#8377;100/மணி</strong><br>
+                    ஒரு நாள் ஊதியம் = &#8377;26,000 / 26 = <strong>&#8377;1,000/நாள்</strong><br>
+                    <br>
+                    &#9472;&#9472;&#9472; மாதாந்திர வேலை &#9472;&#9472;&#9472;<br>
+                    சாதாரண நாட்கள் (Mon-Sat): 22 நாட்கள், 215 மணி நேரம்<br>
+                    ஞாயிறு: 4 நாட்கள், 18 மணி நேரம்<br>
+                    Overtime: 5 மணி நேரம்<br>
+                    <br>
+                    &#9472;&#9472;&#9472; சம்பள கணக்கீடு &#9472;&#9472;&#9472;<br>
+                    சாதாரண சம்பளம் = 215 &times; &#8377;100 = &#8377;21,500<br>
+                    ஞாயிறு சம்பளம் = 18 &times; &#8377;100 = &#8377;1,800<br>
+                    Overtime = 5 &times; &#8377;100 &times; 1.5 = &#8377;750<br>
+                    கொடுப்பனவுகள் = &#8377;2,000<br>
+                    <br>
+                    <strong>மொத்த சம்பளம் = &#8377;21,500 + &#8377;1,800 + &#8377;750 + &#8377;2,000 = &#8377;26,050</strong><br>
+                    <br>
+                    &#9472;&#9472;&#9472; பிடித்தங்கள் &#9472;&#9472;&#9472;<br>
+                    தாமத பிடித்தம் = 3 நாட்கள் &times; &#8377;100 = &#8377;300<br>
+                    விடுப்பு = 0 நாட்கள்<br>
+                    <br>
+                    <strong>நிகர சம்பளம் = &#8377;26,050 - &#8377;300 = &#8377;25,750</strong>
+                </div>
+                <div class="calc-result">நிகர சம்பளம்: &#8377;25,750</div>
+            </div>
+
+            <h3>&#128680; மோசமான மாத உதாரணம்</h3>
+            <div class="calc-box">
+                <h4>உதாரணம்: பல பிரச்சனைகள் கொண்ட மாதம்</h4>
+                <div class="calc-formula">
+                    மாத சம்பளம் = &#8377;26,000 | மணி நேர ஊதியம் = &#8377;100<br>
+                    <br>
+                    வேலை செய்த நேரம்: 200 மணி (20 நிமிடம் குறைவு = 2 அரை நாள் மிகை Break)<br>
+                    ஞாயிறு: 15 மணி<br>
+                    தாமத நாட்கள் (Unapproved): 6<br>
+                    விடுப்பு நாட்கள்: 2<br>
+                    <br>
+                    சாதாரண சம்பளம் = 200 &times; &#8377;100 = &#8377;20,000<br>
+                    ஞாயிறு சம்பளம் = 15 &times; &#8377;100 = &#8377;1,500<br>
+                    கொடுப்பனவுகள் = &#8377;2,000<br>
+                    <br>
+                    மொத்த சம்பளம் = &#8377;23,500<br>
+                    <br>
+                    பிடித்தங்கள்:<br>
+                    தாமதம் = 6 &times; &#8377;100 = &#8377;600<br>
+                    விடுப்பு = 2 &times; &#8377;100 &times; 10 = &#8377;2,000<br>
+                    <br>
+                    <strong>நிகர சம்பளம் = &#8377;23,500 - &#8377;2,600 = &#8377;20,900</strong>
+                </div>
+                <div class="calc-result negative">&#8377;5,100 இழப்பு! (&#8377;26,000-க்கு பதிலாக &#8377;20,900 மட்டுமே)</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 9: REAL-TIME FEATURES -->
+    <!-- ============================= -->
+    <section id="s9" class="page-break">
+        <div class="section-header">
+            <div class="section-num">9</div>
+            <div class="section-title">நிகழ்நேர அம்சங்கள் (Real-Time Features)</div>
+        </div>
+        <div class="section-body">
+            <h3>Staff Dashboard அம்சங்கள்</h3>
+            <p>உங்கள் Dashboard-ல் பின்வரும் தகவல்கள் நிகழ்நேரமாக புதுப்பிக்கப்படும்:</p>
+
+            <table class="styled-table">
+                <tr>
+                    <th>அம்சம்</th>
+                    <th>விளக்கம்</th>
+                </tr>
+                <tr>
+                    <td><strong>Working Timer</strong></td>
+                    <td>Clock In முதல் இப்போது வரை வேலை செய்த நேரம் (HH:MM:SS). இடைவேளை நேரம் கழிக்கப்படும்.</td>
+                </tr>
+                <tr>
+                    <td><strong>Clock In நேரம்</strong></td>
+                    <td>நீங்கள் Clock In செய்த நேரம் (உதா: 08:30 AM)</td>
+                </tr>
+                <tr>
+                    <td><strong>Expected Hours</strong></td>
+                    <td>அன்றைய தேவையான வேலை நேரம் (உதா: 10h)</td>
+                </tr>
+                <tr>
+                    <td><strong>Break Left</strong></td>
+                    <td>மீதமுள்ள இடைவேளை நேரம் - நிறம் மாறும்:<br>
+                        <span class="badge badge-green">பச்சை</span> &gt;30 நிமிடம் |
+                        <span class="badge badge-amber">மஞ்சள்</span> &lt;30 நிமிடம் |
+                        <span class="badge badge-red">சிவப்பு</span> மீறல்
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Expected Clock-Out</strong></td>
+                    <td>Timer கீழே எதிர்பார்க்கப்படும் வெளியேற்ற நேரம் காட்டும். மிகை Break இருந்தால் நீட்டிக்கப்படும்.</td>
+                </tr>
+            </table>
+
+            <h3>எச்சரிக்கை அறிவிப்புகள்</h3>
+            <table class="styled-table">
+                <tr>
+                    <th>நிலை</th>
+                    <th>அறிவிப்பு</th>
+                    <th>நிறம்</th>
+                </tr>
+                <tr>
+                    <td>இடைவேளை 90 நிமிடத்தை கடக்கும்போது</td>
+                    <td>"Break warning: X minutes remaining"</td>
+                    <td><span class="badge badge-amber">மஞ்சள்</span></td>
+                </tr>
+                <tr>
+                    <td>இடைவேளை 120 நிமிடத்தை கடக்கும்போது</td>
+                    <td>"Break limit reached! Excess time will be deducted"</td>
+                    <td><span class="badge badge-red">சிவப்பு</span></td>
+                </tr>
+                <tr>
+                    <td>Geo-fence வெளியே (Grace Period)</td>
+                    <td>"You are outside the geo-fence, return within 5 minutes"</td>
+                    <td><span class="badge badge-amber">மஞ்சள்</span></td>
+                </tr>
+                <tr>
+                    <td>Auto Clock-Out</td>
+                    <td>"Auto-clocked out due to geo-fence violation"</td>
+                    <td><span class="badge badge-red">சிவப்பு</span></td>
+                </tr>
+            </table>
+
+            <h3>Break நேரத்தில் எண்ணி காட்டுதல்</h3>
+            <p>Break Active-ஆக இருக்கும்போது, Timer-ல் பின்வரும் தகவல்கள் காணலாம்:</p>
+            <ul>
+                <li><strong>Break Duration:</strong> இந்த Break-ல் எவ்வளவு நேரம் ஆகிறது</li>
+                <li><strong>Remaining:</strong> அடைப்புக்குறியில் மீதமுள்ள நேரம் (உதா: "45m left")</li>
+                <li><strong>நிறம்:</strong> பச்சை &#8594; மஞ்சள் &#8594; சிவப்பு (நேரம் குறையும்போது)</li>
+            </ul>
+
+            <h3>Staff Timeline</h3>
+            <p>Admin "Staff Timeline" tab-ல் உங்கள் அன்றைய அனைத்து நடவடிக்கைகளையும் நேர வரிசையில் பார்க்கலாம்:</p>
+            <ul>
+                <li>Clock In (நேரம் + புகைப்படம் + இருப்பிடம்)</li>
+                <li>Break Start / End (புகைப்படம்)</li>
+                <li>Outside Work Start / Return</li>
+                <li>Geo-fence Violations</li>
+                <li>Clock Out (நேரம் + புகைப்படம்)</li>
+            </ul>
+
+            <h3>கோரிக்கை நிலை கண்காணிப்பு</h3>
+            <p>Permission Request நிலையை எப்போதும் பார்க்கலாம்:</p>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0;">
+                <span class="badge badge-amber" style="padding:6px 14px;font-size:13px;">Pending - காத்திருக்கிறது</span>
+                <span class="badge badge-green" style="padding:6px 14px;font-size:13px;">Approved - ஒப்புதல்</span>
+                <span class="badge badge-red" style="padding:6px 14px;font-size:13px;">Rejected - நிராகரிக்கப்பட்டது</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 10: TERMS & CONDITIONS -->
+    <!-- ============================= -->
+    <section id="s10" class="page-break">
+        <div class="section-header">
+            <div class="section-num">10</div>
+            <div class="section-title">முக்கிய விதிமுறைகள் (Terms & Conditions)</div>
+        </div>
+        <div class="section-body">
+            <h3>நிறுவன கொள்கைகள்</h3>
+            <ul>
+                <li>ஒவ்வொரு நாளும் <strong>Clock In மற்றும் Clock Out</strong> செய்வது கட்டாயம்</li>
+                <li>Clock In/Out செய்யும்போது <strong>புகைப்படம் மற்றும் GPS</strong> கட்டாயம்</li>
+                <li>நிர்ணயிக்கப்பட்ட <strong>கடை நேரத்திற்குள்</strong> வேலை செய்ய வேண்டும்</li>
+                <li><strong>Geo-fence</strong> எல்லைக்குள் இருக்க வேண்டும் (வெளி வேலைக்கு Outside Work பொத்தான் பயன்படுத்தவும்)</li>
+                <li>இடைவேளை <strong>2 மணி நேரத்திற்கு மேல்</strong> எடுக்கக்கூடாது</li>
+            </ul>
+
+            <h3>மீறல்களின் விளைவுகள்</h3>
+            <div class="danger-box">
+                <table class="styled-table" style="margin:0;">
+                    <tr>
+                        <th>மீறல்</th>
+                        <th>விளைவு</th>
+                    </tr>
+                    <tr>
+                        <td>அனுமதியின்றி தாமதம்</td>
+                        <td>நாளொன்றுக்கு நிர்ணயிக்கப்பட்ட தொகை பிடித்தம்</td>
+                    </tr>
+                    <tr>
+                        <td>வேலைக்கு வராமை (Absent)</td>
+                        <td>ஒரு நாள் முழு சம்பளம் பிடித்தம்</td>
+                    </tr>
+                    <tr>
+                        <td>மிகை இடைவேளை</td>
+                        <td>குறைவான வேலை நேரம் = குறைவான சம்பளம் + Admin அறிவிப்பு</td>
+                    </tr>
+                    <tr>
+                        <td>Geo-fence மீறல்</td>
+                        <td>5 நிமிட Grace பிறகு Auto Clock-Out</td>
+                    </tr>
+                    <tr>
+                        <td>Clock In/Out இல்லாமல்</td>
+                        <td>அந்த நாள் Absent ஆக கணக்கிடப்படும்</td>
+                    </tr>
+                </table>
+            </div>
+
+            <h3>அனுமதி கோரிக்கை வழிமுறை</h3>
+            <ol class="steps">
+                <li>முடிந்தவரை <strong>முன்கூட்டியே</strong> அனுமதி கோரவும்</li>
+                <li><strong>தெளிவான காரணம்</strong> எழுதவும் - "Personal" என்பது போதாது</li>
+                <li>Admin முடிவுக்கு <strong>மரியாதையுடன்</strong> ஏற்றுக்கொள்ளவும்</li>
+                <li>அவசர நிலையில் உடனடியாக <strong>Admin-ஐ தொடர்பு</strong> கொள்ளவும்</li>
+            </ol>
+
+            <h3>சிறந்த நடைமுறைகள் (Best Practices)</h3>
+            <div class="success-box">
+                <ul style="margin:0;">
+                    <li>&#10004; ஒவ்வொரு நாளும் <strong>8:30 AM-க்கு முன்பே</strong> கடைக்கு வாருங்கள்</li>
+                    <li>&#10004; இடைவேளையை <strong>2 மணி நேரத்திற்குள்</strong> முடிக்கவும்</li>
+                    <li>&#10004; Break Left காட்சியை <strong>அடிக்கடி பாருங்கள்</strong></li>
+                    <li>&#10004; வெளியே செல்லும்போது <strong>"Outside Work" பொத்தானை</strong> பயன்படுத்தவும்</li>
+                    <li>&#10004; தாமதமாக வரும்போது <strong>உடனடியாக காரணம்</strong> தெரிவிக்கவும்</li>
+                    <li>&#10004; புகைப்படம் <strong>தெளிவாக</strong> இருக்குமாறு பார்த்துக்கொள்ளுங்கள்</li>
+                    <li>&#10004; Phone GPS <strong>எப்போதும் ON</strong> ஆக இருக்கட்டும்</li>
+                </ul>
+            </div>
+
+            <h3>உதவிக்கு தொடர்பு</h3>
+            <div class="info-box">
+                <strong>ஏதேனும் சிக்கல் இருந்தால்:</strong>
+                <ul style="margin-top:8px;">
+                    <li>உங்கள் <strong>Branch Manager</strong>-ஐ தொடர்பு கொள்ளவும்</li>
+                    <li>ஆப்-ல் <strong>Chat</strong> அம்சம் மூலம் Admin-ஐ தொடர்பு கொள்ளலாம்</li>
+                    <li>Permission Request மூலம் <strong>அதிகாரபூர்வமாக</strong> கோரிக்கை செய்யவும்</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- QUICK REFERENCE CARD          -->
+    <!-- ============================= -->
+    <section class="page-break">
+        <div class="section-header">
+            <div class="section-num" style="font-size:14px;">&#9733;</div>
+            <div class="section-title">விரைவு குறிப்பு அட்டை (Quick Reference Card)</div>
+        </div>
+        <div class="section-body">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div style="background:#eff6ff;padding:16px;border-radius:10px;">
+                    <h3 style="border:none;margin:0 0 8px 0;font-size:14px;">நேரம்</h3>
+                    <div style="font-size:13px;">
+                        கடை நேரம்: <strong>8:30 AM - 8:30 PM</strong><br>
+                        வேலை நேரம்: <strong>10 மணி</strong><br>
+                        இடைவேளை: <strong>2 மணி</strong><br>
+                        Grace Period: <strong>15 நிமிடம்</strong><br>
+                        ஞாயிறு: <strong>5 மணி</strong>
+                    </div>
+                </div>
+                <div style="background:#faf5ff;padding:16px;border-radius:10px;">
+                    <h3 style="border:none;margin:0 0 8px 0;font-size:14px;">சம்பளம்</h3>
+                    <div style="font-size:13px;">
+                        மணி ஊதியம்: <strong>சம்பளம் / 260</strong><br>
+                        நாள் ஊதியம்: <strong>சம்பளம் / 26</strong><br>
+                        Overtime: <strong>1.5x ஊதியம்</strong><br>
+                        மாத நாட்கள்: <strong>26</strong>
+                    </div>
+                </div>
+                <div style="background:#d1fae5;padding:16px;border-radius:10px;">
+                    <h3 style="border:none;margin:0 0 8px 0;font-size:14px;">சம்பளம் பெற</h3>
+                    <div style="font-size:13px;">
+                        &#10004; சரியான நேரத்தில் வா<br>
+                        &#10004; 10 மணி நேரம் வேலை செய்<br>
+                        &#10004; Break 2 மணிக்குள் முடி<br>
+                        &#10004; Geo-fence-ல் இரு<br>
+                        &#10004; புகைப்படம் தெளிவாக எடு
+                    </div>
+                </div>
+                <div style="background:#fee2e2;padding:16px;border-radius:10px;">
+                    <h3 style="border:none;margin:0 0 8px 0;font-size:14px;">சம்பளம் குறையும்</h3>
+                    <div style="font-size:13px;">
+                        &#10060; தாமதமாக வருதல் (பிடித்தம்)<br>
+                        &#10060; வராமை (நாள் ஊதியம்)<br>
+                        &#10060; மிகை Break (குறைவான மணி)<br>
+                        &#10060; குறைவான வேலை நேரம்<br>
+                        &#10060; Auto Clock-Out (Geo)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="doc-footer">
+        <img src="/uploads/logos/logo-1770737238581-627910713.png" alt="Logo" style="height: 40px; margin-bottom: 10px;"><br>
+        <strong>Quality Colours - The Branded Paint Showrooms</strong><br>
+        QC Staff App - Attendance System Guide<br>
+        &#169; 2026 Quality Colours. All rights reserved.<br>
+        <br>
+        <em>இந்த ஆவணம் Quality Colours நிறுவனத்தின் உள்ளக பயன்பாட்டிற்கு மட்டுமே.<br>
+        For internal use only.</em>
+    </div>
+</div>
+
+</body>
+</html>
