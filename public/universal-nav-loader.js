@@ -15,6 +15,9 @@
         LEADS_SUBNAV_PATH: '/components/leads-subnav.html',
         BRANCHES_SUBNAV_PATH: '/components/branches-subnav.html',
         SALARY_SUBNAV_PATH: '/components/salary-subnav.html',
+        SALES_SUBNAV_PATH: '/components/sales-subnav.html',
+        PRODUCTS_SUBNAV_PATH: '/components/products-subnav.html',
+        SYSTEM_SUBNAV_PATH: '/components/system-subnav.html',
         RETRY_ATTEMPTS: 3,
         RETRY_DELAY: 1000
     };
@@ -26,7 +29,6 @@
         'customers': CONFIG.LEADS_SUBNAV_PATH,
         'customer-types': CONFIG.LEADS_SUBNAV_PATH,
         'design-requests': CONFIG.LEADS_SUBNAV_PATH,
-        'estimate-requests': CONFIG.LEADS_SUBNAV_PATH,
         // Branches & Staff
         'branches': CONFIG.BRANCHES_SUBNAV_PATH,
         'staff': CONFIG.BRANCHES_SUBNAV_PATH,
@@ -43,6 +45,21 @@
         'salary-payments': CONFIG.SALARY_SUBNAV_PATH,
         'salary-advances': CONFIG.SALARY_SUBNAV_PATH,
         'salary-reports': CONFIG.SALARY_SUBNAV_PATH,
+        // Sales & Estimates
+        'estimates': CONFIG.SALES_SUBNAV_PATH,
+        'estimate-create': CONFIG.SALES_SUBNAV_PATH,
+        'estimate-requests': CONFIG.SALES_SUBNAV_PATH,
+        'estimate-actions': CONFIG.SALES_SUBNAV_PATH,
+        'estimate-settings': CONFIG.SALES_SUBNAV_PATH,
+        // Products & Inventory
+        'products': CONFIG.PRODUCTS_SUBNAV_PATH,
+        'categories': CONFIG.PRODUCTS_SUBNAV_PATH,
+        'brands': CONFIG.PRODUCTS_SUBNAV_PATH,
+        // System
+        'reports': CONFIG.SYSTEM_SUBNAV_PATH,
+        'settings': CONFIG.SYSTEM_SUBNAV_PATH,
+        'profile': CONFIG.SYSTEM_SUBNAV_PATH,
+        'website': CONFIG.SYSTEM_SUBNAV_PATH,
     };
     
     // Skip navigation on login pages and public share pages

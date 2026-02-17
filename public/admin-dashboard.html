@@ -38,78 +38,41 @@
             padding-bottom: 0.5rem;
             border-bottom: 2px solid #e5e7eb;
         }
-        /* Module cards */
-        .module-card {
+        /* Quick action links */
+        .quick-links-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .quick-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0.75rem 1rem;
             background: white;
-            border-radius: 12px;
-            padding: 1.25rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            transition: all 0.2s;
             border: 1px solid #e5e7eb;
-            text-decoration: none;
-            display: block;
-        }
-        .module-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-            border-color: #667eea;
-        }
-        .module-card-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 0.5rem;
-        }
-        .module-card-icon {
-            width: 40px;
-            height: 40px;
             border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
+            text-decoration: none;
+            color: #374151;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            transition: all 0.15s;
+            cursor: pointer;
         }
-        .module-card-icon svg {
-            width: 22px;
-            height: 22px;
-            stroke: white;
+        .quick-link:hover {
+            background: #f0f0ff;
+            border-color: #667eea;
+            color: #4338ca;
+        }
+        .quick-link svg {
+            width: 18px;
+            height: 18px;
+            stroke: #667eea;
             fill: none;
             stroke-width: 1.75;
             stroke-linecap: round;
             stroke-linejoin: round;
-        }
-        .module-card-title {
-            font-size: 0.95rem;
-            font-weight: 700;
-            color: #1f2937;
-        }
-        .module-card-desc {
-            font-size: 0.75rem;
-            color: #6b7280;
-            margin-bottom: 0.75rem;
-            line-height: 1.4;
-        }
-        .module-card-links {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-        }
-        .module-chip {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 500;
-            color: #475569;
-            background: #f1f5f9;
-            text-decoration: none;
-            transition: all 0.15s;
-            border: 1px solid transparent;
-        }
-        .module-chip:hover {
-            background: #e0e7ff;
-            color: #4338ca;
-            border-color: #c7d2fe;
+            flex-shrink: 0;
         }
 
         /* Desktop adjustments for pinned sidebar */
@@ -118,7 +81,11 @@
             .stat-value { font-size: 2rem; }
             .stat-label { font-size: 0.85rem; }
             .stat-icon { font-size: 1.75rem; }
-            .module-card { padding: 1.5rem; }
+        }
+        @media (max-width: 640px) {
+            .quick-links-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
         @media (min-width: 1280px) {
             .stat-card { padding: 1.75rem; }
@@ -234,95 +201,46 @@
             </div>
         </div>
 
-        <!-- Module Quick Access -->
+        <!-- Quick Actions -->
         <div class="mb-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">⚡ Modules</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-                <!-- Leads & CRM -->
-                <a href="/admin-leads.html" class="module-card">
-                    <div class="module-card-header">
-                        <div class="module-card-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-                        </div>
-                        <div class="module-card-title">Leads & CRM</div>
-                    </div>
-                    <div class="module-card-desc">Manage leads, customers, design & estimate requests</div>
-                    <div class="module-card-links">
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-customers.html'">Customers</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-customer-types.html'">Customer Types</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-design-requests.html'">Design Requests</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-estimate-requests.html'">Estimates</span>
-                    </div>
+            <h3 class="text-lg font-bold text-gray-800 mb-4">⚡ Quick Actions</h3>
+            <div class="quick-links-grid">
+                <button class="quick-link" onclick="toggleSidebar()">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    <span>All Modules</span>
+                </button>
+                <a href="/chat.html" class="quick-link">
+                    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    <span>Chat</span>
                 </a>
-
-                <!-- Branches & Staff -->
-                <a href="/admin-staff.html" class="module-card">
-                    <div class="module-card-header">
-                        <div class="module-card-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">
-                            <svg viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                        </div>
-                        <div class="module-card-title">Branches & Staff</div>
-                    </div>
-                    <div class="module-card-desc">Staff management, branches, roles & permissions</div>
-                    <div class="module-card-links">
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-branches.html'">Branches</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-staff-registrations.html'">Registrations</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-roles.html'">Roles</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-role-permissions.html'">Permissions</span>
-                    </div>
+                <a href="/admin-leads.html" class="quick-link">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                    <span>Leads & CRM</span>
                 </a>
-
-                <!-- HR & Attendance -->
-                <a href="/admin-attendance.html" class="module-card">
-                    <div class="module-card-header">
-                        <div class="module-card-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
-                            <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                        <div class="module-card-title">HR & Attendance</div>
-                    </div>
-                    <div class="module-card-desc">Attendance tracking, tasks & geofence monitoring</div>
-                    <div class="module-card-links">
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-tasks.html'">Tasks</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-daily-tasks.html'">Daily Tasks</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-geofence-logs.html'">Geofence Logs</span>
-                    </div>
+                <a href="/admin-staff.html" class="quick-link">
+                    <svg viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <span>Branches & Staff</span>
                 </a>
-
-                <!-- Salary & Payroll -->
-                <a href="/admin-salary-monthly.html" class="module-card">
-                    <div class="module-card-header">
-                        <div class="module-card-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
-                            <svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                        </div>
-                        <div class="module-card-title">Salary & Payroll</div>
-                    </div>
-                    <div class="module-card-desc">Salary config, monthly payroll, payments & advances</div>
-                    <div class="module-card-links">
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-salary-config.html'">Config</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-salary-payments.html'">Payments</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-salary-advances.html'">Advances</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-salary-reports.html'">Reports</span>
-                    </div>
+                <a href="/admin-attendance.html" class="quick-link">
+                    <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>HR & Attendance</span>
                 </a>
-
-                <!-- Zoho Books -->
-                <a href="/admin-zoho-dashboard.html" class="module-card">
-                    <div class="module-card-header">
-                        <div class="module-card-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
-                            <svg viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-                        </div>
-                        <div class="module-card-title">Zoho Books</div>
-                    </div>
-                    <div class="module-card-desc">Invoices, inventory, stock management & reports</div>
-                    <div class="module-card-links">
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-zoho-invoices.html'">Invoices</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-zoho-items.html'">Items</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-zoho-stock.html'">Stock</span>
-                        <span class="module-chip" onclick="event.preventDefault();window.location='/admin-zoho-reports.html'">Reports</span>
-                    </div>
+                <a href="/admin-salary-monthly.html" class="quick-link">
+                    <svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                    <span>Salary & Payroll</span>
                 </a>
-
+                <a href="/admin-products.html" class="quick-link">
+                    <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    <span>Products & Inventory</span>
+                </a>
+                <a href="/estimates.html" class="quick-link">
+                    <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span>Sales & Estimates</span>
+                </a>
+                <a href="/admin-zoho-dashboard.html" class="quick-link">
+                    <svg viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    <span>Zoho Books</span>
+                </a>
             </div>
         </div>
     </div>

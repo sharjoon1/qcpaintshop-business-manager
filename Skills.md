@@ -551,8 +551,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Lead statistics (total, new)
 - Task statistics (pending, overdue)
 - Monthly estimates (count, total value)
-- 5 Module quick-access cards: Leads & CRM, Branches & Staff, HR & Attendance, Salary & Payroll, Zoho Books
-- Each card links to module main page + sub-page chip links
+- 9 Quick-action buttons: All Modules (toggles sidebar), Chat, Leads & CRM, Branches & Staff, HR & Attendance, Salary & Payroll, Products & Inventory, Sales & Estimates, Zoho Books
 - Page: `admin-dashboard.html`
 
 **Staff Dashboard**
@@ -805,6 +804,9 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Leads Subnav | `components/leads-subnav.html` | Leads & CRM section nav |
 | Branches Subnav | `components/branches-subnav.html` | Branches & Staff section nav |
 | Salary Subnav | `components/salary-subnav.html` | Salary & Payroll section nav |
+| Sales Subnav | `components/sales-subnav.html` | Sales & Estimates section nav |
+| Products Subnav | `components/products-subnav.html` | Products & Inventory section nav |
+| System Subnav | `components/system-subnav.html` | System (Reports, Settings, Profile, Website) section nav |
 
 ### JavaScript Files
 | File | Purpose |
