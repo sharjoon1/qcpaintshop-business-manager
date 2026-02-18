@@ -14,6 +14,7 @@
  *   GET    /api/zoho/invoices         - List cached invoices
  *   GET    /api/zoho/invoices/:id     - Single invoice detail
  *   GET    /api/zoho/payments         - List cached payments
+ *   GET    /api/zoho/payments/:id    - Single payment detail
  *   GET    /api/zoho/customers        - List Zoho customers
  *   GET    /api/zoho/reports/:type    - Financial reports
  *   GET    /api/zoho/sync/log         - Sync history
@@ -780,6 +781,37 @@ router.get('/payments', requirePermission('zoho', 'view'), async (req, res) => {
                 pages: Math.ceil(total / parseInt(limit))
             }
         });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * GET /api/zoho/payments/:id - Single payment detail (from local cache)
+ */
+router.get('/payments/:id', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const [local] = await pool.query(
+            `SELECT * FROM zoho_payments WHERE id = ? OR zoho_payment_id = ? LIMIT 1`,
+            [req.params.id, req.params.id]
+        );
+
+        if (local.length === 0) {
+            return res.status(404).json({ success: false, message: 'Payment not found' });
+        }
+
+        // Fetch related invoice if linked
+        let relatedInvoice = null;
+        if (local[0].zoho_invoice_id) {
+            const [inv] = await pool.query(
+                `SELECT invoice_number, customer_name, total, balance, status, invoice_date, due_date
+                 FROM zoho_invoices WHERE zoho_invoice_id = ? LIMIT 1`,
+                [local[0].zoho_invoice_id]
+            );
+            if (inv.length > 0) relatedInvoice = inv[0];
+        }
+
+        res.json({ success: true, data: { ...local[0], related_invoice: relatedInvoice } });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

@@ -364,7 +364,7 @@
         .drilldown-overlay {
             position: fixed;
             inset: 0;
-            z-index: 50;
+            z-index: 9998;
             background: rgba(0,0,0,0.5);
             display: none;
             justify-content: flex-end;
@@ -563,6 +563,185 @@
             .drilldown-toolbar, .drilldown-pagination, .drilldown-close { display: none !important; }
             .drilldown-table-wrap { overflow: visible !important; }
         }
+
+        /* Live Preview Panel */
+        .preview-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .preview-overlay.open { display: flex; }
+
+        .preview-panel {
+            background: white;
+            width: 95%;
+            max-width: 600px;
+            max-height: 85vh;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            transform: scale(0.95);
+            opacity: 0;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+        }
+        .preview-overlay.open .preview-panel { transform: scale(1); opacity: 1; }
+
+        .preview-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid #e5e7eb;
+            background: linear-gradient(135deg, #667eea08, #764ba208);
+        }
+        .preview-header h3 { flex: 1; font-size: 1rem; font-weight: 700; color: #1f2937; }
+        .preview-header .preview-type-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .preview-close {
+            width: 2rem; height: 2rem;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px;
+            border: none;
+            background: #f3f4f6;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.15s;
+        }
+        .preview-close:hover { background: #e5e7eb; color: #1f2937; }
+
+        .preview-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem;
+        }
+
+        .preview-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 1rem;
+            gap: 0.75rem;
+        }
+        .preview-loading .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .preview-loading .text { font-size: 0.8rem; color: #9ca3af; }
+
+        .preview-section { margin-bottom: 1.25rem; }
+        .preview-section:last-child { margin-bottom: 0; }
+        .preview-section-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        .preview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+        .preview-field {
+            padding: 0.5rem 0.65rem;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        .preview-field.full { grid-column: 1 / -1; }
+        .preview-field-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.15rem;
+        }
+        .preview-field-value {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #1f2937;
+            word-break: break-word;
+        }
+        .preview-field-value.amount {
+            font-size: 1.1rem;
+            color: #7c3aed;
+        }
+        .preview-field-value.overdue { color: #dc2626; }
+        .preview-field-value.paid { color: #059669; }
+
+        .preview-line-items {
+            width: 100%;
+            font-size: 0.75rem;
+            border-collapse: collapse;
+        }
+        .preview-line-items th {
+            text-align: left;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .preview-line-items td {
+            padding: 0.45rem 0.5rem;
+            color: #374151;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .preview-line-items tr:last-child td { border-bottom: none; }
+
+        .preview-footer {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+        .preview-footer a, .preview-footer button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.45rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.15s;
+            cursor: pointer;
+        }
+        .preview-footer .btn-secondary {
+            background: white;
+            border: 1px solid #d1d5db;
+            color: #374151;
+        }
+        .preview-footer .btn-secondary:hover { background: #f3f4f6; }
+        .preview-footer .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+        }
+        .preview-footer .btn-primary:hover { opacity: 0.9; }
     </style>
 </head>
 <body class="bg-gray-50" data-page="zoho-dashboard">
@@ -595,14 +774,14 @@
 
     <!-- Period Filter Bar -->
     <div class="period-bar" id="periodBar">
-        <button class="period-pill active" data-period="all" onclick="setPeriod('all')">All Time</button>
-        <button class="period-pill" data-period="today" onclick="setPeriod('today')">Today</button>
+        <button class="period-pill active" data-period="today" onclick="setPeriod('today')">Today</button>
         <button class="period-pill" data-period="yesterday" onclick="setPeriod('yesterday')">Yesterday</button>
         <button class="period-pill" data-period="this_week" onclick="setPeriod('this_week')">This Week</button>
         <button class="period-pill" data-period="this_month" onclick="setPeriod('this_month')">This Month</button>
         <button class="period-pill" data-period="prev_month" onclick="setPeriod('prev_month')">Prev Month</button>
         <button class="period-pill" data-period="this_year" onclick="setPeriod('this_year')">This Year</button>
         <button class="period-pill" data-period="custom" onclick="toggleCustomRange()">Custom</button>
+        <button class="period-pill" data-period="all" onclick="setPeriod('all')">All Time</button>
         <div class="period-controls">
             <label class="compare-toggle">
                 <input type="checkbox" id="compareToggle" onchange="toggleCompare()">
@@ -1086,6 +1265,35 @@
     </div>
 </div>
 
+<!-- Live Preview Modal -->
+<div class="preview-overlay" id="previewModal">
+    <div class="preview-panel">
+        <div class="preview-header">
+            <svg class="w-5 h-5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+            </svg>
+            <h3 id="previewTitle">Transaction Details</h3>
+            <span class="preview-type-badge" id="previewTypeBadge"></span>
+            <button class="preview-close" onclick="closePreview()" title="Close">&times;</button>
+        </div>
+        <div class="preview-body" id="previewBody">
+            <div class="preview-loading" id="previewLoading">
+                <div class="spinner"></div>
+                <div class="text">Loading transaction details...</div>
+            </div>
+            <div id="previewContent" style="display:none;"></div>
+        </div>
+        <div class="preview-footer" id="previewFooter" style="display:none;">
+            <button class="btn-secondary" onclick="closePreview()">Close</button>
+            <a class="btn-primary" id="previewZohoLink" href="#" target="_blank" rel="noopener">
+                View in Zoho
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+            </a>
+        </div>
+    </div>
+</div>
+
 <script>
     // Currency formatting helper
     function formatCurrency(amount) {
@@ -1267,7 +1475,7 @@
     // ============================
     // PERIOD FILTER STATE
     // ============================
-    var currentPeriod = 'all';
+    var currentPeriod = 'today';
     var currentFromDate = null;
     var currentToDate = null;
     var isCompareMode = false;
@@ -2279,7 +2487,7 @@
             var cells = '';
 
             if (isPayment) {
-                cells += '<td class="link-cell">' + (row.payment_number || '--') + '</td>';
+                cells += '<td class="link-cell"><a href="#" onclick="openPreview(\'payment\',' + row.id + ',\'' + (row.zoho_payment_id || '') + '\');return false;" style="cursor:pointer;text-decoration:none;color:#667eea;" title="Click to preview">' + (row.payment_number || '--') + '</a></td>';
                 cells += '<td style="max-width:180px" class="truncate">' + (row.customer_name || '--') + '</td>';
                 cells += '<td>' + formatDate(row.payment_date) + '</td>';
                 cells += '<td class="text-right" style="font-weight:600">' + formatCurrency(row.amount) + '</td>';
@@ -2287,7 +2495,7 @@
                 cells += '<td>' + (row.reference_number || '--') + '</td>';
                 cells += '<td>' + getZohoLink(row.zoho_payment_id, 'payments') + '</td>';
             } else {
-                cells += '<td class="link-cell">' + (row.invoice_number || '--') + '</td>';
+                cells += '<td class="link-cell"><a href="#" onclick="openPreview(\'invoice\',' + row.id + ',\'' + (row.zoho_invoice_id || '') + '\');return false;" style="cursor:pointer;text-decoration:none;color:#667eea;" title="Click to preview">' + (row.invoice_number || '--') + '</a></td>';
                 cells += '<td style="max-width:180px" class="truncate">' + (row.customer_name || '--') + '</td>';
                 cells += '<td>' + formatDate(row.invoice_date) + '</td>';
                 var dueDateClass = row.status === 'overdue' ? ' overdue-date' : '';
@@ -2424,6 +2632,268 @@
         window.print();
     }
 
+    // ============================
+    // LIVE PREVIEW MODAL
+    // ============================
+    function openPreview(type, id, zohoId) {
+        var modal = document.getElementById('previewModal');
+        var loading = document.getElementById('previewLoading');
+        var content = document.getElementById('previewContent');
+        var footer = document.getElementById('previewFooter');
+
+        // Reset
+        loading.style.display = 'flex';
+        content.style.display = 'none';
+        content.innerHTML = '';
+        footer.style.display = 'none';
+
+        // Set header
+        document.getElementById('previewTitle').textContent = type === 'invoice' ? 'Invoice Details' : 'Payment Details';
+        var badge = document.getElementById('previewTypeBadge');
+        badge.textContent = type === 'invoice' ? 'Invoice' : 'Payment';
+        badge.style.background = type === 'invoice' ? '#eef2ff' : '#ecfdf5';
+        badge.style.color = type === 'invoice' ? '#4338ca' : '#065f46';
+
+        modal.classList.add('open');
+
+        // Fetch data
+        if (type === 'invoice') {
+            fetchInvoicePreview(id, zohoId);
+        } else {
+            fetchPaymentPreview(id, zohoId);
+        }
+    }
+
+    function closePreview() {
+        document.getElementById('previewModal').classList.remove('open');
+    }
+
+    // Close preview on backdrop click
+    document.getElementById('previewModal').addEventListener('click', function(e) {
+        if (e.target === this) closePreview();
+    });
+
+    // Close preview on Escape (only if preview is open)
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('previewModal').classList.contains('open')) {
+            closePreview();
+        }
+    });
+
+    async function fetchInvoicePreview(id, zohoId) {
+        try {
+            var response = await fetch('/api/zoho/invoices/' + id, { headers: getAuthHeaders() });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            var result = await response.json();
+            if (result.success && result.data) {
+                renderInvoicePreview(result.data);
+            } else {
+                showPreviewError(result.message || 'Invoice not found');
+            }
+        } catch (err) {
+            showPreviewError(err.message);
+        }
+    }
+
+    async function fetchPaymentPreview(id, zohoId) {
+        try {
+            var response = await fetch('/api/zoho/payments/' + id, { headers: getAuthHeaders() });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            var result = await response.json();
+            if (result.success && result.data) {
+                renderPaymentPreview(result.data);
+            } else {
+                showPreviewError(result.message || 'Payment not found');
+            }
+        } catch (err) {
+            showPreviewError(err.message);
+        }
+    }
+
+    function showPreviewError(message) {
+        document.getElementById('previewLoading').style.display = 'none';
+        var content = document.getElementById('previewContent');
+        content.style.display = 'block';
+        content.innerHTML = '<div style="text-align:center;padding:2rem;color:#dc2626;"><svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:2rem;height:2rem;margin:0 auto 0.5rem;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg><div style="font-weight:600;">Error loading details</div><div style="font-size:0.8rem;color:#9ca3af;margin-top:0.25rem;">' + message + '</div></div>';
+    }
+
+    function formatCurrencyFull(amount) {
+        var num = parseFloat(amount || 0);
+        return '\u20B9' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function renderInvoicePreview(data) {
+        document.getElementById('previewLoading').style.display = 'none';
+        var content = document.getElementById('previewContent');
+        var footer = document.getElementById('previewFooter');
+        content.style.display = 'block';
+        footer.style.display = 'flex';
+
+        var statusColorMap = {
+            paid: 'paid', overdue: 'overdue', sent: '', partially_paid: '', draft: '', void: ''
+        };
+        var statusClass = statusColorMap[data.status] || '';
+
+        var html = '';
+
+        // Transaction info section
+        html += '<div class="preview-section">';
+        html += '<div class="preview-section-title">Transaction Info</div>';
+        html += '<div class="preview-grid">';
+        html += '<div class="preview-field"><div class="preview-field-label">Invoice #</div><div class="preview-field-value">' + (data.invoice_number || '--') + '</div></div>';
+        html += '<div class="preview-field"><div class="preview-field-label">Status</div><div class="preview-field-value">' + getStatusBadge(data.status) + '</div></div>';
+        html += '<div class="preview-field"><div class="preview-field-label">Invoice Date</div><div class="preview-field-value">' + formatDate(data.invoice_date) + '</div></div>';
+        var dueDateVal = formatDate(data.due_date);
+        var dueDateClass = data.status === 'overdue' ? ' overdue' : '';
+        html += '<div class="preview-field"><div class="preview-field-label">Due Date</div><div class="preview-field-value' + dueDateClass + '">' + dueDateVal + '</div></div>';
+        html += '</div>';
+        html += '</div>';
+
+        // Customer section
+        html += '<div class="preview-section">';
+        html += '<div class="preview-section-title">Customer</div>';
+        html += '<div class="preview-grid">';
+        html += '<div class="preview-field full"><div class="preview-field-label">Customer Name</div><div class="preview-field-value">' + (data.customer_name || '--') + '</div></div>';
+        if (data.reference_number) {
+            html += '<div class="preview-field full"><div class="preview-field-label">Reference #</div><div class="preview-field-value">' + data.reference_number + '</div></div>';
+        }
+        html += '</div>';
+        html += '</div>';
+
+        // Financial section
+        html += '<div class="preview-section">';
+        html += '<div class="preview-section-title">Financial Summary</div>';
+        html += '<div class="preview-grid">';
+        html += '<div class="preview-field"><div class="preview-field-label">Sub Total</div><div class="preview-field-value">' + formatCurrencyFull(data.sub_total) + '</div></div>';
+        html += '<div class="preview-field"><div class="preview-field-label">Tax</div><div class="preview-field-value">' + formatCurrencyFull(data.tax_total) + '</div></div>';
+        html += '<div class="preview-field"><div class="preview-field-label">Total</div><div class="preview-field-value amount">' + formatCurrencyFull(data.total) + '</div></div>';
+        var balanceClass = parseFloat(data.balance) > 0 ? (data.status === 'overdue' ? ' overdue' : '') : ' paid';
+        html += '<div class="preview-field"><div class="preview-field-label">Balance Due</div><div class="preview-field-value' + balanceClass + '">' + formatCurrencyFull(data.balance) + '</div></div>';
+        html += '</div>';
+        html += '</div>';
+
+        // Line items (if available)
+        var lineItems = data.line_items;
+        if (typeof lineItems === 'string') {
+            try { lineItems = JSON.parse(lineItems); } catch(e) { lineItems = null; }
+        }
+        if (lineItems && Array.isArray(lineItems) && lineItems.length > 0) {
+            html += '<div class="preview-section">';
+            html += '<div class="preview-section-title">Line Items (' + lineItems.length + ')</div>';
+            html += '<div style="overflow-x:auto;">';
+            html += '<table class="preview-line-items">';
+            html += '<thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>';
+            html += '<tbody>';
+            lineItems.forEach(function(item) {
+                html += '<tr>';
+                html += '<td>' + (item.name || item.description || '--') + '</td>';
+                html += '<td style="text-align:right">' + (item.quantity || 1) + '</td>';
+                html += '<td style="text-align:right">' + formatCurrencyFull(item.rate || item.price) + '</td>';
+                html += '<td style="text-align:right;font-weight:600">' + formatCurrencyFull(item.item_total || item.amount) + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            html += '</div>';
+        }
+
+        // Notes / Terms
+        if (data.notes) {
+            html += '<div class="preview-section">';
+            html += '<div class="preview-section-title">Notes</div>';
+            html += '<div class="preview-field full"><div class="preview-field-value" style="font-weight:400;font-size:0.8rem;color:#6b7280;">' + data.notes + '</div></div>';
+            html += '</div>';
+        }
+
+        content.innerHTML = html;
+
+        // Set Zoho link
+        var zohoLink = document.getElementById('previewZohoLink');
+        if (zohoOrgId && data.zoho_invoice_id) {
+            zohoLink.href = 'https://books.zoho.in/app/' + zohoOrgId + '#/invoices/' + data.zoho_invoice_id;
+            zohoLink.style.display = 'inline-flex';
+        } else {
+            zohoLink.style.display = 'none';
+        }
+    }
+
+    function renderPaymentPreview(data) {
+        document.getElementById('previewLoading').style.display = 'none';
+        var content = document.getElementById('previewContent');
+        var footer = document.getElementById('previewFooter');
+        content.style.display = 'block';
+        footer.style.display = 'flex';
+
+        var html = '';
+
+        // Payment info
+        html += '<div class="preview-section">';
+        html += '<div class="preview-section-title">Payment Info</div>';
+        html += '<div class="preview-grid">';
+        html += '<div class="preview-field"><div class="preview-field-label">Payment #</div><div class="preview-field-value">' + (data.payment_number || '--') + '</div></div>';
+        html += '<div class="preview-field"><div class="preview-field-label">Payment Date</div><div class="preview-field-value">' + formatDate(data.payment_date) + '</div></div>';
+        html += '<div class="preview-field"><div class="preview-field-label">Amount</div><div class="preview-field-value amount">' + formatCurrencyFull(data.amount) + '</div></div>';
+        html += '<div class="preview-field"><div class="preview-field-label">Payment Mode</div><div class="preview-field-value">' + getPaymentModeBadge(data.payment_mode) + '</div></div>';
+        html += '</div>';
+        html += '</div>';
+
+        // Customer
+        html += '<div class="preview-section">';
+        html += '<div class="preview-section-title">Customer</div>';
+        html += '<div class="preview-grid">';
+        html += '<div class="preview-field full"><div class="preview-field-label">Customer Name</div><div class="preview-field-value">' + (data.customer_name || '--') + '</div></div>';
+        if (data.reference_number) {
+            html += '<div class="preview-field full"><div class="preview-field-label">Reference #</div><div class="preview-field-value">' + data.reference_number + '</div></div>';
+        }
+        html += '</div>';
+        html += '</div>';
+
+        // Additional details
+        html += '<div class="preview-section">';
+        html += '<div class="preview-section-title">Additional Details</div>';
+        html += '<div class="preview-grid">';
+        if (parseFloat(data.unused_amount) > 0) {
+            html += '<div class="preview-field"><div class="preview-field-label">Unused Amount</div><div class="preview-field-value">' + formatCurrencyFull(data.unused_amount) + '</div></div>';
+        }
+        if (parseFloat(data.bank_charges) > 0) {
+            html += '<div class="preview-field"><div class="preview-field-label">Bank Charges</div><div class="preview-field-value">' + formatCurrencyFull(data.bank_charges) + '</div></div>';
+        }
+        html += '</div>';
+        html += '</div>';
+
+        // Related invoice
+        if (data.related_invoice) {
+            var inv = data.related_invoice;
+            html += '<div class="preview-section">';
+            html += '<div class="preview-section-title">Related Invoice</div>';
+            html += '<div class="preview-grid">';
+            html += '<div class="preview-field"><div class="preview-field-label">Invoice #</div><div class="preview-field-value">' + (inv.invoice_number || '--') + '</div></div>';
+            html += '<div class="preview-field"><div class="preview-field-label">Status</div><div class="preview-field-value">' + getStatusBadge(inv.status) + '</div></div>';
+            html += '<div class="preview-field"><div class="preview-field-label">Invoice Total</div><div class="preview-field-value">' + formatCurrencyFull(inv.total) + '</div></div>';
+            html += '<div class="preview-field"><div class="preview-field-label">Balance</div><div class="preview-field-value">' + formatCurrencyFull(inv.balance) + '</div></div>';
+            html += '</div>';
+            html += '</div>';
+        }
+
+        // Description
+        if (data.description) {
+            html += '<div class="preview-section">';
+            html += '<div class="preview-section-title">Description</div>';
+            html += '<div class="preview-field full"><div class="preview-field-value" style="font-weight:400;font-size:0.8rem;color:#6b7280;">' + data.description + '</div></div>';
+            html += '</div>';
+        }
+
+        content.innerHTML = html;
+
+        // Set Zoho link
+        var zohoLink = document.getElementById('previewZohoLink');
+        if (zohoOrgId && data.zoho_payment_id) {
+            zohoLink.href = 'https://books.zoho.in/app/' + zohoOrgId + '#/payments/' + data.zoho_payment_id;
+            zohoLink.style.display = 'inline-flex';
+        } else {
+            zohoLink.style.display = 'none';
+        }
+    }
+
     // Fetch zoho org ID on page load (for "View in Zoho" links)
     async function fetchZohoOrgId() {
         try {
@@ -2449,7 +2919,12 @@
         fetchZohoOrgId();
     }
 
-    // Initialize
+    // Initialize — set "Today" as default period with dates
+    (function initDefaultPeriod() {
+        var dates = calcPeriodDates('today');
+        currentFromDate = dates.from;
+        currentToDate = dates.to;
+    })();
     loadAll();
 </script>
 </body>

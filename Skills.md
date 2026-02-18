@@ -108,7 +108,8 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Pages: `admin-zoho-settings.html`, `admin-zoho-dashboard.html`
 
 **Dashboard Financial Filtering**
-- Time-period filter pills: All Time, Today, Yesterday, This Week, This Month, Prev Month, This Year, Custom
+- Time-period filter pills: Today (default), Yesterday, This Week, This Month, Prev Month, This Year, Custom, All Time
+- "Today" is the default view on page load — cards show today's data immediately
 - Custom date range picker with validation
 - Period comparison mode: shows % change arrows (▲/▼) vs previous equivalent period
 - Inverted coloring for "bad" metrics (overdue up = red, outstanding up = red)
@@ -120,15 +121,19 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 
 **Stat Card Drill-Down**
 - Click any stat card (Revenue, Outstanding, Overdue, Collected, Total Invoices, Overdue Invoices, Unpaid Invoices) to see individual transactions
-- Full-screen slide-in panel with table, search, sort, pagination (25 per page)
+- Full-screen slide-in panel (z-index 9998, above header) with table, search, sort, pagination (25 per page)
 - Invoice metrics show: Invoice #, Customer, Date, Due Date, Total, Balance, Status, View in Zoho
 - Payment metric (Collected) shows: Payment #, Customer, Date, Amount, Mode, Reference, View in Zoho
+- **First column clickable for Live Preview**: Invoice # or Payment # opens an in-app detail modal (no redirect)
+- Live Preview shows: full transaction details, financial summary, line items (for invoices), related invoice (for payments)
+- "View in Zoho" button in preview footer + action column links
 - "View in Zoho" links open Zoho Books directly (uses `ZOHO_ORGANIZATION_ID` env var exposed via `/status`)
 - CSV export of drilldown data, print-friendly layout
 - Search filters by customer name or invoice/payment number
 - Column header click sorts, toggle ASC/DESC
 - Close via X button, Escape key, or backdrop click
 - API endpoints: `GET /dashboard/drilldown?metric&from_date&to_date&search&sort&order&page&limit`, `GET /dashboard/drilldown/export?metric&...`
+- API endpoint: `GET /payments/:id` — single payment detail with related invoice info
 - Metrics: `revenue`, `outstanding`, `overdue`, `collected`, `total_invoices`, `overdue_invoices`, `unpaid_invoices`
 
 **Data Sync**
