@@ -13,32 +13,11 @@
     <title>Bulk Jobs - Quality Colours Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <style>
-        body { background: #f9fafb; }
-
-        /* Toast notification */
-        .toast {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 9999;
-            padding: 0.75rem 1.25rem;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            font-size: 0.875rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-        }
-        .toast.show { transform: translateX(0); }
-        .toast-success { background: #059669; }
-        .toast-error { background: #dc2626; }
-        .toast-info { background: #2563eb; }
-
         /* Status badges */
         .badge {
             display: inline-flex;
@@ -142,18 +121,6 @@
         .item-badge-failed { background: #fee2e2; color: #991b1b; }
         .item-badge-skipped { background: #fef9c3; color: #854d0e; }
 
-        /* Loading skeleton */
-        .skeleton {
-            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 6px;
-        }
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
         /* Chevron rotate on expand */
         .chevron-icon { transition: transform 0.2s; }
         .chevron-icon.rotated { transform: rotate(180deg); }
@@ -179,7 +146,7 @@
         }
     </style>
 </head>
-<body data-page="zoho-bulk-jobs">
+<body class="bg-gray-50" data-page="zoho-bulk-jobs">
 <div class="container mx-auto p-4 md:p-6">
 
     <!-- Toast Notification -->
@@ -267,14 +234,6 @@
     let expandedJobId = null;
     let expandedJobDetail = null;
     let pollInterval = null;
-
-    // --- Auth ---
-    function getAuthHeaders() {
-        return {
-            'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
-            'Content-Type': 'application/json'
-        };
-    }
 
     // --- Helpers ---
     function formatDate(dateStr) {

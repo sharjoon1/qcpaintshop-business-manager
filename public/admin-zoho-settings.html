@@ -13,6 +13,7 @@
     <title>Zoho Settings - Quality Colours Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -23,39 +24,6 @@
         .toggle-slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
         input:checked + .toggle-slider { background: #7c3aed; }
         input:checked + .toggle-slider:before { transform: translateX(20px); }
-
-        .toast-container {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        .toast {
-            padding: 0.75rem 1.25rem;
-            border-radius: 8px;
-            color: white;
-            font-weight: 600;
-            font-size: 0.875rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: slideIn 0.3s ease-out;
-            max-width: 400px;
-        }
-        .toast-success { background: #10b981; }
-        .toast-error { background: #ef4444; }
-        .toast-warning { background: #f59e0b; }
-        .toast-info { background: #3b82f6; }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
 
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin {
@@ -101,7 +69,7 @@
     </style>
 </head>
 <body class="bg-gray-50" data-page="zoho-settings">
-    <div class="toast-container" id="toastContainer"></div>
+    <div id="toast" class="toast" role="alert"></div>
 
     <div class="container mx-auto p-4 md:p-6">
 
@@ -327,39 +295,20 @@
     // ========================
     // Toast Notification
     // ========================
-    function showToast(message, type = 'success') {
-        const container = document.getElementById('toastContainer');
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
+    function showToast(message, type) {
+        var toast = document.getElementById('toast');
         toast.textContent = message;
-        container.appendChild(toast);
-        setTimeout(() => {
-            toast.style.animation = 'slideOut 0.3s ease-in forwards';
-            setTimeout(() => toast.remove(), 300);
-        }, 3500);
+        toast.className = 'toast toast-' + (type || 'info');
+        toast.classList.add('show');
+        setTimeout(function() { toast.classList.remove('show'); }, 3500);
     }
 
     // ========================
     // API Helper
     // ========================
-    async function apiFetch(url, options = {}) {
-        try {
-            const headers = { ...getAuthHeaders(), ...(options.headers || {}) };
-            // Auto-add Content-Type for JSON bodies
-            if (options.body && typeof options.body === 'string' && !headers['Content-Type']) {
-                headers['Content-Type'] = 'application/json';
-            }
-            const response = await fetch(url, { ...options, headers });
-            if (response.status === 401) {
-                window.location.href = '/login.html';
-                return null;
-            }
-            return response;
-        } catch (err) {
-            console.error('API fetch error:', err);
-            showToast('Network error. Please try again.', 'error');
-            return null;
-        }
+    async function zohoFetch(url, options) {
+        try { return await apiRequest(url, options); }
+        catch (err) { showToast(err.message || 'Network error', 'error'); return null; }
     }
 
     // ========================
@@ -374,7 +323,7 @@
         loadingEl.classList.remove('hidden');
         contentEl.classList.add('hidden');
 
-        const response = await apiFetch('/api/zoho/status');
+        const response = await zohoFetch('/api/zoho/status');
         if (!response) {
             loadingEl.innerHTML = '<span class="text-red-500">Failed to load connection status</span>';
             return;
@@ -398,7 +347,7 @@
     }
 
     async function connectZoho() {
-        const response = await apiFetch('/api/zoho/oauth/url');
+        const response = await zohoFetch('/api/zoho/oauth/url');
         if (!response) return;
         const data = await response.json();
         const authUrl = data.authorization_url || (data.data && data.data.authorization_url);
@@ -480,7 +429,7 @@
     async function disconnectZoho() {
         if (!confirm('Are you sure you want to disconnect from Zoho Books? This will stop all syncing.')) return;
 
-        const response = await apiFetch('/api/zoho/oauth/disconnect', { method: 'POST' });
+        const response = await zohoFetch('/api/zoho/oauth/disconnect', { method: 'POST' });
         if (!response) return;
         const result = await response.json();
 
@@ -496,7 +445,7 @@
     // 2. Sync Configuration
     // ========================
     async function loadSyncConfig() {
-        const response = await apiFetch('/api/zoho/config');
+        const response = await zohoFetch('/api/zoho/config');
         if (!response) return;
         const result = await response.json();
         const configs = result.data || result.configs || [];
@@ -527,7 +476,7 @@
             { key: 'sync_interval_minutes', value: document.getElementById('syncInterval').value }
         ];
 
-        const response = await apiFetch('/api/zoho/config', {
+        const response = await zohoFetch('/api/zoho/config', {
             method: 'PUT',
             body: JSON.stringify({ configs })
         });
@@ -562,7 +511,7 @@
             payments: '/api/zoho/sync/payments'
         };
 
-        const response = await apiFetch(urlMap[type], { method: 'POST' });
+        const response = await zohoFetch(urlMap[type], { method: 'POST' });
 
         btn.disabled = false;
         spinner.classList.add('hidden');
@@ -583,7 +532,7 @@
     // 4. WhatsApp Configuration
     // ========================
     async function loadWhatsAppConfig() {
-        const response = await apiFetch('/api/zoho/config');
+        const response = await zohoFetch('/api/zoho/config');
         if (!response) return;
         const result = await response.json();
         const configs = result.data || result.configs || [];
@@ -622,7 +571,7 @@
             { key: 'overdue_reminder_days', value: document.getElementById('overdueReminderDays').value.trim() }
         ];
 
-        const response = await apiFetch('/api/zoho/config', {
+        const response = await zohoFetch('/api/zoho/config', {
             method: 'PUT',
             body: JSON.stringify({ configs })
         });
@@ -649,7 +598,7 @@
         const body = document.getElementById('mappingBody');
         body.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-gray-400">Loading unmapped customers...</td></tr>';
 
-        const response = await apiFetch('/api/zoho/customers?mapped=false&limit=10');
+        const response = await zohoFetch('/api/zoho/customers?mapped=false&limit=10');
         if (!response) {
             body.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-red-400">Failed to load customers</td></tr>';
             return;
@@ -704,7 +653,7 @@
 
         // Load local customers if not cached
         if (localCustomersCache.length === 0) {
-            const response = await apiFetch('/api/customers?limit=100');
+            const response = await zohoFetch('/api/customers?limit=100');
             if (response) {
                 const data = await response.json();
                 localCustomersCache = data.customers || data.data || [];
@@ -757,7 +706,7 @@
         // Close dropdown
         document.querySelectorAll('.mapping-dropdown').forEach(d => d.remove());
 
-        const response = await apiFetch(`/api/zoho/customers/${zohoCustomerId}/map`, {
+        const response = await zohoFetch(`/api/zoho/customers/${zohoCustomerId}/map`, {
             method: 'PUT',
             body: JSON.stringify({ local_customer_id: localCustomerId })
         });
@@ -781,7 +730,7 @@
     async function loadSyncLog() {
         const body = document.getElementById('syncLogBody');
 
-        const response = await apiFetch('/api/zoho/sync/log?limit=20');
+        const response = await zohoFetch('/api/zoho/sync/log?limit=20');
         if (!response) {
             body.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-red-400">Failed to load sync history</td></tr>';
             return;

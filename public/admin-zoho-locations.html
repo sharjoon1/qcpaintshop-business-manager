@@ -13,6 +13,7 @@
     <title>Zoho Locations - Quality Colours Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -45,54 +46,10 @@
         .badge-inactive { background: #fee2e2; color: #991b1b; }
         .badge-primary { background: #dbeafe; color: #1e40af; }
 
-        .toast-container {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        .toast {
-            padding: 0.75rem 1.25rem;
-            border-radius: 8px;
-            color: white;
-            font-weight: 600;
-            font-size: 0.875rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: slideIn 0.3s ease-out;
-            max-width: 400px;
-        }
-        .toast-success { background: #059669; }
-        .toast-error { background: #dc2626; }
-        .toast-info { background: #2563eb; }
-        .toast-warning { background: #f59e0b; }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
-        }
-
-        .skeleton {
-            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 6px;
-        }
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
         }
 
         .branch-select {
@@ -106,7 +63,7 @@
 </head>
 <body class="bg-gray-50" data-page="zoho-locations">
     <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
+    <div id="toast" class="toast" role="alert"></div>
 
     <div class="container mx-auto p-4 md:p-6">
 
@@ -183,29 +140,14 @@
 
 <script>
     // ========================
-    // Auth Headers
-    // ========================
-    function getAuthHeaders() {
-        return {
-            'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
-            'Content-Type': 'application/json'
-        };
-    }
-
-    // ========================
     // Toast Notification
     // ========================
     function showToast(message, type) {
-        type = type || 'info';
-        var container = document.getElementById('toastContainer');
-        var toast = document.createElement('div');
-        toast.className = 'toast toast-' + type;
+        var toast = document.getElementById('toast');
         toast.textContent = message;
-        container.appendChild(toast);
-        setTimeout(function() {
-            toast.style.animation = 'slideOut 0.3s ease-in forwards';
-            setTimeout(function() { toast.remove(); }, 300);
-        }, 3500);
+        toast.className = 'toast toast-' + (type || 'info');
+        toast.classList.add('show');
+        setTimeout(function() { toast.classList.remove('show'); }, 3500);
     }
 
     // ========================
@@ -241,29 +183,16 @@
     // ========================
     // API Fetch Helper
     // ========================
-    async function apiFetch(url, options) {
-        options = options || {};
-        try {
-            var response = await fetch(url, Object.assign({}, options, {
-                headers: Object.assign({}, getAuthHeaders(), options.headers || {})
-            }));
-            if (response.status === 401) {
-                window.location.href = '/login.html';
-                return null;
-            }
-            return response;
-        } catch (err) {
-            console.error('API fetch error:', err);
-            showToast('Network error. Please try again.', 'error');
-            return null;
-        }
+    async function zohoFetch(url, options) {
+        try { return await apiRequest(url, options); }
+        catch (err) { showToast(err.message || 'Network error', 'error'); return null; }
     }
 
     // ========================
     // Load Branches (for dropdown)
     // ========================
     async function loadBranches() {
-        var response = await apiFetch('/api/branches');
+        var response = await zohoFetch('/api/branches');
         if (!response) return;
         try {
             var data = await response.json();
@@ -295,7 +224,7 @@
         locationsGrid.classList.add('hidden');
         emptyState.classList.add('hidden');
 
-        var response = await apiFetch('/api/zoho/locations');
+        var response = await zohoFetch('/api/zoho/locations');
         if (!response) {
             loadingGrid.classList.add('hidden');
             emptyState.classList.remove('hidden');
@@ -451,7 +380,7 @@
             '<span>Saving...</span>';
         btn.classList.add('opacity-75');
 
-        var response = await apiFetch('/api/zoho/locations/' + locationId + '/map', {
+        var response = await zohoFetch('/api/zoho/locations/' + locationId + '/map', {
             method: 'PUT',
             body: JSON.stringify({ branch_id: parseInt(branchId) })
         });
@@ -514,7 +443,7 @@
         icon.classList.add('spin');
         text.textContent = 'Syncing...';
 
-        var response = await apiFetch('/api/zoho/locations/sync', {
+        var response = await zohoFetch('/api/zoho/locations/sync', {
             method: 'POST'
         });
 

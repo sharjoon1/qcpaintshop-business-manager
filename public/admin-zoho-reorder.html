@@ -13,31 +13,12 @@
     <title>Reorder Alerts - Quality Colours Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
-
-        /* Toast notification */
-        .toast {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 9999;
-            padding: 0.75rem 1.25rem;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            font-size: 0.875rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-        }
-        .toast.show { transform: translateX(0); }
-        .toast-success { background: #059669; }
-        .toast-error { background: #dc2626; }
-        .toast-info { background: #2563eb; }
 
         /* Tab styles */
         .tab-btn {
@@ -106,18 +87,6 @@
         }
         .table-wrapper table {
             min-width: 700px;
-        }
-
-        /* Loading skeleton */
-        .skeleton {
-            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 4px;
-        }
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
         }
 
         /* Toggle switch */
@@ -546,16 +515,6 @@
 
     let locations = [];
     let itemSearchTimeout = null;
-
-    // ============================
-    // AUTH HEADERS
-    // ============================
-    function getAuthHeaders() {
-        return {
-            'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
-            'Content-Type': 'application/json'
-        };
-    }
 
     // ============================
     // HELPERS

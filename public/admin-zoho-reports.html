@@ -13,6 +13,7 @@
     <title>Financial Reports - Quality Colours Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
@@ -176,15 +177,6 @@
         // ===== State =====
         let currentReport = 'profit_loss';
         let lastCacheTime = null;
-
-        // ===== Auth =====
-        function getAuthHeaders() {
-            const token = localStorage.getItem('auth_token');
-            return {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : ''
-            };
-        }
 
         // ===== Currency formatting =====
         function formatCurrency(val) {

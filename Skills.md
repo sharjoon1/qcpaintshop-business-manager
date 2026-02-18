@@ -923,7 +923,8 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 ### JavaScript Files
 | File | Purpose |
 |------|---------|
-| `js/auth-helper.js` | Auth token management, SW registration, `isAndroidApp()` |
+| `css/zoho-common.css` | Shared toast notification + skeleton loading CSS for all Zoho pages |
+| `js/auth-helper.js` | Auth token management, SW registration, `isAndroidApp()`, global `getAuthHeaders()`, `apiRequest()`, `apiFetch()` |
 | `js/socket-helper.js` | Socket.io client helper |
 | `estimates.js` | Estimate page logic |
 | `universal-nav-loader.js` | Dynamic nav component loader |
@@ -1181,6 +1182,19 @@ node promote-release.js internal production
   - Existing Tamil guide auto-imported into system
   - Navigation: System subnav + staff sidebar integration
 - Migration: `migrations/migrate-attendance-improvements.js`, `migrations/migrate-break-enforcement.js`, `migrations/migrate-guides-system.js`
+
+### 2026-02-18 - Zoho Dashboard Enhancements & Module Cleanup
+- **Zoho Dashboard Time-Based Filtering**: Period pills, comparison arrows, Chart.js trend chart, CSV export
+- **Zoho Dashboard Stat Card Drilldown**: Click KPI cards for transaction details, live invoice/payment preview, search/sort/export
+- **Zoho Module Cleanup** (all 13 pages):
+  - Created shared `css/zoho-common.css` (toast + skeleton CSS)
+  - Removed duplicate `getAuthHeaders()` from 10 pages (now uses global from `auth-helper.js`)
+  - Removed duplicate `apiFetch()` from 3 pages (locations/settings use `zohoFetch()` wrapper, purchase-suggestions uses global `apiFetch()`)
+  - Fixed dashboard double `/api/zoho/status` API call (merged into `loadConnectionStatus()`)
+  - Fixed reports page auth bug (template-literal sending empty `Authorization: ""` header)
+  - Converted 2 Pattern-B toast pages (locations, settings) to standard single-element toast
+  - Removed inline toast CSS from 9 pages, skeleton CSS from 7 pages
+  - Fixed HTML structure: removed `data-page` from invoices `<html>` tag, added `bg-gray-50` to bulk-jobs `<body>`
 
 ---
 
