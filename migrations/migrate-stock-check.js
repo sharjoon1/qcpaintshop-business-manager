@@ -100,8 +100,18 @@ async function migrate() {
             console.log('   SKIP:', err.message);
         }
 
-        // 5. Add permission
-        console.log('4. Adding zoho.stock_check permission...');
+        // 5. Add zoho_location_id column for per-assignment location selection
+        console.log('5. Adding zoho_location_id column to assignments...');
+        try {
+            await pool.query('ALTER TABLE stock_check_assignments ADD COLUMN zoho_location_id VARCHAR(50) AFTER branch_id');
+            console.log('   OK');
+        } catch (err) {
+            if (err.code === 'ER_DUP_FIELDNAME') console.log('   SKIP (already exists)');
+            else console.log('   WARN:', err.message);
+        }
+
+        // 6. Add permission
+        console.log('6. Adding zoho.stock_check permission...');
         const [existingPerm] = await pool.query("SELECT id FROM permissions WHERE module = 'zoho' AND action = 'stock_check'");
         if (existingPerm.length === 0) {
             await pool.query("INSERT INTO permissions (module, action, display_name) VALUES ('zoho', 'stock_check', 'Stock Check Assignments')");

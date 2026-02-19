@@ -96,11 +96,17 @@
         <div id="tab-assign">
             <div class="bg-white rounded-lg shadow p-4 mb-4">
                 <h3 class="text-sm font-semibold text-gray-700 mb-3">Create Stock Check Assignment</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1">Branch</label>
-                        <select id="assignBranch" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadBranchStaff()">
+                        <select id="assignBranch" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadBranchData()">
                             <option value="">Select Branch</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Location</label>
+                        <select id="assignLocation" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">Select Branch first</option>
                         </select>
                     </div>
                     <div>
@@ -283,16 +289,32 @@ init();
 // ========================================
 // ASSIGN TAB
 // ========================================
-async function loadBranchStaff() {
+async function loadBranchData() {
     const branchId = document.getElementById('assignBranch').value;
-    const sel = document.getElementById('assignStaff');
-    sel.innerHTML = '<option value="">Select Staff</option>';
+    const staffSel = document.getElementById('assignStaff');
+    const locSel = document.getElementById('assignLocation');
+    staffSel.innerHTML = '<option value="">Select Staff</option>';
+    locSel.innerHTML = '<option value="">Select Branch first</option>';
     if (!branchId) return;
 
-    const res = await apiFetch('/api/branches/' + branchId + '/staff');
-    if (res.success && res.data && res.data.staff) {
-        sel.innerHTML = '<option value="">Select Staff</option>' +
-            res.data.staff.map(s => `<option value="${s.id}">${s.full_name}</option>`).join('');
+    // Load staff and locations in parallel
+    const [staffRes, locRes] = await Promise.all([
+        apiFetch('/api/branches/' + branchId + '/staff'),
+        apiFetch(API + '/locations/' + branchId)
+    ]);
+
+    if (staffRes.success && staffRes.data && staffRes.data.staff) {
+        staffSel.innerHTML = '<option value="">Select Staff</option>' +
+            staffRes.data.staff.map(s => `<option value="${s.id}">${s.full_name}</option>`).join('');
+    }
+
+    if (locRes.success && locRes.data && locRes.data.length) {
+        locSel.innerHTML = '<option value="">Select Location</option>' +
+            locRes.data.map(l => `<option value="${l.zoho_location_id}">${l.zoho_location_name}</option>`).join('');
+        // Auto-select if only one location
+        if (locRes.data.length === 1) locSel.value = locRes.data[0].zoho_location_id;
+    } else {
+        locSel.innerHTML = '<option value="">No locations found</option>';
     }
 }
 
@@ -352,8 +374,11 @@ renderSelectedProducts();
 async function autoSuggest() {
     const branchId = document.getElementById('assignBranch').value;
     if (!branchId) { showToast('Select a branch first', 'warning'); return; }
+    const locationId = document.getElementById('assignLocation').value;
 
-    const res = await apiFetch(API + '/products/suggest?branch_id=' + branchId);
+    let url = API + '/products/suggest?branch_id=' + branchId;
+    if (locationId) url += '&zoho_location_id=' + encodeURIComponent(locationId);
+    const res = await apiFetch(url);
     if (res.success && res.data) {
         let added = 0;
         res.data.forEach(item => {
@@ -376,7 +401,10 @@ async function createAssignment() {
     const show_system_qty = document.getElementById('showSystemQty').checked;
     const notes = document.getElementById('assignNotes').value.trim();
 
+    const zoho_location_id = document.getElementById('assignLocation').value;
+
     if (!branch_id || !staff_id || !check_date) { showToast('Fill in branch, staff, and date', 'warning'); return; }
+    if (!zoho_location_id) { showToast('Select a Zoho location', 'warning'); return; }
     if (!selectedItems.length) { showToast('Add at least one product', 'warning'); return; }
 
     const btn = document.getElementById('btnCreate');
@@ -387,6 +415,7 @@ async function createAssignment() {
         staff_id: parseInt(staff_id),
         check_date,
         show_system_qty,
+        zoho_location_id,
         notes: notes || undefined,
         item_ids: selectedItems.map(s => s.zoho_item_id)
     });
@@ -425,12 +454,13 @@ async function loadReviewList() {
     el.innerHTML = `
         <table class="sc-table">
             <thead><tr>
-                <th>#</th><th>Branch</th><th>Staff</th><th>Date</th><th>Items</th><th>Discrepancies</th><th>Submitted</th><th></th>
+                <th>#</th><th>Branch</th><th>Location</th><th>Staff</th><th>Date</th><th>Items</th><th>Discrepancies</th><th>Submitted</th><th></th>
             </tr></thead>
             <tbody>
                 ${res.data.map(a => `<tr>
                     <td>${a.id}</td>
                     <td>${a.branch_name || '-'}</td>
+                    <td class="text-xs">${a.location_name || '-'}</td>
                     <td>${a.staff_name || '-'}</td>
                     <td>${a.check_date ? a.check_date.split('T')[0] : '-'}</td>
                     <td>${a.item_count}</td>
@@ -460,6 +490,8 @@ async function openReview(id) {
     let html = `
         <div class="mb-3">
             <span class="text-xs text-gray-500">Staff: <strong>${d.staff_name || '-'}</strong></span>
+            <span class="mx-2 text-gray-300">|</span>
+            <span class="text-xs text-gray-500">Location: <strong>${d.location_name || '-'}</strong></span>
             <span class="mx-2 text-gray-300">|</span>
             <span class="text-xs text-gray-500">Status: <span class="status-badge status-${d.status}">${d.status}</span></span>
         </div>
@@ -594,11 +626,12 @@ async function loadHistory(page) {
 
     el.innerHTML = `
         <table class="sc-table">
-            <thead><tr><th>#</th><th>Branch</th><th>Staff</th><th>Date</th><th>Items</th><th>Discrepancies</th><th>Status</th><th>Created By</th><th></th></tr></thead>
+            <thead><tr><th>#</th><th>Branch</th><th>Location</th><th>Staff</th><th>Date</th><th>Items</th><th>Discrepancies</th><th>Status</th><th>Created By</th><th></th></tr></thead>
             <tbody>
                 ${res.data.map(a => `<tr>
                     <td>${a.id}</td>
                     <td>${a.branch_name || '-'}</td>
+                    <td class="text-xs">${a.location_name || '-'}</td>
                     <td>${a.staff_name || '-'}</td>
                     <td>${a.check_date ? a.check_date.split('T')[0] : '-'}</td>
                     <td>${a.item_count}</td>

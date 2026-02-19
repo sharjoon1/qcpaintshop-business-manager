@@ -33,39 +33,61 @@ const UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'stock-check');
 // ADMIN: CREATE ASSIGNMENT
 // ========================================
 
+/** GET /api/stock-check/locations/:branchId — Get Zoho locations for a branch */
+router.get('/locations/:branchId', requirePermission('zoho', 'stock_check'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT zoho_location_id, zoho_location_name FROM zoho_locations_map
+             WHERE local_branch_id = ? AND is_active = 1
+             ORDER BY zoho_location_name`,
+            [req.params.branchId]
+        );
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Get branch locations error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get locations' });
+    }
+});
+
 /** POST /api/stock-check/assign — Admin creates stock check assignment */
 router.post('/assign', requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
-        const { branch_id, staff_id, check_date, item_ids, show_system_qty, notes } = req.body;
+        const { branch_id, staff_id, check_date, item_ids, show_system_qty, notes, zoho_location_id } = req.body;
 
         if (!branch_id || !staff_id || !check_date || !item_ids || !item_ids.length) {
             return res.status(400).json({ success: false, message: 'branch_id, staff_id, check_date, and item_ids are required' });
         }
 
-        // Get branch zoho_location_id
-        const [branches] = await pool.query('SELECT id, name as branch_name, zoho_location_id FROM branches WHERE id = ?', [branch_id]);
+        // Get branch info
+        const [branches] = await pool.query('SELECT id, name as branch_name FROM branches WHERE id = ?', [branch_id]);
         if (!branches.length) return res.status(404).json({ success: false, message: 'Branch not found' });
         const branch = branches[0];
 
-        if (!branch.zoho_location_id) {
-            return res.status(400).json({ success: false, message: 'Branch has no linked Zoho location. Link it in Zoho Locations first.' });
+        // Determine location: use explicit selection, or fall back to branch default
+        let locationId = zoho_location_id;
+        if (!locationId) {
+            const [brRow] = await pool.query('SELECT zoho_location_id FROM branches WHERE id = ?', [branch_id]);
+            locationId = brRow.length ? brRow[0].zoho_location_id : null;
+        }
+        if (!locationId) {
+            return res.status(400).json({ success: false, message: 'No Zoho location selected or linked to branch.' });
         }
 
-        // Create assignment
+        // Create assignment with chosen location
         const [result] = await pool.query(
-            `INSERT INTO stock_check_assignments (branch_id, staff_id, check_date, show_system_qty, notes, created_by)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [branch_id, staff_id, check_date, show_system_qty ? 1 : 0, notes || null, req.user.id]
+            `INSERT INTO stock_check_assignments (branch_id, zoho_location_id, staff_id, check_date, show_system_qty, notes, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [branch_id, locationId, staff_id, check_date, show_system_qty ? 1 : 0, notes || null, req.user.id]
         );
         const assignmentId = result.insertId;
 
-        // Fetch system quantities from zoho_location_stock cache
+        // Fetch system quantities from zoho_location_stock cache for selected location
         const placeholders = item_ids.map(() => '?').join(',');
         const [stockRows] = await pool.query(
             `SELECT zoho_item_id, item_name, sku, stock_on_hand
              FROM zoho_location_stock
              WHERE zoho_item_id IN (${placeholders}) AND zoho_location_id = ?`,
-            [...item_ids, branch.zoho_location_id]
+            [...item_ids, locationId]
         );
 
         const stockMap = {};
@@ -125,6 +147,7 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
             `SELECT a.*, b.name as branch_name, u.full_name as staff_name,
                     creator.full_name as created_by_name,
                     reviewer.full_name as reviewed_by_name,
+                    zlm.zoho_location_name as location_name,
                     (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count,
                     (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id AND difference != 0 AND difference IS NOT NULL) as discrepancy_count
              FROM stock_check_assignments a
@@ -132,6 +155,7 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
              LEFT JOIN users u ON a.staff_id = u.id
              LEFT JOIN users creator ON a.created_by = creator.id
              LEFT JOIN users reviewer ON a.reviewed_by = reviewer.id
+             LEFT JOIN zoho_locations_map zlm ON a.zoho_location_id = zlm.zoho_location_id
              ${where}
              ORDER BY a.check_date DESC, a.created_at DESC
              LIMIT ? OFFSET ?`,
@@ -360,10 +384,12 @@ router.post('/submit/:id', requireAuth, upload.any(), async (req, res) => {
 router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT a.*, b.name as branch_name, b.zoho_location_id, u.full_name as staff_name
+            `SELECT a.*, b.name as branch_name, u.full_name as staff_name,
+                    zlm.zoho_location_name as location_name
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
              LEFT JOIN users u ON a.staff_id = u.id
+             LEFT JOIN zoho_locations_map zlm ON a.zoho_location_id = zlm.zoho_location_id
              WHERE a.id = ?`,
             [req.params.id]
         );
@@ -405,7 +431,7 @@ router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, 
 router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT a.*, b.name as branch_name, b.zoho_location_id
+            `SELECT a.*, b.name as branch_name
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
              WHERE a.id = ?`,
@@ -417,8 +443,15 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
         if (assignment.status === 'adjusted') {
             return res.status(400).json({ success: false, message: 'Already adjusted' });
         }
-        if (!assignment.zoho_location_id) {
-            return res.status(400).json({ success: false, message: 'Branch has no linked Zoho location' });
+
+        // Use assignment's stored location, fall back to branch default
+        let locationId = assignment.zoho_location_id;
+        if (!locationId) {
+            const [brRow] = await pool.query('SELECT zoho_location_id FROM branches WHERE id = ?', [assignment.branch_id]);
+            locationId = brRow.length ? brRow[0].zoho_location_id : null;
+        }
+        if (!locationId) {
+            return res.status(400).json({ success: false, message: 'No Zoho location linked' });
         }
 
         // Get items with discrepancies
@@ -455,7 +488,7 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             reason: `Stock check #${assignment.id}`,
             description: `Physical count on ${checkDate}, assignment #${assignment.id}`,
             adjustment_type: 'quantity',
-            location_id: assignment.zoho_location_id,
+            location_id: locationId,
             line_items: lineItems
         };
 
@@ -534,18 +567,21 @@ router.get('/dashboard', requirePermission('zoho', 'stock_check'), async (req, r
 /** GET /api/stock-check/products/suggest — Items not checked in 30+ days */
 router.get('/products/suggest', requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
-        const { branch_id, days = 30, limit: lim = 50 } = req.query;
+        const { branch_id, zoho_location_id, days = 30, limit: lim = 50 } = req.query;
 
         if (!branch_id) {
             return res.status(400).json({ success: false, message: 'branch_id is required' });
         }
 
-        // Get branch zoho_location_id
-        const [branches] = await pool.query('SELECT zoho_location_id FROM branches WHERE id = ?', [branch_id]);
-        if (!branches.length || !branches[0].zoho_location_id) {
-            return res.status(400).json({ success: false, message: 'Branch has no linked Zoho location' });
+        // Use explicit location or fall back to branch default
+        let locationId = zoho_location_id;
+        if (!locationId) {
+            const [branches] = await pool.query('SELECT zoho_location_id FROM branches WHERE id = ?', [branch_id]);
+            locationId = branches.length ? branches[0].zoho_location_id : null;
         }
-        const locationId = branches[0].zoho_location_id;
+        if (!locationId) {
+            return res.status(400).json({ success: false, message: 'No Zoho location selected or linked to branch' });
+        }
 
         // Items in this location that haven't been checked in N days
         const [rows] = await pool.query(
