@@ -290,9 +290,9 @@ async function loadBranchStaff() {
     if (!branchId) return;
 
     const res = await apiFetch('/api/branches/' + branchId + '/staff');
-    if (res.success && res.data) {
+    if (res.success && res.data && res.data.staff) {
         sel.innerHTML = '<option value="">Select Staff</option>' +
-            res.data.map(s => `<option value="${s.id}">${s.full_name}</option>`).join('');
+            res.data.staff.map(s => `<option value="${s.id}">${s.full_name}</option>`).join('');
     }
 }
 
