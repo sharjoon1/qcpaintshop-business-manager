@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Stock Check - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* Tabs */
+        .sc-tab { padding: 8px 18px; border-radius: 8px 8px 0 0; font-size: 0.8125rem; font-weight: 500; color: #64748b; cursor: pointer; border: 1px solid transparent; border-bottom: none; transition: all 0.2s; background: none; }
+        .sc-tab:hover { background: #f1f5f9; color: #334155; }
+        .sc-tab.active { background: white; color: #667eea; font-weight: 600; border-color: #e2e8f0; box-shadow: 0 -2px 4px rgba(0,0,0,0.03); }
+
+        /* Table */
+        .sc-table { font-size: 0.8125rem; width: 100%; border-collapse: collapse; }
+        .sc-table thead th { background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 8px 10px; font-weight: 600; color: #475569; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 5; }
+        .sc-table tbody td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .sc-table tbody tr:hover { background: #f0f4ff; }
+
+        .status-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; text-transform: capitalize; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-submitted { background: #dbeafe; color: #1e40af; }
+        .status-reviewed { background: #d1fae5; color: #065f46; }
+        .status-adjusted { background: #ede9fe; color: #5b21b6; }
+
+        .diff-positive { color: #059669; font-weight: 600; }
+        .diff-negative { color: #dc2626; font-weight: 600; }
+        .diff-zero { color: #64748b; }
+
+        /* Slide-in review panel */
+        .review-panel { position: fixed; top: 0; right: -600px; width: 600px; max-width: 100vw; height: 100vh; background: white; box-shadow: -4px 0 20px rgba(0,0,0,0.15); z-index: 9998; transition: right 0.3s ease; overflow-y: auto; }
+        .review-panel.open { right: 0; }
+        .review-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.4); z-index: 9997; }
+        .review-overlay.show { display: block; }
+
+        /* Product search */
+        .product-search-results { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px; max-height: 240px; overflow-y: auto; z-index: 20; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .product-search-item { padding: 8px 12px; cursor: pointer; font-size: 0.8125rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
+        .product-search-item:hover { background: #f0f4ff; }
+
+        .selected-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 4px; font-size: 0.8125rem; }
+        .selected-item .remove-btn { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem; padding: 0 4px; }
+
+        /* Stat cards */
+        .stat-card { background: white; border-radius: 10px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .stat-card .label { font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .stat-card .value { font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 2px; }
+
+        /* Photo thumbnail */
+        .photo-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; cursor: pointer; border: 1px solid #e2e8f0; }
+        .photo-thumb:hover { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.3); }
+
+        @media (max-width: 767px) {
+            .review-panel { width: 100vw; }
+        }
+    </style>
+</head>
+<body data-page="zoho-stock-check" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
+
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+            <div>
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800">Stock Check</h2>
+                <p class="text-gray-500 mt-0.5 text-xs">Assign items for physical stock verification, review discrepancies, push adjustments to Zoho.</p>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 border-b border-gray-200 mb-4">
+            <button class="sc-tab active" onclick="switchTab('assign')">Assign</button>
+            <button class="sc-tab" onclick="switchTab('review')">Review</button>
+            <button class="sc-tab" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="sc-tab" onclick="switchTab('history')">History</button>
+        </div>
+
+        <!-- ==================== ASSIGN TAB ==================== -->
+        <div id="tab-assign">
+            <div class="bg-white rounded-lg shadow p-4 mb-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">Create Stock Check Assignment</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Branch</label>
+                        <select id="assignBranch" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadBranchStaff()">
+                            <option value="">Select Branch</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Staff</label>
+                        <select id="assignStaff" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">Select Staff</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Check Date</label>
+                        <input type="date" id="assignDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div class="flex items-end">
+                        <label class="flex items-center gap-2 text-sm cursor-pointer">
+                            <input type="checkbox" id="showSystemQty" class="w-4 h-4 rounded border-gray-300 text-indigo-600">
+                            <span class="text-gray-700 text-xs font-medium">Show system qty to staff</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Product search -->
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Add Products</label>
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <input type="text" id="productSearch" placeholder="Search by name or SKU..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" oninput="searchProducts()" autocomplete="off">
+                            <div id="productResults" class="product-search-results" style="display:none"></div>
+                        </div>
+                        <button onclick="autoSuggest()" class="px-3 py-2 bg-amber-50 border border-amber-300 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition whitespace-nowrap">Auto-Suggest</button>
+                    </div>
+                </div>
+
+                <!-- Selected products -->
+                <div id="selectedProducts" class="mb-3"></div>
+
+                <!-- Notes -->
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Notes (optional)</label>
+                    <textarea id="assignNotes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Instructions for staff..."></textarea>
+                </div>
+
+                <button onclick="createAssignment()" id="btnCreate" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:opacity-90 transition">Create Assignment</button>
+            </div>
+        </div>
+
+        <!-- ==================== REVIEW TAB ==================== -->
+        <div id="tab-review" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-sm font-semibold text-gray-700">Submitted Assignments</h3>
+                    <button onclick="loadReviewList()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Refresh</button>
+                </div>
+                <div id="reviewList" class="text-sm text-gray-500">Loading...</div>
+            </div>
+        </div>
+
+        <!-- ==================== DASHBOARD TAB ==================== -->
+        <div id="tab-dashboard" style="display:none">
+            <div id="dashboardTotals" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4"></div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">By Branch</h3>
+                <div id="dashboardBranches" class="text-sm text-gray-500">Loading...</div>
+            </div>
+        </div>
+
+        <!-- ==================== HISTORY TAB ==================== -->
+        <div id="tab-history" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex flex-wrap gap-2 items-end mb-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Branch</label>
+                        <select id="histBranch" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs" onchange="loadHistory()">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Status</label>
+                        <select id="histStatus" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs" onchange="loadHistory()">
+                            <option value="">All</option>
+                            <option value="pending">Pending</option>
+                            <option value="submitted">Submitted</option>
+                            <option value="reviewed">Reviewed</option>
+                            <option value="adjusted">Adjusted</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">From</label>
+                        <input type="date" id="histFrom" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs" onchange="loadHistory()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">To</label>
+                        <input type="date" id="histTo" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs" onchange="loadHistory()">
+                    </div>
+                </div>
+                <div id="historyTable" class="text-sm text-gray-500">Loading...</div>
+                <div id="histPagination" class="flex justify-center gap-2 mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review slide-in panel -->
+    <div class="review-overlay" id="reviewOverlay" onclick="closeReview()"></div>
+    <div class="review-panel" id="reviewPanel">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+            <h3 class="font-semibold text-gray-800 text-sm" id="reviewTitle">Review Stock Check</h3>
+            <button onclick="closeReview()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+        <div id="reviewContent" class="p-4 text-sm">Loading...</div>
+    </div>
+
+    <!-- Photo modal -->
+    <div id="photoModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100vh; background:rgba(0,0,0,0.8); z-index:9999; cursor:pointer; display:none;" onclick="this.style.display='none'">
+        <img id="photoModalImg" style="max-width:90%; max-height:90vh; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); border-radius:8px;">
+    </div>
+
+<script>
+// ========================================
+// STATE & HELPERS
+// ========================================
+const API = '/api/stock-check';
+let selectedItems = []; // { zoho_item_id, item_name, sku, stock_on_hand }
+let searchTimeout = null;
+let histPage = 1;
+
+function headers() { return getAuthHeaders(); }
+
+function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast toast-' + type + ' show';
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function apiFetch(url) {
+    const res = await fetch(url, { headers: headers() });
+    return res.json();
+}
+
+async function apiPost(url, body) {
+    const res = await fetch(url, { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return res.json();
+}
+
+async function apiDelete(url) {
+    const res = await fetch(url, { method: 'DELETE', headers: headers() });
+    return res.json();
+}
+
+// ========================================
+// TAB SWITCHING
+// ========================================
+function switchTab(tab) {
+    ['assign', 'review', 'dashboard', 'history'].forEach(t => {
+        document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+    });
+    document.querySelectorAll('.sc-tab').forEach((el, i) => {
+        el.classList.toggle('active', ['assign', 'review', 'dashboard', 'history'][i] === tab);
+    });
+    if (tab === 'review') loadReviewList();
+    if (tab === 'dashboard') loadDashboard();
+    if (tab === 'history') loadHistory();
+}
+
+// ========================================
+// INIT
+// ========================================
+async function init() {
+    document.getElementById('assignDate').value = new Date().toISOString().split('T')[0];
+
+    // Load branches for assign + history
+    const brRes = await apiFetch('/api/branches');
+    if (brRes.success) {
+        const opts = brRes.data.map(b => `<option value="${b.id}">${b.branch_name}</option>`).join('');
+        document.getElementById('assignBranch').innerHTML = '<option value="">Select Branch</option>' + opts;
+        document.getElementById('histBranch').innerHTML = '<option value="">All</option>' + opts;
+    }
+}
+init();
+
+// ========================================
+// ASSIGN TAB
+// ========================================
+async function loadBranchStaff() {
+    const branchId = document.getElementById('assignBranch').value;
+    const sel = document.getElementById('assignStaff');
+    sel.innerHTML = '<option value="">Select Staff</option>';
+    if (!branchId) return;
+
+    const res = await apiFetch('/api/branches/' + branchId + '/staff');
+    if (res.success && res.data) {
+        sel.innerHTML = '<option value="">Select Staff</option>' +
+            res.data.map(s => `<option value="${s.id}">${s.full_name}</option>`).join('');
+    }
+}
+
+function searchProducts() {
+    clearTimeout(searchTimeout);
+    const q = document.getElementById('productSearch').value.trim();
+    const container = document.getElementById('productResults');
+    if (q.length < 2) { container.style.display = 'none'; return; }
+
+    searchTimeout = setTimeout(async () => {
+        const res = await apiFetch('/api/zoho/items?search=' + encodeURIComponent(q) + '&limit=20');
+        if (res.success && res.data && res.data.length) {
+            container.innerHTML = res.data
+                .filter(item => !selectedItems.find(s => s.zoho_item_id === item.zoho_item_id))
+                .map(item => `
+                    <div class="product-search-item" onclick="addProduct('${item.zoho_item_id}', '${(item.name || item.item_name || '').replace(/'/g, "\\'")}', '${(item.sku || '').replace(/'/g, "\\'")}', ${item.stock_on_hand || 0})">
+                        <span>${item.name || item.item_name} <span class="text-gray-400">${item.sku || ''}</span></span>
+                        <span class="text-xs text-gray-500">Qty: ${item.stock_on_hand || 0}</span>
+                    </div>
+                `).join('');
+            container.style.display = '';
+        } else {
+            container.innerHTML = '<div class="p-3 text-xs text-gray-400">No items found</div>';
+            container.style.display = '';
+        }
+    }, 300);
+}
+
+function addProduct(id, name, sku, qty) {
+    if (selectedItems.find(s => s.zoho_item_id === id)) return;
+    selectedItems.push({ zoho_item_id: id, item_name: name, sku: sku, stock_on_hand: qty });
+    renderSelectedProducts();
+    document.getElementById('productSearch').value = '';
+    document.getElementById('productResults').style.display = 'none';
+}
+
+function removeProduct(id) {
+    selectedItems = selectedItems.filter(s => s.zoho_item_id !== id);
+    renderSelectedProducts();
+}
+
+function renderSelectedProducts() {
+    const el = document.getElementById('selectedProducts');
+    if (!selectedItems.length) { el.innerHTML = '<p class="text-xs text-gray-400">No products selected</p>'; return; }
+    el.innerHTML = selectedItems.map(item => `
+        <div class="selected-item">
+            <span>${item.item_name} <span class="text-gray-400 text-xs">${item.sku}</span></span>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">Sys: ${item.stock_on_hand}</span>
+                <button class="remove-btn" onclick="removeProduct('${item.zoho_item_id}')">&times;</button>
+            </div>
+        </div>
+    `).join('');
+}
+renderSelectedProducts();
+
+async function autoSuggest() {
+    const branchId = document.getElementById('assignBranch').value;
+    if (!branchId) { showToast('Select a branch first', 'warning'); return; }
+
+    const res = await apiFetch(API + '/products/suggest?branch_id=' + branchId);
+    if (res.success && res.data) {
+        let added = 0;
+        res.data.forEach(item => {
+            if (!selectedItems.find(s => s.zoho_item_id === item.zoho_item_id)) {
+                selectedItems.push({ zoho_item_id: item.zoho_item_id, item_name: item.item_name, sku: item.sku, stock_on_hand: item.stock_on_hand });
+                added++;
+            }
+        });
+        renderSelectedProducts();
+        showToast(added ? `Added ${added} suggested items` : 'No new items to suggest', added ? 'success' : 'info');
+    } else {
+        showToast(res.message || 'Failed to get suggestions', 'error');
+    }
+}
+
+async function createAssignment() {
+    const branch_id = document.getElementById('assignBranch').value;
+    const staff_id = document.getElementById('assignStaff').value;
+    const check_date = document.getElementById('assignDate').value;
+    const show_system_qty = document.getElementById('showSystemQty').checked;
+    const notes = document.getElementById('assignNotes').value.trim();
+
+    if (!branch_id || !staff_id || !check_date) { showToast('Fill in branch, staff, and date', 'warning'); return; }
+    if (!selectedItems.length) { showToast('Add at least one product', 'warning'); return; }
+
+    const btn = document.getElementById('btnCreate');
+    btn.disabled = true; btn.textContent = 'Creating...';
+
+    const res = await apiPost(API + '/assign', {
+        branch_id: parseInt(branch_id),
+        staff_id: parseInt(staff_id),
+        check_date,
+        show_system_qty,
+        notes: notes || undefined,
+        item_ids: selectedItems.map(s => s.zoho_item_id)
+    });
+
+    btn.disabled = false; btn.textContent = 'Create Assignment';
+    if (res.success) {
+        showToast('Assignment created! (' + res.data.items + ' items)');
+        selectedItems = [];
+        renderSelectedProducts();
+        document.getElementById('assignNotes').value = '';
+    } else {
+        showToast(res.message || 'Failed', 'error');
+    }
+}
+
+// Close product search on outside click
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#productSearch') && !e.target.closest('#productResults')) {
+        document.getElementById('productResults').style.display = 'none';
+    }
+});
+
+// ========================================
+// REVIEW TAB
+// ========================================
+async function loadReviewList() {
+    const el = document.getElementById('reviewList');
+    el.innerHTML = '<div class="skeleton h-8 w-full mb-2"></div>'.repeat(3);
+
+    const res = await apiFetch(API + '/assignments?status=submitted&limit=50');
+    if (!res.success || !res.data || !res.data.length) {
+        el.innerHTML = '<p class="text-gray-400 text-center py-4">No submitted assignments to review</p>';
+        return;
+    }
+
+    el.innerHTML = `
+        <table class="sc-table">
+            <thead><tr>
+                <th>#</th><th>Branch</th><th>Staff</th><th>Date</th><th>Items</th><th>Discrepancies</th><th>Submitted</th><th></th>
+            </tr></thead>
+            <tbody>
+                ${res.data.map(a => `<tr>
+                    <td>${a.id}</td>
+                    <td>${a.branch_name || '-'}</td>
+                    <td>${a.staff_name || '-'}</td>
+                    <td>${a.check_date ? a.check_date.split('T')[0] : '-'}</td>
+                    <td>${a.item_count}</td>
+                    <td>${a.discrepancy_count > 0 ? '<span class="diff-negative">' + a.discrepancy_count + '</span>' : '<span class="diff-zero">0</span>'}</td>
+                    <td class="text-xs text-gray-500">${a.submitted_at ? new Date(a.submitted_at).toLocaleString() : '-'}</td>
+                    <td><button onclick="openReview(${a.id})" class="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-medium hover:bg-indigo-100">Review</button></td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+async function openReview(id) {
+    document.getElementById('reviewOverlay').classList.add('show');
+    document.getElementById('reviewPanel').classList.add('open');
+    document.getElementById('reviewContent').innerHTML = '<div class="skeleton h-6 w-3/4 mb-2"></div>'.repeat(5);
+
+    const res = await apiFetch(API + '/review/' + id);
+    if (!res.success) {
+        document.getElementById('reviewContent').innerHTML = '<p class="text-red-500">Failed to load review data</p>';
+        return;
+    }
+
+    const d = res.data;
+    const s = d.summary;
+    document.getElementById('reviewTitle').textContent = `Review #${d.id} - ${d.branch_name} (${d.check_date ? d.check_date.split('T')[0] : ''})`;
+
+    let html = `
+        <div class="mb-3">
+            <span class="text-xs text-gray-500">Staff: <strong>${d.staff_name || '-'}</strong></span>
+            <span class="mx-2 text-gray-300">|</span>
+            <span class="text-xs text-gray-500">Status: <span class="status-badge status-${d.status}">${d.status}</span></span>
+        </div>
+
+        <div class="grid grid-cols-4 gap-2 mb-4">
+            <div class="stat-card"><div class="label">Total</div><div class="value text-base">${s.totalItems}</div></div>
+            <div class="stat-card"><div class="label">Match</div><div class="value text-base text-green-600">${s.matchCount}</div></div>
+            <div class="stat-card"><div class="label">Discrepancy</div><div class="value text-base text-red-600">${s.discrepancyCount}</div></div>
+            <div class="stat-card"><div class="label">Pending</div><div class="value text-base text-amber-600">${s.pendingCount}</div></div>
+        </div>
+
+        <div style="overflow-x:auto;">
+        <table class="sc-table">
+            <thead><tr><th>Item</th><th>System</th><th>Reported</th><th>Diff</th><th>Var%</th><th>Photo</th><th>Notes</th></tr></thead>
+            <tbody>
+                ${d.items.map(item => {
+                    const diff = parseFloat(item.difference);
+                    const diffClass = isNaN(diff) ? '' : diff > 0 ? 'diff-positive' : diff < 0 ? 'diff-negative' : 'diff-zero';
+                    const diffStr = isNaN(diff) ? '-' : (diff > 0 ? '+' : '') + diff;
+                    return `<tr>
+                        <td><div class="font-medium">${item.item_name}</div><div class="text-xs text-gray-400">${item.item_sku || ''}</div></td>
+                        <td>${item.system_qty}</td>
+                        <td>${item.reported_qty !== null ? item.reported_qty : '<span class="text-gray-300">-</span>'}</td>
+                        <td class="${diffClass}">${diffStr}</td>
+                        <td class="text-xs ${Math.abs(item.variance_pct) > 10 ? 'text-red-600 font-semibold' : 'text-gray-500'}">${item.variance_pct !== null ? item.variance_pct + '%' : '-'}</td>
+                        <td>${item.photo_url ? '<img src="' + item.photo_url + '" class="photo-thumb" onclick="showPhoto(\'' + item.photo_url + '\')">' : '<span class="text-gray-300">-</span>'}</td>
+                        <td class="text-xs text-gray-500 max-w-[120px] truncate">${item.notes || '-'}</td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>
+        </div>
+    `;
+
+    if (d.status === 'submitted') {
+        html += `
+            <div class="flex gap-2 mt-4 pt-3 border-t border-gray-200">
+                <button onclick="markReviewed(${d.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition">Mark Reviewed (No Adjust)</button>
+                ${s.discrepancyCount > 0 ? `<button onclick="pushAdjustment(${d.id})" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition">Push Adjustment to Zoho (${s.discrepancyCount} items)</button>` : ''}
+            </div>
+        `;
+    }
+
+    document.getElementById('reviewContent').innerHTML = html;
+}
+
+function closeReview() {
+    document.getElementById('reviewOverlay').classList.remove('show');
+    document.getElementById('reviewPanel').classList.remove('open');
+}
+
+function showPhoto(url) {
+    document.getElementById('photoModalImg').src = url;
+    document.getElementById('photoModal').style.display = 'block';
+}
+
+async function markReviewed(id) {
+    // Use adjust endpoint — it handles the "no discrepancy" case gracefully
+    const res = await apiPost(API + '/adjust/' + id, {});
+    showToast(res.message || 'Reviewed', res.success ? 'success' : 'error');
+    if (res.success) { closeReview(); loadReviewList(); }
+}
+
+async function pushAdjustment(id) {
+    if (!confirm('Push inventory adjustment to Zoho Books? This will modify stock levels.')) return;
+    const res = await apiPost(API + '/adjust/' + id, {});
+    showToast(res.message || 'Adjustment created', res.success ? 'success' : 'error');
+    if (res.success) { closeReview(); loadReviewList(); }
+}
+
+// ========================================
+// DASHBOARD TAB
+// ========================================
+async function loadDashboard() {
+    const res = await apiFetch(API + '/dashboard');
+    if (!res.success) return;
+
+    const t = res.data.totals;
+    document.getElementById('dashboardTotals').innerHTML = `
+        <div class="stat-card"><div class="label">Total</div><div class="value">${t.total}</div></div>
+        <div class="stat-card"><div class="label">Pending</div><div class="value text-amber-600">${t.pending}</div></div>
+        <div class="stat-card"><div class="label">Submitted</div><div class="value text-blue-600">${t.submitted}</div></div>
+        <div class="stat-card"><div class="label">Adjusted</div><div class="value text-purple-600">${t.adjusted}</div></div>
+    `;
+
+    const branches = res.data.branches;
+    if (!branches.length) {
+        document.getElementById('dashboardBranches').innerHTML = '<p class="text-gray-400 text-center py-4">No data</p>';
+        return;
+    }
+
+    document.getElementById('dashboardBranches').innerHTML = `
+        <table class="sc-table">
+            <thead><tr><th>Branch</th><th>Total</th><th>Pending</th><th>Submitted</th><th>Reviewed</th><th>Adjusted</th></tr></thead>
+            <tbody>
+                ${branches.map(b => `<tr>
+                    <td class="font-medium">${b.branch_name}</td>
+                    <td>${b.total_assignments || 0}</td>
+                    <td>${b.pending_count ? '<span class="status-badge status-pending">' + b.pending_count + '</span>' : '0'}</td>
+                    <td>${b.submitted_count ? '<span class="status-badge status-submitted">' + b.submitted_count + '</span>' : '0'}</td>
+                    <td>${b.reviewed_count ? '<span class="status-badge status-reviewed">' + b.reviewed_count + '</span>' : '0'}</td>
+                    <td>${b.adjusted_count ? '<span class="status-badge status-adjusted">' + b.adjusted_count + '</span>' : '0'}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+// ========================================
+// HISTORY TAB
+// ========================================
+async function loadHistory(page) {
+    histPage = page || 1;
+    const el = document.getElementById('historyTable');
+    el.innerHTML = '<div class="skeleton h-8 w-full mb-2"></div>'.repeat(3);
+
+    const params = new URLSearchParams({ page: histPage, limit: 25 });
+    const branch = document.getElementById('histBranch').value;
+    const status = document.getElementById('histStatus').value;
+    const from = document.getElementById('histFrom').value;
+    const to = document.getElementById('histTo').value;
+    if (branch) params.set('branch_id', branch);
+    if (status) params.set('status', status);
+    if (from) params.set('from_date', from);
+    if (to) params.set('to_date', to);
+
+    const res = await apiFetch(API + '/assignments?' + params.toString());
+    if (!res.success || !res.data || !res.data.length) {
+        el.innerHTML = '<p class="text-gray-400 text-center py-4">No assignments found</p>';
+        document.getElementById('histPagination').innerHTML = '';
+        return;
+    }
+
+    el.innerHTML = `
+        <table class="sc-table">
+            <thead><tr><th>#</th><th>Branch</th><th>Staff</th><th>Date</th><th>Items</th><th>Discrepancies</th><th>Status</th><th>Created By</th><th></th></tr></thead>
+            <tbody>
+                ${res.data.map(a => `<tr>
+                    <td>${a.id}</td>
+                    <td>${a.branch_name || '-'}</td>
+                    <td>${a.staff_name || '-'}</td>
+                    <td>${a.check_date ? a.check_date.split('T')[0] : '-'}</td>
+                    <td>${a.item_count}</td>
+                    <td>${a.discrepancy_count > 0 ? '<span class="diff-negative">' + a.discrepancy_count + '</span>' : '0'}</td>
+                    <td><span class="status-badge status-${a.status}">${a.status}</span></td>
+                    <td class="text-xs text-gray-500">${a.created_by_name || '-'}</td>
+                    <td>
+                        ${a.status === 'pending' ? '<button onclick="deleteAssignment(' + a.id + ')" class="text-xs text-red-500 hover:text-red-700">Delete</button>' : ''}
+                        ${a.status === 'submitted' ? '<button onclick="openReview(' + a.id + ')" class="text-xs text-indigo-600 hover:text-indigo-800">Review</button>' : ''}
+                        ${a.status !== 'pending' ? '<button onclick="viewDetail(' + a.id + ')" class="text-xs text-gray-500 hover:text-gray-700 ml-1">View</button>' : ''}
+                    </td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+
+    // Pagination
+    const p = res.pagination;
+    const totalPages = Math.ceil(p.total / p.limit);
+    let pHtml = '';
+    if (totalPages > 1) {
+        for (let i = 1; i <= totalPages; i++) {
+            pHtml += `<button onclick="loadHistory(${i})" class="px-2 py-1 rounded text-xs ${i === histPage ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border'}">${i}</button>`;
+        }
+    }
+    document.getElementById('histPagination').innerHTML = pHtml;
+}
+
+async function deleteAssignment(id) {
+    if (!confirm('Delete this pending assignment?')) return;
+    const res = await apiDelete(API + '/assignments/' + id);
+    showToast(res.message || 'Deleted', res.success ? 'success' : 'error');
+    if (res.success) loadHistory(histPage);
+}
+
+async function viewDetail(id) {
+    openReview(id);
+}
+</script>
+</body>
+</html>

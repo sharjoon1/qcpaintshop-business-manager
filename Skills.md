@@ -652,7 +652,46 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 
 ---
 
-### 2.19 Dashboard & Reports
+### 2.19 Stock Check Assignment System
+
+Admin assigns specific Zoho Books products to branch staff for daily physical stock verification. Staff submits counts with optional photo proof, admin reviews discrepancies, and pushes inventory adjustments back to Zoho Books.
+
+**Admin Features** (`admin-stock-check.html`):
+- 4 tabs: Assign, Review, Dashboard, History
+- Assign: Select branch + staff + date, search/add products, auto-suggest (items not checked in 30 days), "show system qty to staff" toggle
+- Review: Slide-in panel with system vs reported comparison, color-coded differences, photo thumbnails, push adjustment to Zoho
+- Dashboard: Stat cards per branch (pending/submitted/reviewed/adjusted)
+- History: Filterable table with status badges, pagination, delete pending, review submitted
+
+**Staff Features** (`staff/stock-check.html`):
+- Mobile-first with gradient header, sidebar navigation
+- Shows today's assignments with item list
+- Per item: name + SKU, system qty (if admin enables), number input, camera button (capture="environment"), notes
+- Photo compression via sharp (800x800, JPEG 80%)
+- Validates all items have counts before submit
+- Post-submit: read-only state with timestamp
+
+**API Endpoints** (`routes/stock-check.js`, 10 endpoints):
+- `POST /assign` — Create assignment (admin)
+- `GET /assignments` — List with filters (admin)
+- `GET /assignments/:id` — Detail (staff sees own, admin sees any)
+- `DELETE /assignments/:id` — Delete pending (admin)
+- `GET /my-assignments` — Staff's today assignments
+- `POST /submit/:id` — Staff submits counts + photos (multipart)
+- `GET /review/:id` — Admin review with comparison
+- `POST /adjust/:id` — Push to Zoho as inventory adjustment
+- `GET /dashboard` — Summary stats per branch
+- `GET /products/suggest` — Items not checked in 30+ days
+
+**Database Tables**: `stock_check_assignments`, `stock_check_items`
+**Migration**: `migrations/migrate-stock-check.js`
+**Permission**: `zoho.stock_check`
+**Notifications**: `stock_check_assigned` (to staff), `stock_check_submitted` (to admins)
+**Photos**: `uploads/stock-check/` (sharp compressed)
+
+---
+
+### 2.20 Dashboard & Reports
 
 **Admin Dashboard**
 - Total users, customers, products, estimates
@@ -756,6 +795,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 **Share**: `share_tokens`
 **Design**: `color_design_requests`, `design_visualizations`
 **Website**: `website_services`, `website_features`, `website_testimonials`, `website_gallery`
+**Stock Check**: `stock_check_assignments`, `stock_check_items`
 
 ### 4.3 File Upload System
 
@@ -773,6 +813,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | AI Visualizations | `uploads/visualizations/` | Generated | JPEG |
 | Documents | `uploads/documents/` | - | Various |
 | Website Content | `uploads/website/` | 10 MB | Images (compressed to 1200px) |
+| Stock Check Photos | `uploads/stock-check/` | 10 MB | Images (compressed to 800px JPEG 80%) |
 
 ### 4.4 Real-time Features (Socket.io)
 
@@ -836,6 +877,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Staff Requests | `staff-requests.html` | Staff-facing requests |
 | Customer Requests | `customer-requests.html` | Design request handling |
 | Guides & Help | `staff/guides.html` | Browse/search guides, favorites, reading view |
+| Stock Check | `staff/stock-check.html` | Submit physical stock counts with photos |
 
 ### Admin Pages
 | Page | File | Purpose |
@@ -878,6 +920,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Zoho Items Edit | `admin-zoho-items-edit.html` | Bulk item editing |
 | Zoho Stock | `admin-zoho-stock.html` | Stock levels |
 | Zoho Stock Adjust | `admin-zoho-stock-adjust.html` | Inventory adjustments |
+| Zoho Stock Check | `admin-stock-check.html` | Daily stock verification assignments (Assign/Review/Dashboard/History) |
 | Zoho Invoices | `admin-zoho-invoices.html` | Invoice viewer |
 | Zoho Locations | `admin-zoho-locations.html` | Warehouse mapping |
 | Zoho Transactions | `admin-zoho-transactions.html` | Daily transactions |
@@ -970,6 +1013,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | Estimate PDF | `/api/estimates/:id/pdf` | 1 | `routes/estimate-pdf.js` |
 | Share | `/api/share/*` | 4 | `routes/share.js` |
 | Guides | `/api/guides/*` | 11 | `routes/guides.js` |
+| Stock Check | `/api/stock-check/*` | 10 | `routes/stock-check.js` |
 | Uploads | `/api/upload/*` | 4 | `server.js` |
 | Health | `/health`, `/api/test` | 2 | `server.js` |
 
@@ -1074,6 +1118,18 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-02-20 - Stock Check Assignment System
+- Admin assigns Zoho products to branch staff for daily physical stock verification
+- Staff submits counts with optional photo proof (camera capture, sharp-compressed)
+- Admin reviews discrepancies in slide-in panel with comparison table
+- Push inventory adjustments to Zoho Books via `createInventoryAdjustment()` API
+- Auto-suggest items not checked in 30+ days
+- Dashboard with per-branch stats, history with filters and pagination
+- Notifications: assigned → staff, submitted → admins
+- Tables: `stock_check_assignments`, `stock_check_items`; Migration: `migrate-stock-check.js`
+- Pages: `admin-stock-check.html` (4 tabs), `staff/stock-check.html` (mobile-first)
+- Route: `routes/stock-check.js` (10 endpoints), permission: `zoho.stock_check`
 
 ### v2.0.0 (2026-02-09) - Major Platform Rebuild
 - Complete server rebuild with all modules integrated

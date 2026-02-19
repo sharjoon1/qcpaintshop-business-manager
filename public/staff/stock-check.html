@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Stock Check - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .page-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+        }
+        .page-header h1 { font-size: 1.25rem; font-weight: 700; }
+        .page-header .subtitle { font-size: 0.75rem; opacity: 0.85; }
+        .hamburger { background: rgba(255,255,255,0.2); border: none; color: white; width: 40px; height: 40px; border-radius: 10px; font-size: 1.25rem; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+
+        .container { max-width: 600px; margin: 0 auto; padding: 0 16px 24px; }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .assignment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .assignment-title { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
+        .assignment-meta { font-size: 0.7rem; color: #94a3b8; }
+
+        .status-badge { display: inline-block; font-size: 0.65rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; text-transform: capitalize; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-submitted { background: #d1fae5; color: #065f46; }
+
+        /* Item card */
+        .item-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
+            transition: border-color 0.2s;
+        }
+        .item-card.filled { border-color: #a5b4fc; background: #f8f7ff; }
+        .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .item-name { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
+        .item-sku { font-size: 0.7rem; color: #94a3b8; }
+        .item-system-qty { font-size: 0.75rem; color: #6366f1; font-weight: 500; background: #eef2ff; padding: 2px 8px; border-radius: 6px; }
+
+        .item-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .item-input-row label { font-size: 0.75rem; color: #64748b; font-weight: 500; white-space: nowrap; }
+        .qty-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .qty-input:focus { border-color: #667eea; }
+        .qty-input.has-value { border-color: #a5b4fc; }
+
+        .photo-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .photo-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: #f1f5f9;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .photo-btn:hover { background: #e2e8f0; }
+        .photo-btn.has-photo { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; border-style: solid; }
+
+        .photo-preview { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; }
+
+        .notes-input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            resize: none;
+            outline: none;
+        }
+        .notes-input:focus { border-color: #667eea; }
+
+        /* Submit button */
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            color: white;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        .submit-btn:active { transform: scale(0.97); }
+        .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .submitted-banner {
+            text-align: center;
+            padding: 20px;
+            background: #ecfdf5;
+            border-radius: 12px;
+            color: #065f46;
+        }
+        .submitted-banner .icon { font-size: 2rem; margin-bottom: 8px; }
+        .submitted-banner .title { font-size: 1rem; font-weight: 700; }
+        .submitted-banner .time { font-size: 0.75rem; opacity: 0.7; margin-top: 4px; }
+
+        .empty-state { text-align: center; padding: 40px 20px; color: rgba(255,255,255,0.8); }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+        .empty-state h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
+        .empty-state p { font-size: 0.8rem; opacity: 0.7; }
+
+        /* Toast */
+        .toast { position: fixed; top: 1rem; right: 1rem; z-index: 9999; padding: 0.75rem 1.25rem; border-radius: 8px; color: white; font-weight: 500; font-size: 0.875rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateX(120%); transition: transform 0.3s ease; }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-warning { background: #f59e0b; }
+
+        /* Hide file inputs */
+        .hidden-input { display: none; }
+    </style>
+</head>
+<body data-page="stock-check">
+    <div id="toast" class="toast"></div>
+
+    <!-- Sidebar component loaded externally for staff pages -->
+    <div id="staff-sidebar-container"></div>
+
+    <!-- Header -->
+    <div class="page-header">
+        <button class="hamburger" onclick="toggleSidebar()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div>
+            <h1>Stock Check</h1>
+            <div class="subtitle" id="headerDate">Today's assignments</div>
+        </div>
+    </div>
+
+    <div class="container" id="mainContent">
+        <div class="card" style="text-align:center; padding: 40px;">
+            <div style="color:#94a3b8">Loading assignments...</div>
+        </div>
+    </div>
+
+<script>
+// Load sidebar
+fetch('/components/staff-sidebar.html')
+    .then(r => r.text())
+    .then(html => {
+        document.getElementById('staff-sidebar-container').innerHTML = html;
+        // Re-execute sidebar scripts
+        document.getElementById('staff-sidebar-container').querySelectorAll('script').forEach(s => {
+            const ns = document.createElement('script');
+            ns.textContent = s.textContent;
+            document.head.appendChild(ns);
+        });
+    })
+    .catch(() => {});
+
+const API = '/api/stock-check';
+let assignments = [];
+let photoFiles = {}; // { item_zoho_id: File }
+
+function headers() { return getAuthHeaders(); }
+
+function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast toast-' + type + ' show';
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function loadAssignments() {
+    const container = document.getElementById('mainContent');
+    try {
+        const res = await fetch(API + '/my-assignments', { headers: headers() });
+        const data = await res.json();
+
+        if (!data.success || !data.data || !data.data.length) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">📦</div>
+                    <h3>No Stock Checks Today</h3>
+                    <p>You don't have any stock check assignments for today.</p>
+                </div>`;
+            return;
+        }
+
+        assignments = data.data;
+        let html = '';
+
+        for (const a of assignments) {
+            if (a.status === 'submitted') {
+                html += renderSubmitted(a);
+            } else {
+                // Fetch full detail with items
+                const detailRes = await fetch(API + '/assignments/' + a.id, { headers: headers() });
+                const detail = await detailRes.json();
+                if (detail.success) {
+                    a.items = detail.data.items;
+                    a.show_system_qty = detail.data.show_system_qty;
+                    a.notes = detail.data.notes;
+                    html += renderAssignment(a);
+                }
+            }
+        }
+
+        container.innerHTML = html;
+    } catch (err) {
+        container.innerHTML = `<div class="card" style="text-align:center; color:#ef4444;">Failed to load assignments</div>`;
+    }
+}
+
+function renderSubmitted(a) {
+    return `
+        <div class="card">
+            <div class="assignment-header">
+                <div>
+                    <div class="assignment-title">${a.branch_name || 'Stock Check'}</div>
+                    <div class="assignment-meta">${a.item_count} items</div>
+                </div>
+                <span class="status-badge status-submitted">Submitted</span>
+            </div>
+            <div class="submitted-banner">
+                <div class="icon">&#10004;</div>
+                <div class="title">Already Submitted</div>
+                <div class="time">${a.submitted_at ? new Date(a.submitted_at).toLocaleString() : ''}</div>
+            </div>
+        </div>`;
+}
+
+function renderAssignment(a) {
+    let html = `
+        <div class="card" id="assignment-${a.id}">
+            <div class="assignment-header">
+                <div>
+                    <div class="assignment-title">${a.branch_name || 'Stock Check'}</div>
+                    <div class="assignment-meta">${a.items ? a.items.length : 0} items &middot; ${a.check_date ? a.check_date.split('T')[0] : ''}</div>
+                </div>
+                <span class="status-badge status-pending">Pending</span>
+            </div>`;
+
+    if (a.notes) {
+        html += `<div style="background:#fffbeb; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:0.75rem; color:#92400e;">
+            <strong>Instructions:</strong> ${a.notes}
+        </div>`;
+    }
+
+    if (a.items) {
+        for (const item of a.items) {
+            html += `
+                <div class="item-card" id="item-${item.id}">
+                    <div class="item-header">
+                        <div>
+                            <div class="item-name">${item.item_name}</div>
+                            ${item.item_sku ? '<div class="item-sku">' + item.item_sku + '</div>' : ''}
+                        </div>
+                        ${a.show_system_qty ? '<div class="item-system-qty">Expected: ' + item.system_qty + '</div>' : ''}
+                    </div>
+
+                    <div class="item-input-row">
+                        <label>Count:</label>
+                        <input type="number" step="0.01" min="0" class="qty-input" id="qty-${a.id}-${item.zoho_item_id}"
+                               placeholder="Enter quantity" oninput="onQtyInput(this, ${a.id}, '${item.zoho_item_id}')">
+                    </div>
+
+                    <div class="photo-row">
+                        <input type="file" accept="image/*" capture="environment" class="hidden-input"
+                               id="file-${a.id}-${item.zoho_item_id}" onchange="onPhotoSelect(this, ${a.id}, '${item.zoho_item_id}')">
+                        <button class="photo-btn" id="photobtn-${a.id}-${item.zoho_item_id}"
+                                onclick="document.getElementById('file-${a.id}-${item.zoho_item_id}').click()">
+                            <span>📷</span> <span>Add Photo</span>
+                        </button>
+                        <img id="preview-${a.id}-${item.zoho_item_id}" class="photo-preview" style="display:none">
+                    </div>
+
+                    <textarea class="notes-input" id="notes-${a.id}-${item.zoho_item_id}" rows="1" placeholder="Notes (optional)"></textarea>
+                </div>`;
+        }
+
+        html += `<button class="submit-btn" id="submitBtn-${a.id}" onclick="submitCheck(${a.id})">Submit Stock Check</button>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+function onQtyInput(el, assignmentId, itemId) {
+    const card = document.getElementById('item-' + getItemDbId(assignmentId, itemId));
+    if (el.value !== '') {
+        el.classList.add('has-value');
+    } else {
+        el.classList.remove('has-value');
+    }
+}
+
+function getItemDbId(assignmentId, zohoItemId) {
+    const a = assignments.find(x => x.id === assignmentId);
+    if (a && a.items) {
+        const item = a.items.find(i => i.zoho_item_id === zohoItemId);
+        if (item) return item.id;
+    }
+    return '';
+}
+
+function onPhotoSelect(input, assignmentId, itemId) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const key = `${assignmentId}-${itemId}`;
+    photoFiles[key] = file;
+
+    // Show preview
+    const preview = document.getElementById(`preview-${assignmentId}-${itemId}`);
+    const btn = document.getElementById(`photobtn-${assignmentId}-${itemId}`);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        btn.classList.add('has-photo');
+        btn.querySelector('span:last-child').textContent = 'Change Photo';
+    };
+    reader.readAsDataURL(file);
+}
+
+async function submitCheck(assignmentId) {
+    const a = assignments.find(x => x.id === assignmentId);
+    if (!a || !a.items) return;
+
+    // Validate all items have counts
+    const itemsData = [];
+    for (const item of a.items) {
+        const qtyInput = document.getElementById(`qty-${assignmentId}-${item.zoho_item_id}`);
+        const notesInput = document.getElementById(`notes-${assignmentId}-${item.zoho_item_id}`);
+
+        if (!qtyInput || qtyInput.value === '') {
+            showToast('Please enter count for all items', 'warning');
+            qtyInput && qtyInput.focus();
+            return;
+        }
+
+        itemsData.push({
+            zoho_item_id: item.zoho_item_id,
+            reported_qty: parseFloat(qtyInput.value),
+            notes: notesInput ? notesInput.value.trim() : ''
+        });
+    }
+
+    const btn = document.getElementById(`submitBtn-${assignmentId}`);
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    // Build FormData with photos
+    const formData = new FormData();
+    formData.append('items', JSON.stringify(itemsData));
+
+    for (const item of a.items) {
+        const key = `${assignmentId}-${item.zoho_item_id}`;
+        if (photoFiles[key]) {
+            formData.append(`photo_${item.zoho_item_id}`, photoFiles[key]);
+        }
+    }
+
+    try {
+        const res = await fetch(API + '/submit/' + assignmentId, {
+            method: 'POST',
+            headers: { 'Authorization': headers()['Authorization'] },
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast('Stock check submitted!');
+            // Replace with submitted banner
+            const card = document.getElementById(`assignment-${assignmentId}`);
+            if (card) {
+                card.innerHTML = `
+                    <div class="assignment-header">
+                        <div>
+                            <div class="assignment-title">${a.branch_name || 'Stock Check'}</div>
+                            <div class="assignment-meta">${a.items.length} items</div>
+                        </div>
+                        <span class="status-badge status-submitted">Submitted</span>
+                    </div>
+                    <div class="submitted-banner">
+                        <div class="icon">&#10004;</div>
+                        <div class="title">Submitted Successfully</div>
+                        <div class="time">${new Date().toLocaleString()}</div>
+                    </div>`;
+            }
+        } else {
+            showToast(data.message || 'Failed to submit', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Submit Stock Check';
+        }
+    } catch (err) {
+        showToast('Network error', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Submit Stock Check';
+    }
+}
+
+// Init
+const today = new Date();
+document.getElementById('headerDate').textContent = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+loadAssignments();
+</script>
+</body>
+</html>
