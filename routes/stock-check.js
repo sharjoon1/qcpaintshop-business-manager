@@ -442,8 +442,7 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
 
         const lineItems = items.map(item => ({
             item_id: item.zoho_item_id,
-            quantity_adjusted: parseFloat(item.difference),
-            warehouse_id: assignment.zoho_location_id
+            quantity_adjusted: parseFloat(item.difference)
         }));
 
         // Format date as YYYY-MM-DD string (MySQL returns Date object)
@@ -456,6 +455,7 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             reason: `Stock check #${assignment.id}`,
             description: `Physical count on ${checkDate}, assignment #${assignment.id}`,
             adjustment_type: 'quantity',
+            location_id: assignment.zoho_location_id,
             line_items: lineItems
         };
 
