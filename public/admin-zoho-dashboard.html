@@ -1489,10 +1489,13 @@
                 return { from: null, to: null };
         }
 
-        return {
-            from: from.toISOString().split('T')[0],
-            to: to.toISOString().split('T')[0]
-        };
+        function toLocalISO(dt) {
+            var yy = dt.getFullYear();
+            var mm = String(dt.getMonth() + 1).padStart(2, '0');
+            var dd = String(dt.getDate()).padStart(2, '0');
+            return yy + '-' + mm + '-' + dd;
+        }
+        return { from: toLocalISO(from), to: toLocalISO(to) };
     }
 
     function setPeriod(period) {
