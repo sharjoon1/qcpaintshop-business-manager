@@ -453,8 +453,8 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
 
         const adjustmentData = {
             date: checkDate,
-            reason: `Stock check #${assignment.id} - Physical count by staff on ${checkDate}`,
-            description: `Auto-generated from stock check assignment #${assignment.id}`,
+            reason: `Stock check #${assignment.id}`,
+            description: `Physical count on ${checkDate}, assignment #${assignment.id}`,
             adjustment_type: 'quantity',
             line_items: lineItems
         };
