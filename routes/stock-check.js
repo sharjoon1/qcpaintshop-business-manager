@@ -43,7 +43,7 @@ router.post('/assign', requirePermission('zoho', 'stock_check'), async (req, res
         }
 
         // Get branch zoho_location_id
-        const [branches] = await pool.query('SELECT id, branch_name, zoho_location_id FROM branches WHERE id = ?', [branch_id]);
+        const [branches] = await pool.query('SELECT id, name as branch_name, zoho_location_id FROM branches WHERE id = ?', [branch_id]);
         if (!branches.length) return res.status(404).json({ success: false, message: 'Branch not found' });
         const branch = branches[0];
 
@@ -122,7 +122,7 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
         );
 
         const [rows] = await pool.query(
-            `SELECT a.*, b.branch_name, u.full_name as staff_name,
+            `SELECT a.*, b.name as branch_name, u.full_name as staff_name,
                     creator.full_name as created_by_name,
                     reviewer.full_name as reviewed_by_name,
                     (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count,
@@ -157,7 +157,7 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
 router.get('/assignments/:id', requireAuth, async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT a.*, b.branch_name, u.full_name as staff_name,
+            `SELECT a.*, b.name as branch_name, u.full_name as staff_name,
                     creator.full_name as created_by_name,
                     reviewer.full_name as reviewed_by_name
              FROM stock_check_assignments a
@@ -224,7 +224,7 @@ router.get('/my-assignments', requireAuth, async (req, res) => {
         const targetDate = date || new Date().toISOString().split('T')[0];
 
         const [rows] = await pool.query(
-            `SELECT a.*, b.branch_name,
+            `SELECT a.*, b.name as branch_name,
                     (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
@@ -360,7 +360,7 @@ router.post('/submit/:id', requireAuth, upload.any(), async (req, res) => {
 router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT a.*, b.branch_name, b.zoho_location_id, u.full_name as staff_name
+            `SELECT a.*, b.name as branch_name, b.zoho_location_id, u.full_name as staff_name
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
              LEFT JOIN users u ON a.staff_id = u.id
@@ -405,7 +405,7 @@ router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, 
 router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT a.*, b.branch_name, b.zoho_location_id
+            `SELECT a.*, b.name as branch_name, b.zoho_location_id
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
              WHERE a.id = ?`,
@@ -492,7 +492,7 @@ router.get('/dashboard', requirePermission('zoho', 'stock_check'), async (req, r
         if (to_date) { dateFilter += ' AND a.check_date <= ?'; params.push(to_date); }
 
         const [stats] = await pool.query(
-            `SELECT b.id as branch_id, b.branch_name,
+            `SELECT b.id as branch_id, b.name as branch_name,
                     COUNT(a.id) as total_assignments,
                     SUM(CASE WHEN a.status = 'pending' THEN 1 ELSE 0 END) as pending_count,
                     SUM(CASE WHEN a.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
@@ -501,8 +501,8 @@ router.get('/dashboard', requirePermission('zoho', 'stock_check'), async (req, r
              FROM branches b
              LEFT JOIN stock_check_assignments a ON b.id = a.branch_id ${dateFilter}
              WHERE b.status = 'active'
-             GROUP BY b.id, b.branch_name
-             ORDER BY b.branch_name`,
+             GROUP BY b.id, b.name
+             ORDER BY b.name`,
             params
         );
 

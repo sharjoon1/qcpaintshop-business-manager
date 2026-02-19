@@ -271,9 +271,9 @@ async function init() {
     document.getElementById('assignDate').value = new Date().toISOString().split('T')[0];
 
     // Load branches for assign + history
-    const brRes = await apiFetch('/api/branches');
+    const brRes = await apiFetch('/api/branches/list');
     if (brRes.success) {
-        const opts = brRes.data.map(b => `<option value="${b.id}">${b.branch_name}</option>`).join('');
+        const opts = brRes.data.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
         document.getElementById('assignBranch').innerHTML = '<option value="">Select Branch</option>' + opts;
         document.getElementById('histBranch').innerHTML = '<option value="">All</option>' + opts;
     }
