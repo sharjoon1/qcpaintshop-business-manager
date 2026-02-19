@@ -339,7 +339,7 @@ function renderSelectedProducts() {
     if (!selectedItems.length) { el.innerHTML = '<p class="text-xs text-gray-400">No products selected</p>'; return; }
     el.innerHTML = selectedItems.map(item => `
         <div class="selected-item">
-            <span>${item.item_name} <span class="text-gray-400 text-xs">${item.sku}</span></span>
+            <span>${item.item_name} <span class="text-gray-400 text-xs">${item.sku || ''}</span></span>
             <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500">Sys: ${item.stock_on_hand}</span>
                 <button class="remove-btn" onclick="removeProduct('${item.zoho_item_id}')">&times;</button>

@@ -446,9 +446,14 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             warehouse_id: assignment.zoho_location_id
         }));
 
+        // Format date as YYYY-MM-DD string (MySQL returns Date object)
+        const checkDate = assignment.check_date instanceof Date
+            ? assignment.check_date.toISOString().split('T')[0]
+            : String(assignment.check_date).split('T')[0];
+
         const adjustmentData = {
-            date: assignment.check_date,
-            reason: `Stock check #${assignment.id} - Physical count by staff on ${assignment.check_date}`,
+            date: checkDate,
+            reason: `Stock check #${assignment.id} - Physical count by staff on ${checkDate}`,
             description: `Auto-generated from stock check assignment #${assignment.id}`,
             adjustment_type: 'quantity',
             line_items: lineItems
@@ -547,7 +552,7 @@ router.get('/products/suggest', requirePermission('zoho', 'stock_check'), async 
             `SELECT ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand,
                     MAX(sci.submitted_at) as last_checked
              FROM zoho_location_stock ls
-             LEFT JOIN stock_check_items sci ON ls.zoho_item_id = sci.zoho_item_id
+             LEFT JOIN stock_check_items sci ON ls.zoho_item_id = sci.zoho_item_id COLLATE utf8mb4_unicode_ci
                  AND sci.assignment_id IN (
                      SELECT id FROM stock_check_assignments WHERE branch_id = ?
                  )

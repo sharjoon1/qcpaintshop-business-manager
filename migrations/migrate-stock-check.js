@@ -91,7 +91,16 @@ async function migrate() {
             }
         }
 
-        // 4. Add permission
+        // 4. Fix collation to match zoho_location_stock
+        console.log('4. Fixing collation on stock_check_items.zoho_item_id...');
+        try {
+            await pool.query(`ALTER TABLE stock_check_items MODIFY zoho_item_id VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL`);
+            console.log('   OK');
+        } catch (err) {
+            console.log('   SKIP:', err.message);
+        }
+
+        // 5. Add permission
         console.log('4. Adding zoho.stock_check permission...');
         const [existingPerm] = await pool.query("SELECT id FROM permissions WHERE module = 'zoho' AND action = 'stock_check'");
         if (existingPerm.length === 0) {
