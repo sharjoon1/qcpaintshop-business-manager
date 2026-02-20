@@ -155,6 +155,7 @@ whatsappSessionsRoutes.setPool(pool);
 whatsappSessionsRoutes.setSessionManager(whatsappSessionManager);
 waMarketingRoutes.setPool(pool);
 waMarketingRoutes.setCampaignEngine(waCampaignEngine);
+waMarketingRoutes.setSessionManager(whatsappSessionManager);
 waCampaignEngine.setPool(pool);
 waCampaignEngine.setSessionManager(whatsappSessionManager);
 
@@ -3226,6 +3227,7 @@ notificationService.setIO(io);
 autoClockout.setIO(io);
 whatsappSessionManager.setIO(io);
 waCampaignEngine.setIO(io);
+waMarketingRoutes.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {

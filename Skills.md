@@ -670,6 +670,9 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - Photo compression via sharp (800x800, JPEG 80%)
 - Validates all items have counts before submit
 - Post-submit: read-only state with timestamp
+- **Real-time notifications**: Socket.io + socket-helper loaded dynamically, listens for `stock_check_assigned` events
+- **Auto-refresh**: New assignments auto-appear when admin creates them
+- **Visual alert**: Slide-down banner with assignment details, auto-dismiss 8s
 
 **API Endpoints** (`routes/stock-check.js`, 11 endpoints):
 - `GET /locations/:branchId` — Zoho locations for a branch (admin)

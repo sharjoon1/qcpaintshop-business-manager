@@ -114,6 +114,7 @@
             <button class="tab-btn" onclick="switchTab('templates')">Templates</button>
             <button class="tab-btn" onclick="switchTab('logs')">Logs</button>
             <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
+            <button class="tab-btn" onclick="switchTab('instant')">Instant Send</button>
         </div>
 
         <!-- TAB: Dashboard -->
@@ -302,6 +303,104 @@
                         <button class="action-btn primary" onclick="saveSettings()">Save Settings</button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- TAB: Instant Send -->
+        <div id="tab-instant" class="tab-content" style="display:none">
+            <!-- Selection bar -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <div class="flex gap-2 flex-wrap items-end">
+                    <div>
+                        <label class="text-xs font-semibold text-gray-500 block mb-1">Search</label>
+                        <input type="text" id="imLeadSearch" placeholder="Name, phone, company..." class="text-xs border rounded-lg px-3 py-1.5 w-44" onkeyup="debounce(browseInstantLeads, 400)()">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-gray-500 block mb-1">Status</label>
+                        <select id="imFilterStatus" onchange="imPage=1;browseInstantLeads()" class="text-xs border rounded-lg px-2 py-1.5">
+                            <option value="">All</option>
+                            <option value="new">New</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="interested">Interested</option>
+                            <option value="quoted">Quoted</option>
+                            <option value="negotiating">Negotiating</option>
+                            <option value="won">Won</option>
+                            <option value="lost">Lost</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-gray-500 block mb-1">Source</label>
+                        <select id="imFilterSource" onchange="imPage=1;browseInstantLeads()" class="text-xs border rounded-lg px-2 py-1.5">
+                            <option value="">All</option>
+                            <option value="website">Website</option>
+                            <option value="walk_in">Walk-in</option>
+                            <option value="referral">Referral</option>
+                            <option value="social_media">Social Media</option>
+                            <option value="phone_call">Phone Call</option>
+                            <option value="advertisement">Advertisement</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-gray-500 block mb-1">Branch</label>
+                        <select id="imFilterBranch" onchange="imPage=1;browseInstantLeads()" class="text-xs border rounded-lg px-2 py-1.5">
+                            <option value="">All Branches</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="imSelCount" class="text-sm font-bold text-indigo-600"></span>
+                    <button class="action-btn primary" id="imSendBtn" onclick="openInstantComposer()" style="display:none">Send Instant Message</button>
+                </div>
+            </div>
+
+            <!-- Select controls -->
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <label class="flex items-center gap-1 cursor-pointer text-xs font-semibold text-indigo-600">
+                        <input type="checkbox" id="imSelectAllPage" onchange="imToggleSelectAll()" class="w-4 h-4 rounded">
+                        Select All on Page
+                    </label>
+                    <button type="button" class="action-btn text-xs" onclick="imSelectAllFiltered()">Select ALL Matching</button>
+                    <button type="button" class="action-btn text-xs" onclick="imClearSelection()" style="color:#dc2626">Clear Selection</button>
+                </div>
+                <span class="text-xs text-gray-400" id="imTotalCount"></span>
+            </div>
+
+            <!-- Leads table -->
+            <div class="table-container" style="max-height:450px;overflow-y:auto">
+                <table class="data-table">
+                    <thead style="position:sticky;top:0;z-index:1">
+                        <tr>
+                            <th style="width:30px"><input type="checkbox" id="imSelectAllHead" onchange="imToggleSelectAll()" class="w-4 h-4"></th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Company</th>
+                            <th>City</th>
+                            <th>Status</th>
+                            <th>Source</th>
+                            <th>Last Contact</th>
+                        </tr>
+                    </thead>
+                    <tbody id="imLeadsBody">
+                        <tr><td colspan="8" class="text-center text-gray-400 py-6">Loading leads...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="imPagination" class="flex justify-center gap-2 mt-2"></div>
+
+            <!-- Recent Instant History -->
+            <div class="mt-6">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3">Recent Instant Messages</h4>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr><th>Time</th><th>Batch</th><th>Lead</th><th>Phone</th><th>Status</th><th>Message</th><th>Error</th></tr></thead>
+                        <tbody id="imHistoryBody">
+                            <tr><td colspan="7" class="text-center text-gray-400 py-4">No instant messages yet</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="imHistoryPagination" class="flex justify-center gap-2 mt-2"></div>
             </div>
         </div>
     </div>
@@ -598,6 +697,115 @@
         </div>
     </div>
 
+    <!-- Instant Message Composer Modal -->
+    <div class="modal-overlay" id="instantComposerModal">
+        <div class="modal-box" style="max-width:700px">
+            <div class="modal-header">
+                <h3>Send Instant Message</h3>
+                <button onclick="closeModal('instantComposerModal')" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#94a3b8">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 p-3 rounded-lg" style="background:#eef2ff;border:1px solid #c7d2fe">
+                    <span class="text-sm font-semibold text-indigo-700" id="imComposerCount">0 leads selected</span>
+                    <span class="text-xs text-indigo-500 ml-2">Messages will be sent with 5-15s delay between each</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div class="form-group" style="margin-bottom:0">
+                        <label>Send from Branch (WhatsApp Session) *</label>
+                        <select id="imBranchSession">
+                            <option value="">Select connected session...</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0">
+                        <label>Template (optional)</label>
+                        <select id="imTemplate" onchange="imApplyTemplate()">
+                            <option value="">-- Start from scratch --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Message *</label>
+                    <div class="mb-1">
+                        <span class="text-xs text-gray-500">Variables:</span>
+                        <button type="button" class="var-btn" onclick="insertToField('imMsgBody','{name}')">{name}</button>
+                        <button type="button" class="var-btn" onclick="insertToField('imMsgBody','{company}')">{company}</button>
+                        <button type="button" class="var-btn" onclick="insertToField('imMsgBody','{city}')">{city}</button>
+                        <button type="button" class="var-btn" onclick="insertToField('imMsgBody','{phone}')">{phone}</button>
+                        <button type="button" class="var-btn" onclick="insertToField('imMsgBody','{source}')">{source}</button>
+                        <button type="button" class="var-btn" onclick="insertToField('imMsgBody','{email}')">{email}</button>
+                        <button type="button" class="var-btn" onclick="insertToField('imMsgBody','{branch}')">{branch}</button>
+                    </div>
+                    <div class="mb-1">
+                        <span class="text-xs text-gray-500">Spin:</span>
+                        <button type="button" class="spin-helper" onclick="insertToField('imMsgBody','[Hi|Hello|Hey]')">[Hi|Hello|Hey]</button>
+                        <button type="button" class="spin-helper" onclick="insertToField('imMsgBody','[Thank you|Thanks|Much appreciated]')">[Thanks|...]</button>
+                    </div>
+                    <textarea id="imMsgBody" rows="5" placeholder="Type your message...&#10;Use {name} for personalization, [Hi|Hello] for random text"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Media Attachment (optional)</label>
+                    <input type="file" id="imMediaFile" accept="image/*,.pdf,.doc,.docx" onchange="imUploadMedia()">
+                    <div id="imMediaPreview" class="mt-1" style="display:none">
+                        <span class="text-xs text-green-600" id="imMediaName"></span>
+                        <button type="button" class="text-xs text-red-500 ml-2" onclick="imClearMedia()">Remove</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Preview</label>
+                    <button type="button" class="action-btn text-xs" onclick="imPreviewMessage()">Generate Preview</button>
+                    <div class="preview-box" id="imPreview" style="display:none"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="action-btn" onclick="closeModal('instantComposerModal')">Cancel</button>
+                <button class="action-btn primary" onclick="startInstantSend()">Send Now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instant Send Progress Modal -->
+    <div class="modal-overlay" id="instantProgressModal">
+        <div class="modal-box" style="max-width:600px">
+            <div class="modal-header">
+                <h3>Sending Messages...</h3>
+                <span id="imProgressCount" class="text-sm text-gray-500"></span>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="progress-bar-bg" style="height:10px;border-radius:5px">
+                        <div class="progress-bar-fill" id="imProgressBar" style="width:0%;height:100%;border-radius:5px;transition:width 0.5s"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span id="imProgressText">Preparing...</span>
+                        <span id="imProgressPct">0%</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3 mb-3">
+                    <div class="stat-card text-center" style="padding:0.75rem">
+                        <div class="stat-value text-sm text-green-600" id="imSentCount">0</div>
+                        <div class="stat-label" style="font-size:0.65rem">Sent</div>
+                    </div>
+                    <div class="stat-card text-center" style="padding:0.75rem">
+                        <div class="stat-value text-sm text-red-500" id="imFailedCount">0</div>
+                        <div class="stat-label" style="font-size:0.65rem">Failed</div>
+                    </div>
+                    <div class="stat-card text-center" style="padding:0.75rem">
+                        <div class="stat-value text-sm text-gray-500" id="imRemainingCount">0</div>
+                        <div class="stat-label" style="font-size:0.65rem">Remaining</div>
+                    </div>
+                </div>
+                <div style="max-height:250px;overflow-y:auto" id="imProgressLog"></div>
+            </div>
+            <div class="modal-footer" id="imProgressFooter" style="display:none">
+                <button class="action-btn primary" onclick="closeModal('instantProgressModal');browseInstantLeads();loadInstantHistory()">Done</button>
+            </div>
+        </div>
+    </div>
+
 <script>
 // ========================================
 // STATE
@@ -621,6 +829,14 @@ let branches = [];
 let templates = [];
 let chartCampaign = null;
 let chartHourly = null;
+// Instant Send state
+let imPage = 1;
+let imHistoryPage = 1;
+let imSelectedLeads = new Set();
+let imMediaUrl = null;
+let imMediaType = null;
+let imMediaFilename = null;
+let imCurrentBatchId = null;
 
 // ========================================
 // INIT
@@ -638,8 +854,10 @@ async function loadBranches() {
         const data = await res.json();
         branches = data.data || [];
         const sel = document.getElementById('wizBranch');
+        const imBranch = document.getElementById('imFilterBranch');
         branches.forEach(b => {
             sel.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.name}</option>`);
+            imBranch.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.name}</option>`);
         });
     } catch (e) { console.error('Failed to load branches:', e); }
 }
@@ -659,6 +877,7 @@ function switchTab(tab) {
     else if (tab === 'templates') loadTemplates();
     else if (tab === 'logs') { loadLogCampaignFilter(); loadLogs(); }
     else if (tab === 'settings') loadSettings();
+    else if (tab === 'instant') { browseInstantLeads(); loadInstantHistory(); }
 }
 
 // ========================================
@@ -1445,6 +1664,342 @@ async function saveSettings() {
 }
 
 // ========================================
+// INSTANT SEND — Lead Browser
+// ========================================
+async function browseInstantLeads() {
+    const search = document.getElementById('imLeadSearch').value;
+    const status = document.getElementById('imFilterStatus').value;
+    const source = document.getElementById('imFilterSource').value;
+    const branch_id = document.getElementById('imFilterBranch').value;
+
+    try {
+        const params = new URLSearchParams({ page: imPage, limit: 50 });
+        if (search) params.set('search', search);
+        if (status) params.set('status', status);
+        if (source) params.set('source', source);
+        if (branch_id) params.set('branch_id', branch_id);
+
+        const res = await fetch(`${API}/leads/browse?${params}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+
+        document.getElementById('imTotalCount').textContent = `(${data.pagination?.total || 0} contacts with phone)`;
+
+        const tbody = document.getElementById('imLeadsBody');
+        tbody.innerHTML = (data.leads || []).map(l => {
+            const checked = imSelectedLeads.has(l.id) ? 'checked' : '';
+            return `<tr onclick="imToggleRow(${l.id}, event)" style="cursor:pointer" class="${checked ? 'bg-indigo-50' : ''}">
+                <td><input type="checkbox" class="im-cb w-4 h-4" data-id="${l.id}" ${checked} onchange="imToggleLead(${l.id}, this.checked)"></td>
+                <td class="font-medium">${esc(l.name)}</td>
+                <td>${esc(l.phone)}</td>
+                <td class="text-xs">${esc(l.company || '-')}</td>
+                <td class="text-xs">${esc(l.city || '-')}</td>
+                <td><span class="badge badge-${l.status === 'new' ? 'draft' : l.status === 'interested' ? 'running' : l.status === 'won' ? 'completed' : 'pending'}">${l.status}</span></td>
+                <td class="text-xs">${esc(l.source || '-')}</td>
+                <td class="text-xs">${l.last_contact_date ? formatDate(l.last_contact_date) : '-'}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="8" class="text-center text-gray-400 py-6">No contacts found</td></tr>';
+
+        imUpdateSelectionUI();
+
+        // Sync header checkbox
+        const cbs = document.querySelectorAll('.im-cb');
+        const allChecked = cbs.length > 0 && Array.from(cbs).every(c => c.checked);
+        document.getElementById('imSelectAllHead').checked = allChecked;
+        document.getElementById('imSelectAllPage').checked = allChecked;
+
+        renderPagination('imPagination', data.pagination, p => { imPage = p; browseInstantLeads(); });
+    } catch (e) { console.error('Browse instant leads error:', e); }
+}
+
+function imToggleLead(id, checked) {
+    if (checked) imSelectedLeads.add(id);
+    else imSelectedLeads.delete(id);
+    imUpdateSelectionUI();
+}
+
+function imToggleRow(id, event) {
+    if (event.target.type === 'checkbox') return;
+    const cb = event.currentTarget.querySelector('.im-cb');
+    cb.checked = !cb.checked;
+    imToggleLead(id, cb.checked);
+    event.currentTarget.classList.toggle('bg-indigo-50', cb.checked);
+}
+
+function imToggleSelectAll() {
+    const headerCb = document.getElementById('imSelectAllHead');
+    const checked = headerCb.checked;
+    document.getElementById('imSelectAllPage').checked = checked;
+    document.querySelectorAll('.im-cb').forEach(cb => {
+        cb.checked = checked;
+        const id = parseInt(cb.dataset.id);
+        if (checked) imSelectedLeads.add(id); else imSelectedLeads.delete(id);
+    });
+    imUpdateSelectionUI();
+}
+
+async function imSelectAllFiltered() {
+    const search = document.getElementById('imLeadSearch').value;
+    const status = document.getElementById('imFilterStatus').value;
+    const source = document.getElementById('imFilterSource').value;
+    const branch_id = document.getElementById('imFilterBranch').value;
+
+    try {
+        const params = new URLSearchParams({ page: 1, limit: 10000 });
+        if (search) params.set('search', search);
+        if (status) params.set('status', status);
+        if (source) params.set('source', source);
+        if (branch_id) params.set('branch_id', branch_id);
+
+        showToast('Selecting all matching contacts...', 'info');
+        const res = await fetch(`${API}/leads/browse?${params}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+
+        (data.leads || []).forEach(l => imSelectedLeads.add(l.id));
+
+        document.querySelectorAll('.im-cb').forEach(cb => {
+            if (imSelectedLeads.has(parseInt(cb.dataset.id))) cb.checked = true;
+        });
+
+        imUpdateSelectionUI();
+        showToast(`${imSelectedLeads.size} contacts selected`, 'success');
+    } catch (e) { showToast('Failed to select all', 'error'); }
+}
+
+function imClearSelection() {
+    imSelectedLeads.clear();
+    document.querySelectorAll('.im-cb').forEach(cb => cb.checked = false);
+    document.getElementById('imSelectAllHead').checked = false;
+    document.getElementById('imSelectAllPage').checked = false;
+    imUpdateSelectionUI();
+}
+
+function imUpdateSelectionUI() {
+    const count = imSelectedLeads.size;
+    document.getElementById('imSelCount').textContent = count > 0 ? `${count} leads selected` : '';
+    document.getElementById('imSendBtn').style.display = count > 0 ? 'inline-flex' : 'none';
+}
+
+// ========================================
+// INSTANT SEND — Composer
+// ========================================
+async function openInstantComposer() {
+    if (imSelectedLeads.size === 0) { showToast('Select at least one lead', 'error'); return; }
+
+    document.getElementById('imComposerCount').textContent = `${imSelectedLeads.size} leads selected`;
+    document.getElementById('imMsgBody').value = '';
+    imMediaUrl = null; imMediaType = null; imMediaFilename = null;
+    document.getElementById('imMediaPreview').style.display = 'none';
+    document.getElementById('imMediaFile').value = '';
+    document.getElementById('imPreview').style.display = 'none';
+
+    // Load connected WhatsApp sessions
+    try {
+        const res = await fetch(`${API}/whatsapp-sessions`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const sel = document.getElementById('imBranchSession');
+        sel.innerHTML = '<option value="">Select connected session...</option>';
+        (data.data || []).forEach(s => {
+            if (s.status === 'connected') {
+                const br = branches.find(b => b.id === s.branch_id);
+                const name = br ? br.name : `Branch #${s.branch_id}`;
+                sel.insertAdjacentHTML('beforeend', `<option value="${s.branch_id}">${name} (${s.phone_number || 'Connected'})</option>`);
+            }
+        });
+    } catch (e) { console.error('Load sessions error:', e); }
+
+    // Populate template dropdown
+    const sel = document.getElementById('imTemplate');
+    sel.innerHTML = '<option value="">-- Start from scratch --</option>';
+    templates.forEach(t => {
+        sel.insertAdjacentHTML('beforeend', `<option value="${t.id}">${esc(t.name)} (${t.category})</option>`);
+    });
+
+    document.getElementById('instantComposerModal').classList.add('show');
+}
+
+function imApplyTemplate() {
+    const id = parseInt(document.getElementById('imTemplate').value);
+    if (!id) return;
+    const t = templates.find(t => t.id === id);
+    if (!t) return;
+    document.getElementById('imMsgBody').value = t.message_body || '';
+    showToast('Template applied', 'success');
+}
+
+async function imUploadMedia() {
+    const file = document.getElementById('imMediaFile').files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('media', file);
+    try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API}/upload`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+            imMediaUrl = data.url;
+            imMediaFilename = data.filename;
+            imMediaType = file.type.startsWith('image/') ? 'image' : 'document';
+            document.getElementById('imMediaPreview').style.display = 'block';
+            document.getElementById('imMediaName').textContent = data.filename;
+            showToast('Media uploaded', 'success');
+        } else showToast(data.error, 'error');
+    } catch (e) { showToast('Upload failed', 'error'); }
+}
+
+function imClearMedia() {
+    imMediaUrl = null; imMediaType = null; imMediaFilename = null;
+    document.getElementById('imMediaPreview').style.display = 'none';
+    document.getElementById('imMediaFile').value = '';
+}
+
+async function imPreviewMessage() {
+    const body = document.getElementById('imMsgBody').value;
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/leads/preview-message`, {
+            method: 'POST', headers: getAuthHeaders(),
+            body: JSON.stringify({ message_body: body })
+        });
+        const data = await res.json();
+        const preview = document.getElementById('imPreview');
+        preview.textContent = data.resolved || body;
+        preview.style.display = 'block';
+    } catch (e) { console.error(e); }
+}
+
+// ========================================
+// INSTANT SEND — Execute
+// ========================================
+async function startInstantSend() {
+    const message = document.getElementById('imMsgBody').value.trim();
+    const branch_id = document.getElementById('imBranchSession').value;
+
+    if (!message) { showToast('Message is required', 'error'); return; }
+    if (!branch_id) { showToast('Select a WhatsApp session', 'error'); return; }
+    if (imSelectedLeads.size === 0) { showToast('No leads selected', 'error'); return; }
+
+    if (!confirm(`Send instant message to ${imSelectedLeads.size} leads? Messages will be sent with 5-15 second delays.`)) return;
+
+    // Reset progress modal
+    document.getElementById('imProgressBar').style.width = '0%';
+    document.getElementById('imProgressText').textContent = 'Starting...';
+    document.getElementById('imProgressPct').textContent = '0%';
+    document.getElementById('imProgressCount').textContent = `0 / ${imSelectedLeads.size}`;
+    document.getElementById('imSentCount').textContent = '0';
+    document.getElementById('imFailedCount').textContent = '0';
+    document.getElementById('imRemainingCount').textContent = String(imSelectedLeads.size);
+    document.getElementById('imProgressLog').innerHTML = '';
+    document.getElementById('imProgressFooter').style.display = 'none';
+
+    closeModal('instantComposerModal');
+    document.getElementById('instantProgressModal').classList.add('show');
+
+    try {
+        const body = {
+            lead_ids: Array.from(imSelectedLeads),
+            message,
+            branch_id: parseInt(branch_id),
+            media_url: imMediaUrl || null,
+            media_type: imMediaType || null,
+            media_caption: null
+        };
+
+        const res = await fetch(`${API}/instant-send`, {
+            method: 'POST', headers: getAuthHeaders(),
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to start', 'error');
+            closeModal('instantProgressModal');
+            return;
+        }
+
+        imCurrentBatchId = data.batch_id;
+        document.getElementById('imProgressText').textContent = `Batch ${data.batch_id} — Sending...`;
+
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+        closeModal('instantProgressModal');
+    }
+}
+
+function onInstantProgress(data) {
+    if (data.batch_id !== imCurrentBatchId) return;
+
+    const pct = Math.round((data.index / data.total) * 100);
+    document.getElementById('imProgressBar').style.width = pct + '%';
+    document.getElementById('imProgressPct').textContent = pct + '%';
+    document.getElementById('imProgressCount').textContent = `${data.index} / ${data.total}`;
+    document.getElementById('imSentCount').textContent = String(data.sent || 0);
+    document.getElementById('imFailedCount').textContent = String(data.failed || 0);
+    document.getElementById('imRemainingCount').textContent = String(data.total - data.index);
+
+    if (data.status === 'sent' || data.status === 'failed') {
+        const icon = data.status === 'sent' ? '&#10004;' : '&#10008;';
+        const color = data.status === 'sent' ? '#16a34a' : '#dc2626';
+        const log = document.getElementById('imProgressLog');
+        log.insertAdjacentHTML('afterbegin',
+            `<div style="padding:6px 10px;border-bottom:1px solid #f1f5f9;font-size:0.8125rem;display:flex;align-items:center;gap:8px">
+                <span style="color:${color};font-weight:700">${icon}</span>
+                <span class="font-medium">${esc(data.lead_name || '')}</span>
+                <span class="text-xs text-gray-400">${esc(data.phone || '')}</span>
+                <span class="badge badge-${data.status}" style="margin-left:auto">${data.status}</span>
+                ${data.error ? '<span class="text-xs text-red-500">' + esc(data.error.substring(0, 60)) + '</span>' : ''}
+            </div>`
+        );
+    }
+
+    document.getElementById('imProgressText').textContent = data.status === 'sending'
+        ? `Sending to ${esc(data.lead_name || '')}...`
+        : `${data.status === 'sent' ? 'Sent' : 'Failed'}: ${esc(data.lead_name || '')}`;
+}
+
+function onInstantComplete(data) {
+    if (data.batch_id !== imCurrentBatchId) return;
+
+    document.getElementById('imProgressBar').style.width = '100%';
+    document.getElementById('imProgressPct').textContent = '100%';
+    document.getElementById('imProgressText').textContent = `Complete! ${data.sent} sent, ${data.failed} failed`;
+    document.getElementById('imRemainingCount').textContent = '0';
+    document.getElementById('imProgressFooter').style.display = 'flex';
+
+    imSelectedLeads.clear();
+    imUpdateSelectionUI();
+    showToast(`Instant send complete: ${data.sent} sent, ${data.failed} failed`, data.failed > 0 ? 'warning' : 'success');
+}
+
+// ========================================
+// INSTANT SEND — History
+// ========================================
+async function loadInstantHistory() {
+    try {
+        const res = await fetch(`${API}/instant-history?page=${imHistoryPage}&limit=50`, { headers: getAuthHeaders() });
+        const data = await res.json();
+
+        const tbody = document.getElementById('imHistoryBody');
+        tbody.innerHTML = (data.data || []).map(m => `
+            <tr>
+                <td class="text-xs">${m.sent_at ? formatDate(m.sent_at) : formatDate(m.created_at)}</td>
+                <td class="text-xs"><span class="filter-chip">${esc(m.batch_id)}</span></td>
+                <td>${esc(m.lead_name || '-')}</td>
+                <td>${esc(m.phone)}</td>
+                <td><span class="badge badge-${m.status}">${m.status}</span></td>
+                <td class="text-xs" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((m.message_content || m.message_template || '').substring(0, 80))}</td>
+                <td class="text-xs text-red-500">${esc(m.error_message || '')}</td>
+            </tr>
+        `).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-4">No instant messages yet</td></tr>';
+
+        renderPagination('imHistoryPagination', data.pagination, p => { imHistoryPage = p; loadInstantHistory(); });
+    } catch (e) { console.error('Instant history error:', e); }
+}
+
+// ========================================
 // SOCKET.IO
 // ========================================
 function setupSocketListeners() {
@@ -1475,6 +2030,18 @@ function setupSocketListeners() {
                 showToast(`Campaign #${data.campaign_id} started`, 'success');
                 if (currentTab === 'campaigns') loadCampaigns();
             });
+
+            // Instant send progress events (sent to user's personal room)
+        }
+    }, 500);
+
+    // Also listen via qc-notification custom events (socket-helper dispatches these)
+    // Instant progress uses direct socket events to user room, so we listen via qcSocket
+    const waitForQcSocket = setInterval(() => {
+        if (window.qcSocket && window.qcSocket.connected) {
+            clearInterval(waitForQcSocket);
+            qcSocket.on('wa_instant_progress', onInstantProgress);
+            qcSocket.on('wa_instant_complete', onInstantComplete);
         }
     }, 500);
 }

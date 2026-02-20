@@ -26,6 +26,8 @@
  *   GET    /api/wa-marketing/settings                - Get settings
  *   PUT    /api/wa-marketing/settings                - Update settings
  *   POST   /api/wa-marketing/upload                  - Upload media
+ *   POST   /api/wa-marketing/instant-send            - Send instant messages
+ *   GET    /api/wa-marketing/instant-history          - Instant message history
  */
 
 const express = require('express');
@@ -38,9 +40,13 @@ const { requirePermission } = require('../middleware/permissionMiddleware');
 
 let pool;
 let campaignEngine;
+let sessionManager;
+let io;
 
 function setPool(p) { pool = p; }
 function setCampaignEngine(engine) { campaignEngine = engine; }
+function setSessionManager(sm) { sessionManager = sm; }
+function setIO(socketIO) { io = socketIO; }
 
 const viewPerm = requirePermission('marketing', 'view');
 const managePerm = requirePermission('marketing', 'manage');
@@ -473,8 +479,8 @@ router.get('/leads/browse', viewPerm, async (req, res) => {
         const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM leads l ${where}`, params);
 
         const [leads] = await pool.query(
-            `SELECT l.id, l.name, l.phone, l.company, l.city, l.status, l.source, l.priority,
-                    b.name as branch_name
+            `SELECT l.id, l.name, l.phone, l.email, l.company, l.city, l.status, l.source, l.priority,
+                    l.last_contact_date, b.name as branch_name
              FROM leads l
              LEFT JOIN branches b ON l.branch_id = b.id
              ${where}
@@ -835,8 +841,253 @@ function buildLeadFilterQuery(filters, branchId, countOnly = false) {
     };
 }
 
+// ========================================
+// INSTANT SEND — Send to selected leads with anti-block
+// ========================================
+
+/** POST /api/wa-marketing/instant-send */
+router.post('/instant-send', managePerm, async (req, res) => {
+    try {
+        const { lead_ids, message, branch_id, media_url, media_type, media_caption } = req.body;
+
+        if (!lead_ids || !lead_ids.length || !message) {
+            return res.status(400).json({ success: false, message: 'lead_ids and message are required' });
+        }
+        if (!branch_id) {
+            return res.status(400).json({ success: false, message: 'branch_id (WhatsApp session) is required' });
+        }
+
+        // Check WhatsApp session
+        if (!sessionManager) {
+            return res.status(500).json({ success: false, message: 'WhatsApp session manager not available' });
+        }
+        if (!sessionManager.isConnected(branch_id)) {
+            const brStatus = sessionManager.getBranchStatus(branch_id);
+            return res.status(400).json({ success: false, message: `WhatsApp session for this branch is ${brStatus?.status || 'not connected'}. Connect it first.` });
+        }
+
+        // Fetch leads
+        const placeholders = lead_ids.map(() => '?').join(',');
+        const [leads] = await pool.query(
+            `SELECT l.id, l.name, l.phone, l.company, l.city, l.email, l.source, l.status as lead_status,
+                    l.last_contact_date, b.name as branch_name
+             FROM leads l
+             LEFT JOIN branches b ON l.branch_id = b.id
+             WHERE l.id IN (${placeholders}) AND l.phone IS NOT NULL AND l.phone != ''`,
+            lead_ids
+        );
+
+        if (!leads.length) {
+            return res.status(400).json({ success: false, message: 'No leads with valid phone numbers found' });
+        }
+
+        // Create batch
+        const batchId = `IM-${Date.now().toString(36).toUpperCase()}`;
+
+        // Insert all as pending
+        const insertValues = leads.map(lead => [
+            batchId, lead.id, lead.name, lead.phone, message, null,
+            media_url || null, media_type || null, media_caption || null,
+            branch_id, 'pending', req.user.id
+        ]);
+        for (const vals of insertValues) {
+            await pool.query(
+                `INSERT INTO wa_instant_messages
+                 (batch_id, lead_id, lead_name, phone, message_template, message_content, media_url, media_type, media_caption, branch_id, status, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                vals
+            );
+        }
+
+        // Start background processing (don't await)
+        processInstantBatch(batchId, branch_id, message, leads, media_url, media_type, media_caption, req.user.id);
+
+        res.json({ success: true, batch_id: batchId, total: leads.length });
+    } catch (error) {
+        console.error('Instant send error:', error);
+        res.status(500).json({ success: false, message: 'Failed to start instant send' });
+    }
+});
+
+/**
+ * Background processor for instant message batch
+ * Sends messages one by one with random delays (5-15s) and anti-block
+ */
+async function processInstantBatch(batchId, branchId, messageTemplate, leads, mediaUrl, mediaType, mediaCaption, userId) {
+    // Shuffle for randomness
+    const shuffled = [...leads].sort(() => Math.random() - 0.5);
+    let sent = 0, failed = 0;
+
+    for (let i = 0; i < shuffled.length; i++) {
+        const lead = shuffled[i];
+
+        try {
+            // Resolve message with anti-block (spin text + variables + invisible marker)
+            const resolvedMsg = campaignEngine.resolveMessage(messageTemplate, {
+                lead_name: lead.name, name: lead.name,
+                company: lead.company, city: lead.city,
+                email: lead.email, phone: lead.phone,
+                source: lead.source, lead_status: lead.lead_status,
+                branch_name: lead.branch_name
+            });
+
+            // Update status to sending
+            await pool.query(
+                `UPDATE wa_instant_messages SET status = 'sending', message_content = ? WHERE batch_id = ? AND lead_id = ?`,
+                [resolvedMsg, batchId, lead.id]
+            );
+
+            // Emit progress: sending
+            emitInstantProgress(userId, {
+                batch_id: batchId, lead_id: lead.id, lead_name: lead.name,
+                phone: lead.phone, status: 'sending',
+                index: i + 1, total: shuffled.length, sent, failed
+            });
+
+            // Send via WhatsApp session
+            if (mediaUrl && mediaType) {
+                const mediaPath = path.join(__dirname, '..', mediaUrl.startsWith('/') ? mediaUrl.substring(1) : mediaUrl);
+                await sessionManager.sendMedia(branchId, lead.phone, {
+                    type: mediaType,
+                    mediaPath,
+                    caption: mediaCaption ? campaignEngine.resolveMessage(mediaCaption, lead) : undefined
+                });
+                // Also send text if message is not just a caption
+                if (messageTemplate.trim() && messageTemplate.trim() !== mediaCaption?.trim()) {
+                    await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
+                    await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg);
+                }
+            } else {
+                await sessionManager.sendMessage(branchId, lead.phone, resolvedMsg);
+            }
+
+            // Mark sent
+            await pool.query(
+                `UPDATE wa_instant_messages SET status = 'sent', sent_at = NOW() WHERE batch_id = ? AND lead_id = ?`,
+                [batchId, lead.id]
+            );
+            sent++;
+
+            emitInstantProgress(userId, {
+                batch_id: batchId, lead_id: lead.id, lead_name: lead.name,
+                phone: lead.phone, status: 'sent',
+                index: i + 1, total: shuffled.length, sent, failed
+            });
+
+        } catch (err) {
+            failed++;
+            await pool.query(
+                `UPDATE wa_instant_messages SET status = 'failed', error_message = ? WHERE batch_id = ? AND lead_id = ?`,
+                [(err.message || 'Unknown error').substring(0, 500), batchId, lead.id]
+            ).catch(() => {});
+
+            emitInstantProgress(userId, {
+                batch_id: batchId, lead_id: lead.id, lead_name: lead.name,
+                phone: lead.phone, status: 'failed', error: err.message,
+                index: i + 1, total: shuffled.length, sent, failed
+            });
+        }
+
+        // Anti-block delay: 5-15 seconds between messages
+        if (i < shuffled.length - 1) {
+            const delay = 5000 + Math.random() * 10000;
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+
+    // Emit completion
+    if (io) {
+        io.to(`user_${userId}`).emit('wa_instant_complete', {
+            batch_id: batchId, total: shuffled.length, sent, failed
+        });
+    }
+}
+
+function emitInstantProgress(userId, data) {
+    if (io) {
+        io.to(`user_${userId}`).emit('wa_instant_progress', data);
+    }
+}
+
+// ========================================
+// INSTANT HISTORY — Recent instant messages
+// ========================================
+
+/** GET /api/wa-marketing/instant-history */
+router.get('/instant-history', viewPerm, async (req, res) => {
+    try {
+        const { batch_id, status, search, page = 1, limit = 50 } = req.query;
+        let where = 'WHERE 1=1';
+        const params = [];
+
+        if (batch_id) { where += ' AND m.batch_id = ?'; params.push(batch_id); }
+        if (status) { where += ' AND m.status = ?'; params.push(status); }
+        if (search) {
+            where += ' AND (m.lead_name LIKE ? OR m.phone LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`);
+        }
+
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
+        const [countResult] = await pool.query(
+            `SELECT COUNT(*) as total FROM wa_instant_messages m ${where}`, params
+        );
+
+        const [rows] = await pool.query(
+            `SELECT m.*, u.full_name as sent_by_name, b.name as branch_name
+             FROM wa_instant_messages m
+             LEFT JOIN users u ON m.created_by = u.id
+             LEFT JOIN branches b ON m.branch_id = b.id
+             ${where}
+             ORDER BY m.created_at DESC
+             LIMIT ? OFFSET ?`,
+            [...params, parseInt(limit), offset]
+        );
+
+        // Also return batch summary stats
+        const [batches] = await pool.query(
+            `SELECT batch_id, COUNT(*) as total,
+                    SUM(status = 'sent') as sent,
+                    SUM(status = 'failed') as failed,
+                    SUM(status = 'pending' OR status = 'sending') as pending,
+                    MIN(created_at) as started_at,
+                    MAX(sent_at) as completed_at
+             FROM wa_instant_messages
+             GROUP BY batch_id
+             ORDER BY MIN(created_at) DESC
+             LIMIT 20`
+        );
+
+        res.json({
+            success: true,
+            data: rows,
+            batches,
+            pagination: { total: countResult[0].total, page: parseInt(page), limit: parseInt(limit) }
+        });
+    } catch (error) {
+        console.error('Instant history error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get instant history' });
+    }
+});
+
+/** GET /api/wa-marketing/whatsapp-sessions — Get connected sessions for branch picker */
+router.get('/whatsapp-sessions', viewPerm, async (req, res) => {
+    try {
+        if (!sessionManager) {
+            return res.json({ success: true, data: [] });
+        }
+        const sessions = sessionManager.getStatus();
+        res.json({ success: true, data: sessions });
+    } catch (error) {
+        console.error('Get WA sessions error:', error);
+        res.json({ success: true, data: [] });
+    }
+});
+
 module.exports = {
     router,
     setPool,
-    setCampaignEngine
+    setCampaignEngine,
+    setSessionManager,
+    setIO
 };
