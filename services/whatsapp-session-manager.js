@@ -15,11 +15,12 @@
 const path = require('path');
 
 // whatsapp-web.js is an optional dependency — server runs without it
-let Client, LocalAuth;
+let Client, LocalAuth, MessageMedia;
 try {
     const wwjs = require('whatsapp-web.js');
     Client = wwjs.Client;
     LocalAuth = wwjs.LocalAuth;
+    MessageMedia = wwjs.MessageMedia;
 } catch (e) {
     console.warn('[WhatsApp Sessions] whatsapp-web.js not installed — session management disabled. Run: npm install whatsapp-web.js qrcode');
 }
@@ -258,6 +259,45 @@ async function sendMessage(branchId, phone, message) {
     return true;
 }
 
+/**
+ * Send a media message via branch's WhatsApp session
+ * @param {number} branchId
+ * @param {string} phone
+ * @param {object} options - { type: 'image'|'document', mediaPath, caption, filename }
+ * @returns {boolean} true if sent successfully
+ */
+async function sendMedia(branchId, phone, options = {}) {
+    branchId = parseInt(branchId);
+    const session = sessions.get(branchId);
+
+    if (!session || session.status !== 'connected' || !session.client) {
+        return false;
+    }
+
+    if (!MessageMedia) {
+        console.error('[WhatsApp Sessions] MessageMedia not available');
+        return false;
+    }
+
+    // Normalize phone: ensure 91XXXXXXXXXX@c.us format
+    let normalized = phone.replace(/[^0-9+]/g, '');
+    if (normalized.startsWith('+')) normalized = normalized.substring(1);
+    if (!normalized.startsWith('91') && normalized.length === 10) {
+        normalized = '91' + normalized;
+    }
+    const chatId = normalized + '@c.us';
+
+    const media = MessageMedia.fromFilePath(options.mediaPath);
+    if (options.filename) media.filename = options.filename;
+
+    const sendOptions = {};
+    if (options.caption) sendOptions.caption = options.caption;
+    if (options.type === 'document') sendOptions.sendMediaAsDocument = true;
+
+    await session.client.sendMessage(chatId, media, sendOptions);
+    return true;
+}
+
 // ========================================
 // STATUS / INIT
 // ========================================
@@ -404,6 +444,7 @@ module.exports = {
     connectBranch,
     disconnectBranch,
     sendMessage,
+    sendMedia,
     getStatus,
     getQRForBranch,
     getBranchStatus,

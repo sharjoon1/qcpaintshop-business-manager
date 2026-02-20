@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>WA Marketing - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        .tab-btn { padding: 8px 16px; font-size: 0.8125rem; font-weight: 500; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s; background: none; color: #64748b; white-space: nowrap; }
+        .tab-btn:hover { background: #f1f5f9; color: #334155; }
+        .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-weight: 600; box-shadow: 0 2px 8px rgba(102,126,234,0.3); }
+        .stat-card { background: #fff; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #f1f5f9; }
+        .stat-value { font-size: 1.75rem; font-weight: 700; color: #1e293b; }
+        .stat-label { font-size: 0.75rem; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; }
+        .badge-draft { background: #f1f5f9; color: #64748b; }
+        .badge-running { background: #dcfce7; color: #16a34a; }
+        .badge-paused { background: #fef3c7; color: #d97706; }
+        .badge-completed { background: #dbeafe; color: #2563eb; }
+        .badge-cancelled { background: #fecaca; color: #dc2626; }
+        .badge-failed { background: #fecaca; color: #dc2626; }
+        .badge-scheduled { background: #e0e7ff; color: #4f46e5; }
+        .badge-sent { background: #dcfce7; color: #16a34a; }
+        .badge-pending { background: #f1f5f9; color: #64748b; }
+        .badge-skipped { background: #fef3c7; color: #d97706; }
+        .badge-sending { background: #e0f2fe; color: #0284c7; }
+        .table-container { overflow-x: auto; background: #fff; border-radius: 12px; border: 1px solid #f1f5f9; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+        .data-table th { background: #f8fafc; padding: 10px 14px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+        .data-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        .data-table tr:hover { background: #f8fafc; }
+        .action-btn { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 500; cursor: pointer; border: 1px solid #e2e8f0; background: #fff; color: #475569; transition: all 0.15s; }
+        .action-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+        .action-btn.primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-color: transparent; }
+        .action-btn.primary:hover { opacity: 0.9; }
+        .action-btn.danger { color: #dc2626; border-color: #fecaca; }
+        .action-btn.danger:hover { background: #fef2f2; }
+        .action-btn.success { color: #16a34a; border-color: #bbf7d0; }
+        .action-btn.success:hover { background: #f0fdf4; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 1rem; }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: #fff; border-radius: 16px; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+        .modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+        .modal-header h3 { font-size: 1.125rem; font-weight: 700; color: #1e293b; }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 0.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.8125rem; font-weight: 600; color: #475569; margin-bottom: 0.375rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; color: #334155; transition: border-color 0.2s; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .form-group textarea { resize: vertical; min-height: 100px; }
+        .var-btn { display: inline-flex; padding: 2px 8px; margin: 2px; border-radius: 4px; font-size: 0.6875rem; background: #f1f5f9; color: #667eea; cursor: pointer; border: 1px solid #e2e8f0; font-weight: 500; }
+        .var-btn:hover { background: #e0e7ff; }
+        .spin-helper { display: inline-flex; padding: 2px 8px; margin: 2px; border-radius: 4px; font-size: 0.6875rem; background: #fef3c7; color: #d97706; cursor: pointer; border: 1px solid #fde68a; font-weight: 500; }
+        .spin-helper:hover { background: #fde68a; }
+        .wizard-step { display: none; }
+        .wizard-step.active { display: block; }
+        .wizard-nav { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; overflow-x: auto; }
+        .wizard-nav-item { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 500; color: #94a3b8; background: #f8fafc; border: 1px solid #e2e8f0; white-space: nowrap; cursor: pointer; }
+        .wizard-nav-item.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-color: transparent; }
+        .wizard-nav-item.done { background: #dcfce7; color: #16a34a; border-color: #bbf7d0; }
+        .engine-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .engine-running { background: #dcfce7; color: #16a34a; }
+        .engine-stopped { background: #fecaca; color: #dc2626; }
+        .engine-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .engine-running .engine-dot { background: #16a34a; animation: pulse 2s infinite; }
+        .engine-stopped .engine-dot { background: #dc2626; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .preview-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 1rem; margin-top: 0.5rem; font-size: 0.875rem; color: #166534; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+        .filter-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 0.6875rem; background: #e0e7ff; color: #4338ca; font-weight: 500; }
+        .filter-chip .remove { cursor: pointer; font-weight: 700; margin-left: 2px; }
+        .progress-bar-bg { width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 3px; transition: width 0.3s; }
+        .template-card { background: #fff; border: 1px solid #f1f5f9; border-radius: 12px; padding: 1rem; cursor: pointer; transition: all 0.2s; }
+        .template-card:hover { border-color: #667eea; box-shadow: 0 2px 8px rgba(102,126,234,0.1); }
+        .template-card.selected { border-color: #667eea; background: #f5f3ff; }
+    </style>
+</head>
+<body data-page="marketing-dashboard" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
+
+    <div class="container mx-auto p-4 md:p-6">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+            <div>
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800">WhatsApp Marketing</h2>
+                <p class="text-gray-500 mt-0.5 text-xs">Bulk campaign messaging to leads</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <div id="engineStatus" class="engine-indicator engine-stopped">
+                    <span class="engine-dot"></span>
+                    <span>Engine Stopped</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 mb-4 overflow-x-auto pb-1">
+            <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="tab-btn" onclick="switchTab('campaigns')">Campaigns</button>
+            <button class="tab-btn" onclick="switchTab('templates')">Templates</button>
+            <button class="tab-btn" onclick="switchTab('logs')">Logs</button>
+            <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
+        </div>
+
+        <!-- TAB: Dashboard -->
+        <div id="tab-dashboard" class="tab-content">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div class="stat-card">
+                    <div class="stat-label">Total Sent</div>
+                    <div class="stat-value" id="statTotalSent">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Today Sent</div>
+                    <div class="stat-value" id="statTodaySent">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Campaigns</div>
+                    <div class="stat-value" id="statRunning">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Failed</div>
+                    <div class="stat-value text-red-500" id="statFailed">0</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div class="stat-card">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Campaign Performance</h4>
+                    <canvas id="campaignChart" height="200"></canvas>
+                </div>
+                <div class="stat-card">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Hourly Sending Volume (Today)</h4>
+                    <canvas id="hourlyChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3">Recent Campaigns</h4>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr><th>Name</th><th>Branch</th><th>Status</th><th>Sent</th><th>Failed</th><th>Progress</th></tr></thead>
+                        <tbody id="recentCampaignsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Campaigns -->
+        <div id="tab-campaigns" class="tab-content" style="display:none">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <div class="flex gap-2 flex-wrap">
+                    <select id="campaignStatusFilter" onchange="loadCampaigns()" class="text-xs border rounded-lg px-3 py-1.5">
+                        <option value="">All Status</option>
+                        <option value="draft">Draft</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="running">Running</option>
+                        <option value="paused">Paused</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                    <input type="text" id="campaignSearch" placeholder="Search..." class="text-xs border rounded-lg px-3 py-1.5 w-40" onkeyup="debounce(loadCampaigns, 300)()">
+                </div>
+                <button class="action-btn primary" onclick="openCampaignWizard()">+ New Campaign</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead><tr><th>Name</th><th>Branch</th><th>Type</th><th>Status</th><th>Audience</th><th>Sent</th><th>Failed</th><th>Progress</th><th>Created</th><th>Actions</th></tr></thead>
+                    <tbody id="campaignsBody"></tbody>
+                </table>
+            </div>
+            <div id="campaignsPagination" class="flex justify-center gap-2 mt-3"></div>
+        </div>
+
+        <!-- TAB: Templates -->
+        <div id="tab-templates" class="tab-content" style="display:none">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <select id="templateCategoryFilter" onchange="loadTemplates()" class="text-xs border rounded-lg px-3 py-1.5">
+                    <option value="">All Categories</option>
+                    <option value="greeting">Greeting</option>
+                    <option value="promotion">Promotion</option>
+                    <option value="followup">Follow-up</option>
+                    <option value="announcement">Announcement</option>
+                    <option value="festival">Festival</option>
+                    <option value="custom">Custom</option>
+                </select>
+                <button class="action-btn primary" onclick="openTemplateModal()">+ New Template</button>
+            </div>
+            <div id="templatesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        </div>
+
+        <!-- TAB: Logs -->
+        <div id="tab-logs" class="tab-content" style="display:none">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <div class="flex gap-2 flex-wrap">
+                    <select id="logCampaignFilter" onchange="loadLogs()" class="text-xs border rounded-lg px-3 py-1.5">
+                        <option value="">All Campaigns</option>
+                    </select>
+                    <select id="logStatusFilter" onchange="loadLogs()" class="text-xs border rounded-lg px-3 py-1.5">
+                        <option value="">All Status</option>
+                        <option value="sent">Sent</option>
+                        <option value="failed">Failed</option>
+                        <option value="pending">Pending</option>
+                        <option value="skipped">Skipped</option>
+                    </select>
+                    <input type="text" id="logSearch" placeholder="Search name/phone..." class="text-xs border rounded-lg px-3 py-1.5 w-40" onkeyup="debounce(loadLogs, 300)()">
+                </div>
+                <button class="action-btn" onclick="exportLogs()">Export CSV</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead><tr><th>Time</th><th>Campaign</th><th>Lead</th><th>Phone</th><th>Status</th><th>Message</th><th>Error</th></tr></thead>
+                    <tbody id="logsBody"></tbody>
+                </table>
+            </div>
+            <div id="logsPagination" class="flex justify-center gap-2 mt-3"></div>
+        </div>
+
+        <!-- TAB: Settings -->
+        <div id="tab-settings" class="tab-content" style="display:none">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="stat-card">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Delay Settings</h4>
+                    <div class="form-group">
+                        <label>Min Delay Between Messages (seconds)</label>
+                        <input type="number" id="settMinDelay" min="10" max="300">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Delay Between Messages (seconds)</label>
+                        <input type="number" id="settMaxDelay" min="20" max="600">
+                    </div>
+                    <div class="form-group">
+                        <label>Typing Delay Min (seconds)</label>
+                        <input type="number" id="settTypingMin" min="0" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Typing Delay Max (seconds)</label>
+                        <input type="number" id="settTypingMax" min="1" max="15">
+                    </div>
+                    <div class="form-group">
+                        <label>Seen Delay Min (seconds)</label>
+                        <input type="number" id="settSeenMin" min="0" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Seen Delay Max (seconds)</label>
+                        <input type="number" id="settSeenMax" min="1" max="20">
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Rate Limits</h4>
+                    <div class="form-group">
+                        <label>Hourly Limit</label>
+                        <input type="number" id="settHourlyLimit" min="5" max="200">
+                    </div>
+                    <div class="form-group">
+                        <label>Daily Limit</label>
+                        <input type="number" id="settDailyLimit" min="10" max="1000">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Consecutive Failures (auto-pause)</label>
+                        <input type="number" id="settMaxFailures" min="1" max="20">
+                    </div>
+                    <div class="form-group">
+                        <label>Engine Poll Interval (ms)</label>
+                        <input type="number" id="settPollInterval" min="5000" max="120000">
+                    </div>
+                    <div class="form-group">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="settInvisibleMarkers" class="w-4 h-4">
+                            <span>Enable Invisible Markers (anti-duplicate)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="stat-card md:col-span-2">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Warm-Up Schedule (messages/day)</h4>
+                    <div class="grid grid-cols-5 gap-3">
+                        <div class="form-group"><label>Day 1</label><input type="number" id="settWarmup1" min="5" max="500"></div>
+                        <div class="form-group"><label>Day 2</label><input type="number" id="settWarmup2" min="5" max="500"></div>
+                        <div class="form-group"><label>Day 3</label><input type="number" id="settWarmup3" min="5" max="500"></div>
+                        <div class="form-group"><label>Day 4</label><input type="number" id="settWarmup4" min="5" max="500"></div>
+                        <div class="form-group"><label>Day 5+</label><input type="number" id="settWarmup5" min="5" max="1000"></div>
+                    </div>
+                    <div class="flex justify-end mt-2">
+                        <button class="action-btn primary" onclick="saveSettings()">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Wizard Modal -->
+    <div class="modal-overlay" id="campaignWizardModal">
+        <div class="modal-box" style="max-width:900px">
+            <div class="modal-header">
+                <h3 id="wizardTitle">New Campaign</h3>
+                <button onclick="closeModal('campaignWizardModal')" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#94a3b8">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="wizard-nav" id="wizardNav">
+                    <span class="wizard-nav-item active" onclick="goToStep(1)">1. Basic Info</span>
+                    <span class="wizard-nav-item" onclick="goToStep(2)">2. Message</span>
+                    <span class="wizard-nav-item" onclick="goToStep(3)">3. Audience</span>
+                    <span class="wizard-nav-item" onclick="goToStep(4)">4. Anti-Block</span>
+                    <span class="wizard-nav-item" onclick="goToStep(5)">5. Review</span>
+                </div>
+
+                <!-- Step 1: Basic Info -->
+                <div class="wizard-step active" id="wizStep1">
+                    <div class="form-group">
+                        <label>Campaign Name *</label>
+                        <input type="text" id="wizName" placeholder="e.g., Diwali Paint Sale 2026">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="wizDesc" rows="2" placeholder="Campaign description..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="form-group">
+                            <label>Branch *</label>
+                            <select id="wizBranch"><option value="">Select Branch</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Message Type</label>
+                            <select id="wizMsgType" onchange="toggleMediaFields()">
+                                <option value="text">Text</option>
+                                <option value="image">Image</option>
+                                <option value="document">Document</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Message Composer -->
+                <div class="wizard-step" id="wizStep2">
+                    <div class="form-group">
+                        <label>Template (optional)</label>
+                        <select id="wizTemplate" onchange="applyTemplate()">
+                            <option value="">-- Start from scratch --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Message Body *</label>
+                        <div class="mb-1">
+                            <span class="text-xs text-gray-500">Variables:</span>
+                            <button type="button" class="var-btn" onclick="insertVar('{name}')">{name}</button>
+                            <button type="button" class="var-btn" onclick="insertVar('{company}')">{company}</button>
+                            <button type="button" class="var-btn" onclick="insertVar('{city}')">{city}</button>
+                            <button type="button" class="var-btn" onclick="insertVar('{phone}')">{phone}</button>
+                            <button type="button" class="var-btn" onclick="insertVar('{source}')">{source}</button>
+                            <button type="button" class="var-btn" onclick="insertVar('{email}')">{email}</button>
+                            <button type="button" class="var-btn" onclick="insertVar('{branch}')">{branch}</button>
+                        </div>
+                        <div class="mb-1">
+                            <span class="text-xs text-gray-500">Spin Text:</span>
+                            <button type="button" class="spin-helper" onclick="insertVar('[Hi|Hello|Hey]')">[Hi|Hello|Hey]</button>
+                            <button type="button" class="spin-helper" onclick="insertVar('[Thank you|Thanks|Much appreciated]')">[Thanks|...]</button>
+                        </div>
+                        <textarea id="wizMsgBody" rows="6" placeholder="Type your message here...&#10;Use {name} for lead name, [Hi|Hello] for random text"></textarea>
+                    </div>
+                    <div id="mediaFields" style="display:none">
+                        <div class="form-group">
+                            <label>Media File</label>
+                            <input type="file" id="wizMediaFile" accept="image/*,.pdf,.doc,.docx" onchange="uploadMedia()">
+                            <div id="mediaPreview" class="mt-2" style="display:none">
+                                <span class="text-xs text-green-600" id="mediaFileName"></span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Media Caption</label>
+                            <textarea id="wizMediaCaption" rows="2" placeholder="Caption for the media..."></textarea>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Live Preview</label>
+                        <button type="button" class="action-btn text-xs" onclick="previewMessage()">Generate Preview</button>
+                        <div class="preview-box" id="messagePreview" style="display:none"></div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Audience Builder -->
+                <div class="wizard-step" id="wizStep3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="form-group">
+                            <label>Lead Status</label>
+                            <select id="wizFilterStatus" multiple style="height:auto;min-height:80px">
+                                <option value="new">New</option>
+                                <option value="contacted">Contacted</option>
+                                <option value="interested">Interested</option>
+                                <option value="quoted">Quoted</option>
+                                <option value="negotiating">Negotiating</option>
+                                <option value="won">Won</option>
+                                <option value="lost">Lost</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                            <span class="text-xs text-gray-400">Hold Ctrl to select multiple</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Lead Source</label>
+                            <select id="wizFilterSource" multiple style="height:auto;min-height:80px">
+                                <option value="website">Website</option>
+                                <option value="walk_in">Walk-in</option>
+                                <option value="referral">Referral</option>
+                                <option value="social_media">Social Media</option>
+                                <option value="phone_call">Phone Call</option>
+                                <option value="advertisement">Advertisement</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Priority</label>
+                            <select id="wizFilterPriority">
+                                <option value="">Any</option>
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>City</label>
+                            <input type="text" id="wizFilterCity" placeholder="e.g., Chennai">
+                        </div>
+                        <div class="form-group">
+                            <label>Created From</label>
+                            <input type="date" id="wizFilterDateFrom">
+                        </div>
+                        <div class="form-group">
+                            <label>Created To</label>
+                            <input type="date" id="wizFilterDateTo">
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 mt-2">
+                        <button type="button" class="action-btn primary" onclick="previewAudience()">Preview Audience Count</button>
+                        <span id="audienceCount" class="text-sm font-semibold text-gray-700"></span>
+                    </div>
+                </div>
+
+                <!-- Step 4: Anti-Block Settings -->
+                <div class="wizard-step" id="wizStep4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="form-group">
+                            <label>Min Delay Between Messages (seconds)</label>
+                            <input type="number" id="wizMinDelay" value="30" min="10" max="300">
+                        </div>
+                        <div class="form-group">
+                            <label>Max Delay Between Messages (seconds)</label>
+                            <input type="number" id="wizMaxDelay" value="90" min="20" max="600">
+                        </div>
+                        <div class="form-group">
+                            <label>Hourly Limit</label>
+                            <input type="number" id="wizHourlyLimit" value="30" min="5" max="200">
+                        </div>
+                        <div class="form-group">
+                            <label>Daily Limit</label>
+                            <input type="number" id="wizDailyLimit" value="200" min="10" max="1000">
+                        </div>
+                    </div>
+                    <div class="form-group mt-2">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="wizWarmUp" class="w-4 h-4">
+                            <span>Enable Warm-Up Mode (gradually increase sending limit)</span>
+                        </label>
+                        <p class="text-xs text-gray-400 mt-1">Day 1: 20 → Day 2: 50 → Day 3: 100 → Day 4: 150 → Day 5+: 200</p>
+                    </div>
+                </div>
+
+                <!-- Step 5: Review -->
+                <div class="wizard-step" id="wizStep5">
+                    <div class="space-y-3" id="reviewSummary"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="action-btn" id="wizBackBtn" onclick="wizardBack()" style="display:none">Back</button>
+                <button class="action-btn primary" id="wizNextBtn" onclick="wizardNext()">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Modal -->
+    <div class="modal-overlay" id="templateModal">
+        <div class="modal-box" style="max-width:600px">
+            <div class="modal-header">
+                <h3 id="templateModalTitle">New Template</h3>
+                <button onclick="closeModal('templateModal')" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#94a3b8">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Template Name *</label>
+                    <input type="text" id="tplName" placeholder="e.g., Festival Greeting">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="tplCategory">
+                            <option value="custom">Custom</option>
+                            <option value="greeting">Greeting</option>
+                            <option value="promotion">Promotion</option>
+                            <option value="followup">Follow-up</option>
+                            <option value="announcement">Announcement</option>
+                            <option value="festival">Festival</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Message Type</label>
+                        <select id="tplMsgType">
+                            <option value="text">Text</option>
+                            <option value="image">Image</option>
+                            <option value="document">Document</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Message Body *</label>
+                    <div class="mb-1">
+                        <button type="button" class="var-btn" onclick="insertToField('tplBody','{name}')">{name}</button>
+                        <button type="button" class="var-btn" onclick="insertToField('tplBody','{company}')">{company}</button>
+                        <button type="button" class="var-btn" onclick="insertToField('tplBody','{city}')">{city}</button>
+                        <button type="button" class="spin-helper" onclick="insertToField('tplBody','[Hi|Hello|Hey]')">[Hi|Hello|Hey]</button>
+                    </div>
+                    <textarea id="tplBody" rows="5" placeholder="Message template body..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="action-btn" onclick="closeModal('templateModal')">Cancel</button>
+                <button class="action-btn primary" onclick="saveTemplate()">Save Template</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Detail / Leads Modal -->
+    <div class="modal-overlay" id="campaignDetailModal">
+        <div class="modal-box" style="max-width:900px">
+            <div class="modal-header">
+                <h3 id="detailModalTitle">Campaign Leads</h3>
+                <button onclick="closeModal('campaignDetailModal')" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#94a3b8">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="campaignDetailStats" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4"></div>
+                <div class="flex gap-2 mb-3">
+                    <select id="detailLeadStatus" onchange="loadCampaignLeads()" class="text-xs border rounded-lg px-3 py-1.5">
+                        <option value="">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="sent">Sent</option>
+                        <option value="failed">Failed</option>
+                        <option value="skipped">Skipped</option>
+                    </select>
+                    <input type="text" id="detailLeadSearch" placeholder="Search..." class="text-xs border rounded-lg px-3 py-1.5" onkeyup="debounce(loadCampaignLeads, 300)()">
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Status</th><th>Sent At</th><th>Error</th></tr></thead>
+                        <tbody id="detailLeadsBody"></tbody>
+                    </table>
+                </div>
+                <div id="detailPagination" class="flex justify-center gap-2 mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ========================================
+// STATE
+// ========================================
+const API = '/api/wa-marketing';
+let currentTab = 'dashboard';
+let campaignPage = 1;
+let logPage = 1;
+let logCampaignId = null;
+let detailCampaignId = null;
+let detailPage = 1;
+let wizardStep = 1;
+let editingCampaignId = null;
+let editingTemplateId = null;
+let uploadedMediaUrl = null;
+let uploadedMediaFilename = null;
+let branches = [];
+let templates = [];
+let chartCampaign = null;
+let chartHourly = null;
+
+// ========================================
+// INIT
+// ========================================
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadBranches();
+    loadDashboard();
+    loadTemplateList();
+    setupSocketListeners();
+});
+
+async function loadBranches() {
+    try {
+        const res = await fetch('/api/branches', { headers: getAuthHeaders() });
+        const data = await res.json();
+        branches = data.branches || data || [];
+        const sel = document.getElementById('wizBranch');
+        branches.forEach(b => {
+            sel.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.name}</option>`);
+        });
+    } catch (e) { console.error('Failed to load branches:', e); }
+}
+
+// ========================================
+// TABS
+// ========================================
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).style.display = 'block';
+    event.target.classList.add('active');
+
+    if (tab === 'dashboard') loadDashboard();
+    else if (tab === 'campaigns') loadCampaigns();
+    else if (tab === 'templates') loadTemplates();
+    else if (tab === 'logs') { loadLogCampaignFilter(); loadLogs(); }
+    else if (tab === 'settings') loadSettings();
+}
+
+// ========================================
+// DASHBOARD
+// ========================================
+async function loadDashboard() {
+    try {
+        const [dashRes, statsRes] = await Promise.all([
+            fetch(`${API}/dashboard`, { headers: getAuthHeaders() }),
+            fetch(`${API}/dashboard/sending-stats?days=7`, { headers: getAuthHeaders() })
+        ]);
+        const dash = await dashRes.json();
+        const stats = await statsRes.json();
+
+        document.getElementById('statTotalSent').textContent = (dash.messages?.total_sent || 0).toLocaleString();
+        document.getElementById('statTodaySent').textContent = (dash.today?.sent || 0).toLocaleString();
+        document.getElementById('statRunning').textContent = dash.campaigns?.running || 0;
+        document.getElementById('statFailed').textContent = (dash.messages?.total_failed || 0).toLocaleString();
+
+        // Engine status
+        const engineEl = document.getElementById('engineStatus');
+        if (dash.engine?.running) {
+            engineEl.className = 'engine-indicator engine-running';
+            engineEl.innerHTML = '<span class="engine-dot"></span><span>Engine Running</span>';
+        } else {
+            engineEl.className = 'engine-indicator engine-stopped';
+            engineEl.innerHTML = '<span class="engine-dot"></span><span>Engine Stopped</span>';
+        }
+
+        // Recent campaigns
+        const tbody = document.getElementById('recentCampaignsBody');
+        tbody.innerHTML = (dash.recent_campaigns || []).map(c => {
+            const pct = c.total_leads > 0 ? Math.round((c.sent_count / c.total_leads) * 100) : 0;
+            return `<tr>
+                <td class="font-medium">${esc(c.name)}</td>
+                <td>${esc(c.branch_name || '-')}</td>
+                <td><span class="badge badge-${c.status}">${c.status}</span></td>
+                <td>${c.sent_count || 0}</td>
+                <td>${c.failed_count || 0}</td>
+                <td><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div><span class="text-xs text-gray-400">${pct}%</span></td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="6" class="text-center text-gray-400 py-4">No campaigns yet</td></tr>';
+
+        // Charts
+        renderCampaignChart(dash.recent_campaigns || []);
+        renderHourlyChart(stats.hourly || []);
+    } catch (e) { console.error('Dashboard error:', e); }
+}
+
+function renderCampaignChart(campaigns) {
+    const ctx = document.getElementById('campaignChart').getContext('2d');
+    if (chartCampaign) chartCampaign.destroy();
+    const labels = campaigns.map(c => c.name.substring(0, 15));
+    chartCampaign = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Sent', data: campaigns.map(c => c.sent_count || 0), backgroundColor: 'rgba(102,126,234,0.7)', borderRadius: 4 },
+                { label: 'Failed', data: campaigns.map(c => c.failed_count || 0), backgroundColor: 'rgba(220,38,38,0.5)', borderRadius: 4 }
+            ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }, scales: { y: { beginAtZero: true } } }
+    });
+}
+
+function renderHourlyChart(hourly) {
+    const ctx = document.getElementById('hourlyChart').getContext('2d');
+    if (chartHourly) chartHourly.destroy();
+    const labels = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+    const sentData = new Array(24).fill(0);
+    const failData = new Array(24).fill(0);
+    hourly.forEach(h => { sentData[h.stat_hour] = h.sent; failData[h.stat_hour] = h.failed; });
+    chartHourly = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Sent', data: sentData, borderColor: '#667eea', backgroundColor: 'rgba(102,126,234,0.1)', fill: true, tension: 0.3 },
+                { label: 'Failed', data: failData, borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.1)', fill: true, tension: 0.3, borderDash: [5, 5] }
+            ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }, scales: { y: { beginAtZero: true } } }
+    });
+}
+
+// ========================================
+// CAMPAIGNS
+// ========================================
+async function loadCampaigns() {
+    try {
+        const status = document.getElementById('campaignStatusFilter').value;
+        const search = document.getElementById('campaignSearch').value;
+        const res = await fetch(`${API}/campaigns?page=${campaignPage}&limit=20&status=${status}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+
+        const tbody = document.getElementById('campaignsBody');
+        tbody.innerHTML = (data.campaigns || []).map(c => {
+            const pct = c.total_leads > 0 ? Math.round((c.sent_count / c.total_leads) * 100) : 0;
+            return `<tr>
+                <td class="font-medium"><a href="#" onclick="viewCampaignDetail(${c.id});return false" class="text-indigo-600 hover:underline">${esc(c.name)}</a></td>
+                <td>${esc(c.branch_name || '-')}</td>
+                <td>${c.message_type}</td>
+                <td><span class="badge badge-${c.status}">${c.status}</span></td>
+                <td>${c.total_leads || 0}</td>
+                <td>${c.sent_count || 0}</td>
+                <td>${c.failed_count || 0}</td>
+                <td style="min-width:100px"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div><span class="text-xs text-gray-400">${pct}%</span></td>
+                <td class="text-xs text-gray-400">${formatDate(c.created_at)}</td>
+                <td class="whitespace-nowrap">${campaignActions(c)}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="10" class="text-center text-gray-400 py-6">No campaigns found</td></tr>';
+
+        renderPagination('campaignsPagination', data.pagination, p => { campaignPage = p; loadCampaigns(); });
+    } catch (e) { console.error('Campaigns error:', e); }
+}
+
+function campaignActions(c) {
+    let html = '';
+    if (c.status === 'draft') {
+        html += `<button class="action-btn success text-xs" onclick="populateAndStart(${c.id})">Populate & Start</button> `;
+        html += `<button class="action-btn danger text-xs" onclick="deleteCampaign(${c.id})">Del</button> `;
+    } else if (c.status === 'running') {
+        html += `<button class="action-btn text-xs" onclick="pauseCampaign(${c.id})">Pause</button> `;
+        html += `<button class="action-btn danger text-xs" onclick="cancelCampaign(${c.id})">Cancel</button> `;
+    } else if (c.status === 'paused') {
+        html += `<button class="action-btn success text-xs" onclick="resumeCampaign(${c.id})">Resume</button> `;
+        html += `<button class="action-btn danger text-xs" onclick="cancelCampaign(${c.id})">Cancel</button> `;
+    } else if (c.status === 'scheduled') {
+        html += `<button class="action-btn danger text-xs" onclick="cancelCampaign(${c.id})">Cancel</button> `;
+    }
+    html += `<button class="action-btn text-xs" onclick="duplicateCampaign(${c.id})">Clone</button>`;
+    return html;
+}
+
+async function populateAndStart(id) {
+    if (!confirm('Populate audience and start this campaign?')) return;
+    try {
+        showToast('Populating audience...', 'info');
+        const popRes = await fetch(`${API}/campaigns/${id}/populate`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({}) });
+        const popData = await popRes.json();
+        if (!popRes.ok) { showToast(popData.error || 'Failed to populate', 'error'); return; }
+        showToast(`${popData.total_leads} leads added. Starting campaign...`, 'success');
+
+        const startRes = await fetch(`${API}/campaigns/${id}/start`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({}) });
+        const startData = await startRes.json();
+        if (!startRes.ok) { showToast(startData.error || 'Failed to start', 'error'); return; }
+        showToast('Campaign started!', 'success');
+        loadCampaigns();
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function pauseCampaign(id) {
+    await campaignAction(id, 'pause', 'Campaign paused');
+}
+async function resumeCampaign(id) {
+    await campaignAction(id, 'resume', 'Campaign resumed');
+}
+async function cancelCampaign(id) {
+    if (!confirm('Cancel this campaign? Pending messages will be skipped.')) return;
+    await campaignAction(id, 'cancel', 'Campaign cancelled');
+}
+async function deleteCampaign(id) {
+    if (!confirm('Delete this campaign?')) return;
+    try {
+        const res = await fetch(`${API}/campaigns/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        if (res.ok) { showToast('Campaign deleted', 'success'); loadCampaigns(); }
+        else { const d = await res.json(); showToast(d.error, 'error'); }
+    } catch (e) { showToast('Error', 'error'); }
+}
+async function duplicateCampaign(id) {
+    try {
+        const res = await fetch(`${API}/campaigns/${id}/duplicate`, { method: 'POST', headers: getAuthHeaders() });
+        const data = await res.json();
+        if (res.ok) { showToast('Campaign duplicated', 'success'); loadCampaigns(); }
+        else showToast(data.error, 'error');
+    } catch (e) { showToast('Error', 'error'); }
+}
+
+async function campaignAction(id, action, successMsg) {
+    try {
+        const res = await fetch(`${API}/campaigns/${id}/${action}`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({}) });
+        if (res.ok) { showToast(successMsg, 'success'); loadCampaigns(); }
+        else { const d = await res.json(); showToast(d.error, 'error'); }
+    } catch (e) { showToast('Error', 'error'); }
+}
+
+// ========================================
+// CAMPAIGN DETAIL
+// ========================================
+async function viewCampaignDetail(id) {
+    detailCampaignId = id;
+    detailPage = 1;
+    try {
+        const res = await fetch(`${API}/campaigns/${id}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const c = data.campaign;
+        document.getElementById('detailModalTitle').textContent = c.name;
+
+        const breakdown = {};
+        (data.status_breakdown || []).forEach(s => breakdown[s.status] = s.count);
+
+        document.getElementById('campaignDetailStats').innerHTML = `
+            <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value text-sm">${c.total_leads}</div></div>
+            <div class="stat-card"><div class="stat-label">Sent</div><div class="stat-value text-sm text-green-600">${breakdown.sent || 0}</div></div>
+            <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value text-sm text-red-500">${breakdown.failed || 0}</div></div>
+            <div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value text-sm text-gray-500">${breakdown.pending || 0}</div></div>
+        `;
+
+        loadCampaignLeads();
+        document.getElementById('campaignDetailModal').classList.add('show');
+    } catch (e) { showToast('Error loading campaign', 'error'); }
+}
+
+async function loadCampaignLeads() {
+    if (!detailCampaignId) return;
+    const status = document.getElementById('detailLeadStatus').value;
+    const search = document.getElementById('detailLeadSearch').value;
+    try {
+        const res = await fetch(`${API}/campaigns/${detailCampaignId}/leads?page=${detailPage}&limit=50&status=${status}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const tbody = document.getElementById('detailLeadsBody');
+        tbody.innerHTML = (data.leads || []).map(l => `
+            <tr>
+                <td>${l.send_order}</td>
+                <td>${esc(l.lead_name || '-')}</td>
+                <td>${esc(l.phone)}</td>
+                <td><span class="badge badge-${l.status}">${l.status}</span></td>
+                <td class="text-xs">${l.sent_at ? formatDate(l.sent_at) : '-'}</td>
+                <td class="text-xs text-red-500">${esc(l.error_message || '')}</td>
+            </tr>
+        `).join('') || '<tr><td colspan="6" class="text-center text-gray-400 py-4">No leads</td></tr>';
+
+        renderPagination('detailPagination', data.pagination, p => { detailPage = p; loadCampaignLeads(); });
+    } catch (e) { console.error('Campaign leads error:', e); }
+}
+
+// ========================================
+// CAMPAIGN WIZARD
+// ========================================
+function openCampaignWizard() {
+    editingCampaignId = null;
+    wizardStep = 1;
+    uploadedMediaUrl = null;
+    uploadedMediaFilename = null;
+    document.getElementById('wizardTitle').textContent = 'New Campaign';
+    document.getElementById('wizName').value = '';
+    document.getElementById('wizDesc').value = '';
+    document.getElementById('wizBranch').value = '';
+    document.getElementById('wizMsgType').value = 'text';
+    document.getElementById('wizMsgBody').value = '';
+    document.getElementById('wizMediaCaption').value = '';
+    document.getElementById('wizMinDelay').value = 30;
+    document.getElementById('wizMaxDelay').value = 90;
+    document.getElementById('wizHourlyLimit').value = 30;
+    document.getElementById('wizDailyLimit').value = 200;
+    document.getElementById('wizWarmUp').checked = false;
+    document.getElementById('wizFilterStatus').selectedIndex = -1;
+    document.getElementById('wizFilterSource').selectedIndex = -1;
+    document.getElementById('wizFilterPriority').value = '';
+    document.getElementById('wizFilterCity').value = '';
+    document.getElementById('wizFilterDateFrom').value = '';
+    document.getElementById('wizFilterDateTo').value = '';
+    document.getElementById('audienceCount').textContent = '';
+    document.getElementById('messagePreview').style.display = 'none';
+    toggleMediaFields();
+    updateWizardNav();
+    showWizardStep(1);
+    loadTemplateList();
+    document.getElementById('campaignWizardModal').classList.add('show');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+}
+
+function showWizardStep(step) {
+    document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
+    document.getElementById('wizStep' + step).classList.add('active');
+    document.getElementById('wizBackBtn').style.display = step > 1 ? 'inline-flex' : 'none';
+    document.getElementById('wizNextBtn').textContent = step === 5 ? 'Create & Start' : 'Next';
+    wizardStep = step;
+    updateWizardNav();
+    if (step === 5) buildReviewSummary();
+}
+
+function updateWizardNav() {
+    document.querySelectorAll('.wizard-nav-item').forEach((el, idx) => {
+        el.classList.remove('active', 'done');
+        if (idx + 1 === wizardStep) el.classList.add('active');
+        else if (idx + 1 < wizardStep) el.classList.add('done');
+    });
+}
+
+function goToStep(step) {
+    if (step <= wizardStep) showWizardStep(step);
+}
+
+function wizardBack() {
+    if (wizardStep > 1) showWizardStep(wizardStep - 1);
+}
+
+async function wizardNext() {
+    if (wizardStep === 1) {
+        if (!document.getElementById('wizName').value.trim()) { showToast('Campaign name required', 'error'); return; }
+        if (!document.getElementById('wizBranch').value) { showToast('Select a branch', 'error'); return; }
+        showWizardStep(2);
+    } else if (wizardStep === 2) {
+        if (!document.getElementById('wizMsgBody').value.trim()) { showToast('Message body required', 'error'); return; }
+        showWizardStep(3);
+    } else if (wizardStep === 3) {
+        showWizardStep(4);
+    } else if (wizardStep === 4) {
+        showWizardStep(5);
+    } else if (wizardStep === 5) {
+        await createAndStartCampaign();
+    }
+}
+
+function toggleMediaFields() {
+    const type = document.getElementById('wizMsgType').value;
+    document.getElementById('mediaFields').style.display = type !== 'text' ? 'block' : 'none';
+}
+
+function insertVar(text) {
+    const ta = document.getElementById('wizMsgBody');
+    const start = ta.selectionStart;
+    ta.value = ta.value.substring(0, start) + text + ta.value.substring(ta.selectionEnd);
+    ta.focus();
+    ta.setSelectionRange(start + text.length, start + text.length);
+}
+
+function insertToField(fieldId, text) {
+    const ta = document.getElementById(fieldId);
+    const start = ta.selectionStart;
+    ta.value = ta.value.substring(0, start) + text + ta.value.substring(ta.selectionEnd);
+    ta.focus();
+}
+
+async function uploadMedia() {
+    const file = document.getElementById('wizMediaFile').files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('media', file);
+    try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API}/upload`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+            uploadedMediaUrl = data.url;
+            uploadedMediaFilename = data.filename;
+            document.getElementById('mediaPreview').style.display = 'block';
+            document.getElementById('mediaFileName').textContent = data.filename;
+            showToast('Media uploaded', 'success');
+        } else showToast(data.error, 'error');
+    } catch (e) { showToast('Upload failed', 'error'); }
+}
+
+async function previewMessage() {
+    const body = document.getElementById('wizMsgBody').value;
+    if (!body) return;
+    try {
+        const res = await fetch(`${API}/leads/preview-message`, {
+            method: 'POST', headers: getAuthHeaders(),
+            body: JSON.stringify({ message_body: body })
+        });
+        const data = await res.json();
+        const preview = document.getElementById('messagePreview');
+        preview.textContent = data.resolved || body;
+        preview.style.display = 'block';
+    } catch (e) { console.error(e); }
+}
+
+function getSelectedValues(selectId) {
+    const sel = document.getElementById(selectId);
+    return Array.from(sel.selectedOptions).map(o => o.value);
+}
+
+function getFilters() {
+    return {
+        status: getSelectedValues('wizFilterStatus'),
+        source: getSelectedValues('wizFilterSource'),
+        priority: document.getElementById('wizFilterPriority').value || undefined,
+        city: document.getElementById('wizFilterCity').value || undefined,
+        date_from: document.getElementById('wizFilterDateFrom').value || undefined,
+        date_to: document.getElementById('wizFilterDateTo').value || undefined
+    };
+}
+
+async function previewAudience() {
+    try {
+        const filters = getFilters();
+        const branch_id = document.getElementById('wizBranch').value;
+        const res = await fetch(`${API}/leads/preview`, {
+            method: 'POST', headers: getAuthHeaders(),
+            body: JSON.stringify({ filters, branch_id: branch_id || undefined })
+        });
+        const data = await res.json();
+        document.getElementById('audienceCount').textContent = `${data.count} leads with phone numbers`;
+    } catch (e) { showToast('Preview failed', 'error'); }
+}
+
+function buildReviewSummary() {
+    const name = document.getElementById('wizName').value;
+    const branch = document.getElementById('wizBranch');
+    const branchName = branch.options[branch.selectedIndex]?.text || '-';
+    const msgType = document.getElementById('wizMsgType').value;
+    const msgBody = document.getElementById('wizMsgBody').value;
+    const filters = getFilters();
+    const warmUp = document.getElementById('wizWarmUp').checked;
+    const audience = document.getElementById('audienceCount').textContent || 'Not previewed';
+
+    const filterSummary = [];
+    if (filters.status?.length) filterSummary.push('Status: ' + filters.status.join(', '));
+    if (filters.source?.length) filterSummary.push('Source: ' + filters.source.join(', '));
+    if (filters.priority) filterSummary.push('Priority: ' + filters.priority);
+    if (filters.city) filterSummary.push('City: ' + filters.city);
+
+    document.getElementById('reviewSummary').innerHTML = `
+        <div class="stat-card">
+            <h4 class="font-semibold text-sm text-gray-700 mb-2">Campaign</h4>
+            <p class="text-sm"><strong>Name:</strong> ${esc(name)}</p>
+            <p class="text-sm"><strong>Branch:</strong> ${esc(branchName)}</p>
+            <p class="text-sm"><strong>Type:</strong> ${msgType}</p>
+            ${warmUp ? '<p class="text-sm text-amber-600"><strong>Warm-Up:</strong> Enabled</p>' : ''}
+        </div>
+        <div class="stat-card">
+            <h4 class="font-semibold text-sm text-gray-700 mb-2">Message</h4>
+            <div class="preview-box text-sm">${esc(msgBody)}</div>
+        </div>
+        <div class="stat-card">
+            <h4 class="font-semibold text-sm text-gray-700 mb-2">Audience</h4>
+            <p class="text-sm">${audience}</p>
+            ${filterSummary.length ? '<div class="flex flex-wrap gap-1 mt-1">' + filterSummary.map(f => '<span class="filter-chip">' + esc(f) + '</span>').join('') + '</div>' : '<p class="text-xs text-gray-400">All leads with phone numbers</p>'}
+        </div>
+        <div class="stat-card">
+            <h4 class="font-semibold text-sm text-gray-700 mb-2">Anti-Block</h4>
+            <p class="text-sm">Delay: ${document.getElementById('wizMinDelay').value}–${document.getElementById('wizMaxDelay').value}s</p>
+            <p class="text-sm">Hourly: ${document.getElementById('wizHourlyLimit').value} | Daily: ${document.getElementById('wizDailyLimit').value}</p>
+        </div>
+    `;
+}
+
+async function createAndStartCampaign() {
+    try {
+        const filters = getFilters();
+        // Clean empty arrays from filters
+        Object.keys(filters).forEach(k => {
+            if (Array.isArray(filters[k]) && filters[k].length === 0) delete filters[k];
+            if (filters[k] === undefined) delete filters[k];
+        });
+
+        const body = {
+            name: document.getElementById('wizName').value.trim(),
+            description: document.getElementById('wizDesc').value.trim() || null,
+            branch_id: document.getElementById('wizBranch').value,
+            message_type: document.getElementById('wizMsgType').value,
+            message_body: document.getElementById('wizMsgBody').value,
+            media_url: uploadedMediaUrl || null,
+            media_filename: uploadedMediaFilename || null,
+            media_caption: document.getElementById('wizMediaCaption').value || null,
+            audience_filter: filters,
+            min_delay_seconds: parseInt(document.getElementById('wizMinDelay').value),
+            max_delay_seconds: parseInt(document.getElementById('wizMaxDelay').value),
+            hourly_limit: parseInt(document.getElementById('wizHourlyLimit').value),
+            daily_limit: parseInt(document.getElementById('wizDailyLimit').value),
+            warm_up_enabled: document.getElementById('wizWarmUp').checked
+        };
+
+        showToast('Creating campaign...', 'info');
+        const createRes = await fetch(`${API}/campaigns`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body) });
+        const createData = await createRes.json();
+        if (!createRes.ok) { showToast(createData.error, 'error'); return; }
+
+        const campaignId = createData.campaign_id;
+
+        // Populate audience
+        showToast('Populating audience...', 'info');
+        const popRes = await fetch(`${API}/campaigns/${campaignId}/populate`, {
+            method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ filters })
+        });
+        const popData = await popRes.json();
+        if (!popRes.ok) { showToast(popData.error, 'error'); return; }
+
+        // Start
+        const startRes = await fetch(`${API}/campaigns/${campaignId}/start`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({}) });
+        if (!startRes.ok) { const d = await startRes.json(); showToast(d.error, 'error'); return; }
+
+        showToast(`Campaign started with ${popData.total_leads} leads!`, 'success');
+        closeModal('campaignWizardModal');
+        switchTab('campaigns');
+        loadCampaigns();
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ========================================
+// TEMPLATES
+// ========================================
+async function loadTemplateList() {
+    try {
+        const res = await fetch(`${API}/templates`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        templates = data.templates || [];
+        // Populate wizard template dropdown
+        const sel = document.getElementById('wizTemplate');
+        sel.innerHTML = '<option value="">-- Start from scratch --</option>';
+        templates.forEach(t => {
+            sel.insertAdjacentHTML('beforeend', `<option value="${t.id}">${esc(t.name)} (${t.category})</option>`);
+        });
+    } catch (e) { console.error(e); }
+}
+
+async function loadTemplates() {
+    try {
+        const category = document.getElementById('templateCategoryFilter').value;
+        const res = await fetch(`${API}/templates?category=${category}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const grid = document.getElementById('templatesGrid');
+        grid.innerHTML = (data.templates || []).map(t => `
+            <div class="template-card">
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="font-semibold text-sm text-gray-800">${esc(t.name)}</h4>
+                    <span class="badge badge-${t.category === 'promotion' ? 'running' : t.category === 'festival' ? 'scheduled' : 'draft'}">${t.category}</span>
+                </div>
+                <p class="text-xs text-gray-500 mb-2 line-clamp-3" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(t.message_body || '')}</p>
+                <div class="flex justify-between items-center text-xs text-gray-400">
+                    <span>Used ${t.usage_count || 0}x</span>
+                    <div class="flex gap-1">
+                        <button class="action-btn text-xs" onclick="editTemplate(${t.id})">Edit</button>
+                        <button class="action-btn danger text-xs" onclick="deleteTemplate(${t.id})">Del</button>
+                    </div>
+                </div>
+            </div>
+        `).join('') || '<p class="text-gray-400 text-center col-span-3 py-8">No templates yet</p>';
+    } catch (e) { console.error(e); }
+}
+
+function applyTemplate() {
+    const id = parseInt(document.getElementById('wizTemplate').value);
+    if (!id) return;
+    const t = templates.find(t => t.id === id);
+    if (!t) return;
+    document.getElementById('wizMsgBody').value = t.message_body || '';
+    document.getElementById('wizMsgType').value = t.message_type || 'text';
+    if (t.media_caption) document.getElementById('wizMediaCaption').value = t.media_caption;
+    toggleMediaFields();
+    showToast('Template applied', 'success');
+}
+
+function openTemplateModal(template = null) {
+    editingTemplateId = template ? template.id : null;
+    document.getElementById('templateModalTitle').textContent = template ? 'Edit Template' : 'New Template';
+    document.getElementById('tplName').value = template?.name || '';
+    document.getElementById('tplCategory').value = template?.category || 'custom';
+    document.getElementById('tplMsgType').value = template?.message_type || 'text';
+    document.getElementById('tplBody').value = template?.message_body || '';
+    document.getElementById('templateModal').classList.add('show');
+}
+
+async function editTemplate(id) {
+    try {
+        const res = await fetch(`${API}/templates`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const t = (data.templates || []).find(t => t.id === id);
+        if (t) openTemplateModal(t);
+    } catch (e) { showToast('Error', 'error'); }
+}
+
+async function saveTemplate() {
+    const body = {
+        name: document.getElementById('tplName').value.trim(),
+        category: document.getElementById('tplCategory').value,
+        message_type: document.getElementById('tplMsgType').value,
+        message_body: document.getElementById('tplBody').value
+    };
+    if (!body.name || !body.message_body) { showToast('Name and body required', 'error'); return; }
+
+    try {
+        const url = editingTemplateId ? `${API}/templates/${editingTemplateId}` : `${API}/templates`;
+        const method = editingTemplateId ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: getAuthHeaders(), body: JSON.stringify(body) });
+        if (res.ok) {
+            showToast('Template saved', 'success');
+            closeModal('templateModal');
+            loadTemplates();
+            loadTemplateList();
+        } else { const d = await res.json(); showToast(d.error, 'error'); }
+    } catch (e) { showToast('Error', 'error'); }
+}
+
+async function deleteTemplate(id) {
+    if (!confirm('Delete this template?')) return;
+    try {
+        const res = await fetch(`${API}/templates/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        if (res.ok) { showToast('Template deleted', 'success'); loadTemplates(); loadTemplateList(); }
+    } catch (e) { showToast('Error', 'error'); }
+}
+
+// ========================================
+// LOGS
+// ========================================
+async function loadLogCampaignFilter() {
+    try {
+        const res = await fetch(`${API}/campaigns?limit=100`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const sel = document.getElementById('logCampaignFilter');
+        sel.innerHTML = '<option value="">All Campaigns</option>';
+        (data.campaigns || []).forEach(c => {
+            sel.insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.name)}</option>`);
+        });
+    } catch (e) { console.error(e); }
+}
+
+async function loadLogs() {
+    const campaignId = document.getElementById('logCampaignFilter').value;
+    const status = document.getElementById('logStatusFilter').value;
+    const search = document.getElementById('logSearch').value;
+
+    if (!campaignId) {
+        document.getElementById('logsBody').innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-6">Select a campaign to view logs</td></tr>';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API}/campaigns/${campaignId}/leads?page=${logPage}&limit=50&status=${status}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const tbody = document.getElementById('logsBody');
+        tbody.innerHTML = (data.leads || []).map(l => `
+            <tr>
+                <td class="text-xs">${l.sent_at ? formatDate(l.sent_at) : l.failed_at ? formatDate(l.failed_at) : '-'}</td>
+                <td class="text-xs">#${campaignId}</td>
+                <td>${esc(l.lead_name || '-')}</td>
+                <td>${esc(l.phone)}</td>
+                <td><span class="badge badge-${l.status}">${l.status}</span></td>
+                <td class="text-xs" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc((l.resolved_message || '').substring(0, 80))}</td>
+                <td class="text-xs text-red-500">${esc(l.error_message || '')}</td>
+            </tr>
+        `).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-4">No logs found</td></tr>';
+
+        renderPagination('logsPagination', data.pagination, p => { logPage = p; loadLogs(); });
+    } catch (e) { console.error(e); }
+}
+
+function exportLogs() {
+    const campaignId = document.getElementById('logCampaignFilter').value;
+    if (!campaignId) { showToast('Select a campaign first', 'error'); return; }
+    showToast('Export not implemented yet — use campaign detail view', 'info');
+}
+
+// ========================================
+// SETTINGS
+// ========================================
+async function loadSettings() {
+    try {
+        const res = await fetch(`${API}/settings`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        const s = data.settings || {};
+        document.getElementById('settMinDelay').value = s.min_delay || 30;
+        document.getElementById('settMaxDelay').value = s.max_delay || 90;
+        document.getElementById('settTypingMin').value = s.typing_delay_min || 1;
+        document.getElementById('settTypingMax').value = s.typing_delay_max || 3;
+        document.getElementById('settSeenMin').value = s.seen_delay_min || 2;
+        document.getElementById('settSeenMax').value = s.seen_delay_max || 5;
+        document.getElementById('settHourlyLimit').value = s.hourly_limit || 30;
+        document.getElementById('settDailyLimit').value = s.daily_limit || 200;
+        document.getElementById('settMaxFailures').value = s.max_consecutive_failures || 3;
+        document.getElementById('settPollInterval').value = s.engine_poll_interval || 30000;
+        document.getElementById('settInvisibleMarkers').checked = s.invisible_markers_enabled === '1';
+        document.getElementById('settWarmup1').value = s.warmup_day1 || 20;
+        document.getElementById('settWarmup2').value = s.warmup_day2 || 50;
+        document.getElementById('settWarmup3').value = s.warmup_day3 || 100;
+        document.getElementById('settWarmup4').value = s.warmup_day4 || 150;
+        document.getElementById('settWarmup5').value = s.warmup_day5 || 200;
+    } catch (e) { showToast('Failed to load settings', 'error'); }
+}
+
+async function saveSettings() {
+    const settings = {
+        min_delay: document.getElementById('settMinDelay').value,
+        max_delay: document.getElementById('settMaxDelay').value,
+        typing_delay_min: document.getElementById('settTypingMin').value,
+        typing_delay_max: document.getElementById('settTypingMax').value,
+        seen_delay_min: document.getElementById('settSeenMin').value,
+        seen_delay_max: document.getElementById('settSeenMax').value,
+        hourly_limit: document.getElementById('settHourlyLimit').value,
+        daily_limit: document.getElementById('settDailyLimit').value,
+        max_consecutive_failures: document.getElementById('settMaxFailures').value,
+        engine_poll_interval: document.getElementById('settPollInterval').value,
+        invisible_markers_enabled: document.getElementById('settInvisibleMarkers').checked ? '1' : '0',
+        warmup_day1: document.getElementById('settWarmup1').value,
+        warmup_day2: document.getElementById('settWarmup2').value,
+        warmup_day3: document.getElementById('settWarmup3').value,
+        warmup_day4: document.getElementById('settWarmup4').value,
+        warmup_day5: document.getElementById('settWarmup5').value
+    };
+    try {
+        const res = await fetch(`${API}/settings`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ settings }) });
+        if (res.ok) showToast('Settings saved', 'success');
+        else showToast('Failed to save', 'error');
+    } catch (e) { showToast('Error', 'error'); }
+}
+
+// ========================================
+// SOCKET.IO
+// ========================================
+function setupSocketListeners() {
+    const waitForSocket = setInterval(() => {
+        if (window.socket) {
+            clearInterval(waitForSocket);
+            socket.emit('join_wa_marketing_admin');
+
+            socket.on('wa_campaign_progress', data => {
+                if (currentTab === 'dashboard') loadDashboard();
+                if (currentTab === 'campaigns') loadCampaigns();
+                if (detailCampaignId === data.campaign_id) loadCampaignLeads();
+            });
+
+            socket.on('wa_campaign_paused', data => {
+                showToast(`Campaign #${data.campaign_id} paused: ${data.reason || 'Manual'}`, 'warning');
+                if (currentTab === 'campaigns') loadCampaigns();
+                if (currentTab === 'dashboard') loadDashboard();
+            });
+
+            socket.on('wa_campaign_completed', data => {
+                showToast(`Campaign #${data.campaign_id} completed! Sent: ${data.sent_count}`, 'success');
+                if (currentTab === 'campaigns') loadCampaigns();
+                if (currentTab === 'dashboard') loadDashboard();
+            });
+
+            socket.on('wa_campaign_started', data => {
+                showToast(`Campaign #${data.campaign_id} started`, 'success');
+                if (currentTab === 'campaigns') loadCampaigns();
+            });
+        }
+    }, 500);
+}
+
+// ========================================
+// UTILITIES
+// ========================================
+function showToast(msg, type = 'info') {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast show ' + (type === 'error' ? 'toast-error' : type === 'success' ? 'toast-success' : type === 'warning' ? 'toast-warning' : 'toast-info');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function formatDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderPagination(containerId, pagination, callback) {
+    const container = document.getElementById(containerId);
+    if (!pagination || pagination.pages <= 1) { container.innerHTML = ''; return; }
+    let html = '';
+    for (let i = 1; i <= pagination.pages; i++) {
+        html += `<button class="action-btn text-xs ${i === pagination.page ? 'primary' : ''}" onclick="(${callback})(${i})">${i}</button>`;
+    }
+    container.innerHTML = html;
+}
+
+let debounceTimers = {};
+function debounce(fn, delay) {
+    return function() {
+        clearTimeout(debounceTimers[fn.name]);
+        debounceTimers[fn.name] = setTimeout(fn, delay);
+    };
+}
+</script>
+</body>
+</html>

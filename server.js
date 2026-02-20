@@ -54,6 +54,8 @@ const stockMigrationRoutes = require('./routes/stock-migration');
 const collectionsRoutes = require('./routes/collections');
 const whatsappSessionManager = require('./services/whatsapp-session-manager');
 const whatsappSessionsRoutes = require('./routes/whatsapp-sessions');
+const waMarketingRoutes = require('./routes/wa-marketing');
+const waCampaignEngine = require('./services/wa-campaign-engine');
 
 const app = express();
 
@@ -151,6 +153,10 @@ collectionsRoutes.setPool(pool);
 whatsappSessionManager.setPool(pool);
 whatsappSessionsRoutes.setPool(pool);
 whatsappSessionsRoutes.setSessionManager(whatsappSessionManager);
+waMarketingRoutes.setPool(pool);
+waMarketingRoutes.setCampaignEngine(waCampaignEngine);
+waCampaignEngine.setPool(pool);
+waCampaignEngine.setSessionManager(whatsappSessionManager);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -169,7 +175,8 @@ const uploadDirs = [
     'public/uploads/daily-tasks',
     'public/uploads/website',
     'uploads/attendance/break',
-    'uploads/stock-check'
+    'uploads/stock-check',
+    'uploads/wa-marketing'
 ];
 uploadDirs.forEach(dir => {
     if (!fs.existsSync(dir)) {
@@ -277,6 +284,7 @@ app.use('/api/stock-check', stockCheckRoutes.router);
 app.use('/api/zoho/migration', stockMigrationRoutes.router);
 app.use('/api/zoho/collections', collectionsRoutes.router);
 app.use('/api/zoho/whatsapp-sessions', whatsappSessionsRoutes.router);
+app.use('/api/wa-marketing', waMarketingRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3217,6 +3225,7 @@ app.set('io', io);
 notificationService.setIO(io);
 autoClockout.setIO(io);
 whatsappSessionManager.setIO(io);
+waCampaignEngine.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {
@@ -3262,6 +3271,13 @@ io.on('connection', async (socket) => {
     socket.on('join_whatsapp_admin', () => {
         if (socket.user.role === 'admin') {
             socket.join('whatsapp_admin');
+        }
+    });
+
+    // WA Marketing admin room
+    socket.on('join_wa_marketing_admin', () => {
+        if (socket.user.role === 'admin') {
+            socket.join('wa_marketing_admin');
         }
     });
 
@@ -3328,7 +3344,8 @@ server.listen(PORT, () => {
         });
         whatsappProcessor.start();
         whatsappSessionManager.initializeSessions();
-        console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, auto-clockout');
+        waCampaignEngine.start();
+        console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout');
     } else {
         console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
     }

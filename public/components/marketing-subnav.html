@@ -1,0 +1,190 @@
+<!-- Marketing Sub-Navigation Component -->
+<style>
+    .mkt-subnav {
+        background: #ffffff;
+        border-bottom: 1px solid #e8ecf1;
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        padding: 0;
+    }
+
+    .mkt-subnav-inner {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 1rem;
+        position: relative;
+    }
+
+    .mkt-subnav-tabs {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: 0.5rem 0;
+    }
+    .mkt-subnav-tabs::-webkit-scrollbar { display: none; }
+
+    .mkt-subnav-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: #64748b;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        flex-shrink: 0;
+    }
+    .mkt-subnav-tab:hover {
+        background: #f1f5f9;
+        color: #334155;
+    }
+    .mkt-subnav-tab svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+    }
+    .mkt-subnav-tab.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #ffffff;
+        border-color: transparent;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    .mkt-subnav-tab.active:hover {
+        background: linear-gradient(135deg, #5a6fd6, #6a4192);
+        color: #ffffff;
+    }
+
+    .mkt-subnav-toggle {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.625rem 0;
+        width: 100%;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #475569;
+    }
+    .mkt-subnav-toggle svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        transition: transform 0.2s ease;
+    }
+    .mkt-subnav-toggle.open svg.chevron-icon {
+        transform: rotate(180deg);
+    }
+    .mkt-subnav-toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .mkt-subnav-toggle-label svg {
+        width: 16px;
+        height: 16px;
+        stroke: #667eea;
+    }
+
+    .mkt-subnav-dropdown {
+        display: none;
+        flex-direction: column;
+        gap: 2px;
+        padding-bottom: 0.5rem;
+    }
+    .mkt-subnav-dropdown.show {
+        display: flex;
+    }
+    .mkt-subnav-dropdown .mkt-subnav-tab {
+        width: 100%;
+        padding: 8px 12px;
+        border-radius: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .mkt-subnav-tabs {
+            display: none;
+        }
+        .mkt-subnav-toggle {
+            display: flex;
+        }
+    }
+</style>
+
+<nav class="mkt-subnav" id="mktSubnav">
+    <div class="mkt-subnav-inner">
+        <button class="mkt-subnav-toggle" id="mktSubnavToggle" onclick="toggleMktSubnav()">
+            <span class="mkt-subnav-toggle-label">
+                <svg viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <span id="mktSubnavCurrentPage">WA Marketing</span>
+            </span>
+            <svg class="chevron-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <div class="mkt-subnav-dropdown" id="mktSubnavDropdown"></div>
+        <div class="mkt-subnav-tabs" id="mktSubnavTabs"></div>
+    </div>
+</nav>
+
+<script>
+(function() {
+    var mktPages = [
+        { page: 'marketing-dashboard', label: 'WA Marketing', href: '/admin-wa-marketing.html', icon: '<path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>' }
+    ];
+
+    var currentPage = document.body.getAttribute('data-page') || '';
+    var currentPageObj = mktPages.find(function(p) { return p.page === currentPage; });
+
+    var tabsContainer = document.getElementById('mktSubnavTabs');
+    var dropdownContainer = document.getElementById('mktSubnavDropdown');
+
+    mktPages.forEach(function(p) {
+        var isActive = p.page === currentPage;
+        var tabHtml = '<a href="' + p.href + '" class="mkt-subnav-tab' + (isActive ? ' active' : '') + '">' +
+            '<svg viewBox="0 0 24 24">' + p.icon + '</svg>' +
+            '<span>' + p.label + '</span>' +
+        '</a>';
+        tabsContainer.insertAdjacentHTML('beforeend', tabHtml);
+        dropdownContainer.insertAdjacentHTML('beforeend', tabHtml);
+    });
+
+    if (currentPageObj) {
+        document.getElementById('mktSubnavCurrentPage').textContent = currentPageObj.label;
+    }
+})();
+
+function toggleMktSubnav() {
+    var toggle = document.getElementById('mktSubnavToggle');
+    var dropdown = document.getElementById('mktSubnavDropdown');
+    toggle.classList.toggle('open');
+    dropdown.classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+    var subnav = document.getElementById('mktSubnav');
+    if (subnav && !subnav.contains(e.target)) {
+        var toggle = document.getElementById('mktSubnavToggle');
+        var dropdown = document.getElementById('mktSubnavDropdown');
+        if (toggle) toggle.classList.remove('open');
+        if (dropdown) dropdown.classList.remove('show');
+    }
+});
+</script>

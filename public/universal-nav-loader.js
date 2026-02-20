@@ -18,6 +18,7 @@
         SALES_SUBNAV_PATH: '/components/sales-subnav.html',
         PRODUCTS_SUBNAV_PATH: '/components/products-subnav.html',
         SYSTEM_SUBNAV_PATH: '/components/system-subnav.html',
+        MARKETING_SUBNAV_PATH: '/components/marketing-subnav.html',
         RETRY_ATTEMPTS: 3,
         RETRY_DELAY: 1000
     };
@@ -206,6 +207,9 @@
                     } else if (dataPage.startsWith('attendance-')) {
                         subnavPath = CONFIG.ATTENDANCE_SUBNAV_PATH;
                         subnavName = 'Attendance';
+                    } else if (dataPage.startsWith('marketing-')) {
+                        subnavPath = CONFIG.MARKETING_SUBNAV_PATH;
+                        subnavName = 'Marketing';
                     } else if (SUBNAV_MAP[dataPage]) {
                         // Fallback to explicit mapping
                         subnavPath = SUBNAV_MAP[dataPage];

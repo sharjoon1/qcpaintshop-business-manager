@@ -1416,6 +1416,36 @@ node promote-release.js internal production
   - Removed inline toast CSS from 9 pages, skeleton CSS from 7 pages
   - Fixed HTML structure: removed `data-page` from invoices `<html>` tag, added `bg-gray-50` to bulk-jobs `<body>`
 
+### 2026-02-20 - Zoho Stock Check, Collections, WhatsApp Sessions, Stock Migration
+- **Stock Check Assignment System**: Admin assigns products to staff for daily physical stock verification with photo proof
+- **Bulk Stock Migration Tool**: One-time warehouse → business location stock transfer with paired inventory adjustments
+- **Warehouse Location Filtering**: All Zoho queries filter by `is_active = 1` to exclude disabled warehouses
+- **Collections & Payment Tracking**: Outstanding invoice management, WhatsApp reminders, promise-to-pay, branch filtering
+- **Per-Branch WhatsApp Sessions**: Each branch connects own WhatsApp number via whatsapp-web.js + QR scan
+- Migrations: `migrate-stock-check.js`, `migrate-collections.js`, `migrate-whatsapp-sessions.js`
+
+### 2026-02-20 - WhatsApp Marketing Campaign System
+- **WA Campaign Engine**: Background singleton for automated bulk WhatsApp messaging to leads
+  - Anti-block: spin text `[Hi|Hello]`, variable substitution `{name}/{company}`, invisible markers (zero-width chars)
+  - Rate limiting: hourly/daily caps via `wa_sending_stats`, warm-up mode (20→50→100→150→200/day)
+  - Auto-pause on 3+ consecutive failures, random delays (30-90s default)
+  - Recovery: resumes `running` campaigns on server restart
+  - Socket.io events: `wa_campaign_progress/paused/completed/started` → `wa_marketing_admin` room
+- **Campaign Management**: Full CRUD, 5-step creation wizard (info → message → audience → anti-block → review)
+  - Audience builder: query leads by status/source/priority/city/date/branch, Fisher-Yates shuffle
+  - Template picker with variable toolbar, spin text helpers, live message preview
+  - Campaign lifecycle: draft → populate → start/schedule → running → pause/resume → completed/cancelled
+- **Message Templates**: Category-based (greeting/promotion/followup/announcement/festival/custom), usage tracking
+- **Dashboard**: 4 stat cards, campaign performance bar chart, hourly sending volume line chart, engine status indicator
+- **Settings**: Configurable delays, rate limits, warm-up schedule, invisible markers toggle, engine poll interval
+- **Media Support**: `sendMedia()` added to session manager — images with captions, documents
+- **5 Tables**: `wa_campaigns`, `wa_campaign_leads`, `wa_message_templates`, `wa_sending_stats`, `wa_marketing_settings`
+- **23 API Endpoints**: `/api/wa-marketing/*` — campaigns CRUD, templates, dashboard, leads preview, settings, media upload
+- **2 Permissions**: `marketing.view`, `marketing.manage` (auto-assigned to admin role)
+- **Navigation**: Marketing sidebar section, `marketing-subnav.html`, `marketing-` prefix detection in nav loader
+- Migration: `migrations/migrate-wa-marketing.js`
+- Files: `services/wa-campaign-engine.js`, `routes/wa-marketing.js`, `public/admin-wa-marketing.html`, `public/components/marketing-subnav.html`
+
 ---
 
 ## 9. KNOWN ISSUES & ROADMAP
