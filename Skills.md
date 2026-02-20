@@ -720,18 +720,26 @@ One-time migration tool to transfer all stock from Warehouse locations to Busine
 
 ### 2.21 Collections & Payment Tracking
 
-Centralized tool for managing outstanding invoices, sending payment reminders (WhatsApp, call, visit, email), and tracking promise-to-pay commitments.
+Centralized tool for managing outstanding invoices, sending payment reminders (WhatsApp, call, visit, email), and tracking promise-to-pay commitments. Now with per-branch filtering and customer-branch assignment.
 
-**5-Tab Page** (`admin-zoho-collections.html`, data-page: `zoho-collections`):
+**Admin Page** (`admin-zoho-collections.html`, data-page: `zoho-collections`, 5 tabs):
 1. **Summary** — KPI cards: Total Outstanding, Overdue Amount, Collection Rate (30d), Avg Days Overdue + mini-stats (reminders today, pending/broken promises)
-2. **Customers** — Customer-grouped outstanding with search, sort, actions (View Invoices, Send Reminder, Add Promise)
+2. **Customers** — Customer-grouped outstanding with search, sort, **Branch column with assign dropdown**, actions (View Invoices, Send Reminder, Add Promise)
 3. **Invoices** — Filterable table with bulk select for mass WhatsApp reminders, CSV export
 4. **Reminders** — Timeline of all sent reminders (WhatsApp/call/visit/email), filter by type/date, "Log Call/Visit" button
 5. **Promises** — Promise-to-pay tracking with status badges, auto-detect broken promises (past due + pending), quick status actions
 
-**WhatsApp Integration**: Dual-write to `whatsapp_followups` (operational queue) + `collection_reminders` (audit log). Two message templates: payment_reminder and overdue_notice.
+**Staff Page** (`staff/collections.html`, data-page: `collections`, 3 tabs):
+- Summary, Customers, Invoices — mobile-first, auto-filtered to staff's branch
+- Actions: Send WhatsApp, Log Call, Add Promise (bottom-sheet modals)
 
-**API Endpoints** (`routes/collections.js`, 10 endpoints):
+**Branch Filtering**: Admin sees branch dropdown filter at top; staff auto-filtered by `req.user.branch_id`. All 12 endpoints respect branch filtering via `getBranchFilter()` helper.
+
+**Customer-Branch Assignment**: Admin can assign customers to branches via dropdown in Customers tab, or bulk assign via API.
+
+**WhatsApp Integration**: Dual-write to `whatsapp_followups` (operational queue) + `collection_reminders` (audit log). Dual-mode sending: per-branch session (whatsapp-web.js) → fallback to HTTP API.
+
+**API Endpoints** (`routes/collections.js`, 12 endpoints):
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/api/zoho/collections/summary` | Dashboard KPI stats |
@@ -744,11 +752,53 @@ Centralized tool for managing outstanding invoices, sending payment reminders (W
 | POST | `/api/zoho/collections/promises` | Create promise-to-pay |
 | PUT | `/api/zoho/collections/promises/:id` | Update promise status |
 | GET | `/api/zoho/collections/export` | CSV export |
+| PUT | `/api/zoho/collections/customers/:id/branch` | Assign customer to branch |
+| POST | `/api/zoho/collections/customers/assign-branch` | Bulk assign customers to branch |
 
-**Tables**: `collection_reminders`, `payment_promises`
-**Migration**: `migrations/migrate-collections.js`
+**Tables**: `collection_reminders`, `payment_promises` (both have `branch_id` column)
+**Migration**: `migrations/migrate-collections.js`, `migrations/migrate-whatsapp-sessions.js` (adds `branch_id` columns)
 **Permission**: `zoho.collections`
-**Navigation**: Zoho subnav "Collections" tab (after Transactions)
+**Navigation**: Zoho subnav "Collections" tab, Staff sidebar "Collections" entry
+
+### 2.22a Per-Branch WhatsApp Sessions
+
+Each branch can connect its own WhatsApp number via `whatsapp-web.js`. Messages from Collections are routed through the branch's connected session.
+
+**Admin Page** (`admin-whatsapp-sessions.html`, data-page: `zoho-whatsapp-sessions`):
+- Branch cards grid showing: name, status dot (green/yellow/red), phone number, connected since
+- QR code display area (rendered via `qrcode-generator` library)
+- Connect / Disconnect / Test Send buttons
+- Real-time updates via Socket.io (`whatsapp_qr`, `whatsapp_status` events)
+
+**Service** (`services/whatsapp-session-manager.js`):
+- Map of `branch_id → { client, status, qr, phoneNumber }`
+- `connectBranch(branchId, userId)` — creates Client with LocalAuth, Chromium args
+- `disconnectBranch(branchId)` — logout + destroy
+- `sendMessage(branchId, phone, message)` — format `91XXXXXXXXXX@c.us`
+- `initializeSessions()` — auto-reconnect previously connected sessions (staggered 3s)
+- Socket.io emits to `whatsapp_admin` room for QR + status updates
+
+**Dual-Mode Sending** (`services/whatsapp-processor.js`):
+- If message has `branch_id` AND branch session is connected → send via local session
+- Otherwise → fallback to HTTP API
+- Zero breaking changes to messages without `branch_id`
+
+**API Endpoints** (`routes/whatsapp-sessions.js`, 6 endpoints):
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/zoho/whatsapp-sessions/` | List all branch sessions with status |
+| POST | `/api/zoho/whatsapp-sessions/:branchId/connect` | Start connection, trigger QR |
+| POST | `/api/zoho/whatsapp-sessions/:branchId/disconnect` | Disconnect branch |
+| GET | `/api/zoho/whatsapp-sessions/:branchId/qr` | Get current QR (fallback for missed Socket event) |
+| GET | `/api/zoho/whatsapp-sessions/:branchId/status` | Get specific branch status |
+| POST | `/api/zoho/whatsapp-sessions/:branchId/test` | Send test message |
+
+**Table**: `whatsapp_sessions` (branch_id UNIQUE, status enum, phone_number, connected/disconnected timestamps)
+**Migration**: `migrations/migrate-whatsapp-sessions.js`
+**Permission**: `zoho.whatsapp_sessions`
+**Navigation**: Zoho subnav "WhatsApp" tab (before Settings)
+**Session storage**: `./whatsapp-sessions/` (gitignored, survives deploys)
+**RAM**: ~300-500MB per branch session (Chromium). Max recommended: 4 branches.
 
 ---
 
@@ -894,7 +944,8 @@ Centralized tool for managing outstanding invoices, sending payment reminders (W
 | Service | File | Function |
 |---------|------|----------|
 | **Sync Scheduler** | `services/sync-scheduler.js` | Cron-based Zoho data sync |
-| **WhatsApp Processor** | `services/whatsapp-processor.js` | Queue-based WhatsApp message sending |
+| **WhatsApp Processor** | `services/whatsapp-processor.js` | Queue-based WhatsApp message sending (dual-mode: branch session + HTTP API) |
+| **WhatsApp Session Manager** | `services/whatsapp-session-manager.js` | Per-branch whatsapp-web.js lifecycle, QR via Socket.io, auto-reconnect |
 | **Zoho OAuth** | `services/zoho-oauth.js` | Token management and auto-refresh |
 | **Zoho API** | `services/zoho-api.js` | API client with rate limiting |
 | **Rate Limiter** | `services/zoho-rate-limiter.js` | Zoho API throttling |
@@ -991,7 +1042,9 @@ Centralized tool for managing outstanding invoices, sending payment reminders (W
 | Zoho Purchases | `admin-zoho-purchase-suggestions.html` | Purchase planning |
 | Zoho Bulk Jobs | `admin-zoho-bulk-jobs.html` | Bulk operation status |
 | Zoho Stock Migration | `admin-stock-migration.html` | Bulk warehouse→business stock transfer (temporary migration tool) |
-| Zoho Collections | `admin-zoho-collections.html` | Outstanding invoice management, payment reminders, promise tracking (5 tabs) |
+| Zoho Collections | `admin-zoho-collections.html` | Outstanding invoice management with branch filter, payment reminders, promise tracking (5 tabs) |
+| WhatsApp Sessions | `admin-whatsapp-sessions.html` | Per-branch WhatsApp connection management with QR codes |
+| Staff Collections | `staff/collections.html` | Mobile-first collections for staff (3 tabs, auto-filtered to branch) |
 
 ### Estimate Pages
 | Page | File | Purpose |
@@ -1079,7 +1132,8 @@ Centralized tool for managing outstanding invoices, sending payment reminders (W
 | Guides | `/api/guides/*` | 11 | `routes/guides.js` |
 | Stock Check | `/api/stock-check/*` | 10 | `routes/stock-check.js` |
 | Stock Migration | `/api/zoho/migration/*` | 4 | `routes/stock-migration.js` |
-| Collections | `/api/zoho/collections/*` | 10 | `routes/collections.js` |
+| Collections | `/api/zoho/collections/*` | 12 | `routes/collections.js` |
+| WhatsApp Sessions | `/api/zoho/whatsapp-sessions/*` | 6 | `routes/whatsapp-sessions.js` |
 | Uploads | `/api/upload/*` | 4 | `server.js` |
 | Health | `/health`, `/api/test` | 2 | `server.js` |
 
@@ -1196,6 +1250,20 @@ node promote-release.js internal production
 - Route: `routes/collections.js` (10 endpoints), permission: `zoho.collections`
 - Page: `admin-zoho-collections.html`, Zoho subnav tab: "Collections"
 - Customer search with debounced typeahead for log and promise modals
+
+### 2026-02-20 - Branch WhatsApp Sessions & Branch-Filtered Collections
+- Per-branch WhatsApp connections via `whatsapp-web.js` — each branch scans QR to connect their own number
+- Admin WhatsApp setup page: branch cards with QR display, connect/disconnect, test message, real-time Socket.io updates
+- Dual-mode sending in `whatsapp-processor.js`: branch session → HTTP API fallback (zero breaking changes)
+- Branch-filtered collections: admin branch dropdown, staff auto-filtered by `req.user.branch_id`
+- Customer-branch assignment: admin assigns customers to branches (dropdown in Customers tab, bulk assign API)
+- Staff collections page: mobile-first (3 tabs), auto-filtered to branch, bottom-sheet modals
+- New table: `whatsapp_sessions`; new columns: `branch_id` on 4 tables
+- New service: `services/whatsapp-session-manager.js` (LocalAuth, auto-reconnect, Socket.io QR/status)
+- New route: `routes/whatsapp-sessions.js` (6 endpoints), permission: `zoho.whatsapp_sessions`
+- Modified: `routes/collections.js` (+2 endpoints, branch filtering on all 10 existing), `admin-zoho-collections.html`, `whatsapp-processor.js`, `server.js`, `zoho-subnav.html`, `staff-sidebar.html`, `.gitignore`
+- New pages: `admin-whatsapp-sessions.html`, `staff/collections.html`
+- Migration: `migrate-whatsapp-sessions.js`
 
 ### 2026-02-20 - Warehouse Location Filtering (Post-Migration)
 - All Zoho queries now filter by `is_active = 1` to exclude disabled warehouse locations

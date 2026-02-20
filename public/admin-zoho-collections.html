@@ -90,6 +90,12 @@
                 <h2 class="text-xl md:text-2xl font-bold text-gray-800">Collections</h2>
                 <p class="text-gray-500 mt-0.5 text-xs">Manage outstanding invoices, send payment reminders, and track collection efforts.</p>
             </div>
+            <!-- Branch filter (admin only) -->
+            <div id="branchFilterWrap" style="display:none">
+                <select id="branchFilter" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onchange="onBranchFilterChange()">
+                    <option value="">All Branches</option>
+                </select>
+            </div>
         </div>
 
         <!-- Tabs -->
@@ -164,6 +170,7 @@
                             <tr>
                                 <th>Customer</th>
                                 <th>Phone</th>
+                                <th class="branch-col">Branch</th>
                                 <th>Outstanding</th>
                                 <th>Overdue</th>
                                 <th>Invoices</th>
@@ -430,6 +437,17 @@
     let selectedInvoices = [];
     let invoicesData = [];
     let custPage = 1, invPage = 1, remPage = 1, promPage = 1;
+    let branchesLoaded = [];
+    let isAdmin = false;
+    let selectedBranchId = '';
+
+    // Get branch_id query param for all API calls
+    function branchParam() {
+        return selectedBranchId ? '&branch_id=' + selectedBranchId : '';
+    }
+    function branchParamFirst() {
+        return selectedBranchId ? '?branch_id=' + selectedBranchId : '';
+    }
 
     // ========================================
     // HELPERS
@@ -538,7 +556,7 @@
 
     async function loadSummary() {
         try {
-            const { data } = await apiJson(API + '/summary');
+            const { data } = await apiJson(API + '/summary' + branchParamFirst());
             document.getElementById('statOutstanding').textContent = formatCurrency(data.total_outstanding);
             document.getElementById('statOutstandingCount').textContent = data.outstanding_count;
             document.getElementById('statOverdue').textContent = formatCurrency(data.overdue_amount);
@@ -564,21 +582,25 @@
         const search = document.getElementById('custSearch').value;
         const sort = document.getElementById('custSort').value;
         const params = new URLSearchParams({ search, sort, order: 'desc', page: custPage, limit: 25 });
+        if (selectedBranchId) params.set('branch_id', selectedBranchId);
 
         try {
             const { data, pagination } = await apiJson(API + '/customers?' + params);
             const tbody = document.getElementById('custBody');
 
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-400">No customers with outstanding balance</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No customers with outstanding balance</td></tr>';
                 document.getElementById('custPagination').innerHTML = '';
                 return;
             }
 
-            tbody.innerHTML = data.map(c => `
+            tbody.innerHTML = data.map(c => {
+                const branchName = c.branch_id ? getBranchName(c.branch_id) : '';
+                return `
                 <tr>
                     <td class="font-medium">${esc(c.customer_name || 'Unknown')}</td>
                     <td>${esc(c.phone || '--')}</td>
+                    <td class="branch-col">${isAdmin ? buildBranchSelect(c.zoho_customer_id, c.branch_id) : esc(branchName || '--')}</td>
                     <td class="font-semibold">${formatCurrencyFull(c.total_outstanding)}</td>
                     <td><span class="${c.overdue_amount > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}">${formatCurrencyFull(c.overdue_amount)}</span></td>
                     <td>${c.invoice_count}${c.overdue_count > 0 ? ` <span class="text-red-500 text-xs">(${c.overdue_count} overdue)</span>` : ''}</td>
@@ -590,7 +612,7 @@
                         <button onclick="openPromiseForCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}')" class="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100" title="Add Promise">Promise</button>
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
 
             buildPagination('custPagination', pagination.page, pagination.limit, pagination.total, 'loadCustomers');
         } catch (err) {
@@ -619,6 +641,7 @@
         const status = document.getElementById('invStatus').value;
         const sort = document.getElementById('invSort').value;
         const params = new URLSearchParams({ search, status, sort, order: 'desc', page: invPage, limit: 25 });
+        if (selectedBranchId) params.set('branch_id', selectedBranchId);
 
         if (window._filterCustomerId) {
             params.set('customer_id', window._filterCustomerId);
@@ -909,6 +932,7 @@
         if (type) params.set('type', type);
         if (from) params.set('from_date', from);
         if (to) params.set('to_date', to);
+        if (selectedBranchId) params.set('branch_id', selectedBranchId);
 
         try {
             const { data, pagination } = await apiJson(API + '/reminders?' + params);
@@ -951,6 +975,7 @@
         if (status) params.set('status', status);
         if (from) params.set('from_date', from);
         if (to) params.set('to_date', to);
+        if (selectedBranchId) params.set('branch_id', selectedBranchId);
 
         try {
             const { data, pagination } = await apiJson(API + '/promises?' + params);
@@ -1164,6 +1189,7 @@
             const status = document.getElementById('invStatus').value;
             const params = new URLSearchParams();
             if (status === 'overdue') params.set('status', 'overdue');
+            if (selectedBranchId) params.set('branch_id', selectedBranchId);
 
             const resp = await apiFetch(API + '/export?' + params);
             const blob = await resp.blob();
@@ -1191,10 +1217,81 @@
     }
 
     // ========================================
+    // BRANCH HELPERS
+    // ========================================
+
+    function getBranchName(branchId) {
+        const b = branchesLoaded.find(x => x.id === branchId);
+        return b ? b.name : 'Branch ' + branchId;
+    }
+
+    function buildBranchSelect(customerId, currentBranchId) {
+        let html = `<select class="px-1 py-0.5 border border-gray-200 rounded text-xs" onchange="assignCustomerBranch('${esc(customerId)}', this.value)">`;
+        html += `<option value="">Unassigned</option>`;
+        for (const b of branchesLoaded) {
+            html += `<option value="${b.id}" ${b.id === currentBranchId ? 'selected' : ''}>${esc(b.name)}</option>`;
+        }
+        html += `</select>`;
+        return html;
+    }
+
+    async function assignCustomerBranch(customerId, branchId) {
+        try {
+            await apiJson(API + '/customers/' + customerId + '/branch', {
+                method: 'PUT',
+                body: { branch_id: branchId ? parseInt(branchId) : null }
+            });
+            showToast('Customer branch updated');
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+            loadCustomers(custPage); // revert UI
+        }
+    }
+
+    function onBranchFilterChange() {
+        selectedBranchId = document.getElementById('branchFilter').value;
+        // Reload current tab
+        if (currentTab === 'summary') loadSummary();
+        else if (currentTab === 'customers') loadCustomers();
+        else if (currentTab === 'invoices') loadInvoices();
+        else if (currentTab === 'reminders') loadReminders();
+        else if (currentTab === 'promises') loadPromises();
+    }
+
+    async function loadBranches() {
+        try {
+            const resp = await apiRequest('/api/branches');
+            if (!resp) return;
+            const data = await resp.json();
+            if (data.success && data.data) {
+                branchesLoaded = data.data;
+                const sel = document.getElementById('branchFilter');
+                branchesLoaded.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    opt.textContent = b.name;
+                    sel.appendChild(opt);
+                });
+            }
+        } catch (err) {
+            console.error('Failed to load branches:', err);
+        }
+    }
+
+    // ========================================
     // INIT
     // ========================================
 
-    (function init() {
+    (async function init() {
+        // Detect admin role
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        isAdmin = user.role === 'admin';
+
+        if (isAdmin) {
+            document.getElementById('branchFilterWrap').style.display = '';
+            await loadBranches();
+        }
+
         const saved = localStorage.getItem('cc_tab');
         if (saved && document.getElementById('tab-' + saved)) {
             const tabs = document.querySelectorAll('.cc-tab');

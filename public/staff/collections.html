@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Collections - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .page-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+        }
+        .page-header h1 { font-size: 1.25rem; font-weight: 700; }
+        .page-header .subtitle { font-size: 0.75rem; opacity: 0.85; }
+        .hamburger { background: rgba(255,255,255,0.2); border: none; color: white; width: 40px; height: 40px; border-radius: 10px; font-size: 1.25rem; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+
+        .container { max-width: 600px; margin: 0 auto; padding: 0 16px 24px; }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 16px;
+            gap: 4px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px 8px;
+            border: none;
+            background: transparent;
+            color: rgba(255,255,255,0.7);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        /* Stat mini cards */
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        .stat-mini {
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .stat-mini .label { font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .stat-mini .val { font-size: 1.25rem; font-weight: 700; color: #1e293b; margin-top: 2px; }
+        .stat-mini .sub { font-size: 0.65rem; color: #94a3b8; margin-top: 1px; }
+
+        /* Customer / Invoice items */
+        .list-item {
+            padding: 14px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .list-item:last-child { border-bottom: none; }
+        .list-item .name { font-weight: 600; font-size: 0.875rem; color: #1e293b; }
+        .list-item .meta { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
+        .list-item .amount { font-weight: 700; font-size: 0.9375rem; color: #1e293b; }
+        .list-item .overdue { color: #dc2626; font-weight: 600; font-size: 0.7rem; }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-remind { background: #d1fae5; color: #065f46; }
+        .btn-remind:hover { background: #a7f3d0; }
+        .btn-call { background: #dbeafe; color: #1e40af; }
+        .btn-call:hover { background: #bfdbfe; }
+        .btn-promise { background: #fef3c7; color: #92400e; }
+        .btn-promise:hover { background: #fde68a; }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.8125rem;
+            outline: none;
+            margin-bottom: 12px;
+        }
+        .search-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+
+        .badge {
+            display: inline-block;
+            font-size: 0.625rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 999px;
+        }
+        .badge-overdue { background: #fee2e2; color: #991b1b; }
+        .badge-ok { background: #d1fae5; color: #065f46; }
+
+        .load-more { text-align: center; padding: 12px; }
+        .load-more button {
+            background: rgba(102,126,234,0.1);
+            color: #667eea;
+            border: none;
+            padding: 8px 24px;
+            border-radius: 10px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .empty-state { text-align: center; padding: 40px 0; color: #94a3b8; }
+        .empty-state .icon { font-size: 2rem; margin-bottom: 8px; }
+
+        /* Modal */
+        .modal-bg { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.5); z-index: 9999; }
+        .modal-bg.show { display: flex; align-items: flex-end; }
+        .modal-sheet {
+            background: white;
+            border-radius: 20px 20px 0 0;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 20px;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-handle { width: 36px; height: 4px; background: #e2e8f0; border-radius: 2px; margin: 0 auto 16px; }
+
+        #toast {
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: white; padding: 10px 20px; border-radius: 10px;
+            font-size: 0.8125rem; font-weight: 500; z-index: 99999;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+        #toast.show { opacity: 1; }
+        #toast.error { background: #dc2626; }
+    </style>
+</head>
+<body data-page="collections">
+
+<!-- Sidebar include -->
+<div id="staff-sidebar-placeholder"></div>
+
+<!-- Header -->
+<div class="page-header">
+    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+    <div>
+        <h1>Collections</h1>
+        <div class="subtitle">Outstanding invoices & payment tracking</div>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('summary', this)">Summary</button>
+        <button class="tab-btn" onclick="switchTab('customers', this)">Customers</button>
+        <button class="tab-btn" onclick="switchTab('invoices', this)">Invoices</button>
+    </div>
+
+    <!-- ====== SUMMARY TAB ====== -->
+    <div id="tab-summary">
+        <div class="stat-grid">
+            <div class="stat-mini">
+                <div class="label">Outstanding</div>
+                <div class="val" id="sOutstanding">--</div>
+                <div class="sub"><span id="sOutCount">0</span> invoices</div>
+            </div>
+            <div class="stat-mini">
+                <div class="label">Overdue</div>
+                <div class="val" style="color:#dc2626" id="sOverdue">--</div>
+                <div class="sub"><span id="sOverCount">0</span> overdue</div>
+            </div>
+            <div class="stat-mini">
+                <div class="label">Collection Rate</div>
+                <div class="val" style="color:#16a34a" id="sRate">--</div>
+                <div class="sub">last 30 days</div>
+            </div>
+            <div class="stat-mini">
+                <div class="label">Avg Days Overdue</div>
+                <div class="val" style="color:#ea580c" id="sAvgDays">--</div>
+                <div class="sub">across overdue</div>
+            </div>
+        </div>
+        <div class="stat-grid">
+            <div class="stat-mini">
+                <div class="label">Reminders Today</div>
+                <div class="val" id="sRemToday">--</div>
+            </div>
+            <div class="stat-mini">
+                <div class="label">Pending Promises</div>
+                <div class="val" id="sPromises">--</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== CUSTOMERS TAB ====== -->
+    <div id="tab-customers" style="display:none">
+        <input type="text" class="search-input" id="custSearchInput" placeholder="Search customer or phone..." onkeydown="if(event.key==='Enter')loadCustomers()">
+        <div class="card" id="custList">
+            <div class="empty-state"><div class="icon">👥</div>Loading...</div>
+        </div>
+        <div class="load-more" id="custMore" style="display:none">
+            <button onclick="loadCustomers(custPage+1, true)">Load More</button>
+        </div>
+    </div>
+
+    <!-- ====== INVOICES TAB ====== -->
+    <div id="tab-invoices" style="display:none">
+        <input type="text" class="search-input" id="invSearchInput" placeholder="Search invoice # or customer..." onkeydown="if(event.key==='Enter')loadInvoices()">
+        <div class="card" id="invList">
+            <div class="empty-state"><div class="icon">📄</div>Loading...</div>
+        </div>
+        <div class="load-more" id="invMore" style="display:none">
+            <button onclick="loadInvoices(invPage+1, true)">Load More</button>
+        </div>
+    </div>
+</div>
+
+<!-- Reminder Modal -->
+<div class="modal-bg" id="reminderModal" onclick="if(event.target===this)closeModal('reminderModal')">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:12px">Send Reminder</h3>
+        <input type="hidden" id="rmCustId"><input type="hidden" id="rmInvId">
+        <div style="margin-bottom:8px">
+            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600">Customer</div>
+            <div style="font-size:0.875rem;font-weight:600" id="rmName">--</div>
+        </div>
+        <div style="margin-bottom:8px">
+            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600">Phone</div>
+            <div style="font-size:0.875rem" id="rmPhone">--</div>
+        </div>
+        <div style="margin-bottom:12px">
+            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Message</div>
+            <textarea id="rmMsg" rows="4" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem;outline:none"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+            <button onclick="closeModal('reminderModal')" style="flex:1;padding:12px;background:#f1f5f9;border:none;border-radius:10px;font-weight:600;cursor:pointer">Cancel</button>
+            <button onclick="sendReminder()" id="rmSendBtn" style="flex:1;padding:12px;background:#22c55e;color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer">Send WhatsApp</button>
+        </div>
+    </div>
+</div>
+
+<!-- Log Call/Visit Modal -->
+<div class="modal-bg" id="logModal" onclick="if(event.target===this)closeModal('logModal')">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:12px">Log Call / Visit</h3>
+        <input type="hidden" id="lgCustId"><input type="hidden" id="lgCustName"><input type="hidden" id="lgPhone">
+        <div style="margin-bottom:10px">
+            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Type</div>
+            <select id="lgType" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem">
+                <option value="call">Phone Call</option>
+                <option value="visit">In-person Visit</option>
+                <option value="email">Email</option>
+            </select>
+        </div>
+        <div style="margin-bottom:12px">
+            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Notes</div>
+            <textarea id="lgNotes" rows="3" placeholder="What was discussed..." style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem;outline:none"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+            <button onclick="closeModal('logModal')" style="flex:1;padding:12px;background:#f1f5f9;border:none;border-radius:10px;font-weight:600;cursor:pointer">Cancel</button>
+            <button onclick="submitLog()" style="flex:1;padding:12px;background:#3b82f6;color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer">Log</button>
+        </div>
+    </div>
+</div>
+
+<!-- Promise Modal -->
+<div class="modal-bg" id="promiseModal" onclick="if(event.target===this)closeModal('promiseModal')">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:12px">Add Promise to Pay</h3>
+        <input type="hidden" id="prCustId"><input type="hidden" id="prCustName">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+                <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Promise Date</div>
+                <input type="date" id="prDate" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem">
+            </div>
+            <div>
+                <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Amount</div>
+                <input type="number" id="prAmount" step="0.01" placeholder="0.00" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem">
+            </div>
+        </div>
+        <div style="margin-bottom:12px">
+            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Notes</div>
+            <textarea id="prNotes" rows="2" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem;outline:none"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+            <button onclick="closeModal('promiseModal')" style="flex:1;padding:12px;background:#f1f5f9;border:none;border-radius:10px;font-weight:600;cursor:pointer">Cancel</button>
+            <button onclick="submitPromise()" style="flex:1;padding:12px;background:#667eea;color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer">Save Promise</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Staff sidebar component -->
+<link rel="stylesheet" href="/components/staff-sidebar.html">
+<script>
+    // Load staff sidebar
+    fetch('/components/staff-sidebar.html')
+        .then(r => r.text())
+        .then(html => {
+            document.getElementById('staff-sidebar-placeholder').innerHTML = html;
+            // Re-run scripts
+            const scripts = document.getElementById('staff-sidebar-placeholder').querySelectorAll('script');
+            scripts.forEach(s => { const ns = document.createElement('script'); ns.textContent = s.textContent; document.body.appendChild(ns); });
+        });
+</script>
+
+<script>
+const API = '/api/zoho/collections';
+let custPage = 1, invPage = 1;
+let custData = [], invData = [];
+
+// ========================================
+// HELPERS
+// ========================================
+
+function fmt(amount) {
+    const n = parseFloat(amount || 0);
+    if (n >= 10000000) return '\u20B9' + (n / 10000000).toFixed(2) + 'Cr';
+    if (n >= 100000) return '\u20B9' + (n / 100000).toFixed(2) + 'L';
+    if (n >= 1000) return '\u20B9' + (n / 1000).toFixed(1) + 'K';
+    return '\u20B9' + n.toFixed(0);
+}
+
+function fmtFull(amount) {
+    return 'Rs.' + parseFloat(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDate(d) {
+    if (!d) return '--';
+    return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show' + (type === 'error' ? ' error' : '');
+    setTimeout(() => t.className = '', 3000);
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+}
+
+async function apiJson(url, opts = {}) {
+    const headers = getAuthHeaders();
+    if (opts.body && typeof opts.body === 'object') {
+        headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(opts.body);
+    }
+    const resp = await fetch(url, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ message: 'Request failed' }));
+        throw new Error(err.message || 'Request failed');
+    }
+    return resp.json();
+}
+
+// ========================================
+// TABS
+// ========================================
+
+function switchTab(tab, btn) {
+    document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+    document.getElementById('tab-' + tab).style.display = '';
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (tab === 'summary') loadSummary();
+    else if (tab === 'customers') loadCustomers();
+    else if (tab === 'invoices') loadInvoices();
+}
+
+// ========================================
+// SUMMARY
+// ========================================
+
+async function loadSummary() {
+    try {
+        const { data } = await apiJson(API + '/summary');
+        document.getElementById('sOutstanding').textContent = fmt(data.total_outstanding);
+        document.getElementById('sOutCount').textContent = data.outstanding_count;
+        document.getElementById('sOverdue').textContent = fmt(data.overdue_amount);
+        document.getElementById('sOverCount').textContent = data.overdue_count;
+        document.getElementById('sRate').textContent = data.collection_rate_30d + '%';
+        document.getElementById('sAvgDays').textContent = data.avg_days_overdue + 'd';
+        document.getElementById('sRemToday').textContent = data.reminders_today;
+        document.getElementById('sPromises').textContent = data.pending_promises;
+    } catch (err) {
+        showToast('Failed to load summary', 'error');
+    }
+}
+
+// ========================================
+// CUSTOMERS
+// ========================================
+
+async function loadCustomers(page, append) {
+    custPage = page || 1;
+    const search = document.getElementById('custSearchInput').value;
+    const params = new URLSearchParams({ search, sort: 'total_outstanding', order: 'desc', page: custPage, limit: 20 });
+
+    try {
+        const { data, pagination } = await apiJson(API + '/customers?' + params);
+
+        if (!append) custData = data;
+        else custData = custData.concat(data);
+
+        const list = document.getElementById('custList');
+        if (custData.length === 0) {
+            list.innerHTML = '<div class="empty-state"><div class="icon">👥</div>No customers with outstanding balance</div>';
+            document.getElementById('custMore').style.display = 'none';
+            return;
+        }
+
+        list.innerHTML = custData.map(c => {
+            const daysStr = c.oldest_due_date ? Math.max(0, Math.floor((Date.now() - new Date(c.oldest_due_date)) / 86400000)) : 0;
+            return `
+            <div class="list-item">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div>
+                        <div class="name">${esc(c.customer_name || 'Unknown')}</div>
+                        <div class="meta">${esc(c.phone || 'No phone')} · ${c.invoice_count} invoices</div>
+                        ${c.overdue_count > 0 ? `<div class="overdue">${c.overdue_count} overdue · ${fmtFull(c.overdue_amount)}</div>` : ''}
+                    </div>
+                    <div style="text-align:right">
+                        <div class="amount">${fmtFull(c.total_outstanding)}</div>
+                        ${c.overdue_amount > 0 ? '<span class="badge badge-overdue">Overdue</span>' : '<span class="badge badge-ok">Current</span>'}
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+                    ${c.phone ? `<button class="action-btn btn-remind" onclick="openRemindCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone)}',${c.total_outstanding})">WhatsApp</button>` : ''}
+                    <button class="action-btn btn-call" onclick="openLogModal('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone || '')}')">Log Call</button>
+                    <button class="action-btn btn-promise" onclick="openPromiseModal('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}',${c.total_outstanding})">Promise</button>
+                </div>
+            </div>`;
+        }).join('');
+
+        document.getElementById('custMore').style.display = (pagination.page * pagination.limit < pagination.total) ? '' : 'none';
+    } catch (err) {
+        showToast('Failed to load customers', 'error');
+    }
+}
+
+// ========================================
+// INVOICES
+// ========================================
+
+async function loadInvoices(page, append) {
+    invPage = page || 1;
+    const search = document.getElementById('invSearchInput').value;
+    const params = new URLSearchParams({ search, sort: 'balance', order: 'desc', page: invPage, limit: 20 });
+
+    try {
+        const { data, pagination } = await apiJson(API + '/invoices?' + params);
+
+        if (!append) invData = data;
+        else invData = invData.concat(data);
+
+        const list = document.getElementById('invList');
+        if (invData.length === 0) {
+            list.innerHTML = '<div class="empty-state"><div class="icon">📄</div>No outstanding invoices</div>';
+            document.getElementById('invMore').style.display = 'none';
+            return;
+        }
+
+        list.innerHTML = invData.map((inv, idx) => `
+            <div class="list-item">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div>
+                        <div class="name">${esc(inv.invoice_number || 'N/A')}</div>
+                        <div class="meta">${esc(inv.customer_name || 'Unknown')} · Due ${fmtDate(inv.due_date)}</div>
+                        ${inv.days_overdue > 0 ? `<div class="overdue">${inv.days_overdue} days overdue</div>` : ''}
+                    </div>
+                    <div style="text-align:right">
+                        <div class="amount">${fmtFull(inv.balance)}</div>
+                        ${inv.days_overdue > 0 ? '<span class="badge badge-overdue">Overdue</span>' : '<span class="badge badge-ok">' + esc(inv.status) + '</span>'}
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+                    ${inv.phone ? `<button class="action-btn btn-remind" onclick="openRemindInvoice(${idx})">WhatsApp</button>` : ''}
+                    <button class="action-btn btn-call" onclick="openLogModal('${esc(inv.zoho_customer_id)}','${esc(inv.customer_name)}','${esc(inv.phone || '')}')">Log Call</button>
+                    <button class="action-btn btn-promise" onclick="openPromiseModal('${esc(inv.zoho_customer_id)}','${esc(inv.customer_name)}',${inv.balance})">Promise</button>
+                </div>
+            </div>
+        `).join('');
+
+        document.getElementById('invMore').style.display = (pagination.page * pagination.limit < pagination.total) ? '' : 'none';
+    } catch (err) {
+        showToast('Failed to load invoices', 'error');
+    }
+}
+
+// ========================================
+// REMINDER
+// ========================================
+
+function openRemindCustomer(custId, name, phone, amount) {
+    document.getElementById('rmCustId').value = custId;
+    document.getElementById('rmInvId').value = '';
+    document.getElementById('rmName').textContent = name;
+    document.getElementById('rmPhone').textContent = phone;
+    document.getElementById('rmMsg').value = `Dear ${name}, you have an outstanding balance of ${fmtFull(amount)} with Quality Colours. Please make the payment at your earliest convenience. - Quality Colours`;
+    document.getElementById('reminderModal').classList.add('show');
+}
+
+function openRemindInvoice(idx) {
+    const inv = invData[idx];
+    document.getElementById('rmCustId').value = inv.zoho_customer_id;
+    document.getElementById('rmInvId').value = inv.zoho_invoice_id;
+    document.getElementById('rmName').textContent = inv.customer_name;
+    document.getElementById('rmPhone').textContent = inv.phone;
+    const msg = inv.days_overdue > 0
+        ? `Dear ${inv.customer_name}, your invoice #${inv.invoice_number} for ${fmtFull(inv.balance)} is overdue by ${inv.days_overdue} days. Kindly settle the payment immediately. - Quality Colours`
+        : `Dear ${inv.customer_name}, this is a reminder about invoice #${inv.invoice_number} for ${fmtFull(inv.balance)}. Due date: ${fmtDate(inv.due_date)}. - Quality Colours`;
+    document.getElementById('rmMsg').value = msg;
+    document.getElementById('reminderModal').classList.add('show');
+}
+
+async function sendReminder() {
+    const btn = document.getElementById('rmSendBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+        const msg = document.getElementById('rmMsg').value.trim();
+        if (!msg) throw new Error('Message is empty');
+
+        await apiJson(API + '/remind', {
+            method: 'POST',
+            body: {
+                reminders: [{
+                    zoho_invoice_id: document.getElementById('rmInvId').value || null,
+                    zoho_customer_id: document.getElementById('rmCustId').value,
+                    customer_name: document.getElementById('rmName').textContent,
+                    phone: document.getElementById('rmPhone').textContent,
+                    message_body: msg,
+                    balance: 0
+                }]
+            }
+        });
+
+        showToast('Reminder sent!');
+        closeModal('reminderModal');
+    } catch (err) {
+        showToast('Failed: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send WhatsApp';
+    }
+}
+
+// ========================================
+// LOG CALL/VISIT
+// ========================================
+
+function openLogModal(custId, name, phone) {
+    document.getElementById('lgCustId').value = custId;
+    document.getElementById('lgCustName').value = name;
+    document.getElementById('lgPhone').value = phone;
+    document.getElementById('lgNotes').value = '';
+    document.getElementById('logModal').classList.add('show');
+}
+
+async function submitLog() {
+    try {
+        await apiJson(API + '/remind/log', {
+            method: 'POST',
+            body: {
+                zoho_customer_id: document.getElementById('lgCustId').value,
+                customer_name: document.getElementById('lgCustName').value,
+                phone: document.getElementById('lgPhone').value,
+                reminder_type: document.getElementById('lgType').value,
+                notes: document.getElementById('lgNotes').value
+            }
+        });
+        showToast('Logged successfully');
+        closeModal('logModal');
+    } catch (err) {
+        showToast('Failed: ' + err.message, 'error');
+    }
+}
+
+// ========================================
+// PROMISE
+// ========================================
+
+function openPromiseModal(custId, name, amount) {
+    document.getElementById('prCustId').value = custId;
+    document.getElementById('prCustName').value = name;
+    document.getElementById('prDate').value = '';
+    document.getElementById('prAmount').value = amount || '';
+    document.getElementById('prNotes').value = '';
+    document.getElementById('promiseModal').classList.add('show');
+}
+
+async function submitPromise() {
+    try {
+        const date = document.getElementById('prDate').value;
+        const amount = document.getElementById('prAmount').value;
+        if (!date || !amount) throw new Error('Date and amount required');
+
+        await apiJson(API + '/promises', {
+            method: 'POST',
+            body: {
+                zoho_customer_id: document.getElementById('prCustId').value,
+                customer_name: document.getElementById('prCustName').value,
+                promise_date: date,
+                promise_amount: parseFloat(amount),
+                notes: document.getElementById('prNotes').value || null
+            }
+        });
+        showToast('Promise recorded');
+        closeModal('promiseModal');
+    } catch (err) {
+        showToast('Failed: ' + err.message, 'error');
+    }
+}
+
+// ========================================
+// INIT
+// ========================================
+
+loadSummary();
+</script>
+</body>
+</html>

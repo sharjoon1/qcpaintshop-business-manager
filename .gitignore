@@ -24,6 +24,9 @@ public/uploads/daily-tasks/
 public/uploads/aadhar/
 public/uploads/logos/
 
+# WhatsApp session data (Chromium profiles, auth tokens)
+whatsapp-sessions/
+
 # Artifacts
 cookie.txt
 nul

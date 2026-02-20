@@ -52,6 +52,8 @@ const guidesRoutes = require('./routes/guides');
 const stockCheckRoutes = require('./routes/stock-check');
 const stockMigrationRoutes = require('./routes/stock-migration');
 const collectionsRoutes = require('./routes/collections');
+const whatsappSessionManager = require('./services/whatsapp-session-manager');
+const whatsappSessionsRoutes = require('./routes/whatsapp-sessions');
 
 const app = express();
 
@@ -133,6 +135,7 @@ staffRegistrationRoutes.setPool(pool);
 dailyTasksRoutes.setPool(pool);
 syncScheduler.setPool(pool);
 whatsappProcessor.setPool(pool);
+whatsappProcessor.setSessionManager(whatsappSessionManager);
 rateLimiter.setPool(pool); // Enable DB persistence for API call tracking
 chatRoutes.setPool(pool);
 notificationRoutes.setPool(pool);
@@ -145,6 +148,9 @@ guidesRoutes.setPool(pool);
 stockCheckRoutes.setPool(pool);
 stockMigrationRoutes.setPool(pool);
 collectionsRoutes.setPool(pool);
+whatsappSessionManager.setPool(pool);
+whatsappSessionsRoutes.setPool(pool);
+whatsappSessionsRoutes.setSessionManager(whatsappSessionManager);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -270,6 +276,7 @@ app.use('/api/guides', guidesRoutes.router);
 app.use('/api/stock-check', stockCheckRoutes.router);
 app.use('/api/zoho/migration', stockMigrationRoutes.router);
 app.use('/api/zoho/collections', collectionsRoutes.router);
+app.use('/api/zoho/whatsapp-sessions', whatsappSessionsRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3209,6 +3216,7 @@ const io = new SocketIO(server, {
 app.set('io', io);
 notificationService.setIO(io);
 autoClockout.setIO(io);
+whatsappSessionManager.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {
@@ -3244,6 +3252,18 @@ io.on('connection', async (socket) => {
 
     // Join user's personal room for notifications
     socket.join(`user_${userId}`);
+
+    // Admin users join WhatsApp admin room for QR/status updates
+    if (socket.user.role === 'admin') {
+        socket.join('whatsapp_admin');
+    }
+
+    // Handle explicit room join request from WhatsApp sessions page
+    socket.on('join_whatsapp_admin', () => {
+        if (socket.user.role === 'admin') {
+            socket.join('whatsapp_admin');
+        }
+    });
 
     // Join all conversations the user is part of
     try {
@@ -3307,7 +3327,8 @@ server.listen(PORT, () => {
             console.error('Failed to start sync scheduler:', err.message);
         });
         whatsappProcessor.start();
-        console.log('Background services started: sync-scheduler, whatsapp-processor, auto-clockout');
+        whatsappSessionManager.initializeSessions();
+        console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, auto-clockout');
     } else {
         console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
     }

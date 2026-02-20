@@ -4,7 +4,7 @@
  *
  * Features:
  *   - Processes pending messages every 5 minutes (via cron)
- *   - Sends via WhatsApp Business API (configurable URL)
+ *   - Dual-mode sending: per-branch session (whatsapp-web.js) or HTTP API fallback
  *   - Retry logic with max 3 attempts
  *   - Scheduled message support (send at specific time)
  *   - Template-based messages for payment reminders
@@ -12,6 +12,7 @@
  * Usage:
  *   const whatsapp = require('../services/whatsapp-processor');
  *   whatsapp.setPool(pool);
+ *   whatsapp.setSessionManager(sessionManager); // optional
  *   whatsapp.start();
  */
 
@@ -20,6 +21,7 @@ const https = require('https');
 const http = require('http');
 
 let pool;
+let sessionManager; // whatsapp-session-manager instance (optional)
 let processorJob = null;
 let isRunning = false;
 let isProcessing = false; // Prevent concurrent processing
@@ -30,6 +32,10 @@ const BATCH_SIZE = 10; // Process 10 messages per cycle
 
 function setPool(dbPool) {
     pool = dbPool;
+}
+
+function setSessionManager(sm) {
+    sessionManager = sm;
 }
 
 // ========================================
@@ -100,7 +106,7 @@ async function processQueue() {
     stats.lastRun = new Date();
 
     try {
-        // Load WhatsApp config
+        // Load WhatsApp config (needed for HTTP API fallback)
         const [configRows] = await pool.query(
             `SELECT config_key, config_value FROM zoho_config WHERE config_key IN ('whatsapp_enabled', 'whatsapp_api_url', 'whatsapp_api_key')`
         );
@@ -112,8 +118,12 @@ async function processQueue() {
             return;
         }
 
-        if (!config.whatsapp_api_url || !config.whatsapp_api_key) {
-            console.warn('[WhatsApp] API URL or Key not configured');
+        const hasHttpApi = !!(config.whatsapp_api_url && config.whatsapp_api_key);
+        const hasSessionManager = !!(sessionManager);
+
+        // Need at least one sending method
+        if (!hasHttpApi && !hasSessionManager) {
+            console.warn('[WhatsApp] No sending method available (no HTTP API and no session manager)');
             isProcessing = false;
             return;
         }
@@ -156,13 +166,38 @@ async function processQueue() {
                     });
                 }
 
-                // Send via WhatsApp API
-                await sendWhatsAppMessage(
-                    config.whatsapp_api_url,
-                    config.whatsapp_api_key,
-                    msg.phone,
-                    body
-                );
+                // DUAL-MODE SENDING:
+                // 1. If message has branch_id AND that branch has a connected session → use local session
+                // 2. Otherwise → fallback to HTTP API
+                let sent = false;
+
+                if (msg.branch_id && sessionManager && sessionManager.isConnected(msg.branch_id)) {
+                    try {
+                        sent = await sessionManager.sendMessage(msg.branch_id, msg.phone, body);
+                        if (sent) {
+                            console.log(`[WhatsApp] Sent via branch ${msg.branch_id} session to ${msg.phone} (ID: ${msg.id})`);
+                        }
+                    } catch (sessionErr) {
+                        console.warn(`[WhatsApp] Branch ${msg.branch_id} session send failed, falling back to HTTP:`, sessionErr.message);
+                        sent = false;
+                    }
+                }
+
+                // Fallback to HTTP API if session send didn't work
+                if (!sent && hasHttpApi) {
+                    await sendWhatsAppMessage(
+                        config.whatsapp_api_url,
+                        config.whatsapp_api_key,
+                        msg.phone,
+                        body
+                    );
+                    sent = true;
+                    console.log(`[WhatsApp] Sent via HTTP API to ${msg.phone} (ID: ${msg.id})`);
+                }
+
+                if (!sent) {
+                    throw new Error('No available sending method (branch session disconnected and no HTTP API)');
+                }
 
                 // Mark as sent
                 await pool.query(
@@ -170,8 +205,15 @@ async function processQueue() {
                     [msg.id]
                 );
 
+                // Also update collection_reminders if linked
+                if (msg.id) {
+                    await pool.query(
+                        `UPDATE collection_reminders SET status = 'sent' WHERE whatsapp_queue_id = ? AND status = 'pending'`,
+                        [msg.id]
+                    ).catch(() => {}); // Non-critical
+                }
+
                 stats.sent++;
-                console.log(`[WhatsApp] Sent to ${msg.phone} (ID: ${msg.id})`);
 
             } catch (sendError) {
                 stats.failed++;
@@ -285,7 +327,7 @@ async function queueOverdueReminders() {
         for (const days of reminderDays) {
             // Find overdue invoices matching this reminder day
             const [overdueInvoices] = await pool.query(`
-                SELECT zi.*, zcm.zoho_phone
+                SELECT zi.*, zcm.zoho_phone, zcm.branch_id
                 FROM zoho_invoices zi
                 LEFT JOIN zoho_customers_map zcm ON zi.zoho_customer_id = zcm.zoho_contact_id
                 WHERE zi.status = 'overdue'
@@ -316,12 +358,12 @@ async function queueOverdueReminders() {
                     await pool.query(`
                         INSERT INTO whatsapp_followups (
                             zoho_customer_id, zoho_invoice_id, customer_name,
-                            phone, message_type, message_body, amount, status
-                        ) VALUES (?, ?, ?, ?, 'overdue_notice', ?, ?, 'pending')
+                            phone, message_type, message_body, amount, status, branch_id
+                        ) VALUES (?, ?, ?, ?, 'overdue_notice', ?, ?, 'pending', ?)
                     `, [
                         inv.zoho_customer_id, inv.zoho_invoice_id,
                         inv.customer_name, inv.zoho_phone || '',
-                        body, inv.balance
+                        body, inv.balance, inv.branch_id || null
                     ]);
 
                     console.log(`[WhatsApp] Queued overdue reminder for ${inv.customer_name} (${days} days overdue)`);
@@ -379,6 +421,7 @@ function getStatus() {
 
 module.exports = {
     setPool,
+    setSessionManager,
     start,
     stop,
     getStatus,
