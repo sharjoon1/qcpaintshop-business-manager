@@ -58,6 +58,11 @@ router.post('/assign', requirePermission('zoho', 'stock_check'), async (req, res
             return res.status(400).json({ success: false, message: 'branch_id, staff_id, check_date, and item_ids are required' });
         }
 
+        // Validate staff_id is an actual staff/admin/manager (not customer)
+        const [staffUser] = await pool.query('SELECT id, role FROM users WHERE id = ? AND status = ?', [staff_id, 'active']);
+        if (!staffUser.length) return res.status(400).json({ success: false, message: 'Staff member not found or inactive' });
+        if (staffUser[0].role === 'customer') return res.status(400).json({ success: false, message: 'Cannot assign stock check to a customer account' });
+
         // Get branch info
         const [branches] = await pool.query('SELECT id, name as branch_name FROM branches WHERE id = ?', [branch_id]);
         if (!branches.length) return res.status(404).json({ success: false, message: 'Branch not found' });
@@ -245,7 +250,8 @@ router.delete('/assignments/:id', requirePermission('zoho', 'stock_check'), asyn
 router.get('/my-assignments', requireAuth, async (req, res) => {
     try {
         const { date } = req.query;
-        const targetDate = date || new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const targetDate = date || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
         const [rows] = await pool.query(
             `SELECT a.*, b.name as branch_name,
@@ -478,9 +484,9 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             quantity_adjusted: parseFloat(item.difference)
         }));
 
-        // Format date as YYYY-MM-DD string (MySQL returns Date object)
+        // Format date as YYYY-MM-DD string (MySQL returns Date object in local time — use local getters, NOT toISOString which converts to UTC)
         const checkDate = assignment.check_date instanceof Date
-            ? assignment.check_date.toISOString().split('T')[0]
+            ? `${assignment.check_date.getFullYear()}-${String(assignment.check_date.getMonth()+1).padStart(2,'0')}-${String(assignment.check_date.getDate()).padStart(2,'0')}`
             : String(assignment.check_date).split('T')[0];
 
         const adjustmentData = {
