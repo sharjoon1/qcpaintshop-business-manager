@@ -100,14 +100,15 @@ router.post('/transfer', requirePermission('zoho', 'manage'), async (req, res) =
             location_id: to_location_id,
             line_items: transferItems.map(item => ({
                 item_id: item.item_id,
+                location_id: to_location_id,
                 quantity_adjusted: parseFloat(item.stock || item.quantity)
             }))
         };
 
-        console.log(`[Stock Migration] Step 1: Increasing stock at business location for ${branch_name} (${transferItems.length} items)`);
+        console.log(`[Stock Migration] Step 1: Increasing at ${to_location_id} for ${branch_name} (${transferItems.length} items)`);
         const increaseResult = await zohoAPI.createInventoryAdjustment(increaseData);
         const increaseId = increaseResult?.inventory_adjustment?.inventory_adjustment_id || 'unknown';
-        console.log(`[Stock Migration] Increase adjustment created: ${increaseId}`);
+        console.log(`[Stock Migration] Increase adjustment created: ${increaseId}, location in response: ${increaseResult?.inventory_adjustment?.location_id}`);
 
         // Step 2: Decrease stock at warehouse location
         const decreaseData = {
@@ -118,14 +119,15 @@ router.post('/transfer', requirePermission('zoho', 'manage'), async (req, res) =
             location_id: from_location_id,
             line_items: transferItems.map(item => ({
                 item_id: item.item_id,
+                location_id: from_location_id,
                 quantity_adjusted: -Math.abs(parseFloat(item.stock || item.quantity))
             }))
         };
 
-        console.log(`[Stock Migration] Step 2: Decreasing stock at warehouse for ${branch_name}`);
+        console.log(`[Stock Migration] Step 2: Decreasing at ${from_location_id} (warehouse) for ${branch_name}`);
         const decreaseResult = await zohoAPI.createInventoryAdjustment(decreaseData);
         const decreaseId = decreaseResult?.inventory_adjustment?.inventory_adjustment_id || 'unknown';
-        console.log(`[Stock Migration] Decrease adjustment created: ${decreaseId}`);
+        console.log(`[Stock Migration] Decrease adjustment created: ${decreaseId}, location in response: ${decreaseResult?.inventory_adjustment?.location_id}`);
 
         res.json({
             success: true,
@@ -182,11 +184,12 @@ router.post('/transfer-all', requirePermission('zoho', 'manage'), async (req, re
                     location_id: branch.business_location_id,
                     line_items: transferItems.map(item => ({
                         item_id: item.item_id,
+                        location_id: branch.business_location_id,
                         quantity_adjusted: parseFloat(item.stock || item.quantity)
                     }))
                 };
 
-                console.log(`[Stock Migration] Increasing stock at business for ${branch.branch_name} (${transferItems.length} items)`);
+                console.log(`[Stock Migration] Increasing at ${branch.business_location_id} for ${branch.branch_name} (${transferItems.length} items)`);
                 await zohoAPI.createInventoryAdjustment(increaseData);
 
                 // Step 2: Decrease at warehouse
@@ -198,11 +201,12 @@ router.post('/transfer-all', requirePermission('zoho', 'manage'), async (req, re
                     location_id: branch.warehouse_location_id,
                     line_items: transferItems.map(item => ({
                         item_id: item.item_id,
+                        location_id: branch.warehouse_location_id,
                         quantity_adjusted: -Math.abs(parseFloat(item.stock || item.quantity))
                     }))
                 };
 
-                console.log(`[Stock Migration] Decreasing stock at warehouse for ${branch.branch_name}`);
+                console.log(`[Stock Migration] Decreasing at ${branch.warehouse_location_id} (warehouse) for ${branch.branch_name}`);
                 await zohoAPI.createInventoryAdjustment(decreaseData);
 
                 results.push({
@@ -260,6 +264,47 @@ router.post('/disable-warehouses', requirePermission('zoho', 'manage'), async (r
     } catch (error) {
         console.error('Disable warehouses error:', error);
         res.status(500).json({ success: false, message: 'Failed to disable warehouses: ' + error.message });
+    }
+});
+
+/**
+ * DELETE /adjustment/:id
+ * Delete an inventory adjustment from Zoho (for cleaning up bad adjustments)
+ */
+router.delete('/adjustment/:id', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const zohoAPI = require('../services/zoho-api');
+        const orgId = process.env.ZOHO_ORGANIZATION_ID;
+        const { apiDelete } = require('../services/zoho-api');
+
+        // Use the raw apiDelete from zoho-api internals
+        const https = require('https');
+        const zohoOAuth = require('../services/zoho-oauth');
+        const token = await zohoOAuth.getAccessToken();
+        const url = `https://www.zohoapis.in/books/v3/inventoryadjustments/${req.params.id}?organization_id=${orgId}`;
+
+        const result = await new Promise((resolve, reject) => {
+            const urlObj = new URL(url);
+            const options = {
+                hostname: urlObj.hostname,
+                path: urlObj.pathname + urlObj.search,
+                method: 'DELETE',
+                headers: { 'Authorization': `Zoho-oauthtoken ${token}` }
+            };
+            const r = https.request(options, (resp) => {
+                let data = '';
+                resp.on('data', c => data += c);
+                resp.on('end', () => resolve(JSON.parse(data)));
+            });
+            r.on('error', reject);
+            r.end();
+        });
+
+        console.log(`[Stock Migration] Delete adjustment ${req.params.id}:`, result.message);
+        res.json({ success: result.code === 0, message: result.message });
+    } catch (error) {
+        console.error('Delete adjustment error:', error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
