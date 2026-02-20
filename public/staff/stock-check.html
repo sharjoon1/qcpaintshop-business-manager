@@ -442,6 +442,65 @@ async function submitCheck(assignmentId) {
     }
 }
 
+// ========================================
+// Socket.io — Real-time stock check alerts
+// ========================================
+
+(function loadSocketForStaff() {
+    const s1 = document.createElement('script');
+    s1.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+    s1.onload = function() {
+        const s2 = document.createElement('script');
+        s2.src = '/js/socket-helper.js';
+        s2.onload = function() {
+            // Listen for stock check notifications
+            window.addEventListener('qc-notification', function(e) {
+                const n = e.detail;
+                if (n.type === 'stock_check_assigned') {
+                    showNewAssignmentAlert(n);
+                    loadAssignments(); // Auto-refresh
+                }
+            });
+        };
+        document.head.appendChild(s2);
+    };
+    document.head.appendChild(s1);
+})();
+
+function showNewAssignmentAlert(notification) {
+    // Remove existing alert if any
+    const existing = document.getElementById('newAssignmentAlert');
+    if (existing) existing.remove();
+
+    const alert = document.createElement('div');
+    alert.id = 'newAssignmentAlert';
+    alert.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white; padding: 14px 20px;
+        display: flex; align-items: center; gap: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        animation: slideDown 0.3s ease;
+    `;
+    alert.innerHTML = `
+        <span style="font-size:1.5rem">📦</span>
+        <div style="flex:1">
+            <div style="font-weight:700;font-size:0.9rem">${notification.title || 'New Stock Check!'}</div>
+            <div style="font-size:0.8rem;opacity:0.9">${notification.body || 'You have a new stock check assignment'}</div>
+        </div>
+        <button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer">×</button>
+    `;
+    document.body.appendChild(alert);
+
+    // Auto-dismiss after 8 seconds
+    setTimeout(() => { if (alert.parentElement) alert.remove(); }, 8000);
+}
+
+// Add animation keyframe
+const style = document.createElement('style');
+style.textContent = '@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }';
+document.head.appendChild(style);
+
 // Init
 const today = new Date();
 document.getElementById('headerDate').textContent = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
