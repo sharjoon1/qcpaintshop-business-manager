@@ -1443,10 +1443,21 @@ node promote-release.js internal production
 - **Settings**: Configurable delays, rate limits, warm-up schedule, invisible markers toggle, engine poll interval
 - **Media Support**: `sendMedia()` added to session manager — images with captions, documents
 - **5 Tables**: `wa_campaigns`, `wa_campaign_leads`, `wa_message_templates`, `wa_sending_stats`, `wa_marketing_settings`
-- **23 API Endpoints**: `/api/wa-marketing/*` — campaigns CRUD, templates, dashboard, leads preview, settings, media upload
+- **Instant Send Feature** (separate from campaigns — for quick ad-hoc messaging):
+  - "Instant Send" tab with full lead browser (search, status, source, branch filters), checkboxes, select all/clear
+  - Instant message composer modal: WhatsApp session picker, template selector, variable/spin text toolbar, media upload, live preview
+  - Real-time progress modal via Socket.io: per-lead sent/failed status, progress bar, summary stats
+  - Anti-block: 5-15s random delays, spin text, variable substitution, invisible markers
+  - Recent history section with batch grouping, status badges, pagination
+  - Background async processing: `processInstantBatch()` sends one by one with delays, emits `wa_instant_progress`/`wa_instant_complete`
+  - New table: `wa_instant_messages` (batch_id, lead_id, message_template, message_content, status, media, timestamps)
+  - New endpoints: `POST /instant-send`, `GET /instant-history`, `GET /whatsapp-sessions`
+  - Migration: `migrations/migrate-wa-instant-messages.js`
+- **27 API Endpoints**: `/api/wa-marketing/*` — campaigns CRUD, templates, dashboard, leads preview, settings, media upload, instant send, history, sessions
 - **2 Permissions**: `marketing.view`, `marketing.manage` (auto-assigned to admin role)
 - **Navigation**: Marketing sidebar section, `marketing-subnav.html`, `marketing-` prefix detection in nav loader
-- Migration: `migrations/migrate-wa-marketing.js`
+- **6 Tables**: `wa_campaigns`, `wa_campaign_leads`, `wa_message_templates`, `wa_sending_stats`, `wa_marketing_settings`, `wa_instant_messages`
+- Migrations: `migrate-wa-marketing.js`, `migrate-wa-instant-messages.js`
 - Files: `services/wa-campaign-engine.js`, `routes/wa-marketing.js`, `public/admin-wa-marketing.html`, `public/components/marketing-subnav.html`
 
 ---
