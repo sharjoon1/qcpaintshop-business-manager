@@ -160,10 +160,13 @@
                 <h1 class="text-2xl font-bold text-gray-900">Stock Migration</h1>
                 <p class="text-sm text-gray-500 mt-1">Transfer all stock from Warehouse to Business locations</p>
             </div>
-            <button id="btnRefresh" onclick="loadData()" class="btn btn-outline btn-sm">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" style="display:inline;vertical-align:middle"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                Refresh
-            </button>
+            <div class="flex gap-2">
+                <button id="btnSync" onclick="syncStock()" class="btn btn-warning btn-sm">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" style="display:inline;vertical-align:middle"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    Sync Stock from Zoho
+                </button>
+                <button id="btnRefresh" onclick="loadData()" class="btn btn-outline btn-sm">Refresh</button>
+            </div>
         </div>
 
         <!-- Summary Stats -->
@@ -235,6 +238,27 @@ let branchData = [];
 let transferInProgress = false;
 
 function headers() { return getAuthHeaders(); }
+
+async function syncStock() {
+    const btn = document.getElementById('btnSync');
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+    showToast('Syncing stock from Zoho... this may take a minute', 'info');
+    try {
+        const result = await apiPost('/api/zoho/migration/sync-stock', {});
+        if (result.success) {
+            showToast('Stock synced! Reloading data...', 'success');
+            await loadData();
+        } else {
+            showToast('Sync failed: ' + result.message, 'error');
+        }
+    } catch (err) {
+        showToast('Sync error: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sync Stock from Zoho';
+    }
+}
 
 function showToast(msg, type = 'success') {
     const t = document.getElementById('toast');

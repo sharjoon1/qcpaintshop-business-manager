@@ -13,6 +13,23 @@ let pool;
 function setPool(p) { pool = p; }
 
 /**
+ * POST /sync-stock
+ * Sync location stock from Zoho to get fresh data
+ */
+router.post('/sync-stock', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const zohoAPI = require('../services/zoho-api');
+        console.log('[Stock Migration] Syncing location stock from Zoho...');
+        const result = await zohoAPI.syncLocationStock('stock-migration');
+        console.log('[Stock Migration] Stock sync complete');
+        res.json({ success: true, message: 'Stock data synced from Zoho', ...result });
+    } catch (error) {
+        console.error('Stock sync error:', error);
+        res.status(500).json({ success: false, message: 'Stock sync failed: ' + error.message });
+    }
+});
+
+/**
  * GET /warehouse-stock
  * Returns stock in all warehouse locations grouped by branch
  */
