@@ -50,6 +50,7 @@ const autoClockout = require('./services/auto-clockout');
 const websiteRoutes = require('./routes/website');
 const guidesRoutes = require('./routes/guides');
 const stockCheckRoutes = require('./routes/stock-check');
+const stockMigrationRoutes = require('./routes/stock-migration');
 
 const app = express();
 
@@ -141,6 +142,7 @@ autoClockout.setPool(pool);
 websiteRoutes.setPool(pool);
 guidesRoutes.setPool(pool);
 stockCheckRoutes.setPool(pool);
+stockMigrationRoutes.setPool(pool);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -264,6 +266,7 @@ app.use('/api/share', shareRoutes.router);
 app.use('/api/website', websiteRoutes.router);
 app.use('/api/guides', guidesRoutes.router);
 app.use('/api/stock-check', stockCheckRoutes.router);
+app.use('/api/zoho/migration', stockMigrationRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {

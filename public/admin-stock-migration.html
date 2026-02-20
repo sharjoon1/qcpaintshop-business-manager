@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Migration - QC Paint Shop</title>
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        .migrate-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .branch-row {
+            display: grid;
+            grid-template-columns: 1.5fr 2fr 0.8fr 0.8fr 2fr 1fr;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            gap: 0.5rem;
+        }
+        .branch-row:last-child { border-bottom: none; }
+        .branch-row.header {
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            background: #f8fafc;
+            border-radius: 8px 8px 0 0;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        @media (max-width: 768px) {
+            .branch-row { grid-template-columns: 1fr; gap: 0.25rem; }
+            .branch-row.header { display: none; }
+            .branch-row:not(.header) {
+                background: #fff;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                margin-bottom: 0.5rem;
+                padding: 1rem;
+            }
+            .mobile-label { display: inline; font-weight: 600; color: #64748b; font-size: 0.75rem; }
+        }
+        @media (min-width: 769px) {
+            .mobile-label { display: none; }
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-transferring { background: #dbeafe; color: #1e40af; }
+        .status-success { background: #d1fae5; color: #065f46; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-skipped { background: #f1f5f9; color: #64748b; }
+        .progress-bar {
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        .log-entry {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8125rem;
+            font-family: monospace;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .log-entry:last-child { border-bottom: none; }
+        .log-success { color: #059669; }
+        .log-error { color: #dc2626; }
+        .log-info { color: #6366f1; }
+        .log-skip { color: #9ca3af; }
+        .spinner-sm {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #e2e8f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .summary-stat {
+            text-align: center;
+            padding: 1rem;
+        }
+        .summary-stat .value {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .summary-stat .label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .expand-btn {
+            background: none;
+            border: none;
+            color: #6366f1;
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+        }
+        .expand-btn:hover { text-decoration: underline; }
+        .item-list {
+            display: none;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.75rem;
+        }
+        .item-list.show { display: block; }
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .item-row:last-child { border-bottom: none; }
+    </style>
+</head>
+<body data-page="zoho-stock-migrate" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
+
+    <div class="max-w-6xl mx-auto px-4 py-6">
+        <!-- Page Header -->
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Stock Migration</h1>
+                <p class="text-sm text-gray-500 mt-1">Transfer all stock from Warehouse to Business locations</p>
+            </div>
+            <button id="btnRefresh" onclick="loadData()" class="btn btn-outline btn-sm">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" style="display:inline;vertical-align:middle"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Refresh
+            </button>
+        </div>
+
+        <!-- Summary Stats -->
+        <div id="summarySection" class="migrate-card" style="display:none">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div class="summary-stat">
+                    <div class="value" id="statBranches">0</div>
+                    <div class="label">Branches</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="value" id="statItems">0</div>
+                    <div class="label">Total Items</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="value" id="statQuantity">0</div>
+                    <div class="label">Total Quantity</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="value" id="statPending">0</div>
+                    <div class="label">Pending</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="actionSection" class="flex flex-wrap gap-3 mb-4" style="display:none">
+            <button id="btnTransferAll" onclick="transferAll()" class="btn btn-primary">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" style="display:inline;vertical-align:middle"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                Transfer All Branches
+            </button>
+            <button id="btnDisable" onclick="disableWarehouses()" class="btn btn-danger" style="display:none">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" style="display:inline;vertical-align:middle"><path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                Disable All Warehouse Locations
+            </button>
+        </div>
+
+        <!-- Progress Bar -->
+        <div id="progressSection" style="display:none" class="migrate-card">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-semibold text-gray-700" id="progressLabel">Transferring...</span>
+                <span class="text-sm text-gray-500" id="progressCount">0/0</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+            </div>
+        </div>
+
+        <!-- Branch Table -->
+        <div id="branchTable" class="migrate-card">
+            <div id="loadingState" class="text-center py-8 text-gray-400">
+                <div class="spinner-sm" style="width:24px;height:24px;border-width:3px;margin:0 auto 0.5rem"></div>
+                <div>Loading warehouse stock data...</div>
+            </div>
+            <div id="emptyState" style="display:none" class="text-center py-8 text-gray-400">
+                No warehouse locations with stock found.
+            </div>
+            <div id="branchList"></div>
+        </div>
+
+        <!-- Transfer Log -->
+        <div id="logSection" class="migrate-card" style="display:none">
+            <h3 class="text-sm font-semibold text-gray-700 mb-2">Transfer Log</h3>
+            <div id="logList" style="max-height:300px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px"></div>
+        </div>
+    </div>
+
+<script>
+let branchData = [];
+let transferInProgress = false;
+
+function headers() { return getAuthHeaders(); }
+
+function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast toast-' + type + ' show';
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function apiFetch(url) {
+    const res = await fetch(url, { headers: headers() });
+    return res.json();
+}
+
+async function apiPost(url, body) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    return res.json();
+}
+
+async function loadData() {
+    document.getElementById('loadingState').style.display = '';
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('branchList').innerHTML = '';
+    document.getElementById('summarySection').style.display = 'none';
+    document.getElementById('actionSection').style.display = 'none';
+
+    try {
+        const data = await apiFetch('/api/zoho/migration/warehouse-stock');
+        if (!data.success) throw new Error(data.message);
+
+        branchData = data.branches || [];
+        document.getElementById('loadingState').style.display = 'none';
+
+        if (branchData.length === 0) {
+            document.getElementById('emptyState').style.display = '';
+            return;
+        }
+
+        renderSummary();
+        renderTable();
+        document.getElementById('summarySection').style.display = '';
+        document.getElementById('actionSection').style.display = 'flex';
+    } catch (err) {
+        document.getElementById('loadingState').innerHTML = '<div class="text-red-500">Error: ' + err.message + '</div>';
+        showToast('Failed to load data: ' + err.message, 'error');
+    }
+}
+
+function renderSummary() {
+    const branches = branchData.filter(b => b.total_items > 0);
+    const totalItems = branchData.reduce((s, b) => s + b.total_items, 0);
+    const totalQty = branchData.reduce((s, b) => s + b.total_quantity, 0);
+
+    document.getElementById('statBranches').textContent = branches.length;
+    document.getElementById('statItems').textContent = totalItems;
+    document.getElementById('statQuantity').textContent = Math.round(totalQty).toLocaleString();
+    document.getElementById('statPending').textContent = branches.length;
+}
+
+function renderTable() {
+    const container = document.getElementById('branchList');
+    let html = `<div class="branch-row header">
+        <div>Branch</div>
+        <div>Warehouse Location</div>
+        <div>Items</div>
+        <div>Total Qty</div>
+        <div>Business Location</div>
+        <div>Action</div>
+    </div>`;
+
+    branchData.forEach((b, idx) => {
+        const hasStock = b.total_items > 0;
+        html += `<div class="branch-row" id="branch-row-${idx}">
+            <div>
+                <span class="mobile-label">Branch: </span>
+                <span class="font-semibold text-gray-900">${esc(b.branch_name)}</span>
+            </div>
+            <div>
+                <span class="mobile-label">Warehouse: </span>
+                <span class="text-sm text-gray-600">${esc(b.warehouse_location_name)}</span>
+            </div>
+            <div>
+                <span class="mobile-label">Items: </span>
+                <span class="font-medium">${b.total_items}</span>
+                ${hasStock ? `<button class="expand-btn" onclick="toggleItems(${idx})">view</button>` : ''}
+            </div>
+            <div>
+                <span class="mobile-label">Total Qty: </span>
+                <span class="font-medium">${Math.round(b.total_quantity).toLocaleString()}</span>
+            </div>
+            <div>
+                <span class="mobile-label">Business: </span>
+                <span class="text-sm text-gray-600">${esc(b.business_location_name)}</span>
+            </div>
+            <div>
+                <span id="branch-status-${idx}">
+                    ${hasStock
+                        ? `<button class="btn btn-primary btn-sm" id="btn-transfer-${idx}" onclick="transferBranch(${idx})">Transfer</button>`
+                        : `<span class="status-badge status-skipped">No stock</span>`}
+                </span>
+            </div>
+        </div>
+        <div id="items-${idx}" class="item-list" style="margin:0 1rem">
+            ${b.items.map(i => `<div class="item-row"><span>${esc(i.name)}${i.sku ? ' (' + esc(i.sku) + ')' : ''}</span><span class="font-medium">${i.stock}</span></div>`).join('')}
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function toggleItems(idx) {
+    const el = document.getElementById('items-' + idx);
+    el.classList.toggle('show');
+}
+
+function addLog(msg, type) {
+    const section = document.getElementById('logSection');
+    section.style.display = '';
+    const list = document.getElementById('logList');
+    const time = new Date().toLocaleTimeString();
+    list.innerHTML += `<div class="log-entry log-${type}">[${time}] ${msg}</div>`;
+    list.scrollTop = list.scrollHeight;
+}
+
+function setBranchStatus(idx, status, text) {
+    const el = document.getElementById('branch-status-' + idx);
+    if (!el) return;
+    if (status === 'transferring') {
+        el.innerHTML = `<span class="status-badge status-transferring"><span class="spinner-sm"></span> Transferring</span>`;
+    } else if (status === 'success') {
+        el.innerHTML = `<span class="status-badge status-success">Done</span>`;
+    } else if (status === 'failed') {
+        el.innerHTML = `<span class="status-badge status-failed" title="${esc(text || '')}">Failed</span>`;
+    } else if (status === 'skipped') {
+        el.innerHTML = `<span class="status-badge status-skipped">Skipped</span>`;
+    }
+}
+
+async function transferBranch(idx) {
+    if (transferInProgress) return showToast('Transfer already in progress', 'warning');
+
+    const branch = branchData[idx];
+    if (!branch || branch.total_items === 0) return;
+
+    const btn = document.getElementById('btn-transfer-' + idx);
+    if (btn) btn.disabled = true;
+
+    setBranchStatus(idx, 'transferring');
+    addLog(`Starting transfer for ${branch.branch_name}...`, 'info');
+
+    try {
+        const result = await apiPost('/api/zoho/migration/transfer', {
+            branch_id: branch.branch_id,
+            branch_name: branch.branch_name,
+            from_location_id: branch.warehouse_location_id,
+            to_location_id: branch.business_location_id,
+            items: branch.items
+        });
+
+        if (result.success) {
+            if (result.skipped) {
+                setBranchStatus(idx, 'skipped');
+                addLog(`${branch.branch_name}: Skipped (no items with stock)`, 'skip');
+            } else {
+                setBranchStatus(idx, 'success');
+                addLog(`${branch.branch_name}: Transfer order created (${result.items_transferred} items, TO#: ${result.transfer_order_number || result.transfer_order_id || 'N/A'})`, 'success');
+            }
+            showToast(`${branch.branch_name} transfer complete`, 'success');
+        } else {
+            setBranchStatus(idx, 'failed', result.message);
+            addLog(`${branch.branch_name}: FAILED - ${result.message}`, 'error');
+            showToast(`${branch.branch_name} transfer failed`, 'error');
+        }
+    } catch (err) {
+        setBranchStatus(idx, 'failed', err.message);
+        addLog(`${branch.branch_name}: ERROR - ${err.message}`, 'error');
+        showToast('Transfer error: ' + err.message, 'error');
+    }
+}
+
+async function transferAll() {
+    if (transferInProgress) return showToast('Transfer already in progress', 'warning');
+
+    const pendingBranches = branchData.filter(b => b.total_items > 0);
+    if (pendingBranches.length === 0) return showToast('No branches to transfer', 'warning');
+
+    if (!confirm(`Transfer stock for ${pendingBranches.length} branch(es)? This will create transfer orders in Zoho.`)) return;
+
+    transferInProgress = true;
+    document.getElementById('btnTransferAll').disabled = true;
+    document.getElementById('progressSection').style.display = '';
+    document.getElementById('logList').innerHTML = '';
+
+    const total = pendingBranches.length;
+    let completed = 0;
+    let successCount = 0;
+    let failCount = 0;
+
+    addLog(`Starting bulk transfer for ${total} branches...`, 'info');
+
+    for (let i = 0; i < branchData.length; i++) {
+        const branch = branchData[i];
+        if (branch.total_items === 0) {
+            setBranchStatus(i, 'skipped');
+            continue;
+        }
+
+        setBranchStatus(i, 'transferring');
+        document.getElementById('progressLabel').textContent = `Transferring ${branch.branch_name}...`;
+        document.getElementById('progressCount').textContent = `${completed}/${total}`;
+
+        try {
+            const result = await apiPost('/api/zoho/migration/transfer', {
+                branch_id: branch.branch_id,
+                branch_name: branch.branch_name,
+                from_location_id: branch.warehouse_location_id,
+                to_location_id: branch.business_location_id,
+                items: branch.items
+            });
+
+            if (result.success && !result.skipped) {
+                setBranchStatus(i, 'success');
+                addLog(`${branch.branch_name}: Transfer order created (${result.items_transferred} items)`, 'success');
+                successCount++;
+            } else if (result.success && result.skipped) {
+                setBranchStatus(i, 'skipped');
+                addLog(`${branch.branch_name}: Skipped`, 'skip');
+            } else {
+                setBranchStatus(i, 'failed', result.message);
+                addLog(`${branch.branch_name}: FAILED - ${result.message}`, 'error');
+                failCount++;
+            }
+        } catch (err) {
+            setBranchStatus(i, 'failed', err.message);
+            addLog(`${branch.branch_name}: ERROR - ${err.message}`, 'error');
+            failCount++;
+        }
+
+        completed++;
+        const pct = Math.round((completed / total) * 100);
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('progressCount').textContent = `${completed}/${total}`;
+    }
+
+    document.getElementById('progressLabel').textContent = 'Complete!';
+    addLog(`Bulk transfer complete: ${successCount} succeeded, ${failCount} failed`, successCount > 0 ? 'success' : 'error');
+
+    transferInProgress = false;
+    document.getElementById('btnTransferAll').disabled = true;
+    document.getElementById('btnTransferAll').textContent = 'All Transfers Complete';
+
+    // Show disable button if any transfers succeeded
+    if (successCount > 0) {
+        document.getElementById('btnDisable').style.display = '';
+    }
+
+    showToast(`Transfer complete: ${successCount} succeeded, ${failCount} failed`, failCount > 0 ? 'warning' : 'success');
+}
+
+async function disableWarehouses() {
+    if (!confirm('This will disable ALL warehouse locations in the system. Are you sure?')) return;
+    if (!confirm('FINAL CONFIRMATION: Warehouse locations will be marked inactive. Continue?')) return;
+
+    const btn = document.getElementById('btnDisable');
+    btn.disabled = true;
+    btn.textContent = 'Disabling...';
+    addLog('Disabling warehouse locations...', 'info');
+
+    try {
+        const result = await apiPost('/api/zoho/migration/disable-warehouses', {});
+        if (result.success) {
+            addLog(`Disabled ${result.disabled_count} warehouse location(s)`, 'success');
+            showToast(`${result.disabled_count} warehouse location(s) disabled`, 'success');
+            btn.textContent = 'Warehouses Disabled';
+        } else {
+            addLog('Failed to disable warehouses: ' + result.message, 'error');
+            showToast('Failed: ' + result.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Disable All Warehouse Locations';
+        }
+    } catch (err) {
+        addLog('Error disabling warehouses: ' + err.message, 'error');
+        showToast('Error: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Disable All Warehouse Locations';
+    }
+}
+
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+// Load on page ready
+loadData();
+</script>
+</body>
+</html>

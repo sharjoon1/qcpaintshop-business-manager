@@ -658,7 +658,7 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 
 **Admin Features** (`admin-stock-check.html`):
 - 4 tabs: Assign, Review, Dashboard, History
-- Assign: Select branch + staff + date, search/add products, auto-suggest (items not checked in 30 days), "show system qty to staff" toggle
+- Assign: Select branch + Zoho location (Business/Warehouse) + staff + date, search/add products, auto-suggest (items not checked in 30 days), "show system qty to staff" toggle
 - Review: Slide-in panel with system vs reported comparison, color-coded differences, photo thumbnails, push adjustment to Zoho
 - Dashboard: Stat cards per branch (pending/submitted/reviewed/adjusted)
 - History: Filterable table with status badges, pagination, delete pending, review submitted
@@ -671,19 +671,20 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - Validates all items have counts before submit
 - Post-submit: read-only state with timestamp
 
-**API Endpoints** (`routes/stock-check.js`, 10 endpoints):
-- `POST /assign` — Create assignment (admin)
+**API Endpoints** (`routes/stock-check.js`, 11 endpoints):
+- `GET /locations/:branchId` — Zoho locations for a branch (admin)
+- `POST /assign` — Create assignment with selected location (admin)
 - `GET /assignments` — List with filters (admin)
 - `GET /assignments/:id` — Detail (staff sees own, admin sees any)
 - `DELETE /assignments/:id` — Delete pending (admin)
 - `GET /my-assignments` — Staff's today assignments
 - `POST /submit/:id` — Staff submits counts + photos (multipart)
-- `GET /review/:id` — Admin review with comparison
-- `POST /adjust/:id` — Push to Zoho as inventory adjustment
+- `GET /review/:id` — Admin review with comparison + location name
+- `POST /adjust/:id` — Push to Zoho as inventory adjustment (uses per-assignment location)
 - `GET /dashboard` — Summary stats per branch
-- `GET /products/suggest` — Items not checked in 30+ days
+- `GET /products/suggest` — Items not checked in 30+ days (accepts `zoho_location_id`)
 
-**Database Tables**: `stock_check_assignments`, `stock_check_items`
+**Database Tables**: `stock_check_assignments` (includes `zoho_location_id` per assignment), `stock_check_items`
 **Migration**: `migrations/migrate-stock-check.js`
 **Permission**: `zoho.stock_check`
 **Notifications**: `stock_check_assigned` (to staff), `stock_check_submitted` (to admins)
@@ -691,7 +692,33 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 
 ---
 
-### 2.20 Dashboard & Reports
+### 2.20 Stock Migration Tool (Temporary)
+
+One-time migration tool to transfer all stock from Warehouse locations to Business locations in Zoho, then disable warehouse locations.
+
+**Features** (`admin-stock-migration.html`):
+- Summary table showing all branches with warehouse/business location pairs
+- Per-branch item count and total quantity from `zoho_location_stock`
+- Individual "Transfer" button per branch or "Transfer All" bulk action
+- Progress bar and real-time transfer log
+- "Disable All Warehouse Locations" button (appears after transfers complete)
+- Double-confirm safety prompts before destructive actions
+
+**API Endpoints** (`routes/stock-migration.js`, 4 endpoints):
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/zoho/migration/warehouse-stock` | Get stock in all warehouse locations grouped by branch |
+| POST | `/api/zoho/migration/transfer` | Create transfer order for one branch |
+| POST | `/api/zoho/migration/transfer-all` | Transfer all branches (unused by UI, UI does sequential calls) |
+| POST | `/api/zoho/migration/disable-warehouses` | Set `is_active=0` on warehouse locations |
+
+**Zoho API**: Uses Zoho Inventory API (`/inventory/v1/transferorders`) — separate from Books API
+**Permission**: `zoho.manage`
+**Navigation**: Zoho subnav "Stock Migration" tab (temporary, remove after migration)
+
+---
+
+### 2.21 Dashboard & Reports
 
 **Admin Dashboard**
 - Total users, customers, products, estimates
@@ -928,6 +955,7 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 | Zoho Reorder | `admin-zoho-reorder.html` | Reorder alerts |
 | Zoho Purchases | `admin-zoho-purchase-suggestions.html` | Purchase planning |
 | Zoho Bulk Jobs | `admin-zoho-bulk-jobs.html` | Bulk operation status |
+| Zoho Stock Migration | `admin-stock-migration.html` | Bulk warehouse→business stock transfer (temporary migration tool) |
 
 ### Estimate Pages
 | Page | File | Purpose |
@@ -1014,6 +1042,7 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 | Share | `/api/share/*` | 4 | `routes/share.js` |
 | Guides | `/api/guides/*` | 11 | `routes/guides.js` |
 | Stock Check | `/api/stock-check/*` | 10 | `routes/stock-check.js` |
+| Stock Migration | `/api/zoho/migration/*` | 4 | `routes/stock-migration.js` |
 | Uploads | `/api/upload/*` | 4 | `server.js` |
 | Health | `/health`, `/api/test` | 2 | `server.js` |
 
@@ -1119,6 +1148,16 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-02-20 - Bulk Stock Migration Tool
+- One-time migration tool to transfer all stock from Warehouse → Business locations
+- Summary table with per-branch item counts and quantities from `zoho_location_stock`
+- Individual or bulk transfer via Zoho Inventory Transfer Order API (`/inventory/v1/transferorders`)
+- Progress bar, real-time log, double-confirm disable warehouse locations
+- Route: `routes/stock-migration.js` (4 endpoints), permission: `zoho.manage`
+- Page: `admin-stock-migration.html`, Zoho subnav tab: "Stock Migration"
+- New function: `zoho-api.js → createTransferOrder()` (uses Zoho Inventory API, not Books)
+- No migration needed — reads existing `zoho_location_stock` + `zoho_locations_map` tables
+
 ### 2026-02-20 - Stock Check Assignment System
 - Admin assigns Zoho products to branch staff for daily physical stock verification
 - Staff submits counts with optional photo proof (camera capture, sharp-compressed)
@@ -1127,9 +1166,10 @@ node promote-release.js internal production
 - Auto-suggest items not checked in 30+ days
 - Dashboard with per-branch stats, history with filters and pagination
 - Notifications: assigned → staff, submitted → admins
-- Tables: `stock_check_assignments`, `stock_check_items`; Migration: `migrate-stock-check.js`
+- Per-assignment Zoho location selection (Business vs Warehouse) for accurate stock adjustments
+- Tables: `stock_check_assignments` (with `zoho_location_id`), `stock_check_items`; Migration: `migrate-stock-check.js`
 - Pages: `admin-stock-check.html` (4 tabs), `staff/stock-check.html` (mobile-first)
-- Route: `routes/stock-check.js` (10 endpoints), permission: `zoho.stock_check`
+- Route: `routes/stock-check.js` (11 endpoints), permission: `zoho.stock_check`
 
 ### v2.0.0 (2026-02-09) - Major Platform Rebuild
 - Complete server rebuild with all modules integrated
