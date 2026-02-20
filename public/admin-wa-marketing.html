@@ -395,12 +395,17 @@
                     </div>
                 </div>
 
-                <!-- Step 3: Audience Builder -->
+                <!-- Step 3: Audience Builder (Contact Browser) -->
                 <div class="wizard-step" id="wizStep3">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div class="form-group">
-                            <label>Lead Status</label>
-                            <select id="wizFilterStatus" multiple style="height:auto;min-height:80px">
+                    <div class="flex flex-col sm:flex-row gap-2 mb-3 items-end flex-wrap">
+                        <div class="flex-1 min-w-[150px]">
+                            <label class="text-xs font-semibold text-gray-500 mb-1 block">Search</label>
+                            <input type="text" id="wizLeadSearch" placeholder="Name, phone, company, city..." class="text-xs border rounded-lg px-3 py-1.5 w-full" onkeyup="debounce(browseLeads, 400)()">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-500 mb-1 block">Status</label>
+                            <select id="wizFilterStatus" onchange="browsePage=1;browseLeads()" class="text-xs border rounded-lg px-2 py-1.5">
+                                <option value="">All</option>
                                 <option value="new">New</option>
                                 <option value="contacted">Contacted</option>
                                 <option value="interested">Interested</option>
@@ -410,11 +415,11 @@
                                 <option value="lost">Lost</option>
                                 <option value="inactive">Inactive</option>
                             </select>
-                            <span class="text-xs text-gray-400">Hold Ctrl to select multiple</span>
                         </div>
-                        <div class="form-group">
-                            <label>Lead Source</label>
-                            <select id="wizFilterSource" multiple style="height:auto;min-height:80px">
+                        <div>
+                            <label class="text-xs font-semibold text-gray-500 mb-1 block">Source</label>
+                            <select id="wizFilterSource" onchange="browsePage=1;browseLeads()" class="text-xs border rounded-lg px-2 py-1.5">
+                                <option value="">All</option>
                                 <option value="website">Website</option>
                                 <option value="walk_in">Walk-in</option>
                                 <option value="referral">Referral</option>
@@ -424,33 +429,51 @@
                                 <option value="other">Other</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label>Priority</label>
-                            <select id="wizFilterPriority">
-                                <option value="">Any</option>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-500 mb-1 block">Priority</label>
+                            <select id="wizFilterPriority" onchange="browsePage=1;browseLeads()" class="text-xs border rounded-lg px-2 py-1.5">
+                                <option value="">All</option>
                                 <option value="low">Low</option>
                                 <option value="medium">Medium</option>
                                 <option value="high">High</option>
                                 <option value="urgent">Urgent</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label>City</label>
-                            <input type="text" id="wizFilterCity" placeholder="e.g., Chennai">
+                    </div>
+
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <label class="flex items-center gap-1 cursor-pointer text-xs font-semibold text-indigo-600">
+                                <input type="checkbox" id="wizSelectAll" onchange="toggleSelectAll()" class="w-4 h-4 rounded">
+                                Select All on Page
+                            </label>
+                            <button type="button" class="action-btn text-xs" onclick="selectAllFiltered()">Select ALL Matching</button>
                         </div>
-                        <div class="form-group">
-                            <label>Created From</label>
-                            <input type="date" id="wizFilterDateFrom">
-                        </div>
-                        <div class="form-group">
-                            <label>Created To</label>
-                            <input type="date" id="wizFilterDateTo">
+                        <div class="flex items-center gap-2">
+                            <span id="audienceCount" class="text-sm font-bold text-indigo-600"></span>
+                            <span class="text-xs text-gray-400" id="browseTotal"></span>
                         </div>
                     </div>
-                    <div class="flex items-center gap-3 mt-2">
-                        <button type="button" class="action-btn primary" onclick="previewAudience()">Preview Audience Count</button>
-                        <span id="audienceCount" class="text-sm font-semibold text-gray-700"></span>
+
+                    <div class="table-container" style="max-height:340px;overflow-y:auto">
+                        <table class="data-table">
+                            <thead style="position:sticky;top:0;z-index:1">
+                                <tr>
+                                    <th style="width:30px"><input type="checkbox" id="wizSelectAllHead" onchange="toggleSelectAll()" class="w-4 h-4"></th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Company</th>
+                                    <th>City</th>
+                                    <th>Status</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+                            <tbody id="browseLeadsBody">
+                                <tr><td colspan="7" class="text-center text-gray-400 py-6">Loading contacts...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
+                    <div id="browsePagination" class="flex justify-center gap-2 mt-2"></div>
                 </div>
 
                 <!-- Step 4: Anti-Block Settings -->
@@ -591,6 +614,9 @@ let editingCampaignId = null;
 let editingTemplateId = null;
 let uploadedMediaUrl = null;
 let uploadedMediaFilename = null;
+let browsePage = 1;
+let selectedLeadIds = new Set();  // manually selected lead IDs
+let selectAllMode = false;        // true = all matching leads selected (not just current page)
 let branches = [];
 let templates = [];
 let chartCampaign = null;
@@ -608,9 +634,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadBranches() {
     try {
-        const res = await fetch('/api/branches', { headers: getAuthHeaders() });
+        const res = await fetch('/api/branches/list', { headers: getAuthHeaders() });
         const data = await res.json();
-        branches = data.branches || data || [];
+        branches = data.data || [];
         const sel = document.getElementById('wizBranch');
         branches.forEach(b => {
             sel.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.name}</option>`);
@@ -890,14 +916,15 @@ function openCampaignWizard() {
     document.getElementById('wizHourlyLimit').value = 30;
     document.getElementById('wizDailyLimit').value = 200;
     document.getElementById('wizWarmUp').checked = false;
-    document.getElementById('wizFilterStatus').selectedIndex = -1;
-    document.getElementById('wizFilterSource').selectedIndex = -1;
+    document.getElementById('wizFilterStatus').value = '';
+    document.getElementById('wizFilterSource').value = '';
     document.getElementById('wizFilterPriority').value = '';
-    document.getElementById('wizFilterCity').value = '';
-    document.getElementById('wizFilterDateFrom').value = '';
-    document.getElementById('wizFilterDateTo').value = '';
+    document.getElementById('wizLeadSearch').value = '';
     document.getElementById('audienceCount').textContent = '';
     document.getElementById('messagePreview').style.display = 'none';
+    selectedLeadIds = new Set();
+    selectAllMode = false;
+    browsePage = 1;
     toggleMediaFields();
     updateWizardNav();
     showWizardStep(1);
@@ -916,6 +943,7 @@ function showWizardStep(step) {
     document.getElementById('wizNextBtn').textContent = step === 5 ? 'Create & Start' : 'Next';
     wizardStep = step;
     updateWizardNav();
+    if (step === 3) browseLeads();
     if (step === 5) buildReviewSummary();
 }
 
@@ -944,6 +972,7 @@ async function wizardNext() {
         if (!document.getElementById('wizMsgBody').value.trim()) { showToast('Message body required', 'error'); return; }
         showWizardStep(3);
     } else if (wizardStep === 3) {
+        if (selectedLeadIds.size === 0 && !selectAllMode) { showToast('Select at least one contact', 'error'); return; }
         showWizardStep(4);
     } else if (wizardStep === 4) {
         showWizardStep(5);
@@ -1010,33 +1039,123 @@ async function previewMessage() {
     } catch (e) { console.error(e); }
 }
 
-function getSelectedValues(selectId) {
-    const sel = document.getElementById(selectId);
-    return Array.from(sel.selectedOptions).map(o => o.value);
-}
+// ========================================
+// CONTACT BROWSER (Step 3)
+// ========================================
+async function browseLeads() {
+    const search = document.getElementById('wizLeadSearch').value;
+    const status = document.getElementById('wizFilterStatus').value;
+    const source = document.getElementById('wizFilterSource').value;
+    const priority = document.getElementById('wizFilterPriority').value;
+    const branch_id = document.getElementById('wizBranch').value;
 
-function getFilters() {
-    return {
-        status: getSelectedValues('wizFilterStatus'),
-        source: getSelectedValues('wizFilterSource'),
-        priority: document.getElementById('wizFilterPriority').value || undefined,
-        city: document.getElementById('wizFilterCity').value || undefined,
-        date_from: document.getElementById('wizFilterDateFrom').value || undefined,
-        date_to: document.getElementById('wizFilterDateTo').value || undefined
-    };
-}
-
-async function previewAudience() {
     try {
-        const filters = getFilters();
-        const branch_id = document.getElementById('wizBranch').value;
-        const res = await fetch(`${API}/leads/preview`, {
-            method: 'POST', headers: getAuthHeaders(),
-            body: JSON.stringify({ filters, branch_id: branch_id || undefined })
-        });
+        const params = new URLSearchParams({ page: browsePage, limit: 50 });
+        if (search) params.set('search', search);
+        if (status) params.set('status', status);
+        if (source) params.set('source', source);
+        if (priority) params.set('priority', priority);
+        if (branch_id) params.set('branch_id', branch_id);
+
+        const res = await fetch(`${API}/leads/browse?${params}`, { headers: getAuthHeaders() });
         const data = await res.json();
-        document.getElementById('audienceCount').textContent = `${data.count} leads with phone numbers`;
-    } catch (e) { showToast('Preview failed', 'error'); }
+
+        document.getElementById('browseTotal').textContent = `(${data.pagination?.total || 0} contacts with phone)`;
+
+        const tbody = document.getElementById('browseLeadsBody');
+        tbody.innerHTML = (data.leads || []).map(l => {
+            const checked = selectAllMode || selectedLeadIds.has(l.id) ? 'checked' : '';
+            return `<tr onclick="toggleLeadRow(${l.id}, event)" style="cursor:pointer" class="${checked ? 'bg-indigo-50' : ''}">
+                <td><input type="checkbox" class="lead-cb w-4 h-4" data-id="${l.id}" ${checked} onchange="toggleLead(${l.id}, this.checked)"></td>
+                <td class="font-medium">${esc(l.name)}</td>
+                <td>${esc(l.phone)}</td>
+                <td class="text-xs">${esc(l.company || '-')}</td>
+                <td class="text-xs">${esc(l.city || '-')}</td>
+                <td><span class="badge badge-${l.status === 'new' ? 'draft' : l.status === 'interested' ? 'running' : l.status === 'won' ? 'completed' : 'pending'}">${l.status}</span></td>
+                <td class="text-xs">${esc(l.source || '-')}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-6">No contacts found with phone numbers</td></tr>';
+
+        updateSelectionCount();
+
+        // Sync header checkbox
+        const cbs = document.querySelectorAll('.lead-cb');
+        const allChecked = cbs.length > 0 && Array.from(cbs).every(c => c.checked);
+        document.getElementById('wizSelectAllHead').checked = allChecked;
+        document.getElementById('wizSelectAll').checked = allChecked;
+
+        renderPagination('browsePagination', data.pagination, p => { browsePage = p; browseLeads(); });
+    } catch (e) { console.error('Browse leads error:', e); }
+}
+
+function toggleLead(id, checked) {
+    if (checked) {
+        selectedLeadIds.add(id);
+    } else {
+        selectedLeadIds.delete(id);
+        selectAllMode = false;
+    }
+    updateSelectionCount();
+}
+
+function toggleLeadRow(id, event) {
+    if (event.target.type === 'checkbox') return; // let checkbox handle itself
+    const cb = event.currentTarget.querySelector('.lead-cb');
+    cb.checked = !cb.checked;
+    toggleLead(id, cb.checked);
+    event.currentTarget.classList.toggle('bg-indigo-50', cb.checked);
+}
+
+function toggleSelectAll() {
+    const cbs = document.querySelectorAll('.lead-cb');
+    const headerCb = document.getElementById('wizSelectAllHead');
+    const checked = headerCb.checked;
+    document.getElementById('wizSelectAll').checked = checked;
+    cbs.forEach(cb => {
+        cb.checked = checked;
+        const id = parseInt(cb.dataset.id);
+        if (checked) selectedLeadIds.add(id); else selectedLeadIds.delete(id);
+    });
+    if (!checked) selectAllMode = false;
+    updateSelectionCount();
+}
+
+async function selectAllFiltered() {
+    // Select ALL leads matching current filters (not just current page)
+    const search = document.getElementById('wizLeadSearch').value;
+    const status = document.getElementById('wizFilterStatus').value;
+    const source = document.getElementById('wizFilterSource').value;
+    const priority = document.getElementById('wizFilterPriority').value;
+    const branch_id = document.getElementById('wizBranch').value;
+
+    try {
+        const params = new URLSearchParams({ page: 1, limit: 10000 });
+        if (search) params.set('search', search);
+        if (status) params.set('status', status);
+        if (source) params.set('source', source);
+        if (priority) params.set('priority', priority);
+        if (branch_id) params.set('branch_id', branch_id);
+
+        showToast('Selecting all matching contacts...', 'info');
+        const res = await fetch(`${API}/leads/browse?${params}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+
+        (data.leads || []).forEach(l => selectedLeadIds.add(l.id));
+        selectAllMode = false; // we have explicit IDs now
+
+        // Refresh checkboxes on current page
+        document.querySelectorAll('.lead-cb').forEach(cb => {
+            if (selectedLeadIds.has(parseInt(cb.dataset.id))) cb.checked = true;
+        });
+
+        updateSelectionCount();
+        showToast(`${selectedLeadIds.size} contacts selected`, 'success');
+    } catch (e) { showToast('Failed to select all', 'error'); }
+}
+
+function updateSelectionCount() {
+    const count = selectedLeadIds.size;
+    document.getElementById('audienceCount').textContent = count > 0 ? `${count} selected` : '';
 }
 
 function buildReviewSummary() {
@@ -1045,15 +1164,8 @@ function buildReviewSummary() {
     const branchName = branch.options[branch.selectedIndex]?.text || '-';
     const msgType = document.getElementById('wizMsgType').value;
     const msgBody = document.getElementById('wizMsgBody').value;
-    const filters = getFilters();
     const warmUp = document.getElementById('wizWarmUp').checked;
-    const audience = document.getElementById('audienceCount').textContent || 'Not previewed';
-
-    const filterSummary = [];
-    if (filters.status?.length) filterSummary.push('Status: ' + filters.status.join(', '));
-    if (filters.source?.length) filterSummary.push('Source: ' + filters.source.join(', '));
-    if (filters.priority) filterSummary.push('Priority: ' + filters.priority);
-    if (filters.city) filterSummary.push('City: ' + filters.city);
+    const selCount = selectedLeadIds.size;
 
     document.getElementById('reviewSummary').innerHTML = `
         <div class="stat-card">
@@ -1069,8 +1181,7 @@ function buildReviewSummary() {
         </div>
         <div class="stat-card">
             <h4 class="font-semibold text-sm text-gray-700 mb-2">Audience</h4>
-            <p class="text-sm">${audience}</p>
-            ${filterSummary.length ? '<div class="flex flex-wrap gap-1 mt-1">' + filterSummary.map(f => '<span class="filter-chip">' + esc(f) + '</span>').join('') + '</div>' : '<p class="text-xs text-gray-400">All leads with phone numbers</p>'}
+            <p class="text-sm font-bold text-indigo-600">${selCount} contacts selected</p>
         </div>
         <div class="stat-card">
             <h4 class="font-semibold text-sm text-gray-700 mb-2">Anti-Block</h4>
@@ -1082,13 +1193,6 @@ function buildReviewSummary() {
 
 async function createAndStartCampaign() {
     try {
-        const filters = getFilters();
-        // Clean empty arrays from filters
-        Object.keys(filters).forEach(k => {
-            if (Array.isArray(filters[k]) && filters[k].length === 0) delete filters[k];
-            if (filters[k] === undefined) delete filters[k];
-        });
-
         const body = {
             name: document.getElementById('wizName').value.trim(),
             description: document.getElementById('wizDesc').value.trim() || null,
@@ -1098,7 +1202,7 @@ async function createAndStartCampaign() {
             media_url: uploadedMediaUrl || null,
             media_filename: uploadedMediaFilename || null,
             media_caption: document.getElementById('wizMediaCaption').value || null,
-            audience_filter: filters,
+            audience_filter: { mode: 'manual', count: selectedLeadIds.size },
             min_delay_seconds: parseInt(document.getElementById('wizMinDelay').value),
             max_delay_seconds: parseInt(document.getElementById('wizMaxDelay').value),
             hourly_limit: parseInt(document.getElementById('wizHourlyLimit').value),
@@ -1113,10 +1217,11 @@ async function createAndStartCampaign() {
 
         const campaignId = createData.campaign_id;
 
-        // Populate audience
-        showToast('Populating audience...', 'info');
+        // Populate audience with selected lead IDs
+        showToast(`Adding ${selectedLeadIds.size} contacts...`, 'info');
         const popRes = await fetch(`${API}/campaigns/${campaignId}/populate`, {
-            method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ filters })
+            method: 'POST', headers: getAuthHeaders(),
+            body: JSON.stringify({ lead_ids: Array.from(selectedLeadIds) })
         });
         const popData = await popRes.json();
         if (!popRes.ok) { showToast(popData.error, 'error'); return; }
@@ -1125,7 +1230,7 @@ async function createAndStartCampaign() {
         const startRes = await fetch(`${API}/campaigns/${campaignId}/start`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({}) });
         if (!startRes.ok) { const d = await startRes.json(); showToast(d.error, 'error'); return; }
 
-        showToast(`Campaign started with ${popData.total_leads} leads!`, 'success');
+        showToast(`Campaign started with ${popData.total_leads} contacts!`, 'success');
         closeModal('campaignWizardModal');
         switchTab('campaigns');
         loadCampaigns();

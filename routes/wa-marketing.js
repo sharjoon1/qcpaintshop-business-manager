@@ -230,7 +230,7 @@ router.delete('/campaigns/:id', managePerm, async (req, res) => {
 // CAMPAIGNS — AUDIENCE
 // ========================================
 
-// POST /campaigns/:id/populate — build audience from lead filters
+// POST /campaigns/:id/populate — build audience from lead_ids (manual) or filters (auto)
 router.post('/campaigns/:id/populate', managePerm, async (req, res) => {
     try {
         const [campaign] = await pool.query('SELECT * FROM wa_campaigns WHERE id = ?', [req.params.id]);
@@ -239,15 +239,29 @@ router.post('/campaigns/:id/populate', managePerm, async (req, res) => {
             return res.status(400).json({ error: 'Only draft/paused campaigns can be populated' });
         }
 
-        const filters = req.body.filters || (campaign[0].audience_filter ? JSON.parse(campaign[0].audience_filter) : {});
+        let leads;
+        const { lead_ids, filters: reqFilters } = req.body;
 
-        // Build lead query
-        const { query: leadQuery, params: leadParams } = buildLeadFilterQuery(filters, campaign[0].branch_id);
-
-        const [leads] = await pool.query(leadQuery, leadParams);
+        if (lead_ids && Array.isArray(lead_ids) && lead_ids.length > 0) {
+            // Manual selection: fetch specific leads by ID
+            const placeholders = lead_ids.map(() => '?').join(',');
+            [leads] = await pool.query(
+                `SELECT l.id, l.name, l.phone, l.company, l.city, l.source, l.status,
+                        l.email, b.name as branch_name
+                 FROM leads l
+                 LEFT JOIN branches b ON l.branch_id = b.id
+                 WHERE l.id IN (${placeholders}) AND l.phone IS NOT NULL AND l.phone != ''`,
+                lead_ids
+            );
+        } else {
+            // Filter-based selection
+            const filters = reqFilters || (campaign[0].audience_filter ? JSON.parse(campaign[0].audience_filter) : {});
+            const { query: leadQuery, params: leadParams } = buildLeadFilterQuery(filters, campaign[0].branch_id);
+            [leads] = await pool.query(leadQuery, leadParams);
+        }
 
         if (leads.length === 0) {
-            return res.status(400).json({ error: 'No leads match the filters' });
+            return res.status(400).json({ error: 'No leads found with phone numbers' });
         }
 
         // Fisher-Yates shuffle
@@ -275,9 +289,10 @@ router.post('/campaigns/:id/populate', managePerm, async (req, res) => {
         }
 
         // Update campaign
+        const filterData = lead_ids ? { mode: 'manual', lead_ids } : (reqFilters || {});
         await pool.query(
             `UPDATE wa_campaigns SET total_leads = ?, audience_filter = ?, sent_count = 0, failed_count = 0 WHERE id = ?`,
-            [leads.length, JSON.stringify(filters), req.params.id]
+            [leads.length, JSON.stringify(filterData), req.params.id]
         );
 
         res.json({ success: true, total_leads: leads.length });
@@ -430,6 +445,56 @@ router.post('/campaigns/:id/duplicate', managePerm, async (req, res) => {
         res.json({ success: true, campaign_id: result.insertId });
     } catch (error) {
         res.status(500).json({ error: 'Failed to duplicate campaign' });
+    }
+});
+
+// ========================================
+// LEADS BROWSER (for contact picker)
+// ========================================
+
+// GET /leads/browse — paginated lead list for audience selection
+router.get('/leads/browse', viewPerm, async (req, res) => {
+    try {
+        const { search, status, source, priority, branch_id, page = 1, limit = 50 } = req.query;
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        const params = [];
+        let where = 'WHERE l.phone IS NOT NULL AND l.phone != ""';
+
+        if (search) {
+            where += ' AND (l.name LIKE ? OR l.phone LIKE ? OR l.company LIKE ? OR l.city LIKE ?)';
+            const s = `%${search}%`;
+            params.push(s, s, s, s);
+        }
+        if (status) { where += ' AND l.status = ?'; params.push(status); }
+        if (source) { where += ' AND l.source = ?'; params.push(source); }
+        if (priority) { where += ' AND l.priority = ?'; params.push(priority); }
+        if (branch_id) { where += ' AND l.branch_id = ?'; params.push(parseInt(branch_id)); }
+
+        const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM leads l ${where}`, params);
+
+        const [leads] = await pool.query(
+            `SELECT l.id, l.name, l.phone, l.company, l.city, l.status, l.source, l.priority,
+                    b.name as branch_name
+             FROM leads l
+             LEFT JOIN branches b ON l.branch_id = b.id
+             ${where}
+             ORDER BY l.name ASC
+             LIMIT ? OFFSET ?`,
+            [...params, parseInt(limit), offset]
+        );
+
+        res.json({
+            leads,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: countRows[0].total,
+                pages: Math.ceil(countRows[0].total / parseInt(limit))
+            }
+        });
+    } catch (error) {
+        console.error('[WA Marketing] Browse leads error:', error.message);
+        res.status(500).json({ error: 'Failed to load leads' });
     }
 });
 

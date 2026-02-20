@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Marketing - User Guide</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #1e293b; line-height: 1.7; background: #f8fafc; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        h1 { font-size: 1.75rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.5rem; }
+        .subtitle { color: #94a3b8; font-size: 0.875rem; margin-bottom: 2rem; }
+        h2 { font-size: 1.25rem; font-weight: 700; color: #334155; margin: 2rem 0 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid #f1f5f9; }
+        h3 { font-size: 1rem; font-weight: 600; color: #475569; margin: 1.5rem 0 0.5rem; }
+        p { margin-bottom: 0.75rem; font-size: 0.9375rem; }
+        ul, ol { margin: 0.5rem 0 1rem 1.5rem; }
+        li { margin-bottom: 0.5rem; font-size: 0.9375rem; }
+        .tip { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin: 1rem 0; font-size: 0.875rem; }
+        .tip strong { color: #16a34a; }
+        .warning { background: #fefce8; border-left: 4px solid #eab308; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin: 1rem 0; font-size: 0.875rem; }
+        .warning strong { color: #ca8a04; }
+        .danger { background: #fef2f2; border-left: 4px solid #ef4444; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin: 1rem 0; font-size: 0.875rem; }
+        .danger strong { color: #dc2626; }
+        .step-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; margin: 0.75rem 0; }
+        .step-num { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-weight: 700; font-size: 0.8125rem; margin-right: 0.5rem; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.8125rem; color: #7c3aed; }
+        .badge { display: inline-flex; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .badge-purple { background: #ede9fe; color: #7c3aed; }
+        .badge-green { background: #dcfce7; color: #16a34a; }
+        .badge-yellow { background: #fef3c7; color: #d97706; }
+        .badge-red { background: #fee2e2; color: #dc2626; }
+        .badge-blue { background: #dbeafe; color: #2563eb; }
+        .toc { background: #f8fafc; border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem; }
+        .toc h3 { margin-top: 0; font-size: 0.9375rem; }
+        .toc ul { list-style: none; margin-left: 0; }
+        .toc li { margin-bottom: 0.25rem; }
+        .toc a { color: #667eea; text-decoration: none; font-size: 0.875rem; }
+        .toc a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+        th { background: #f8fafc; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
+        img { max-width: 100%; border-radius: 8px; margin: 0.5rem 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>WhatsApp Marketing Guide</h1>
+    <p class="subtitle">Complete guide to sending bulk WhatsApp campaigns to your leads</p>
+
+    <div class="toc">
+        <h3>Contents</h3>
+        <ul>
+            <li><a href="#overview">1. Overview</a></li>
+            <li><a href="#getting-started">2. Getting Started</a></li>
+            <li><a href="#creating-campaign">3. Creating a Campaign</a></li>
+            <li><a href="#templates">4. Message Templates</a></li>
+            <li><a href="#anti-block">5. Anti-Block Protection</a></li>
+            <li><a href="#managing">6. Managing Campaigns</a></li>
+            <li><a href="#dashboard">7. Dashboard & Analytics</a></li>
+            <li><a href="#settings">8. Settings</a></li>
+            <li><a href="#faq">9. FAQ & Troubleshooting</a></li>
+        </ul>
+    </div>
+
+    <h2 id="overview">1. Overview</h2>
+    <p>The WhatsApp Marketing system lets you send bulk promotional messages to your leads through WhatsApp. It uses the branch WhatsApp sessions (connected via QR code) to send messages with built-in anti-block protection.</p>
+
+    <p><strong>Key Features:</strong></p>
+    <ul>
+        <li>Send text messages, images, and documents to leads in bulk</li>
+        <li>Select specific contacts or filter by status, source, city, etc.</li>
+        <li>Anti-block protection: random delays, spin text, unique messages</li>
+        <li>Message templates for quick campaign creation</li>
+        <li>Real-time progress tracking and analytics</li>
+        <li>Warm-up mode for new WhatsApp numbers</li>
+    </ul>
+
+    <div class="warning">
+        <strong>Important:</strong> Make sure your branch WhatsApp is connected before starting a campaign. Go to <strong>Zoho Books &rarr; WhatsApp</strong> tab to check connection status.
+    </div>
+
+    <h2 id="getting-started">2. Getting Started</h2>
+
+    <h3>Prerequisites</h3>
+    <ol>
+        <li><strong>WhatsApp Connected:</strong> At least one branch must have WhatsApp connected (Zoho &rarr; WhatsApp tab)</li>
+        <li><strong>Leads with Phone Numbers:</strong> Your leads must have phone numbers saved</li>
+        <li><strong>Admin Access:</strong> Only admin users can access WA Marketing</li>
+    </ol>
+
+    <h3>Accessing WA Marketing</h3>
+    <p>Navigate to <strong>Marketing &rarr; WA Marketing</strong> in the sidebar. The page has 5 tabs:</p>
+    <table>
+        <tr><th>Tab</th><th>Purpose</th></tr>
+        <tr><td><strong>Dashboard</strong></td><td>Overview stats, charts, engine status</td></tr>
+        <tr><td><strong>Campaigns</strong></td><td>Create, manage, and track campaigns</td></tr>
+        <tr><td><strong>Templates</strong></td><td>Create reusable message templates</td></tr>
+        <tr><td><strong>Logs</strong></td><td>View per-message send logs</td></tr>
+        <tr><td><strong>Settings</strong></td><td>Configure delays, limits, and anti-block settings</td></tr>
+    </table>
+
+    <h2 id="creating-campaign">3. Creating a Campaign</h2>
+    <p>Creating a campaign is done through a 5-step wizard:</p>
+
+    <div class="step-box">
+        <h3><span class="step-num">1</span> Basic Info</h3>
+        <ul>
+            <li><strong>Campaign Name:</strong> Give your campaign a descriptive name (e.g., "Diwali Paint Sale")</li>
+            <li><strong>Description:</strong> Optional notes about the campaign</li>
+            <li><strong>Branch:</strong> Select which branch's WhatsApp number to send from</li>
+            <li><strong>Message Type:</strong> Choose Text, Image, or Document</li>
+        </ul>
+    </div>
+
+    <div class="step-box">
+        <h3><span class="step-num">2</span> Message Composer</h3>
+        <p>Write your message using the composer. You can:</p>
+        <ul>
+            <li><strong>Use Templates:</strong> Pick a saved template from the dropdown</li>
+            <li><strong>Insert Variables:</strong> Click variable buttons to insert <code>{name}</code>, <code>{company}</code>, <code>{city}</code> etc. These will be replaced with each lead's actual data</li>
+            <li><strong>Use Spin Text:</strong> Write <code>[Hi|Hello|Hey]</code> &mdash; the system will randomly pick one word for each message, making every message unique</li>
+            <li><strong>Preview:</strong> Click "Generate Preview" to see how the message looks with sample data</li>
+        </ul>
+
+        <p><strong>Example Message:</strong></p>
+        <p style="background:#f0fdf4;padding:12px;border-radius:8px;font-size:0.875rem;color:#166534">
+            [Hi|Hello|Hey] {name}! 🎨<br><br>
+            [We are excited|Happy] to announce our [special|exclusive] Diwali paint sale!<br>
+            Get up to 30% off on all premium paints at our {city} store.<br><br>
+            Visit us today or call for more details.<br>
+            - Quality Colours
+        </p>
+
+        <div class="tip">
+            <strong>Tip:</strong> Use spin text <code>[option1|option2|option3]</code> to make each message unique. This helps avoid WhatsApp blocking your number.
+        </div>
+    </div>
+
+    <div class="step-box">
+        <h3><span class="step-num">3</span> Select Contacts</h3>
+        <p>Browse and select which leads to send the message to:</p>
+        <ul>
+            <li><strong>Search:</strong> Type to search by name, phone, company, or city</li>
+            <li><strong>Filter:</strong> Use Status, Source, and Priority filters to narrow down contacts</li>
+            <li><strong>Select Individual:</strong> Click on any row or tick the checkbox to select that contact</li>
+            <li><strong>Select All on Page:</strong> Tick the header checkbox to select all visible contacts</li>
+            <li><strong>Select ALL Matching:</strong> Click this button to select ALL contacts matching your current filters (across all pages)</li>
+        </ul>
+
+        <div class="tip">
+            <strong>Tip:</strong> Only leads with phone numbers are shown. If a lead doesn't appear, make sure their phone number is saved in the Leads module.
+        </div>
+    </div>
+
+    <div class="step-box">
+        <h3><span class="step-num">4</span> Anti-Block Settings</h3>
+        <p>Configure protection against WhatsApp blocking:</p>
+        <ul>
+            <li><strong>Min/Max Delay:</strong> Random wait time between messages (default: 30-90 seconds)</li>
+            <li><strong>Hourly Limit:</strong> Maximum messages per hour (default: 30)</li>
+            <li><strong>Daily Limit:</strong> Maximum messages per day (default: 200)</li>
+            <li><strong>Warm-Up Mode:</strong> Gradually increases the daily limit over 5 days for new numbers</li>
+        </ul>
+    </div>
+
+    <div class="step-box">
+        <h3><span class="step-num">5</span> Review & Start</h3>
+        <p>Review all your campaign settings and click <strong>"Create & Start"</strong> to begin sending.</p>
+    </div>
+
+    <h2 id="templates">4. Message Templates</h2>
+    <p>Templates save your commonly used messages for quick reuse.</p>
+
+    <h3>Creating a Template</h3>
+    <ol>
+        <li>Go to the <strong>Templates</strong> tab</li>
+        <li>Click <strong>"+ New Template"</strong></li>
+        <li>Enter a name and select a category</li>
+        <li>Write your message with variables and spin text</li>
+        <li>Click <strong>Save Template</strong></li>
+    </ol>
+
+    <h3>Template Categories</h3>
+    <table>
+        <tr><th>Category</th><th>Use For</th></tr>
+        <tr><td><span class="badge badge-green">Greeting</span></td><td>Welcome messages, introductions</td></tr>
+        <tr><td><span class="badge badge-purple">Promotion</span></td><td>Sales, discounts, offers</td></tr>
+        <tr><td><span class="badge badge-blue">Follow-up</span></td><td>Checking in with leads after meetings</td></tr>
+        <tr><td><span class="badge badge-yellow">Announcement</span></td><td>New products, branch openings</td></tr>
+        <tr><td><span class="badge badge-red">Festival</span></td><td>Diwali, Pongal, Christmas greetings</td></tr>
+        <tr><td>Custom</td><td>Anything else</td></tr>
+    </table>
+
+    <h2 id="anti-block">5. Anti-Block Protection</h2>
+    <p>The system has multiple layers of protection to prevent WhatsApp from blocking your number:</p>
+
+    <table>
+        <tr><th>Feature</th><th>How It Works</th></tr>
+        <tr><td><strong>Random Delays</strong></td><td>Waits 30-90 seconds between messages (configurable)</td></tr>
+        <tr><td><strong>Spin Text</strong></td><td><code>[Hi|Hello|Hey]</code> &rarr; randomly picks one, making each message different</td></tr>
+        <tr><td><strong>Variable Substitution</strong></td><td><code>{name}</code> &rarr; each lead gets personalized message</td></tr>
+        <tr><td><strong>Invisible Markers</strong></td><td>Adds invisible characters so no two messages are identical</td></tr>
+        <tr><td><strong>Rate Limiting</strong></td><td>Enforces hourly and daily sending limits</td></tr>
+        <tr><td><strong>Warm-Up Mode</strong></td><td>Day 1: 20 msgs &rarr; Day 2: 50 &rarr; Day 3: 100 &rarr; Day 4: 150 &rarr; Day 5+: 200</td></tr>
+        <tr><td><strong>Auto-Pause</strong></td><td>Pauses campaign after 3 consecutive failures</td></tr>
+    </table>
+
+    <div class="danger">
+        <strong>Warning:</strong> Even with all protections, sending too many messages too fast can lead to a WhatsApp ban. Use warm-up mode for new numbers and keep daily limits reasonable (under 200/day).
+    </div>
+
+    <h2 id="managing">6. Managing Campaigns</h2>
+
+    <h3>Campaign Statuses</h3>
+    <table>
+        <tr><th>Status</th><th>Meaning</th><th>Actions Available</th></tr>
+        <tr><td><span class="badge badge-purple">Draft</span></td><td>Not started yet</td><td>Edit, Populate & Start, Delete</td></tr>
+        <tr><td><span class="badge badge-blue">Scheduled</span></td><td>Will start at scheduled time</td><td>Cancel</td></tr>
+        <tr><td><span class="badge badge-green">Running</span></td><td>Currently sending messages</td><td>Pause, Cancel</td></tr>
+        <tr><td><span class="badge badge-yellow">Paused</span></td><td>Temporarily stopped</td><td>Resume, Cancel</td></tr>
+        <tr><td><span class="badge badge-blue">Completed</span></td><td>All messages sent</td><td>Clone, Delete</td></tr>
+        <tr><td><span class="badge badge-red">Cancelled</span></td><td>Stopped by user</td><td>Clone, Delete</td></tr>
+    </table>
+
+    <h3>Viewing Campaign Details</h3>
+    <p>Click a campaign name to see per-lead statuses: who received the message, who failed, and error details.</p>
+
+    <h3>Cloning a Campaign</h3>
+    <p>Click <strong>"Clone"</strong> on any campaign to create a copy as a new draft. This is useful for running similar campaigns with tweaked messages.</p>
+
+    <h2 id="dashboard">7. Dashboard & Analytics</h2>
+    <p>The Dashboard tab shows:</p>
+    <ul>
+        <li><strong>Total Sent:</strong> All-time messages sent across all campaigns</li>
+        <li><strong>Today Sent:</strong> Messages sent today</li>
+        <li><strong>Active Campaigns:</strong> Currently running campaigns</li>
+        <li><strong>Failed:</strong> Total failed messages</li>
+        <li><strong>Campaign Performance Chart:</strong> Bar chart comparing sent vs failed per campaign</li>
+        <li><strong>Hourly Volume Chart:</strong> Line chart showing today's sending pattern by hour</li>
+        <li><strong>Engine Status:</strong> Green indicator = engine is running and processing campaigns</li>
+    </ul>
+
+    <h2 id="settings">8. Settings</h2>
+    <p>The Settings tab lets you configure global defaults:</p>
+    <ul>
+        <li><strong>Delay Settings:</strong> Min/max delay, typing delay, seen delay between messages</li>
+        <li><strong>Rate Limits:</strong> Hourly and daily message caps</li>
+        <li><strong>Safety:</strong> Max consecutive failures before auto-pause, engine poll interval</li>
+        <li><strong>Invisible Markers:</strong> Toggle the zero-width character feature on/off</li>
+        <li><strong>Warm-Up Schedule:</strong> Customize daily limits for each warm-up day</li>
+    </ul>
+
+    <div class="tip">
+        <strong>Tip:</strong> Campaign-specific settings override the global defaults. Each campaign can have its own delay and limit settings.
+    </div>
+
+    <h2 id="faq">9. FAQ & Troubleshooting</h2>
+
+    <h3>Campaign paused automatically?</h3>
+    <p>This happens when 3+ consecutive messages fail. Check if your WhatsApp is still connected (Zoho &rarr; WhatsApp tab). Reconnect if needed, then resume the campaign.</p>
+
+    <h3>Branch dropdown is empty?</h3>
+    <p>Make sure branches are set up in the system (Branches &amp; Staff section). At least one active branch is needed.</p>
+
+    <h3>No contacts showing?</h3>
+    <p>Only leads with phone numbers appear in the contact browser. Go to the <strong>Leads</strong> module and make sure your leads have phone numbers saved.</p>
+
+    <h3>Messages not sending?</h3>
+    <p>Check these things:</p>
+    <ol>
+        <li>Is the engine running? (Green indicator in Dashboard)</li>
+        <li>Is WhatsApp connected for the campaign's branch?</li>
+        <li>Have daily/hourly limits been reached?</li>
+        <li>Is the campaign status "Running"?</li>
+    </ol>
+
+    <h3>How to send to just one person?</h3>
+    <p>Create a campaign, and in Step 3 (Select Contacts), simply select only the one person you want to send to. Campaigns work for both single and bulk messages.</p>
+
+    <h3>Can I send images?</h3>
+    <p>Yes! In Step 1, set Message Type to "Image". In Step 2, upload your image file and add an optional caption. The image will be sent to each selected contact.</p>
+
+    <hr style="margin:2rem 0;border:none;border-top:1px solid #e2e8f0">
+    <p style="font-size:0.8125rem;color:#94a3b8;text-align:center">Quality Colours Business Manager &mdash; WA Marketing Guide v1.0 &mdash; February 2026</p>
+</div>
+</body>
+</html>
