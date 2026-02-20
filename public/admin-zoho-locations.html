@@ -224,7 +224,7 @@
         locationsGrid.classList.add('hidden');
         emptyState.classList.add('hidden');
 
-        var response = await zohoFetch('/api/zoho/locations');
+        var response = await zohoFetch('/api/zoho/locations?include_inactive=1');
         if (!response) {
             loadingGrid.classList.add('hidden');
             emptyState.classList.remove('hidden');

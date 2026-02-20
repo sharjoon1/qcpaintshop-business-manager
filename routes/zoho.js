@@ -1296,6 +1296,7 @@ router.post('/whatsapp/queue-reminders', requirePermission('zoho', 'whatsapp'), 
  */
 router.get('/locations', requirePermission('zoho', 'view'), async (req, res) => {
     try {
+        const includeInactive = req.query.include_inactive === '1' || req.query.include_inactive === 'true';
         const [locations] = await pool.query(`
             SELECT zlm.*,
                 zlm.zoho_location_name as name,
@@ -1305,6 +1306,7 @@ router.get('/locations', requirePermission('zoho', 'view'), async (req, res) => 
                 b.name as branch_name
             FROM zoho_locations_map zlm
             LEFT JOIN branches b ON zlm.local_branch_id = b.id
+            ${includeInactive ? '' : 'WHERE zlm.is_active = 1'}
             ORDER BY zlm.zoho_location_name
         `);
         res.json({ success: true, data: locations });
@@ -1443,14 +1445,16 @@ router.get('/stock/history', requirePermission('zoho', 'view'), async (req, res)
 
         const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
         const [[{ total }]] = await pool.query(
-            `SELECT COUNT(*) as total FROM zoho_stock_history sh ${where}`, params
+            `SELECT COUNT(*) as total FROM zoho_stock_history sh
+             LEFT JOIN zoho_locations_map lm ON sh.zoho_location_id = lm.zoho_location_id
+             ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)`, params
         );
 
         const [rows] = await pool.query(`
             SELECT sh.*, lm.zoho_location_name
             FROM zoho_stock_history sh
             LEFT JOIN zoho_locations_map lm ON sh.zoho_location_id = lm.zoho_location_id
-            ${where}
+            ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
             ORDER BY sh.created_at DESC
             LIMIT ? OFFSET ?
         `, [...params, parseInt(limit), offset]);
@@ -1475,7 +1479,7 @@ router.get('/stock/:itemId', requirePermission('zoho', 'view'), async (req, res)
             FROM zoho_location_stock ls
             LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
             LEFT JOIN zoho_reorder_config rc ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id
-            WHERE ls.zoho_item_id = ?
+            WHERE ls.zoho_item_id = ? AND (lm.is_active = 1 OR lm.is_active IS NULL)
             ORDER BY lm.zoho_location_name
         `, [req.params.itemId]);
 
@@ -1876,12 +1880,16 @@ router.get('/transactions/daily', requirePermission('zoho', 'view'), async (req,
 
         const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
 
-        const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM zoho_daily_transactions dt ${where}`, params);
+        const [[{ total }]] = await pool.query(`
+            SELECT COUNT(*) as total FROM zoho_daily_transactions dt
+            LEFT JOIN zoho_locations_map lm ON dt.zoho_location_id = lm.zoho_location_id
+            ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)`, params);
 
         const [transactions] = await pool.query(`
             SELECT dt.*
             FROM zoho_daily_transactions dt
-            ${where}
+            LEFT JOIN zoho_locations_map lm ON dt.zoho_location_id = lm.zoho_location_id
+            ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
             ORDER BY dt.transaction_date DESC, dt.location_name ASC
             LIMIT ? OFFSET ?
         `, [...params, parseInt(limit), offset]);
@@ -1903,7 +1911,8 @@ router.get('/transactions/daily/:date', requirePermission('zoho', 'view'), async
     try {
         const [transactions] = await pool.query(`
             SELECT dt.* FROM zoho_daily_transactions dt
-            WHERE dt.transaction_date = ?
+            LEFT JOIN zoho_locations_map lm ON dt.zoho_location_id = lm.zoho_location_id
+            WHERE dt.transaction_date = ? AND (lm.is_active = 1 OR lm.is_active IS NULL)
             ORDER BY dt.location_name
         `, [req.params.date]);
 
@@ -2016,13 +2025,17 @@ router.get('/reorder/config', requirePermission('zoho', 'view'), async (req, res
 
         const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
 
-        const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM zoho_reorder_config rc ${where}`, params);
+        const [[{ total }]] = await pool.query(`
+            SELECT COUNT(*) as total FROM zoho_reorder_config rc
+            LEFT JOIN zoho_locations_map lm ON rc.zoho_location_id = lm.zoho_location_id
+            ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)`, params);
 
         const [configs] = await pool.query(`
             SELECT rc.*, ls.stock_on_hand, ls.available_stock
             FROM zoho_reorder_config rc
             LEFT JOIN zoho_location_stock ls ON rc.zoho_item_id = ls.zoho_item_id AND rc.zoho_location_id = ls.zoho_location_id
-            ${where}
+            LEFT JOIN zoho_locations_map lm ON rc.zoho_location_id = lm.zoho_location_id
+            ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
             ORDER BY rc.item_name ASC
             LIMIT ? OFFSET ?
         `, [...params, parseInt(limit), offset]);
@@ -2142,13 +2155,15 @@ router.get('/reorder/alerts/summary', requirePermission('zoho', 'view'), async (
     try {
         const [summary] = await pool.query(`
             SELECT
-                COUNT(CASE WHEN status = 'active' THEN 1 END) as active_count,
-                COUNT(CASE WHEN status = 'acknowledged' THEN 1 END) as acknowledged_count,
-                COUNT(CASE WHEN severity = 'critical' AND status IN ('active','acknowledged') THEN 1 END) as critical_count,
-                COUNT(CASE WHEN severity = 'high' AND status IN ('active','acknowledged') THEN 1 END) as high_count,
-                COUNT(CASE WHEN severity = 'medium' AND status IN ('active','acknowledged') THEN 1 END) as medium_count,
-                COUNT(CASE WHEN severity = 'low' AND status IN ('active','acknowledged') THEN 1 END) as low_count
-            FROM zoho_reorder_alerts
+                COUNT(CASE WHEN ra.status = 'active' THEN 1 END) as active_count,
+                COUNT(CASE WHEN ra.status = 'acknowledged' THEN 1 END) as acknowledged_count,
+                COUNT(CASE WHEN ra.severity = 'critical' AND ra.status IN ('active','acknowledged') THEN 1 END) as critical_count,
+                COUNT(CASE WHEN ra.severity = 'high' AND ra.status IN ('active','acknowledged') THEN 1 END) as high_count,
+                COUNT(CASE WHEN ra.severity = 'medium' AND ra.status IN ('active','acknowledged') THEN 1 END) as medium_count,
+                COUNT(CASE WHEN ra.severity = 'low' AND ra.status IN ('active','acknowledged') THEN 1 END) as low_count
+            FROM zoho_reorder_alerts ra
+            LEFT JOIN zoho_locations_map lm ON ra.zoho_location_id = lm.zoho_location_id
+            WHERE lm.is_active = 1 OR lm.is_active IS NULL
         `);
 
         res.json({ success: true, data: summary[0] });

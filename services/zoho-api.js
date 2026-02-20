@@ -1503,8 +1503,9 @@ async function getLocationStockDashboard(filters = {}) {
 
     const [[{ total }]] = await pool.query(`
         SELECT COUNT(*) as total FROM zoho_location_stock ls
+        LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
         LEFT JOIN zoho_reorder_config rc ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id
-        ${where}
+        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
     `, params);
 
     const [rows] = await pool.query(`
@@ -1512,7 +1513,7 @@ async function getLocationStockDashboard(filters = {}) {
         FROM zoho_location_stock ls
         LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
         LEFT JOIN zoho_reorder_config rc ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id
-        ${where}
+        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
         ORDER BY ls.item_name ASC
         LIMIT ? OFFSET ?
     `, [...params, limit, offset]);
@@ -1890,6 +1891,7 @@ async function checkReorderAlerts() {
         JOIN zoho_location_stock ls ON rc.zoho_item_id = ls.zoho_item_id AND rc.zoho_location_id = ls.zoho_location_id
         LEFT JOIN zoho_locations_map lm ON rc.zoho_location_id = lm.zoho_location_id
         WHERE rc.is_active = 1 AND ls.stock_on_hand < rc.reorder_level
+              AND (lm.is_active = 1 OR lm.is_active IS NULL)
     `);
 
     let created = 0;
@@ -2004,14 +2006,18 @@ async function getReorderDashboard(filters = {}) {
     const limit = Math.min(100, parseInt(filters.limit) || 50);
     const offset = (page - 1) * limit;
 
-    const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM zoho_reorder_alerts ra ${where}`, params);
+    const [[{ total }]] = await pool.query(`
+        SELECT COUNT(*) as total FROM zoho_reorder_alerts ra
+        LEFT JOIN zoho_locations_map lm ON ra.zoho_location_id = lm.zoho_location_id
+        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)`, params);
 
     const [alerts] = await pool.query(`
         SELECT ra.*, u1.full_name as acknowledged_by_name, u2.full_name as resolved_by_name
         FROM zoho_reorder_alerts ra
         LEFT JOIN users u1 ON ra.acknowledged_by = u1.id
         LEFT JOIN users u2 ON ra.resolved_by = u2.id
-        ${where}
+        LEFT JOIN zoho_locations_map lm ON ra.zoho_location_id = lm.zoho_location_id
+        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
         ORDER BY FIELD(ra.severity, 'critical','high','medium','low'), ra.created_at DESC
         LIMIT ? OFFSET ?
     `, [...params, limit, offset]);

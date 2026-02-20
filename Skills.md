@@ -1148,14 +1148,21 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-02-20 - Warehouse Location Filtering (Post-Migration)
+- All Zoho queries now filter by `is_active = 1` to exclude disabled warehouse locations
+- **API**: `GET /api/zoho/locations` returns only active locations by default (`?include_inactive=1` for management page)
+- **Server queries filtered**: stock dashboard, stock/:itemId, stock history, daily transactions, reorder configs, reorder alerts, alert summary
+- **Functions filtered**: `getLocationStockDashboard()`, `checkReorderAlerts()`, `getReorderDashboard()` in zoho-api.js
+- **Locations page**: `admin-zoho-locations.html` passes `?include_inactive=1` to show all locations for management
+- Pattern: `AND (lm.is_active = 1 OR lm.is_active IS NULL)` — LEFT JOIN safe, allows items without location mapping
+
 ### 2026-02-20 - Bulk Stock Migration Tool
 - One-time migration tool to transfer all stock from Warehouse → Business locations
-- Summary table with per-branch item counts and quantities from `zoho_location_stock`
-- Individual or bulk transfer via Zoho Inventory Transfer Order API (`/inventory/v1/transferorders`)
-- Progress bar, real-time log, double-confirm disable warehouse locations
-- Route: `routes/stock-migration.js` (4 endpoints), permission: `zoho.manage`
+- Uses paired inventory adjustments (+qty at business, -qty at warehouse) via Zoho Books API
+- Transfer Orders not used due to OAuth scope limitation (Books only, not Inventory)
+- Key learning: `location_id` must be in each line item, not just root level
+- Route: `routes/stock-migration.js` (6 endpoints), permission: `zoho.manage`
 - Page: `admin-stock-migration.html`, Zoho subnav tab: "Stock Migration"
-- New function: `zoho-api.js → createTransferOrder()` (uses Zoho Inventory API, not Books)
 - No migration needed — reads existing `zoho_location_stock` + `zoho_locations_map` tables
 
 ### 2026-02-20 - Stock Check Assignment System
