@@ -1386,7 +1386,7 @@ router.get('/stock', requirePermission('zoho', 'view'), async (req, res) => {
  */
 router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, res) => {
     try {
-        const { location_id, search, page = 1, limit = 50 } = req.query;
+        const { location_id, search, page = 1, limit = 50, sort = 'name_asc' } = req.query;
         if (!location_id) {
             return res.status(400).json({ success: false, message: 'location_id required' });
         }
@@ -1399,6 +1399,19 @@ router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, 
             params.push('%' + search + '%', '%' + search + '%');
         }
 
+        // Sort mapping
+        const sortMap = {
+            name_asc: 'ls.item_name ASC',
+            name_desc: 'ls.item_name DESC',
+            sku_asc: 'ls.sku ASC',
+            sku_desc: 'ls.sku DESC',
+            stock_asc: 'ls.stock_on_hand ASC',
+            stock_desc: 'ls.stock_on_hand DESC',
+            updated_desc: 'ls.last_synced_at DESC',
+            updated_asc: 'ls.last_synced_at ASC'
+        };
+        const orderBy = sortMap[sort] || sortMap.name_asc;
+
         const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
         const [[{ total }]] = await pool.query(
             `SELECT COUNT(*) as total FROM zoho_location_stock ls LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id ${where}`, params
@@ -1407,11 +1420,11 @@ router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, 
         const [rows] = await pool.query(`
             SELECT ls.zoho_item_id as item_id, ls.item_name as name, ls.sku,
                    ls.stock_on_hand, ls.available_stock, ls.committed_stock, ls.available_for_sale,
-                   ls.zoho_location_id as location_id
+                   ls.zoho_location_id as location_id, ls.last_synced_at
             FROM zoho_location_stock ls
             LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id
             ${where}
-            ORDER BY ls.item_name ASC
+            ORDER BY ${orderBy}
             LIMIT ? OFFSET ?
         `, [...params, parseInt(limit), offset]);
 

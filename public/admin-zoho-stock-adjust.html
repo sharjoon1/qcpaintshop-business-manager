@@ -116,12 +116,22 @@
                 <div class="summary-card"><div class="label">Total Decrease</div><div class="value text-red-600" id="summaryDecrease">0</div></div>
             </div>
 
-            <!-- Search -->
-            <div class="bg-white rounded-lg shadow-sm p-2 mb-3 flex gap-2">
-                <div class="flex-1 relative">
+            <!-- Search + Sort -->
+            <div class="bg-white rounded-lg shadow-sm p-2 mb-3 flex flex-wrap gap-2">
+                <div class="flex-1 relative" style="min-width:150px">
                     <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <input type="text" id="stockSearch" onkeyup="debounceStockSearch()" placeholder="Search items..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-300 text-xs outline-none focus:ring-2 focus:ring-indigo-500 transition">
                 </div>
+                <select id="sortSelect" onchange="onSortChange()" class="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs outline-none focus:ring-2 focus:ring-indigo-500 transition bg-white" title="Sort items">
+                    <option value="name_asc">Name (A-Z)</option>
+                    <option value="name_desc">Name (Z-A)</option>
+                    <option value="sku_asc">SKU (A-Z)</option>
+                    <option value="sku_desc">SKU (Z-A)</option>
+                    <option value="stock_asc">Stock (Low → High)</option>
+                    <option value="stock_desc">Stock (High → Low)</option>
+                    <option value="updated_desc">Recently Updated</option>
+                    <option value="updated_asc">Oldest Updated</option>
+                </select>
                 <label class="flex items-center gap-1.5 text-xs text-gray-600 whitespace-nowrap cursor-pointer">
                     <input type="checkbox" id="showAdjustedOnly" onchange="renderStockTable()" class="accent-indigo-600"> Adjusted only
                 </label>
@@ -183,6 +193,7 @@
     var stockPage = 1, stockTotal = 0, stockPages = 1;
     var STOCK_LIMIT = 50;
     var stockSearchTimeout = null;
+    var currentSort = localStorage.getItem('stockAdjustSort') || 'name_asc';
 
     function showToast(msg, type) { var t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast toast-' + (type||'info'); t.classList.add('show'); setTimeout(function(){t.classList.remove('show');}, 3500); }
     function escapeHtml(s) { if (s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -241,7 +252,7 @@
         document.getElementById('stockContent').classList.add('hidden');
 
         var search = document.getElementById('stockSearch') ? document.getElementById('stockSearch').value.trim() : '';
-        var url = '/api/zoho/stock/by-location?location_id=' + selectedLocationId + '&page=' + stockPage + '&limit=' + STOCK_LIMIT;
+        var url = '/api/zoho/stock/by-location?location_id=' + selectedLocationId + '&page=' + stockPage + '&limit=' + STOCK_LIMIT + '&sort=' + currentSort;
         if (search) url += '&search=' + encodeURIComponent(search);
 
         try {
@@ -265,6 +276,13 @@
     }
 
     function debounceStockSearch() { clearTimeout(stockSearchTimeout); stockSearchTimeout = setTimeout(function() { stockPage = 1; loadStockForLocation(); }, 400); }
+
+    function onSortChange() {
+        currentSort = document.getElementById('sortSelect').value;
+        localStorage.setItem('stockAdjustSort', currentSort);
+        stockPage = 1;
+        loadStockForLocation();
+    }
 
     // ---- Render Stock Table ----
     function renderStockTable() {
@@ -497,6 +515,8 @@
         // Set today as default date
         var today = new Date().toISOString().split('T')[0];
         document.getElementById('adjDate').value = today;
+        // Restore sort preference
+        document.getElementById('sortSelect').value = currentSort;
         loadLocations();
     });
 
