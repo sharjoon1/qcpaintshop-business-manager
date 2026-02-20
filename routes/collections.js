@@ -300,6 +300,16 @@ router.post('/remind', perm, async (req, res) => {
                 continue;
             }
 
+            // Resolve branch_id: request body → branch filter → customer mapping → null
+            let msgBranchId = r.branch_id || branchId;
+            if (!msgBranchId && r.zoho_customer_id) {
+                const [custRow] = await pool.query(
+                    'SELECT branch_id FROM zoho_customers_map WHERE zoho_contact_id = ?',
+                    [r.zoho_customer_id]
+                );
+                msgBranchId = custRow[0]?.branch_id || null;
+            }
+
             // 1. Insert into whatsapp_followups queue (with branch_id for routing)
             const [wfResult] = await pool.query(`
                 INSERT INTO whatsapp_followups (
@@ -310,7 +320,7 @@ router.post('/remind', perm, async (req, res) => {
             `, [
                 r.zoho_customer_id || null, r.zoho_invoice_id || null,
                 r.customer_name || 'Unknown', r.phone, 'payment_reminder', r.message_body,
-                r.balance || null, req.user.id, branchId || null
+                r.balance || null, req.user.id, msgBranchId || null
             ]);
 
             // 2. Insert into collection_reminders audit log
@@ -323,7 +333,7 @@ router.post('/remind', perm, async (req, res) => {
             `, [
                 r.zoho_invoice_id || '', r.zoho_customer_id || '',
                 r.customer_name || 'Unknown', r.phone,
-                r.message_body, wfResult.insertId, req.user.id, branchId || null
+                r.message_body, wfResult.insertId, req.user.id, msgBranchId || null
             ]);
 
             results.push({ zoho_invoice_id: r.zoho_invoice_id, success: true, whatsapp_queue_id: wfResult.insertId });

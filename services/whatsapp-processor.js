@@ -113,13 +113,14 @@ async function processQueue() {
         const config = {};
         configRows.forEach(r => { config[r.config_key] = r.config_value; });
 
-        if (config.whatsapp_enabled !== 'true') {
+        const hasHttpApi = !!(config.whatsapp_api_url && config.whatsapp_api_key);
+        const hasSessionManager = !!(sessionManager);
+
+        // Need whatsapp_enabled=true for HTTP API, OR session manager for local sessions
+        if (config.whatsapp_enabled !== 'true' && !hasSessionManager) {
             isProcessing = false;
             return;
         }
-
-        const hasHttpApi = !!(config.whatsapp_api_url && config.whatsapp_api_key);
-        const hasSessionManager = !!(sessionManager);
 
         // Need at least one sending method
         if (!hasHttpApi && !hasSessionManager) {
@@ -168,18 +169,30 @@ async function processQueue() {
 
                 // DUAL-MODE SENDING:
                 // 1. If message has branch_id AND that branch has a connected session → use local session
-                // 2. Otherwise → fallback to HTTP API
+                // 2. If no branch_id → try ANY connected session (single-branch setups)
+                // 3. Otherwise → fallback to HTTP API
                 let sent = false;
 
-                if (msg.branch_id && sessionManager && sessionManager.isConnected(msg.branch_id)) {
-                    try {
-                        sent = await sessionManager.sendMessage(msg.branch_id, msg.phone, body);
-                        if (sent) {
-                            console.log(`[WhatsApp] Sent via branch ${msg.branch_id} session to ${msg.phone} (ID: ${msg.id})`);
+                if (sessionManager) {
+                    let targetBranch = msg.branch_id;
+
+                    // If no branch_id on message, try to find any connected session
+                    if (!targetBranch) {
+                        const allStatus = sessionManager.getStatus();
+                        const connected = allStatus.find(s => s.status === 'connected');
+                        if (connected) targetBranch = connected.branch_id;
+                    }
+
+                    if (targetBranch && sessionManager.isConnected(targetBranch)) {
+                        try {
+                            sent = await sessionManager.sendMessage(targetBranch, msg.phone, body);
+                            if (sent) {
+                                console.log(`[WhatsApp] Sent via branch ${targetBranch} session to ${msg.phone} (ID: ${msg.id})`);
+                            }
+                        } catch (sessionErr) {
+                            console.warn(`[WhatsApp] Branch ${targetBranch} session send failed, falling back to HTTP:`, sessionErr.message);
+                            sent = false;
                         }
-                    } catch (sessionErr) {
-                        console.warn(`[WhatsApp] Branch ${msg.branch_id} session send failed, falling back to HTTP:`, sessionErr.message);
-                        sent = false;
                     }
                 }
 
