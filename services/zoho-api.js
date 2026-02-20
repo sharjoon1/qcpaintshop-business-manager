@@ -1497,38 +1497,62 @@ async function getLocationStockDashboard(filters = {}) {
         where += ' AND ls.stock_on_hand <= COALESCE(rc.reorder_level, 0) AND rc.id IS NOT NULL';
     }
 
+    // Sort mapping
+    const sortMap = {
+        name_asc: 'ls.item_name ASC', name_desc: 'ls.item_name DESC',
+        sku_asc: 'ls.sku ASC', sku_desc: 'ls.sku DESC',
+        stock_asc: 'ls.stock_on_hand ASC', stock_desc: 'ls.stock_on_hand DESC',
+        value_asc: '(ls.stock_on_hand * COALESCE(zim.zoho_purchase_rate, 0)) ASC',
+        value_desc: '(ls.stock_on_hand * COALESCE(zim.zoho_purchase_rate, 0)) DESC',
+        rate_asc: 'COALESCE(zim.zoho_rate, 0) ASC', rate_desc: 'COALESCE(zim.zoho_rate, 0) DESC',
+        updated_desc: 'ls.last_synced_at DESC', updated_asc: 'ls.last_synced_at ASC'
+    };
+    const orderBy = sortMap[filters.sort] || sortMap.name_asc;
+
     const page = Math.max(1, parseInt(filters.page) || 1);
     const limit = Math.min(100, parseInt(filters.limit) || 50);
     const offset = (page - 1) * limit;
+
+    const activeFilter = 'AND (lm.is_active = 1 OR lm.is_active IS NULL)';
 
     const [[{ total }]] = await pool.query(`
         SELECT COUNT(*) as total FROM zoho_location_stock ls
         LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
         LEFT JOIN zoho_reorder_config rc ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id
-        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
+        ${where} ${activeFilter}
     `, params);
 
     const [rows] = await pool.query(`
-        SELECT ls.*, lm.zoho_location_name, rc.reorder_level
+        SELECT ls.*, lm.zoho_location_name, rc.reorder_level,
+               zim.zoho_purchase_rate as purchase_rate, zim.zoho_rate as rate,
+               COALESCE(zim.zoho_tax_percentage, 18) as tax_percentage, zim.zoho_tax_name as tax_name
         FROM zoho_location_stock ls
         LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
         LEFT JOIN zoho_reorder_config rc ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id
-        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
-        ORDER BY ls.item_name ASC
+        LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id
+        ${where} ${activeFilter}
+        ORDER BY ${orderBy}
         LIMIT ? OFFSET ?
     `, [...params, limit, offset]);
 
-    // Stats: total items, low stock, out of stock (across all active locations, ignoring current filters)
+    // Stats: scoped to same location filter as the main query
+    const statsWhere = filters.location_id ? 'WHERE ls.zoho_location_id = ? ' + activeFilter : 'WHERE 1=1 ' + activeFilter;
+    const statsParams = filters.location_id ? [filters.location_id] : [];
+
     const [[stats]] = await pool.query(`
         SELECT
             COUNT(*) as total_items,
+            COALESCE(SUM(ls.stock_on_hand), 0) as total_quantity,
             SUM(CASE WHEN ls.stock_on_hand <= 0 THEN 1 ELSE 0 END) as out_of_stock,
-            SUM(CASE WHEN rc.reorder_level IS NOT NULL AND ls.stock_on_hand > 0 AND ls.stock_on_hand <= rc.reorder_level THEN 1 ELSE 0 END) as low_stock
+            SUM(CASE WHEN rc.reorder_level IS NOT NULL AND ls.stock_on_hand > 0 AND ls.stock_on_hand <= rc.reorder_level THEN 1 ELSE 0 END) as low_stock,
+            COALESCE(SUM(ls.stock_on_hand * COALESCE(zim.zoho_purchase_rate, 0)), 0) as total_value_excl_gst,
+            COALESCE(SUM(ls.stock_on_hand * COALESCE(zim.zoho_purchase_rate, 0) * (1 + COALESCE(zim.zoho_tax_percentage, 18) / 100)), 0) as total_value_incl_gst
         FROM zoho_location_stock ls
         LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
         LEFT JOIN zoho_reorder_config rc ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id
-        WHERE (lm.is_active = 1 OR lm.is_active IS NULL)
-    `);
+        LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id
+        ${statsWhere}
+    `, statsParams);
 
     // Last sync time
     const [[syncInfo]] = await pool.query(`SELECT MAX(last_synced_at) as last_sync FROM zoho_location_stock`);
@@ -1536,7 +1560,14 @@ async function getLocationStockDashboard(filters = {}) {
     return {
         data: rows,
         pagination: { total, page, limit, pages: Math.ceil(total / limit) },
-        stats: { total_items: parseInt(stats.total_items) || 0, low_stock: parseInt(stats.low_stock) || 0, out_of_stock: parseInt(stats.out_of_stock) || 0 },
+        stats: {
+            total_items: parseInt(stats.total_items) || 0,
+            total_quantity: parseFloat(stats.total_quantity) || 0,
+            low_stock: parseInt(stats.low_stock) || 0,
+            out_of_stock: parseInt(stats.out_of_stock) || 0,
+            total_value_excl_gst: parseFloat(stats.total_value_excl_gst) || 0,
+            total_value_incl_gst: parseFloat(stats.total_value_incl_gst) || 0
+        },
         last_sync: syncInfo.last_sync || null
     };
 }

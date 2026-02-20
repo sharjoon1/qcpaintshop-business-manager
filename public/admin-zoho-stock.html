@@ -150,66 +150,37 @@
         </div>
 
         <!-- Summary Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-            <!-- Total Items -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-6">
             <div class="stat-card" style="border-left-color: #667eea;">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <div id="statTotalItems" class="stat-value">
-                            <div class="skeleton" style="width: 50px; height: 28px;"></div>
-                        </div>
-                        <div class="stat-label">Total Items</div>
-                    </div>
-                    <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                    </svg>
-                </div>
+                <div id="statTotalItems" class="stat-value"><div class="skeleton" style="width:50px;height:28px;"></div></div>
+                <div class="stat-label">Total Items</div>
             </div>
-
-            <!-- Low Stock Items -->
-            <div class="stat-card" style="border-left-color: #f59e0b;">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <div id="statLowStock" class="stat-value">
-                            <div class="skeleton" style="width: 50px; height: 28px;"></div>
-                        </div>
-                        <div class="stat-label">Low Stock</div>
-                    </div>
-                    <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                    </svg>
-                </div>
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div id="statTotalQty" class="stat-value"><div class="skeleton" style="width:50px;height:28px;"></div></div>
+                <div class="stat-label">Total Quantity</div>
             </div>
-
-            <!-- Out of Stock -->
-            <div class="stat-card" style="border-left-color: #ef4444;">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <div id="statOutOfStock" class="stat-value">
-                            <div class="skeleton" style="width: 50px; height: 28px;"></div>
-                        </div>
-                        <div class="stat-label">Out of Stock</div>
-                    </div>
-                    <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
-                    </svg>
-                </div>
-            </div>
-
-            <!-- Last Sync -->
             <div class="stat-card" style="border-left-color: #10b981;">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <div id="statLastSync" class="stat-value text-base font-bold">
-                            <div class="skeleton" style="width: 80px; height: 28px;"></div>
-                        </div>
-                        <div class="stat-label">Last Sync</div>
-                    </div>
-                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                </div>
+                <div id="statValueExclGst" class="stat-value text-base font-bold"><div class="skeleton" style="width:80px;height:28px;"></div></div>
+                <div class="stat-label">Value (excl. GST)</div>
             </div>
+            <div class="stat-card" style="border-left-color: #3b82f6;">
+                <div id="statValueInclGst" class="stat-value text-base font-bold"><div class="skeleton" style="width:80px;height:28px;"></div></div>
+                <div class="stat-label">Value (incl. GST)</div>
+            </div>
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div id="statLowStock" class="stat-value"><div class="skeleton" style="width:50px;height:28px;"></div></div>
+                <div class="stat-label">Low Stock</div>
+            </div>
+            <div class="stat-card" style="border-left-color: #ef4444;">
+                <div id="statOutOfStock" class="stat-value"><div class="skeleton" style="width:50px;height:28px;"></div></div>
+                <div class="stat-label">Out of Stock</div>
+            </div>
+        </div>
+        <div class="text-right mb-4">
+            <span id="lastSyncBadge" class="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span id="statLastSync">--</span>
+            </span>
         </div>
 
         <!-- Location Tabs -->
@@ -225,15 +196,31 @@
 
         <!-- Search & Filter Bar -->
         <div class="bg-white rounded-lg shadow p-4 mb-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
                     <input type="text" id="searchInput" onkeyup="debounceSearch()" placeholder="Item name or SKU..." class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none">
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sort by</label>
+                    <select id="sortSelect" onchange="onSortChange()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none bg-white">
+                        <option value="name_asc">Name (A-Z)</option>
+                        <option value="name_desc">Name (Z-A)</option>
+                        <option value="sku_asc">SKU (A-Z)</option>
+                        <option value="sku_desc">SKU (Z-A)</option>
+                        <option value="stock_asc">Stock (Low → High)</option>
+                        <option value="stock_desc">Stock (High → Low)</option>
+                        <option value="value_desc">Value (High → Low)</option>
+                        <option value="value_asc">Value (Low → High)</option>
+                        <option value="rate_desc">Rate (High → Low)</option>
+                        <option value="rate_asc">Rate (Low → High)</option>
+                        <option value="updated_desc">Recently Updated</option>
+                    </select>
+                </div>
                 <div class="flex items-center gap-3 sm:pt-6">
                     <label class="flex items-center gap-2 cursor-pointer select-none">
                         <input type="checkbox" id="lowStockToggle" onchange="applyFilters()" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                        <span class="text-sm font-medium text-gray-700">Show low stock only</span>
+                        <span class="text-sm font-medium text-gray-700">Low stock only</span>
                     </label>
                 </div>
                 <div class="flex justify-end">
@@ -269,14 +256,16 @@
         <div id="stockTableContainer" class="hidden">
             <div class="stock-table-wrap bg-white rounded-lg shadow overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left" style="min-width: 650px;">
+                    <table class="w-full text-sm text-left" style="min-width: 900px;">
                         <thead class="bg-gray-50 border-b">
                             <tr>
                                 <th class="px-4 py-3 font-semibold text-gray-600">Item Name</th>
                                 <th class="px-4 py-3 font-semibold text-gray-600">SKU</th>
-                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Stock on Hand</th>
-                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Available</th>
-                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Committed</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Qty</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Rate</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">GST%</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Rate+GST</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Stock Value</th>
                                 <th class="px-4 py-3 font-semibold text-gray-600 text-center">Status</th>
                             </tr>
                         </thead>
@@ -315,6 +304,7 @@
         let searchTimeout = null;
         let selectedLocationId = '';
         let expandedItemId = null;
+        let currentSort = localStorage.getItem('stockViewSort') || 'name_asc';
 
         // =============================================
         // TOAST NOTIFICATIONS
@@ -458,6 +448,13 @@
             loadStockData();
         }
 
+        function onSortChange() {
+            currentSort = document.getElementById('sortSelect').value;
+            localStorage.setItem('stockViewSort', currentSort);
+            currentPage = 1;
+            loadStockData();
+        }
+
         function clearFilters() {
             document.getElementById('searchInput').value = '';
             document.getElementById('lowStockToggle').checked = false;
@@ -478,7 +475,8 @@
 
             const params = new URLSearchParams({
                 page: currentPage,
-                limit: PAGE_LIMIT
+                limit: PAGE_LIMIT,
+                sort: currentSort
             });
             if (selectedLocationId) params.set('location_id', selectedLocationId);
             if (search) params.set('search', search);
@@ -621,16 +619,25 @@
         // =============================================
         // RENDERING: SUMMARY CARDS
         // =============================================
+        function formatCurrency(val) {
+            if (!val && val !== 0) return '--';
+            return '\u20B9' + parseFloat(val).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
         function updateSummaryCards(stats) {
-            document.getElementById('statTotalItems').textContent = stats.total_items != null ? stats.total_items : (stats.total || '--');
-            document.getElementById('statLowStock').textContent = stats.low_stock != null ? stats.low_stock : (stats.low_stock_items || '--');
-            document.getElementById('statOutOfStock').textContent = stats.out_of_stock != null ? stats.out_of_stock : (stats.out_of_stock_items || '--');
+            document.getElementById('statTotalItems').textContent = (stats.total_items != null ? stats.total_items : '--').toLocaleString();
+            document.getElementById('statTotalQty').textContent = stats.total_quantity != null ? Math.round(stats.total_quantity).toLocaleString() : '--';
+            document.getElementById('statValueExclGst').textContent = stats.total_value_excl_gst != null ? formatCurrency(stats.total_value_excl_gst) : '--';
+            document.getElementById('statValueInclGst').textContent = stats.total_value_incl_gst != null ? formatCurrency(stats.total_value_incl_gst) : '--';
+            document.getElementById('statLowStock').textContent = stats.low_stock != null ? stats.low_stock : '--';
+            document.getElementById('statOutOfStock').textContent = stats.out_of_stock != null ? stats.out_of_stock : '--';
         }
 
         function updateLastSync(syncTime) {
             const formatted = timeAgo(syncTime);
-            document.getElementById('statLastSync').textContent = formatted;
-            document.getElementById('lastSyncTime').textContent = syncTime ? 'Last sync: ' + formatDateTime(syncTime) : '';
+            document.getElementById('statLastSync').textContent = syncTime ? formatted : 'Never';
+            const el = document.getElementById('lastSyncTime');
+            if (el) el.textContent = syncTime ? 'Last sync: ' + formatDateTime(syncTime) : '';
         }
 
         // =============================================
@@ -655,8 +662,10 @@
                 const id = item.item_id || item.id;
                 const status = getStockStatus(item);
                 const stockOnHand = parseFloat(item.stock_on_hand || item.quantity || 0);
-                const available = parseFloat(item.available_stock || item.available || item.stock_on_hand || 0);
-                const committed = parseFloat(item.committed_stock || item.committed || 0);
+                const purchaseRate = parseFloat(item.purchase_rate || 0);
+                const gstPct = parseFloat(item.tax_percentage || 18);
+                const rateWithGst = purchaseRate * (1 + gstPct / 100);
+                const stockValue = stockOnHand * purchaseRate;
                 const isExpanded = expandedItemId === id;
 
                 let rowHtml = '<tr class="stock-row' + (isExpanded ? ' expanded' : '') + '" data-item-id="' + escapeHtml(String(id)) + '" onclick="toggleItemDetail(\'' + escapeHtml(String(id)) + '\')">' +
@@ -665,8 +674,10 @@
                     '</td>' +
                     '<td class="px-4 py-3 text-gray-500 text-xs font-mono">' + escapeHtml(item.sku || '--') + '</td>' +
                     '<td class="px-4 py-3 text-right font-medium text-gray-800">' + stockOnHand.toLocaleString() + '</td>' +
-                    '<td class="px-4 py-3 text-right text-gray-700">' + available.toLocaleString() + '</td>' +
-                    '<td class="px-4 py-3 text-right text-gray-700">' + committed.toLocaleString() + '</td>' +
+                    '<td class="px-4 py-3 text-right text-gray-700">' + (purchaseRate > 0 ? '\u20B9' + purchaseRate.toFixed(2) : '--') + '</td>' +
+                    '<td class="px-4 py-3 text-right text-gray-500 text-xs">' + gstPct + '%</td>' +
+                    '<td class="px-4 py-3 text-right text-gray-700">' + (purchaseRate > 0 ? '\u20B9' + rateWithGst.toFixed(2) : '--') + '</td>' +
+                    '<td class="px-4 py-3 text-right font-medium ' + (stockValue > 0 ? 'text-green-700' : 'text-gray-400') + '">' + (stockValue > 0 ? '\u20B9' + Math.round(stockValue).toLocaleString() : '--') + '</td>' +
                     '<td class="px-4 py-3 text-center">' +
                         '<div class="flex items-center justify-center gap-2">' +
                             '<span class="status-dot ' + status.class + '"></span>' +
@@ -677,7 +688,7 @@
 
                 // Detail panel row (always present, toggled via class)
                 rowHtml += '<tr class="detail-row" id="detail-row-' + escapeHtml(String(id)) + '"' + (!isExpanded ? ' style="display:none;"' : '') + '>' +
-                    '<td colspan="6" class="p-0">' +
+                    '<td colspan="8" class="p-0">' +
                         '<div class="detail-panel' + (isExpanded ? ' open' : '') + '" id="detail-panel-' + escapeHtml(String(id)) + '">' +
                             '<div class="flex items-center justify-center py-4">' +
                                 '<svg class="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
@@ -695,8 +706,9 @@
                 const id = item.item_id || item.id;
                 const status = getStockStatus(item);
                 const stockOnHand = parseFloat(item.stock_on_hand || item.quantity || 0);
-                const available = parseFloat(item.available_stock || item.available || item.stock_on_hand || 0);
-                const committed = parseFloat(item.committed_stock || item.committed || 0);
+                const purchaseRate = parseFloat(item.purchase_rate || 0);
+                const gstPct = parseFloat(item.tax_percentage || 18);
+                const stockValue = stockOnHand * purchaseRate;
 
                 return '<div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition" onclick="toggleItemDetailMobile(\'' + escapeHtml(String(id)) + '\')">' +
                     '<div class="flex justify-between items-start mb-2">' +
@@ -711,16 +723,16 @@
                     '</div>' +
                     '<div class="grid grid-cols-3 gap-2 mt-3">' +
                         '<div class="text-center">' +
-                            '<div class="text-xs text-gray-500">On Hand</div>' +
+                            '<div class="text-xs text-gray-500">Qty</div>' +
                             '<div class="text-sm font-bold text-gray-800">' + stockOnHand.toLocaleString() + '</div>' +
                         '</div>' +
                         '<div class="text-center">' +
-                            '<div class="text-xs text-gray-500">Available</div>' +
-                            '<div class="text-sm font-bold text-gray-700">' + available.toLocaleString() + '</div>' +
+                            '<div class="text-xs text-gray-500">Rate</div>' +
+                            '<div class="text-sm font-bold text-gray-700">' + (purchaseRate > 0 ? '\u20B9' + purchaseRate.toFixed(0) : '--') + '</div>' +
                         '</div>' +
                         '<div class="text-center">' +
-                            '<div class="text-xs text-gray-500">Committed</div>' +
-                            '<div class="text-sm font-bold text-gray-700">' + committed.toLocaleString() + '</div>' +
+                            '<div class="text-xs text-gray-500">Value</div>' +
+                            '<div class="text-sm font-bold text-green-700">' + (stockValue > 0 ? '\u20B9' + Math.round(stockValue).toLocaleString() : '--') + '</div>' +
                         '</div>' +
                     '</div>' +
                     '<div class="detail-panel mt-2" id="detail-panel-mobile-' + escapeHtml(String(id)) + '"></div>' +
@@ -968,6 +980,8 @@
         // INITIALIZATION
         // =============================================
         document.addEventListener('DOMContentLoaded', function() {
+            // Restore sort preference
+            document.getElementById('sortSelect').value = currentSort;
             loadLocations();
             loadStockData();
         });
