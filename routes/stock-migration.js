@@ -17,15 +17,16 @@ function setPool(p) { pool = p; }
  * Sync location stock from Zoho to get fresh data
  */
 router.post('/sync-stock', requirePermission('zoho', 'manage'), async (req, res) => {
+    // Return immediately, sync runs in background (takes 1-2 min for ~1800 items)
+    const zohoAPI = require('../services/zoho-api');
+    console.log('[Stock Migration] Starting background stock sync...');
+    res.json({ success: true, message: 'Stock sync started. Please wait 1-2 minutes, then click Refresh.' });
+
     try {
-        const zohoAPI = require('../services/zoho-api');
-        console.log('[Stock Migration] Syncing location stock from Zoho...');
-        const result = await zohoAPI.syncLocationStock(req.user?.id || null);
-        console.log('[Stock Migration] Stock sync complete');
-        res.json({ success: true, message: 'Stock data synced from Zoho', ...result });
+        await zohoAPI.syncLocationStock(req.user?.id || null);
+        console.log('[Stock Migration] Background stock sync complete');
     } catch (error) {
-        console.error('Stock sync error:', error);
-        res.status(500).json({ success: false, message: 'Stock sync failed: ' + error.message });
+        console.error('[Stock Migration] Background stock sync error:', error.message);
     }
 });
 

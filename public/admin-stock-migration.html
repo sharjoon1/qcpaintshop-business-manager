@@ -247,8 +247,7 @@ async function syncStock() {
     try {
         const result = await apiPost('/api/zoho/migration/sync-stock', {});
         if (result.success) {
-            showToast('Stock synced! Reloading data...', 'success');
-            await loadData();
+            showToast('Stock sync started! Wait 1-2 minutes, then click Refresh.', 'success');
         } else {
             showToast('Sync failed: ' + result.message, 'error');
         }
