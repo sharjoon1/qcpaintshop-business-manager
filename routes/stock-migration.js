@@ -20,7 +20,7 @@ router.post('/sync-stock', requirePermission('zoho', 'manage'), async (req, res)
     try {
         const zohoAPI = require('../services/zoho-api');
         console.log('[Stock Migration] Syncing location stock from Zoho...');
-        const result = await zohoAPI.syncLocationStock('stock-migration');
+        const result = await zohoAPI.syncLocationStock(req.user?.id || null);
         console.log('[Stock Migration] Stock sync complete');
         res.json({ success: true, message: 'Stock data synced from Zoho', ...result });
     } catch (error) {
