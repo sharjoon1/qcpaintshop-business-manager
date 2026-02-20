@@ -2063,13 +2063,61 @@ async function getInventoryAdjustments(params = {}) {
 }
 
 /**
- * Create a Transfer Order in Zoho Books
- * Zoho Books API: POST /transferorders
+ * Create a Transfer Order in Zoho Inventory
+ * Zoho Inventory API: POST /inventory/v1/transferorders
+ * (Transfer orders are an Inventory API feature, not Books)
  */
 async function createTransferOrder(transferData) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
-    console.log('[Zoho API] Creating transfer order:', JSON.stringify(transferData, null, 2));
-    return await apiPost(`/transferorders?organization_id=${orgId}`, transferData);
+    const caller = 'createTransferOrder';
+    await rateLimiter.acquire(caller, { priority: 'normal' });
+
+    const token = await zohoOAuth.getAccessToken();
+    const url = `https://www.zohoapis.in/inventory/v1/transferorders?organization_id=${orgId}`;
+    const postData = JSON.stringify(transferData);
+
+    console.log('[Zoho API] Creating transfer order:', postData.substring(0, 500));
+
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const options = {
+            hostname: urlObj.hostname,
+            path: urlObj.pathname + urlObj.search,
+            method: 'POST',
+            headers: {
+                'Authorization': `Zoho-oauthtoken ${token}`,
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.code && parsed.code !== 0) {
+                        console.error('[Zoho API] Transfer order error response:', data.substring(0, 500));
+                        reject(new Error(`Zoho Inventory API error ${parsed.code}: ${parsed.message}`));
+                    } else {
+                        resolve(parsed);
+                    }
+                } catch (e) {
+                    console.error('[Zoho API] Transfer order raw response:', data.substring(0, 500));
+                    reject(new Error(`Invalid JSON from Zoho Inventory: ${data.substring(0, 200)}`));
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.setTimeout(60000, () => {
+            req.destroy();
+            reject(new Error('Zoho Inventory API request timeout'));
+        });
+        req.write(postData);
+        req.end();
+    });
 }
 
 module.exports = {

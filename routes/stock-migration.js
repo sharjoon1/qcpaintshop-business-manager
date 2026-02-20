@@ -93,7 +93,8 @@ router.post('/transfer', requirePermission('zoho', 'manage'), async (req, res) =
             date: new Date().toISOString().split('T')[0],
             line_items: transferItems.map(item => ({
                 item_id: item.item_id,
-                quantity_to_transfer: parseFloat(item.stock || item.quantity)
+                name: item.name || '',
+                quantity_transfer: parseFloat(item.stock || item.quantity)
             }))
         };
 
@@ -152,7 +153,8 @@ router.post('/transfer-all', requirePermission('zoho', 'manage'), async (req, re
                     date: new Date().toISOString().split('T')[0],
                     line_items: transferItems.map(item => ({
                         item_id: item.item_id,
-                        quantity_to_transfer: parseFloat(item.stock || item.quantity)
+                        name: item.name || '',
+                        quantity_transfer: parseFloat(item.stock || item.quantity)
                     }))
                 };
 
