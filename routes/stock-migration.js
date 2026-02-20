@@ -1,7 +1,8 @@
 /**
  * Stock Migration Routes
  * Bulk transfer stock from Warehouse locations to Business locations
- * One-time migration tool
+ * Uses paired inventory adjustments (decrease warehouse + increase business)
+ * since Transfer Orders require Zoho Inventory OAuth scope we don't have.
  */
 
 const express = require('express');
@@ -69,7 +70,8 @@ router.get('/warehouse-stock', requirePermission('zoho', 'manage'), async (req, 
 
 /**
  * POST /transfer
- * Transfer stock from warehouse to business location for one branch
+ * Transfer stock from warehouse to business location for one branch.
+ * Uses two inventory adjustments: decrease at warehouse, increase at business.
  */
 router.post('/transfer', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
@@ -86,29 +88,50 @@ router.post('/transfer', requirePermission('zoho', 'manage'), async (req, res) =
         }
 
         const zohoAPI = require('../services/zoho-api');
+        const today = new Date().toISOString().split('T')[0];
+        const label = (branch_name || 'Branch').substring(0, 30);
 
-        const transferData = {
-            from_warehouse_id: from_location_id,
-            to_warehouse_id: to_location_id,
-            date: new Date().toISOString().split('T')[0],
+        // Step 1: Increase stock at business location
+        const increaseData = {
+            date: today,
+            reason: `Migration IN: ${label}`.substring(0, 50),
+            description: `Stock migration from warehouse to business location for ${branch_name}`,
+            adjustment_type: 'quantity',
+            location_id: to_location_id,
             line_items: transferItems.map(item => ({
                 item_id: item.item_id,
-                name: item.name || '',
-                quantity_transfer: parseFloat(item.stock || item.quantity)
+                quantity_adjusted: parseFloat(item.stock || item.quantity)
             }))
         };
 
-        console.log(`[Stock Migration] Transferring ${transferItems.length} items for branch ${branch_name || branch_id}`);
+        console.log(`[Stock Migration] Step 1: Increasing stock at business location for ${branch_name} (${transferItems.length} items)`);
+        const increaseResult = await zohoAPI.createInventoryAdjustment(increaseData);
+        const increaseId = increaseResult?.inventory_adjustment?.inventory_adjustment_id || 'unknown';
+        console.log(`[Stock Migration] Increase adjustment created: ${increaseId}`);
 
-        const result = await zohoAPI.createTransferOrder(transferData);
+        // Step 2: Decrease stock at warehouse location
+        const decreaseData = {
+            date: today,
+            reason: `Migration OUT: ${label}`.substring(0, 50),
+            description: `Stock migration from warehouse to business location for ${branch_name}`,
+            adjustment_type: 'quantity',
+            location_id: from_location_id,
+            line_items: transferItems.map(item => ({
+                item_id: item.item_id,
+                quantity_adjusted: -Math.abs(parseFloat(item.stock || item.quantity))
+            }))
+        };
 
-        console.log(`[Stock Migration] Transfer order created: ${result.transfer_order?.transfer_order_id || 'unknown'}`);
+        console.log(`[Stock Migration] Step 2: Decreasing stock at warehouse for ${branch_name}`);
+        const decreaseResult = await zohoAPI.createInventoryAdjustment(decreaseData);
+        const decreaseId = decreaseResult?.inventory_adjustment?.inventory_adjustment_id || 'unknown';
+        console.log(`[Stock Migration] Decrease adjustment created: ${decreaseId}`);
 
         res.json({
             success: true,
-            message: `Transfer order created for ${branch_name || 'branch'}`,
-            transfer_order_id: result.transfer_order?.transfer_order_id,
-            transfer_order_number: result.transfer_order?.transfer_order_number,
+            message: `Stock transferred for ${branch_name}`,
+            increase_adjustment_id: increaseId,
+            decrease_adjustment_id: decreaseId,
             items_transferred: transferItems.length
         });
     } catch (error) {
@@ -131,6 +154,7 @@ router.post('/transfer-all', requirePermission('zoho', 'manage'), async (req, re
 
         const zohoAPI = require('../services/zoho-api');
         const results = [];
+        const today = new Date().toISOString().split('T')[0];
 
         for (const branch of branches) {
             const transferItems = (branch.items || []).filter(i => parseFloat(i.stock || i.quantity) > 0);
@@ -147,27 +171,46 @@ router.post('/transfer-all', requirePermission('zoho', 'manage'), async (req, re
             }
 
             try {
-                const transferData = {
-                    from_warehouse_id: branch.warehouse_location_id,
-                    to_warehouse_id: branch.business_location_id,
-                    date: new Date().toISOString().split('T')[0],
+                const label = (branch.branch_name || 'Branch').substring(0, 30);
+
+                // Step 1: Increase at business
+                const increaseData = {
+                    date: today,
+                    reason: `Migration IN: ${label}`.substring(0, 50),
+                    description: `Stock migration from warehouse to business for ${branch.branch_name}`,
+                    adjustment_type: 'quantity',
+                    location_id: branch.business_location_id,
                     line_items: transferItems.map(item => ({
                         item_id: item.item_id,
-                        name: item.name || '',
-                        quantity_transfer: parseFloat(item.stock || item.quantity)
+                        quantity_adjusted: parseFloat(item.stock || item.quantity)
                     }))
                 };
 
-                console.log(`[Stock Migration] Transferring ${transferItems.length} items for ${branch.branch_name}`);
-                const result = await zohoAPI.createTransferOrder(transferData);
+                console.log(`[Stock Migration] Increasing stock at business for ${branch.branch_name} (${transferItems.length} items)`);
+                await zohoAPI.createInventoryAdjustment(increaseData);
+
+                // Step 2: Decrease at warehouse
+                const decreaseData = {
+                    date: today,
+                    reason: `Migration OUT: ${label}`.substring(0, 50),
+                    description: `Stock migration from warehouse to business for ${branch.branch_name}`,
+                    adjustment_type: 'quantity',
+                    location_id: branch.warehouse_location_id,
+                    line_items: transferItems.map(item => ({
+                        item_id: item.item_id,
+                        quantity_adjusted: -Math.abs(parseFloat(item.stock || item.quantity))
+                    }))
+                };
+
+                console.log(`[Stock Migration] Decreasing stock at warehouse for ${branch.branch_name}`);
+                await zohoAPI.createInventoryAdjustment(decreaseData);
 
                 results.push({
                     branch_id: branch.branch_id,
                     branch_name: branch.branch_name,
                     success: true,
-                    transfer_order_id: result.transfer_order?.transfer_order_id,
                     items_transferred: transferItems.length,
-                    message: 'Transfer order created'
+                    message: 'Stock transferred'
                 });
             } catch (err) {
                 console.error(`[Stock Migration] Failed for ${branch.branch_name}:`, err.message);
