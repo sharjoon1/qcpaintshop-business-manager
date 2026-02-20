@@ -425,8 +425,8 @@
             const container = document.getElementById('locationTabs');
             let html = '<div class="location-tab active" data-location-id="" onclick="selectLocation(this)">All</div>';
             locations.forEach(loc => {
-                const id = loc.warehouse_id || loc.location_id || loc.id || '';
-                const name = loc.warehouse_name || loc.location_name || loc.name || 'Unknown';
+                const id = loc.zoho_location_id || loc.location_id || loc.id || '';
+                const name = loc.zoho_location_name || loc.location_name || loc.name || 'Unknown';
                 html += '<div class="location-tab" data-location-id="' + escapeHtml(String(id)) + '" onclick="selectLocation(this)">' + escapeHtml(name) + '</div>';
             });
             container.innerHTML = html;
@@ -503,7 +503,7 @@
                 if (result.success) {
                     stockItems = result.data || [];
                     totalItems = result.pagination ? result.pagination.total : stockItems.length;
-                    totalPages = result.pagination ? result.pagination.totalPages : Math.ceil(totalItems / PAGE_LIMIT);
+                    totalPages = result.pagination ? (result.pagination.pages || result.pagination.totalPages) : Math.ceil(totalItems / PAGE_LIMIT);
                     currentPage = result.pagination ? result.pagination.page : currentPage;
 
                     if (result.stats) {

@@ -1518,7 +1518,27 @@ async function getLocationStockDashboard(filters = {}) {
         LIMIT ? OFFSET ?
     `, [...params, limit, offset]);
 
-    return { data: rows, pagination: { total, page, limit, pages: Math.ceil(total / limit) } };
+    // Stats: total items, low stock, out of stock (across all active locations, ignoring current filters)
+    const [[stats]] = await pool.query(`
+        SELECT
+            COUNT(*) as total_items,
+            SUM(CASE WHEN ls.stock_on_hand <= 0 THEN 1 ELSE 0 END) as out_of_stock,
+            SUM(CASE WHEN rc.reorder_level IS NOT NULL AND ls.stock_on_hand > 0 AND ls.stock_on_hand <= rc.reorder_level THEN 1 ELSE 0 END) as low_stock
+        FROM zoho_location_stock ls
+        LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
+        LEFT JOIN zoho_reorder_config rc ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id
+        WHERE (lm.is_active = 1 OR lm.is_active IS NULL)
+    `);
+
+    // Last sync time
+    const [[syncInfo]] = await pool.query(`SELECT MAX(last_synced_at) as last_sync FROM zoho_location_stock`);
+
+    return {
+        data: rows,
+        pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+        stats: { total_items: parseInt(stats.total_items) || 0, low_stock: parseInt(stats.low_stock) || 0, out_of_stock: parseInt(stats.out_of_stock) || 0 },
+        last_sync: syncInfo.last_sync || null
+    };
 }
 
 // ========================================
