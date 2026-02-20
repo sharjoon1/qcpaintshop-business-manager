@@ -41,7 +41,7 @@ async function migrate() {
             KEY idx_cr_customer (zoho_customer_id),
             KEY idx_cr_invoice (zoho_invoice_id),
             FOREIGN KEY (sent_by) REFERENCES users(id) ON DELETE SET NULL
-        )
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
     console.log('   ✓ collection_reminders created');
 
@@ -66,7 +66,7 @@ async function migrate() {
             KEY idx_pp_customer (zoho_customer_id),
             KEY idx_pp_status (status),
             FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-        )
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
     console.log('   ✓ payment_promises created');
 
