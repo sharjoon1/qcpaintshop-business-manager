@@ -88,13 +88,12 @@ router.post('/transfer', requirePermission('zoho', 'manage'), async (req, res) =
         const zohoAPI = require('../services/zoho-api');
 
         const transferData = {
-            from_location_id: from_location_id,
-            to_location_id: to_location_id,
-            transfer_order_number: `MIGRATION-${(branch_name || 'BRANCH').replace(/[^A-Za-z0-9]/g, '')}-${Date.now()}`,
+            from_warehouse_id: from_location_id,
+            to_warehouse_id: to_location_id,
             date: new Date().toISOString().split('T')[0],
             line_items: transferItems.map(item => ({
                 item_id: item.item_id,
-                quantity_transfer: parseFloat(item.stock || item.quantity)
+                quantity_to_transfer: parseFloat(item.stock || item.quantity)
             }))
         };
 
@@ -108,7 +107,7 @@ router.post('/transfer', requirePermission('zoho', 'manage'), async (req, res) =
             success: true,
             message: `Transfer order created for ${branch_name || 'branch'}`,
             transfer_order_id: result.transfer_order?.transfer_order_id,
-            transfer_order_number: result.transfer_order?.transfer_order_number || transferData.transfer_order_number,
+            transfer_order_number: result.transfer_order?.transfer_order_number,
             items_transferred: transferItems.length
         });
     } catch (error) {
@@ -148,13 +147,12 @@ router.post('/transfer-all', requirePermission('zoho', 'manage'), async (req, re
 
             try {
                 const transferData = {
-                    from_location_id: branch.warehouse_location_id,
-                    to_location_id: branch.business_location_id,
-                    transfer_order_number: `MIGRATION-${(branch.branch_name || 'BRANCH').replace(/[^A-Za-z0-9]/g, '')}-${Date.now()}`,
+                    from_warehouse_id: branch.warehouse_location_id,
+                    to_warehouse_id: branch.business_location_id,
                     date: new Date().toISOString().split('T')[0],
                     line_items: transferItems.map(item => ({
                         item_id: item.item_id,
-                        quantity_transfer: parseFloat(item.stock || item.quantity)
+                        quantity_to_transfer: parseFloat(item.stock || item.quantity)
                     }))
                 };
 
