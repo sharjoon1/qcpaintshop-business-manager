@@ -108,7 +108,7 @@ router.get('/customers', perm, async (req, res) => {
         const params = [];
 
         if (search) {
-            where += ' AND (zcm.zoho_contact_name LIKE ? OR zcm.phone LIKE ?)';
+            where += ' AND (zcm.zoho_contact_name LIKE ? OR zcm.zoho_phone LIKE ?)';
             params.push(`%${search}%`, `%${search}%`);
         }
 
@@ -117,7 +117,7 @@ router.get('/customers', perm, async (req, res) => {
             SELECT
                 zi.zoho_customer_id,
                 zcm.zoho_contact_name as customer_name,
-                zcm.phone,
+                zcm.zoho_phone as phone,
                 COUNT(*) as invoice_count,
                 SUM(zi.balance) as total_outstanding,
                 SUM(zi.total) as total_invoiced,
@@ -130,7 +130,7 @@ router.get('/customers', perm, async (req, res) => {
             FROM zoho_invoices zi
             LEFT JOIN zoho_customers_map zcm ON zi.zoho_customer_id = zcm.zoho_contact_id
             ${where}
-            GROUP BY zi.zoho_customer_id, zcm.zoho_contact_name, zcm.phone
+            GROUP BY zi.zoho_customer_id, zcm.zoho_contact_name, zcm.zoho_phone
             ORDER BY ${getSortColumn(sort, 'total_outstanding')} ${order === 'asc' ? 'ASC' : 'DESC'}
             LIMIT ? OFFSET ?
         `, [...params, parseInt(limit), offset]);
@@ -202,7 +202,7 @@ router.get('/invoices', perm, async (req, res) => {
                 zi.invoice_number,
                 zi.zoho_customer_id,
                 zcm.zoho_contact_name as customer_name,
-                zcm.phone,
+                zcm.zoho_phone as phone,
                 zi.total,
                 zi.balance,
                 zi.invoice_date,
@@ -547,7 +547,7 @@ router.get('/export', perm, async (req, res) => {
             SELECT
                 zi.invoice_number as "Invoice #",
                 zcm.zoho_contact_name as "Customer",
-                zcm.phone as "Phone",
+                zcm.zoho_phone as "Phone",
                 zi.invoice_date as "Invoice Date",
                 zi.due_date as "Due Date",
                 zi.total as "Total",
