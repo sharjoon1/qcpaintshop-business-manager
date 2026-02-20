@@ -95,7 +95,8 @@ async function ensureZohoPermissions(dbPool) {
         ['zoho', 'stock',       'Manage Stock',               'View stock levels and create stock adjustments'],
         ['zoho', 'locations',   'Manage Locations',           'View and manage warehouse/location mappings'],
         ['zoho', 'reorder',     'Manage Reorder Alerts',      'Configure reorder levels, view and action alerts'],
-        ['zoho', 'bulk_update', 'Bulk Operations',            'Execute bulk item updates and price changes']
+        ['zoho', 'bulk_update', 'Bulk Operations',            'Execute bulk item updates and price changes'],
+        ['zoho', 'collections', 'Manage Collections',        'View and manage outstanding invoice collections and payment tracking']
     ];
 
     for (const [module, action, displayName, desc] of zohoPermissions) {

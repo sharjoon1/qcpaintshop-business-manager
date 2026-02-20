@@ -718,7 +718,41 @@ One-time migration tool to transfer all stock from Warehouse locations to Busine
 
 ---
 
-### 2.21 Dashboard & Reports
+### 2.21 Collections & Payment Tracking
+
+Centralized tool for managing outstanding invoices, sending payment reminders (WhatsApp, call, visit, email), and tracking promise-to-pay commitments.
+
+**5-Tab Page** (`admin-zoho-collections.html`, data-page: `zoho-collections`):
+1. **Summary** — KPI cards: Total Outstanding, Overdue Amount, Collection Rate (30d), Avg Days Overdue + mini-stats (reminders today, pending/broken promises)
+2. **Customers** — Customer-grouped outstanding with search, sort, actions (View Invoices, Send Reminder, Add Promise)
+3. **Invoices** — Filterable table with bulk select for mass WhatsApp reminders, CSV export
+4. **Reminders** — Timeline of all sent reminders (WhatsApp/call/visit/email), filter by type/date, "Log Call/Visit" button
+5. **Promises** — Promise-to-pay tracking with status badges, auto-detect broken promises (past due + pending), quick status actions
+
+**WhatsApp Integration**: Dual-write to `whatsapp_followups` (operational queue) + `collection_reminders` (audit log). Two message templates: payment_reminder and overdue_notice.
+
+**API Endpoints** (`routes/collections.js`, 10 endpoints):
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/zoho/collections/summary` | Dashboard KPI stats |
+| GET | `/api/zoho/collections/customers` | Customer-wise outstanding (search, sort, paginate) |
+| GET | `/api/zoho/collections/invoices` | Filterable invoice list |
+| POST | `/api/zoho/collections/remind` | Send WhatsApp reminders (individual/bulk) |
+| POST | `/api/zoho/collections/remind/log` | Log non-WhatsApp reminder (call/visit/email) |
+| GET | `/api/zoho/collections/reminders` | Reminder history |
+| GET | `/api/zoho/collections/promises` | List promises |
+| POST | `/api/zoho/collections/promises` | Create promise-to-pay |
+| PUT | `/api/zoho/collections/promises/:id` | Update promise status |
+| GET | `/api/zoho/collections/export` | CSV export |
+
+**Tables**: `collection_reminders`, `payment_promises`
+**Migration**: `migrations/migrate-collections.js`
+**Permission**: `zoho.collections`
+**Navigation**: Zoho subnav "Collections" tab (after Transactions)
+
+---
+
+### 2.22 Dashboard & Reports
 
 **Admin Dashboard**
 - Total users, customers, products, estimates
@@ -823,6 +857,7 @@ One-time migration tool to transfer all stock from Warehouse locations to Busine
 **Design**: `color_design_requests`, `design_visualizations`
 **Website**: `website_services`, `website_features`, `website_testimonials`, `website_gallery`
 **Stock Check**: `stock_check_assignments`, `stock_check_items`
+**Collections**: `collection_reminders`, `payment_promises`
 
 ### 4.3 File Upload System
 
@@ -956,6 +991,7 @@ One-time migration tool to transfer all stock from Warehouse locations to Busine
 | Zoho Purchases | `admin-zoho-purchase-suggestions.html` | Purchase planning |
 | Zoho Bulk Jobs | `admin-zoho-bulk-jobs.html` | Bulk operation status |
 | Zoho Stock Migration | `admin-stock-migration.html` | Bulk warehouse→business stock transfer (temporary migration tool) |
+| Zoho Collections | `admin-zoho-collections.html` | Outstanding invoice management, payment reminders, promise tracking (5 tabs) |
 
 ### Estimate Pages
 | Page | File | Purpose |
@@ -1043,6 +1079,7 @@ One-time migration tool to transfer all stock from Warehouse locations to Busine
 | Guides | `/api/guides/*` | 11 | `routes/guides.js` |
 | Stock Check | `/api/stock-check/*` | 10 | `routes/stock-check.js` |
 | Stock Migration | `/api/zoho/migration/*` | 4 | `routes/stock-migration.js` |
+| Collections | `/api/zoho/collections/*` | 10 | `routes/collections.js` |
 | Uploads | `/api/upload/*` | 4 | `server.js` |
 | Health | `/health`, `/api/test` | 2 | `server.js` |
 
@@ -1147,6 +1184,18 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-02-20 - Outstanding Invoice Collections System
+- Centralized tool to manage outstanding invoices, send WhatsApp payment reminders, and track collection efforts
+- 5-tab admin page: Summary (KPI dashboard), Customers (grouped outstanding), Invoices (filterable with bulk select), Reminders (timeline), Promises (tracking)
+- WhatsApp reminders: individual & bulk send, dual-write to `whatsapp_followups` + `collection_reminders`
+- Non-WhatsApp reminder logging: call, visit, email with notes
+- Promise-to-pay tracking: create/edit/mark as kept/broken/partial, auto-detect broken (past due + pending)
+- CSV export of outstanding invoices
+- 2 new tables: `collection_reminders`, `payment_promises`; Migration: `migrate-collections.js`
+- Route: `routes/collections.js` (10 endpoints), permission: `zoho.collections`
+- Page: `admin-zoho-collections.html`, Zoho subnav tab: "Collections"
+- Customer search with debounced typeahead for log and promise modals
 
 ### 2026-02-20 - Warehouse Location Filtering (Post-Migration)
 - All Zoho queries now filter by `is_active = 1` to exclude disabled warehouse locations

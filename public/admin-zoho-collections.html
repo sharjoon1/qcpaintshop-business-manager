@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Collections - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* Tabs */
+        .cc-tab { padding: 8px 18px; border-radius: 8px 8px 0 0; font-size: 0.8125rem; font-weight: 500; color: #64748b; cursor: pointer; border: 1px solid transparent; border-bottom: none; transition: all 0.2s; background: none; }
+        .cc-tab:hover { background: #f1f5f9; color: #334155; }
+        .cc-tab.active { background: white; color: #667eea; font-weight: 600; border-color: #e2e8f0; box-shadow: 0 -2px 4px rgba(0,0,0,0.03); }
+
+        /* Table */
+        .cc-table { font-size: 0.8125rem; width: 100%; border-collapse: collapse; }
+        .cc-table thead th { background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 8px 10px; font-weight: 600; color: #475569; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 5; }
+        .cc-table tbody td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .cc-table tbody tr:hover { background: #f0f4ff; }
+
+        /* Status badges */
+        .status-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; text-transform: capitalize; }
+        .status-overdue { background: #fee2e2; color: #991b1b; }
+        .status-sent { background: #dbeafe; color: #1e40af; }
+        .status-partially_paid { background: #fef3c7; color: #92400e; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-kept { background: #d1fae5; color: #065f46; }
+        .status-broken { background: #fee2e2; color: #991b1b; }
+        .status-partial { background: #e0e7ff; color: #3730a3; }
+        .status-whatsapp { background: #d1fae5; color: #065f46; }
+        .status-call { background: #dbeafe; color: #1e40af; }
+        .status-visit { background: #ede9fe; color: #5b21b6; }
+        .status-email { background: #fce7f3; color: #9d174d; }
+
+        /* Overdue coloring */
+        .overdue-mild { color: #d97706; font-weight: 600; }
+        .overdue-bad { color: #ea580c; font-weight: 600; }
+        .overdue-severe { color: #dc2626; font-weight: 700; }
+
+        /* Stat cards */
+        .stat-card { background: white; border-radius: 10px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .stat-card .label { font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .stat-card .value { font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 2px; }
+        .stat-card .sub { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
+
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.4); z-index: 9997; }
+        .modal-overlay.show { display: flex; align-items: center; justify-content: center; }
+        .modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 520px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+
+        /* Checkbox */
+        .row-check { width: 16px; height: 16px; cursor: pointer; accent-color: #667eea; }
+
+        /* Pagination */
+        .pag-btn { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; border: 1px solid #e2e8f0; background: white; cursor: pointer; color: #475569; }
+        .pag-btn:hover:not(:disabled) { background: #f1f5f9; }
+        .pag-btn:disabled { opacity: 0.5; cursor: default; }
+        .pag-btn.active { background: #667eea; color: white; border-color: #667eea; }
+
+        @media (max-width: 767px) {
+            .cc-table { font-size: 0.75rem; }
+            .cc-table thead th, .cc-table tbody td { padding: 5px 6px; }
+            .stat-card .value { font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body data-page="zoho-collections" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
+
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+            <div>
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800">Collections</h2>
+                <p class="text-gray-500 mt-0.5 text-xs">Manage outstanding invoices, send payment reminders, and track collection efforts.</p>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 border-b border-gray-200 mb-4 overflow-x-auto">
+            <button class="cc-tab active" onclick="switchTab('summary')">Summary</button>
+            <button class="cc-tab" onclick="switchTab('customers')">Customers</button>
+            <button class="cc-tab" onclick="switchTab('invoices')">Invoices</button>
+            <button class="cc-tab" onclick="switchTab('reminders')">Reminders</button>
+            <button class="cc-tab" onclick="switchTab('promises')">Promises</button>
+        </div>
+
+        <!-- ==================== SUMMARY TAB ==================== -->
+        <div id="tab-summary">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <div class="stat-card">
+                    <div class="label">Total Outstanding</div>
+                    <div class="value" id="statOutstanding">--</div>
+                    <div class="sub"><span id="statOutstandingCount">0</span> invoices</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Overdue Amount</div>
+                    <div class="value text-red-600" id="statOverdue">--</div>
+                    <div class="sub"><span id="statOverdueCount">0</span> invoices overdue</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Collection Rate (30d)</div>
+                    <div class="value text-green-600" id="statCollectionRate">--</div>
+                    <div class="sub"><span id="statCollected30d">--</span> collected</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Avg Days Overdue</div>
+                    <div class="value text-orange-600" id="statAvgDays">--</div>
+                    <div class="sub">across overdue invoices</div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                <div class="stat-card">
+                    <div class="label">Reminders Today</div>
+                    <div class="value" id="statRemindersToday">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Pending Promises</div>
+                    <div class="value" id="statPendingPromises">--</div>
+                    <div class="sub" id="statPendingPromisesAmt">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Broken Promises</div>
+                    <div class="value text-red-600" id="statBrokenPromises">--</div>
+                    <div class="sub">past due, unfulfilled</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== CUSTOMERS TAB ==================== -->
+        <div id="tab-customers" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <!-- Search & Sort -->
+                <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                    <input type="text" id="custSearch" placeholder="Search customer or phone..." class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onkeydown="if(event.key==='Enter')loadCustomers()">
+                    <select id="custSort" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadCustomers()">
+                        <option value="total_outstanding">Sort: Outstanding (High)</option>
+                        <option value="overdue_amount">Sort: Overdue Amount</option>
+                        <option value="customer_name">Sort: Name</option>
+                        <option value="invoice_count">Sort: Invoice Count</option>
+                        <option value="oldest_due_date">Sort: Oldest Due</option>
+                    </select>
+                    <button onclick="loadCustomers()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600">Search</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th>Outstanding</th>
+                                <th>Overdue</th>
+                                <th>Invoices</th>
+                                <th>Oldest Due</th>
+                                <th>Last Reminder</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="custBody"></tbody>
+                    </table>
+                </div>
+                <div id="custPagination" class="flex items-center justify-between mt-3 text-xs text-gray-500"></div>
+            </div>
+        </div>
+
+        <!-- ==================== INVOICES TAB ==================== -->
+        <div id="tab-invoices" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <!-- Filters -->
+                <div class="flex flex-col sm:flex-row gap-2 mb-3 flex-wrap">
+                    <input type="text" id="invSearch" placeholder="Search invoice # or customer..." class="flex-1 min-w-[180px] px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onkeydown="if(event.key==='Enter')loadInvoices()">
+                    <select id="invStatus" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadInvoices()">
+                        <option value="">All Statuses</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="not_overdue">Not Overdue</option>
+                        <option value="sent">Sent</option>
+                        <option value="partially_paid">Partially Paid</option>
+                    </select>
+                    <select id="invSort" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadInvoices()">
+                        <option value="balance">Sort: Balance (High)</option>
+                        <option value="days_overdue">Sort: Days Overdue</option>
+                        <option value="due_date">Sort: Due Date</option>
+                        <option value="customer_name">Sort: Customer</option>
+                    </select>
+                    <button onclick="loadInvoices()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600">Search</button>
+                </div>
+                <!-- Bulk actions -->
+                <div id="bulkBar" class="hidden flex items-center gap-2 mb-3 p-2 bg-indigo-50 rounded-lg text-sm">
+                    <span id="bulkCount" class="font-semibold text-indigo-700">0 selected</span>
+                    <button onclick="bulkRemind()" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700">Send Reminders</button>
+                    <button onclick="clearSelection()" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-300">Clear</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" class="row-check" onchange="toggleAllInvoices(this.checked)"></th>
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Total</th>
+                                <th>Balance</th>
+                                <th>Due Date</th>
+                                <th>Days Overdue</th>
+                                <th>Status</th>
+                                <th>Reminders</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invBody"></tbody>
+                    </table>
+                </div>
+                <div class="flex items-center justify-between mt-3 text-xs text-gray-500">
+                    <div id="invPagination"></div>
+                    <button onclick="exportCSV()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-xs hover:bg-gray-50">Export CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== REMINDERS TAB ==================== -->
+        <div id="tab-reminders" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex flex-col sm:flex-row gap-2 mb-3 flex-wrap">
+                    <select id="remType" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadReminders()">
+                        <option value="">All Types</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="call">Call</option>
+                        <option value="visit">Visit</option>
+                        <option value="email">Email</option>
+                    </select>
+                    <input type="date" id="remFrom" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadReminders()">
+                    <input type="date" id="remTo" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadReminders()">
+                    <button onclick="showLogReminderModal()" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 ml-auto">Log Call/Visit</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Invoice</th>
+                                <th>Type</th>
+                                <th>Message / Notes</th>
+                                <th>Status</th>
+                                <th>Sent By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="remBody"></tbody>
+                    </table>
+                </div>
+                <div id="remPagination" class="flex items-center justify-between mt-3 text-xs text-gray-500"></div>
+            </div>
+        </div>
+
+        <!-- ==================== PROMISES TAB ==================== -->
+        <div id="tab-promises" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex flex-col sm:flex-row gap-2 mb-3 flex-wrap">
+                    <select id="promStatus" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadPromises()">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="kept">Kept</option>
+                        <option value="broken">Broken</option>
+                        <option value="partial">Partial</option>
+                        <option value="broken_auto">Auto-Broken (Past Due)</option>
+                    </select>
+                    <input type="date" id="promFrom" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadPromises()">
+                    <input type="date" id="promTo" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadPromises()">
+                    <button onclick="showPromiseModal()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600 ml-auto">Add Promise</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Invoice</th>
+                                <th>Promise Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Actual</th>
+                                <th>Follow-up</th>
+                                <th>Notes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="promBody"></tbody>
+                    </table>
+                </div>
+                <div id="promPagination" class="flex items-center justify-between mt-3 text-xs text-gray-500"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== REMINDER PREVIEW MODAL ==================== -->
+    <div id="reminderModal" class="modal-overlay" onclick="if(event.target===this)closeReminderModal()">
+        <div class="modal-box">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">Send Payment Reminder</h3>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Customer</label>
+                <div id="rmCustomerName" class="text-sm font-medium text-gray-800">--</div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Phone</label>
+                <div id="rmPhone" class="text-sm text-gray-700">--</div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Invoice</label>
+                <div id="rmInvoice" class="text-sm text-gray-700">--</div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Message (editable)</label>
+                <textarea id="rmMessage" rows="5" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
+            </div>
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeReminderModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+                <button onclick="sendReminder()" id="rmSendBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 font-semibold">Send via WhatsApp</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== LOG REMINDER MODAL ==================== -->
+    <div id="logReminderModal" class="modal-overlay" onclick="if(event.target===this)closeLogModal()">
+        <div class="modal-box">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">Log Call / Visit / Email</h3>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Customer *</label>
+                <input type="text" id="lrSearch" placeholder="Search customer..." class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" oninput="searchCustomersForLog()">
+                <div id="lrResults" class="border border-gray-200 rounded-lg mt-1 max-h-32 overflow-y-auto text-sm" style="display:none"></div>
+                <input type="hidden" id="lrCustomerId">
+                <input type="hidden" id="lrCustomerName">
+                <input type="hidden" id="lrPhone">
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Type *</label>
+                <select id="lrType" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                    <option value="call">Phone Call</option>
+                    <option value="visit">In-person Visit</option>
+                    <option value="email">Email</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Notes</label>
+                <textarea id="lrNotes" rows="3" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="What was discussed..."></textarea>
+            </div>
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeLogModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+                <button onclick="submitLogReminder()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-semibold">Log Reminder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PROMISE MODAL ==================== -->
+    <div id="promiseModal" class="modal-overlay" onclick="if(event.target===this)closePromiseModal()">
+        <div class="modal-box">
+            <h3 class="text-lg font-bold text-gray-800 mb-3" id="pmTitle">Add Promise to Pay</h3>
+            <input type="hidden" id="pmId">
+            <input type="hidden" id="pmMode" value="create">
+            <div class="mb-3" id="pmCustSearchWrap">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Customer *</label>
+                <input type="text" id="pmCustSearch" placeholder="Search customer..." class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" oninput="searchCustomersForPromise()">
+                <div id="pmCustResults" class="border border-gray-200 rounded-lg mt-1 max-h-32 overflow-y-auto text-sm" style="display:none"></div>
+                <input type="hidden" id="pmCustomerId">
+                <input type="hidden" id="pmCustomerName">
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Promise Date *</label>
+                    <input type="date" id="pmDate" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Amount *</label>
+                    <input type="number" id="pmAmount" step="0.01" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="0.00">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Follow-up Date</label>
+                <input type="date" id="pmFollowUp" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Notes</label>
+                <textarea id="pmNotes" rows="2" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Any notes..."></textarea>
+            </div>
+            <!-- Update fields (hidden for create) -->
+            <div id="pmUpdateFields" style="display:none">
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Status</label>
+                    <select id="pmStatus" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                        <option value="pending">Pending</option>
+                        <option value="kept">Kept</option>
+                        <option value="broken">Broken</option>
+                        <option value="partial">Partial</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Actual Payment Date</label>
+                        <input type="date" id="pmActualDate" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Actual Amount</label>
+                        <input type="number" id="pmActualAmount" step="0.01" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2 justify-end">
+                <button onclick="closePromiseModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+                <button onclick="submitPromise()" id="pmSubmitBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 font-semibold">Save Promise</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const API = '/api/zoho/collections';
+    let currentTab = 'summary';
+    let selectedInvoices = [];
+    let invoicesData = [];
+    let custPage = 1, invPage = 1, remPage = 1, promPage = 1;
+
+    // ========================================
+    // HELPERS
+    // ========================================
+
+    function formatCurrency(amount) {
+        const num = parseFloat(amount || 0);
+        if (num >= 10000000) return '\u20B9' + (num / 10000000).toFixed(2) + 'Cr';
+        if (num >= 100000) return '\u20B9' + (num / 100000).toFixed(2) + 'L';
+        if (num >= 1000) return '\u20B9' + (num / 1000).toFixed(1) + 'K';
+        return '\u20B9' + num.toFixed(0);
+    }
+
+    function formatCurrencyFull(amount) {
+        const num = parseFloat(amount || 0);
+        return 'Rs.' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '--';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function formatDateTime(dateStr) {
+        if (!dateStr) return '--';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function overdueClass(days) {
+        if (days <= 0) return '';
+        if (days <= 15) return 'overdue-mild';
+        if (days <= 45) return 'overdue-bad';
+        return 'overdue-severe';
+    }
+
+    function showToast(msg, type = 'success') {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast show ' + (type === 'error' ? 'error' : '');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    async function apiFetch(url, opts = {}) {
+        const headers = getAuthHeaders();
+        if (opts.body && typeof opts.body === 'object') {
+            headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(opts.body);
+        }
+        const resp = await fetch(url, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({ message: 'Request failed' }));
+            throw new Error(err.message || 'Request failed');
+        }
+        return resp;
+    }
+
+    async function apiJson(url, opts = {}) {
+        const resp = await apiFetch(url, opts);
+        return resp.json();
+    }
+
+    function buildPagination(containerId, page, limit, total, loadFn) {
+        const el = document.getElementById(containerId);
+        const totalPages = Math.ceil(total / limit) || 1;
+        const from = ((page - 1) * limit) + 1;
+        const to = Math.min(page * limit, total);
+        let html = `<span>Showing ${from}-${to} of ${total}</span><div class="flex gap-1">`;
+        html += `<button class="pag-btn" onclick="${loadFn}(${page - 1})" ${page <= 1 ? 'disabled' : ''}>&laquo; Prev</button>`;
+        // Show up to 5 page buttons
+        const start = Math.max(1, page - 2);
+        const end = Math.min(totalPages, start + 4);
+        for (let i = start; i <= end; i++) {
+            html += `<button class="pag-btn ${i === page ? 'active' : ''}" onclick="${loadFn}(${i})">${i}</button>`;
+        }
+        html += `<button class="pag-btn" onclick="${loadFn}(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>Next &raquo;</button>`;
+        html += '</div>';
+        el.innerHTML = html;
+    }
+
+    // ========================================
+    // TAB SWITCHING
+    // ========================================
+
+    function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+        document.getElementById('tab-' + tab).style.display = '';
+        document.querySelectorAll('.cc-tab').forEach(el => el.classList.remove('active'));
+        event.target.classList.add('active');
+        localStorage.setItem('cc_tab', tab);
+
+        if (tab === 'summary') loadSummary();
+        else if (tab === 'customers') loadCustomers();
+        else if (tab === 'invoices') loadInvoices();
+        else if (tab === 'reminders') loadReminders();
+        else if (tab === 'promises') loadPromises();
+    }
+
+    // ========================================
+    // SUMMARY
+    // ========================================
+
+    async function loadSummary() {
+        try {
+            const { data } = await apiJson(API + '/summary');
+            document.getElementById('statOutstanding').textContent = formatCurrency(data.total_outstanding);
+            document.getElementById('statOutstandingCount').textContent = data.outstanding_count;
+            document.getElementById('statOverdue').textContent = formatCurrency(data.overdue_amount);
+            document.getElementById('statOverdueCount').textContent = data.overdue_count;
+            document.getElementById('statCollectionRate').textContent = data.collection_rate_30d + '%';
+            document.getElementById('statCollected30d').textContent = formatCurrency(data.collected_30d) + ' collected';
+            document.getElementById('statAvgDays').textContent = data.avg_days_overdue + ' days';
+            document.getElementById('statRemindersToday').textContent = data.reminders_today;
+            document.getElementById('statPendingPromises').textContent = data.pending_promises;
+            document.getElementById('statPendingPromisesAmt').textContent = formatCurrency(data.pending_promises_amount) + ' promised';
+            document.getElementById('statBrokenPromises').textContent = data.broken_promises;
+        } catch (err) {
+            showToast('Failed to load summary: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // CUSTOMERS
+    // ========================================
+
+    async function loadCustomers(page) {
+        custPage = page || 1;
+        const search = document.getElementById('custSearch').value;
+        const sort = document.getElementById('custSort').value;
+        const params = new URLSearchParams({ search, sort, order: 'desc', page: custPage, limit: 25 });
+
+        try {
+            const { data, pagination } = await apiJson(API + '/customers?' + params);
+            const tbody = document.getElementById('custBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-400">No customers with outstanding balance</td></tr>';
+                document.getElementById('custPagination').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = data.map(c => `
+                <tr>
+                    <td class="font-medium">${esc(c.customer_name || 'Unknown')}</td>
+                    <td>${esc(c.phone || '--')}</td>
+                    <td class="font-semibold">${formatCurrencyFull(c.total_outstanding)}</td>
+                    <td><span class="${c.overdue_amount > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}">${formatCurrencyFull(c.overdue_amount)}</span></td>
+                    <td>${c.invoice_count}${c.overdue_count > 0 ? ` <span class="text-red-500 text-xs">(${c.overdue_count} overdue)</span>` : ''}</td>
+                    <td>${formatDate(c.oldest_due_date)}</td>
+                    <td>${c.last_reminder ? formatDateTime(c.last_reminder) : '<span class="text-gray-400">Never</span>'}</td>
+                    <td class="flex gap-1 flex-wrap">
+                        <button onclick="viewCustomerInvoices('${c.zoho_customer_id}')" class="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100" title="View Invoices">Invoices</button>
+                        ${c.phone ? `<button onclick="sendCustomerReminder('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone)}',${c.total_outstanding})" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100" title="Send Reminder">Remind</button>` : ''}
+                        <button onclick="openPromiseForCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}')" class="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100" title="Add Promise">Promise</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            buildPagination('custPagination', pagination.page, pagination.limit, pagination.total, 'loadCustomers');
+        } catch (err) {
+            showToast('Failed to load customers: ' + err.message, 'error');
+        }
+    }
+
+    function viewCustomerInvoices(customerId) {
+        // Switch to invoices tab filtered by customer
+        document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+        document.getElementById('tab-invoices').style.display = '';
+        document.querySelectorAll('.cc-tab').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.cc-tab')[2].classList.add('active');
+        currentTab = 'invoices';
+        window._filterCustomerId = customerId;
+        loadInvoices();
+    }
+
+    // ========================================
+    // INVOICES
+    // ========================================
+
+    async function loadInvoices(page) {
+        invPage = page || 1;
+        const search = document.getElementById('invSearch').value;
+        const status = document.getElementById('invStatus').value;
+        const sort = document.getElementById('invSort').value;
+        const params = new URLSearchParams({ search, status, sort, order: 'desc', page: invPage, limit: 25 });
+
+        if (window._filterCustomerId) {
+            params.set('customer_id', window._filterCustomerId);
+            window._filterCustomerId = null;
+        }
+
+        try {
+            const { data, pagination } = await apiJson(API + '/invoices?' + params);
+            invoicesData = data;
+            selectedInvoices = [];
+            updateBulkBar();
+
+            const tbody = document.getElementById('invBody');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No outstanding invoices found</td></tr>';
+                document.getElementById('invPagination').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = data.map((inv, idx) => `
+                <tr>
+                    <td><input type="checkbox" class="row-check" data-idx="${idx}" onchange="toggleInvoiceSelect(${idx}, this.checked)"></td>
+                    <td class="font-medium">${esc(inv.invoice_number || '--')}</td>
+                    <td>${esc(inv.customer_name || 'Unknown')}</td>
+                    <td>${formatCurrencyFull(inv.total)}</td>
+                    <td class="font-semibold">${formatCurrencyFull(inv.balance)}</td>
+                    <td>${formatDate(inv.due_date)}</td>
+                    <td><span class="${overdueClass(inv.days_overdue)}">${inv.days_overdue > 0 ? inv.days_overdue + 'd' : '--'}</span></td>
+                    <td><span class="status-badge status-${inv.days_overdue > 0 ? 'overdue' : inv.status}">${inv.days_overdue > 0 ? 'Overdue' : inv.status}</span></td>
+                    <td>${inv.reminder_count > 0 ? `<span class="text-xs text-gray-500">${inv.reminder_count}x</span>` : '--'}</td>
+                    <td class="flex gap-1">
+                        ${inv.phone ? `<button onclick="openReminderModal(${idx})" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">Remind</button>` : '<span class="text-xs text-gray-400">No phone</span>'}
+                        <button onclick="openPromiseForInvoice(${idx})" class="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100">Promise</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            buildPagination('invPagination', pagination.page, pagination.limit, pagination.total, 'loadInvoices');
+        } catch (err) {
+            showToast('Failed to load invoices: ' + err.message, 'error');
+        }
+    }
+
+    function toggleInvoiceSelect(idx, checked) {
+        if (checked) {
+            if (!selectedInvoices.includes(idx)) selectedInvoices.push(idx);
+        } else {
+            selectedInvoices = selectedInvoices.filter(i => i !== idx);
+        }
+        updateBulkBar();
+    }
+
+    function toggleAllInvoices(checked) {
+        selectedInvoices = checked ? invoicesData.map((_, i) => i) : [];
+        document.querySelectorAll('#invBody .row-check').forEach(cb => cb.checked = checked);
+        updateBulkBar();
+    }
+
+    function clearSelection() {
+        selectedInvoices = [];
+        document.querySelectorAll('#invBody .row-check').forEach(cb => cb.checked = false);
+        document.querySelector('#tab-invoices thead .row-check').checked = false;
+        updateBulkBar();
+    }
+
+    function updateBulkBar() {
+        const bar = document.getElementById('bulkBar');
+        if (selectedInvoices.length > 0) {
+            bar.classList.remove('hidden');
+            document.getElementById('bulkCount').textContent = selectedInvoices.length + ' selected';
+        } else {
+            bar.classList.add('hidden');
+        }
+    }
+
+    // ========================================
+    // REMINDER MODAL (WhatsApp)
+    // ========================================
+
+    let reminderTarget = null;
+
+    function buildReminderMessage(inv) {
+        const daysOverdue = parseInt(inv.days_overdue) || 0;
+        const balance = formatCurrencyFull(inv.balance);
+        const name = inv.customer_name || 'Customer';
+        const invNum = inv.invoice_number || 'N/A';
+        const dueDate = formatDate(inv.due_date);
+
+        if (daysOverdue > 0) {
+            return `Dear ${name}, your invoice #${invNum} for ${balance} is overdue by ${daysOverdue} days. Kindly settle the payment immediately to avoid any inconvenience. - Quality Colours`;
+        }
+        return `Dear ${name}, this is a reminder about your outstanding invoice #${invNum} for ${balance}. Due date: ${dueDate}. Please make the payment at your earliest convenience. - Quality Colours`;
+    }
+
+    function openReminderModal(idx) {
+        const inv = invoicesData[idx];
+        reminderTarget = inv;
+        document.getElementById('rmCustomerName').textContent = inv.customer_name || 'Unknown';
+        document.getElementById('rmPhone').textContent = inv.phone || '--';
+        document.getElementById('rmInvoice').textContent = `${inv.invoice_number} - ${formatCurrencyFull(inv.balance)}`;
+        document.getElementById('rmMessage').value = buildReminderMessage(inv);
+        document.getElementById('reminderModal').classList.add('show');
+    }
+
+    function closeReminderModal() {
+        document.getElementById('reminderModal').classList.remove('show');
+        reminderTarget = null;
+    }
+
+    async function sendReminder() {
+        if (!reminderTarget) return;
+        const btn = document.getElementById('rmSendBtn');
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+
+        try {
+            const msg = document.getElementById('rmMessage').value.trim();
+            if (!msg) throw new Error('Message cannot be empty');
+
+            await apiJson(API + '/remind', {
+                method: 'POST',
+                body: {
+                    reminders: [{
+                        zoho_invoice_id: reminderTarget.zoho_invoice_id,
+                        zoho_customer_id: reminderTarget.zoho_customer_id,
+                        customer_name: reminderTarget.customer_name,
+                        phone: reminderTarget.phone,
+                        message_body: msg,
+                        balance: reminderTarget.balance
+                    }]
+                }
+            });
+
+            showToast('Reminder sent successfully');
+            closeReminderModal();
+            loadInvoices(invPage);
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Send via WhatsApp';
+        }
+    }
+
+    function sendCustomerReminder(customerId, name, phone, amount) {
+        // Build a generic customer-level reminder
+        reminderTarget = {
+            zoho_invoice_id: '',
+            zoho_customer_id: customerId,
+            customer_name: name,
+            phone: phone,
+            balance: amount,
+            invoice_number: 'multiple',
+            due_date: null,
+            days_overdue: 0
+        };
+        document.getElementById('rmCustomerName').textContent = name;
+        document.getElementById('rmPhone').textContent = phone;
+        document.getElementById('rmInvoice').textContent = `Total outstanding: ${formatCurrencyFull(amount)}`;
+        document.getElementById('rmMessage').value = `Dear ${name}, you have an outstanding balance of ${formatCurrencyFull(amount)} with Quality Colours. Please make the payment at your earliest convenience. - Quality Colours`;
+        document.getElementById('reminderModal').classList.add('show');
+    }
+
+    async function bulkRemind() {
+        const eligible = selectedInvoices.filter(idx => invoicesData[idx].phone);
+        if (eligible.length === 0) {
+            showToast('No selected invoices have phone numbers', 'error');
+            return;
+        }
+
+        if (!confirm(`Send WhatsApp reminders for ${eligible.length} invoices?`)) return;
+
+        try {
+            const reminders = eligible.map(idx => {
+                const inv = invoicesData[idx];
+                return {
+                    zoho_invoice_id: inv.zoho_invoice_id,
+                    zoho_customer_id: inv.zoho_customer_id,
+                    customer_name: inv.customer_name,
+                    phone: inv.phone,
+                    message_body: buildReminderMessage(inv),
+                    balance: inv.balance
+                };
+            });
+
+            const result = await apiJson(API + '/remind', {
+                method: 'POST',
+                body: { reminders }
+            });
+
+            showToast(result.message);
+            clearSelection();
+            loadInvoices(invPage);
+        } catch (err) {
+            showToast('Bulk remind failed: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // LOG REMINDER (Call/Visit)
+    // ========================================
+
+    function showLogReminderModal() {
+        document.getElementById('lrSearch').value = '';
+        document.getElementById('lrCustomerId').value = '';
+        document.getElementById('lrCustomerName').value = '';
+        document.getElementById('lrPhone').value = '';
+        document.getElementById('lrNotes').value = '';
+        document.getElementById('lrResults').style.display = 'none';
+        document.getElementById('logReminderModal').classList.add('show');
+    }
+
+    function closeLogModal() {
+        document.getElementById('logReminderModal').classList.remove('show');
+    }
+
+    let logSearchTimer;
+    async function searchCustomersForLog() {
+        clearTimeout(logSearchTimer);
+        const q = document.getElementById('lrSearch').value.trim();
+        if (q.length < 2) { document.getElementById('lrResults').style.display = 'none'; return; }
+
+        logSearchTimer = setTimeout(async () => {
+            try {
+                const { data } = await apiJson(API + '/customers?search=' + encodeURIComponent(q) + '&limit=10');
+                const div = document.getElementById('lrResults');
+                if (data.length === 0) {
+                    div.innerHTML = '<div class="p-2 text-gray-400">No customers found</div>';
+                } else {
+                    div.innerHTML = data.map(c => `
+                        <div class="p-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100" onclick="selectLogCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone || '')}')">
+                            <div class="font-medium">${esc(c.customer_name)}</div>
+                            <div class="text-xs text-gray-500">${esc(c.phone || 'No phone')} - ${formatCurrencyFull(c.total_outstanding)} outstanding</div>
+                        </div>
+                    `).join('');
+                }
+                div.style.display = '';
+            } catch (err) { /* ignore */ }
+        }, 300);
+    }
+
+    function selectLogCustomer(id, name, phone) {
+        document.getElementById('lrCustomerId').value = id;
+        document.getElementById('lrCustomerName').value = name;
+        document.getElementById('lrPhone').value = phone;
+        document.getElementById('lrSearch').value = name;
+        document.getElementById('lrResults').style.display = 'none';
+    }
+
+    async function submitLogReminder() {
+        const customerId = document.getElementById('lrCustomerId').value;
+        const customerName = document.getElementById('lrCustomerName').value;
+        const phone = document.getElementById('lrPhone').value;
+        const type = document.getElementById('lrType').value;
+        const notes = document.getElementById('lrNotes').value;
+
+        if (!customerId) { showToast('Please select a customer', 'error'); return; }
+
+        try {
+            await apiJson(API + '/remind/log', {
+                method: 'POST',
+                body: {
+                    zoho_customer_id: customerId,
+                    customer_name: customerName,
+                    phone: phone,
+                    reminder_type: type,
+                    notes: notes
+                }
+            });
+            showToast(type + ' logged successfully');
+            closeLogModal();
+            loadReminders(remPage);
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // REMINDERS LIST
+    // ========================================
+
+    async function loadReminders(page) {
+        remPage = page || 1;
+        const type = document.getElementById('remType').value;
+        const from = document.getElementById('remFrom').value;
+        const to = document.getElementById('remTo').value;
+        const params = new URLSearchParams({ page: remPage, limit: 25 });
+        if (type) params.set('type', type);
+        if (from) params.set('from_date', from);
+        if (to) params.set('to_date', to);
+
+        try {
+            const { data, pagination } = await apiJson(API + '/reminders?' + params);
+            const tbody = document.getElementById('remBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">No reminders found</td></tr>';
+                document.getElementById('remPagination').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = data.map(r => `
+                <tr>
+                    <td>${formatDateTime(r.created_at)}</td>
+                    <td class="font-medium">${esc(r.customer_name || 'Unknown')}</td>
+                    <td>${esc(r.zoho_invoice_id ? r.zoho_invoice_id.substring(0, 12) + '...' : '--')}</td>
+                    <td><span class="status-badge status-${r.reminder_type}">${r.reminder_type}</span></td>
+                    <td class="max-w-[200px] truncate" title="${esc(r.message_content || r.notes || '')}">${esc(r.message_content || r.notes || '--')}</td>
+                    <td><span class="status-badge status-${r.status}">${r.status}</span></td>
+                    <td>${esc(r.sent_by_name || '--')}</td>
+                </tr>
+            `).join('');
+
+            buildPagination('remPagination', pagination.page, pagination.limit, pagination.total, 'loadReminders');
+        } catch (err) {
+            showToast('Failed to load reminders: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // PROMISES
+    // ========================================
+
+    async function loadPromises(page) {
+        promPage = page || 1;
+        const status = document.getElementById('promStatus').value;
+        const from = document.getElementById('promFrom').value;
+        const to = document.getElementById('promTo').value;
+        const params = new URLSearchParams({ page: promPage, limit: 25 });
+        if (status) params.set('status', status);
+        if (from) params.set('from_date', from);
+        if (to) params.set('to_date', to);
+
+        try {
+            const { data, pagination } = await apiJson(API + '/promises?' + params);
+            const tbody = document.getElementById('promBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No promises found</td></tr>';
+                document.getElementById('promPagination').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = data.map(p => {
+                const isBroken = p.is_broken == 1;
+                const effectiveStatus = isBroken ? 'broken' : p.status;
+                return `
+                <tr class="${isBroken ? 'bg-red-50' : ''}">
+                    <td class="font-medium">${esc(p.customer_name || 'Unknown')}</td>
+                    <td>${p.zoho_invoice_id ? esc(p.zoho_invoice_id.substring(0, 12)) + '...' : '<span class="text-gray-400">Customer-level</span>'}</td>
+                    <td>${formatDate(p.promise_date)}</td>
+                    <td class="font-semibold">${formatCurrencyFull(p.promise_amount)}</td>
+                    <td><span class="status-badge status-${effectiveStatus}">${isBroken ? 'BROKEN' : p.status}</span></td>
+                    <td>${p.actual_amount ? formatCurrencyFull(p.actual_amount) + (p.actual_payment_date ? ' on ' + formatDate(p.actual_payment_date) : '') : '--'}</td>
+                    <td>${p.follow_up_date ? formatDate(p.follow_up_date) : '--'}</td>
+                    <td class="max-w-[150px] truncate" title="${esc(p.notes || '')}">${esc(p.notes || '--')}</td>
+                    <td class="flex gap-1">
+                        <button onclick="editPromise(${p.id})" class="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100">Edit</button>
+                        ${p.status === 'pending' ? `
+                            <button onclick="quickUpdatePromise(${p.id},'kept')" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">Kept</button>
+                            <button onclick="quickUpdatePromise(${p.id},'broken')" class="px-2 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100">Broken</button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `}).join('');
+
+            buildPagination('promPagination', pagination.page, pagination.limit, pagination.total, 'loadPromises');
+        } catch (err) {
+            showToast('Failed to load promises: ' + err.message, 'error');
+        }
+    }
+
+    function showPromiseModal() {
+        document.getElementById('pmMode').value = 'create';
+        document.getElementById('pmId').value = '';
+        document.getElementById('pmTitle').textContent = 'Add Promise to Pay';
+        document.getElementById('pmCustSearchWrap').style.display = '';
+        document.getElementById('pmCustSearch').value = '';
+        document.getElementById('pmCustomerId').value = '';
+        document.getElementById('pmCustomerName').value = '';
+        document.getElementById('pmDate').value = '';
+        document.getElementById('pmAmount').value = '';
+        document.getElementById('pmFollowUp').value = '';
+        document.getElementById('pmNotes').value = '';
+        document.getElementById('pmUpdateFields').style.display = 'none';
+        document.getElementById('pmSubmitBtn').textContent = 'Save Promise';
+        document.getElementById('pmCustResults').style.display = 'none';
+        document.getElementById('promiseModal').classList.add('show');
+    }
+
+    function closePromiseModal() {
+        document.getElementById('promiseModal').classList.remove('show');
+    }
+
+    function openPromiseForCustomer(customerId, customerName) {
+        showPromiseModal();
+        document.getElementById('pmCustomerId').value = customerId;
+        document.getElementById('pmCustomerName').value = customerName;
+        document.getElementById('pmCustSearch').value = customerName;
+    }
+
+    function openPromiseForInvoice(idx) {
+        const inv = invoicesData[idx];
+        showPromiseModal();
+        document.getElementById('pmCustomerId').value = inv.zoho_customer_id;
+        document.getElementById('pmCustomerName').value = inv.customer_name;
+        document.getElementById('pmCustSearch').value = inv.customer_name;
+        document.getElementById('pmAmount').value = inv.balance;
+    }
+
+    let promSearchTimer;
+    async function searchCustomersForPromise() {
+        clearTimeout(promSearchTimer);
+        const q = document.getElementById('pmCustSearch').value.trim();
+        if (q.length < 2) { document.getElementById('pmCustResults').style.display = 'none'; return; }
+
+        promSearchTimer = setTimeout(async () => {
+            try {
+                const { data } = await apiJson(API + '/customers?search=' + encodeURIComponent(q) + '&limit=10');
+                const div = document.getElementById('pmCustResults');
+                if (data.length === 0) {
+                    div.innerHTML = '<div class="p-2 text-gray-400">No customers found</div>';
+                } else {
+                    div.innerHTML = data.map(c => `
+                        <div class="p-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100" onclick="selectPromiseCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}')">
+                            <div class="font-medium">${esc(c.customer_name)}</div>
+                            <div class="text-xs text-gray-500">${formatCurrencyFull(c.total_outstanding)} outstanding</div>
+                        </div>
+                    `).join('');
+                }
+                div.style.display = '';
+            } catch (err) { /* ignore */ }
+        }, 300);
+    }
+
+    function selectPromiseCustomer(id, name) {
+        document.getElementById('pmCustomerId').value = id;
+        document.getElementById('pmCustomerName').value = name;
+        document.getElementById('pmCustSearch').value = name;
+        document.getElementById('pmCustResults').style.display = 'none';
+    }
+
+    async function submitPromise() {
+        const mode = document.getElementById('pmMode').value;
+        const customerId = document.getElementById('pmCustomerId').value;
+        const customerName = document.getElementById('pmCustomerName').value;
+
+        if (mode === 'create') {
+            if (!customerId) { showToast('Please select a customer', 'error'); return; }
+            const date = document.getElementById('pmDate').value;
+            const amount = document.getElementById('pmAmount').value;
+            if (!date || !amount) { showToast('Date and amount are required', 'error'); return; }
+
+            try {
+                await apiJson(API + '/promises', {
+                    method: 'POST',
+                    body: {
+                        zoho_customer_id: customerId,
+                        customer_name: customerName,
+                        promise_date: date,
+                        promise_amount: parseFloat(amount),
+                        follow_up_date: document.getElementById('pmFollowUp').value || null,
+                        notes: document.getElementById('pmNotes').value || null
+                    }
+                });
+                showToast('Promise recorded');
+                closePromiseModal();
+                loadPromises(promPage);
+            } catch (err) {
+                showToast('Failed: ' + err.message, 'error');
+            }
+        } else {
+            // Update mode
+            const id = document.getElementById('pmId').value;
+            try {
+                await apiJson(API + '/promises/' + id, {
+                    method: 'PUT',
+                    body: {
+                        status: document.getElementById('pmStatus').value,
+                        actual_payment_date: document.getElementById('pmActualDate').value || null,
+                        actual_amount: document.getElementById('pmActualAmount').value ? parseFloat(document.getElementById('pmActualAmount').value) : null,
+                        follow_up_date: document.getElementById('pmFollowUp').value || null,
+                        notes: document.getElementById('pmNotes').value || null
+                    }
+                });
+                showToast('Promise updated');
+                closePromiseModal();
+                loadPromises(promPage);
+            } catch (err) {
+                showToast('Failed: ' + err.message, 'error');
+            }
+        }
+    }
+
+    async function editPromise(id) {
+        // Fetch current data from the table (already loaded)
+        try {
+            const { data } = await apiJson(API + '/promises?limit=100');
+            const p = data.find(x => x.id === id);
+            if (!p) { showToast('Promise not found', 'error'); return; }
+
+            document.getElementById('pmMode').value = 'edit';
+            document.getElementById('pmId').value = id;
+            document.getElementById('pmTitle').textContent = 'Edit Promise';
+            document.getElementById('pmCustSearchWrap').style.display = 'none';
+            document.getElementById('pmCustomerId').value = p.zoho_customer_id;
+            document.getElementById('pmCustomerName').value = p.customer_name;
+            document.getElementById('pmDate').value = p.promise_date ? p.promise_date.substring(0, 10) : '';
+            document.getElementById('pmAmount').value = p.promise_amount;
+            document.getElementById('pmFollowUp').value = p.follow_up_date ? p.follow_up_date.substring(0, 10) : '';
+            document.getElementById('pmNotes').value = p.notes || '';
+            document.getElementById('pmUpdateFields').style.display = '';
+            document.getElementById('pmStatus').value = p.status;
+            document.getElementById('pmActualDate').value = p.actual_payment_date ? p.actual_payment_date.substring(0, 10) : '';
+            document.getElementById('pmActualAmount').value = p.actual_amount || '';
+            document.getElementById('pmSubmitBtn').textContent = 'Update Promise';
+            document.getElementById('promiseModal').classList.add('show');
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        }
+    }
+
+    async function quickUpdatePromise(id, status) {
+        if (!confirm(`Mark this promise as "${status}"?`)) return;
+        try {
+            await apiJson(API + '/promises/' + id, {
+                method: 'PUT',
+                body: { status }
+            });
+            showToast('Promise marked as ' + status);
+            loadPromises(promPage);
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // EXPORT
+    // ========================================
+
+    async function exportCSV() {
+        try {
+            const status = document.getElementById('invStatus').value;
+            const params = new URLSearchParams();
+            if (status === 'overdue') params.set('status', 'overdue');
+
+            const resp = await apiFetch(API + '/export?' + params);
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `collections-${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV exported');
+        } catch (err) {
+            showToast('Export failed: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // ESCAPE HTML
+    // ========================================
+
+    function esc(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+    }
+
+    // ========================================
+    // INIT
+    // ========================================
+
+    (function init() {
+        const saved = localStorage.getItem('cc_tab');
+        if (saved && document.getElementById('tab-' + saved)) {
+            const tabs = document.querySelectorAll('.cc-tab');
+            const tabNames = ['summary', 'customers', 'invoices', 'reminders', 'promises'];
+            const idx = tabNames.indexOf(saved);
+            if (idx >= 0) {
+                document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+                document.getElementById('tab-' + saved).style.display = '';
+                tabs.forEach(t => t.classList.remove('active'));
+                tabs[idx].classList.add('active');
+                currentTab = saved;
+            }
+        }
+        loadSummary();
+        if (currentTab !== 'summary') {
+            if (currentTab === 'customers') loadCustomers();
+            else if (currentTab === 'invoices') loadInvoices();
+            else if (currentTab === 'reminders') loadReminders();
+            else if (currentTab === 'promises') loadPromises();
+        }
+    })();
+</script>
+</body>
+</html>
