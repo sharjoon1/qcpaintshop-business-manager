@@ -667,8 +667,10 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
         // Build Zoho inventory adjustment payload
         const zohoAPI = require('../services/zoho-api');
 
+        // Each line item MUST include location_id — without it Zoho defaults to primary/Main location
         const lineItems = items.map(item => ({
             item_id: item.zoho_item_id,
+            location_id: locationId,
             quantity_adjusted: parseFloat(item.difference)
         }));
 
@@ -679,12 +681,15 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
 
         const adjustmentData = {
             date: checkDate,
-            reason: `Stock check #${assignment.id}`,
-            description: `Physical count on ${checkDate}, assignment #${assignment.id}`,
+            reason: `Stock check #${assignment.id} — ${assignment.branch_name || 'Branch'}`,
+            description: `Physical count on ${checkDate}, assignment #${assignment.id}, branch: ${assignment.branch_name || 'Unknown'}`,
             adjustment_type: 'quantity',
             location_id: locationId,
             line_items: lineItems
         };
+
+        console.log(`[Stock Check] Pushing adjustment for assignment #${assignment.id}, branch: ${assignment.branch_name}, location: ${locationId}, items: ${lineItems.length}`);
+        console.log(`[Stock Check] Line items:`, lineItems.map(li => `${li.item_id}: diff=${li.quantity_adjusted}`).join(', '));
 
         const zohoResult = await zohoAPI.createInventoryAdjustment(adjustmentData);
 

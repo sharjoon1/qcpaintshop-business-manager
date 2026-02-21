@@ -1624,10 +1624,15 @@ router.post('/inventory-adjustments', requirePermission('zoho', 'manage'), async
             reason: reason || '',
             description: description || '',
             line_items: line_items.map(function(li) {
-                return {
+                const item = {
                     item_id: li.item_id,
                     quantity_adjusted: li.quantity_adjusted
                 };
+                // Each line item needs location_id for multi-warehouse — without it Zoho defaults to primary location
+                if (li.location_id || zohoLocationId) {
+                    item.location_id = li.location_id || zohoLocationId;
+                }
+                return item;
             })
         };
 
