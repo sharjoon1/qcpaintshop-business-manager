@@ -731,27 +731,51 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
   - "Start" button links to `stock-check.html`
   - Real-time: Socket.io `notification` event with type `stock_check_assigned` triggers toast + auto-refresh
 
-**Bug Fixes** (Feb 20):
+**Staff Self-Request** (Feb 21):
+- Staff can initiate stock checks themselves via "New Request" tab
+- Product search with last-checked indicators (color-coded: green = recent, amber = old, red = never checked)
+- Staff enters counts + photos + reason, submits directly
+- Creates assignment with `request_type='self_requested'` and `status='submitted'`
+- Admin sees self-requested items in Review tab with "Self-Requested" badge
+
+**Staff Submission History** (Feb 21):
+- "History" tab on staff page showing past submitted/reviewed/adjusted assignments
+- Pagination support, detail view for each past submission
+
+**Admin Enhancements** (Feb 21):
+- Dashboard tab "Items Needing Check" widget: branch selector, shows products not verified in 30+ days via `/products/suggest`
+- Review and History tables show "Self" / "Assigned" request type badges
+- Review panel shows self-requested reason if present
+- Product search endpoint with last-checked timestamps used in Assign tab
+
+**Bug Fixes** (Feb 20-21):
 - Staff dropdown (`/api/branches/:id/staff`) now filters out `role='customer'` users
 - Assign endpoint validates staff role (rejects customer accounts)
 - `my-assignments` date uses local server time instead of UTC (fixes midnight timezone drift)
 - DATE→string conversion uses local getters instead of `toISOString()` (fixes CET→UTC day shift)
+- Added `COLLATE utf8mb4_unicode_ci` to `zoho_locations_map` JOINs in assignments list and review queries (collation mismatch fix)
+- Staff `my-assignments` now sorts recent-first (DESC)
 
-**API Endpoints** (`routes/stock-check.js`, 11 endpoints):
+**Staff Page Tabs**: 3 tabs — Assignments | History | New Request
+
+**API Endpoints** (`routes/stock-check.js`, 14 endpoints):
 - `GET /locations/:branchId` — Zoho locations for a branch (admin)
 - `POST /assign` — Create assignment with selected location + role validation (admin)
 - `GET /assignments` — List with filters (admin)
 - `GET /assignments/:id` — Detail (staff sees own, admin sees any)
 - `DELETE /assignments/:id` — Delete pending (admin)
-- `GET /my-assignments` — Staff's assignments by date (default today); `?pending=1` returns all pending/submitted
+- `GET /my-assignments` — Staff's assignments by date (default today); `?pending=1` returns all pending/submitted; sorted DESC
+- `GET /my-submissions` — Staff's past submitted/reviewed/adjusted assignments with pagination
 - `POST /submit/:id` — Staff submits counts + photos (multipart)
+- `POST /self-request` — Staff self-initiates stock check (creates assignment + items, `request_type='self_requested'`)
 - `GET /review/:id` — Admin review with comparison + location name
 - `POST /adjust/:id` — Push to Zoho as inventory adjustment (uses per-assignment location)
 - `GET /dashboard` — Summary stats per branch
 - `GET /products/suggest` — Items not checked in 30+ days (accepts `zoho_location_id`)
+- `GET /products/search` — Search products from `zoho_location_stock` with `MAX(submitted_at)` as `last_checked`
 
-**Database Tables**: `stock_check_assignments` (includes `zoho_location_id` per assignment), `stock_check_items`
-**Migration**: `migrations/migrate-stock-check.js`
+**Database Tables**: `stock_check_assignments` (includes `zoho_location_id`, `request_type`, `requested_reason` per assignment), `stock_check_items`
+**Migration**: `migrations/migrate-stock-check.js`, `migrations/migrate-stock-check-enhancements.js` (adds `request_type ENUM('admin_assigned','self_requested')` + `requested_reason TEXT`)
 **Permission**: `zoho.stock_check`
 **Notifications**: `stock_check_assigned` (to staff), `stock_check_submitted` (to admins)
 **Photos**: `uploads/stock-check/` (sharp compressed)
@@ -1196,7 +1220,7 @@ Each branch can connect its own WhatsApp number via `whatsapp-web.js`. Messages 
 | Estimate PDF | `/api/estimates/:id/pdf` | 1 | `routes/estimate-pdf.js` |
 | Share | `/api/share/*` | 4 | `routes/share.js` |
 | Guides | `/api/guides/*` | 11 | `routes/guides.js` |
-| Stock Check | `/api/stock-check/*` | 10 | `routes/stock-check.js` |
+| Stock Check | `/api/stock-check/*` | 14 | `routes/stock-check.js` |
 | Stock Migration | `/api/zoho/migration/*` | 4 | `routes/stock-migration.js` |
 | Collections | `/api/zoho/collections/*` | 12 | `routes/collections.js` |
 | WhatsApp Sessions | `/api/zoho/whatsapp-sessions/*` | 6 | `routes/whatsapp-sessions.js` |
@@ -1536,6 +1560,17 @@ node promote-release.js internal production
   - Admin bypass: `is_admin === true` shows all items
   - Empty sections auto-hidden when all child nav items are permission-gated and hidden
   - Always-visible items: My Dashboard, Main Dashboard, My Requests, Guides & Help, My Profile
+
+### 2026-02-21 - Stock Check Enhancements
+- **Collation fix**: Added `COLLATE utf8mb4_unicode_ci` to `zoho_locations_map` JOINs in assignments list and review queries
+- **Sort order**: Staff `my-assignments` now sorts recent-first (DESC)
+- **Staff submission history**: New `GET /my-submissions` endpoint + History tab on staff page (past submitted/reviewed/adjusted, pagination, detail view)
+- **Staff self-request**: New `POST /self-request` endpoint + New Request tab — staff search products, enter counts + photos + reason, submit directly (`request_type='self_requested'`, `status='submitted'`). Admin sees "Self-Requested" badge in Review tab.
+- **Product search with last-checked**: New `GET /products/search` endpoint returns products from `zoho_location_stock` with `MAX(submitted_at)` as `last_checked`. Color-coded badges: green (recent), amber (old), red (never checked). Used in admin Assign tab and staff New Request tab.
+- **Admin dashboard suggestion widget**: "Items Needing Check" section with branch selector, products not verified in 30+ days via `/products/suggest`
+- **Request type badges**: Admin Review and History tables show "Self" / "Assigned" type column; review panel shows self-requested reason
+- **Staff page tabs**: 3 tabs — Assignments | History | New Request
+- Migration: `migrate-stock-check-enhancements.js` (adds `request_type ENUM('admin_assigned','self_requested')` + `requested_reason TEXT` to `stock_check_assignments`)
 
 ### 2026-02-21 - Assignable Role Filtering
 - **Assignment dropdowns now show only assignable roles** (staff, sales_staff, branch_manager)
