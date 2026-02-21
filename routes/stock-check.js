@@ -853,6 +853,48 @@ router.get('/products/search', requireAuth, async (req, res) => {
     }
 });
 
+// ========================================
+// BRANCH INVENTORY (ALL ITEMS + PRICE + LAST CHECKED)
+// ========================================
+
+/** GET /api/stock-check/products/inventory — All items for a branch location */
+router.get('/products/inventory', requirePermission('zoho', 'stock_check'), async (req, res) => {
+    try {
+        const { branch_id, zoho_location_id } = req.query;
+        if (!branch_id) return res.status(400).json({ success: false, message: 'branch_id is required' });
+
+        let locationId = zoho_location_id;
+        if (!locationId) {
+            const [locRows] = await pool.query(
+                'SELECT zoho_location_id FROM zoho_locations_map WHERE local_branch_id = ? AND is_active = 1 LIMIT 1',
+                [branch_id]
+            );
+            locationId = locRows.length ? locRows[0].zoho_location_id : null;
+        }
+        if (!locationId) return res.status(400).json({ success: false, message: 'No active location for branch' });
+
+        const [rows] = await pool.query(
+            `SELECT ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand,
+                    ls.last_synced_at as updated_at,
+                    COALESCE(zim.zoho_rate, 0) as price,
+                    MAX(sci.submitted_at) as last_checked
+             FROM zoho_location_stock ls
+             LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+             LEFT JOIN stock_check_items sci ON ls.zoho_item_id = sci.zoho_item_id COLLATE utf8mb4_unicode_ci
+                 AND sci.submitted_at IS NOT NULL
+             WHERE ls.zoho_location_id = ?
+             GROUP BY ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand, ls.last_synced_at, zim.zoho_rate
+             ORDER BY ls.item_name ASC`,
+            [locationId]
+        );
+
+        res.json({ success: true, data: rows, total: rows.length });
+    } catch (error) {
+        console.error('Products inventory error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load inventory' });
+    }
+});
+
 /** Helper: get user's branch_id from DB */
 async function getBranchId(userId) {
     const [rows] = await pool.query('SELECT branch_id FROM users WHERE id = ?', [userId]);

@@ -73,6 +73,17 @@
         .photo-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; cursor: pointer; border: 1px solid #e2e8f0; }
         .photo-thumb:hover { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.3); }
 
+        /* Sort dropdown */
+        .sort-panel { position: absolute; top: 100%; right: 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 30; min-width: 220px; padding: 4px 0; max-height: 360px; overflow-y: auto; }
+        .sort-option { padding: 7px 12px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #475569; transition: background 0.15s; }
+        .sort-option:hover { background: #f0f4ff; }
+        .sort-option.active { background: #eef2ff; color: #4f46e5; font-weight: 600; }
+        .sort-option input[type="radio"] { accent-color: #4f46e5; margin: 0; }
+
+        /* Inventory table */
+        .inv-row-added { opacity: 0.4; background: #f8fafc !important; }
+        .inv-row-added:hover { background: #f8fafc !important; }
+
         @media (max-width: 767px) {
             .review-panel { width: 100vw; }
         }
@@ -112,7 +123,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1">Location</label>
-                        <select id="assignLocation" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <select id="assignLocation" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadBranchInventory()">
                             <option value="">Select Branch first</option>
                         </select>
                     </div>
@@ -148,6 +159,66 @@
 
                 <!-- Selected products -->
                 <div id="selectedProducts" class="mb-3"></div>
+
+                <!-- Branch Inventory -->
+                <div id="branchInventorySection" style="display:none" class="border-t border-gray-200 pt-3 mt-1 mb-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-xs font-semibold text-gray-600">Branch Inventory</h4>
+                        <span id="invItemCount" class="text-xs text-gray-400"></span>
+                    </div>
+                    <!-- Toolbar -->
+                    <div class="flex flex-wrap gap-2 items-center mb-2">
+                        <input type="text" id="invSearch" placeholder="Filter by name or SKU..."
+                               class="flex-1 min-w-[150px] px-2 py-1.5 border border-gray-300 rounded-lg text-xs"
+                               oninput="filterInventory()">
+                        <div class="relative">
+                            <button onclick="toggleSortDropdown()" id="sortBtn"
+                                    class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 flex items-center gap-1 whitespace-nowrap">
+                                <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+                                <span id="sortLabel">Name (A-Z)</span>
+                            </button>
+                            <div id="sortDropdown" style="display:none" class="sort-panel">
+                                <div class="sort-option active" data-sort="name_asc" onclick="setInvSort('name_asc')"><input type="radio" name="invSort" checked> Name (A-Z)</div>
+                                <div class="sort-option" data-sort="name_desc" onclick="setInvSort('name_desc')"><input type="radio" name="invSort"> Name (Z-A)</div>
+                                <div class="sort-option" data-sort="sku_asc" onclick="setInvSort('sku_asc')"><input type="radio" name="invSort"> SKU (A-Z)</div>
+                                <div class="sort-option" data-sort="sku_desc" onclick="setInvSort('sku_desc')"><input type="radio" name="invSort"> SKU (Z-A)</div>
+                                <div class="sort-option" data-sort="stock_asc" onclick="setInvSort('stock_asc')"><input type="radio" name="invSort"> Stock (Low &rarr; High)</div>
+                                <div class="sort-option" data-sort="stock_desc" onclick="setInvSort('stock_desc')"><input type="radio" name="invSort"> Stock (High &rarr; Low)</div>
+                                <div class="sort-option" data-sort="price_asc" onclick="setInvSort('price_asc')"><input type="radio" name="invSort"> Price (Low &rarr; High)</div>
+                                <div class="sort-option" data-sort="price_desc" onclick="setInvSort('price_desc')"><input type="radio" name="invSort"> Price (High &rarr; Low)</div>
+                                <div class="sort-option" data-sort="updated_desc" onclick="setInvSort('updated_desc')"><input type="radio" name="invSort"> Recently Updated</div>
+                                <div class="sort-option" data-sort="updated_asc" onclick="setInvSort('updated_asc')"><input type="radio" name="invSort"> Oldest Updated</div>
+                                <div class="sort-option" data-sort="checked_desc" onclick="setInvSort('checked_desc')"><input type="radio" name="invSort"> Recently Checked</div>
+                                <div class="sort-option" data-sort="checked_asc" onclick="setInvSort('checked_asc')"><input type="radio" name="invSort"> Never/Oldest Checked</div>
+                            </div>
+                        </div>
+                        <div id="invBulkBar" style="display:none" class="flex items-center gap-2">
+                            <span id="invSelectedCount" class="text-xs font-medium text-indigo-600"></span>
+                            <button onclick="addSelectedFromInventory()" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 transition">Add Selected</button>
+                        </div>
+                    </div>
+                    <!-- Table -->
+                    <div style="overflow-x:auto; max-height:420px; overflow-y:auto;" class="border border-gray-200 rounded-lg">
+                        <table class="sc-table" id="invTable">
+                            <thead>
+                                <tr>
+                                    <th style="width:30px"><input type="checkbox" id="invSelectAll" onchange="toggleInvSelectAll()" class="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600"></th>
+                                    <th>Item Name</th>
+                                    <th>SKU</th>
+                                    <th>Price</th>
+                                    <th>Stock Qty</th>
+                                    <th>Last Checked</th>
+                                    <th style="width:50px"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="invBody">
+                                <tr><td colspan="7" class="text-center py-4 text-gray-400">Select a branch to view inventory</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Pagination -->
+                    <div id="invPaginationBar" class="flex items-center justify-between mt-2 text-xs"></div>
+                </div>
 
                 <!-- Notes -->
                 <div class="mb-3">
@@ -254,6 +325,14 @@ let selectedItems = []; // { zoho_item_id, item_name, sku, stock_on_hand }
 let searchTimeout = null;
 let histPage = 1;
 
+// Branch Inventory state
+let allInventoryItems = [];
+let invSearchTerm = '';
+let invSortKey = 'name_asc';
+let invPage = 1;
+let invChecked = new Set();
+const INV_PER_PAGE = 50;
+
 function headers() { return getAuthHeaders(); }
 
 function showToast(msg, type = 'success') {
@@ -340,6 +419,9 @@ async function loadBranchData() {
     } else {
         locSel.innerHTML = '<option value="">No locations found</option>';
     }
+
+    // Load inventory for the selected branch
+    loadBranchInventory();
 }
 
 function searchProducts() {
@@ -379,7 +461,9 @@ function searchProducts() {
 function addProduct(id, name, sku, qty) {
     if (selectedItems.find(s => s.zoho_item_id === id)) return;
     selectedItems.push({ zoho_item_id: id, item_name: name, sku: sku, stock_on_hand: qty });
+    invChecked.delete(id);
     renderSelectedProducts();
+    if (allInventoryItems.length) renderInventory();
     document.getElementById('productSearch').value = '';
     document.getElementById('productResults').style.display = 'none';
 }
@@ -387,6 +471,7 @@ function addProduct(id, name, sku, qty) {
 function removeProduct(id) {
     selectedItems = selectedItems.filter(s => s.zoho_item_id !== id);
     renderSelectedProducts();
+    if (allInventoryItems.length) renderInventory();
 }
 
 function renderSelectedProducts() {
@@ -457,17 +542,284 @@ async function createAssignment() {
     if (res.success) {
         showToast('Assignment created! (' + res.data.items + ' items)');
         selectedItems = [];
+        invChecked.clear();
         renderSelectedProducts();
+        if (allInventoryItems.length) renderInventory();
         document.getElementById('assignNotes').value = '';
     } else {
         showToast(res.message || 'Failed', 'error');
     }
 }
 
-// Close product search on outside click
+// ========================================
+// BRANCH INVENTORY
+// ========================================
+async function loadBranchInventory() {
+    const branchId = document.getElementById('assignBranch').value;
+    const locationId = document.getElementById('assignLocation').value;
+    const section = document.getElementById('branchInventorySection');
+    const body = document.getElementById('invBody');
+
+    if (!branchId) {
+        section.style.display = 'none';
+        allInventoryItems = [];
+        return;
+    }
+
+    section.style.display = '';
+    body.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-400"><span class="spinner inline-block" style="width:16px;height:16px;border:2px solid #e2e8f0;border-top-color:#667eea;border-radius:50%;"></span> Loading inventory...</td></tr>';
+
+    let url = API + '/products/inventory?branch_id=' + branchId;
+    if (locationId) url += '&zoho_location_id=' + encodeURIComponent(locationId);
+
+    try {
+        const res = await apiFetch(url);
+        if (res.success && res.data) {
+            allInventoryItems = res.data;
+        } else {
+            allInventoryItems = [];
+        }
+    } catch (err) {
+        allInventoryItems = [];
+    }
+
+    invSearchTerm = '';
+    invPage = 1;
+    invChecked.clear();
+    document.getElementById('invSearch').value = '';
+    document.getElementById('invSelectAll').checked = false;
+    updateBulkBar();
+    renderInventory();
+}
+
+function getFilteredSortedInventory() {
+    let items = allInventoryItems;
+
+    // Filter by search term
+    if (invSearchTerm) {
+        const q = invSearchTerm.toLowerCase();
+        items = items.filter(it => (it.item_name || '').toLowerCase().includes(q) || (it.sku || '').toLowerCase().includes(q));
+    }
+
+    // Sort
+    const [field, dir] = invSortKey.split('_');
+    const asc = dir === 'asc' ? 1 : -1;
+
+    items = [...items].sort((a, b) => {
+        let va, vb;
+        switch (field) {
+            case 'name':
+                va = (a.item_name || '').toLowerCase(); vb = (b.item_name || '').toLowerCase();
+                return va < vb ? -asc : va > vb ? asc : 0;
+            case 'sku':
+                va = (a.sku || '').toLowerCase(); vb = (b.sku || '').toLowerCase();
+                return va < vb ? -asc : va > vb ? asc : 0;
+            case 'stock':
+                return ((a.stock_on_hand || 0) - (b.stock_on_hand || 0)) * asc;
+            case 'price':
+                return ((a.price || 0) - (b.price || 0)) * asc;
+            case 'updated':
+                va = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                vb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                return (va - vb) * asc;
+            case 'checked':
+                va = a.last_checked ? new Date(a.last_checked).getTime() : 0;
+                vb = b.last_checked ? new Date(b.last_checked).getTime() : 0;
+                return (va - vb) * asc;
+            default: return 0;
+        }
+    });
+
+    return items;
+}
+
+function renderInventory() {
+    const items = getFilteredSortedInventory();
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total / INV_PER_PAGE));
+    if (invPage > totalPages) invPage = totalPages;
+
+    const start = (invPage - 1) * INV_PER_PAGE;
+    const pageItems = items.slice(start, start + INV_PER_PAGE);
+    const body = document.getElementById('invBody');
+
+    // Update count
+    const filtered = invSearchTerm ? ` (${total} of ${allInventoryItems.length})` : '';
+    document.getElementById('invItemCount').textContent = `${allInventoryItems.length} items${filtered}`;
+
+    if (!pageItems.length) {
+        body.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-400">' +
+            (allInventoryItems.length ? 'No items match your filter' : 'No inventory items found') + '</td></tr>';
+        document.getElementById('invPaginationBar').innerHTML = '';
+        return;
+    }
+
+    body.innerHTML = pageItems.map(it => {
+        const isAdded = selectedItems.some(s => s.zoho_item_id === it.zoho_item_id);
+        const isChecked = invChecked.has(it.zoho_item_id);
+        return `<tr class="${isAdded ? 'inv-row-added' : ''}">
+            <td><input type="checkbox" class="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 inv-chk"
+                 data-id="${it.zoho_item_id}" ${isChecked ? 'checked' : ''} ${isAdded ? 'disabled' : ''}
+                 onchange="toggleInvCheck('${it.zoho_item_id}')"></td>
+            <td class="font-medium">${it.item_name || '-'}</td>
+            <td class="text-xs text-gray-400">${it.sku || '-'}</td>
+            <td class="text-xs">₹${(it.price || 0).toLocaleString('en-IN')}</td>
+            <td>${it.stock_on_hand ?? 0}</td>
+            <td>${daysAgoLabel(it.last_checked)}</td>
+            <td>${isAdded
+                ? '<span class="text-xs text-gray-400 font-medium">Added</span>'
+                : '<button onclick="addFromInventory(\'' + it.zoho_item_id + '\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add</button>'
+            }</td>
+        </tr>`;
+    }).join('');
+
+    renderInvPagination(total, totalPages);
+    updateBulkBar();
+}
+
+function renderInvPagination(total, totalPages) {
+    const bar = document.getElementById('invPaginationBar');
+    if (totalPages <= 1) { bar.innerHTML = `<span class="text-gray-400">${total} items</span><span></span>`; return; }
+
+    const start = (invPage - 1) * INV_PER_PAGE + 1;
+    const end = Math.min(invPage * INV_PER_PAGE, total);
+
+    let pages = '';
+    const maxVisible = 5;
+    let pStart = Math.max(1, invPage - Math.floor(maxVisible / 2));
+    let pEnd = Math.min(totalPages, pStart + maxVisible - 1);
+    if (pEnd - pStart < maxVisible - 1) pStart = Math.max(1, pEnd - maxVisible + 1);
+
+    if (invPage > 1) pages += `<button onclick="setInvPage(${invPage - 1})" class="px-2 py-0.5 rounded border text-gray-500 hover:bg-gray-50">&laquo;</button>`;
+    if (pStart > 1) pages += `<button onclick="setInvPage(1)" class="px-2 py-0.5 rounded border text-gray-500 hover:bg-gray-50">1</button><span class="text-gray-300">…</span>`;
+
+    for (let i = pStart; i <= pEnd; i++) {
+        pages += `<button onclick="setInvPage(${i})" class="px-2 py-0.5 rounded ${i === invPage ? 'bg-indigo-600 text-white' : 'border text-gray-500 hover:bg-gray-50'}">${i}</button>`;
+    }
+
+    if (pEnd < totalPages) pages += `<span class="text-gray-300">…</span><button onclick="setInvPage(${totalPages})" class="px-2 py-0.5 rounded border text-gray-500 hover:bg-gray-50">${totalPages}</button>`;
+    if (invPage < totalPages) pages += `<button onclick="setInvPage(${invPage + 1})" class="px-2 py-0.5 rounded border text-gray-500 hover:bg-gray-50">&raquo;</button>`;
+
+    bar.innerHTML = `<span class="text-gray-400">${start}–${end} of ${total}</span><div class="flex gap-1">${pages}</div>`;
+}
+
+function filterInventory() {
+    invSearchTerm = document.getElementById('invSearch').value.trim();
+    invPage = 1;
+    invChecked.clear();
+    document.getElementById('invSelectAll').checked = false;
+    renderInventory();
+}
+
+function toggleSortDropdown() {
+    const dd = document.getElementById('sortDropdown');
+    dd.style.display = dd.style.display === 'none' ? '' : 'none';
+}
+
+function setInvSort(key) {
+    invSortKey = key;
+    invPage = 1;
+    // Update active state
+    document.querySelectorAll('#sortDropdown .sort-option').forEach(el => {
+        const isActive = el.dataset.sort === key;
+        el.classList.toggle('active', isActive);
+        el.querySelector('input[type="radio"]').checked = isActive;
+    });
+    // Update label
+    const activeEl = document.querySelector('#sortDropdown .sort-option.active');
+    if (activeEl) document.getElementById('sortLabel').textContent = activeEl.textContent.trim();
+    document.getElementById('sortDropdown').style.display = 'none';
+    renderInventory();
+}
+
+function toggleInvCheck(id) {
+    if (invChecked.has(id)) {
+        invChecked.delete(id);
+    } else {
+        // Don't allow checking already-added items
+        if (!selectedItems.some(s => s.zoho_item_id === id)) {
+            invChecked.add(id);
+        }
+    }
+    // Sync selectAll checkbox
+    const visibleCheckable = getFilteredSortedInventory()
+        .slice((invPage - 1) * INV_PER_PAGE, invPage * INV_PER_PAGE)
+        .filter(it => !selectedItems.some(s => s.zoho_item_id === it.zoho_item_id));
+    const allChecked = visibleCheckable.length > 0 && visibleCheckable.every(it => invChecked.has(it.zoho_item_id));
+    document.getElementById('invSelectAll').checked = allChecked;
+    updateBulkBar();
+}
+
+function toggleInvSelectAll() {
+    const checked = document.getElementById('invSelectAll').checked;
+    const items = getFilteredSortedInventory()
+        .slice((invPage - 1) * INV_PER_PAGE, invPage * INV_PER_PAGE);
+
+    items.forEach(it => {
+        if (selectedItems.some(s => s.zoho_item_id === it.zoho_item_id)) return; // skip added
+        if (checked) {
+            invChecked.add(it.zoho_item_id);
+        } else {
+            invChecked.delete(it.zoho_item_id);
+        }
+    });
+
+    // Update visible checkboxes
+    document.querySelectorAll('#invBody .inv-chk').forEach(cb => {
+        if (!cb.disabled) cb.checked = checked;
+    });
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const bar = document.getElementById('invBulkBar');
+    const count = invChecked.size;
+    if (count > 0) {
+        bar.style.display = 'flex';
+        document.getElementById('invSelectedCount').textContent = count + ' selected';
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+function addFromInventory(id) {
+    const item = allInventoryItems.find(it => it.zoho_item_id === id);
+    if (!item) return;
+    addProduct(item.zoho_item_id, (item.item_name || '').replace(/'/g, "\\'"), (item.sku || '').replace(/'/g, "\\'"), item.stock_on_hand || 0);
+}
+
+function addSelectedFromInventory() {
+    const ids = [...invChecked];
+    let added = 0;
+    ids.forEach(id => {
+        const item = allInventoryItems.find(it => it.zoho_item_id === id);
+        if (item && !selectedItems.some(s => s.zoho_item_id === id)) {
+            selectedItems.push({ zoho_item_id: item.zoho_item_id, item_name: item.item_name, sku: item.sku, stock_on_hand: item.stock_on_hand || 0 });
+            added++;
+        }
+    });
+    invChecked.clear();
+    document.getElementById('invSelectAll').checked = false;
+    renderSelectedProducts();
+    renderInventory();
+    if (added) showToast(`Added ${added} items from inventory`);
+}
+
+function setInvPage(p) {
+    invPage = p;
+    document.getElementById('invSelectAll').checked = false;
+    renderInventory();
+    // Scroll inventory table into view
+    document.getElementById('invTable').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Close product search & sort dropdown on outside click
 document.addEventListener('click', (e) => {
     if (!e.target.closest('#productSearch') && !e.target.closest('#productResults')) {
         document.getElementById('productResults').style.display = 'none';
+    }
+    if (!e.target.closest('#sortBtn') && !e.target.closest('#sortDropdown')) {
+        document.getElementById('sortDropdown').style.display = 'none';
     }
 });
 
