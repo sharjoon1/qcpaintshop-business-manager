@@ -557,7 +557,7 @@ router.get('/admin/summary', requirePermission('tasks', 'view'), async (req, res
 
         // Get all staff who should have submitted
         const [allStaff] = await pool.query(
-            "SELECT id, full_name, username, role FROM users WHERE role IN ('staff', 'manager') AND status = 'active'"
+            "SELECT id, full_name, username, role FROM users WHERE role IN ('staff', 'sales_staff', 'branch_manager', 'manager') AND status = 'active'"
         );
 
         const submittedIds = submissions.map(s => s.user_id);

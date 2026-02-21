@@ -667,7 +667,7 @@
         async function loadStaff() {
             try {
                 const token = localStorage.getItem('auth_token');
-                const response = await fetch(`${API_BASE}/api/users?role=staff`, {
+                const response = await fetch(`${API_BASE}/api/users?assignable=1`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await response.json();

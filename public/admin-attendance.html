@@ -822,7 +822,7 @@
 
         async function loadStaffList() {
             try {
-                const res = await fetch('/api/users?role=staff&status=active', { headers: getAuthHeaders() });
+                const res = await fetch('/api/users?assignable=1', { headers: getAuthHeaders() });
                 const data = await res.json();
                 if (data.success !== false) {
                     staffList = Array.isArray(data) ? data : (data.data || []);
