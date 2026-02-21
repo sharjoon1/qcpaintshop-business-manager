@@ -1383,11 +1383,32 @@ router.get('/stock', requirePermission('zoho', 'view'), async (req, res) => {
 });
 
 /**
+ * GET /api/zoho/stock/filter-options - Distinct brands and categories for filter dropdowns
+ */
+router.get('/stock/filter-options', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const [brands] = await pool.query(
+            `SELECT DISTINCT zoho_brand FROM zoho_items_map WHERE zoho_status = 'active' AND zoho_brand IS NOT NULL AND zoho_brand != '' ORDER BY zoho_brand ASC`
+        );
+        const [categories] = await pool.query(
+            `SELECT DISTINCT zoho_category_name FROM zoho_items_map WHERE zoho_status = 'active' AND zoho_category_name IS NOT NULL AND zoho_category_name != '' ORDER BY zoho_category_name ASC`
+        );
+        res.json({
+            success: true,
+            brands: brands.map(r => r.zoho_brand),
+            categories: categories.map(r => r.zoho_category_name)
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
  * GET /api/zoho/stock/by-location - Stock for a specific location (must be before :itemId)
  */
 router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, res) => {
     try {
-        const { location_id, search, page = 1, limit = 50, sort = 'name_asc' } = req.query;
+        const { location_id, search, page = 1, limit = 50, sort = 'name_asc', brands, categories, stock_status } = req.query;
         if (!location_id) {
             return res.status(400).json({ success: false, message: 'location_id required' });
         }
@@ -1399,6 +1420,25 @@ router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, 
             where += ' AND (ls.item_name LIKE ? OR ls.sku LIKE ?)';
             params.push('%' + search + '%', '%' + search + '%');
         }
+        if (brands) {
+            const brandList = brands.split(',').map(b => b.trim()).filter(Boolean);
+            if (brandList.length) {
+                where += ` AND zim.zoho_brand IN (${brandList.map(() => '?').join(',')})`;
+                params.push(...brandList);
+            }
+        }
+        if (categories) {
+            const catList = categories.split(',').map(c => c.trim()).filter(Boolean);
+            if (catList.length) {
+                where += ` AND zim.zoho_category_name IN (${catList.map(() => '?').join(',')})`;
+                params.push(...catList);
+            }
+        }
+        if (stock_status) {
+            if (stock_status === 'out_of_stock') where += ' AND ls.stock_on_hand <= 0';
+            else if (stock_status === 'low_stock') where += ' AND ls.stock_on_hand > 0 AND ls.stock_on_hand <= 5';
+            else if (stock_status === 'in_stock') where += ' AND ls.stock_on_hand > 0';
+        }
 
         // Sort mapping
         const sortMap = {
@@ -1409,7 +1449,11 @@ router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, 
             stock_asc: 'ls.stock_on_hand ASC',
             stock_desc: 'ls.stock_on_hand DESC',
             updated_desc: 'ls.last_synced_at DESC',
-            updated_asc: 'ls.last_synced_at ASC'
+            updated_asc: 'ls.last_synced_at ASC',
+            brand_asc: 'COALESCE(zim.zoho_brand, "zzz") ASC',
+            brand_desc: 'COALESCE(zim.zoho_brand, "") DESC',
+            category_asc: 'COALESCE(zim.zoho_category_name, "zzz") ASC',
+            category_desc: 'COALESCE(zim.zoho_category_name, "") DESC'
         };
         const orderBy = sortMap[sort] || sortMap.name_asc;
 
@@ -1421,7 +1465,8 @@ router.get('/stock/by-location', requirePermission('zoho', 'view'), async (req, 
         const [rows] = await pool.query(`
             SELECT ls.zoho_item_id as item_id, ls.item_name as name, ls.sku,
                    ls.stock_on_hand, ls.available_stock, ls.committed_stock, ls.available_for_sale,
-                   ls.zoho_location_id as location_id, ls.last_synced_at
+                   ls.zoho_location_id as location_id, ls.last_synced_at,
+                   zim.zoho_brand as brand, zim.zoho_category_name as category
             FROM zoho_location_stock ls
             LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id
             ${where}

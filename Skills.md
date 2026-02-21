@@ -746,6 +746,18 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - Dashboard tab "Items Needing Check" widget: branch selector, shows products not verified in 30+ days via `/products/suggest`
 - Review and History tables show "Self" / "Assigned" request type badges
 - Review panel shows self-requested reason if present
+
+**Branch Inventory Table** (Feb 21):
+- On Assign tab, selecting a branch/location loads ALL items into a full-featured inventory table
+- Columns: Checkbox, Item Name, SKU, Price (₹), Stock Qty, Last Checked (color-coded badge), Add button
+- Instant search filtering by name/SKU with result count
+- Sort dropdown (12 options): Name, SKU, Stock, Price, Updated, Checked (each asc/desc) — radio-button style
+- Checkbox multi-select with Select All + bulk "Add Selected" action with selected count
+- Pagination: 50 items/page with page controls, range display (e.g. "1-50 of 234")
+- Already-added items grayed out (opacity 0.4), disabled checkbox, "Added" label instead of "Add" button
+- Items re-enable when removed from Selected Products
+- Clears selection state after assignment creation
+- New endpoint: `GET /products/inventory` — returns all items with price (from `zoho_items_map.zoho_rate`) and last_checked
 - Product search endpoint with last-checked timestamps used in Assign tab
 
 **Bug Fixes** (Feb 20-21):
@@ -758,7 +770,7 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 
 **Staff Page Tabs**: 3 tabs — Assignments | History | New Request
 
-**API Endpoints** (`routes/stock-check.js`, 14 endpoints):
+**API Endpoints** (`routes/stock-check.js`, 15 endpoints):
 - `GET /locations/:branchId` — Zoho locations for a branch (admin)
 - `POST /assign` — Create assignment with selected location + role validation (admin)
 - `GET /assignments` — List with filters (admin)
@@ -773,6 +785,7 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - `GET /dashboard` — Summary stats per branch
 - `GET /products/suggest` — Items not checked in 30+ days (accepts `zoho_location_id`)
 - `GET /products/search` — Search products from `zoho_location_stock` with `MAX(submitted_at)` as `last_checked`
+- `GET /products/inventory` — All items for a branch location with price (`zoho_items_map.zoho_rate`) and last_checked (client-side filter/sort/paginate)
 
 **Database Tables**: `stock_check_assignments` (includes `zoho_location_id`, `request_type`, `requested_reason` per assignment), `stock_check_items`
 **Migration**: `migrations/migrate-stock-check.js`, `migrations/migrate-stock-check-enhancements.js` (adds `request_type ENUM('admin_assigned','self_requested')` + `requested_reason TEXT`)
@@ -1588,6 +1601,18 @@ node promote-release.js internal production
   - `zoho-subnav.html` now hides entire subnav for non-admin users (early return if not admin/manager)
   - Defense in depth: server-side `requirePermission()` middleware was already blocking API calls; this adds client-side page-level redirect
   - Previously: staff could navigate directly to any admin page URL and see the full admin UI (API calls would fail with 403, but the page/subnav still rendered)
+
+### 2026-02-21 - Advanced Stock Filters & Sort
+- **Shared filter system** across 3 stock management pages: `admin-zoho-stock.html`, `admin-zoho-stock-adjust.html`, `admin-stock-check.html`
+- Reusable `StockFilterManager` class (`public/js/stock-filters.js`) + shared styles (`public/css/stock-filters.css`)
+- **Filters**: Brand (multi-select), Category (multi-select), Stock Status (in_stock/low_stock/out_of_stock), Last Checked (stock-check only: never/7d/30d)
+- **Sort options added**: Brand (A-Z/Z-A), Category (A-Z/Z-A) on all 3 pages
+- **Filter UI**: Collapsible panel with toggle button + badge count, searchable multi-select dropdowns, removable chips
+- **Architecture**: Server-side filtering (stock + stock-adjust pages via API params), client-side filtering (stock-check page via JS predicate)
+- **New endpoint**: `GET /api/zoho/stock/filter-options` — returns distinct brands + categories from `zoho_items_map`
+- **Modified endpoints**: `GET /api/zoho/stock` (via `getLocationStockDashboard()`), `GET /api/zoho/stock/by-location`, `GET /api/stock-check/products/inventory`
+- Brand/Category displayed as subtle gray text under item name in all table rows + mobile cards
+- No migration needed — uses existing `zoho_brand` and `zoho_category_name` columns in `zoho_items_map`
 
 ---
 

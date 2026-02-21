@@ -1496,6 +1496,25 @@ async function getLocationStockDashboard(filters = {}) {
     if (filters.low_stock === 'true') {
         where += ' AND ls.stock_on_hand <= COALESCE(rc.reorder_level, 0) AND rc.id IS NOT NULL';
     }
+    if (filters.brands) {
+        const brandList = filters.brands.split(',').map(b => b.trim()).filter(Boolean);
+        if (brandList.length) {
+            where += ` AND zim.zoho_brand IN (${brandList.map(() => '?').join(',')})`;
+            params.push(...brandList);
+        }
+    }
+    if (filters.categories) {
+        const catList = filters.categories.split(',').map(c => c.trim()).filter(Boolean);
+        if (catList.length) {
+            where += ` AND zim.zoho_category_name IN (${catList.map(() => '?').join(',')})`;
+            params.push(...catList);
+        }
+    }
+    if (filters.stock_status) {
+        if (filters.stock_status === 'out_of_stock') where += ' AND ls.stock_on_hand <= 0';
+        else if (filters.stock_status === 'low_stock') where += ' AND ls.stock_on_hand > 0 AND ls.stock_on_hand <= COALESCE(rc.reorder_level, 0) AND rc.id IS NOT NULL';
+        else if (filters.stock_status === 'in_stock') where += ' AND ls.stock_on_hand > 0';
+    }
 
     // Sort mapping
     const sortMap = {
@@ -1505,7 +1524,9 @@ async function getLocationStockDashboard(filters = {}) {
         value_asc: '(ls.stock_on_hand * COALESCE(zim.zoho_purchase_rate, 0)) ASC',
         value_desc: '(ls.stock_on_hand * COALESCE(zim.zoho_purchase_rate, 0)) DESC',
         rate_asc: 'COALESCE(zim.zoho_rate, 0) ASC', rate_desc: 'COALESCE(zim.zoho_rate, 0) DESC',
-        updated_desc: 'ls.last_synced_at DESC', updated_asc: 'ls.last_synced_at ASC'
+        updated_desc: 'ls.last_synced_at DESC', updated_asc: 'ls.last_synced_at ASC',
+        brand_asc: 'COALESCE(zim.zoho_brand, "zzz") ASC', brand_desc: 'COALESCE(zim.zoho_brand, "") DESC',
+        category_asc: 'COALESCE(zim.zoho_category_name, "zzz") ASC', category_desc: 'COALESCE(zim.zoho_category_name, "") DESC'
     };
     const orderBy = sortMap[filters.sort] || sortMap.name_asc;
 
@@ -1519,13 +1540,15 @@ async function getLocationStockDashboard(filters = {}) {
         SELECT COUNT(*) as total FROM zoho_location_stock ls
         LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
         LEFT JOIN zoho_reorder_config rc ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id
+        LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id
         ${where} ${activeFilter}
     `, params);
 
     const [rows] = await pool.query(`
         SELECT ls.*, lm.zoho_location_name, rc.reorder_level,
                zim.zoho_purchase_rate as purchase_rate, zim.zoho_rate as rate,
-               COALESCE(zim.zoho_tax_percentage, 18) as tax_percentage, zim.zoho_tax_name as tax_name
+               COALESCE(zim.zoho_tax_percentage, 18) as tax_percentage, zim.zoho_tax_name as tax_name,
+               zim.zoho_brand as brand, zim.zoho_category_name as category
         FROM zoho_location_stock ls
         LEFT JOIN zoho_locations_map lm ON ls.zoho_location_id = lm.zoho_location_id
         LEFT JOIN zoho_reorder_config rc ON ls.zoho_item_id = rc.zoho_item_id AND ls.zoho_location_id = rc.zoho_location_id

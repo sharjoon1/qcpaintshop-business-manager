@@ -877,13 +877,14 @@ router.get('/products/inventory', requirePermission('zoho', 'stock_check'), asyn
             `SELECT ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand,
                     ls.last_synced_at as updated_at,
                     COALESCE(zim.zoho_rate, 0) as price,
+                    zim.zoho_brand as brand, zim.zoho_category_name as category,
                     MAX(sci.submitted_at) as last_checked
              FROM zoho_location_stock ls
              LEFT JOIN zoho_items_map zim ON ls.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
              LEFT JOIN stock_check_items sci ON ls.zoho_item_id = sci.zoho_item_id COLLATE utf8mb4_unicode_ci
                  AND sci.submitted_at IS NOT NULL
              WHERE ls.zoho_location_id = ?
-             GROUP BY ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand, ls.last_synced_at, zim.zoho_rate
+             GROUP BY ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand, ls.last_synced_at, zim.zoho_rate, zim.zoho_brand, zim.zoho_category_name
              ORDER BY ls.item_name ASC`,
             [locationId]
         );

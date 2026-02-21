@@ -14,8 +14,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
     <link rel="stylesheet" href="/css/zoho-common.css">
+    <link rel="stylesheet" href="/css/stock-filters.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
+    <script src="/js/stock-filters.js"></script>
     <script>requireAdminOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
@@ -196,7 +198,7 @@
 
         <!-- Search & Filter Bar -->
         <div class="bg-white rounded-lg shadow p-4 mb-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
                     <input type="text" id="searchInput" onkeyup="debounceSearch()" placeholder="Item name or SKU..." class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none">
@@ -208,6 +210,10 @@
                         <option value="name_desc">Name (Z-A)</option>
                         <option value="sku_asc">SKU (A-Z)</option>
                         <option value="sku_desc">SKU (Z-A)</option>
+                        <option value="brand_asc">Brand (A-Z)</option>
+                        <option value="brand_desc">Brand (Z-A)</option>
+                        <option value="category_asc">Category (A-Z)</option>
+                        <option value="category_desc">Category (Z-A)</option>
                         <option value="stock_asc">Stock (Low → High)</option>
                         <option value="stock_desc">Stock (High → Low)</option>
                         <option value="value_desc">Value (High → Low)</option>
@@ -223,12 +229,20 @@
                         <span class="text-sm font-medium text-gray-700">Low stock only</span>
                     </label>
                 </div>
+                <div class="flex items-center sm:pt-6">
+                    <button id="filterToggleBtn" onclick="filterMgr.togglePanel()" class="filter-toggle-btn">
+                        <svg style="width:14px;height:14px" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                        Filters <span id="filterBadge" class="filter-badge">0</span>
+                    </button>
+                </div>
                 <div class="flex justify-end">
                     <button onclick="clearFilters()" class="rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition">
                         Clear Filters
                     </button>
                 </div>
             </div>
+            <div id="filterPanel" class="filter-panel"></div>
+            <div id="filterChips" class="filter-chips"></div>
         </div>
 
         <!-- Loading State -->
@@ -305,6 +319,7 @@
         let selectedLocationId = '';
         let expandedItemId = null;
         let currentSort = localStorage.getItem('stockViewSort') || 'name_asc';
+        let filterMgr = null;
 
         // =============================================
         // TOAST NOTIFICATIONS
@@ -462,6 +477,7 @@
             document.querySelectorAll('.location-tab').forEach(tab => tab.classList.remove('active'));
             const allTab = document.querySelector('.location-tab[data-location-id=""]');
             if (allTab) allTab.classList.add('active');
+            if (filterMgr) filterMgr.clearAll();
             currentPage = 1;
             loadStockData();
         }
@@ -481,6 +497,10 @@
             if (selectedLocationId) params.set('location_id', selectedLocationId);
             if (search) params.set('search', search);
             if (lowStock) params.set('low_stock', 'true');
+            if (filterMgr) {
+                const fp = filterMgr.getQueryParams();
+                Object.keys(fp).forEach(k => params.set(k, fp[k]));
+            }
 
             showLoading(true);
 
@@ -668,9 +688,13 @@
                 const stockValue = stockOnHand * purchaseRate;
                 const isExpanded = expandedItemId === id;
 
+                const metaParts = [item.brand, item.category].filter(Boolean);
+                const metaText = metaParts.length ? metaParts.join(' · ') : '';
+
                 let rowHtml = '<tr class="stock-row' + (isExpanded ? ' expanded' : '') + '" data-item-id="' + escapeHtml(String(id)) + '" onclick="toggleItemDetail(\'' + escapeHtml(String(id)) + '\')">' +
                     '<td class="px-4 py-3">' +
                         '<div class="font-semibold text-gray-800">' + escapeHtml(item.name || item.item_name || '--') + '</div>' +
+                        (metaText ? '<div class="item-meta">' + escapeHtml(metaText) + '</div>' : '') +
                     '</td>' +
                     '<td class="px-4 py-3 text-gray-500 text-xs font-mono">' + escapeHtml(item.sku || '--') + '</td>' +
                     '<td class="px-4 py-3 text-right font-medium text-gray-800">' + stockOnHand.toLocaleString() + '</td>' +
@@ -710,10 +734,14 @@
                 const gstPct = parseFloat(item.tax_percentage || 18);
                 const stockValue = stockOnHand * purchaseRate;
 
+                const mobileMetaParts = [item.brand, item.category].filter(Boolean);
+                const mobileMetaText = mobileMetaParts.length ? mobileMetaParts.join(' · ') : '';
+
                 return '<div class="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition" onclick="toggleItemDetailMobile(\'' + escapeHtml(String(id)) + '\')">' +
                     '<div class="flex justify-between items-start mb-2">' +
                         '<div class="flex-1 min-w-0 mr-3">' +
                             '<div class="font-bold text-gray-800 text-sm truncate">' + escapeHtml(item.name || item.item_name || '--') + '</div>' +
+                            (mobileMetaText ? '<div class="item-meta">' + escapeHtml(mobileMetaText) + '</div>' : '') +
                             '<div class="text-xs text-gray-400 font-mono mt-0.5">' + escapeHtml(item.sku || '--') + '</div>' +
                         '</div>' +
                         '<div class="flex items-center gap-1.5 flex-shrink-0">' +
@@ -979,11 +1007,21 @@
         // =============================================
         // INITIALIZATION
         // =============================================
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             // Restore sort preference
             document.getElementById('sortSelect').value = currentSort;
             loadLocations();
             loadStockData();
+            // Init filter manager
+            filterMgr = new StockFilterManager({
+                containerId: 'filterPanel',
+                chipsContainerId: 'filterChips',
+                toggleBtnId: 'filterToggleBtn',
+                badgeId: 'filterBadge',
+                showLastChecked: false,
+                onFilterChange: function() { currentPage = 1; loadStockData(); }
+            });
+            await filterMgr.init();
         });
     </script>
 </body>

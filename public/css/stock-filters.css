@@ -1,0 +1,146 @@
+/* Stock Filters — shared filter panel, chips, multi-select */
+
+/* ── Filter Toggle Button ── */
+.filter-toggle-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 8px;
+    border: 1px solid #d1d5db; background: #f9fafb;
+    font-size: 12px; font-weight: 500; color: #4b5563;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.filter-toggle-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+.filter-toggle-btn.has-filters {
+    background: #eef2ff; border-color: #818cf8; color: #4338ca;
+}
+.filter-badge {
+    display: none; min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 9px; background: #6366f1; color: #fff;
+    font-size: 10px; font-weight: 700; line-height: 18px; text-align: center;
+}
+.filter-toggle-btn.has-filters .filter-badge { display: inline-block; }
+
+/* ── Filter Panel (collapsible) ── */
+.filter-panel {
+    max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height .25s ease, opacity .2s ease, margin .2s ease;
+    margin-top: 0;
+}
+.filter-panel.open {
+    max-height: 300px; opacity: 1; margin-top: 12px;
+}
+.filter-panel-inner {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px; padding: 12px;
+    background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+}
+.filter-group label {
+    display: block; font-size: 11px; font-weight: 600;
+    color: #6b7280; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .3px;
+}
+
+/* ── Multi-Select Dropdown ── */
+.multi-select-wrap { position: relative; }
+.multi-select-trigger {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 6px 10px; border-radius: 8px;
+    border: 1px solid #d1d5db; background: #fff;
+    font-size: 12px; color: #374151; cursor: pointer; transition: border-color .15s;
+    min-height: 34px;
+}
+.multi-select-trigger:hover { border-color: #9ca3af; }
+.multi-select-trigger.active { border-color: #818cf8; box-shadow: 0 0 0 2px rgba(99,102,241,.15); }
+.multi-select-trigger .arrow { font-size: 10px; color: #9ca3af; transition: transform .15s; }
+.multi-select-trigger.active .arrow { transform: rotate(180deg); }
+
+.multi-select-dropdown {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 50;
+    max-height: 240px; overflow: hidden;
+    flex-direction: column;
+}
+.multi-select-dropdown.show { display: flex; }
+
+.multi-select-search {
+    padding: 8px 10px; border: none; border-bottom: 1px solid #e5e7eb;
+    font-size: 12px; outline: none; width: 100%; background: #fafafa;
+    border-radius: 10px 10px 0 0;
+}
+.multi-select-search::placeholder { color: #9ca3af; }
+
+.multi-select-options {
+    overflow-y: auto; max-height: 190px; padding: 4px 0;
+}
+.multi-select-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; cursor: pointer; font-size: 12px; color: #374151;
+    transition: background .1s;
+}
+.multi-select-option:hover { background: #f3f4f6; }
+.multi-select-option input[type="checkbox"] {
+    width: 14px; height: 14px; border-radius: 3px;
+    accent-color: #6366f1; cursor: pointer; flex-shrink: 0;
+}
+.multi-select-option .opt-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.multi-select-empty {
+    padding: 12px; text-align: center; font-size: 11px; color: #9ca3af;
+}
+
+/* Single select (stock status / last checked) */
+.filter-select {
+    width: 100%; padding: 6px 10px; border-radius: 8px;
+    border: 1px solid #d1d5db; background: #fff;
+    font-size: 12px; color: #374151; cursor: pointer; outline: none;
+    min-height: 34px;
+}
+.filter-select:focus { border-color: #818cf8; box-shadow: 0 0 0 2px rgba(99,102,241,.15); }
+
+/* ── Filter Chips ── */
+.filter-chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 8px; min-height: 0;
+    transition: min-height .15s;
+}
+.filter-chips:empty { margin-top: 0; }
+.filter-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px 3px 10px; border-radius: 20px;
+    background: #eef2ff; color: #4338ca;
+    font-size: 11px; font-weight: 500; white-space: nowrap;
+    border: 1px solid #c7d2fe;
+}
+.chip-remove {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: transparent; border: none; cursor: pointer;
+    color: #6366f1; font-size: 13px; line-height: 1;
+    transition: background .1s;
+}
+.chip-remove:hover { background: #c7d2fe; }
+.chip-clear-all {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 3px 10px; border-radius: 20px;
+    background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    transition: background .1s;
+}
+.chip-clear-all:hover { background: #fee2e2; }
+
+/* ── Item meta text (brand/category under name) ── */
+.item-meta {
+    font-size: 11px; color: #9ca3af; margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 260px;
+}
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+    .filter-panel-inner {
+        grid-template-columns: 1fr;
+    }
+    .multi-select-dropdown {
+        position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px;
+        max-height: 50vh; border-radius: 14px;
+    }
+}

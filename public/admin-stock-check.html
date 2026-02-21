@@ -14,8 +14,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
     <link rel="stylesheet" href="/css/zoho-common.css">
+    <link rel="stylesheet" href="/css/stock-filters.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
+    <script src="/js/stock-filters.js"></script>
     <script>requireAdminOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
@@ -182,6 +184,10 @@
                                 <div class="sort-option" data-sort="name_desc" onclick="setInvSort('name_desc')"><input type="radio" name="invSort"> Name (Z-A)</div>
                                 <div class="sort-option" data-sort="sku_asc" onclick="setInvSort('sku_asc')"><input type="radio" name="invSort"> SKU (A-Z)</div>
                                 <div class="sort-option" data-sort="sku_desc" onclick="setInvSort('sku_desc')"><input type="radio" name="invSort"> SKU (Z-A)</div>
+                                <div class="sort-option" data-sort="brand_asc" onclick="setInvSort('brand_asc')"><input type="radio" name="invSort"> Brand (A-Z)</div>
+                                <div class="sort-option" data-sort="brand_desc" onclick="setInvSort('brand_desc')"><input type="radio" name="invSort"> Brand (Z-A)</div>
+                                <div class="sort-option" data-sort="category_asc" onclick="setInvSort('category_asc')"><input type="radio" name="invSort"> Category (A-Z)</div>
+                                <div class="sort-option" data-sort="category_desc" onclick="setInvSort('category_desc')"><input type="radio" name="invSort"> Category (Z-A)</div>
                                 <div class="sort-option" data-sort="stock_asc" onclick="setInvSort('stock_asc')"><input type="radio" name="invSort"> Stock (Low &rarr; High)</div>
                                 <div class="sort-option" data-sort="stock_desc" onclick="setInvSort('stock_desc')"><input type="radio" name="invSort"> Stock (High &rarr; Low)</div>
                                 <div class="sort-option" data-sort="price_asc" onclick="setInvSort('price_asc')"><input type="radio" name="invSort"> Price (Low &rarr; High)</div>
@@ -192,11 +198,17 @@
                                 <div class="sort-option" data-sort="checked_asc" onclick="setInvSort('checked_asc')"><input type="radio" name="invSort"> Never/Oldest Checked</div>
                             </div>
                         </div>
+                        <button id="filterToggleBtn" onclick="invFilterMgr && invFilterMgr.togglePanel()" class="filter-toggle-btn" style="padding:4px 10px;">
+                            <svg style="width:12px;height:12px" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                            Filters <span id="filterBadge" class="filter-badge">0</span>
+                        </button>
                         <div id="invBulkBar" style="display:none" class="flex items-center gap-2">
                             <span id="invSelectedCount" class="text-xs font-medium text-indigo-600"></span>
                             <button onclick="addSelectedFromInventory()" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 transition">Add Selected</button>
                         </div>
                     </div>
+                    <div id="filterPanel" class="filter-panel" style="margin-bottom:8px;"></div>
+                    <div id="filterChips" class="filter-chips" style="margin-bottom:8px;"></div>
                     <!-- Table -->
                     <div style="overflow-x:auto; max-height:420px; overflow-y:auto;" class="border border-gray-200 rounded-lg">
                         <table class="sc-table" id="invTable">
@@ -332,6 +344,7 @@ let invSortKey = 'name_asc';
 let invPage = 1;
 let invChecked = new Set();
 const INV_PER_PAGE = 50;
+let invFilterMgr = null;
 
 function headers() { return getAuthHeaders(); }
 
@@ -386,6 +399,17 @@ async function init() {
         document.getElementById('histBranch').innerHTML = '<option value="">All</option>' + opts;
         document.getElementById('suggestBranch').innerHTML = '<option value="">Select Branch</option>' + opts;
     }
+
+    // Init inventory filter manager (client-side with Last Checked)
+    invFilterMgr = new StockFilterManager({
+        containerId: 'filterPanel',
+        chipsContainerId: 'filterChips',
+        toggleBtnId: 'filterToggleBtn',
+        badgeId: 'filterBadge',
+        showLastChecked: true,
+        onFilterChange: function() { invPage = 1; renderInventory(); }
+    });
+    await invFilterMgr.init();
 }
 init();
 
@@ -601,6 +625,12 @@ function getFilteredSortedInventory() {
         items = items.filter(it => (it.item_name || '').toLowerCase().includes(q) || (it.sku || '').toLowerCase().includes(q));
     }
 
+    // Apply advanced filters (brand, category, stock status, last checked)
+    if (invFilterMgr) {
+        const pred = invFilterMgr.getFilterPredicate();
+        items = items.filter(pred);
+    }
+
     // Sort
     const [field, dir] = invSortKey.split('_');
     const asc = dir === 'asc' ? 1 : -1;
@@ -613,6 +643,12 @@ function getFilteredSortedInventory() {
                 return va < vb ? -asc : va > vb ? asc : 0;
             case 'sku':
                 va = (a.sku || '').toLowerCase(); vb = (b.sku || '').toLowerCase();
+                return va < vb ? -asc : va > vb ? asc : 0;
+            case 'brand':
+                va = (a.brand || 'zzz').toLowerCase(); vb = (b.brand || 'zzz').toLowerCase();
+                return va < vb ? -asc : va > vb ? asc : 0;
+            case 'category':
+                va = (a.category || 'zzz').toLowerCase(); vb = (b.category || 'zzz').toLowerCase();
                 return va < vb ? -asc : va > vb ? asc : 0;
             case 'stock':
                 return ((a.stock_on_hand || 0) - (b.stock_on_hand || 0)) * asc;
@@ -644,7 +680,8 @@ function renderInventory() {
     const body = document.getElementById('invBody');
 
     // Update count
-    const filtered = invSearchTerm ? ` (${total} of ${allInventoryItems.length})` : '';
+    const hasFilters = invSearchTerm || (invFilterMgr && invFilterMgr.getActiveFilterCount() > 0);
+    const filtered = hasFilters ? ` (${total} of ${allInventoryItems.length})` : '';
     document.getElementById('invItemCount').textContent = `${allInventoryItems.length} items${filtered}`;
 
     if (!pageItems.length) {
@@ -657,11 +694,12 @@ function renderInventory() {
     body.innerHTML = pageItems.map(it => {
         const isAdded = selectedItems.some(s => s.zoho_item_id === it.zoho_item_id);
         const isChecked = invChecked.has(it.zoho_item_id);
+        const invMeta = [it.brand, it.category].filter(Boolean).join(' · ');
         return `<tr class="${isAdded ? 'inv-row-added' : ''}">
             <td><input type="checkbox" class="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 inv-chk"
                  data-id="${it.zoho_item_id}" ${isChecked ? 'checked' : ''} ${isAdded ? 'disabled' : ''}
                  onchange="toggleInvCheck('${it.zoho_item_id}')"></td>
-            <td class="font-medium">${it.item_name || '-'}</td>
+            <td class="font-medium">${it.item_name || '-'}${invMeta ? '<div class="item-meta">' + invMeta + '</div>' : ''}</td>
             <td class="text-xs text-gray-400">${it.sku || '-'}</td>
             <td class="text-xs">₹${(it.price || 0).toLocaleString('en-IN')}</td>
             <td>${it.stock_on_hand ?? 0}</td>
