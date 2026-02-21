@@ -23,7 +23,6 @@
             min-height: 100vh;
         }
 
-        /* Page title header (below injected nav header) */
         .page-header {
             padding: 16px;
             display: flex;
@@ -33,6 +32,30 @@
         }
         .page-header h1 { font-size: 1.25rem; font-weight: 700; }
         .page-header .subtitle { font-size: 0.75rem; opacity: 0.85; }
+
+        /* Tabs */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            padding: 0 16px 8px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px 8px;
+            border: none;
+            border-radius: 12px 12px 0 0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            color: #1e293b;
+            background: white;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+        }
 
         .container { max-width: 600px; margin: 0 auto; padding: 0 16px 24px; }
 
@@ -55,7 +78,10 @@
 
         .status-badge { display: inline-block; font-size: 0.65rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; text-transform: capitalize; }
         .status-pending { background: #fef3c7; color: #92400e; }
-        .status-submitted { background: #d1fae5; color: #065f46; }
+        .status-submitted { background: #dbeafe; color: #1e40af; }
+        .status-reviewed { background: #d1fae5; color: #065f46; }
+        .status-adjusted { background: #ede9fe; color: #5b21b6; }
+        .badge-self { background: #fce7f3; color: #9d174d; font-size: 0.6rem; padding: 1px 6px; }
 
         /* Item card */
         .item-card {
@@ -117,7 +143,6 @@
         }
         .notes-input:focus { border-color: #667eea; }
 
-        /* Submit button */
         .submit-btn {
             width: 100%;
             padding: 16px;
@@ -156,9 +181,65 @@
         .toast-success { background: #059669; }
         .toast-error { background: #dc2626; }
         .toast-warning { background: #f59e0b; }
+        .toast-info { background: #3b82f6; }
 
-        /* Hide file inputs */
         .hidden-input { display: none; }
+
+        /* History items */
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .history-item:last-child { border-bottom: none; }
+
+        /* Self-request product search */
+        .search-results {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 0 0 12px 12px;
+            max-height: 240px;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .search-result-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .search-result-item:hover { background: #f0f4ff; }
+        .search-result-item:active { background: #e0e7ff; }
+
+        .last-checked-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 500;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+        .checked-recent { background: #dcfce7; color: #166534; }
+        .checked-old { background: #fef3c7; color: #92400e; }
+        .checked-never { background: #fee2e2; color: #991b1b; }
+
+        .selected-product {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 0.8rem;
+        }
+        .remove-btn { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.2rem; padding: 0 4px; }
+
+        .diff-positive { color: #059669; font-weight: 600; }
+        .diff-negative { color: #dc2626; font-weight: 600; }
+        .diff-zero { color: #64748b; }
     </style>
 </head>
 <body data-page="stock-check">
@@ -172,9 +253,63 @@
         </div>
     </div>
 
-    <div class="container" id="mainContent">
+    <!-- Tabs -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('assignments')">Assignments</button>
+        <button class="tab-btn" onclick="switchTab('history')">History</button>
+        <button class="tab-btn" onclick="switchTab('request')">New Request</button>
+    </div>
+
+    <!-- Assignments Tab -->
+    <div class="container" id="tab-assignments">
         <div class="card" style="text-align:center; padding: 40px;">
             <div style="color:#94a3b8">Loading assignments...</div>
+        </div>
+    </div>
+
+    <!-- History Tab -->
+    <div class="container" id="tab-history" style="display:none">
+        <div class="card" id="historyContent" style="text-align:center; padding: 30px; color:#94a3b8;">
+            Loading history...
+        </div>
+    </div>
+
+    <!-- New Request Tab -->
+    <div class="container" id="tab-request" style="display:none">
+        <div class="card">
+            <h3 style="font-size:0.95rem; font-weight:700; color:#1e293b; margin-bottom:4px;">Self-Request Stock Check</h3>
+            <p style="font-size:0.7rem; color:#94a3b8; margin-bottom:16px;">Report stock counts for items you want to verify. Admin will review.</p>
+
+            <!-- Location selector (if multiple) -->
+            <div id="locationSection" style="display:none; margin-bottom:12px;">
+                <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Location</label>
+                <select id="reqLocation" style="width:100%; padding:10px 12px; border:2px solid #e2e8f0; border-radius:10px; font-size:0.85rem; outline:none;">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+
+            <!-- Product search -->
+            <div style="margin-bottom:12px; position:relative;">
+                <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Search Products</label>
+                <input type="text" id="reqSearch" placeholder="Type product name or SKU..."
+                       style="width:100%; padding:10px 12px; border:2px solid #e2e8f0; border-radius:10px; font-size:0.85rem; outline:none;"
+                       oninput="searchRequestProducts()" autocomplete="off">
+                <div id="reqSearchResults" class="search-results" style="display:none"></div>
+            </div>
+
+            <!-- Selected products -->
+            <div id="reqSelectedProducts" style="margin-bottom:12px;"></div>
+
+            <!-- Reason -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Reason</label>
+                <textarea id="reqReason" rows="2" placeholder="Why are you requesting this stock check?"
+                          style="width:100%; padding:10px 12px; border:2px solid #e2e8f0; border-radius:10px; font-size:0.8rem; outline:none; resize:none;"></textarea>
+            </div>
+
+            <button onclick="submitSelfRequest()" id="reqSubmitBtn" class="submit-btn" disabled>
+                Submit Stock Check
+            </button>
         </div>
     </div>
 
@@ -182,6 +317,10 @@
 const API = '/api/stock-check';
 let assignments = [];
 let photoFiles = {}; // { item_zoho_id: File }
+let reqSelectedItems = []; // for self-request
+let reqPhotoFiles = {}; // for self-request photos
+let searchTimeout = null;
+let userBranchId = null;
 
 function formatCheckDate(dateStr) {
     if (!dateStr) return 'No date';
@@ -194,6 +333,26 @@ function formatCheckDate(dateStr) {
     } catch(e) { return 'No date'; }
 }
 
+function daysAgo(dateStr) {
+    if (!dateStr) return null;
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return null;
+        const diff = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+        return diff;
+    } catch(e) { return null; }
+}
+
+function lastCheckedLabel(dateStr) {
+    const days = daysAgo(dateStr);
+    if (days === null) return '<span class="last-checked-badge checked-never">Never checked</span>';
+    if (days === 0) return '<span class="last-checked-badge checked-recent">Today</span>';
+    if (days === 1) return '<span class="last-checked-badge checked-recent">Yesterday</span>';
+    if (days <= 7) return '<span class="last-checked-badge checked-recent">' + days + 'd ago</span>';
+    if (days <= 30) return '<span class="last-checked-badge checked-old">' + days + 'd ago</span>';
+    return '<span class="last-checked-badge checked-never">' + days + 'd ago</span>';
+}
+
 function headers() { return getAuthHeaders(); }
 
 function showToast(msg, type = 'success') {
@@ -203,8 +362,25 @@ function showToast(msg, type = 'success') {
     setTimeout(() => t.classList.remove('show'), 3000);
 }
 
+// ========================================
+// TAB SWITCHING
+// ========================================
+function switchTab(tab) {
+    ['assignments', 'history', 'request'].forEach(t => {
+        document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+    });
+    document.querySelectorAll('.tab-btn').forEach((el, i) => {
+        el.classList.toggle('active', ['assignments', 'history', 'request'][i] === tab);
+    });
+    if (tab === 'history') loadHistory();
+    if (tab === 'request') initSelfRequest();
+}
+
+// ========================================
+// ASSIGNMENTS TAB
+// ========================================
 async function loadAssignments() {
-    const container = document.getElementById('mainContent');
+    const container = document.getElementById('tab-assignments');
     try {
         const res = await fetch(API + '/my-assignments?pending=1', { headers: headers() });
         const data = await res.json();
@@ -212,7 +388,7 @@ async function loadAssignments() {
         if (!data.success || !data.data || !data.data.length) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <div class="icon">📦</div>
+                    <div class="icon">&#128230;</div>
                     <h3>No Pending Stock Checks</h3>
                     <p>You don't have any stock check assignments right now.</p>
                 </div>`;
@@ -226,7 +402,6 @@ async function loadAssignments() {
             if (a.status === 'submitted') {
                 html += renderSubmitted(a);
             } else {
-                // Fetch full detail with items
                 const detailRes = await fetch(API + '/assignments/' + a.id, { headers: headers() });
                 const detail = await detailRes.json();
                 if (detail.success) {
@@ -249,8 +424,8 @@ function renderSubmitted(a) {
         <div class="card">
             <div class="assignment-header">
                 <div>
-                    <div class="assignment-title">${a.branch_name || 'Stock Check'}</div>
-                    <div class="assignment-meta">${a.item_count} items</div>
+                    <div class="assignment-title">${a.branch_name || 'Stock Check'} ${a.request_type === 'self_requested' ? '<span class="badge-self">Self</span>' : ''}</div>
+                    <div class="assignment-meta">${a.item_count} items &middot; ${formatCheckDate(a.check_date)}</div>
                 </div>
                 <span class="status-badge status-submitted">Submitted</span>
             </div>
@@ -294,7 +469,7 @@ function renderAssignment(a) {
                     <div class="item-input-row">
                         <label>Count:</label>
                         <input type="number" step="0.01" min="0" class="qty-input" id="qty-${a.id}-${item.zoho_item_id}"
-                               placeholder="Enter quantity" oninput="onQtyInput(this, ${a.id}, '${item.zoho_item_id}')">
+                               placeholder="Enter quantity" oninput="onQtyInput(this)">
                     </div>
 
                     <div class="photo-row">
@@ -302,7 +477,7 @@ function renderAssignment(a) {
                                id="file-${a.id}-${item.zoho_item_id}" onchange="onPhotoSelect(this, ${a.id}, '${item.zoho_item_id}')">
                         <button class="photo-btn" id="photobtn-${a.id}-${item.zoho_item_id}"
                                 onclick="document.getElementById('file-${a.id}-${item.zoho_item_id}').click()">
-                            <span>📷</span> <span>Add Photo</span>
+                            <span>&#128247;</span> <span>Add Photo</span>
                         </button>
                         <img id="preview-${a.id}-${item.zoho_item_id}" class="photo-preview" style="display:none">
                     </div>
@@ -318,22 +493,9 @@ function renderAssignment(a) {
     return html;
 }
 
-function onQtyInput(el, assignmentId, itemId) {
-    const card = document.getElementById('item-' + getItemDbId(assignmentId, itemId));
-    if (el.value !== '') {
-        el.classList.add('has-value');
-    } else {
-        el.classList.remove('has-value');
-    }
-}
-
-function getItemDbId(assignmentId, zohoItemId) {
-    const a = assignments.find(x => x.id === assignmentId);
-    if (a && a.items) {
-        const item = a.items.find(i => i.zoho_item_id === zohoItemId);
-        if (item) return item.id;
-    }
-    return '';
+function onQtyInput(el) {
+    if (el.value !== '') el.classList.add('has-value');
+    else el.classList.remove('has-value');
 }
 
 function onPhotoSelect(input, assignmentId, itemId) {
@@ -343,7 +505,6 @@ function onPhotoSelect(input, assignmentId, itemId) {
     const key = `${assignmentId}-${itemId}`;
     photoFiles[key] = file;
 
-    // Show preview
     const preview = document.getElementById(`preview-${assignmentId}-${itemId}`);
     const btn = document.getElementById(`photobtn-${assignmentId}-${itemId}`);
     const reader = new FileReader();
@@ -360,7 +521,6 @@ async function submitCheck(assignmentId) {
     const a = assignments.find(x => x.id === assignmentId);
     if (!a || !a.items) return;
 
-    // Validate all items have counts
     const itemsData = [];
     for (const item of a.items) {
         const qtyInput = document.getElementById(`qty-${assignmentId}-${item.zoho_item_id}`);
@@ -368,7 +528,7 @@ async function submitCheck(assignmentId) {
 
         if (!qtyInput || qtyInput.value === '') {
             showToast('Please enter count for all items', 'warning');
-            qtyInput && qtyInput.focus();
+            if (qtyInput) qtyInput.focus();
             return;
         }
 
@@ -383,7 +543,6 @@ async function submitCheck(assignmentId) {
     btn.disabled = true;
     btn.textContent = 'Submitting...';
 
-    // Build FormData with photos
     const formData = new FormData();
     formData.append('items', JSON.stringify(itemsData));
 
@@ -404,7 +563,6 @@ async function submitCheck(assignmentId) {
 
         if (data.success) {
             showToast('Stock check submitted!');
-            // Replace with submitted banner
             const card = document.getElementById(`assignment-${assignmentId}`);
             if (card) {
                 card.innerHTML = `
@@ -434,18 +592,382 @@ async function submitCheck(assignmentId) {
 }
 
 // ========================================
-// Real-time stock check alerts (Socket.io loaded by universal-nav-loader)
+// HISTORY TAB
+// ========================================
+let historyPage = 1;
+
+async function loadHistory(page) {
+    historyPage = page || 1;
+    const el = document.getElementById('historyContent');
+    el.innerHTML = '<div style="text-align:center; padding:30px; color:#94a3b8;">Loading...</div>';
+
+    try {
+        const res = await fetch(API + '/my-submissions?page=' + historyPage + '&limit=15', { headers: headers() });
+        const data = await res.json();
+
+        if (!data.success || !data.data || !data.data.length) {
+            el.innerHTML = '<div style="text-align:center; padding:30px; color:#94a3b8;">No submissions yet</div>';
+            return;
+        }
+
+        let html = '<div style="font-size:0.85rem; font-weight:700; color:#1e293b; margin-bottom:12px;">Your Submissions</div>';
+
+        for (const a of data.data) {
+            const dateStr = formatCheckDate(a.check_date);
+            const submittedStr = a.submitted_at ? new Date(a.submitted_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
+            html += `
+                <div class="history-item" onclick="viewSubmission(${a.id})" style="cursor:pointer;">
+                    <div>
+                        <div style="font-size:0.85rem; font-weight:600; color:#1e293b;">
+                            ${a.branch_name || 'Stock Check'} #${a.id}
+                            ${a.request_type === 'self_requested' ? '<span class="badge-self">Self</span>' : ''}
+                        </div>
+                        <div style="font-size:0.7rem; color:#94a3b8;">
+                            ${dateStr} &middot; ${a.item_count} items
+                            ${a.discrepancy_count > 0 ? '&middot; <span class="diff-negative">' + a.discrepancy_count + ' discrepancies</span>' : ''}
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="status-badge status-${a.status}">${a.status}</span>
+                        <div style="font-size:0.65rem; color:#94a3b8; margin-top:2px;">${submittedStr}</div>
+                    </div>
+                </div>`;
+        }
+
+        // Pagination
+        if (data.pagination) {
+            const totalPages = Math.ceil(data.pagination.total / data.pagination.limit);
+            if (totalPages > 1) {
+                html += '<div style="display:flex; justify-content:center; gap:4px; margin-top:12px;">';
+                for (let i = 1; i <= totalPages; i++) {
+                    html += `<button onclick="loadHistory(${i})" style="padding:4px 10px; border-radius:6px; border:1px solid ${i === historyPage ? '#667eea' : '#e2e8f0'}; background:${i === historyPage ? '#667eea' : 'white'}; color:${i === historyPage ? 'white' : '#64748b'}; font-size:0.75rem; cursor:pointer;">${i}</button>`;
+                }
+                html += '</div>';
+            }
+        }
+
+        el.innerHTML = html;
+    } catch (err) {
+        el.innerHTML = '<div style="text-align:center; padding:30px; color:#ef4444;">Failed to load history</div>';
+    }
+}
+
+async function viewSubmission(id) {
+    const el = document.getElementById('historyContent');
+    el.innerHTML = '<div style="text-align:center; padding:30px; color:#94a3b8;">Loading details...</div>';
+
+    try {
+        const res = await fetch(API + '/assignments/' + id, { headers: headers() });
+        const data = await res.json();
+
+        if (!data.success) {
+            el.innerHTML = '<div style="text-align:center; padding:30px; color:#ef4444;">Failed to load details</div>';
+            return;
+        }
+
+        const a = data.data;
+        let html = `
+            <div style="margin-bottom:12px;">
+                <button onclick="loadHistory(${historyPage})" style="background:none; border:none; color:#667eea; font-size:0.8rem; cursor:pointer; font-weight:600;">&larr; Back to list</button>
+            </div>
+            <div style="font-size:0.95rem; font-weight:700; color:#1e293b; margin-bottom:2px;">
+                ${a.branch_name || 'Stock Check'} #${a.id}
+                ${a.request_type === 'self_requested' ? '<span class="badge-self">Self-Requested</span>' : ''}
+            </div>
+            <div style="font-size:0.7rem; color:#94a3b8; margin-bottom:16px;">
+                ${formatCheckDate(a.check_date)} &middot; <span class="status-badge status-${a.status}">${a.status}</span>
+            </div>`;
+
+        if (a.items && a.items.length) {
+            for (const item of a.items) {
+                const diff = parseFloat(item.difference);
+                const diffClass = isNaN(diff) ? '' : diff > 0 ? 'diff-positive' : diff < 0 ? 'diff-negative' : 'diff-zero';
+                const diffStr = isNaN(diff) ? '-' : (diff > 0 ? '+' : '') + diff;
+
+                html += `
+                    <div class="item-card" style="padding:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <div>
+                                <div style="font-size:0.8rem; font-weight:600; color:#1e293b;">${item.item_name}</div>
+                                ${item.item_sku ? '<div style="font-size:0.65rem; color:#94a3b8;">' + item.item_sku + '</div>' : ''}
+                            </div>
+                            ${item.photo_url ? '<img src="' + item.photo_url + '" style="width:36px; height:36px; border-radius:6px; object-fit:cover; border:1px solid #e2e8f0;">' : ''}
+                        </div>
+                        <div style="display:flex; gap:12px; font-size:0.75rem;">
+                            <span style="color:#64748b;">System: <strong>${item.system_qty}</strong></span>
+                            <span style="color:#64748b;">Reported: <strong>${item.reported_qty !== null ? item.reported_qty : '-'}</strong></span>
+                            <span class="${diffClass}">Diff: ${diffStr}</span>
+                        </div>
+                        ${item.notes ? '<div style="font-size:0.7rem; color:#64748b; margin-top:4px;">' + item.notes + '</div>' : ''}
+                    </div>`;
+            }
+        }
+
+        el.innerHTML = html;
+    } catch (err) {
+        el.innerHTML = '<div style="text-align:center; padding:30px; color:#ef4444;">Failed to load details</div>';
+    }
+}
+
+// ========================================
+// SELF-REQUEST TAB
+// ========================================
+let reqInitialized = false;
+
+async function initSelfRequest() {
+    if (reqInitialized) return;
+    reqInitialized = true;
+
+    try {
+        // Get user's branch info
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+
+        if (user && user.branch_id) {
+            userBranchId = user.branch_id;
+        } else {
+            // Fetch from API
+            const res = await fetch('/api/auth/me', { headers: headers() });
+            const data = await res.json();
+            if (data.success && data.user) {
+                userBranchId = data.user.branch_id;
+            }
+        }
+
+        if (!userBranchId) {
+            document.getElementById('reqSearch').disabled = true;
+            document.getElementById('reqSearch').placeholder = 'No branch assigned to your account';
+            return;
+        }
+
+        // Load locations
+        const locRes = await fetch(API + '/locations/' + userBranchId, { headers: headers() });
+        const locData = await locRes.json();
+
+        if (locData.success && locData.data && locData.data.length > 1) {
+            const locSel = document.getElementById('reqLocation');
+            locSel.innerHTML = locData.data.map(l => `<option value="${l.zoho_location_id}">${l.zoho_location_name}</option>`).join('');
+            document.getElementById('locationSection').style.display = '';
+        }
+    } catch (err) {
+        console.error('Init self-request error:', err);
+    }
+}
+
+function searchRequestProducts() {
+    clearTimeout(searchTimeout);
+    const q = document.getElementById('reqSearch').value.trim();
+    const container = document.getElementById('reqSearchResults');
+    if (q.length < 2) { container.style.display = 'none'; return; }
+
+    searchTimeout = setTimeout(async () => {
+        const locationId = document.getElementById('reqLocation').value;
+        let url = API + '/products/search?search=' + encodeURIComponent(q);
+        if (locationId) url += '&zoho_location_id=' + encodeURIComponent(locationId);
+        if (userBranchId) url += '&branch_id=' + userBranchId;
+
+        try {
+            const res = await fetch(url, { headers: headers() });
+            const data = await res.json();
+
+            if (data.success && data.data && data.data.length) {
+                container.innerHTML = data.data
+                    .filter(item => !reqSelectedItems.find(s => s.zoho_item_id === item.zoho_item_id))
+                    .map(item => `
+                        <div class="search-result-item" onclick="addRequestProduct('${item.zoho_item_id}', '${(item.item_name || '').replace(/'/g, "\\'")}', '${(item.sku || '').replace(/'/g, "\\'")}', ${item.stock_on_hand || 0}, ${item.last_checked ? "'" + item.last_checked + "'" : 'null'})">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <span style="font-weight:600;">${item.item_name}</span>
+                                    <span style="color:#94a3b8; font-size:0.7rem; margin-left:4px;">${item.sku || ''}</span>
+                                </div>
+                                <span style="font-size:0.7rem; color:#64748b;">Qty: ${item.stock_on_hand || 0}</span>
+                            </div>
+                            <div style="margin-top:2px;">${lastCheckedLabel(item.last_checked)}</div>
+                        </div>
+                    `).join('');
+                container.style.display = '';
+            } else {
+                container.innerHTML = '<div style="padding:12px; text-align:center; color:#94a3b8; font-size:0.8rem;">No items found</div>';
+                container.style.display = '';
+            }
+        } catch (err) {
+            container.style.display = 'none';
+        }
+    }, 300);
+}
+
+function addRequestProduct(id, name, sku, qty, lastChecked) {
+    if (reqSelectedItems.find(s => s.zoho_item_id === id)) return;
+    reqSelectedItems.push({ zoho_item_id: id, item_name: name, sku: sku, stock_on_hand: qty, last_checked: lastChecked });
+    renderRequestProducts();
+    document.getElementById('reqSearch').value = '';
+    document.getElementById('reqSearchResults').style.display = 'none';
+    updateReqSubmitBtn();
+}
+
+function removeRequestProduct(id) {
+    reqSelectedItems = reqSelectedItems.filter(s => s.zoho_item_id !== id);
+    // Also remove photo
+    delete reqPhotoFiles[id];
+    renderRequestProducts();
+    updateReqSubmitBtn();
+}
+
+function renderRequestProducts() {
+    const el = document.getElementById('reqSelectedProducts');
+    if (!reqSelectedItems.length) {
+        el.innerHTML = '<p style="font-size:0.75rem; color:#94a3b8; text-align:center; padding:8px;">No products selected. Search above to add items.</p>';
+        return;
+    }
+
+    el.innerHTML = reqSelectedItems.map(item => `
+        <div class="item-card" style="padding:12px;">
+            <div class="item-header">
+                <div>
+                    <div class="item-name">${item.item_name}</div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        ${item.sku ? '<span class="item-sku">' + item.sku + '</span>' : ''}
+                        ${lastCheckedLabel(item.last_checked)}
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span style="font-size:0.7rem; color:#6366f1;">Sys: ${item.stock_on_hand}</span>
+                    <button class="remove-btn" onclick="removeRequestProduct('${item.zoho_item_id}')">&times;</button>
+                </div>
+            </div>
+
+            <div class="item-input-row">
+                <label>Count:</label>
+                <input type="number" step="0.01" min="0" class="qty-input" id="req-qty-${item.zoho_item_id}"
+                       placeholder="Actual count" oninput="onQtyInput(this); updateReqSubmitBtn();">
+            </div>
+
+            <div class="photo-row">
+                <input type="file" accept="image/*" capture="environment" class="hidden-input"
+                       id="req-file-${item.zoho_item_id}" onchange="onReqPhotoSelect(this, '${item.zoho_item_id}')">
+                <button class="photo-btn" id="req-photobtn-${item.zoho_item_id}"
+                        onclick="document.getElementById('req-file-${item.zoho_item_id}').click()">
+                    <span>&#128247;</span> <span>Add Photo</span>
+                </button>
+                <img id="req-preview-${item.zoho_item_id}" class="photo-preview" style="display:none">
+            </div>
+
+            <textarea class="notes-input" id="req-notes-${item.zoho_item_id}" rows="1" placeholder="Notes (optional)"></textarea>
+        </div>
+    `).join('');
+}
+renderRequestProducts();
+
+function onReqPhotoSelect(input, itemId) {
+    const file = input.files[0];
+    if (!file) return;
+    reqPhotoFiles[itemId] = file;
+
+    const preview = document.getElementById('req-preview-' + itemId);
+    const btn = document.getElementById('req-photobtn-' + itemId);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        btn.classList.add('has-photo');
+        btn.querySelector('span:last-child').textContent = 'Change Photo';
+    };
+    reader.readAsDataURL(file);
+}
+
+function updateReqSubmitBtn() {
+    const btn = document.getElementById('reqSubmitBtn');
+    const allFilled = reqSelectedItems.length > 0 && reqSelectedItems.every(item => {
+        const input = document.getElementById('req-qty-' + item.zoho_item_id);
+        return input && input.value !== '';
+    });
+    btn.disabled = !allFilled;
+}
+
+async function submitSelfRequest() {
+    if (!reqSelectedItems.length) return;
+
+    const items = [];
+    for (const item of reqSelectedItems) {
+        const qtyInput = document.getElementById('req-qty-' + item.zoho_item_id);
+        const notesInput = document.getElementById('req-notes-' + item.zoho_item_id);
+        if (!qtyInput || qtyInput.value === '') {
+            showToast('Enter count for all items', 'warning');
+            if (qtyInput) qtyInput.focus();
+            return;
+        }
+        items.push({
+            zoho_item_id: item.zoho_item_id,
+            reported_qty: parseFloat(qtyInput.value),
+            notes: notesInput ? notesInput.value.trim() : ''
+        });
+    }
+
+    const reason = document.getElementById('reqReason').value.trim();
+    const btn = document.getElementById('reqSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    const formData = new FormData();
+    formData.append('items', JSON.stringify(items));
+    if (reason) formData.append('reason', reason);
+
+    const locationId = document.getElementById('reqLocation').value;
+    if (locationId) formData.append('zoho_location_id', locationId);
+
+    for (const item of reqSelectedItems) {
+        if (reqPhotoFiles[item.zoho_item_id]) {
+            formData.append(`photo_${item.zoho_item_id}`, reqPhotoFiles[item.zoho_item_id]);
+        }
+    }
+
+    try {
+        const res = await fetch(API + '/self-request', {
+            method: 'POST',
+            headers: { 'Authorization': headers()['Authorization'] },
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast('Stock check submitted! Admin will review it.');
+            reqSelectedItems = [];
+            reqPhotoFiles = {};
+            renderRequestProducts();
+            document.getElementById('reqReason').value = '';
+            btn.textContent = 'Submit Stock Check';
+            updateReqSubmitBtn();
+        } else {
+            showToast(data.message || 'Failed to submit', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Submit Stock Check';
+        }
+    } catch (err) {
+        showToast('Network error', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Submit Stock Check';
+    }
+}
+
+// Close search on outside click
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#reqSearch') && !e.target.closest('#reqSearchResults')) {
+        document.getElementById('reqSearchResults').style.display = 'none';
+    }
+});
+
+// ========================================
+// Real-time stock check alerts
 // ========================================
 window.addEventListener('qc-notification', function(e) {
     const n = e.detail;
     if (n.type === 'stock_check_assigned') {
         showNewAssignmentAlert(n);
-        loadAssignments(); // Auto-refresh
+        loadAssignments();
     }
 });
 
 function showNewAssignmentAlert(notification) {
-    // Remove existing alert if any
     const existing = document.getElementById('newAssignmentAlert');
     if (existing) existing.remove();
 
@@ -460,25 +982,24 @@ function showNewAssignmentAlert(notification) {
         animation: slideDown 0.3s ease;
     `;
     alert.innerHTML = `
-        <span style="font-size:1.5rem">📦</span>
+        <span style="font-size:1.5rem">&#128230;</span>
         <div style="flex:1">
             <div style="font-weight:700;font-size:0.9rem">${notification.title || 'New Stock Check!'}</div>
             <div style="font-size:0.8rem;opacity:0.9">${notification.body || 'You have a new stock check assignment'}</div>
         </div>
-        <button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer">×</button>
+        <button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer">&times;</button>
     `;
     document.body.appendChild(alert);
-
-    // Auto-dismiss after 8 seconds
     setTimeout(() => { if (alert.parentElement) alert.remove(); }, 8000);
 }
 
-// Add animation keyframe
 const style = document.createElement('style');
 style.textContent = '@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }';
 document.head.appendChild(style);
 
-// Init
+// ========================================
+// INIT
+// ========================================
 const today = new Date();
 document.getElementById('headerDate').textContent = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 loadAssignments();

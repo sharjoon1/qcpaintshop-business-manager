@@ -161,7 +161,7 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
              LEFT JOIN users u ON a.staff_id = u.id
              LEFT JOIN users creator ON a.created_by = creator.id
              LEFT JOIN users reviewer ON a.reviewed_by = reviewer.id
-             LEFT JOIN zoho_locations_map zlm ON a.zoho_location_id = zlm.zoho_location_id
+             LEFT JOIN zoho_locations_map zlm ON a.zoho_location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
              ${where}
              ORDER BY a.check_date DESC, a.created_at DESC
              LIMIT ? OFFSET ?`,
@@ -262,7 +262,7 @@ router.get('/my-assignments', requireAuth, async (req, res) => {
                  LEFT JOIN branches b ON a.branch_id = b.id
                  LEFT JOIN users u ON a.created_by = u.id
                  WHERE a.staff_id = ? AND a.status IN ('pending', 'submitted')
-                 ORDER BY a.check_date ASC, a.created_at DESC
+                 ORDER BY a.check_date DESC, a.created_at DESC
                  LIMIT 10`,
                 [req.user.id]
             );
@@ -286,6 +286,45 @@ router.get('/my-assignments', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('My assignments error:', error);
         res.status(500).json({ success: false, message: 'Failed to get assignments' });
+    }
+});
+
+// ========================================
+// STAFF: MY SUBMISSIONS HISTORY
+// ========================================
+
+/** GET /api/stock-check/my-submissions — Staff's past submitted/reviewed/adjusted assignments */
+router.get('/my-submissions', requireAuth, async (req, res) => {
+    try {
+        const { page = 1, limit: lim = 20 } = req.query;
+        const offset = (parseInt(page) - 1) * parseInt(lim);
+
+        const [countResult] = await pool.query(
+            `SELECT COUNT(*) as total FROM stock_check_assignments
+             WHERE staff_id = ? AND status IN ('submitted', 'reviewed', 'adjusted')`,
+            [req.user.id]
+        );
+
+        const [rows] = await pool.query(
+            `SELECT a.*, b.name as branch_name,
+                    (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count,
+                    (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id AND difference != 0 AND difference IS NOT NULL) as discrepancy_count
+             FROM stock_check_assignments a
+             LEFT JOIN branches b ON a.branch_id = b.id
+             WHERE a.staff_id = ? AND a.status IN ('submitted', 'reviewed', 'adjusted')
+             ORDER BY a.submitted_at DESC
+             LIMIT ? OFFSET ?`,
+            [req.user.id, parseInt(lim), offset]
+        );
+
+        res.json({
+            success: true,
+            data: rows,
+            pagination: { total: countResult[0].total, page: parseInt(page), limit: parseInt(lim) }
+        });
+    } catch (error) {
+        console.error('My submissions error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get submissions' });
     }
 });
 
@@ -402,6 +441,136 @@ router.post('/submit/:id', requireAuth, upload.any(), async (req, res) => {
 });
 
 // ========================================
+// STAFF: SELF-REQUEST STOCK CHECK
+// ========================================
+
+/** POST /api/stock-check/self-request — Staff creates + submits their own stock check */
+router.post('/self-request', requireAuth, upload.any(), async (req, res) => {
+    try {
+        const { reason, zoho_location_id: reqLocationId } = req.body;
+        let items;
+        try {
+            items = typeof req.body.items === 'string' ? JSON.parse(req.body.items) : req.body.items;
+        } catch (e) {
+            return res.status(400).json({ success: false, message: 'Invalid items data' });
+        }
+
+        if (!items || !items.length) {
+            return res.status(400).json({ success: false, message: 'No items submitted' });
+        }
+
+        // Get staff's branch
+        const [userRows] = await pool.query('SELECT branch_id FROM users WHERE id = ?', [req.user.id]);
+        if (!userRows.length || !userRows[0].branch_id) {
+            return res.status(400).json({ success: false, message: 'Your account is not assigned to a branch' });
+        }
+        const branchId = userRows[0].branch_id;
+
+        // Get zoho location
+        let locationId = reqLocationId;
+        if (!locationId) {
+            const [locRows] = await pool.query(
+                'SELECT zoho_location_id FROM zoho_locations_map WHERE local_branch_id = ? AND is_active = 1 LIMIT 1',
+                [branchId]
+            );
+            locationId = locRows.length ? locRows[0].zoho_location_id : null;
+        }
+        if (!locationId) {
+            return res.status(400).json({ success: false, message: 'No Zoho location found for your branch' });
+        }
+
+        const now = new Date();
+        const checkDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        // Create assignment as self_requested + already submitted
+        const [result] = await pool.query(
+            `INSERT INTO stock_check_assignments
+             (branch_id, zoho_location_id, staff_id, check_date, show_system_qty, notes, requested_reason, request_type, created_by, status, submitted_at)
+             VALUES (?, ?, ?, ?, 0, ?, ?, 'self_requested', ?, 'submitted', ?)`,
+            [branchId, locationId, req.user.id, checkDate, reason || null, reason || null, req.user.id, now]
+        );
+        const assignmentId = result.insertId;
+
+        // Build file map
+        const fileMap = {};
+        if (req.files) {
+            for (const file of req.files) {
+                fileMap[file.fieldname] = file;
+            }
+        }
+
+        // Ensure upload dir
+        if (!fs.existsSync(UPLOAD_DIR)) {
+            fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+        }
+
+        // Fetch system quantities
+        const itemIds = items.map(i => i.zoho_item_id);
+        const placeholders = itemIds.map(() => '?').join(',');
+        const [stockRows] = await pool.query(
+            `SELECT zoho_item_id, item_name, sku, stock_on_hand
+             FROM zoho_location_stock
+             WHERE zoho_item_id IN (${placeholders}) AND zoho_location_id = ?`,
+            [...itemIds, locationId]
+        );
+        const stockMap = {};
+        stockRows.forEach(r => { stockMap[r.zoho_item_id] = r; });
+
+        // Insert items with counts
+        for (const item of items) {
+            const stock = stockMap[item.zoho_item_id] || {};
+            const reportedQty = parseFloat(item.reported_qty);
+            const systemQty = parseFloat(stock.stock_on_hand) || 0;
+            const difference = reportedQty - systemQty;
+            const variancePct = systemQty !== 0 ? ((difference / systemQty) * 100) : (reportedQty !== 0 ? 100 : 0);
+
+            // Process photo
+            let photoUrl = null;
+            const photoFile = fileMap[`photo_${item.zoho_item_id}`];
+            if (photoFile) {
+                const filename = `sc-${assignmentId}-${item.zoho_item_id}-${Date.now()}.jpg`;
+                const filepath = path.join(UPLOAD_DIR, filename);
+                await sharp(photoFile.buffer)
+                    .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+                    .jpeg({ quality: 80 })
+                    .toFile(filepath);
+                photoUrl = `/uploads/stock-check/${filename}`;
+            }
+
+            await pool.query(
+                `INSERT INTO stock_check_items
+                 (assignment_id, zoho_item_id, item_name, item_sku, system_qty, reported_qty, difference, variance_pct, photo_url, notes, submitted_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [assignmentId, item.zoho_item_id, stock.item_name || 'Unknown', stock.sku || '',
+                 systemQty, reportedQty, difference, Math.round(variancePct * 100) / 100,
+                 photoUrl, item.notes || null, now]
+            );
+        }
+
+        // Notify admins
+        try {
+            const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+            const [staffRow] = await pool.query('SELECT full_name FROM users WHERE id = ?', [req.user.id]);
+            const staffName = staffRow.length ? staffRow[0].full_name : 'Staff';
+
+            for (const admin of admins) {
+                await notificationService.send(admin.id, {
+                    type: 'stock_check_submitted',
+                    title: 'Self-Requested Stock Check',
+                    body: `${staffName} submitted a self-requested stock check (${items.length} items)${reason ? ': ' + reason : ''}`,
+                    data: { assignment_id: assignmentId }
+                });
+            }
+        } catch (e) { console.error('Self-request notification error:', e.message); }
+
+        res.json({ success: true, message: 'Stock check submitted', data: { id: assignmentId, items: items.length } });
+    } catch (error) {
+        console.error('Self-request stock check error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create stock check' });
+    }
+});
+
+// ========================================
 // ADMIN: REVIEW ASSIGNMENT
 // ========================================
 
@@ -414,7 +583,7 @@ router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, 
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
              LEFT JOIN users u ON a.staff_id = u.id
-             LEFT JOIN zoho_locations_map zlm ON a.zoho_location_id = zlm.zoho_location_id
+             LEFT JOIN zoho_locations_map zlm ON a.zoho_location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
              WHERE a.id = ?`,
             [req.params.id]
         );
@@ -631,5 +800,63 @@ router.get('/products/suggest', requirePermission('zoho', 'stock_check'), async 
         res.status(500).json({ success: false, message: 'Failed to get suggestions' });
     }
 });
+
+// ========================================
+// PRODUCT SEARCH WITH LAST-CHECKED INFO
+// ========================================
+
+/** GET /api/stock-check/products/search — Search products with last-checked info */
+router.get('/products/search', requireAuth, async (req, res) => {
+    try {
+        const { search, zoho_location_id, branch_id, limit: lim = 20 } = req.query;
+
+        if (!search || search.length < 2) {
+            return res.json({ success: true, data: [] });
+        }
+
+        // Determine location
+        let locationId = zoho_location_id;
+        if (!locationId) {
+            const bId = branch_id;
+            const effectiveBranchId = bId || (await getBranchId(req.user.id));
+            if (effectiveBranchId) {
+                const [locRows] = await pool.query(
+                    'SELECT zoho_location_id FROM zoho_locations_map WHERE local_branch_id = ? AND is_active = 1 LIMIT 1',
+                    [effectiveBranchId]
+                );
+                locationId = locRows.length ? locRows[0].zoho_location_id : null;
+            }
+        }
+
+        if (!locationId) {
+            return res.status(400).json({ success: false, message: 'Could not determine Zoho location' });
+        }
+
+        const searchTerm = '%' + search + '%';
+        const [rows] = await pool.query(
+            `SELECT ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand,
+                    MAX(sci.submitted_at) as last_checked
+             FROM zoho_location_stock ls
+             LEFT JOIN stock_check_items sci ON ls.zoho_item_id = sci.zoho_item_id COLLATE utf8mb4_unicode_ci
+                 AND sci.submitted_at IS NOT NULL
+             WHERE ls.zoho_location_id = ? AND (ls.item_name LIKE ? OR ls.sku LIKE ?)
+             GROUP BY ls.zoho_item_id, ls.item_name, ls.sku, ls.stock_on_hand
+             ORDER BY ls.item_name ASC
+             LIMIT ?`,
+            [locationId, searchTerm, searchTerm, parseInt(lim)]
+        );
+
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Product search error:', error);
+        res.status(500).json({ success: false, message: 'Failed to search products' });
+    }
+});
+
+/** Helper: get user's branch_id from DB */
+async function getBranchId(userId) {
+    const [rows] = await pool.query('SELECT branch_id FROM users WHERE id = ?', [userId]);
+    return rows.length ? rows[0].branch_id : null;
+}
 
 module.exports = { router, setPool };
