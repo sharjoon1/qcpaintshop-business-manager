@@ -725,6 +725,11 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - **Real-time notifications**: Socket.io + socket-helper loaded dynamically, listens for `stock_check_assigned` events
 - **Auto-refresh**: New assignments auto-appear when admin creates them
 - **Visual alert**: Slide-down banner with assignment details, auto-dismiss 8s
+- **Dashboard widget** (`staff/dashboard.html`): "Stock Check Assignments" card shows all pending/submitted assignments
+  - Auto-hides when no assignments, shows count badge for pending
+  - Color-coded: red border for overdue, amber for pending, green for submitted
+  - "Start" button links to `stock-check.html`
+  - Real-time: Socket.io `notification` event with type `stock_check_assigned` triggers toast + auto-refresh
 
 **Bug Fixes** (Feb 20):
 - Staff dropdown (`/api/branches/:id/staff`) now filters out `role='customer'` users
@@ -738,7 +743,7 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - `GET /assignments` — List with filters (admin)
 - `GET /assignments/:id` — Detail (staff sees own, admin sees any)
 - `DELETE /assignments/:id` — Delete pending (admin)
-- `GET /my-assignments` — Staff's today assignments
+- `GET /my-assignments` — Staff's assignments by date (default today); `?pending=1` returns all pending/submitted
 - `POST /submit/:id` — Staff submits counts + photos (multipart)
 - `GET /review/:id` — Admin review with comparison + location name
 - `POST /adjust/:id` — Push to Zoho as inventory adjustment (uses per-assignment location)

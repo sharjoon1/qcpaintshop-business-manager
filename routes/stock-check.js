@@ -247,10 +247,28 @@ router.delete('/assignments/:id', requirePermission('zoho', 'stock_check'), asyn
 // STAFF: MY ASSIGNMENTS
 // ========================================
 
-/** GET /api/stock-check/my-assignments — Staff's assignments (today by default) */
+/** GET /api/stock-check/my-assignments — Staff's assignments (today by default, or all pending) */
 router.get('/my-assignments', requireAuth, async (req, res) => {
     try {
-        const { date } = req.query;
+        const { date, pending } = req.query;
+
+        // ?pending=1 — return all non-completed assignments (for dashboard widget)
+        if (pending === '1') {
+            const [rows] = await pool.query(
+                `SELECT a.*, b.name as branch_name,
+                        u.full_name as created_by_name,
+                        (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count
+                 FROM stock_check_assignments a
+                 LEFT JOIN branches b ON a.branch_id = b.id
+                 LEFT JOIN users u ON a.created_by = u.id
+                 WHERE a.staff_id = ? AND a.status IN ('pending', 'submitted')
+                 ORDER BY a.check_date ASC, a.created_at DESC
+                 LIMIT 10`,
+                [req.user.id]
+            );
+            return res.json({ success: true, data: rows });
+        }
+
         const now = new Date();
         const targetDate = date || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 

@@ -584,6 +584,15 @@
         </div>
     </div>
 
+    <!-- Stock Check Assignments -->
+    <div class="status-card" id="stockCheckCard" style="display: none;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <h3 style="font-size: 16px; font-weight: 600; color: #1f2937;">Stock Check Assignments</h3>
+            <span id="stockCheckBadge" class="badge badge-danger" style="display:none;"></span>
+        </div>
+        <div id="stockCheckContent"></div>
+    </div>
+
     <!-- Quick Actions -->
     <div class="status-card">
         <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1f2937;">Quick Actions</h3>
@@ -2329,6 +2338,79 @@
             } catch (err) {
                 // Silently fail
             }
+        }
+
+        // ========================================
+        // STOCK CHECK ASSIGNMENTS
+        // ========================================
+        async function loadStockChecks() {
+            try {
+                const res = await fetch('/api/stock-check/my-assignments?pending=1', { headers: getAuthHeaders() });
+                const data = await res.json();
+                const card = document.getElementById('stockCheckCard');
+                const content = document.getElementById('stockCheckContent');
+                const badge = document.getElementById('stockCheckBadge');
+
+                if (!data.success || !data.data || data.data.length === 0) {
+                    card.style.display = 'none';
+                    return;
+                }
+
+                card.style.display = 'block';
+                const pending = data.data.filter(a => a.status === 'pending');
+                if (pending.length > 0) {
+                    badge.textContent = `${pending.length} Pending`;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+
+                content.innerHTML = data.data.map(a => {
+                    const isPending = a.status === 'pending';
+                    const statusColor = isPending ? '#f59e0b' : '#10b981';
+                    const statusBg = isPending ? '#fef3c7' : '#d1fae5';
+                    const statusText = isPending ? 'Pending' : 'Submitted';
+                    const checkDate = new Date(a.check_date + 'T00:00:00');
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const isToday = checkDate.getTime() === today.getTime();
+                    const isOverdue = checkDate < today && isPending;
+                    const dateStr = isToday ? 'Today' : checkDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+                    return `
+                    <div style="padding: 14px; background: ${isOverdue ? '#fef2f2' : '#f9fafb'}; border-radius: 12px; margin-bottom: 8px; ${isOverdue ? 'border-left: 4px solid #ef4444;' : isPending ? 'border-left: 4px solid #f59e0b;' : 'border-left: 4px solid #10b981;'}">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 14px; color: #1f2937;">${a.branch_name || 'Branch'}</div>
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${a.item_count} item${a.item_count !== 1 ? 's' : ''} to check</div>
+                            </div>
+                            <span style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${statusBg}; color: ${statusColor};">
+                                ${isOverdue ? 'Overdue' : statusText}
+                            </span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="font-size: 12px; color: #6b7280;">
+                                📅 ${dateStr}${a.notes ? ' · 📝 ' + (a.notes.length > 30 ? a.notes.substring(0, 30) + '...' : a.notes) : ''}
+                            </div>
+                            ${isPending ? `<a href="stock-check.html" style="padding: 6px 14px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 8px; font-size: 12px; font-weight: 600; text-decoration: none;">Start</a>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+
+            } catch (err) {
+                // Silently fail — stock check is not critical
+            }
+        }
+        loadStockChecks();
+
+        // Listen for stock check assignment notifications via Socket.io
+        if (dashboardSocket) {
+            dashboardSocket.on('notification', (data) => {
+                if (data && data.type === 'stock_check_assigned') {
+                    showToast('New stock check assigned to you!', 'info');
+                    loadStockChecks();
+                }
+            });
         }
 
         // Start monitoring after attendance loads
