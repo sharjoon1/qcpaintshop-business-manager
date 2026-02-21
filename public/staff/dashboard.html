@@ -2370,12 +2370,19 @@
                     const statusColor = isPending ? '#f59e0b' : '#10b981';
                     const statusBg = isPending ? '#fef3c7' : '#d1fae5';
                     const statusText = isPending ? 'Pending' : 'Submitted';
-                    const checkDate = new Date(a.check_date + 'T00:00:00');
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-                    const isToday = checkDate.getTime() === today.getTime();
-                    const isOverdue = checkDate < today && isPending;
-                    const dateStr = isToday ? 'Today' : checkDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                    let isToday = false, isOverdue = false, dateStr = 'No date';
+                    if (a.check_date) {
+                        try {
+                            const checkDate = new Date(a.check_date + (a.check_date.includes('T') ? '' : 'T00:00:00'));
+                            if (!isNaN(checkDate.getTime())) {
+                                const today = new Date();
+                                today.setHours(0,0,0,0);
+                                isToday = checkDate.getTime() === today.getTime();
+                                isOverdue = checkDate < today && isPending;
+                                dateStr = isToday ? 'Today' : checkDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                            }
+                        } catch(e) {}
+                    }
 
                     return `
                     <div style="padding: 14px; background: ${isOverdue ? '#fef2f2' : '#f9fafb'}; border-radius: 12px; margin-bottom: 8px; ${isOverdue ? 'border-left: 4px solid #ef4444;' : isPending ? 'border-left: 4px solid #f59e0b;' : 'border-left: 4px solid #10b981;'}">

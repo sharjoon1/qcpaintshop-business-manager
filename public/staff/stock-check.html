@@ -14,6 +14,7 @@
     <script>checkAuthOrRedirect();</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -22,7 +23,7 @@
             min-height: 100vh;
         }
 
-        /* Header */
+        /* Page title header (below injected nav header) */
         .page-header {
             padding: 16px;
             display: flex;
@@ -32,7 +33,6 @@
         }
         .page-header h1 { font-size: 1.25rem; font-weight: 700; }
         .page-header .subtitle { font-size: 0.75rem; opacity: 0.85; }
-        .hamburger { background: rgba(255,255,255,0.2); border: none; color: white; width: 40px; height: 40px; border-radius: 10px; font-size: 1.25rem; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 
         .container { max-width: 600px; margin: 0 auto; padding: 0 16px 24px; }
 
@@ -164,17 +164,11 @@
 <body data-page="stock-check">
     <div id="toast" class="toast"></div>
 
-    <!-- Sidebar component loaded externally for staff pages -->
-    <div id="staff-sidebar-container"></div>
-
-    <!-- Header -->
+    <!-- Page title -->
     <div class="page-header">
-        <button class="hamburger" onclick="toggleSidebar()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        </button>
         <div>
             <h1>Stock Check</h1>
-            <div class="subtitle" id="headerDate">Today's assignments</div>
+            <div class="subtitle" id="headerDate">Your assignments</div>
         </div>
     </div>
 
@@ -185,23 +179,20 @@
     </div>
 
 <script>
-// Load sidebar
-fetch('/components/staff-sidebar.html')
-    .then(r => r.text())
-    .then(html => {
-        document.getElementById('staff-sidebar-container').innerHTML = html;
-        // Re-execute sidebar scripts
-        document.getElementById('staff-sidebar-container').querySelectorAll('script').forEach(s => {
-            const ns = document.createElement('script');
-            ns.textContent = s.textContent;
-            document.head.appendChild(ns);
-        });
-    })
-    .catch(() => {});
-
 const API = '/api/stock-check';
 let assignments = [];
 let photoFiles = {}; // { item_zoho_id: File }
+
+function formatCheckDate(dateStr) {
+    if (!dateStr) return 'No date';
+    try {
+        const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
+        if (isNaN(d.getTime())) return 'No date';
+        const today = new Date(); today.setHours(0,0,0,0);
+        if (d.getTime() === today.getTime()) return 'Today';
+        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch(e) { return 'No date'; }
+}
 
 function headers() { return getAuthHeaders(); }
 
@@ -215,15 +206,15 @@ function showToast(msg, type = 'success') {
 async function loadAssignments() {
     const container = document.getElementById('mainContent');
     try {
-        const res = await fetch(API + '/my-assignments', { headers: headers() });
+        const res = await fetch(API + '/my-assignments?pending=1', { headers: headers() });
         const data = await res.json();
 
         if (!data.success || !data.data || !data.data.length) {
             container.innerHTML = `
                 <div class="empty-state">
                     <div class="icon">📦</div>
-                    <h3>No Stock Checks Today</h3>
-                    <p>You don't have any stock check assignments for today.</p>
+                    <h3>No Pending Stock Checks</h3>
+                    <p>You don't have any stock check assignments right now.</p>
                 </div>`;
             return;
         }
@@ -277,7 +268,7 @@ function renderAssignment(a) {
             <div class="assignment-header">
                 <div>
                     <div class="assignment-title">${a.branch_name || 'Stock Check'}</div>
-                    <div class="assignment-meta">${a.items ? a.items.length : 0} items &middot; ${a.check_date ? a.check_date.split('T')[0] : ''}</div>
+                    <div class="assignment-meta">${a.items ? a.items.length : 0} items &middot; ${formatCheckDate(a.check_date)}</div>
                 </div>
                 <span class="status-badge status-pending">Pending</span>
             </div>`;
@@ -443,29 +434,15 @@ async function submitCheck(assignmentId) {
 }
 
 // ========================================
-// Socket.io — Real-time stock check alerts
+// Real-time stock check alerts (Socket.io loaded by universal-nav-loader)
 // ========================================
-
-(function loadSocketForStaff() {
-    const s1 = document.createElement('script');
-    s1.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
-    s1.onload = function() {
-        const s2 = document.createElement('script');
-        s2.src = '/js/socket-helper.js';
-        s2.onload = function() {
-            // Listen for stock check notifications
-            window.addEventListener('qc-notification', function(e) {
-                const n = e.detail;
-                if (n.type === 'stock_check_assigned') {
-                    showNewAssignmentAlert(n);
-                    loadAssignments(); // Auto-refresh
-                }
-            });
-        };
-        document.head.appendChild(s2);
-    };
-    document.head.appendChild(s1);
-})();
+window.addEventListener('qc-notification', function(e) {
+    const n = e.detail;
+    if (n.type === 'stock_check_assigned') {
+        showNewAssignmentAlert(n);
+        loadAssignments(); // Auto-refresh
+    }
+});
 
 function showNewAssignmentAlert(notification) {
     // Remove existing alert if any
