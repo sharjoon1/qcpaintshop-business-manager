@@ -801,8 +801,74 @@
         </div>
     </div>
 
+    <!-- Overtime Prompt Modal -->
+    <div class="clockout-backdrop" id="overtimeBackdrop" style="z-index: 9999;"></div>
+    <div class="break-panel" id="overtimeModal" style="z-index: 10000;">
+        <div style="text-align: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 4px; background: #d1d5db; border-radius: 2px; margin: 0 auto 16px;"></div>
+            <div style="font-size: 40px; margin-bottom: 8px;">⏰</div>
+            <h3 style="font-size: 20px; font-weight: 700; color: #1f2937;">Expected Hours Completed!</h3>
+            <p id="overtimeWorkingTime" style="font-size: 16px; color: #6b7280; margin-top: 8px;"></p>
+        </div>
+        <p style="font-size: 14px; color: #374151; text-align: center; margin-bottom: 16px;">
+            நீங்கள் வேலை நேரத்தை முடித்துவிட்டீர்கள்.<br>
+            You have completed your expected working hours.
+        </p>
+        <div style="display: flex; gap: 12px;">
+            <button onclick="clockOutFromOvertime()" style="flex: 1; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; background: #fee2e2; color: #dc2626;">
+                🚪 Clock Out Now
+            </button>
+            <button onclick="continueOvertime()" style="flex: 1; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #059669, #047857); color: white;">
+                ✅ Continue Overtime
+            </button>
+        </div>
+    </div>
+
+    <!-- Force Clock-Out Modal (10 PM) -->
+    <div class="clockout-backdrop" id="forceClockoutBackdrop" style="z-index: 9999;"></div>
+    <div class="break-panel" id="forceClockoutModal" style="z-index: 10000;">
+        <div style="text-align: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 4px; background: #d1d5db; border-radius: 2px; margin: 0 auto 16px;"></div>
+            <div style="font-size: 40px; margin-bottom: 8px;">🕙</div>
+            <h3 style="font-size: 20px; font-weight: 700; color: #dc2626;">10 PM - Auto Clock-Out</h3>
+            <p style="font-size: 14px; color: #6b7280; margin-top: 8px;">
+                இரவு 10 மணி ஆகிவிட்டது. தானாக வெளியேற்றப்படுவீர்கள்.<br>
+                It's 10 PM. You will be automatically clocked out.
+            </p>
+        </div>
+        <div id="forceClockoutCountdown" style="font-size: 48px; font-weight: 700; color: #dc2626; text-align: center; margin: 16px 0;">10</div>
+        <button onclick="acknowledgeForceClockout()" style="width: 100%; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #667eea, #764ba2); color: white;">
+            👍 OK
+        </button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
     <script src="/components/logo-loader.js"></script>
     <script>
+        // Initialize Socket.io for real-time overtime/force-clockout events
+        let dashboardSocket = null;
+        try {
+            dashboardSocket = io();
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.id) {
+                dashboardSocket.emit('join', `user_${user.id}`);
+            }
+            dashboardSocket.on('overtime_prompt', (data) => {
+                if (!overtimePromptShown) {
+                    showOvertimeModal(data.working_minutes, data.expected_minutes);
+                }
+            });
+            dashboardSocket.on('force_clockout', () => {
+                showForceClockoutModal();
+            });
+            dashboardSocket.on('auto_clockout', () => {
+                showToast('You have been automatically clocked out', 'info');
+                setTimeout(() => loadTodayAttendance(), 1500);
+            });
+        } catch (e) {
+            console.warn('Socket.io not available:', e.message);
+        }
+
         let attendanceData = null;
         let timerInterval = null;
         let breakTimerInterval = null;
@@ -1101,6 +1167,20 @@
             // Update time breakdown
             if (attendanceData && attendanceData.data) {
                 updateTimeBreakdown(attendanceData.data);
+            }
+
+            // Overtime state
+            if (attendanceData && attendanceData.overtime && attendanceData.overtime.acknowledged) {
+                isInOvertime = true;
+                overtimePromptShown = true;
+                showOvertimeBadge();
+            }
+
+            // Start overtime checking if clocked in and not clocked out
+            if (attendanceData && attendanceData.has_clocked_in && !attendanceData.has_clocked_out) {
+                startOvertimeCheck();
+            } else {
+                stopOvertimeCheck();
             }
 
             // Show expected clock-out
@@ -1959,6 +2039,129 @@
             document.getElementById('tbPrayer').textContent = formatMins(prayerMins);
             document.getElementById('tbBreak').textContent = formatMins(breakMins);
             document.getElementById('tbTotal').textContent = formatMins(totalWorking);
+        }
+
+        // ========================================
+        // OVERTIME TRACKING
+        // ========================================
+        let overtimeCheckInterval = null;
+        let overtimePromptShown = false;
+        let isInOvertime = false;
+
+        function startOvertimeCheck() {
+            if (overtimeCheckInterval) return;
+            checkOvertimeStatus();
+            overtimeCheckInterval = setInterval(checkOvertimeStatus, 2 * 60 * 1000); // every 2 min
+        }
+
+        function stopOvertimeCheck() {
+            if (overtimeCheckInterval) {
+                clearInterval(overtimeCheckInterval);
+                overtimeCheckInterval = null;
+            }
+        }
+
+        async function checkOvertimeStatus() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/attendance/check-overtime-status', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    if (data.needsOvertimePrompt && !overtimePromptShown) {
+                        showOvertimeModal(data.working_minutes, data.expected_minutes);
+                    }
+                    if (data.overtime_acknowledged) {
+                        isInOvertime = true;
+                        showOvertimeBadge();
+                    }
+                }
+            } catch (err) {
+                // Silent fail
+            }
+        }
+
+        function showOvertimeModal(workingMinutes, expectedMinutes) {
+            overtimePromptShown = true;
+            const hours = Math.floor(workingMinutes / 60);
+            const mins = workingMinutes % 60;
+            const expHours = Math.round(expectedMinutes / 60);
+            document.getElementById('overtimeWorkingTime').textContent =
+                `Working: ${hours}h ${mins}m (Expected: ${expHours}h)`;
+            document.getElementById('overtimeBackdrop').classList.add('active');
+            document.getElementById('overtimeModal').classList.add('active');
+        }
+
+        function hideOvertimeModal() {
+            document.getElementById('overtimeBackdrop').classList.remove('active');
+            document.getElementById('overtimeModal').classList.remove('active');
+        }
+
+        async function continueOvertime() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/attendance/acknowledge-overtime', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    hideOvertimeModal();
+                    isInOvertime = true;
+                    showOvertimeBadge();
+                    showToast('Overtime started. Continue working!', 'success');
+                } else {
+                    showToast(data.message || 'Failed', 'error');
+                }
+            } catch (err) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        function clockOutFromOvertime() {
+            hideOvertimeModal();
+            // Show clock out section and trigger it
+            document.getElementById('clockOutSection').style.display = 'block';
+            document.getElementById('showClockOutBtn').style.display = 'none';
+            showToast('Please use the Clock Out button below', 'info');
+        }
+
+        function showOvertimeBadge() {
+            const existing = document.getElementById('overtimeBadge');
+            if (existing) return;
+            const badge = document.createElement('div');
+            badge.id = 'overtimeBadge';
+            badge.style.cssText = 'text-align: center; padding: 8px; background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 8px; margin: 8px 0; font-weight: 700; color: #92400e; font-size: 14px;';
+            badge.textContent = '🕐 OVERTIME MODE';
+            const statsRow = document.querySelector('.stats-row');
+            if (statsRow) statsRow.parentNode.insertBefore(badge, statsRow.nextSibling);
+        }
+
+        function showForceClockoutModal() {
+            document.getElementById('forceClockoutBackdrop').classList.add('active');
+            document.getElementById('forceClockoutModal').classList.add('active');
+            let countdown = 10;
+            const el = document.getElementById('forceClockoutCountdown');
+            const timer = setInterval(() => {
+                countdown--;
+                el.textContent = countdown;
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    acknowledgeForceClockout();
+                }
+            }, 1000);
+        }
+
+        function acknowledgeForceClockout() {
+            document.getElementById('forceClockoutBackdrop').classList.remove('active');
+            document.getElementById('forceClockoutModal').classList.remove('active');
+            stopOvertimeCheck();
+            showToast('You have been clocked out at 10 PM (end of day)', 'info');
+            // Reload to show clocked-out state
+            setTimeout(() => loadTodayAttendance(), 1500);
         }
 
         // ========================================

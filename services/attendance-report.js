@@ -61,16 +61,20 @@ async function generateReport(userId, date) {
         const totalBreak = records.reduce((s, r) => s + (r.break_duration_minutes || 0), 0);
         const totalOutside = records.reduce((s, r) => s + (r.outside_work_minutes || 0), 0);
         const totalPrayer = records.reduce((s, r) => s + (r.prayer_minutes || 0), 0);
+        const totalOvertime = records.reduce((s, r) => s + (r.overtime_minutes || 0), 0);
         const shopTime = Math.max(0, totalWorking - totalOutside - totalPrayer);
 
         const clockIn = formatTime(staff.clock_in_time);
         const clockOut = staff.clock_out_time ? formatTime(staff.clock_out_time) : 'Still working';
         const isComplete = staff.clock_out_time ? (totalWorking >= (staff.expected_hours || 10) * 60) : false;
         const status = !staff.clock_out_time ? 'Still Working' : (isComplete ? 'Complete' : 'Incomplete');
+        const autoClockoutNote = staff.auto_clockout_type === 'end_of_day' ? '\n⚠️ Auto clock-out at 10 PM' : '';
 
         // Format date
         const dateObj = new Date(date + 'T00:00:00');
         const dateStr = dateObj.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+        const overtimeLine = totalOvertime > 0 ? `\n🕐 *Overtime: ${formatMinutes(totalOvertime)}*` : '';
 
         const text = `📋 *Daily Attendance Report*
 ━━━━━━━━━━━━━━━━━━━
@@ -88,8 +92,8 @@ async function generateReport(userId, date) {
 🕌 Prayer: ${formatMinutes(totalPrayer)}
 ☕ Break: ${formatMinutes(totalBreak)}
 ━━━━━━━━━━━━━━━━━━━
-⏱️ *Total Working: ${formatMinutes(totalWorking)}*
-📌 Status: ${status}
+⏱️ *Total Working: ${formatMinutes(totalWorking)}*${overtimeLine}
+📌 Status: ${status}${autoClockoutNote}
 
 _QC Paint Shop - Auto Report_`;
 
@@ -107,6 +111,7 @@ _QC Paint Shop - Auto Report_`;
                 total_break: totalBreak,
                 total_outside: totalOutside,
                 total_prayer: totalPrayer,
+                total_overtime: totalOvertime,
                 shop_time: shopTime,
                 status
             }
@@ -236,9 +241,9 @@ async function sendAllReports(date, sentBy) {
  * Start the 10 PM IST cron job
  */
 function start() {
-    // Run at 10:00 PM IST every day
-    cron.schedule('0 22 * * *', async () => {
-        console.log('[AttendanceReport] 10 PM cron triggered - sending daily reports');
+    // Run at 10:05 PM IST every day (after 10 PM force clock-out)
+    cron.schedule('5 22 * * *', async () => {
+        console.log('[AttendanceReport] 10:05 PM cron triggered - sending daily reports');
         const now = new Date();
         // Get today's date in IST
         const istOffset = 5.5 * 60 * 60 * 1000;
@@ -247,7 +252,7 @@ function start() {
         await sendAllReports(today);
     }, { timezone: 'Asia/Kolkata' });
 
-    console.log('[AttendanceReport] 10 PM IST cron scheduled');
+    console.log('[AttendanceReport] 10:05 PM IST cron scheduled');
 }
 
 module.exports = {

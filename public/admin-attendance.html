@@ -1340,6 +1340,10 @@
                                 <div class="stat-label">Prayer</div>
                                 <div style="font-size: 1.25rem; font-weight: 700; color: #1f2937;">${formatMinutesToHours(s.total_prayer_minutes || 0)}</div>
                             </div>
+                            <div class="stat-card" style="--border-color: #d97706; padding: 1rem;">
+                                <div class="stat-label">Overtime</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: ${(s.total_overtime_minutes || 0) > 0 ? '#d97706' : '#1f2937'};">${formatMinutesToHours(s.total_overtime_minutes || 0)}</div>
+                            </div>
                             <div class="stat-card" style="--border-color: #ef4444; padding: 1rem;">
                                 <div class="stat-label">Violations</div>
                                 <div style="font-size: 1.25rem; font-weight: 700; color: #1f2937;">${s.violation_count}</div>
@@ -1425,7 +1429,8 @@
                 geofence_violation:  { icon: '&#9888;&#65039;', label: 'Geofence Violation', color: '#ef4444' },
                 auto_clockout_geo:   { icon: '&#128680;', label: 'Auto Clock-Out (Geo)', color: '#ef4444' },
                 auto_clockout_admin: { icon: '&#128680;', label: 'Auto Clock-Out (Admin)', color: '#ef4444' },
-                auto_clockout_max_hours: { icon: '&#128680;', label: 'Auto Clock-Out (Max Hours)', color: '#ef4444' }
+                auto_clockout_max_hours: { icon: '&#128680;', label: 'Auto Clock-Out (Max Hours)', color: '#ef4444' },
+                auto_clockout_end_of_day: { icon: '&#128345;', label: 'Auto Clock-Out (10 PM)', color: '#d97706' }
             };
             return configs[type] || { icon: '&#128308;', label: type.replace(/_/g, ' '), color: '#6b7280' };
         }
@@ -1617,11 +1622,12 @@
                 let html = `<div style="overflow-x: auto;"><table class="data-table" style="width: 100%; font-size: 14px;">
                     <thead><tr>
                         <th>Staff</th><th>Branch</th><th>Clock In</th><th>Clock Out</th>
-                        <th>Working</th><th>Prayer</th><th>Phone</th><th>Status</th><th>Actions</th>
+                        <th>Working</th><th>Overtime</th><th>Prayer</th><th>Phone</th><th>Status</th><th>Actions</th>
                     </tr></thead><tbody>`;
 
                 for (const s of data.data) {
                     const working = fmtMins(s.total_working_minutes);
+                    const overtime = fmtMins(s.overtime_minutes);
                     const prayer = fmtMins(s.prayer_minutes);
                     const sentBadge = s.report_id
                         ? `<span style="background: #d1fae5; color: #059669; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;">Sent</span>`
@@ -1633,6 +1639,7 @@
                         <td>${fmtTime(s.clock_in_time)}</td>
                         <td>${fmtTime(s.clock_out_time)}</td>
                         <td>${working}</td>
+                        <td style="${s.overtime_minutes > 0 ? 'color: #d97706; font-weight: 700;' : ''}">${overtime}</td>
                         <td>${prayer}</td>
                         <td>${s.phone || '-'}</td>
                         <td>${sentBadge}</td>

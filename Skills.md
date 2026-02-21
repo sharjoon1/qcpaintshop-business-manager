@@ -343,9 +343,26 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Automatic nearest-branch detection on clock-in (uses GPS to match assigned branches)
 - Geo-fence violation logging
 - **Geo-fence auto clock-out**: staff 300m+ from branch → 5-minute grace period → auto clocked out with notification to BOTH staff AND all admins
-- **Auto-clockout tracking**: `auto_clockout_type` (geo/max_hours/admin) and `auto_clockout_distance` columns on attendance record
+- **Auto-clockout tracking**: `auto_clockout_type` (geo/max_hours/admin/end_of_day) and `auto_clockout_distance` columns on attendance record
+- **10 PM end-of-day force clock-out**: cron at 21:59 IST auto-clocks out all staff, ends active breaks/prayer/outside work, notifies via Socket.io
 - Late detection (configurable threshold per branch, shop opens 08:30 AM)
 - Work hours calculation
+
+**Overtime Tracking**
+- After expected hours (e.g., 10h weekday, 5h Sunday), staff gets overtime prompt (NOT auto-clocked-out)
+- Modal: "Continue Overtime" (acknowledges, enters overtime mode) or "Clock Out Now"
+- Server checks every 5 minutes + Socket.io `overtime_prompt` event for real-time notification
+- Frontend polls `GET /check-overtime-status` every 2 minutes as backup
+- On acknowledge: `overtime_acknowledged = 1`, `overtime_started_at` recorded
+- On clock-out: `overtime_minutes = max(0, total_working - expected_hours * 60)` computed and stored
+- Force clock-out at 10 PM: `force_clockout` Socket.io event + 10-second countdown modal
+- Staff dashboard: amber "OVERTIME MODE" badge when in overtime
+- Endpoints: `GET /check-overtime-status`, `POST /acknowledge-overtime`
+- Columns: `overtime_minutes`, `overtime_started_at`, `overtime_acknowledged`, `overtime_acknowledged_at`
+- Admin timeline: shows overtime minutes in summary stats
+- Reports tab: overtime column highlighted in amber
+- WhatsApp report: includes overtime line when > 0
+- Migration: `migrations/migrate-overtime.js`
 - Pages: `staff/clock-in.html`, `staff/clock-out.html`
 
 **Break Management & Enforcement**

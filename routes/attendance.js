@@ -620,16 +620,21 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
         const currentDateTime = new Date(`1970-01-01T${currentTime}`);
         const isEarly = currentDateTime < closeTime;
 
-        // Update attendance with break enforcement data
+        // Calculate overtime
+        const expectedMinutes = (record.expected_hours || 10) * 60;
+        const overtimeMinutes = Math.max(0, workingMinutes - expectedMinutes);
+
+        // Update attendance with break enforcement data + overtime
         await pool.query(
             `UPDATE staff_attendance
              SET clock_out_time = ?, clock_out_photo = ?,
                  clock_out_lat = ?, clock_out_lng = ?, clock_out_address = ?,
                  total_working_minutes = ?, is_early_checkout = ?, clock_out_distance = ?,
-                 excess_break_minutes = ?, break_exceeded = ?, effective_working_minutes = ?
+                 excess_break_minutes = ?, break_exceeded = ?, effective_working_minutes = ?,
+                 overtime_minutes = ?
              WHERE id = ?`,
             [now, photoPath, latitude, longitude, address, workingMinutes, isEarly ? 1 : 0, clockOutDistance,
-             excessBreak, breakExceeded, effectiveWorking, record.id]
+             excessBreak, breakExceeded, effectiveWorking, overtimeMinutes, record.id]
         );
         
         // Save photo record
@@ -643,7 +648,6 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
         );
         
         const workingHours = workingMinutes / 60;
-        const expectedMinutes = record.expected_hours * 60;
         const shortage = expectedMinutes - workingMinutes;
         
         res.json({
@@ -781,6 +785,11 @@ router.get('/today', requireAuth, async (req, res) => {
             day_total_minutes: dayTotalMinutes,
             outside_work: outsideWork,
             prayer: prayer,
+            overtime: {
+                acknowledged: !!attendance.overtime_acknowledged,
+                started_at: attendance.overtime_started_at,
+                minutes: attendance.overtime_minutes || 0
+            },
             break_policy: {
                 allowance: breakAllowance,
                 warning: breakWarning,
@@ -2772,6 +2781,7 @@ router.get('/admin/staff-timeline', requirePermission('attendance', 'view'), asy
                     total_break_minutes: totalBreakMinutes,
                     total_outside_minutes: totalOutsideMinutes,
                     total_prayer_minutes: totalPrayerMinutes,
+                    total_overtime_minutes: attendanceRows.reduce((sum, a) => sum + (a.overtime_minutes || 0), 0),
                     violation_count: violationCount,
                     records_count: attendanceRows.length
                 }
@@ -2926,6 +2936,101 @@ router.get('/prayer/status', requireAuth, async (req, res) => {
 });
 
 // ========================================
+// OVERTIME TRACKING ENDPOINTS
+// ========================================
+
+/**
+ * GET /api/attendance/check-overtime-status
+ * Check if staff needs overtime prompt or force clock-out
+ */
+router.get('/check-overtime-status', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const today = getTodayIST();
+
+        const [attendance] = await pool.query(
+            `SELECT a.*, shc.expected_hours as config_expected_hours
+             FROM staff_attendance a
+             LEFT JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
+                AND shc.day_of_week = LOWER(DAYNAME(a.date))
+             WHERE a.user_id = ? AND a.date = ? AND a.clock_out_time IS NULL
+             ORDER BY a.id DESC LIMIT 1`,
+            [userId, today]
+        );
+
+        if (attendance.length === 0) {
+            return res.json({ success: true, needsOvertimePrompt: false, reason: 'not_clocked_in' });
+        }
+
+        const att = attendance[0];
+        const now = new Date();
+        const clockIn = new Date(att.clock_in_time);
+        const elapsedMinutes = (now - clockIn) / 1000 / 60;
+        const breakMinutes = att.break_duration_minutes || 0;
+        const workingMinutes = Math.round(elapsedMinutes - breakMinutes);
+        const expectedMinutes = (att.expected_hours || att.config_expected_hours || 10) * 60;
+
+        // Check if working time exceeded expected hours
+        if (workingMinutes >= expectedMinutes && !att.overtime_acknowledged) {
+            return res.json({
+                success: true,
+                needsOvertimePrompt: true,
+                working_minutes: workingMinutes,
+                expected_minutes: expectedMinutes,
+                overtime_minutes: workingMinutes - expectedMinutes,
+                message: `Working time exceeded ${Math.round(expectedMinutes / 60)} hours`
+            });
+        }
+
+        res.json({
+            success: true,
+            needsOvertimePrompt: false,
+            working_minutes: workingMinutes,
+            expected_minutes: expectedMinutes,
+            overtime_acknowledged: !!att.overtime_acknowledged,
+            overtime_started_at: att.overtime_started_at
+        });
+    } catch (error) {
+        console.error('Check overtime error:', error);
+        res.status(500).json({ success: false, message: 'Failed to check overtime status' });
+    }
+});
+
+/**
+ * POST /api/attendance/acknowledge-overtime
+ * Staff confirms they want to continue working overtime
+ */
+router.post('/acknowledge-overtime', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const today = getTodayIST();
+        const now = new Date();
+
+        const [result] = await pool.query(
+            `UPDATE staff_attendance
+             SET overtime_acknowledged = 1,
+                 overtime_acknowledged_at = ?,
+                 overtime_started_at = ?
+             WHERE user_id = ? AND date = ? AND clock_out_time IS NULL`,
+            [now, now, userId, today]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(400).json({ success: false, message: 'No active attendance found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Overtime acknowledged. Continue working.',
+            overtime_started_at: now
+        });
+    } catch (error) {
+        console.error('Acknowledge overtime error:', error);
+        res.status(500).json({ success: false, message: 'Failed to acknowledge overtime' });
+    }
+});
+
+// ========================================
 // DAILY ATTENDANCE REPORT ENDPOINTS
 // ========================================
 
@@ -3023,7 +3128,7 @@ router.get('/report/staff-list', requirePermission('attendance.view'), async (re
         let query = `
             SELECT a.id, a.user_id, a.clock_in_time, a.clock_out_time,
                    a.total_working_minutes, a.break_duration_minutes,
-                   a.outside_work_minutes, a.prayer_minutes, a.branch_id,
+                   a.outside_work_minutes, a.prayer_minutes, a.overtime_minutes, a.branch_id,
                    u.full_name, u.phone, u.email,
                    b.name as branch_name,
                    dr.id as report_id, dr.sent_at, dr.delivery_status
