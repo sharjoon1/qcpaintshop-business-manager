@@ -22,11 +22,13 @@
 /* ── Filter Panel (collapsible) ── */
 .filter-panel {
     max-height: 0; overflow: hidden; opacity: 0;
-    transition: max-height .25s ease, opacity .2s ease, margin .2s ease;
+    transition: max-height .25s ease, opacity .2s ease, margin .2s ease, overflow 0s .25s;
     margin-top: 0;
 }
 .filter-panel.open {
     max-height: 300px; opacity: 1; margin-top: 12px;
+    overflow: visible;
+    transition: max-height .25s ease, opacity .2s ease, margin .2s ease, overflow 0s 0s;
 }
 .filter-panel-inner {
     display: grid;
