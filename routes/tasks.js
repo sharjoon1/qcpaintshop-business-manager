@@ -493,9 +493,10 @@ router.post('/', requirePermission('tasks', 'assign'), async (req, res) => {
             });
         }
 
-        // Verify assigned user exists
+        // Verify assigned user exists and has an assignable role
+        const ASSIGNABLE_ROLES = ['staff', 'sales_staff', 'branch_manager'];
         const [users] = await pool.query(
-            'SELECT id, full_name, branch_id FROM users WHERE id = ? AND status = ?',
+            'SELECT id, full_name, branch_id, role FROM users WHERE id = ? AND status = ?',
             [assigned_to, 'active']
         );
 
@@ -504,6 +505,9 @@ router.post('/', requirePermission('tasks', 'assign'), async (req, res) => {
                 success: false,
                 message: 'Assigned user not found or inactive'
             });
+        }
+        if (!ASSIGNABLE_ROLES.includes(users[0].role)) {
+            return res.status(400).json({ success: false, message: 'Can only assign tasks to staff members' });
         }
 
         // Generate task number
@@ -1109,11 +1113,12 @@ router.post('/bulk-assign', requirePermission('tasks', 'assign'), async (req, re
         const results = [];
         const errors = [];
 
+        const ASSIGNABLE_ROLES = ['staff', 'sales_staff', 'branch_manager'];
         for (const task of tasks) {
             try {
-                // Verify assigned user exists
+                // Verify assigned user exists and has an assignable role
                 const [users] = await pool.query(
-                    'SELECT id, full_name, branch_id FROM users WHERE id = ? AND status = ?',
+                    'SELECT id, full_name, branch_id, role FROM users WHERE id = ? AND status = ?',
                     [task.assigned_to, 'active']
                 );
 
@@ -1122,6 +1127,14 @@ router.post('/bulk-assign', requirePermission('tasks', 'assign'), async (req, re
                         assigned_to: task.assigned_to,
                         title: task.title,
                         error: 'Assigned user not found or inactive'
+                    });
+                    continue;
+                }
+                if (!ASSIGNABLE_ROLES.includes(users[0].role)) {
+                    errors.push({
+                        assigned_to: task.assigned_to,
+                        title: task.title,
+                        error: 'Can only assign tasks to staff members'
                     });
                     continue;
                 }

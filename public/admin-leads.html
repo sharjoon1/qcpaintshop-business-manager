@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
-    <script>checkAuthOrRedirect();</script>
+    <script>requireAdminOrRedirect();</script>
     <style>
         .status-new { background: #dbeafe; color: #1e40af; }
         .status-contacted { background: #fef3c7; color: #92400e; }
@@ -637,7 +637,7 @@
         // Load users for assignment dropdown
         async function loadUsers() {
             try {
-                const response = await fetch(`${API_BASE}/users?status=active`, { headers: getAuthHeaders() });
+                const response = await fetch(`${API_BASE}/users?assignable=1`, { headers: getAuthHeaders() });
                 const result = await response.json();
 
                 if (result.success || Array.isArray(result)) {

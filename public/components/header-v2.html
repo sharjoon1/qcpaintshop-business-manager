@@ -616,7 +616,7 @@ async function loadNotifications() {
         list.innerHTML = notifications.map(n => {
             const icon = getNotifIcon(n.type);
             const timeAgo = formatTimeAgo(n.created_at);
-            return `<div class="qc-notification-item ${n.is_read ? '' : 'unread'}" onclick="handleNotifClick(${n.id}, ${JSON.stringify((n.data || '{}').toString()).replace(/"/g, '&quot;')})">
+            return `<div class="qc-notification-item ${n.is_read ? '' : 'unread'}" onclick="handleNotifClick(${n.id}, '${n.type || ''}', ${JSON.stringify((n.data || '{}').toString()).replace(/"/g, '&quot;')})">
                 <div class="qc-notification-icon">${icon}</div>
                 <div class="qc-notification-body">
                     <div class="qc-notification-title">${escapeHtml(n.title)}</div>
@@ -631,7 +631,14 @@ async function loadNotifications() {
 function getNotifIcon(type) {
     const icons = {
         'chat_message': '💬', 'estimate_shared': '📋', 'estimate_approved': '✅',
-        'estimate_rejected': '❌', 'task_assigned': '📌', 'system': '🔔'
+        'estimate_rejected': '❌', 'task_assigned': '📌', 'task_completed': '✅',
+        'stock_check_assigned': '📦', 'stock_check_submitted': '📦',
+        'permission_approved': '✅', 'permission_rejected': '❌',
+        'reclockin_request': '🔄', 'break_exceeded': '⏰',
+        'force_clockout': '🔴', 'geo_auto_clockout': '📍', 'geo_auto_clockout_admin': '📍',
+        'salary_generated': '💰', 'salary_paid': '💵',
+        'advance_approved': '✅', 'advance_rejected': '❌',
+        'new_registration': '👤', 'system': '🔔'
     };
     return icons[type] || '🔔';
 }
@@ -652,12 +659,15 @@ function formatTimeAgo(dateStr) {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-async function handleNotifClick(id, dataStr) {
+async function handleNotifClick(id, type, dataStr) {
     try {
         const token = localStorage.getItem('auth_token');
         await fetch(`/api/notifications/${id}/read`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
         fetchNotificationCount();
     } catch {}
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const isStaff = user.role === 'staff';
 
     try {
         const data = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
@@ -666,6 +676,31 @@ async function handleNotifClick(id, dataStr) {
             return;
         }
     } catch {}
+
+    // Type-based navigation
+    const routes = {
+        'stock_check_assigned':   isStaff ? '/staff/stock-check.html' : '/admin-stock-check.html',
+        'stock_check_submitted':  '/admin-stock-check.html',
+        'permission_approved':    isStaff ? '/staff/permission-request.html' : null,
+        'permission_rejected':    isStaff ? '/staff/permission-request.html' : null,
+        'reclockin_request':      '/admin-attendance.html',
+        'break_exceeded':         isStaff ? '/staff/clock-out.html' : '/admin-attendance.html',
+        'force_clockout':         isStaff ? '/staff/history.html' : null,
+        'geo_auto_clockout':      isStaff ? '/staff/history.html' : null,
+        'geo_auto_clockout_admin':'/admin-attendance.html',
+        'task_assigned':          '/staff-requests.html',
+        'task_completed':         '/staff-requests.html',
+        'salary_generated':       isStaff ? '/staff/dashboard.html' : null,
+        'salary_paid':            isStaff ? '/staff/dashboard.html' : null,
+        'advance_approved':       isStaff ? '/staff/dashboard.html' : null,
+        'advance_rejected':       isStaff ? '/staff/dashboard.html' : null,
+    };
+
+    const dest = routes[type];
+    if (dest) {
+        window.location.href = dest;
+        return;
+    }
 
     document.getElementById('notifPanel').classList.remove('show');
 }

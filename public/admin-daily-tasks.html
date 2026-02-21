@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
-    <script>checkAuthOrRedirect();</script>
+    <script>requireAdminOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
         .tab-btn { padding: 12px 20px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; border-radius: 8px 8px 0 0; transition: all 0.2s; min-height: 44px; }
@@ -447,7 +447,7 @@
 
         async function loadUsers() {
             try {
-                const res = await fetch('/api/users', { headers: getAuthHeaders() });
+                const res = await fetch('/api/users?assignable=1', { headers: getAuthHeaders() });
                 if (res.ok) {
                     const users = await res.json();
                     allUsers = users;

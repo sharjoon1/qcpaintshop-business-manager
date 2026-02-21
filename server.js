@@ -2011,13 +2011,18 @@ app.delete('/api/categories/:id', requirePermission('categories', 'delete'), asy
 
 app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
     try {
-        const { role, branch_id, status } = req.query;
+        const { role, branch_id, status, assignable } = req.query;
         let query = `SELECT id, username, email, full_name, phone, role, branch_id, geo_fence_enabled, status, created_at, last_login, profile_image_url, kyc_status FROM users WHERE 1=1`;
         const params = [];
 
-        if (role) { query += ' AND role = ?'; params.push(role); }
+        if (assignable === '1') {
+            query += " AND role IN ('staff', 'sales_staff', 'branch_manager')";
+            query += " AND status = 'active'";
+        } else {
+            if (role) { query += ' AND role = ?'; params.push(role); }
+            if (status) { query += ' AND status = ?'; params.push(status); }
+        }
         if (branch_id) { query += ' AND branch_id = ?'; params.push(branch_id); }
-        if (status) { query += ' AND status = ?'; params.push(status); }
 
         query += ' ORDER BY created_at DESC';
         const [rows] = await pool.query(query, params);

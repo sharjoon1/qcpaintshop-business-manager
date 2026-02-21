@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
-    <script>checkAuthOrRedirect();</script>
+    <script>requireAdminOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
 
@@ -515,7 +515,7 @@
 
         async function loadUsers() {
             try {
-                const response = await fetch('/api/users', {
+                const response = await fetch('/api/users?assignable=1', {
                     headers: getAuthHeaders()
                 });
 

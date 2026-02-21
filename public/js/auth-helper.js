@@ -210,6 +210,24 @@ async function apiFetch(url, options = {}) {
     return response.json();
 }
 
+/**
+ * Check if current user has admin/manager role.
+ * If staff or other non-admin role, redirect to staff dashboard.
+ * Call this at the top of admin-only pages.
+ */
+function requireAdminOrRedirect() {
+    if (!isAuthenticated()) {
+        window.location.href = '/login.html';
+        return false;
+    }
+    const user = getCurrentUser();
+    if (user && !['admin', 'manager', 'super_admin'].includes(user.role)) {
+        window.location.href = '/staff/dashboard.html';
+        return false;
+    }
+    return true;
+}
+
 // Expose functions globally
 window.getAuthHeaders = getAuthHeaders;
 window.isAuthenticated = isAuthenticated;
@@ -218,6 +236,7 @@ window.logout = logout;
 window.apiRequest = apiRequest;
 window.apiFetch = apiFetch;
 window.checkAuthOrRedirect = checkAuthOrRedirect;
+window.requireAdminOrRedirect = requireAdminOrRedirect;
 window.isAndroidApp = isAndroidApp;
 
 console.log('✅ Auth helper loaded');

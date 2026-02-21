@@ -83,17 +83,34 @@ self.addEventListener('notificationclick', (event) => {
       break;
     case 'task_assigned':
     case 'task_completed':
-      path = '/staff/tasks.html';
+      path = '/staff-requests.html';
       break;
     case 'advance_approved':
     case 'advance_rejected':
     case 'salary_generated':
     case 'salary_paid':
-      path = '/staff/salary.html';
+      path = '/staff/dashboard.html';
       break;
     case 'permission_approved':
     case 'permission_rejected':
-      path = '/staff/dashboard.html';
+      path = '/staff/permission-request.html';
+      break;
+    case 'stock_check_assigned':
+      path = '/staff/stock-check.html';
+      break;
+    case 'stock_check_submitted':
+      path = '/admin-stock-check.html';
+      break;
+    case 'break_exceeded':
+      path = '/staff/clock-out.html';
+      break;
+    case 'force_clockout':
+    case 'geo_auto_clockout':
+      path = '/staff/history.html';
+      break;
+    case 'geo_auto_clockout_admin':
+    case 'reclockin_request':
+      path = '/admin-attendance.html';
       break;
     case 'new_registration':
       path = '/admin-staff-registrations.html';

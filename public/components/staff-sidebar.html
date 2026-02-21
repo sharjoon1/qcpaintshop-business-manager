@@ -82,7 +82,7 @@
         <!-- My Work -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">My Work</div>
-            <a href="/staff-estimates.html" class="qc-nav-item" data-page="estimates">
+            <a href="/staff-estimates.html" class="qc-nav-item" data-page="estimates" data-requires="estimates.view">
                 <span class="qc-nav-item-icon">📋</span>
                 <span>My Estimates</span>
             </a>
@@ -95,15 +95,15 @@
         <!-- Attendance -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Attendance</div>
-            <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
+            <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in" data-requires="attendance.view">
                 <span class="qc-nav-item-icon">🟢</span>
                 <span>Clock In</span>
             </a>
-            <a href="/staff/clock-out.html" class="qc-nav-item" data-page="clock-out">
+            <a href="/staff/clock-out.html" class="qc-nav-item" data-page="clock-out" data-requires="attendance.view">
                 <span class="qc-nav-item-icon">🔴</span>
                 <span>Clock Out</span>
             </a>
-            <a href="/staff/history.html" class="qc-nav-item" data-page="history">
+            <a href="/staff/history.html" class="qc-nav-item" data-page="history" data-requires="attendance.view">
                 <span class="qc-nav-item-icon">📜</span>
                 <span>My History</span>
             </a>
@@ -112,7 +112,7 @@
         <!-- Permissions -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Permissions</div>
-            <a href="/staff/permission-request.html" class="qc-nav-item" data-page="permission">
+            <a href="/staff/permission-request.html" class="qc-nav-item" data-page="permission" data-requires="attendance.view">
                 <span class="qc-nav-item-icon">✋</span>
                 <span>Request Permission</span>
             </a>
@@ -121,11 +121,11 @@
         <!-- Inventory -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Inventory</div>
-            <a href="/staff/stock-check.html" class="qc-nav-item" data-page="stock-check">
+            <a href="/staff/stock-check.html" class="qc-nav-item" data-page="stock-check" data-requires="zoho.stock_check">
                 <span class="qc-nav-item-icon">📦</span>
                 <span>Stock Check</span>
             </a>
-            <a href="/staff/collections.html" class="qc-nav-item" data-page="collections">
+            <a href="/staff/collections.html" class="qc-nav-item" data-page="collections" data-requires="zoho.collections">
                 <span class="qc-nav-item-icon">💰</span>
                 <span>Collections</span>
             </a>
@@ -211,6 +211,65 @@ function highlightActiveSidebarPage() {
     });
 }
 
+// Filter sidebar items by user permissions
+async function filterSidebarByPermissions() {
+    try {
+        // Check localStorage cache first (same key as PermissionManager)
+        let permData = null;
+        const cached = localStorage.getItem('user_permissions');
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                if (parsed.timestamp && (Date.now() - parsed.timestamp) < 3600000) {
+                    permData = parsed;
+                }
+            } catch(e) {}
+        }
+
+        // Fetch from API if no valid cache
+        if (!permData) {
+            const token = localStorage.getItem('auth_token');
+            if (!token) return;
+            const resp = await fetch('/api/auth/permissions', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!resp.ok) return;
+            permData = await resp.json();
+            permData.timestamp = Date.now();
+            localStorage.setItem('user_permissions', JSON.stringify(permData));
+        }
+
+        // Admin bypass — show everything
+        if (permData.is_admin) return;
+
+        // Build permission set for fast lookup
+        const permSet = new Set();
+        if (Array.isArray(permData.permissions)) {
+            permData.permissions.forEach(p => permSet.add(`${p.module}.${p.action}`));
+        }
+
+        // Hide gated items the user lacks permission for
+        document.querySelectorAll('[data-requires]').forEach(el => {
+            const required = el.getAttribute('data-requires');
+            if (!permSet.has(required)) {
+                el.style.display = 'none';
+            }
+        });
+
+        // Hide sections where all nav items are hidden
+        document.querySelectorAll('.qc-nav-section').forEach(section => {
+            const items = section.querySelectorAll('.qc-nav-item');
+            if (items.length === 0) return;
+            const allHidden = Array.from(items).every(item => item.style.display === 'none');
+            if (allHidden) {
+                section.style.display = 'none';
+            }
+        });
+    } catch(e) {
+        // On error, leave sidebar as-is (show all)
+    }
+}
+
 // Logout
 function logoutUser() {
     if (confirm('Are you sure you want to logout?')) {
@@ -225,9 +284,11 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         loadSidebarUserInfo();
         highlightActiveSidebarPage();
+        filterSidebarByPermissions();
     });
 } else {
     loadSidebarUserInfo();
     highlightActiveSidebarPage();
+    filterSidebarByPermissions();
 }
 </script>

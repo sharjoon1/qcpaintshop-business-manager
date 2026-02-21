@@ -12,7 +12,7 @@
     <title>Settings - Quality Colours Business Manager</title>
     <script src="/js/auth-helper.js"></script>
     <script>
-        checkAuthOrRedirect();
+        requireAdminOrRedirect();
         // Settings page is admin-only
         (function() {
             try {

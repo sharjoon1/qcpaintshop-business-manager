@@ -541,6 +541,14 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Auto-cleanup of stale subscriptions (410/404)
 - Background notification delivery (non-blocking)
 
+**Notification Click Routing** (Feb 20)
+- `handleNotifClick(id, type, dataStr)` in `header-v2.html` routes to correct pages based on notification type
+- Previously only handled `conversation_id` (chat) — all other notifications just closed the panel
+- Role-aware routing: staff users → staff pages, admin → admin pages (e.g. `stock_check_assigned` → `/staff/stock-check.html` for staff, `/admin-stock-check.html` for admin)
+- 16 notification types mapped: `chat_message`, `stock_check_assigned`/`submitted`, `permission_approved`/`rejected`, `reclockin_request`, `break_exceeded`, `force_clockout`, `geo_auto_clockout`, `geo_auto_clockout_admin`, `task_assigned`/`completed`, `salary_generated`/`paid`, `advance_approved`/`rejected`
+- Service worker (`sw.js`) push notification click handler also updated with matching routes
+- Notification icons updated: type-specific icons for all 16+ notification types (previously only 6)
+
 ---
 
 ### 2.16 Settings & Configuration
@@ -674,9 +682,15 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - **Auto-refresh**: New assignments auto-appear when admin creates them
 - **Visual alert**: Slide-down banner with assignment details, auto-dismiss 8s
 
+**Bug Fixes** (Feb 20):
+- Staff dropdown (`/api/branches/:id/staff`) now filters out `role='customer'` users
+- Assign endpoint validates staff role (rejects customer accounts)
+- `my-assignments` date uses local server time instead of UTC (fixes midnight timezone drift)
+- DATE→string conversion uses local getters instead of `toISOString()` (fixes CET→UTC day shift)
+
 **API Endpoints** (`routes/stock-check.js`, 11 endpoints):
 - `GET /locations/:branchId` — Zoho locations for a branch (admin)
-- `POST /assign` — Create assignment with selected location (admin)
+- `POST /assign` — Create assignment with selected location + role validation (admin)
 - `GET /assignments` — List with filters (admin)
 - `GET /assignments/:id` — Detail (staff sees own, admin sees any)
 - `DELETE /assignments/:id` — Delete pending (admin)
@@ -1071,7 +1085,7 @@ Each branch can connect its own WhatsApp number via `whatsapp-web.js`. Messages 
 |-----------|------|---------|
 | Header | `components/header-v2.html` | Top nav with notification bell |
 | Sidebar | `components/sidebar-complete.html` | Full navigation sidebar |
-| Staff Sidebar | `components/staff-sidebar.html` | Staff-only sidebar |
+| Staff Sidebar | `components/staff-sidebar.html` | Staff-only sidebar (permission-filtered, see §8 Feb 20 changelog) |
 | Dashboard Actions | `components/dashboard-quick-actions.html` | Quick action buttons |
 | Staff Actions | `components/staff-quick-actions.html` | Staff quick actions |
 | Attendance Subnav | `components/attendance-subnav.html` | Attendance + admin HR section nav |
@@ -1459,6 +1473,37 @@ node promote-release.js internal production
 - **6 Tables**: `wa_campaigns`, `wa_campaign_leads`, `wa_message_templates`, `wa_sending_stats`, `wa_marketing_settings`, `wa_instant_messages`
 - Migrations: `migrate-wa-marketing.js`, `migrate-wa-instant-messages.js`
 - Files: `services/wa-campaign-engine.js`, `routes/wa-marketing.js`, `public/admin-wa-marketing.html`, `public/components/marketing-subnav.html`
+
+### 2026-02-20 - Stock Check Bug Fixes
+- **Staff dropdown customer leak**: `/api/branches/:id/staff` returned ALL active users (including `role='customer'`); fixed with `AND u.role != 'customer'`
+- **Assign endpoint role validation**: `POST /api/stock-check/assign` now validates staff_id has non-customer role before creating assignment
+- **UTC date bug**: `my-assignments` used `toISOString().split('T')[0]` (UTC date); on CET server, midnight→1AM returns previous day; fixed to use local date getters
+- **DATE→string CET drift**: `toISOString()` on mysql2 DATE objects (local midnight) converts to previous day in UTC; fixed to use `getFullYear()/getMonth()/getDate()`
+
+### 2026-02-20 - Permission-Based Staff Sidebar Filtering
+- **Permission-based sidebar filtering**: Staff sidebar (`staff-sidebar.html`) filters nav items by user permissions
+  - `data-requires="module.action"` attribute on 7 gated items (estimates.view, attendance.view×4, zoho.stock_check, zoho.collections)
+  - `filterSidebarByPermissions()` reads cached `user_permissions` from localStorage (1-hour TTL), fetches `/api/auth/permissions` if expired
+  - Admin bypass: `is_admin === true` shows all items
+  - Empty sections auto-hidden when all child nav items are permission-gated and hidden
+  - Always-visible items: My Dashboard, Main Dashboard, My Requests, Guides & Help, My Profile
+
+### 2026-02-21 - Assignable Role Filtering
+- **Assignment dropdowns now show only assignable roles** (staff, sales_staff, branch_manager)
+  - Backend: `/api/users?assignable=1` query param filters to assignable roles + active status
+  - Backend: `/api/branches/:id/staff` tightened from `role != 'customer'` to `role IN ('staff', 'sales_staff', 'branch_manager')`
+  - Backend: Server-side validation in `POST /api/stock-check/assign` and `POST /api/tasks` + `/bulk-assign` rejects non-assignable roles
+  - Frontend: `admin-stock-check.html`, `admin-tasks.html`, `admin-daily-tasks.html`, `admin-leads.html` updated to use `?assignable=1`
+  - Roles excluded from assignment: admin, customer, guest, dealer, contractor, accountant
+
+### 2026-02-21 - Admin Page Access Control
+- **All 45 admin pages now redirect non-admin users to staff dashboard**
+  - Added `requireAdminOrRedirect()` to `auth-helper.js` — checks role is `admin`, `manager`, or `super_admin`; redirects staff/others to `/staff/dashboard.html`
+  - Replaced `checkAuthOrRedirect()` with `requireAdminOrRedirect()` on all 45 admin pages
+  - Exception: `admin-profile.html` kept with `checkAuthOrRedirect()` (staff use it for "My Profile")
+  - `zoho-subnav.html` now hides entire subnav for non-admin users (early return if not admin/manager)
+  - Defense in depth: server-side `requirePermission()` middleware was already blocking API calls; this adds client-side page-level redirect
+  - Previously: staff could navigate directly to any admin page URL and see the full admin UI (API calls would fail with 403, but the page/subnav still rendered)
 
 ---
 

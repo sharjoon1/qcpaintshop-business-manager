@@ -527,7 +527,7 @@ router.get('/:id/staff', requirePermission('branches', 'view'), async (req, res)
                     CASE WHEN b.manager_user_id = u.id THEN 1 ELSE 0 END as is_manager
              FROM users u
              LEFT JOIN branches b ON b.id = u.branch_id AND b.manager_user_id = u.id
-             WHERE u.branch_id = ? AND u.status = 'active' AND u.role != 'customer'
+             WHERE u.branch_id = ? AND u.status = 'active' AND u.role IN ('staff', 'sales_staff', 'branch_manager')
              ORDER BY is_manager DESC, u.full_name ASC`,
             [id]
         );

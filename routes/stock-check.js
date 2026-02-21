@@ -58,10 +58,11 @@ router.post('/assign', requirePermission('zoho', 'stock_check'), async (req, res
             return res.status(400).json({ success: false, message: 'branch_id, staff_id, check_date, and item_ids are required' });
         }
 
-        // Validate staff_id is an actual staff/admin/manager (not customer)
+        // Validate staff_id is an assignable role
+        const ASSIGNABLE_ROLES = ['staff', 'sales_staff', 'branch_manager'];
         const [staffUser] = await pool.query('SELECT id, role FROM users WHERE id = ? AND status = ?', [staff_id, 'active']);
         if (!staffUser.length) return res.status(400).json({ success: false, message: 'Staff member not found or inactive' });
-        if (staffUser[0].role === 'customer') return res.status(400).json({ success: false, message: 'Cannot assign stock check to a customer account' });
+        if (!ASSIGNABLE_ROLES.includes(staffUser[0].role)) return res.status(400).json({ success: false, message: 'Can only assign stock checks to staff members' });
 
         // Get branch info
         const [branches] = await pool.query('SELECT id, name as branch_name FROM branches WHERE id = ?', [branch_id]);
