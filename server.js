@@ -56,6 +56,7 @@ const whatsappSessionManager = require('./services/whatsapp-session-manager');
 const whatsappSessionsRoutes = require('./routes/whatsapp-sessions');
 const waMarketingRoutes = require('./routes/wa-marketing');
 const waCampaignEngine = require('./services/wa-campaign-engine');
+const attendanceReport = require('./services/attendance-report');
 
 const app = express();
 
@@ -158,6 +159,9 @@ waMarketingRoutes.setCampaignEngine(waCampaignEngine);
 waMarketingRoutes.setSessionManager(whatsappSessionManager);
 waCampaignEngine.setPool(pool);
 waCampaignEngine.setSessionManager(whatsappSessionManager);
+attendanceReport.setPool(pool);
+attendanceReport.setSessionManager(whatsappSessionManager);
+attendanceRoutes.setReportService(attendanceReport);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -3233,6 +3237,7 @@ autoClockout.setIO(io);
 whatsappSessionManager.setIO(io);
 waCampaignEngine.setIO(io);
 waMarketingRoutes.setIO(io);
+attendanceReport.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {
@@ -3344,6 +3349,7 @@ server.listen(PORT, () => {
 
     // Start background services after server is ready
     autoClockout.start();
+    attendanceReport.start();
 
     if (process.env.ZOHO_ORGANIZATION_ID) {
         syncScheduler.start().catch(err => {

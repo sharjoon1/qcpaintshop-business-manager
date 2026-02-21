@@ -82,6 +82,54 @@
             0%, 100% { box-shadow: 0 4px 15px rgba(8, 145, 178, 0.4); }
             50% { box-shadow: 0 4px 30px rgba(8, 145, 178, 0.7); }
         }
+        .prayer-btn {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4);
+        }
+        .prayer-btn.active-prayer {
+            animation: pulse-green 2s ease-in-out infinite;
+        }
+        @keyframes pulse-green {
+            0%, 100% { box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4); }
+            50% { box-shadow: 0 4px 30px rgba(5, 150, 105, 0.7); }
+        }
+        .time-breakdown {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 12px 0;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 12px;
+        }
+        .time-breakdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: white;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .time-breakdown-item .tb-icon {
+            width: 28px; height: 28px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; flex-shrink: 0;
+        }
+        .time-breakdown-item .tb-value { font-weight: 700; color: #1f2937; font-size: 14px; }
+        .time-breakdown-item .tb-label { font-size: 11px; color: #6b7280; }
+        .time-breakdown-total {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: linear-gradient(135deg, #667eea15, #764ba215);
+            border: 1px solid #667eea30;
+            border-radius: 8px;
+            font-size: 14px; font-weight: 700; color: #4338ca;
+        }
         .info-row {
             display: flex;
             justify-content: space-between;
@@ -452,6 +500,40 @@
             </button>
             <!-- Outside work duration counter -->
             <div id="outsideWorkDurationDisplay" style="display: none; text-align: center; font-size: 14px; font-weight: 600; color: #0891b2;"></div>
+
+            <!-- Prayer Button -->
+            <button class="action-btn prayer-btn" id="prayerBtn" onclick="togglePrayer()">
+                <svg id="prayerIcon" style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707"/>
+                </svg>
+                <span id="prayerBtnText">Go to Prayer</span>
+            </button>
+            <!-- Prayer duration counter -->
+            <div id="prayerDurationDisplay" style="display: none; text-align: center; font-size: 14px; font-weight: 600; color: #059669;"></div>
+
+            <!-- Time Breakdown -->
+            <div class="time-breakdown" id="timeBreakdown" style="display: none;">
+                <div class="time-breakdown-item">
+                    <div class="tb-icon" style="background: #ede9fe;">🏪</div>
+                    <div><div class="tb-value" id="tbShop">0m</div><div class="tb-label">Shop</div></div>
+                </div>
+                <div class="time-breakdown-item">
+                    <div class="tb-icon" style="background: #ccfbf1;">🚶</div>
+                    <div><div class="tb-value" id="tbOutside">0m</div><div class="tb-label">Outside</div></div>
+                </div>
+                <div class="time-breakdown-item">
+                    <div class="tb-icon" style="background: #d1fae5;">🕌</div>
+                    <div><div class="tb-value" id="tbPrayer">0m</div><div class="tb-label">Prayer</div></div>
+                </div>
+                <div class="time-breakdown-item">
+                    <div class="tb-icon" style="background: #fef3c7;">☕</div>
+                    <div><div class="tb-value" id="tbBreak">0m</div><div class="tb-label">Break</div></div>
+                </div>
+                <div class="time-breakdown-total">
+                    <span>⏱️ Total Working</span>
+                    <span id="tbTotal">0m</span>
+                </div>
+            </div>
 
             <!-- Clock Out Section (Hidden by default) -->
             <div id="clockOutSection" style="display: none; margin-top: 8px;">
@@ -1009,6 +1091,18 @@
                 setOutsideWorkActive(false);
             }
 
+            // Prayer state
+            if (attendanceData && attendanceData.prayer) {
+                setPrayerActive(true, attendanceData.prayer.start_time);
+            } else {
+                setPrayerActive(false);
+            }
+
+            // Update time breakdown
+            if (attendanceData && attendanceData.data) {
+                updateTimeBreakdown(attendanceData.data);
+            }
+
             // Show expected clock-out
             updateExpectedClockOut(data);
         }
@@ -1555,6 +1649,8 @@
                 durationDisplay.style.display = 'block';
                 breakBtn.disabled = true;
                 breakBtn.style.opacity = '0.5';
+                document.getElementById('prayerBtn').disabled = true;
+                document.getElementById('prayerBtn').style.opacity = '0.5';
                 startOutsideWorkTimer();
             } else {
                 outsideWorkStartTime = null;
@@ -1563,6 +1659,10 @@
                 durationDisplay.style.display = 'none';
                 breakBtn.disabled = false;
                 breakBtn.style.opacity = '1';
+                if (!prayerActive) {
+                    document.getElementById('prayerBtn').disabled = false;
+                    document.getElementById('prayerBtn').style.opacity = '1';
+                }
                 if (outsideWorkTimerInterval) {
                     clearInterval(outsideWorkTimerInterval);
                     outsideWorkTimerInterval = null;
@@ -1689,7 +1789,180 @@
         }
 
         // ========================================
-        // GEO-FENCE MONITORING (with break/outside-work skip + grace period)
+        // PRAYER TIME MANAGEMENT
+        // ========================================
+        let prayerActive = false;
+        let prayerStartTime = null;
+        let prayerTimerInterval = null;
+
+        function setPrayerActive(active, startTime) {
+            prayerActive = active;
+            const btn = document.getElementById('prayerBtn');
+            const btnText = document.getElementById('prayerBtnText');
+            const durationDisplay = document.getElementById('prayerDurationDisplay');
+            const breakBtn = document.getElementById('breakBtn');
+            const owBtn = document.getElementById('outsideWorkBtn');
+
+            if (active) {
+                prayerStartTime = startTime;
+                btnText.textContent = 'Back from Prayer';
+                btn.classList.add('active-prayer');
+                durationDisplay.style.display = 'block';
+                breakBtn.disabled = true;
+                breakBtn.style.opacity = '0.5';
+                owBtn.disabled = true;
+                owBtn.style.opacity = '0.5';
+                startPrayerTimer();
+            } else {
+                prayerStartTime = null;
+                btnText.textContent = 'Go to Prayer';
+                btn.classList.remove('active-prayer');
+                durationDisplay.style.display = 'none';
+                if (!outsideWorkActive) {
+                    breakBtn.disabled = false;
+                    breakBtn.style.opacity = '1';
+                }
+                owBtn.disabled = false;
+                owBtn.style.opacity = '1';
+                if (prayerTimerInterval) {
+                    clearInterval(prayerTimerInterval);
+                    prayerTimerInterval = null;
+                }
+            }
+        }
+
+        function startPrayerTimer() {
+            if (prayerTimerInterval) clearInterval(prayerTimerInterval);
+            const display = document.getElementById('prayerDurationDisplay');
+            const update = () => {
+                if (!prayerStartTime) return;
+                const now = new Date();
+                const start = new Date(prayerStartTime);
+                const diffMs = now - start;
+                const mins = Math.floor(diffMs / 1000 / 60);
+                const secs = Math.floor((diffMs / 1000) % 60);
+                display.textContent = `Prayer: ${mins}m ${secs.toString().padStart(2, '0')}s`;
+            };
+            update();
+            prayerTimerInterval = setInterval(update, 1000);
+        }
+
+        function togglePrayer() {
+            if (prayerActive) {
+                endPrayer();
+            } else {
+                startPrayer();
+            }
+        }
+
+        async function startPrayer() {
+            const btn = document.getElementById('prayerBtn');
+            btn.disabled = true;
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const pos = await new Promise((resolve, reject) =>
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 })
+                ).catch(() => null);
+
+                const body = {};
+                if (pos) {
+                    body.latitude = pos.coords.latitude;
+                    body.longitude = pos.coords.longitude;
+                }
+
+                const res = await fetch('/api/attendance/prayer/start', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    setPrayerActive(true, data.data.start_time);
+                    showToast('Prayer time started. Geofence paused.', 'info');
+                } else {
+                    showToast(data.message || 'Failed to start prayer', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Please try again.', 'error');
+            }
+
+            btn.disabled = false;
+        }
+
+        async function endPrayer() {
+            const btn = document.getElementById('prayerBtn');
+            btn.disabled = true;
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const pos = await new Promise((resolve, reject) =>
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 })
+                ).catch(() => null);
+
+                const body = {};
+                if (pos) {
+                    body.latitude = pos.coords.latitude;
+                    body.longitude = pos.coords.longitude;
+                }
+
+                const res = await fetch('/api/attendance/prayer/end', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    setPrayerActive(false);
+                    showToast(`Prayer ended (${data.data.duration_minutes}m). Geofence resumed.`, 'success');
+                    loadTodayAttendance();
+                } else {
+                    showToast(data.message || 'Failed to end prayer', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Please try again.', 'error');
+            }
+
+            btn.disabled = false;
+        }
+
+        // ========================================
+        // TIME BREAKDOWN DISPLAY
+        // ========================================
+        function formatMins(m) {
+            if (!m || m <= 0) return '0m';
+            const h = Math.floor(m / 60);
+            const min = m % 60;
+            if (h === 0) return `${min}m`;
+            if (min === 0) return `${h}h`;
+            return `${h}h ${min}m`;
+        }
+
+        function updateTimeBreakdown(data) {
+            const container = document.getElementById('timeBreakdown');
+            if (!data || !data.clock_in_time) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'grid';
+
+            const totalWorking = data.total_working_minutes || 0;
+            const outsideMins = data.outside_work_minutes || 0;
+            const prayerMins = data.prayer_minutes || 0;
+            const breakMins = data.break_duration_minutes || 0;
+            const shopMins = Math.max(0, totalWorking - outsideMins - prayerMins);
+
+            document.getElementById('tbShop').textContent = formatMins(shopMins);
+            document.getElementById('tbOutside').textContent = formatMins(outsideMins);
+            document.getElementById('tbPrayer').textContent = formatMins(prayerMins);
+            document.getElementById('tbBreak').textContent = formatMins(breakMins);
+            document.getElementById('tbTotal').textContent = formatMins(totalWorking);
+        }
+
+        // ========================================
+        // GEO-FENCE MONITORING (with break/outside-work/prayer skip + grace period)
         // ========================================
         let geoWatchId = null;
         let isOutsideFence = false;
@@ -1718,6 +1991,12 @@
 
                         // Skip geofence enforcement during outside work
                         if (outsideWorkActive) {
+                            hideGeofenceAlert();
+                            return;
+                        }
+
+                        // Skip geofence enforcement during prayer
+                        if (prayerActive) {
                             hideGeofenceAlert();
                             return;
                         }

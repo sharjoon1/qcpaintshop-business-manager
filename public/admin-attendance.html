@@ -361,6 +361,7 @@
         }
 
         .badge-outside_work { background: #cffafe; color: #0e7490; }
+        .badge-prayer { background: #d1fae5; color: #059669; }
     </style>
 </head>
 <body data-page="attendance-admin">
@@ -410,6 +411,7 @@
                 <button class="tab-btn" onclick="switchTab('monthly')">Monthly View</button>
                 <button class="tab-btn" onclick="switchTab('mark')">Mark Attendance</button>
                 <button class="tab-btn" onclick="switchTab('timeline')">Staff Timeline</button>
+                <button class="tab-btn" onclick="switchTab('reports')">Daily Reports</button>
             </div>
 
             <!-- Tab 1: Live Today -->
@@ -640,6 +642,51 @@
                 </div>
             </div>
 
+            <!-- Tab 6: Daily Reports -->
+            <div class="tab-content" id="tab-reports">
+                <div class="filter-bar">
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                            <input type="date" id="reportDate">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Branch</label>
+                            <select id="reportBranch">
+                                <option value="">All Branches</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="btn btn-primary w-full" onclick="loadReportStaff()">Load Staff</button>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="btn w-full" style="background: #059669; color: white;" onclick="sendAllReports()" id="sendAllBtn">
+                                Send All via WhatsApp
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="reportContainer">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <p class="font-semibold text-gray-700 mb-1">Daily Attendance Reports</p>
+                        <p class="text-sm">Select a date and click Load Staff to view and send WhatsApp reports</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Report Preview Modal -->
+    <div class="modal" id="reportPreviewModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="font-semibold">Report Preview</h3>
+                <button onclick="closeModal('reportPreviewModal')" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+            <pre id="reportPreviewText" style="white-space: pre-wrap; font-family: inherit; font-size: 14px; background: #f9fafb; padding: 16px; border-radius: 8px; max-height: 400px; overflow-y: auto;"></pre>
         </div>
     </div>
 
@@ -784,6 +831,7 @@
             // Load data for the tab
             if (tab === 'live') { loadLiveAttendance(); loadAbsentStaff(); }
             if (tab === 'permissions') loadPermissions();
+            if (tab === 'reports') initReportsTab();
         }
 
         function openModal(id) {
@@ -1288,6 +1336,10 @@
                                 <div class="stat-label">Outside Work</div>
                                 <div style="font-size: 1.25rem; font-weight: 700; color: #1f2937;">${formatMinutesToHours(s.total_outside_minutes)}</div>
                             </div>
+                            <div class="stat-card" style="--border-color: #059669; padding: 1rem;">
+                                <div class="stat-label">Prayer</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: #1f2937;">${formatMinutesToHours(s.total_prayer_minutes || 0)}</div>
+                            </div>
                             <div class="stat-card" style="--border-color: #ef4444; padding: 1rem;">
                                 <div class="stat-label">Violations</div>
                                 <div style="font-size: 1.25rem; font-weight: 700; color: #1f2937;">${s.violation_count}</div>
@@ -1368,6 +1420,8 @@
                 break_end:           { icon: '&#9749;', label: 'Break End',            color: '#f59e0b' },
                 outside_work_start:  { icon: '&#128205;', label: 'Outside Work Start', color: '#0891b2' },
                 outside_work_end:    { icon: '&#128205;', label: 'Outside Work End',   color: '#0891b2' },
+                prayer_start:        { icon: '&#128332;', label: 'Prayer Start',       color: '#059669' },
+                prayer_end:          { icon: '&#128332;', label: 'Prayer End',         color: '#059669' },
                 geofence_violation:  { icon: '&#9888;&#65039;', label: 'Geofence Violation', color: '#ef4444' },
                 auto_clockout_geo:   { icon: '&#128680;', label: 'Auto Clock-Out (Geo)', color: '#ef4444' },
                 auto_clockout_admin: { icon: '&#128680;', label: 'Auto Clock-Out (Admin)', color: '#ef4444' },
@@ -1490,6 +1544,193 @@
             } catch (e) {
                 console.error('View photos error:', e);
                 content.innerHTML = '<div class="text-center py-8 text-red-500">Failed to load photos</div>';
+            }
+        }
+
+        // ========================================
+        // DAILY REPORTS TAB
+        // ========================================
+        let reportBranchesLoaded = false;
+
+        function initReportsTab() {
+            if (!document.getElementById('reportDate').value) {
+                document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+            }
+            if (!reportBranchesLoaded) {
+                loadReportBranches();
+                reportBranchesLoaded = true;
+            }
+        }
+
+        async function loadReportBranches() {
+            try {
+                const res = await fetch('/api/branches', { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) {
+                    const sel = document.getElementById('reportBranch');
+                    data.data.forEach(b => {
+                        const opt = document.createElement('option');
+                        opt.value = b.id;
+                        opt.textContent = b.name;
+                        sel.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                console.error('Load branches error:', e);
+            }
+        }
+
+        function fmtMins(m) {
+            if (!m || m <= 0) return '0m';
+            const h = Math.floor(m / 60);
+            const min = m % 60;
+            if (h === 0) return `${min}m`;
+            if (min === 0) return `${h}h`;
+            return `${h}h ${min}m`;
+        }
+
+        function fmtTime(dt) {
+            if (!dt) return '--:--';
+            return new Date(dt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+
+        async function loadReportStaff() {
+            const date = document.getElementById('reportDate').value;
+            const branchId = document.getElementById('reportBranch').value;
+            if (!date) { showToast('Please select a date', 'error'); return; }
+
+            const container = document.getElementById('reportContainer');
+            container.innerHTML = '<div class="text-center py-8"><div class="skeleton" style="height: 200px;"></div></div>';
+
+            try {
+                let url = `/api/attendance/report/staff-list?date=${date}`;
+                if (branchId) url += `&branch_id=${branchId}`;
+
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (!data.success || !data.data.length) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p class="font-semibold text-gray-700">No attendance records found for this date</p></div>';
+                    return;
+                }
+
+                let html = `<div style="overflow-x: auto;"><table class="data-table" style="width: 100%; font-size: 14px;">
+                    <thead><tr>
+                        <th>Staff</th><th>Branch</th><th>Clock In</th><th>Clock Out</th>
+                        <th>Working</th><th>Prayer</th><th>Phone</th><th>Status</th><th>Actions</th>
+                    </tr></thead><tbody>`;
+
+                for (const s of data.data) {
+                    const working = fmtMins(s.total_working_minutes);
+                    const prayer = fmtMins(s.prayer_minutes);
+                    const sentBadge = s.report_id
+                        ? `<span style="background: #d1fae5; color: #059669; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;">Sent</span>`
+                        : `<span style="background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;">Pending</span>`;
+
+                    html += `<tr>
+                        <td class="font-semibold">${s.full_name}</td>
+                        <td>${s.branch_name}</td>
+                        <td>${fmtTime(s.clock_in_time)}</td>
+                        <td>${fmtTime(s.clock_out_time)}</td>
+                        <td>${working}</td>
+                        <td>${prayer}</td>
+                        <td>${s.phone || '-'}</td>
+                        <td>${sentBadge}</td>
+                        <td>
+                            <button class="btn btn-sm" style="background: #059669; color: white; padding: 4px 10px; font-size: 12px; border-radius: 6px; margin-right: 4px;"
+                                onclick="sendSingleReport(${s.user_id}, '${date}', this)" id="sendBtn_${s.user_id}">
+                                ${s.report_id ? 'Resend' : 'Send'}
+                            </button>
+                            <button class="btn btn-sm" style="background: #6366f1; color: white; padding: 4px 10px; font-size: 12px; border-radius: 6px;"
+                                onclick="previewReport(${s.user_id}, '${date}')">Preview</button>
+                        </td>
+                    </tr>`;
+                }
+
+                html += '</tbody></table></div>';
+                container.innerHTML = html;
+
+            } catch (e) {
+                console.error('Load report staff error:', e);
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❌</div><p class="text-red-500">Failed to load staff list</p></div>';
+            }
+        }
+
+        async function sendSingleReport(userId, date, btn) {
+            const origText = btn.textContent;
+            btn.textContent = 'Sending...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/attendance/report/send', {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, date })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    btn.textContent = 'Sent!';
+                    btn.style.background = '#10b981';
+                    showToast(data.message, 'success');
+                    setTimeout(() => { btn.textContent = 'Resend'; btn.disabled = false; }, 2000);
+                } else {
+                    btn.textContent = 'Failed';
+                    btn.style.background = '#ef4444';
+                    showToast(data.message || 'Send failed', 'error');
+                    setTimeout(() => { btn.textContent = origText; btn.disabled = false; btn.style.background = '#059669'; }, 2000);
+                }
+            } catch (e) {
+                btn.textContent = origText;
+                btn.disabled = false;
+                showToast('Network error', 'error');
+            }
+        }
+
+        async function sendAllReports() {
+            const date = document.getElementById('reportDate').value;
+            if (!date) { showToast('Please select a date first', 'error'); return; }
+
+            if (!confirm(`Send attendance reports to ALL staff for ${date} via WhatsApp?`)) return;
+
+            const btn = document.getElementById('sendAllBtn');
+            btn.textContent = 'Sending...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/attendance/report/send-all', {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('Reports are being sent in the background', 'success');
+                } else {
+                    showToast(data.message || 'Failed to start sending', 'error');
+                }
+            } catch (e) {
+                showToast('Network error', 'error');
+            }
+
+            btn.textContent = 'Send All via WhatsApp';
+            btn.disabled = false;
+        }
+
+        async function previewReport(userId, date) {
+            try {
+                const res = await fetch(`/api/attendance/report/preview?user_id=${userId}&date=${date}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('reportPreviewText').textContent = data.data.text;
+                    openModal('reportPreviewModal');
+                } else {
+                    showToast(data.message || 'No report data', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to load preview', 'error');
             }
         }
     </script>

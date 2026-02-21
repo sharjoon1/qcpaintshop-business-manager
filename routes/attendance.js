@@ -578,6 +578,42 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
         // effective_working_minutes = same as workingMinutes since calculateWorkingMinutes already deducts ALL break
         const effectiveWorking = workingMinutes;
 
+        // Auto-end active prayer period on clock-out
+        const [activePrayerClockout] = await pool.query(
+            "SELECT * FROM prayer_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+            [userId]
+        );
+        if (activePrayerClockout.length > 0) {
+            const pp = activePrayerClockout[0];
+            const prayerDur = Math.round((now - new Date(pp.start_time)) / 1000 / 60);
+            await pool.query(
+                `UPDATE prayer_periods SET end_time = ?, duration_minutes = ?, status = 'ended' WHERE id = ?`,
+                [now, prayerDur, pp.id]
+            );
+            await pool.query(
+                'UPDATE staff_attendance SET prayer_minutes = prayer_minutes + ? WHERE id = ?',
+                [prayerDur, pp.attendance_id]
+            );
+        }
+
+        // Auto-end active outside work period on clock-out
+        const [activeOWClockout] = await pool.query(
+            "SELECT * FROM outside_work_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+            [userId]
+        );
+        if (activeOWClockout.length > 0) {
+            const ow = activeOWClockout[0];
+            const owDur = Math.round((now - new Date(ow.start_time)) / 1000 / 60);
+            await pool.query(
+                `UPDATE outside_work_periods SET end_time = ?, duration_minutes = ?, status = 'ended' WHERE id = ?`,
+                [now, owDur, ow.id]
+            );
+            await pool.query(
+                'UPDATE staff_attendance SET outside_work_minutes = outside_work_minutes + ? WHERE id = ?',
+                [owDur, ow.attendance_id]
+            );
+        }
+
         // Check if early checkout
         const currentTime = now.toTimeString().split(' ')[0];
         const closeTime = new Date(`1970-01-01T${record.close_time}`);
@@ -720,6 +756,18 @@ router.get('/today', requireAuth, async (req, res) => {
             }
         }
 
+        // Check for active prayer period
+        let prayer = null;
+        if (!attendance.clock_out_time) {
+            const [pRows] = await pool.query(
+                "SELECT * FROM prayer_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+                [userId]
+            );
+            if (pRows.length > 0) {
+                prayer = pRows[0];
+            }
+        }
+
         // Build break policy info
         const breakAllowance = attendance.break_allowance_minutes || attendance.shop_break_allowance || 120;
         const breakWarning = attendance.shop_break_warning || 90;
@@ -732,6 +780,7 @@ router.get('/today', requireAuth, async (req, res) => {
             reclockin_status: reclockinStatus,
             day_total_minutes: dayTotalMinutes,
             outside_work: outsideWork,
+            prayer: prayer,
             break_policy: {
                 allowance: breakAllowance,
                 warning: breakWarning,
@@ -2101,6 +2150,19 @@ router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
             });
         }
 
+        // Reject if prayer period is active
+        const [activePrayerGeo] = await pool.query(
+            "SELECT id FROM prayer_periods WHERE user_id = ? AND status = 'active' LIMIT 1",
+            [userId]
+        );
+        if (activePrayerGeo.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Staff is at prayer',
+                code: 'AT_PRAYER'
+            });
+        }
+
         // Calculate distance from branch
         const distance = Math.round(calculateDistance(
             parseFloat(latitude), parseFloat(longitude),
@@ -2408,6 +2470,15 @@ router.post('/outside-work/start', requireAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: 'You already have an active outside work period' });
         }
 
+        // Must not have active prayer period
+        const [activePrayerOW] = await pool.query(
+            "SELECT id FROM prayer_periods WHERE user_id = ? AND status = 'active' LIMIT 1",
+            [userId]
+        );
+        if (activePrayerOW.length > 0) {
+            return res.status(400).json({ success: false, message: 'Please end your prayer time before starting outside work' });
+        }
+
         const now = new Date();
         const [result] = await pool.query(
             `INSERT INTO outside_work_periods (attendance_id, user_id, reason, start_time, start_lat, start_lng)
@@ -2622,6 +2693,32 @@ router.get('/admin/staff-timeline', requirePermission('attendance', 'view'), asy
             }
         }
 
+        // Get prayer periods
+        if (attIds.length > 0) {
+            const [prayerPeriods] = await pool.query(
+                `SELECT * FROM prayer_periods WHERE attendance_id IN (?) ORDER BY start_time ASC`,
+                [attIds]
+            );
+
+            for (const pp of prayerPeriods) {
+                events.push({
+                    type: 'prayer_start',
+                    time: pp.start_time,
+                    lat: pp.start_lat,
+                    lng: pp.start_lng
+                });
+                if (pp.end_time) {
+                    events.push({
+                        type: 'prayer_end',
+                        time: pp.end_time,
+                        lat: pp.end_lat,
+                        lng: pp.end_lng,
+                        duration: pp.duration_minutes
+                    });
+                }
+            }
+        }
+
         // Get geofence violations
         const [violations] = await pool.query(
             `SELECT * FROM geofence_violations WHERE user_id = ? AND DATE(created_at) = ? ORDER BY created_at ASC`,
@@ -2652,6 +2749,7 @@ router.get('/admin/staff-timeline', requirePermission('attendance', 'view'), asy
         const totalWorkingMinutes = attendanceRows.reduce((sum, a) => sum + (a.total_working_minutes || 0), 0);
         const totalBreakMinutes = attendanceRows.reduce((sum, a) => sum + (a.break_duration_minutes || 0), 0);
         const totalOutsideMinutes = attendanceRows.reduce((sum, a) => sum + (a.outside_work_minutes || 0), 0);
+        const totalPrayerMinutes = attendanceRows.reduce((sum, a) => sum + (a.prayer_minutes || 0), 0);
         const violationCount = violations.length;
 
         res.json({
@@ -2673,6 +2771,7 @@ router.get('/admin/staff-timeline', requirePermission('attendance', 'view'), asy
                     total_working_minutes: totalWorkingMinutes,
                     total_break_minutes: totalBreakMinutes,
                     total_outside_minutes: totalOutsideMinutes,
+                    total_prayer_minutes: totalPrayerMinutes,
                     violation_count: violationCount,
                     records_count: attendanceRows.length
                 }
@@ -2685,7 +2784,276 @@ router.get('/admin/staff-timeline', requirePermission('attendance', 'view'), asy
     }
 });
 
+// ========================================
+// PRAYER TIME TRACKING ENDPOINTS
+// ========================================
+
+/**
+ * POST /api/attendance/prayer/start
+ * Start a prayer period (geofence exemption, mirrors outside work)
+ */
+router.post('/prayer/start', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { latitude, longitude } = req.body;
+        const today = getTodayIST();
+
+        // Must be clocked in
+        const [attendance] = await pool.query(
+            'SELECT * FROM staff_attendance WHERE user_id = ? AND date = ? AND clock_out_time IS NULL ORDER BY id DESC LIMIT 1',
+            [userId, today]
+        );
+
+        if (attendance.length === 0) {
+            return res.status(400).json({ success: false, message: 'You must be clocked in to start prayer' });
+        }
+
+        const record = attendance[0];
+
+        // Must not be on break
+        if (record.break_start_time && !record.break_end_time) {
+            return res.status(400).json({ success: false, message: 'Please end your break before starting prayer' });
+        }
+
+        // Must not have active outside work period
+        const [activeOW] = await pool.query(
+            "SELECT id FROM outside_work_periods WHERE user_id = ? AND status = 'active' LIMIT 1",
+            [userId]
+        );
+        if (activeOW.length > 0) {
+            return res.status(400).json({ success: false, message: 'Please end outside work before starting prayer' });
+        }
+
+        // Must not have active prayer period
+        const [activePrayer] = await pool.query(
+            "SELECT id FROM prayer_periods WHERE user_id = ? AND status = 'active' LIMIT 1",
+            [userId]
+        );
+        if (activePrayer.length > 0) {
+            return res.status(400).json({ success: false, message: 'You already have an active prayer period' });
+        }
+
+        const now = new Date();
+        const [result] = await pool.query(
+            `INSERT INTO prayer_periods (attendance_id, user_id, start_time, start_lat, start_lng)
+             VALUES (?, ?, ?, ?, ?)`,
+            [record.id, userId, now, latitude || null, longitude || null]
+        );
+
+        res.json({
+            success: true,
+            message: 'Prayer time started. Geofence monitoring paused.',
+            data: { id: result.insertId, start_time: now }
+        });
+
+    } catch (error) {
+        console.error('Prayer start error:', error);
+        res.status(500).json({ success: false, message: 'Failed to start prayer' });
+    }
+});
+
+/**
+ * POST /api/attendance/prayer/end
+ * End an active prayer period
+ */
+router.post('/prayer/end', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { latitude, longitude } = req.body;
+
+        const [active] = await pool.query(
+            "SELECT * FROM prayer_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+            [userId]
+        );
+
+        if (active.length === 0) {
+            return res.status(400).json({ success: false, message: 'No active prayer period found' });
+        }
+
+        const period = active[0];
+        const now = new Date();
+        const durationMinutes = Math.round((now - new Date(period.start_time)) / 1000 / 60);
+
+        // Update the period
+        await pool.query(
+            `UPDATE prayer_periods
+             SET end_time = ?, end_lat = ?, end_lng = ?, duration_minutes = ?, status = 'ended'
+             WHERE id = ?`,
+            [now, latitude || null, longitude || null, durationMinutes, period.id]
+        );
+
+        // Accumulate prayer minutes on attendance record
+        await pool.query(
+            'UPDATE staff_attendance SET prayer_minutes = prayer_minutes + ? WHERE id = ?',
+            [durationMinutes, period.attendance_id]
+        );
+
+        res.json({
+            success: true,
+            message: `Prayer ended. Duration: ${durationMinutes} minutes. Geofence monitoring resumed.`,
+            data: { id: period.id, duration_minutes: durationMinutes, end_time: now }
+        });
+
+    } catch (error) {
+        console.error('Prayer end error:', error);
+        res.status(500).json({ success: false, message: 'Failed to end prayer' });
+    }
+});
+
+/**
+ * GET /api/attendance/prayer/status
+ * Get current active prayer period
+ */
+router.get('/prayer/status', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const [active] = await pool.query(
+            "SELECT * FROM prayer_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+            [userId]
+        );
+
+        res.json({
+            success: true,
+            active: active.length > 0,
+            data: active.length > 0 ? active[0] : null
+        });
+
+    } catch (error) {
+        console.error('Prayer status error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get prayer status' });
+    }
+});
+
+// ========================================
+// DAILY ATTENDANCE REPORT ENDPOINTS
+// ========================================
+
+let attendanceReportService = null;
+function setReportService(service) { attendanceReportService = service; }
+
+/**
+ * GET /api/attendance/report/preview
+ * Preview the report text for a staff member on a date
+ */
+router.get('/report/preview', requirePermission('attendance.view'), async (req, res) => {
+    try {
+        const { user_id, date } = req.query;
+        if (!user_id || !date) {
+            return res.status(400).json({ success: false, message: 'user_id and date are required' });
+        }
+
+        if (!attendanceReportService) {
+            return res.status(500).json({ success: false, message: 'Report service not available' });
+        }
+
+        const report = await attendanceReportService.generateReport(parseInt(user_id), date);
+        if (!report) {
+            return res.status(404).json({ success: false, message: 'No attendance data found for this date' });
+        }
+
+        res.json({ success: true, data: report });
+
+    } catch (error) {
+        console.error('Report preview error:', error);
+        res.status(500).json({ success: false, message: 'Failed to generate report preview' });
+    }
+});
+
+/**
+ * POST /api/attendance/report/send
+ * Send report to a single staff member via WhatsApp
+ */
+router.post('/report/send', requirePermission('attendance.manage'), async (req, res) => {
+    try {
+        const { user_id, date } = req.body;
+        if (!user_id || !date) {
+            return res.status(400).json({ success: false, message: 'user_id and date are required' });
+        }
+
+        if (!attendanceReportService) {
+            return res.status(500).json({ success: false, message: 'Report service not available' });
+        }
+
+        const result = await attendanceReportService.sendReport(parseInt(user_id), date, req.user.id);
+        res.json(result);
+
+    } catch (error) {
+        console.error('Report send error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send report' });
+    }
+});
+
+/**
+ * POST /api/attendance/report/send-all
+ * Send reports to all staff for a date
+ */
+router.post('/report/send-all', requirePermission('attendance.manage'), async (req, res) => {
+    try {
+        const { date } = req.body;
+        if (!date) {
+            return res.status(400).json({ success: false, message: 'date is required' });
+        }
+
+        if (!attendanceReportService) {
+            return res.status(500).json({ success: false, message: 'Report service not available' });
+        }
+
+        // Run in background, respond immediately
+        attendanceReportService.sendAllReports(date, req.user.id);
+        res.json({ success: true, message: 'Reports are being sent in the background. You will see progress updates.' });
+
+    } catch (error) {
+        console.error('Report send-all error:', error);
+        res.status(500).json({ success: false, message: 'Failed to start sending reports' });
+    }
+});
+
+/**
+ * GET /api/attendance/report/staff-list
+ * Get staff list with attendance data for report sending
+ */
+router.get('/report/staff-list', requirePermission('attendance.view'), async (req, res) => {
+    try {
+        const { date, branch_id } = req.query;
+        if (!date) {
+            return res.status(400).json({ success: false, message: 'date is required' });
+        }
+
+        let query = `
+            SELECT a.id, a.user_id, a.clock_in_time, a.clock_out_time,
+                   a.total_working_minutes, a.break_duration_minutes,
+                   a.outside_work_minutes, a.prayer_minutes, a.branch_id,
+                   u.full_name, u.phone, u.email,
+                   b.name as branch_name,
+                   dr.id as report_id, dr.sent_at, dr.delivery_status
+            FROM staff_attendance a
+            JOIN users u ON a.user_id = u.id
+            JOIN branches b ON a.branch_id = b.id
+            LEFT JOIN attendance_daily_reports dr ON dr.user_id = a.user_id AND dr.report_date = ?
+            WHERE a.date = ? AND u.role != 'customer'
+        `;
+        const params = [date, date];
+
+        if (branch_id) {
+            query += ' AND a.branch_id = ?';
+            params.push(parseInt(branch_id));
+        }
+
+        query += ' ORDER BY b.name, u.full_name';
+
+        const [rows] = await pool.query(query, params);
+
+        res.json({ success: true, data: rows });
+
+    } catch (error) {
+        console.error('Report staff list error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get staff list' });
+    }
+});
+
 module.exports = {
     router,
-    setPool
+    setPool,
+    setReportService
 };

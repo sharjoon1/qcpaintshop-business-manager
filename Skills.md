@@ -379,6 +379,33 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Endpoints: `POST /outside-work/start`, `POST /outside-work/end`, `GET /outside-work/status`
 - Server-side: geo-auto-clockout rejects with `OUTSIDE_WORK` code during active outside work
 
+**Prayer Time Tracking**
+- Staff can declare "Go to Prayer" — mirrors outside work pattern exactly
+- **Geofence exemption**: geofence monitoring is paused during active prayer
+- Tracked in `prayer_periods` table with start/end times, GPS, duration
+- Prayer minutes accumulated on attendance record (`prayer_minutes` column)
+- UI: green-colored button on staff dashboard, pulsing animation when active, elapsed timer
+- **Mutual exclusion**: prayer, break, and outside work are mutually exclusive (can't start one while another is active)
+- Auto-ended on clock-out and max-hours auto-clockout
+- Endpoints: `POST /prayer/start`, `POST /prayer/end`, `GET /prayer/status`
+- Server-side: geo-auto-clockout rejects with `AT_PRAYER` code during active prayer
+- **Time Breakdown**: staff dashboard shows 2x2 grid (Shop, Outside, Prayer, Break) + Total Working
+  - Shop time = totalWorking - outsideMinutes - prayerMinutes
+- Admin timeline shows prayer_start/prayer_end events with green color
+- Migration: `migrations/migrate-prayer-and-reports.js`
+
+**Daily WhatsApp Attendance Reports**
+- Auto-sends daily attendance summary to all staff at 10 PM IST via `node-cron`
+- Manual send: admin can send to individual staff or all staff from "Daily Reports" tab
+- Report includes: clock in/out, time breakdown (Shop, Outside, Prayer, Break), total working, status
+- Sent via WhatsApp session manager (branch session → fallback)
+- Logged in `attendance_daily_reports` table (unique per user+date, upserts on resend)
+- Admin UI: Daily Reports tab in admin-attendance.html with date/branch filter, per-staff Send/Preview, bulk Send All
+- Real-time: Socket.io `report_send_progress` and `report_send_complete` events to admin
+- Service: `services/attendance-report.js` (generateReport, sendReport, sendAllReports, 10 PM cron)
+- Endpoints: `GET /report/preview`, `POST /report/send`, `POST /report/send-all`, `GET /report/staff-list`
+- Migration: `migrations/migrate-prayer-and-reports.js`
+
 **Permission Requests**
 - Staff can request permissions: late_arrival, early_checkout, extended_break, leave, half_day, re_clockin, outside_work
 - Admin approval/rejection workflow with `review_notes` column
@@ -911,7 +938,7 @@ Each branch can connect its own WhatsApp number via `whatsapp-web.js`. Messages 
 **Core**: `users`, `user_sessions`, `branches`, `customers`, `customer_types`, `settings`
 **Products**: `products`, `brands`, `categories`, `pack_sizes`
 **Estimates**: `estimates`, `estimate_items`, `estimate_status_history`, `estimate_requests`
-**Attendance**: `staff_attendance`, `attendance_breaks`, `permission_requests`, `shop_hours_config`, `geofence_violations`, `user_branches`, `outside_work_periods`, `attendance_photos`
+**Attendance**: `staff_attendance`, `attendance_breaks`, `permission_requests`, `shop_hours_config`, `geofence_violations`, `user_branches`, `outside_work_periods`, `prayer_periods`, `attendance_photos`, `attendance_daily_reports`
 **Salary**: `salary_config`, `monthly_salary`, `salary_payments`, `salary_advances`
 **Tasks**: `staff_tasks`, `task_updates`, `daily_task_templates`, `daily_task_responses`, `daily_task_materials`
 **Leads**: `leads`, `lead_followups`

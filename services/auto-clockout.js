@@ -67,6 +67,42 @@ async function runAutoClockout() {
                     [now, now, record.id]
                 );
 
+                // End active prayer period if any
+                const [activePrayer] = await pool.query(
+                    "SELECT * FROM prayer_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+                    [record.user_id]
+                );
+                if (activePrayer.length > 0) {
+                    const pp = activePrayer[0];
+                    const prayerDur = Math.round((now - new Date(pp.start_time)) / 1000 / 60);
+                    await pool.query(
+                        `UPDATE prayer_periods SET end_time = ?, duration_minutes = ?, status = 'ended' WHERE id = ?`,
+                        [now, prayerDur, pp.id]
+                    );
+                    await pool.query(
+                        'UPDATE staff_attendance SET prayer_minutes = prayer_minutes + ? WHERE id = ?',
+                        [prayerDur, pp.attendance_id]
+                    );
+                }
+
+                // End active outside work period if any
+                const [activeOW] = await pool.query(
+                    "SELECT * FROM outside_work_periods WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+                    [record.user_id]
+                );
+                if (activeOW.length > 0) {
+                    const ow = activeOW[0];
+                    const owDur = Math.round((now - new Date(ow.start_time)) / 1000 / 60);
+                    await pool.query(
+                        `UPDATE outside_work_periods SET end_time = ?, duration_minutes = ?, status = 'ended' WHERE id = ?`,
+                        [now, owDur, ow.id]
+                    );
+                    await pool.query(
+                        'UPDATE staff_attendance SET outside_work_minutes = outside_work_minutes + ? WHERE id = ?',
+                        [owDur, ow.attendance_id]
+                    );
+                }
+
                 // Notify staff via Socket.io
                 if (io) {
                     io.to(`user_${record.user_id}`).emit('auto_clockout', {
