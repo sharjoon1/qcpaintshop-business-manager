@@ -136,6 +136,34 @@
     max-width: 260px;
 }
 
+/* ── Column Header Sort Dropdowns ── */
+.col-sortable {
+    position: relative; cursor: pointer; user-select: none;
+    white-space: nowrap;
+}
+.col-sortable:hover { background: #eef2ff; }
+.col-sort-icon {
+    display: inline-block; width: 14px; text-align: center;
+    font-size: 10px; color: #9ca3af; margin-left: 3px; vertical-align: middle;
+}
+.col-sortable.sort-active .col-sort-icon { color: #6366f1; font-weight: 700; }
+.col-dropdown {
+    display: none; position: fixed;
+    min-width: 170px; background: #fff; border: 1px solid #e5e7eb;
+    border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.12);
+    z-index: 9999; padding: 4px 0;
+}
+.col-dropdown.show { display: block; }
+.col-sort-opt {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px; font-size: 12px; color: #374151;
+    cursor: pointer; transition: background .1s; white-space: nowrap;
+}
+.col-sort-opt:hover { background: #f3f4f6; }
+.col-sort-opt.active { background: #eef2ff; color: #4338ca; font-weight: 600; }
+.col-sort-opt .sort-arrow { font-size: 11px; color: #9ca3af; min-width: 14px; }
+.col-sort-opt.active .sort-arrow { color: #6366f1; }
+
 /* ── Mobile ── */
 @media (max-width: 640px) {
     .filter-panel-inner {

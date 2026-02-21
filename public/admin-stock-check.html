@@ -215,11 +215,11 @@
                             <thead>
                                 <tr>
                                     <th style="width:30px"><input type="checkbox" id="invSelectAll" onchange="toggleInvSelectAll()" class="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600"></th>
-                                    <th>Item Name</th>
-                                    <th>SKU</th>
-                                    <th>Price</th>
-                                    <th>Stock Qty</th>
-                                    <th>Last Checked</th>
+                                    <th class="col-sortable" data-sort-asc="name_asc" data-sort-desc="name_desc" data-sort-asc-label="Name A → Z" data-sort-desc-label="Name Z → A">Item Name</th>
+                                    <th class="col-sortable" data-sort-asc="sku_asc" data-sort-desc="sku_desc" data-sort-asc-label="SKU A → Z" data-sort-desc-label="SKU Z → A">SKU</th>
+                                    <th class="col-sortable" data-sort-asc="price_asc" data-sort-desc="price_desc" data-sort-asc-label="Low → High" data-sort-desc-label="High → Low">Price</th>
+                                    <th class="col-sortable" data-sort-asc="stock_asc" data-sort-desc="stock_desc" data-sort-asc-label="Low → High" data-sort-desc-label="High → Low">Stock Qty</th>
+                                    <th class="col-sortable" data-sort-asc="checked_asc" data-sort-desc="checked_desc" data-sort-asc-label="Never/Oldest First" data-sort-desc-label="Recently Checked">Last Checked</th>
                                     <th style="width:50px"></th>
                                 </tr>
                             </thead>
@@ -345,6 +345,7 @@ let invPage = 1;
 let invChecked = new Set();
 const INV_PER_PAGE = 50;
 let invFilterMgr = null;
+let invColSort = null;
 
 function headers() { return getAuthHeaders(); }
 
@@ -410,6 +411,13 @@ async function init() {
         onFilterChange: function() { invPage = 1; renderInventory(); }
     });
     await invFilterMgr.init();
+
+    // Column header sort dropdowns
+    invColSort = new ColumnSort({
+        tableId: 'invTable',
+        currentSort: invSortKey,
+        onSort: function(key) { setInvSort(key); }
+    });
 }
 init();
 
@@ -767,6 +775,7 @@ function setInvSort(key) {
     const activeEl = document.querySelector('#sortDropdown .sort-option.active');
     if (activeEl) document.getElementById('sortLabel').textContent = activeEl.textContent.trim();
     document.getElementById('sortDropdown').style.display = 'none';
+    if (invColSort) invColSort.setSort(key);
     renderInventory();
 }
 

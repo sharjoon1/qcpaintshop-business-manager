@@ -152,12 +152,12 @@
             <!-- Table -->
             <div class="adj-table-wrap bg-white rounded-lg shadow overflow-hidden">
                 <div class="overflow-auto" style="max-height: calc(100vh - 420px); min-height: 300px;">
-                    <table class="adj-table">
+                    <table class="adj-table" id="adjTable">
                         <thead>
                             <tr>
-                                <th style="min-width:220px">Item Name</th>
-                                <th>SKU</th>
-                                <th class="text-right">Current Stock</th>
+                                <th style="min-width:220px" class="col-sortable" data-sort-asc="name_asc" data-sort-desc="name_desc" data-sort-asc-label="Name A → Z" data-sort-desc-label="Name Z → A">Item Name</th>
+                                <th class="col-sortable" data-sort-asc="sku_asc" data-sort-desc="sku_desc" data-sort-asc-label="SKU A → Z" data-sort-desc-label="SKU Z → A">SKU</th>
+                                <th class="text-right col-sortable" data-sort-asc="stock_asc" data-sort-desc="stock_desc" data-sort-asc-label="Low → High" data-sort-desc-label="High → Low">Current Stock</th>
                                 <th class="text-right">Available</th>
                                 <th class="text-center" style="min-width:130px">Adjust Qty</th>
                                 <th class="text-right">New Stock</th>
@@ -207,6 +207,7 @@
     var stockSearchTimeout = null;
     var currentSort = localStorage.getItem('stockAdjustSort') || 'name_asc';
     var filterMgr = null;
+    var colSort = null;
 
     function showToast(msg, type) { var t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast toast-' + (type||'info'); t.classList.add('show'); setTimeout(function(){t.classList.remove('show');}, 3500); }
     function escapeHtml(s) { if (s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -297,6 +298,7 @@
     function onSortChange() {
         currentSort = document.getElementById('sortSelect').value;
         localStorage.setItem('stockAdjustSort', currentSort);
+        if (colSort) colSort.setSort(currentSort);
         stockPage = 1;
         loadStockForLocation();
     }
@@ -548,6 +550,18 @@
             onFilterChange: function() { stockPage = 1; loadStockForLocation(); }
         });
         await filterMgr.init();
+        // Column header sort dropdowns
+        colSort = new ColumnSort({
+            tableId: 'adjTable',
+            currentSort: currentSort,
+            onSort: function(key) {
+                currentSort = key;
+                localStorage.setItem('stockAdjustSort', key);
+                document.getElementById('sortSelect').value = key;
+                stockPage = 1;
+                loadStockForLocation();
+            }
+        });
     });
 
     window.addEventListener('beforeunload', function(e) {

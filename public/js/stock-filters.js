@@ -352,3 +352,141 @@ class StockFilterManager {
         return div.innerHTML;
     }
 }
+
+/**
+ * ColumnSort — adds sort dropdowns to table column headers.
+ *
+ * Usage:
+ *   const colSort = new ColumnSort({
+ *       tableId: 'myTable',
+ *       currentSort: 'name_asc',
+ *       onSort: function(key) { ... }
+ *   });
+ *
+ * Table headers need: <th class="col-sortable" data-sort-asc="name_asc" data-sort-desc="name_desc">Name</th>
+ */
+class ColumnSort {
+    constructor(opts) {
+        this.tableId = opts.tableId;
+        this.currentSort = opts.currentSort || '';
+        this.onSort = opts.onSort || function(){};
+        this._openTh = null;
+        this._init();
+    }
+
+    _init() {
+        const table = document.getElementById(this.tableId);
+        if (!table) return;
+        this._dropdowns = [];
+
+        // Build dropdowns for each sortable th
+        table.querySelectorAll('th.col-sortable').forEach(th => {
+            const ascKey = th.dataset.sortAsc;
+            const descKey = th.dataset.sortDesc;
+            if (!ascKey && !descKey) return;
+
+            // Add sort icon
+            const icon = document.createElement('span');
+            icon.className = 'col-sort-icon';
+            icon.innerHTML = '&#9650;&#9660;';
+            th.appendChild(icon);
+
+            // Build dropdown — appended to body to avoid overflow clipping
+            const dd = document.createElement('div');
+            dd.className = 'col-dropdown';
+
+            const ascLabel = th.dataset.sortAscLabel || 'Sort A → Z';
+            const descLabel = th.dataset.sortDescLabel || 'Sort Z → A';
+
+            if (ascKey) {
+                const optAsc = document.createElement('div');
+                optAsc.className = 'col-sort-opt';
+                optAsc.dataset.sort = ascKey;
+                optAsc.innerHTML = '<span class="sort-arrow">&#9650;</span> ' + ascLabel;
+                optAsc.addEventListener('click', (e) => { e.stopPropagation(); this._apply(ascKey); });
+                dd.appendChild(optAsc);
+            }
+            if (descKey) {
+                const optDesc = document.createElement('div');
+                optDesc.className = 'col-sort-opt';
+                optDesc.dataset.sort = descKey;
+                optDesc.innerHTML = '<span class="sort-arrow">&#9660;</span> ' + descLabel;
+                optDesc.addEventListener('click', (e) => { e.stopPropagation(); this._apply(descKey); });
+                dd.appendChild(optDesc);
+            }
+
+            document.body.appendChild(dd);
+            this._dropdowns.push({ th, dd, ascKey, descKey });
+
+            // Click header to toggle dropdown
+            th.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (this._openTh === th) {
+                    this._closeAll();
+                } else {
+                    this._closeAll();
+                    // Position dropdown below the th
+                    const rect = th.getBoundingClientRect();
+                    dd.style.position = 'fixed';
+                    dd.style.top = rect.bottom + 2 + 'px';
+                    // Align left for left-aligned, right for right-aligned columns
+                    if (th.classList.contains('text-right')) {
+                        dd.style.left = 'auto';
+                        dd.style.right = (window.innerWidth - rect.right) + 'px';
+                    } else {
+                        dd.style.left = rect.left + 'px';
+                        dd.style.right = 'auto';
+                    }
+                    dd.classList.add('show');
+                    this._openTh = th;
+                }
+            });
+        });
+
+        // Outside click closes
+        document.addEventListener('click', () => this._closeAll());
+
+        // Mark initial active
+        this._updateActive();
+    }
+
+    _apply(sortKey) {
+        this.currentSort = sortKey;
+        this._closeAll();
+        this._updateActive();
+        this.onSort(sortKey);
+    }
+
+    _closeAll() {
+        if (!this._dropdowns) return;
+        this._dropdowns.forEach(({ dd }) => dd.classList.remove('show'));
+        this._openTh = null;
+    }
+
+    _updateActive() {
+        if (!this._dropdowns) return;
+
+        this._dropdowns.forEach(({ th, dd, ascKey, descKey }) => {
+            const isActive = (this.currentSort === ascKey || this.currentSort === descKey);
+            th.classList.toggle('sort-active', isActive);
+
+            // Update icon to show current direction
+            const icon = th.querySelector('.col-sort-icon');
+            if (icon) {
+                if (this.currentSort === ascKey) icon.innerHTML = '&#9650;';
+                else if (this.currentSort === descKey) icon.innerHTML = '&#9660;';
+                else icon.innerHTML = '&#9650;&#9660;';
+            }
+
+            // Mark active option in dropdown
+            dd.querySelectorAll('.col-sort-opt').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.sort === this.currentSort);
+            });
+        });
+    }
+
+    setSort(sortKey) {
+        this.currentSort = sortKey;
+        this._updateActive();
+    }
+}

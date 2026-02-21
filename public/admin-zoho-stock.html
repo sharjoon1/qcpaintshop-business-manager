@@ -270,16 +270,16 @@
         <div id="stockTableContainer" class="hidden">
             <div class="stock-table-wrap bg-white rounded-lg shadow overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left" style="min-width: 900px;">
+                    <table id="stockTable" class="w-full text-sm text-left" style="min-width: 900px;">
                         <thead class="bg-gray-50 border-b">
                             <tr>
-                                <th class="px-4 py-3 font-semibold text-gray-600">Item Name</th>
-                                <th class="px-4 py-3 font-semibold text-gray-600">SKU</th>
-                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Qty</th>
-                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Rate</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 col-sortable" data-sort-asc="name_asc" data-sort-desc="name_desc" data-sort-asc-label="Name A → Z" data-sort-desc-label="Name Z → A">Item Name</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 col-sortable" data-sort-asc="sku_asc" data-sort-desc="sku_desc" data-sort-asc-label="SKU A → Z" data-sort-desc-label="SKU Z → A">SKU</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right col-sortable" data-sort-asc="stock_asc" data-sort-desc="stock_desc" data-sort-asc-label="Low → High" data-sort-desc-label="High → Low">Qty</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right col-sortable" data-sort-asc="rate_asc" data-sort-desc="rate_desc" data-sort-asc-label="Low → High" data-sort-desc-label="High → Low">Rate</th>
                                 <th class="px-4 py-3 font-semibold text-gray-600 text-right">GST%</th>
                                 <th class="px-4 py-3 font-semibold text-gray-600 text-right">Rate+GST</th>
-                                <th class="px-4 py-3 font-semibold text-gray-600 text-right">Stock Value</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-right col-sortable" data-sort-asc="value_asc" data-sort-desc="value_desc" data-sort-asc-label="Low → High" data-sort-desc-label="High → Low">Stock Value</th>
                                 <th class="px-4 py-3 font-semibold text-gray-600 text-center">Status</th>
                             </tr>
                         </thead>
@@ -320,6 +320,7 @@
         let expandedItemId = null;
         let currentSort = localStorage.getItem('stockViewSort') || 'name_asc';
         let filterMgr = null;
+        let colSort = null;
 
         // =============================================
         // TOAST NOTIFICATIONS
@@ -466,6 +467,7 @@
         function onSortChange() {
             currentSort = document.getElementById('sortSelect').value;
             localStorage.setItem('stockViewSort', currentSort);
+            if (colSort) colSort.setSort(currentSort);
             currentPage = 1;
             loadStockData();
         }
@@ -1022,6 +1024,18 @@
                 onFilterChange: function() { currentPage = 1; loadStockData(); }
             });
             await filterMgr.init();
+            // Column header sort dropdowns
+            colSort = new ColumnSort({
+                tableId: 'stockTable',
+                currentSort: currentSort,
+                onSort: function(key) {
+                    currentSort = key;
+                    localStorage.setItem('stockViewSort', key);
+                    document.getElementById('sortSelect').value = key;
+                    currentPage = 1;
+                    loadStockData();
+                }
+            });
         });
     </script>
 </body>
