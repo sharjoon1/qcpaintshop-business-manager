@@ -6,10 +6,19 @@
 (function() {
     'use strict';
     
+    // Determine sidebar based on user role
+    let sidebarPath = '/components/sidebar-complete.html';
+    try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        if (u.role && !['admin', 'manager', 'super_admin'].includes(u.role)) {
+            sidebarPath = '/components/staff-sidebar.html';
+        }
+    } catch(e) {}
+
     // Configuration
     const CONFIG = {
         HEADER_PATH: '/components/header-v2.html',
-        SIDEBAR_PATH: '/components/sidebar-complete.html',
+        SIDEBAR_PATH: sidebarPath,
         ZOHO_SUBNAV_PATH: '/components/zoho-subnav.html',
         ATTENDANCE_SUBNAV_PATH: '/components/attendance-subnav.html',
         LEADS_SUBNAV_PATH: '/components/leads-subnav.html',
