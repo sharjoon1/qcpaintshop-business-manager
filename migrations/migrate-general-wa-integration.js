@@ -1,7 +1,7 @@
 /**
  * Migration: General WhatsApp Integration for Marketing & Collections
- * Drops FK constraints on wa_campaigns.branch_id and wa_campaign_leads.branch_id
- * to allow branch_id = 0 for the company-wide "General WhatsApp" session.
+ * Drops FK constraints on wa_campaigns.branch_id, wa_campaign_leads.branch_id,
+ * and wa_instant_messages.branch_id to allow branch_id = 0 for General WhatsApp.
  *
  * Run: node migrations/migrate-general-wa-integration.js
  */
@@ -22,15 +22,23 @@ async function migrate() {
     console.log('[General WA Integration Migration] Connected to database');
 
     // 1. Drop FK on wa_campaigns.branch_id
-    console.log('[1/2] Dropping FK on wa_campaigns.branch_id...');
+    console.log('[1/3] Dropping FK on wa_campaigns.branch_id...');
     await dropForeignKey(pool, 'wa_campaigns', 'branch_id');
 
     // 2. Drop FK on wa_campaign_leads.branch_id
-    console.log('[2/2] Dropping FK on wa_campaign_leads.branch_id...');
+    console.log('[2/3] Dropping FK on wa_campaign_leads.branch_id...');
     await dropForeignKey(pool, 'wa_campaign_leads', 'branch_id');
 
+    // 3. Drop FK on wa_instant_messages.branch_id
+    console.log('[3/4] Dropping FK on wa_instant_messages.branch_id...');
+    await dropForeignKey(pool, 'wa_instant_messages', 'branch_id');
+
+    // 4. Drop FK on wa_sending_stats.branch_id
+    console.log('[4/4] Dropping FK on wa_sending_stats.branch_id...');
+    await dropForeignKey(pool, 'wa_sending_stats', 'branch_id');
+
     console.log('\n[General WA Integration Migration] Complete!');
-    console.log('branch_id = 0 is now allowed for General WhatsApp campaigns.');
+    console.log('branch_id = 0 is now allowed for General WhatsApp campaigns, instant messages, and sending stats.');
     await pool.end();
     process.exit(0);
 }

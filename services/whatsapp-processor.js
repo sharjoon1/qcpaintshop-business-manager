@@ -168,7 +168,7 @@ async function processQueue() {
                 }
 
                 // DUAL-MODE SENDING:
-                // 1. If message has branch_id AND that branch has a connected session → use local session
+                // 1. If message has branch_id → call sendMessage() (has internal General fallback)
                 // 2. If no branch_id → try ANY connected session (single-branch setups)
                 // 3. Otherwise → fallback to HTTP API
                 let sent = false;
@@ -184,14 +184,15 @@ async function processQueue() {
                         if (connected) targetBranch = connected.branch_id;
                     }
 
-                    if (targetBranch != null && sessionManager.isConnected(targetBranch)) {
+                    // Let sendMessage() handle fallback to General if branch disconnected
+                    if (targetBranch != null) {
                         try {
                             sent = await sessionManager.sendMessage(targetBranch, msg.phone, body);
                             if (sent) {
-                                console.log(`[WhatsApp] Sent via branch ${targetBranch} session to ${msg.phone} (ID: ${msg.id})`);
+                                console.log(`[WhatsApp] Sent via session to ${msg.phone} (ID: ${msg.id}, requested branch: ${targetBranch})`);
                             }
                         } catch (sessionErr) {
-                            console.warn(`[WhatsApp] Branch ${targetBranch} session send failed, falling back to HTTP:`, sessionErr.message);
+                            console.warn(`[WhatsApp] Session send failed for branch ${targetBranch}, falling back to HTTP:`, sessionErr.message);
                             sent = false;
                         }
                     }
