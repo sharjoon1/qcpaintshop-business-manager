@@ -437,6 +437,17 @@ async function sendMessage() {
             })
         });
 
+        // Check for HTTP errors
+        if (!resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
+            const ti = document.getElementById('typing-indicator');
+            if (ti) ti.remove();
+            const err = await resp.json();
+            appendMessage('assistant', 'Error: ' + (err.error || err.message || 'Request failed'));
+            isStreaming = false;
+            document.getElementById('sendBtn').disabled = false;
+            return;
+        }
+
         // Remove typing indicator
         const ti = document.getElementById('typing-indicator');
         if (ti) ti.remove();

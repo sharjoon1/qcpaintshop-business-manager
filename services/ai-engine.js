@@ -14,7 +14,8 @@ function setPool(p) { pool = p; }
 // ─── Provider configs ──────────────────────────────────────────
 
 const GEMINI_BASE = 'generativelanguage.googleapis.com';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+// Use AI_GEMINI_MODEL for text chat (separate from GEMINI_MODEL which is for image generation)
+const GEMINI_MODEL = process.env.AI_GEMINI_MODEL || 'gemini-2.0-flash';
 
 const CLAUDE_BASE = 'api.anthropic.com';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';

@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 
+const { requireAuth } = require('../middleware/permissionMiddleware');
 const aiEngine = require('../services/ai-engine');
 const aiAnalyzer = require('../services/ai-analyzer');
 const aiStaffAnalyzer = require('../services/ai-staff-analyzer');
@@ -18,14 +19,6 @@ let io = null;
 
 function setPool(p) { pool = p; }
 function setIO(i) { io = i; }
-
-// Middleware: require auth (from request header)
-function requireAuth(req, res, next) {
-    if (!req.user || !req.user.id) {
-        return res.status(401).json({ error: 'Authentication required' });
-    }
-    next();
-}
 
 // ═══════════════════════════════════════════════════════════════
 // CONVERSATIONS
@@ -98,10 +91,13 @@ router.post('/chat', requireAuth, async (req, res) => {
     if (!message) return res.status(400).json({ error: 'Message required' });
 
     // Set SSE headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no'
+    });
+    res.flushHeaders();
 
     let convId = conversation_id;
 
