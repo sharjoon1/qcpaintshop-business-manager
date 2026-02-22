@@ -67,7 +67,7 @@ router.get('/conversations', perm, async (req, res) => {
 
         const [rows] = await pool.query(`
             SELECT wc.*,
-                   b.name as branch_name,
+                   CASE WHEN wc.branch_id = 0 THEN 'General' ELSE b.name END as branch_name,
                    (SELECT body FROM whatsapp_messages wm
                     WHERE wm.branch_id = wc.branch_id AND wm.phone_number = wc.phone_number
                     ORDER BY wm.timestamp DESC LIMIT 1) as last_message,
@@ -78,7 +78,7 @@ router.get('/conversations', perm, async (req, res) => {
                     WHERE wm.branch_id = wc.branch_id AND wm.phone_number = wc.phone_number
                     ORDER BY wm.timestamp DESC LIMIT 1) as last_direction
             FROM whatsapp_contacts wc
-            JOIN branches b ON wc.branch_id = b.id
+            LEFT JOIN branches b ON wc.branch_id = b.id
             ${where}
             ORDER BY wc.is_pinned DESC, wc.last_message_at DESC
             LIMIT ? OFFSET ?

@@ -26,6 +26,8 @@ try {
     console.warn('[WhatsApp Sessions] whatsapp-web.js not installed — session management disabled. Run: npm install whatsapp-web.js qrcode');
 }
 
+const GENERAL_ID = 0; // Sentinel value for company-wide General WhatsApp
+
 let pool;
 let io;
 
@@ -372,10 +374,23 @@ async function disconnectBranch(branchId) {
  */
 async function sendMessage(branchId, phone, message, metadata = {}) {
     branchId = parseInt(branchId);
-    const session = sessions.get(branchId);
+    let session = sessions.get(branchId);
+    let actualBranchId = branchId;
 
+    // Fallback: if target branch not connected, try General session
     if (!session || session.status !== 'connected' || !session.client) {
-        return false;
+        if (branchId !== GENERAL_ID) {
+            const generalSession = sessions.get(GENERAL_ID);
+            if (generalSession?.status === 'connected' && generalSession?.client) {
+                session = generalSession;
+                actualBranchId = GENERAL_ID;
+                console.log(`[WhatsApp Sessions] Fallback: sending via General for branch ${branchId}`);
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
     }
 
     // Normalize phone: ensure 91XXXXXXXXXX@c.us format
@@ -388,8 +403,8 @@ async function sendMessage(branchId, phone, message, metadata = {}) {
 
     const sentMsg = await session.client.sendMessage(chatId, message);
 
-    // Record outbound message
-    await recordOutbound(branchId, normalized, {
+    // Record outbound message (use actualBranchId — General if fallback used)
+    await recordOutbound(actualBranchId, normalized, {
         message_type: 'text',
         body: message,
         whatsapp_msg_id: sentMsg?.id?._serialized || null,
@@ -410,10 +425,23 @@ async function sendMessage(branchId, phone, message, metadata = {}) {
  */
 async function sendMedia(branchId, phone, options = {}, metadata = {}) {
     branchId = parseInt(branchId);
-    const session = sessions.get(branchId);
+    let session = sessions.get(branchId);
+    let actualBranchId = branchId;
 
+    // Fallback: if target branch not connected, try General session
     if (!session || session.status !== 'connected' || !session.client) {
-        return false;
+        if (branchId !== GENERAL_ID) {
+            const generalSession = sessions.get(GENERAL_ID);
+            if (generalSession?.status === 'connected' && generalSession?.client) {
+                session = generalSession;
+                actualBranchId = GENERAL_ID;
+                console.log(`[WhatsApp Sessions] Fallback: sending media via General for branch ${branchId}`);
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
     }
 
     if (!MessageMedia) {
@@ -438,9 +466,9 @@ async function sendMedia(branchId, phone, options = {}, metadata = {}) {
 
     const sentMsg = await session.client.sendMessage(chatId, media, sendOptions);
 
-    // Record outbound media message
+    // Record outbound media message (use actualBranchId — General if fallback used)
     const msgType = options.type === 'document' ? 'document' : 'image';
-    await recordOutbound(branchId, normalized, {
+    await recordOutbound(actualBranchId, normalized, {
         message_type: msgType,
         body: null,
         caption: options.caption || null,
@@ -514,9 +542,10 @@ async function initializeSessions() {
 
     try {
         const [rows] = await pool.query(
-            `SELECT ws.branch_id, ws.created_by, b.name as branch_name
+            `SELECT ws.branch_id, ws.created_by,
+                    CASE WHEN ws.branch_id = 0 THEN 'General' ELSE b.name END as branch_name
              FROM whatsapp_sessions ws
-             JOIN branches b ON ws.branch_id = b.id
+             LEFT JOIN branches b ON ws.branch_id = b.id
              WHERE ws.status = 'connected'`
         );
 
@@ -529,7 +558,7 @@ async function initializeSessions() {
 
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            console.log(`[WhatsApp Sessions] Restoring ${row.branch_name} (branch ${row.branch_id})...`);
+            console.log(`[WhatsApp Sessions] Restoring ${row.branch_name || 'General'} (branch ${row.branch_id})...`);
 
             // Stagger reconnections by 3 seconds each
             if (i > 0) {
@@ -663,6 +692,7 @@ function getClient(branchId) {
 }
 
 module.exports = {
+    GENERAL_ID,
     setPool,
     setIO,
     connectBranch,

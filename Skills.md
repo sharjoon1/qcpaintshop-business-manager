@@ -901,7 +901,42 @@ Each branch can connect its own WhatsApp number via `whatsapp-web.js`. Messages 
 **Permission**: `zoho.whatsapp_sessions`
 **Navigation**: Zoho subnav "WhatsApp" tab (before Settings)
 **Session storage**: `./whatsapp-sessions/` (gitignored, survives deploys)
-**RAM**: ~300-500MB per branch session (Chromium). Max recommended: 4 branches.
+**RAM**: ~300-500MB per branch session (Chromium). Max recommended: 4 branches + 1 General.
+
+### 2.22b General WhatsApp (Company-wide Session)
+
+A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. Works as a fallback when a branch's own session is disconnected.
+
+**Architecture**:
+- `GENERAL_ID = 0` constant exported from `whatsapp-session-manager.js`
+- FK constraints on `whatsapp_sessions`, `whatsapp_messages`, `whatsapp_contacts` dropped to allow `branch_id = 0`
+- General session stored in the same `sessions` Map with key `0`
+
+**Fallback Logic** (in `sendMessage()` / `sendMedia()`):
+1. Try target branch session first
+2. If disconnected and `branchId !== 0`, try General session (`sessions.get(0)`)
+3. If General also disconnected, return `false`
+4. Messages sent via fallback are recorded with `branch_id = 0` (General)
+5. ALL callers (campaigns, reports, chat replies, processors) automatically benefit from fallback
+
+**Admin Sessions Page** (`admin-whatsapp-sessions.html`):
+- Dedicated "General WhatsApp" card at top with green company-wide badge
+- Same connect/disconnect/QR/test flow using branchId=0 API endpoints
+- Branch sessions grid shown below with "Branch Sessions" label
+- Socket.io events for branchId=0 update the General card independently
+
+**Admin Chat Page** (`admin-whatsapp-chat.html`):
+- Branch filter dropdown: "All Accounts" (default) → "General WhatsApp" → branch options
+- Account badge on each conversation: green "General" or gray branch name
+- Chat header shows "via General WhatsApp" or "via [branch name]"
+- Conversations query uses `LEFT JOIN` + `CASE WHEN branch_id = 0 THEN 'General'`
+
+**API Changes**:
+- `GET /api/zoho/whatsapp-sessions/` now returns `{ data: [...branches], general: {...} }`
+- All `:branchId` endpoints work with `0` (connect, disconnect, QR, status, test)
+- Chat conversations query changed from `JOIN` to `LEFT JOIN` for branch_id=0 support
+
+**Migration**: `migrations/migrate-general-whatsapp.js` (drops FK constraints)
 
 ---
 
@@ -1613,6 +1648,16 @@ node promote-release.js internal production
 - **Modified endpoints**: `GET /api/zoho/stock` (via `getLocationStockDashboard()`), `GET /api/zoho/stock/by-location`, `GET /api/stock-check/products/inventory`
 - Brand/Category displayed as subtle gray text under item name in all table rows + mobile cards
 - No migration needed — uses existing `zoho_brand` and `zoho_category_name` columns in `zoho_items_map`
+
+### 2026-02-22 - General WhatsApp (Company-wide Session)
+- **General WhatsApp session**: Company-wide session using `branch_id = 0` sentinel value
+- **Fallback logic**: `sendMessage()`/`sendMedia()` automatically fall back to General session when a branch is disconnected — all callers benefit without code changes
+- **Admin Sessions page**: Dedicated "General WhatsApp" card with green company-wide badge above branch cards
+- **Admin Chat page**: "General WhatsApp" filter option, account badges (green=General, gray=branch), "via" label in chat header
+- **Schema changes**: FK constraints dropped on `whatsapp_sessions`, `whatsapp_messages`, `whatsapp_contacts` to allow `branch_id = 0`
+- **Session restore**: `initializeSessions()` uses `LEFT JOIN` to restore General session on server restart
+- Migration: `migrations/migrate-general-whatsapp.js`
+- Modified: `services/whatsapp-session-manager.js`, `routes/whatsapp-sessions.js`, `routes/whatsapp-chat.js`, `admin-whatsapp-sessions.html`, `admin-whatsapp-chat.html`
 
 ### 2026-02-22 - WhatsApp Chat History (Admin Panel)
 - **Incoming message capture**: `client.on('message')` in session manager stores all incoming WhatsApp messages (text, images, video, audio, documents, stickers, location, contacts)

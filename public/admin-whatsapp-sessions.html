@@ -115,6 +115,35 @@
         }
         .btn-test:hover { background: #e0e7ff; }
 
+        /* General WhatsApp card */
+        .general-card {
+            background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+            border: 2px solid #bbf7d0;
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .general-card .status-bar {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+        }
+        .general-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #22c55e;
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         /* Modal */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.4); z-index: 9997; }
         .modal-overlay.show { display: flex; align-items: center; justify-content: center; }
@@ -140,11 +169,15 @@
 
         <!-- Info banner -->
         <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5 text-xs text-amber-800">
-            <strong>Important:</strong> Each branch can connect one WhatsApp number. Messages sent from Collections will route through the branch's connected session.
-            Each session uses ~300-500MB RAM. Recommended max: 4 branches.
+            <strong>Important:</strong> Each branch can connect one WhatsApp number. The <strong>General WhatsApp</strong> works as a company-wide fallback — if a branch has no connection, messages route through General.
+            Each session uses ~300-500MB RAM. Recommended max: 4 branches + 1 General.
         </div>
 
+        <!-- General WhatsApp Section -->
+        <div id="generalSection"></div>
+
         <!-- Branch Cards Grid -->
+        <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3" id="branchesLabel" style="display:none;">Branch Sessions</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="sessionsGrid">
             <div class="text-center py-12 text-gray-400 col-span-full">
                 <svg class="w-8 h-8 mx-auto mb-2 spinner" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -177,6 +210,7 @@
 <script>
 const API_BASE = '/api/zoho/whatsapp-sessions';
 let sessionsData = [];
+let generalData = null;
 
 // ========================================
 // LOAD SESSIONS
@@ -190,6 +224,8 @@ async function loadSessions() {
         if (!data.success) throw new Error(data.message);
 
         sessionsData = data.data;
+        generalData = data.general || null;
+        renderGeneralCard();
         renderCards();
     } catch (err) {
         console.error('Load sessions error:', err);
@@ -197,8 +233,76 @@ async function loadSessions() {
     }
 }
 
+function renderGeneralCard() {
+    const container = document.getElementById('generalSection');
+    if (!generalData) {
+        generalData = { branch_id: 0, branch_name: 'General WhatsApp', status: 'disconnected' };
+    }
+
+    const g = generalData;
+    const status = g.status || 'disconnected';
+    const statusLabel = {
+        connected: 'Connected',
+        qr_pending: 'Scan QR Code',
+        connecting: 'Connecting...',
+        disconnected: 'Disconnected',
+        failed: 'Failed'
+    }[status] || 'Unknown';
+
+    const connectedInfo = status === 'connected' && g.phone_number
+        ? `<div class="text-sm text-green-700 font-medium mt-1">+${g.phone_number}</div>
+           ${g.connected_at ? `<div class="text-xs text-gray-400 mt-0.5">Connected since ${formatDate(g.connected_at)}</div>` : ''}`
+        : '';
+
+    const errorInfo = status === 'failed' && g.last_error
+        ? `<div class="text-xs text-red-500 mt-1 truncate" title="${escHtml(g.last_error)}">${escHtml(g.last_error.substring(0, 80))}</div>`
+        : '';
+
+    const buttons = status === 'connected'
+        ? `<div class="flex gap-2 mt-3">
+               <button onclick="openTestModal(0)" class="btn-test flex-1">Test Message</button>
+               <button onclick="disconnectBranch(0)" class="btn-disconnect flex-1">Disconnect</button>
+           </div>`
+        : status === 'connecting' || status === 'qr_pending'
+        ? `<button onclick="disconnectBranch(0)" class="btn-disconnect w-full mt-3">Cancel</button>`
+        : `<button onclick="connectBranch(0)" class="btn-connect w-full mt-3">Connect General WhatsApp</button>`;
+
+    container.innerHTML = `
+        <div class="general-card" id="card-0">
+            <div class="status-bar ${status}"></div>
+            <div class="flex items-center gap-3 mb-2">
+                <span class="status-dot ${status}"></span>
+                <div class="flex-1">
+                    <div class="font-semibold text-gray-800 flex items-center gap-2">
+                        General WhatsApp
+                        <span class="general-badge">Company-wide</span>
+                    </div>
+                    <div class="text-xs text-gray-500">${statusLabel}</div>
+                </div>
+            </div>
+            ${connectedInfo}
+            ${errorInfo}
+            <div class="qr-container" id="qr-0" style="display:${status === 'qr_pending' || g.has_qr ? 'flex' : 'none'}">
+                <div class="text-center text-gray-400 text-xs">
+                    ${status === 'qr_pending' ? '<div class="spinner w-6 h-6 border-2 border-indigo-300 border-t-indigo-600 rounded-full mx-auto mb-2"></div>Loading QR...' : ''}
+                </div>
+            </div>
+            ${buttons}
+            <div class="text-xs text-gray-400 mt-3 border-t border-gray-200 pt-2">
+                Used as fallback when a branch has no connection. Messages sent via General appear in chat history under "General" label.
+            </div>
+        </div>
+    `;
+
+    // Load QR if pending
+    if (g.has_qr || status === 'qr_pending') {
+        fetchQR(0);
+    }
+}
+
 function renderCards() {
     const grid = document.getElementById('sessionsGrid');
+    document.getElementById('branchesLabel').style.display = sessionsData.length > 0 ? '' : 'none';
     if (sessionsData.length === 0) {
         grid.innerHTML = '<div class="text-center py-12 text-gray-400 col-span-full">No branches found.</div>';
         return;
@@ -364,26 +468,38 @@ function setupSocketListeners() {
 
     socket.on('whatsapp_qr', (data) => {
         console.log('QR received for branch', data.branch_id);
-        const s = sessionsData.find(x => x.branch_id === data.branch_id);
-        if (s) {
-            s.status = 'qr_pending';
-            s.has_qr = true;
-            renderCards();
+        if (data.branch_id === 0) {
+            if (generalData) { generalData.status = 'qr_pending'; generalData.has_qr = true; }
+            renderGeneralCard();
+        } else {
+            const s = sessionsData.find(x => x.branch_id === data.branch_id);
+            if (s) {
+                s.status = 'qr_pending';
+                s.has_qr = true;
+                renderCards();
+            }
         }
         renderQR(data.branch_id, data.qr);
     });
 
     socket.on('whatsapp_status', (data) => {
         console.log('Status update for branch', data.branch_id, ':', data.status);
-        const s = sessionsData.find(x => x.branch_id === data.branch_id);
-        if (s) {
-            s.status = data.status;
-            if (data.phone_number) s.phone_number = data.phone_number;
-            if (data.status === 'connected') s.has_qr = false;
-            renderCards();
+        if (data.branch_id === 0) {
+            if (!generalData) generalData = { branch_id: 0, branch_name: 'General WhatsApp' };
+            generalData.status = data.status;
+            if (data.phone_number) generalData.phone_number = data.phone_number;
+            if (data.status === 'connected') generalData.has_qr = false;
+            renderGeneralCard();
         } else {
-            // Reload all
-            loadSessions();
+            const s = sessionsData.find(x => x.branch_id === data.branch_id);
+            if (s) {
+                s.status = data.status;
+                if (data.phone_number) s.phone_number = data.phone_number;
+                if (data.status === 'connected') s.has_qr = false;
+                renderCards();
+            } else {
+                loadSessions();
+            }
         }
     });
 }

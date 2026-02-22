@@ -61,7 +61,42 @@ router.get('/', perm, async (req, res) => {
             live_phone: liveMap[b.branch_id]?.phone_number || null
         }));
 
-        res.json({ success: true, data: result });
+        // Also get General WhatsApp session (branch_id = 0)
+        let general = null;
+        const [generalRows] = await pool.query(`
+            SELECT ws.*, u.full_name as created_by_name
+            FROM whatsapp_sessions ws
+            LEFT JOIN users u ON ws.created_by = u.id
+            WHERE ws.branch_id = 0
+        `);
+        if (generalRows.length > 0) {
+            const g = generalRows[0];
+            const live = liveMap[0];
+            general = {
+                branch_id: 0,
+                branch_name: 'General WhatsApp',
+                status: live?.status || g.status || 'disconnected',
+                phone_number: live?.phone_number || g.phone_number,
+                connected_at: g.connected_at,
+                disconnected_at: g.disconnected_at,
+                last_error: g.last_error,
+                has_qr: live?.has_qr || false,
+                created_at: g.created_at,
+                created_by_name: g.created_by_name
+            };
+        } else {
+            // No DB row yet — check live status
+            const live = liveMap[0];
+            general = {
+                branch_id: 0,
+                branch_name: 'General WhatsApp',
+                status: live?.status || 'disconnected',
+                phone_number: live?.phone_number || null,
+                has_qr: live?.has_qr || false
+            };
+        }
+
+        res.json({ success: true, data: result, general });
     } catch (error) {
         console.error('[WhatsApp Sessions] List error:', error.message);
         res.status(500).json({ success: false, message: error.message });

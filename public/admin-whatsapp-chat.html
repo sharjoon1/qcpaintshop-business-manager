@@ -407,6 +407,30 @@
         }
         .stats-bar .stat-value.unread { color: #25d366; }
 
+        /* Account badge on conversations */
+        .conv-account {
+            font-size: 0.6rem;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-top: 2px;
+            line-height: 1.4;
+        }
+        .conv-account.general {
+            background: #dcfce7;
+            color: #15803d;
+        }
+        .conv-account.branch {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        .chat-header-account {
+            font-size: 0.7rem;
+            color: #15803d;
+            font-weight: 500;
+        }
+
         /* Mobile */
         @media (max-width: 768px) {
             .conv-panel { width: 100%; min-width: unset; }
@@ -429,7 +453,8 @@
                 <h2>WhatsApp Chat</h2>
                 <div class="conv-filters">
                     <select id="branchFilter" onchange="loadConversations()">
-                        <option value="">All Branches</option>
+                        <option value="">All Accounts</option>
+                        <option value="0">General WhatsApp</option>
                     </select>
                     <input type="text" id="searchInput" placeholder="Search..." oninput="debounceSearch()">
                 </div>
@@ -573,12 +598,17 @@ function renderConversations() {
         }
         if (c.last_direction === 'out') preview = '<span class="direction-icon">↩</span> ' + preview;
         const pin = c.is_pinned ? '<span class="pin-icon">📌</span>' : '';
+        const isGeneral = c.branch_id == 0;
+        const accountBadge = isGeneral
+            ? '<span class="conv-account general">General</span>'
+            : (c.branch_name ? `<span class="conv-account branch">${escHtml(c.branch_name)}</span>` : '');
 
         return `<div class="conv-item${isActive ? ' active' : ''}" onclick="openChat('${c.phone_number}', ${c.branch_id})" data-phone="${c.phone_number}" data-branch="${c.branch_id}">
             <div class="conv-avatar">${initial}</div>
             <div class="conv-info">
                 <div class="conv-name">${escHtml(name)} ${pin}</div>
                 <div class="conv-preview">${preview}</div>
+                ${accountBadge}
             </div>
             <div class="conv-meta">
                 <div class="conv-time${c.unread_count > 0 ? ' has-unread' : ''}">${timeStr}</div>
@@ -606,9 +636,10 @@ async function openChat(phone, branchId) {
 
     // Update header
     const name = currentContact.saved_name || currentContact.pushname || formatPhone(phone);
+    const accountLabel = branchId == 0 ? 'General WhatsApp' : (currentContact.branch_name || '');
     document.getElementById('chatAvatar').textContent = (name[0] || '?').toUpperCase();
     document.getElementById('chatName').textContent = name;
-    document.getElementById('chatPhone').textContent = '+' + phone + (currentContact.branch_name ? ` · ${currentContact.branch_name}` : '');
+    document.getElementById('chatPhone').innerHTML = '+' + phone + (accountLabel ? ` · <span class="chat-header-account">via ${escHtml(accountLabel)}</span>` : '');
 
     // Update pin/mute buttons
     updateContactButtons();
