@@ -71,6 +71,14 @@ function setCache(key, data) {
     _apiCache[key] = { data, timestamp: Date.now() };
 }
 
+function clearCache(prefix) {
+    if (prefix) {
+        Object.keys(_apiCache).forEach(k => { if (k.startsWith(prefix)) delete _apiCache[k]; });
+    } else {
+        Object.keys(_apiCache).forEach(k => delete _apiCache[k]);
+    }
+}
+
 function setPool(dbPool) {
     pool = dbPool;
     zohoOAuth.setPool(dbPool);
@@ -1642,6 +1650,7 @@ router.post('/inventory-adjustments', requirePermission('zoho', 'manage'), async
         }
 
         const result = await zohoAPI.createInventoryAdjustment(adjustmentData);
+        clearCache('inv_adjustments_'); // Invalidate cached adjustment lists
         res.json({ success: true, data: result, message: 'Inventory adjustment created' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -1802,11 +1811,24 @@ router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req,
         const jobId = jobResult.insertId;
 
         // Create individual job items with per-item payloads
+        // If item_name is missing, look it up from zoho_items_map
+        const itemsWithoutName = items.filter(i => !i.item_name);
+        const nameLookup = {};
+        if (itemsWithoutName.length > 0) {
+            const ids = itemsWithoutName.map(i => i.zoho_item_id);
+            const [nameRows] = await pool.query(
+                `SELECT zoho_item_id, zoho_item_name FROM zoho_items_map WHERE zoho_item_id IN (${ids.map(() => '?').join(',')})`,
+                ids
+            );
+            nameRows.forEach(r => { nameLookup[r.zoho_item_id] = r.zoho_item_name; });
+        }
+
         for (const item of items) {
+            const itemName = item.item_name || nameLookup[item.zoho_item_id] || '';
             await pool.query(`
                 INSERT INTO zoho_bulk_job_items (job_id, zoho_item_id, item_name, payload)
                 VALUES (?, ?, ?, ?)
-            `, [jobId, item.zoho_item_id, item.item_name || '', JSON.stringify(item.changes)]);
+            `, [jobId, item.zoho_item_id, itemName, JSON.stringify(item.changes)]);
         }
 
         res.json({

@@ -289,16 +289,21 @@
         var origStr = String(getOriginal(id, field) ?? '');
         var newStr = String(newValue ?? '');
         if (origStr === newStr) {
-            if (dirtyItems.has(id)) { var c = dirtyItems.get(id); delete c[field]; if (!Object.keys(c).length) dirtyItems.delete(id); }
+            if (dirtyItems.has(id)) { var c = dirtyItems.get(id); delete c[field]; if (!Object.keys(c).filter(function(k){return k!=='_itemName';}).length) dirtyItems.delete(id); }
         } else {
-            if (!dirtyItems.has(id)) dirtyItems.set(id, {});
+            if (!dirtyItems.has(id)) {
+                dirtyItems.set(id, {});
+                // Store item name for later use in pushChangesToZoho
+                var item = items.find(function(it){return String(it.item_id||it.zoho_item_id)===id;});
+                if (item) dirtyItems.get(id)._itemName = item.name || item.item_name || '';
+            }
             dirtyItems.get(id)[field] = newValue;
         }
         updateChangesUI();
     }
     function isDirty(id, f) { var i = String(id); return dirtyItems.has(i) && dirtyItems.get(i).hasOwnProperty(f); }
     function getCurrentValue(id, f) { var i = String(id); if (dirtyItems.has(i) && dirtyItems.get(i).hasOwnProperty(f)) return dirtyItems.get(i)[f]; return getOriginal(i, f); }
-    function getTotalChanges() { var c = 0; dirtyItems.forEach(function(ch) { c += Object.keys(ch).length; }); return c; }
+    function getTotalChanges() { var c = 0; dirtyItems.forEach(function(ch) { c += Object.keys(ch).filter(function(k){return k!=='_itemName';}).length; }); return c; }
     function getDirtyItemCount() { return dirtyItems.size; }
 
     function updateChangesUI() {
@@ -580,7 +585,7 @@
             html += '<span>Rate: <b class="text-gray-700">'+formatINR(getCurrentValue(itemId,'rate'))+'</b></span>';
             html += '<span>DPL: <b class="text-gray-700">'+escapeHtml(getCurrentValue(itemId,'cf_dpl')||'--')+'</b></span>';
             html += '</div>';
-            if (hasDirty) { var cc = Object.keys(dirtyItems.get(itemId)).length; html += '<div class="mt-1"><span class="change-badge">'+cc+' change'+(cc>1?'s':'')+'</span></div>'; }
+            if (hasDirty) { var cc = Object.keys(dirtyItems.get(itemId)).filter(function(k){return k!=='_itemName';}).length; html += '<div class="mt-1"><span class="change-badge">'+cc+' change'+(cc>1?'s':'')+'</span></div>'; }
             html += '</div>';
             html += '<button onclick="openMobileEdit(\''+escapeHtml(itemId)+'\')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-medium transition flex-shrink-0">Edit</button>';
             html += '</div></div>';
@@ -661,7 +666,7 @@
         var btn=document.getElementById('pushBtn'),spinner=document.getElementById('pushSpinner'),icon=document.getElementById('pushIcon'),text=document.getElementById('pushBtnText');
         btn.disabled=true;spinner.classList.remove('hidden');icon.classList.add('hidden');text.textContent='Pushing...';
         var payload=[];
-        dirtyItems.forEach(function(changes,itemId){var item=items.find(function(it){return String(it.item_id||it.zoho_item_id)===itemId;});payload.push({zoho_item_id:itemId,item_name:item?(item.name||item.item_name||''):'',changes:changes});});
+        dirtyItems.forEach(function(changes,itemId){var name=changes._itemName||'';var cleanChanges={};Object.keys(changes).forEach(function(k){if(k!=='_itemName')cleanChanges[k]=changes[k];});payload.push({zoho_item_id:itemId,item_name:name,changes:cleanChanges});});
         try {
             var resp=await fetch('/api/zoho/items/bulk-edit',{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({items:payload})});
             if(!resp.ok){var e=await resp.json().catch(function(){return{};}); throw new Error(e.message||'Push failed');}

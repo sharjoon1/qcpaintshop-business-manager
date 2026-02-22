@@ -1907,7 +1907,15 @@ async function generateDailyTransactionReport(dateStart, dateEnd, triggeredBy = 
                     data.purchaseOrders.length, poAmount
                 ]);
 
-                const dailyId = dtResult.insertId || dtResult.insertId;
+                // Get the row id: insertId for new rows, or lookup for existing (ON DUPLICATE KEY UPDATE returns 0)
+                let dailyId = dtResult.insertId;
+                if (!dailyId) {
+                    const [[existing]] = await pool.query(
+                        `SELECT id FROM zoho_daily_transactions WHERE transaction_date = ? AND zoho_location_id <=> ? LIMIT 1`,
+                        [dateStr, locId]
+                    );
+                    dailyId = existing?.id;
+                }
                 if (dailyId) {
                     // Store details for drilldown
                     // Delete old details first

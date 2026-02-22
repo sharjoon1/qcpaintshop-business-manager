@@ -1718,6 +1718,16 @@ node promote-release.js internal production
 - **Collections**: "Send via" dropdown in reminder modal (Auto / General WhatsApp); `session_type` param on POST /remind
 - **Migration**: `migrate-general-wa-integration.js` drops FK constraints on `wa_campaigns` and `wa_campaign_leads`
 
+### Feb 23, 2026 — Zoho Bulk Edit Bug Fix & Module Analysis
+- **Fixed**: Bulk edit item names showing "--" in job status — `pushChangesToZoho()` searched current page's `items` array; items from other pages weren't found
+  - Frontend: `setDirty()` now stores `_itemName` in `dirtyItems` Map; `pushChangesToZoho()` uses stored name
+  - Backend: POST `/api/zoho/items/bulk-edit` queries `zoho_items_map` for names when `item_name` is empty
+- **Fixed**: Daily transaction details never updated on re-generate (`insertId` returns 0 on ON DUPLICATE KEY UPDATE)
+  - `zoho-api.js`: Falls back to SELECT lookup for existing row ID when `insertId` is 0
+- **Fixed**: Inventory adjustment cache not invalidated — `clearCache('inv_adjustments_')` called after POST
+- **Added**: `clearCache(prefix)` utility function for targeted cache invalidation in `routes/zoho.js`
+- **Analysis**: Comprehensive review of all 60+ Zoho endpoints across 4 files (zoho.js, zoho-api.js, rate-limiter, sync-scheduler)
+
 ---
 
 ## 9. KNOWN ISSUES & ROADMAP
