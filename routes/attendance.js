@@ -30,9 +30,14 @@ const upload = multer({
 
 // Database connection (imported from main app)
 let pool;
+let io;
 
 function setPool(dbPool) {
     pool = dbPool;
+}
+
+function setIO(socketIO) {
+    io = socketIO;
 }
 
 // ========================================
@@ -624,6 +629,21 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
         const expectedMinutes = (record.expected_hours || 10) * 60;
         const overtimeMinutes = Math.max(0, workingMinutes - expectedMinutes);
 
+        // Check if approved OT request exists for this attendance
+        let otApprovedMinutes = 0;
+        const [otReq] = await pool.query(
+            "SELECT id, status FROM overtime_requests WHERE attendance_id = ? AND status = 'approved' LIMIT 1",
+            [record.id]
+        );
+        if (otReq.length > 0) {
+            otApprovedMinutes = overtimeMinutes;
+            // Update approved_minutes on the request
+            await pool.query(
+                "UPDATE overtime_requests SET approved_minutes = ? WHERE id = ?",
+                [overtimeMinutes, otReq[0].id]
+            );
+        }
+
         // Update attendance with break enforcement data + overtime
         await pool.query(
             `UPDATE staff_attendance
@@ -631,10 +651,10 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
                  clock_out_lat = ?, clock_out_lng = ?, clock_out_address = ?,
                  total_working_minutes = ?, is_early_checkout = ?, clock_out_distance = ?,
                  excess_break_minutes = ?, break_exceeded = ?, effective_working_minutes = ?,
-                 overtime_minutes = ?
+                 overtime_minutes = ?, ot_approved_minutes = ?
              WHERE id = ?`,
             [now, photoPath, latitude, longitude, address, workingMinutes, isEarly ? 1 : 0, clockOutDistance,
-             excessBreak, breakExceeded, effectiveWorking, overtimeMinutes, record.id]
+             excessBreak, breakExceeded, effectiveWorking, overtimeMinutes, otApprovedMinutes, record.id]
         );
         
         // Save photo record
@@ -788,7 +808,11 @@ router.get('/today', requireAuth, async (req, res) => {
             overtime: {
                 acknowledged: !!attendance.overtime_acknowledged,
                 started_at: attendance.overtime_started_at,
-                minutes: attendance.overtime_minutes || 0
+                minutes: attendance.overtime_minutes || 0,
+                request_status: attendance.ot_request_status || 'none',
+                request_id: attendance.ot_request_id,
+                approved_minutes: attendance.ot_approved_minutes || 0,
+                prompt_shown_at: attendance.ot_prompt_shown_at
             },
             break_policy: {
                 allowance: breakAllowance,
@@ -1999,7 +2023,8 @@ router.get('/admin/today-summary', requirePermission('attendance', 'view'), asyn
                 SUM(CASE WHEN is_late = 1 THEN 1 ELSE 0 END) as late,
                 SUM(CASE WHEN break_start_time IS NOT NULL AND break_end_time IS NULL THEN 1 ELSE 0 END) as on_break,
                 SUM(CASE WHEN clock_out_time IS NULL THEN 1 ELSE 0 END) as not_clocked_out,
-                SUM(CASE WHEN break_exceeded = 1 THEN 1 ELSE 0 END) as break_exceeded
+                SUM(CASE WHEN break_exceeded = 1 THEN 1 ELSE 0 END) as break_exceeded,
+                SUM(CASE WHEN ot_request_status = 'pending' AND clock_out_time IS NULL THEN 1 ELSE 0 END) as ot_pending
              FROM staff_attendance
              WHERE date = ? AND status = 'present'`,
             [today]
@@ -2023,7 +2048,8 @@ router.get('/admin/today-summary', requirePermission('attendance', 'view'), asyn
                 on_break: stats.on_break || 0,
                 not_clocked_out: stats.not_clocked_out || 0,
                 pending_permissions: permRows[0].pending || 0,
-                break_exceeded: stats.break_exceeded || 0
+                break_exceeded: stats.break_exceeded || 0,
+                ot_pending: stats.ot_pending || 0
             }
         });
 
@@ -2949,7 +2975,8 @@ router.get('/check-overtime-status', requireAuth, async (req, res) => {
         const today = getTodayIST();
 
         const [attendance] = await pool.query(
-            `SELECT a.*, shc.expected_hours as config_expected_hours
+            `SELECT a.*, shc.expected_hours as config_expected_hours,
+                    shc.ot_auto_timeout_minutes, shc.ot_approval_required
              FROM staff_attendance a
              LEFT JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
                 AND shc.day_of_week = LOWER(DAYNAME(a.date))
@@ -2969,15 +2996,28 @@ router.get('/check-overtime-status', requireAuth, async (req, res) => {
         const breakMinutes = att.break_duration_minutes || 0;
         const workingMinutes = Math.round(elapsedMinutes - breakMinutes);
         const expectedMinutes = (att.expected_hours || att.config_expected_hours || 10) * 60;
+        const timeoutMinutes = att.ot_auto_timeout_minutes || 15;
 
-        // Check if working time exceeded expected hours
-        if (workingMinutes >= expectedMinutes && !att.overtime_acknowledged) {
+        // Calculate timeout remaining if prompt was shown
+        let timeoutRemaining = null;
+        if (att.ot_prompt_shown_at && att.ot_request_status === 'none') {
+            const promptAge = (now - new Date(att.ot_prompt_shown_at)) / 1000;
+            timeoutRemaining = Math.max(0, (timeoutMinutes * 60) - promptAge);
+        }
+
+        // Check if working time exceeded expected hours and no OT action taken
+        if (workingMinutes >= expectedMinutes && !att.overtime_acknowledged && att.ot_request_status === 'none') {
             return res.json({
                 success: true,
                 needsOvertimePrompt: true,
                 working_minutes: workingMinutes,
                 expected_minutes: expectedMinutes,
                 overtime_minutes: workingMinutes - expectedMinutes,
+                ot_request_status: att.ot_request_status || 'none',
+                ot_request_id: att.ot_request_id,
+                ot_auto_timeout_minutes: timeoutMinutes,
+                ot_prompt_shown_at: att.ot_prompt_shown_at,
+                timeout_remaining_seconds: timeoutRemaining,
                 message: `Working time exceeded ${Math.round(expectedMinutes / 60)} hours`
             });
         }
@@ -2988,7 +3028,13 @@ router.get('/check-overtime-status', requireAuth, async (req, res) => {
             working_minutes: workingMinutes,
             expected_minutes: expectedMinutes,
             overtime_acknowledged: !!att.overtime_acknowledged,
-            overtime_started_at: att.overtime_started_at
+            overtime_started_at: att.overtime_started_at,
+            ot_request_status: att.ot_request_status || 'none',
+            ot_request_id: att.ot_request_id,
+            ot_approved_minutes: att.ot_approved_minutes || 0,
+            ot_auto_timeout_minutes: timeoutMinutes,
+            ot_prompt_shown_at: att.ot_prompt_shown_at,
+            timeout_remaining_seconds: timeoutRemaining
         });
     } catch (error) {
         console.error('Check overtime error:', error);
@@ -2997,8 +3043,138 @@ router.get('/check-overtime-status', requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/attendance/request-overtime
+ * Staff requests to continue working overtime (requires admin approval)
+ */
+router.post('/request-overtime', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const today = getTodayIST();
+        const now = new Date();
+        const { reason } = req.body;
+
+        // Get current attendance + config
+        const [attendance] = await pool.query(
+            `SELECT a.*, shc.ot_approval_required
+             FROM staff_attendance a
+             LEFT JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
+                AND shc.day_of_week = LOWER(DAYNAME(a.date))
+             WHERE a.user_id = ? AND a.date = ? AND a.clock_out_time IS NULL
+             ORDER BY a.id DESC LIMIT 1`,
+            [userId, today]
+        );
+
+        if (attendance.length === 0) {
+            return res.status(400).json({ success: false, message: 'No active attendance found' });
+        }
+
+        const att = attendance[0];
+        if (att.ot_request_status !== 'none') {
+            return res.status(400).json({ success: false, message: 'OT request already submitted' });
+        }
+
+        const clockIn = new Date(att.clock_in_time);
+        const elapsedMinutes = (now - clockIn) / 1000 / 60;
+        const breakMinutes = att.break_duration_minutes || 0;
+        const workingMinutes = Math.round(elapsedMinutes - breakMinutes);
+        const expectedMinutes = (att.expected_hours || 10) * 60;
+        const approvalRequired = att.ot_approval_required !== 0; // default true
+
+        // Determine initial status
+        const initialStatus = approvalRequired ? 'pending' : 'approved';
+
+        // Create overtime request
+        const [insertResult] = await pool.query(
+            `INSERT INTO overtime_requests
+             (user_id, attendance_id, branch_id, request_date, requested_at,
+              expected_minutes, working_minutes_at_request, status, reason)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, att.id, att.branch_id, today, now,
+             expectedMinutes, workingMinutes, initialStatus, reason || null]
+        );
+
+        const requestId = insertResult.insertId;
+
+        // Update staff_attendance
+        await pool.query(
+            `UPDATE staff_attendance
+             SET overtime_acknowledged = 1, overtime_acknowledged_at = ?,
+                 overtime_started_at = ?, ot_request_id = ?,
+                 ot_request_status = ?
+             WHERE id = ?`,
+            [now, now, requestId, initialStatus, att.id]
+        );
+
+        if (approvalRequired) {
+            // Notify all admins
+            try {
+                const [admins] = await pool.query(
+                    "SELECT id FROM users WHERE role IN ('admin','super_admin') AND status = 'active'"
+                );
+                const [staffInfo] = await pool.query("SELECT full_name FROM users WHERE id = ?", [userId]);
+                const staffName = staffInfo.length > 0 ? staffInfo[0].full_name : 'Staff';
+
+                for (const admin of admins) {
+                    await notificationService.sendNotification({
+                        userId: admin.id,
+                        type: 'attendance',
+                        title: 'OT Request',
+                        message: `${staffName} has requested overtime approval${reason ? ': ' + reason : ''}`,
+                        data: { request_id: requestId, staff_id: userId }
+                    });
+                }
+
+                // Emit socket event to admin room
+                if (io) {
+                    io.to('admin_room').emit('ot_request_new', {
+                        request_id: requestId,
+                        user_id: userId,
+                        staff_name: staffName,
+                        reason: reason,
+                        working_minutes: workingMinutes,
+                        expected_minutes: expectedMinutes
+                    });
+                }
+            } catch (notifErr) {
+                console.error('OT notification error:', notifErr.message);
+            }
+
+            res.json({
+                success: true,
+                message: 'Overtime request submitted. Waiting for admin approval.',
+                request_id: requestId,
+                status: 'pending'
+            });
+        } else {
+            // Auto-approved
+            await pool.query(
+                "UPDATE overtime_requests SET reviewed_at = ?, review_notes = 'Auto-approved' WHERE id = ?",
+                [now, requestId]
+            );
+
+            if (io) {
+                io.to(`user_${userId}`).emit('ot_approved', {
+                    request_id: requestId,
+                    message: 'Overtime auto-approved. Continue working!'
+                });
+            }
+
+            res.json({
+                success: true,
+                message: 'Overtime approved. Continue working!',
+                request_id: requestId,
+                status: 'approved'
+            });
+        }
+    } catch (error) {
+        console.error('Request overtime error:', error);
+        res.status(500).json({ success: false, message: 'Failed to request overtime' });
+    }
+});
+
+/**
  * POST /api/attendance/acknowledge-overtime
- * Staff confirms they want to continue working overtime
+ * Backward-compat wrapper → delegates to request-overtime
  */
 router.post('/acknowledge-overtime', requireAuth, async (req, res) => {
     try {
@@ -3006,27 +3182,265 @@ router.post('/acknowledge-overtime', requireAuth, async (req, res) => {
         const today = getTodayIST();
         const now = new Date();
 
-        const [result] = await pool.query(
-            `UPDATE staff_attendance
-             SET overtime_acknowledged = 1,
-                 overtime_acknowledged_at = ?,
-                 overtime_started_at = ?
-             WHERE user_id = ? AND date = ? AND clock_out_time IS NULL`,
-            [now, now, userId, today]
+        // Check if new OT system columns exist
+        const [attendance] = await pool.query(
+            `SELECT a.*, shc.ot_approval_required
+             FROM staff_attendance a
+             LEFT JOIN shop_hours_config shc ON a.branch_id = shc.branch_id
+                AND shc.day_of_week = LOWER(DAYNAME(a.date))
+             WHERE a.user_id = ? AND a.date = ? AND a.clock_out_time IS NULL
+             ORDER BY a.id DESC LIMIT 1`,
+            [userId, today]
         );
 
-        if (result.affectedRows === 0) {
+        if (attendance.length === 0) {
             return res.status(400).json({ success: false, message: 'No active attendance found' });
         }
 
+        const att = attendance[0];
+
+        // If already has OT request, just acknowledge
+        if (att.ot_request_status && att.ot_request_status !== 'none') {
+            return res.json({
+                success: true,
+                message: 'Overtime already requested.',
+                overtime_started_at: att.overtime_started_at,
+                status: att.ot_request_status
+            });
+        }
+
+        // Create OT request via new system
+        const clockIn = new Date(att.clock_in_time);
+        const elapsedMinutes = (now - clockIn) / 1000 / 60;
+        const breakMinutes = att.break_duration_minutes || 0;
+        const workingMinutes = Math.round(elapsedMinutes - breakMinutes);
+        const expectedMinutes = (att.expected_hours || 10) * 60;
+        const approvalRequired = att.ot_approval_required !== 0;
+        const initialStatus = approvalRequired ? 'pending' : 'approved';
+
+        const [insertResult] = await pool.query(
+            `INSERT INTO overtime_requests
+             (user_id, attendance_id, branch_id, request_date, requested_at,
+              expected_minutes, working_minutes_at_request, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, att.id, att.branch_id, today, now,
+             expectedMinutes, workingMinutes, initialStatus]
+        );
+
+        await pool.query(
+            `UPDATE staff_attendance
+             SET overtime_acknowledged = 1, overtime_acknowledged_at = ?,
+                 overtime_started_at = ?, ot_request_id = ?,
+                 ot_request_status = ?
+             WHERE id = ?`,
+            [now, now, insertResult.insertId, initialStatus, att.id]
+        );
+
         res.json({
             success: true,
-            message: 'Overtime acknowledged. Continue working.',
-            overtime_started_at: now
+            message: approvalRequired ? 'Overtime request submitted.' : 'Overtime approved.',
+            overtime_started_at: now,
+            status: initialStatus
         });
     } catch (error) {
         console.error('Acknowledge overtime error:', error);
         res.status(500).json({ success: false, message: 'Failed to acknowledge overtime' });
+    }
+});
+
+/**
+ * PUT /api/attendance/overtime-request/:id/approve
+ * Admin approves an OT request
+ */
+router.put('/overtime-request/:id/approve', requireAuth, requirePermission('attendance', 'approve'), async (req, res) => {
+    try {
+        const requestId = req.params.id;
+        const reviewerId = req.user.id;
+        const now = new Date();
+        const { notes } = req.body;
+
+        const [requests] = await pool.query(
+            "SELECT * FROM overtime_requests WHERE id = ? AND status = 'pending'",
+            [requestId]
+        );
+
+        if (requests.length === 0) {
+            return res.status(404).json({ success: false, message: 'Pending OT request not found' });
+        }
+
+        const otReq = requests[0];
+
+        // Update request
+        await pool.query(
+            `UPDATE overtime_requests
+             SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_notes = ?
+             WHERE id = ?`,
+            [reviewerId, now, notes || null, requestId]
+        );
+
+        // Update attendance
+        await pool.query(
+            "UPDATE staff_attendance SET ot_request_status = 'approved' WHERE id = ?",
+            [otReq.attendance_id]
+        );
+
+        // Notify staff
+        try {
+            const [reviewer] = await pool.query("SELECT full_name FROM users WHERE id = ?", [reviewerId]);
+            const reviewerName = reviewer.length > 0 ? reviewer[0].full_name : 'Admin';
+
+            await notificationService.sendNotification({
+                userId: otReq.user_id,
+                type: 'attendance',
+                title: 'OT Approved',
+                message: `Your overtime request has been approved by ${reviewerName}`,
+                data: { request_id: requestId }
+            });
+
+            if (io) {
+                io.to(`user_${otReq.user_id}`).emit('ot_approved', {
+                    request_id: requestId,
+                    approved_by: reviewerName,
+                    message: 'Your overtime has been approved!'
+                });
+            }
+        } catch (notifErr) {
+            console.error('OT approve notification error:', notifErr.message);
+        }
+
+        res.json({ success: true, message: 'OT request approved' });
+    } catch (error) {
+        console.error('Approve OT error:', error);
+        res.status(500).json({ success: false, message: 'Failed to approve OT request' });
+    }
+});
+
+/**
+ * PUT /api/attendance/overtime-request/:id/reject
+ * Admin rejects an OT request
+ */
+router.put('/overtime-request/:id/reject', requireAuth, requirePermission('attendance', 'approve'), async (req, res) => {
+    try {
+        const requestId = req.params.id;
+        const reviewerId = req.user.id;
+        const now = new Date();
+        const { notes } = req.body;
+
+        if (!notes || !notes.trim()) {
+            return res.status(400).json({ success: false, message: 'Rejection reason is required' });
+        }
+
+        const [requests] = await pool.query(
+            "SELECT * FROM overtime_requests WHERE id = ? AND status = 'pending'",
+            [requestId]
+        );
+
+        if (requests.length === 0) {
+            return res.status(404).json({ success: false, message: 'Pending OT request not found' });
+        }
+
+        const otReq = requests[0];
+
+        // Update request
+        await pool.query(
+            `UPDATE overtime_requests
+             SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_notes = ?
+             WHERE id = ?`,
+            [reviewerId, now, notes, requestId]
+        );
+
+        // Update attendance
+        await pool.query(
+            "UPDATE staff_attendance SET ot_request_status = 'rejected' WHERE id = ?",
+            [otReq.attendance_id]
+        );
+
+        // Notify staff
+        try {
+            const [reviewer] = await pool.query("SELECT full_name FROM users WHERE id = ?", [reviewerId]);
+            const reviewerName = reviewer.length > 0 ? reviewer[0].full_name : 'Admin';
+
+            await notificationService.sendNotification({
+                userId: otReq.user_id,
+                type: 'attendance',
+                title: 'OT Rejected',
+                message: `Your overtime request was rejected: ${notes}`,
+                data: { request_id: requestId }
+            });
+
+            if (io) {
+                io.to(`user_${otReq.user_id}`).emit('ot_rejected', {
+                    request_id: requestId,
+                    rejected_by: reviewerName,
+                    reason: notes,
+                    message: 'Your overtime request was rejected. Please clock out.'
+                });
+            }
+        } catch (notifErr) {
+            console.error('OT reject notification error:', notifErr.message);
+        }
+
+        res.json({ success: true, message: 'OT request rejected' });
+    } catch (error) {
+        console.error('Reject OT error:', error);
+        res.status(500).json({ success: false, message: 'Failed to reject OT request' });
+    }
+});
+
+/**
+ * GET /api/attendance/overtime-requests
+ * Admin lists OT requests with filters
+ */
+router.get('/overtime-requests', requireAuth, requirePermission('attendance', 'approve'), async (req, res) => {
+    try {
+        const { status, date, branch_id } = req.query;
+        let where = ['1=1'];
+        let params = [];
+
+        if (status) {
+            where.push('otr.status = ?');
+            params.push(status);
+        }
+        if (date) {
+            where.push('otr.request_date = ?');
+            params.push(date);
+        }
+        if (branch_id) {
+            where.push('otr.branch_id = ?');
+            params.push(branch_id);
+        }
+
+        const [rows] = await pool.query(
+            `SELECT otr.*,
+                    u.full_name as staff_name, u.username,
+                    b.name as branch_name,
+                    a.clock_in_time, a.clock_out_time, a.total_working_minutes,
+                    a.overtime_minutes,
+                    rv.full_name as reviewer_name
+             FROM overtime_requests otr
+             JOIN users u ON otr.user_id = u.id
+             JOIN branches b ON otr.branch_id = b.id
+             LEFT JOIN staff_attendance a ON otr.attendance_id = a.id
+             LEFT JOIN users rv ON otr.reviewed_by = rv.id
+             WHERE ${where.join(' AND ')}
+             ORDER BY otr.requested_at DESC
+             LIMIT 100`,
+            params
+        );
+
+        // Get pending count
+        const [pendingCount] = await pool.query(
+            "SELECT COUNT(*) as count FROM overtime_requests WHERE status = 'pending'"
+        );
+
+        res.json({
+            success: true,
+            data: rows,
+            pending_count: pendingCount[0].count
+        });
+    } catch (error) {
+        console.error('List OT requests error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list OT requests' });
     }
 });
 
@@ -3160,5 +3574,6 @@ router.get('/report/staff-list', requirePermission('attendance.view'), async (re
 module.exports = {
     router,
     setPool,
+    setIO,
     setReportService
 };

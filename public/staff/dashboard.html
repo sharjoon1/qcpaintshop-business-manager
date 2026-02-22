@@ -836,16 +836,26 @@
             <h3 style="font-size: 20px; font-weight: 700; color: #1f2937;">Expected Hours Completed!</h3>
             <p id="overtimeWorkingTime" style="font-size: 16px; color: #6b7280; margin-top: 8px;"></p>
         </div>
-        <p style="font-size: 14px; color: #374151; text-align: center; margin-bottom: 16px;">
+        <p style="font-size: 14px; color: #374151; text-align: center; margin-bottom: 8px;">
             நீங்கள் வேலை நேரத்தை முடித்துவிட்டீர்கள்.<br>
             You have completed your expected working hours.
         </p>
+        <!-- Countdown timer -->
+        <div id="otTimeoutCountdown" style="text-align: center; padding: 8px; background: #fef2f2; border-radius: 8px; margin-bottom: 12px;">
+            <span style="font-size: 13px; color: #991b1b;">Auto clock-out in: </span>
+            <span id="otCountdownTimer" style="font-size: 20px; font-weight: 700; color: #dc2626;">15:00</span>
+        </div>
+        <!-- Optional reason -->
+        <div style="margin-bottom: 12px;">
+            <textarea id="otReasonInput" placeholder="Reason for overtime (optional)" rows="2"
+                style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; resize: none; box-sizing: border-box;"></textarea>
+        </div>
         <div style="display: flex; gap: 12px;">
             <button onclick="clockOutFromOvertime()" style="flex: 1; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; background: #fee2e2; color: #dc2626;">
-                🚪 Clock Out Now
+                Clock Out Now
             </button>
-            <button onclick="continueOvertime()" style="flex: 1; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #059669, #047857); color: white;">
-                ✅ Continue Overtime
+            <button id="requestOtBtn" onclick="requestOvertime()" style="flex: 1; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #059669, #047857); color: white;">
+                Request OT
             </button>
         </div>
     </div>
@@ -881,7 +891,7 @@
             }
             dashboardSocket.on('overtime_prompt', (data) => {
                 if (!overtimePromptShown) {
-                    showOvertimeModal(data.working_minutes, data.expected_minutes);
+                    showOvertimeModal(data.working_minutes, data.expected_minutes, data.timeout_minutes);
                 }
             });
             dashboardSocket.on('force_clockout', () => {
@@ -889,6 +899,28 @@
             });
             dashboardSocket.on('auto_clockout', () => {
                 showToast('You have been automatically clocked out', 'info');
+                setTimeout(() => loadTodayAttendance(), 1500);
+            });
+            dashboardSocket.on('ot_approved', (data) => {
+                showOTStatusBadge('approved');
+                hideOvertimeModal();
+                clearOtTimeoutTimer();
+                showToast(data.message || 'Overtime approved!', 'success');
+            });
+            dashboardSocket.on('ot_rejected', (data) => {
+                showOTStatusBadge('rejected');
+                hideOvertimeModal();
+                clearOtTimeoutTimer();
+                showToast(data.reason ? `OT rejected: ${data.reason}` : 'Overtime rejected. Please clock out.', 'error');
+                // Show clock out section
+                const clockOutSection = document.getElementById('clockOutSection');
+                const showClockOutBtn = document.getElementById('showClockOutBtn');
+                if (clockOutSection) clockOutSection.style.display = 'block';
+                if (showClockOutBtn) showClockOutBtn.style.display = 'none';
+            });
+            dashboardSocket.on('ot_timeout_clockout', () => {
+                clearOtTimeoutTimer();
+                showToast('Auto clock-out: No response to overtime prompt', 'info');
                 setTimeout(() => loadTodayAttendance(), 1500);
             });
         } catch (e) {
@@ -1196,10 +1228,23 @@
             }
 
             // Overtime state
-            if (attendanceData && attendanceData.overtime && attendanceData.overtime.acknowledged) {
-                isInOvertime = true;
-                overtimePromptShown = true;
-                showOvertimeBadge();
+            if (attendanceData && attendanceData.overtime) {
+                const otStatus = attendanceData.overtime.request_status;
+                if (otStatus === 'pending') {
+                    overtimePromptShown = true;
+                    showOTStatusBadge('pending');
+                } else if (otStatus === 'approved') {
+                    isInOvertime = true;
+                    overtimePromptShown = true;
+                    showOTStatusBadge('approved');
+                } else if (otStatus === 'rejected') {
+                    overtimePromptShown = true;
+                    showOTStatusBadge('rejected');
+                } else if (attendanceData.overtime.acknowledged) {
+                    isInOvertime = true;
+                    overtimePromptShown = true;
+                    showOTStatusBadge('approved');
+                }
             }
 
             // Start overtime checking if clocked in and not clocked out
@@ -2073,6 +2118,7 @@
         let overtimeCheckInterval = null;
         let overtimePromptShown = false;
         let isInOvertime = false;
+        let otTimeoutInterval = null;
 
         function startOvertimeCheck() {
             if (overtimeCheckInterval) return;
@@ -2085,6 +2131,7 @@
                 clearInterval(overtimeCheckInterval);
                 overtimeCheckInterval = null;
             }
+            clearOtTimeoutTimer();
         }
 
         async function checkOvertimeStatus() {
@@ -2096,12 +2143,27 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    if (data.needsOvertimePrompt && !overtimePromptShown) {
-                        showOvertimeModal(data.working_minutes, data.expected_minutes);
-                    }
-                    if (data.overtime_acknowledged) {
+                    const otStatus = data.ot_request_status || 'none';
+
+                    if (otStatus === 'pending') {
+                        overtimePromptShown = true;
+                        showOTStatusBadge('pending');
+                    } else if (otStatus === 'approved') {
                         isInOvertime = true;
-                        showOvertimeBadge();
+                        overtimePromptShown = true;
+                        showOTStatusBadge('approved');
+                    } else if (otStatus === 'rejected') {
+                        overtimePromptShown = true;
+                        showOTStatusBadge('rejected');
+                    } else if (data.needsOvertimePrompt && !overtimePromptShown) {
+                        // Show modal with timeout
+                        const timeoutMins = data.ot_auto_timeout_minutes || 15;
+                        const remaining = data.timeout_remaining_seconds;
+                        showOvertimeModal(data.working_minutes, data.expected_minutes, timeoutMins, remaining);
+                    } else if (data.overtime_acknowledged && otStatus === 'none') {
+                        // Legacy fallback
+                        isInOvertime = true;
+                        showOTStatusBadge('approved');
                     }
                 }
             } catch (err) {
@@ -2109,7 +2171,7 @@
             }
         }
 
-        function showOvertimeModal(workingMinutes, expectedMinutes) {
+        function showOvertimeModal(workingMinutes, expectedMinutes, timeoutMinutes, remainingSeconds) {
             overtimePromptShown = true;
             const hours = Math.floor(workingMinutes / 60);
             const mins = workingMinutes % 60;
@@ -2118,6 +2180,10 @@
                 `Working: ${hours}h ${mins}m (Expected: ${expHours}h)`;
             document.getElementById('overtimeBackdrop').classList.add('active');
             document.getElementById('overtimeModal').classList.add('active');
+
+            // Start countdown timer
+            const totalSeconds = remainingSeconds != null ? Math.round(remainingSeconds) : (timeoutMinutes || 15) * 60;
+            startOtTimeoutTimer(totalSeconds);
         }
 
         function hideOvertimeModal() {
@@ -2125,45 +2191,109 @@
             document.getElementById('overtimeModal').classList.remove('active');
         }
 
-        async function continueOvertime() {
+        function startOtTimeoutTimer(totalSeconds) {
+            clearOtTimeoutTimer();
+            let remaining = totalSeconds;
+            const timerEl = document.getElementById('otCountdownTimer');
+            const countdownDiv = document.getElementById('otTimeoutCountdown');
+            if (!timerEl || !countdownDiv) return;
+
+            countdownDiv.style.display = 'block';
+
+            function updateTimer() {
+                const m = Math.floor(remaining / 60);
+                const s = remaining % 60;
+                timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+                if (remaining <= 60) {
+                    timerEl.style.color = '#dc2626';
+                    countdownDiv.style.background = '#fef2f2';
+                }
+                if (remaining <= 0) {
+                    clearOtTimeoutTimer();
+                }
+                remaining--;
+            }
+
+            updateTimer();
+            otTimeoutInterval = setInterval(updateTimer, 1000);
+        }
+
+        function clearOtTimeoutTimer() {
+            if (otTimeoutInterval) {
+                clearInterval(otTimeoutInterval);
+                otTimeoutInterval = null;
+            }
+        }
+
+        async function requestOvertime() {
             try {
                 const token = localStorage.getItem('auth_token');
-                const res = await fetch('/api/attendance/acknowledge-overtime', {
+                const reason = document.getElementById('otReasonInput').value.trim();
+                const btn = document.getElementById('requestOtBtn');
+                btn.disabled = true;
+                btn.textContent = 'Submitting...';
+
+                const res = await fetch('/api/attendance/request-overtime', {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: reason || undefined })
                 });
                 const data = await res.json();
 
                 if (data.success) {
                     hideOvertimeModal();
-                    isInOvertime = true;
-                    showOvertimeBadge();
-                    showToast('Overtime started. Continue working!', 'success');
+                    clearOtTimeoutTimer();
+
+                    if (data.status === 'approved') {
+                        isInOvertime = true;
+                        showOTStatusBadge('approved');
+                        showToast('Overtime approved! Continue working.', 'success');
+                    } else {
+                        showOTStatusBadge('pending');
+                        showToast('OT request submitted. Waiting for admin approval.', 'info');
+                    }
                 } else {
-                    showToast(data.message || 'Failed', 'error');
+                    showToast(data.message || 'Failed to request OT', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Request OT';
                 }
             } catch (err) {
                 showToast('Network error', 'error');
+                const btn = document.getElementById('requestOtBtn');
+                btn.disabled = false;
+                btn.textContent = 'Request OT';
             }
         }
 
         function clockOutFromOvertime() {
             hideOvertimeModal();
+            clearOtTimeoutTimer();
             // Show clock out section and trigger it
             document.getElementById('clockOutSection').style.display = 'block';
             document.getElementById('showClockOutBtn').style.display = 'none';
             showToast('Please use the Clock Out button below', 'info');
         }
 
-        function showOvertimeBadge() {
-            const existing = document.getElementById('overtimeBadge');
-            if (existing) return;
-            const badge = document.createElement('div');
-            badge.id = 'overtimeBadge';
-            badge.style.cssText = 'text-align: center; padding: 8px; background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 8px; margin: 8px 0; font-weight: 700; color: #92400e; font-size: 14px;';
-            badge.textContent = '🕐 OVERTIME MODE';
-            const statsRow = document.querySelector('.stats-row');
-            if (statsRow) statsRow.parentNode.insertBefore(badge, statsRow.nextSibling);
+        function showOTStatusBadge(status) {
+            let badge = document.getElementById('overtimeBadge');
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.id = 'overtimeBadge';
+                const statsRow = document.querySelector('.stats-row');
+                if (statsRow) statsRow.parentNode.insertBefore(badge, statsRow.nextSibling);
+            }
+
+            if (status === 'pending') {
+                badge.style.cssText = 'text-align: center; padding: 8px; background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 8px; margin: 8px 0; font-weight: 700; color: #92400e; font-size: 14px;';
+                badge.textContent = 'OT PENDING APPROVAL';
+            } else if (status === 'approved') {
+                badge.style.cssText = 'text-align: center; padding: 8px; background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-radius: 8px; margin: 8px 0; font-weight: 700; color: #065f46; font-size: 14px;';
+                badge.textContent = 'OT APPROVED';
+            } else if (status === 'rejected') {
+                badge.style.cssText = 'text-align: center; padding: 8px; background: linear-gradient(135deg, #fee2e2, #fecaca); border-radius: 8px; margin: 8px 0; font-weight: 700; color: #991b1b; font-size: 14px;';
+                badge.textContent = 'OT REJECTED - Please Clock Out';
+            }
         }
 
         function showForceClockoutModal() {

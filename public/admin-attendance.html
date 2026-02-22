@@ -402,12 +402,17 @@
                     <div class="stat-label">Break Exceeded</div>
                     <div class="stat-value" id="statBreakExceeded" style="color: #dc2626;">-</div>
                 </div>
+                <div class="stat-card" style="--border-color: #f59e0b;">
+                    <div class="stat-label">OT Pending</div>
+                    <div class="stat-value" id="statOtPending" style="color: #f59e0b;">-</div>
+                </div>
             </div>
 
             <!-- Tab Bar -->
             <div class="tab-bar">
                 <button class="tab-btn active" onclick="switchTab('live')">Live Today</button>
                 <button class="tab-btn" onclick="switchTab('permissions')">Permission Requests</button>
+                <button class="tab-btn" onclick="switchTab('ot')">OT Requests <span id="otBadgeCount" class="badge" style="background:#f59e0b;color:#fff;font-size:11px;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;">0</span></button>
                 <button class="tab-btn" onclick="switchTab('monthly')">Monthly View</button>
                 <button class="tab-btn" onclick="switchTab('mark')">Mark Attendance</button>
                 <button class="tab-btn" onclick="switchTab('timeline')">Staff Timeline</button>
@@ -502,6 +507,80 @@
                 <div id="permissionsContainer">
                     <div class="empty-state">
                         <div class="empty-state-icon">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: OT Requests -->
+            <div class="tab-content" id="tab-ot">
+                <div class="filter-bar">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                            <select id="otStatusFilter" onchange="loadOTRequests()">
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="auto_clockout">Auto Clock-Out</option>
+                                <option value="expired">Expired</option>
+                                <option value="">All</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                            <input type="date" id="otDateFilter" onchange="loadOTRequests()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Branch</label>
+                            <select id="otBranchFilter" onchange="loadOTRequests()">
+                                <option value="">All Branches</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="table-container">
+                        <table>
+                            <thead class="gradient-header">
+                                <tr>
+                                    <th>Staff</th>
+                                    <th>Branch</th>
+                                    <th>Date</th>
+                                    <th>Requested At</th>
+                                    <th>Working Time</th>
+                                    <th>Expected</th>
+                                    <th>OT So Far</th>
+                                    <th>Reason</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="otTableBody">
+                                <tr><td colspan="10" class="text-center py-8 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OT Review Modal -->
+            <div class="modal" id="otReviewModal">
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Review OT Request</h3>
+                        <button class="modal-close" onclick="closeModal('otReviewModal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="otReviewDetails" style="margin-bottom: 16px;"></div>
+                        <div class="form-group">
+                            <label class="form-label">Notes <span id="otNotesReqLabel" style="color:#dc2626;display:none;">(required for rejection)</span></label>
+                            <textarea id="otReviewNotes" class="form-input" rows="3" placeholder="Optional notes..."></textarea>
+                        </div>
+                        <div style="display: flex; gap: 12px; margin-top: 16px;">
+                            <button id="otRejectBtn" onclick="submitOTReview('reject')" class="btn btn-danger" style="flex:1;">Reject</button>
+                            <button id="otApproveBtn" onclick="submitOTReview('approve')" class="btn btn-primary" style="flex:1;">Approve</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -755,6 +834,7 @@
             const currentMonth = today.substring(0, 7);
 
             document.getElementById('liveDate').value = today;
+            document.getElementById('otDateFilter').value = today;
             document.getElementById('timelineDate').value = today;
             document.getElementById('markDate').value = today;
             document.getElementById('monthlyMonth').value = currentMonth;
@@ -831,6 +911,7 @@
             // Load data for the tab
             if (tab === 'live') { loadLiveAttendance(); loadAbsentStaff(); }
             if (tab === 'permissions') loadPermissions();
+            if (tab === 'ot') loadOTRequests();
             if (tab === 'reports') initReportsTab();
         }
 
@@ -861,6 +942,7 @@
                     const options = '<option value="">All Branches</option>' +
                         branches.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
                     document.getElementById('liveBranch').innerHTML = options;
+                    document.getElementById('otBranchFilter').innerHTML = options;
                     document.getElementById('activityBranch').innerHTML = options;
                 }
             } catch (e) {
@@ -900,9 +982,152 @@
                     document.getElementById('statOnBreak').textContent = s.on_break;
                     document.getElementById('statPendingPerms').textContent = s.pending_permissions;
                     document.getElementById('statBreakExceeded').textContent = s.break_exceeded || 0;
+                    document.getElementById('statOtPending').textContent = s.ot_pending || 0;
+
+                    // Update OT badge count on tab
+                    const otBadge = document.getElementById('otBadgeCount');
+                    if (otBadge) {
+                        const otCount = s.ot_pending || 0;
+                        otBadge.textContent = otCount;
+                        otBadge.style.display = otCount > 0 ? 'inline' : 'none';
+                    }
                 }
             } catch (e) {
                 console.error('Load summary error:', e);
+            }
+        }
+
+        // ========================================
+        // TAB: OT REQUESTS
+        // ========================================
+        let currentOTRequestId = null;
+
+        async function loadOTRequests() {
+            const status = document.getElementById('otStatusFilter').value;
+            const date = document.getElementById('otDateFilter').value;
+            const branchId = document.getElementById('otBranchFilter').value;
+            const tbody = document.getElementById('otTableBody');
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">Loading...</td></tr>';
+
+            try {
+                let url = '/api/attendance/overtime-requests?';
+                if (status) url += `status=${status}&`;
+                if (date) url += `date=${date}&`;
+                if (branchId) url += `branch_id=${branchId}&`;
+
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (!data.success) {
+                    tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-gray-400">${escapeHtml(data.message)}</td></tr>`;
+                    return;
+                }
+
+                // Update badge
+                const otBadge = document.getElementById('otBadgeCount');
+                if (otBadge) {
+                    otBadge.textContent = data.pending_count || 0;
+                    otBadge.style.display = data.pending_count > 0 ? 'inline' : 'none';
+                }
+
+                const rows = data.data || [];
+                if (rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No OT requests found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = rows.map(r => {
+                    const requestedAt = r.requested_at ? new Date(r.requested_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--';
+                    const workMins = r.working_minutes_at_request || 0;
+                    const workHrs = `${Math.floor(workMins / 60)}h ${workMins % 60}m`;
+                    const expHrs = `${Math.round((r.expected_minutes || 600) / 60)}h`;
+                    const otMins = Math.max(0, workMins - (r.expected_minutes || 600));
+                    const otDisplay = `${Math.floor(otMins / 60)}h ${otMins % 60}m`;
+
+                    let statusBadge = '';
+                    if (r.status === 'pending') statusBadge = '<span class="badge" style="background:#fef3c7;color:#92400e;">Pending</span>';
+                    else if (r.status === 'approved') statusBadge = '<span class="badge" style="background:#d1fae5;color:#065f46;">Approved</span>';
+                    else if (r.status === 'rejected') statusBadge = '<span class="badge" style="background:#fee2e2;color:#991b1b;">Rejected</span>';
+                    else if (r.status === 'auto_clockout') statusBadge = '<span class="badge" style="background:#e5e7eb;color:#374151;">Timeout</span>';
+                    else if (r.status === 'expired') statusBadge = '<span class="badge" style="background:#e5e7eb;color:#6b7280;">Expired</span>';
+
+                    const actions = r.status === 'pending'
+                        ? `<button class="action-btn-sm btn-primary" onclick="openOTReview(${r.id})">Review</button>`
+                        : (r.reviewer_name ? `<span style="font-size:12px;color:#6b7280;">${escapeHtml(r.reviewer_name)}</span>` : '--');
+
+                    return `<tr>
+                        <td class="font-semibold">${escapeHtml(r.staff_name)}</td>
+                        <td>${escapeHtml(r.branch_name)}</td>
+                        <td>${r.request_date || '--'}</td>
+                        <td>${requestedAt}</td>
+                        <td>${workHrs}</td>
+                        <td>${expHrs}</td>
+                        <td>${otDisplay}</td>
+                        <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(r.reason || '')}">${escapeHtml(r.reason || '--')}</td>
+                        <td>${statusBadge}</td>
+                        <td>${actions}</td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {
+                console.error('Load OT requests error:', e);
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-red-500">Failed to load OT requests</td></tr>';
+            }
+        }
+
+        function openOTReview(requestId) {
+            currentOTRequestId = requestId;
+            document.getElementById('otReviewNotes').value = '';
+            document.getElementById('otNotesReqLabel').style.display = 'none';
+
+            // Find request data from table
+            const tbody = document.getElementById('otTableBody');
+            const rows = tbody.querySelectorAll('tr');
+            let details = '';
+            // Just show the request ID and let the modal load
+            document.getElementById('otReviewDetails').innerHTML = `
+                <div style="padding: 12px; background: #f9fafb; border-radius: 8px;">
+                    <p style="font-size: 14px; color: #374151;"><strong>Request #${requestId}</strong></p>
+                    <p style="font-size: 13px; color: #6b7280; margin-top: 4px;">Approve or reject this overtime request.</p>
+                </div>
+            `;
+            openModal('otReviewModal');
+        }
+
+        async function submitOTReview(action) {
+            if (!currentOTRequestId) return;
+
+            const notes = document.getElementById('otReviewNotes').value.trim();
+            if (action === 'reject' && !notes) {
+                document.getElementById('otNotesReqLabel').style.display = 'inline';
+                showToast('Rejection reason is required', 'error');
+                return;
+            }
+
+            const btn = action === 'approve' ? document.getElementById('otApproveBtn') : document.getElementById('otRejectBtn');
+            btn.disabled = true;
+            btn.textContent = action === 'approve' ? 'Approving...' : 'Rejecting...';
+
+            try {
+                const res = await fetch(`/api/attendance/overtime-request/${currentOTRequestId}/${action}`, {
+                    method: 'PUT',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    closeModal('otReviewModal');
+                    showToast(`OT request ${action}d successfully`, 'success');
+                    loadOTRequests();
+                    loadSummaryStats();
+                } else {
+                    showToast(data.message || `Failed to ${action}`, 'error');
+                }
+            } catch (e) {
+                showToast('Network error', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = action === 'approve' ? 'Approve' : 'Reject';
             }
         }
 
@@ -950,7 +1175,13 @@
                     const breakDur = breakMins > 0
                         ? `<span class="${breakBadgeClass}" style="${breakBadgeColor}padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;">${breakMins}m${r.excess_break_minutes > 0 ? ' (+' + r.excess_break_minutes + ')' : ''}</span>`
                         : '--';
-                    const workHrs = r.total_working_minutes ? formatMinutesToHours(r.total_working_minutes) : (r.clock_in_time && !r.clock_out_time ? 'Ongoing' : '--');
+                    let workHrs = r.total_working_minutes ? formatMinutesToHours(r.total_working_minutes) : (r.clock_in_time && !r.clock_out_time ? 'Ongoing' : '--');
+                    // OT badge
+                    if (r.ot_request_status === 'approved') {
+                        workHrs += ' <span style="background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:600;">OT</span>';
+                    } else if (r.ot_request_status === 'pending') {
+                        workHrs += ' <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:600;">OT?</span>';
+                    }
                     const statusClass = r.status || 'absent';
                     const dayStatus = r.day_status || r.status;
 

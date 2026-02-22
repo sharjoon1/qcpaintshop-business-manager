@@ -348,22 +348,29 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Late detection (configurable threshold per branch, shop opens 08:30 AM)
 - Work hours calculation
 
-**Overtime Tracking**
-- After expected hours (e.g., 10h weekday, 5h Sunday), staff gets overtime prompt (NOT auto-clocked-out)
-- Modal: "Continue Overtime" (acknowledges, enters overtime mode) or "Clock Out Now"
-- Server checks every 5 minutes + Socket.io `overtime_prompt` event for real-time notification
+**Overtime Tracking & Approval System**
+- After expected hours (e.g., 10h weekday, 5h Sunday), staff gets OT prompt ONCE (not repeated)
+- Modal: "Request OT" (submits for admin approval) or "Clock Out Now", with optional reason textarea
+- **15-minute auto-clockout timeout**: If staff doesn't respond to prompt within timeout, auto-clocked-out (`ot_timeout`)
+- Server checks every 5 minutes + Socket.io `overtime_prompt` event (sent once, tracked via `ot_prompt_shown_at`)
 - Frontend polls `GET /check-overtime-status` every 2 minutes as backup
-- On acknowledge: `overtime_acknowledged = 1`, `overtime_started_at` recorded
-- On clock-out: `overtime_minutes = max(0, total_working - expected_hours * 60)` computed and stored
-- Force clock-out at 10 PM: `force_clockout` Socket.io event + 10-second countdown modal
-- Staff dashboard: amber "OVERTIME MODE" badge when in overtime
-- Endpoints: `GET /check-overtime-status`, `POST /acknowledge-overtime`
-- Columns: `overtime_minutes`, `overtime_started_at`, `overtime_acknowledged`, `overtime_acknowledged_at`
-- Admin timeline: shows overtime minutes in summary stats
-- Reports tab: overtime column highlighted in amber
-- WhatsApp report: includes overtime line when > 0
-- Migration: `migrations/migrate-overtime.js`
-- Pages: `staff/clock-in.html`, `staff/clock-out.html`
+- **OT Approval Flow**: Staff requests OT → admin approves/rejects → only approved OT counts toward salary
+- OT request creates row in `overtime_requests` table (status: pending/approved/rejected/auto_clockout/expired)
+- Admin endpoints: `PUT /overtime-request/:id/approve`, `PUT /overtime-request/:id/reject`, `GET /overtime-requests`
+- Staff endpoint: `POST /request-overtime` (replaces old `POST /acknowledge-overtime`, which is kept as backward-compat wrapper)
+- Socket events: `ot_request_new` (to admin), `ot_approved`/`ot_rejected`/`ot_timeout_clockout` (to staff)
+- Staff dashboard badges: yellow "OT PENDING APPROVAL", green "OT APPROVED", red "OT REJECTED - Please Clock Out"
+- Admin "OT Requests" tab on attendance page: filters (status/date/branch), review modal, approve/reject buttons
+- Admin Live Today: OT badges on working hours column (green "OT" if approved, yellow "OT?" if pending)
+- Admin stat card: "OT Pending" count (orange)
+- On clock-out: `ot_approved_minutes` set only if approved request exists; `overtime_minutes` always computed
+- Force clock-out at 10 PM: pending OT requests → expired; approved → `ot_approved_minutes` calculated
+- Salary: uses `ot_approved_minutes` (not raw `overtime_minutes`) for OT pay calculation
+- Configurable per branch: `ot_auto_timeout_minutes` (default 15), `ot_approval_required` (default true) in `shop_hours_config`
+- Columns on `staff_attendance`: `ot_request_id`, `ot_request_status`, `ot_approved_minutes`, `ot_prompt_shown_at`
+- Table: `overtime_requests` (id, user_id, attendance_id, branch_id, request_date, status, reason, approved_minutes, etc.)
+- Migration: `migrations/migrate-ot-approval.js` (includes backfill: `overtime_acknowledged=1` → `ot_approved`)
+- Pages: `staff/dashboard.html`, `admin-attendance.html`
 
 **Break Management & Enforcement**
 - Break start/end with photo proof

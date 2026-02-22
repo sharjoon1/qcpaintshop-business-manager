@@ -448,6 +448,7 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
                 THEN total_working_minutes ELSE 0 END) / 60, 0) as sunday_hours,
             COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status = 'present' AND total_working_minutes > 600
                 THEN (total_working_minutes - 600) ELSE 0 END) / 60, 0) as overtime_hours,
+            COALESCE(SUM(CASE WHEN status = 'present' THEN ot_approved_minutes ELSE 0 END) / 60, 0) as approved_overtime_hours,
             COALESCE(SUM(CASE WHEN is_late = 1 THEN 1 ELSE 0 END), 0) as late_days
          FROM staff_attendance
          WHERE user_id = ? AND date BETWEEN ? AND ?`,
@@ -459,7 +460,8 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
     // Calculate pay components
     const standardHoursPay = parseFloat(att.standard_hours) * hourlyRate;
     const sundayHoursPay = parseFloat(att.sunday_hours) * hourlyRate;
-    const overtimePay = parseFloat(att.overtime_hours) * hourlyRate * overtimeMultiplier;
+    // Use approved OT hours for pay (falls back to 0 if no approved OT)
+    const overtimePay = parseFloat(att.approved_overtime_hours) * hourlyRate * overtimeMultiplier;
 
     // Allowances from config
     const transportAllowance = parseFloat(config.transport_allowance) || 0;

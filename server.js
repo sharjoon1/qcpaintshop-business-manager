@@ -3244,6 +3244,7 @@ waCampaignEngine.setIO(io);
 waMarketingRoutes.setIO(io);
 attendanceReport.setIO(io);
 whatsappChatRoutes.setIO(io);
+attendanceRoutes.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {
