@@ -953,14 +953,20 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 - Validation uses `== null` checks to allow `branch_id = 0` to pass
 
 **Collections Integration** (`collections.js` + `admin-zoho-collections.html`):
-- Reminder modal has "Send via" dropdown: Auto (Branch / General fallback) or General WhatsApp (Company)
+- Reminder modal has "Send via" dropdown: General WhatsApp (default for admin) or Auto (Branch / General fallback)
 - `session_type: 'general'` in POST /remind → forces `branch_id = 0` routing
 - `session_type: 'auto'` or absent → existing 4-tier branch resolution with session manager fallback
-- Bulk remind also reads the dropdown value
+- **6 reminder templates**: English/Tamil x Polite/Overdue/Urgent — auto-selects based on days overdue (>30=urgent, >0=overdue, else=polite)
+- Template selector dropdown with `onchange="applyReminderTemplate()"` + editable textarea
+- Bulk remind uses selected template for all messages
+
+**Socket Fix** (`socket-helper.js` + `admin-wa-marketing.html`):
+- `qcSocket` exposed on `window` object (`window.qcSocket = qcSocket`) for cross-script access
+- Marketing page socket listeners fixed: was polling `window.socket` which never existed
 
 **Migrations**:
 - `migrations/migrate-general-whatsapp.js` (drops FK on sessions/messages/contacts)
-- `migrations/migrate-general-wa-integration.js` (drops FK on wa_campaigns/wa_campaign_leads)
+- `migrations/migrate-general-wa-integration.js` (drops FK on wa_campaigns/wa_campaign_leads/wa_instant_messages/wa_sending_stats)
 
 ---
 
