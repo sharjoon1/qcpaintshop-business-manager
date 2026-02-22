@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>AI Dashboard - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        .tab-bar {
+            display: flex; gap: 0.25rem; background: white; border-radius: 12px;
+            padding: 0.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 1.5rem; overflow-x: auto;
+        }
+        .tab-btn {
+            padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 600;
+            font-size: 0.875rem; border: none; cursor: pointer; white-space: nowrap;
+            background: transparent; color: #6b7280; transition: all 0.2s; position: relative;
+        }
+        .tab-btn:hover { background: #f3f4f6; color: #374151; }
+        .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .tab-badge {
+            position: absolute; top: 2px; right: 2px; background: #ef4444; color: white;
+            font-size: 0.625rem; min-width: 16px; height: 16px; border-radius: 999px;
+            display: flex; align-items: center; justify-content: center; font-weight: 700;
+        }
+
+        /* Chat UI */
+        .chat-container { display: flex; height: calc(100vh - 240px); min-height: 400px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .chat-sidebar { width: 260px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; flex-shrink: 0; }
+        .chat-sidebar-header { padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; gap: 0.5rem; }
+        .chat-sidebar-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
+        .conv-item { padding: 0.625rem 0.75rem; border-radius: 8px; cursor: pointer; margin-bottom: 2px; font-size: 0.8125rem; color: #374151; transition: background 0.15s; display: flex; justify-content: space-between; align-items: center; }
+        .conv-item:hover { background: #f3f4f6; }
+        .conv-item.active { background: #eef2ff; color: #4f46e5; font-weight: 600; }
+        .conv-item .conv-delete { opacity: 0; color: #9ca3af; cursor: pointer; font-size: 1rem; }
+        .conv-item:hover .conv-delete { opacity: 1; }
+        .conv-item .conv-delete:hover { color: #ef4444; }
+
+        .chat-main { flex: 1; display: flex; flex-direction: column; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+        .msg { max-width: 85%; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.875rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+        .msg.user { align-self: flex-end; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-bottom-right-radius: 4px; }
+        .msg.assistant { align-self: flex-start; background: #f3f4f6; color: #1f2937; border-bottom-left-radius: 4px; }
+        .msg.assistant strong { color: #4f46e5; }
+        .msg-meta { font-size: 0.6875rem; color: #9ca3af; margin-top: 4px; }
+        .msg.assistant .msg-meta { color: #9ca3af; }
+        .msg.user .msg-meta { color: rgba(255,255,255,0.7); }
+
+        .chat-input-area { padding: 1rem; border-top: 1px solid #e5e7eb; display: flex; gap: 0.5rem; align-items: flex-end; }
+        .chat-input-area textarea { flex: 1; resize: none; border: 1px solid #d1d5db; border-radius: 10px; padding: 0.625rem 0.875rem; font-size: 0.875rem; max-height: 120px; outline: none; font-family: inherit; }
+        .chat-input-area textarea:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .chat-send-btn { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 10px; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .chat-send-btn:hover { opacity: 0.9; }
+        .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .quick-prompts { display: flex; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem 1rem; border-bottom: 1px solid #e5e7eb; }
+        .quick-prompt { padding: 0.375rem 0.75rem; border-radius: 999px; font-size: 0.75rem; border: 1px solid #d1d5db; cursor: pointer; background: white; color: #4b5563; transition: all 0.15s; white-space: nowrap; }
+        .quick-prompt:hover { border-color: #667eea; color: #667eea; background: #eef2ff; }
+
+        .provider-toggle { display: flex; gap: 4px; background: #f3f4f6; border-radius: 8px; padding: 2px; }
+        .provider-btn { padding: 4px 10px; border-radius: 6px; font-size: 0.6875rem; font-weight: 600; border: none; cursor: pointer; background: transparent; color: #6b7280; }
+        .provider-btn.active { background: white; color: #374151; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        .typing-indicator { display: inline-flex; gap: 4px; padding: 8px 12px; }
+        .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: #9ca3af; animation: typing 1.2s infinite; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+
+        /* Insights */
+        .insight-card { background: white; border-radius: 12px; padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid #d1d5db; transition: all 0.15s; }
+        .insight-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .insight-card.severity-info { border-left-color: #3b82f6; }
+        .insight-card.severity-warning { border-left-color: #f59e0b; }
+        .insight-card.severity-critical { border-left-color: #ef4444; }
+        .insight-card.is-read { opacity: 0.7; }
+        .severity-badge { padding: 2px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; }
+        .severity-badge.info { background: #dbeafe; color: #1d4ed8; }
+        .severity-badge.warning { background: #fef3c7; color: #92400e; }
+        .severity-badge.critical { background: #fee2e2; color: #991b1b; }
+        .category-pill { padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 500; cursor: pointer; border: 1px solid #e5e7eb; background: white; color: #4b5563; transition: all 0.15s; }
+        .category-pill:hover, .category-pill.active { border-color: #667eea; color: #667eea; background: #eef2ff; }
+
+        /* Settings */
+        .config-card { background: white; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .config-card h3 { font-size: 0.9375rem; font-weight: 600; color: #1f2937; margin-bottom: 1rem; }
+        .config-row { display: flex; justify-content: space-between; align-items: center; padding: 0.625rem 0; border-bottom: 1px solid #f3f4f6; }
+        .config-row:last-child { border-bottom: none; }
+        .config-label { font-size: 0.8125rem; color: #374151; }
+        .config-desc { font-size: 0.6875rem; color: #9ca3af; }
+        .toggle-switch { position: relative; width: 40px; height: 22px; cursor: pointer; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-track { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #d1d5db; border-radius: 999px; transition: 0.2s; }
+        .toggle-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: white; transition: 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .toggle-switch input:checked + .toggle-track { background: #667eea; }
+        .toggle-switch input:checked + .toggle-track::after { transform: translateX(18px); }
+
+        .stat-card { background: white; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center; }
+        .stat-value { font-size: 1.75rem; font-weight: 700; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .stat-label { font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; }
+
+        .run-btn { padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 600; border: 1px solid #d1d5db; cursor: pointer; background: white; color: #374151; transition: all 0.15s; }
+        .run-btn:hover { border-color: #667eea; color: #667eea; }
+        .run-btn.running { opacity: 0.6; cursor: not-allowed; }
+
+        @media (max-width: 768px) {
+            .chat-sidebar { display: none; }
+            .chat-container { height: calc(100vh - 200px); }
+            .insight-grid { grid-template-columns: 1fr !important; }
+        }
+    </style>
+</head>
+<body data-page="ai">
+
+<div id="nav-placeholder"></div>
+<div id="subnav-placeholder"></div>
+
+<main style="max-width: 1400px; margin: 0 auto; padding: 1rem;">
+    <!-- Page header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+            <h1 style="font-size: 1.375rem; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 0.5rem;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/><path d="M8.24 4.73A4 4 0 0 1 12 2"/><path d="M5 10a4 4 0 0 1 6.5-3.1"/><path d="M2 14a4 4 0 0 1 3-3.87"/><path d="M7 18a4 4 0 0 1-2-7.46"/><path d="M9.84 21.02A4 4 0 0 1 7 18"/><path d="M14 22a4 4 0 0 1-2.18-3.17"/><path d="M17 18a4 4 0 0 1-5.22 3.81"/><path d="M22 14a4 4 0 0 1-5 3.87"/><path d="M19 10a4 4 0 0 1 3 3.87"/><path d="M12 12m-2 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0"/></svg>
+                AI Dashboard
+            </h1>
+            <p style="font-size: 0.8125rem; color: #6b7280;">AI-powered business intelligence and analysis</p>
+        </div>
+        <div class="provider-toggle" id="globalProvider">
+            <button class="provider-btn active" data-provider="gemini" onclick="setGlobalProvider('gemini')">Gemini</button>
+            <button class="provider-btn" data-provider="claude" onclick="setGlobalProvider('claude')">Claude</button>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('chat')">
+            <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            Chat
+        </button>
+        <button class="tab-btn" onclick="switchTab('insights')">
+            <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4m-7-7H1m22 0h-4m-2.636-6.364L14.95 7.05m-5.9 9.9l-1.414 1.414M19.364 5.636L17.95 7.05m-11.9 9.9l-1.414 1.414"/><circle cx="12" cy="12" r="3"/></svg>
+            Insights
+            <span class="tab-badge" id="insightsBadge" style="display:none">0</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('settings')">
+            <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            Settings
+        </button>
+    </div>
+
+    <!-- Tab: Chat -->
+    <div id="tab-chat" class="tab-content">
+        <div class="chat-container">
+            <!-- Sidebar: conversation list -->
+            <div class="chat-sidebar">
+                <div class="chat-sidebar-header">
+                    <button onclick="newConversation()" style="flex:1; padding:0.5rem; border-radius:8px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; cursor:pointer; font-size:0.8125rem; font-weight:600;">+ New Chat</button>
+                </div>
+                <div class="chat-sidebar-list" id="convList"></div>
+            </div>
+
+            <!-- Main chat area -->
+            <div class="chat-main">
+                <div class="quick-prompts">
+                    <button class="quick-prompt" onclick="quickAsk('What was today\'s revenue and how does it compare to yesterday?')">Today's Revenue</button>
+                    <button class="quick-prompt" onclick="quickAsk('Are there any staff attendance issues today?')">Staff Issues</button>
+                    <button class="quick-prompt" onclick="quickAsk('Which leads should we follow up with today?')">Top Leads</button>
+                    <button class="quick-prompt" onclick="quickAsk('What items are low on stock and need reordering?')">Stock Alerts</button>
+                    <button class="quick-prompt" onclick="quickAsk('Give me a quick business health overview for today')">Business Overview</button>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <div style="text-align:center; color:#9ca3af; padding:3rem 1rem; font-size:0.875rem;">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" style="margin:0 auto 1rem"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/><path d="M8.24 4.73A4 4 0 0 1 12 2"/><circle cx="12" cy="12" r="2"/></svg>
+                        <p style="font-weight:600; color:#6b7280; margin-bottom:0.25rem;">Ask me anything about your business</p>
+                        <p>I have access to your Zoho Books, attendance, leads, and stock data.</p>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <textarea id="chatInput" rows="1" placeholder="Ask about revenue, staff, leads, stock..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+                    <button class="chat-send-btn" id="sendBtn" onclick="sendMessage()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Insights -->
+    <div id="tab-insights" class="tab-content" style="display:none">
+        <!-- Category filters -->
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem; align-items:center;">
+            <button class="category-pill active" onclick="filterInsights('all', this)">All</button>
+            <button class="category-pill" onclick="filterInsights('revenue', this)">Revenue</button>
+            <button class="category-pill" onclick="filterInsights('collections', this)">Collections</button>
+            <button class="category-pill" onclick="filterInsights('overdue', this)">Overdue</button>
+            <button class="category-pill" onclick="filterInsights('staff', this)">Staff</button>
+            <button class="category-pill" onclick="filterInsights('leads', this)">Leads</button>
+            <button class="category-pill" onclick="filterInsights('marketing', this)">Marketing</button>
+            <div style="flex:1"></div>
+            <select id="severityFilter" onchange="filterInsights(currentCategory)" style="padding:0.375rem 0.75rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem;">
+                <option value="">All Severity</option>
+                <option value="critical">Critical</option>
+                <option value="warning">Warning</option>
+                <option value="info">Info</option>
+            </select>
+            <button class="run-btn" onclick="markAllRead()">Mark All Read</button>
+        </div>
+
+        <!-- Manual run buttons -->
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <button class="run-btn" id="runZoho" onclick="triggerAnalysis('zoho_daily', this)">Run Zoho Analysis</button>
+            <button class="run-btn" id="runStaff" onclick="triggerAnalysis('staff_daily', this)">Run Staff Analysis</button>
+            <button class="run-btn" id="runLeads" onclick="triggerAnalysis('lead_scoring', this)">Run Lead Scoring</button>
+            <button class="run-btn" id="runMarketing" onclick="triggerAnalysis('marketing_tips', this)">Run Marketing Analysis</button>
+        </div>
+
+        <div id="insightsGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:1rem;" class="insight-grid"></div>
+        <div id="insightsEmpty" style="text-align:center; padding:3rem; color:#9ca3af; display:none;">
+            <p style="font-weight:600; margin-bottom:0.25rem;">No insights yet</p>
+            <p style="font-size:0.8125rem;">Run an analysis to generate AI-powered business insights.</p>
+        </div>
+    </div>
+
+    <!-- Tab: Settings -->
+    <div id="tab-settings" class="tab-content" style="display:none">
+        <!-- Stats row -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+            <div class="stat-card"><div class="stat-value" id="statRuns">-</div><div class="stat-label">Analysis Runs</div></div>
+            <div class="stat-card"><div class="stat-value" id="statTokens">-</div><div class="stat-label">Tokens Used</div></div>
+            <div class="stat-card"><div class="stat-value" id="statInsights">-</div><div class="stat-label">Total Insights</div></div>
+            <div class="stat-card"><div class="stat-value" id="statMessages">-</div><div class="stat-label">Chat Messages</div></div>
+            <div class="stat-card"><div class="stat-value" id="statCost">-</div><div class="stat-label">Est. Cost (USD)</div></div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap:1rem;">
+            <!-- Provider Config -->
+            <div class="config-card">
+                <h3>AI Provider</h3>
+                <div class="config-row">
+                    <div><div class="config-label">Primary Provider</div><div class="config-desc">Used for all AI requests first</div></div>
+                    <select id="cfgPrimary" onchange="saveConfig('primary_provider', this.value)" style="padding:0.375rem 0.75rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem;">
+                        <option value="gemini">Gemini</option>
+                        <option value="claude">Claude</option>
+                    </select>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Fallback Provider</div><div class="config-desc">Used when primary fails</div></div>
+                    <select id="cfgFallback" onchange="saveConfig('fallback_provider', this.value)" style="padding:0.375rem 0.75rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem;">
+                        <option value="claude">Claude</option>
+                        <option value="gemini">Gemini</option>
+                    </select>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Temperature</div><div class="config-desc">Lower = more focused (0.1-1.0)</div></div>
+                    <input type="number" id="cfgTemp" min="0.1" max="1" step="0.1" onchange="saveConfig('temperature', this.value)" style="width:70px; padding:0.375rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem; text-align:center;">
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Max Tokens</div><div class="config-desc">Max output tokens per request</div></div>
+                    <input type="number" id="cfgMaxTokens" min="256" max="8192" step="256" onchange="saveConfig('max_tokens_per_request', this.value)" style="width:80px; padding:0.375rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem; text-align:center;">
+                </div>
+            </div>
+
+            <!-- Schedule Config -->
+            <div class="config-card">
+                <h3>Automated Schedules</h3>
+                <div class="config-row">
+                    <div><div class="config-label">Daily Zoho Analysis</div><div class="config-desc">Revenue, collections, overdue at 9 PM IST</div></div>
+                    <label class="toggle-switch"><input type="checkbox" id="cfgZohoDaily" onchange="saveConfig('zoho_daily_enabled', this.checked?'1':'0')"><span class="toggle-track"></span></label>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Daily Staff Analysis</div><div class="config-desc">Attendance, performance at 10:30 PM IST</div></div>
+                    <label class="toggle-switch"><input type="checkbox" id="cfgStaffDaily" onchange="saveConfig('staff_daily_enabled', this.checked?'1':'0')"><span class="toggle-track"></span></label>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Lead Scoring</div><div class="config-desc">Every 6 hours</div></div>
+                    <label class="toggle-switch"><input type="checkbox" id="cfgLeadScoring" onchange="saveConfig('lead_scoring_enabled', this.checked?'1':'0')"><span class="toggle-track"></span></label>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Weekly Marketing Tips</div><div class="config-desc">Monday 9 AM IST</div></div>
+                    <label class="toggle-switch"><input type="checkbox" id="cfgMarketing" onchange="saveConfig('marketing_weekly_enabled', this.checked?'1':'0')"><span class="toggle-track"></span></label>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">WhatsApp Reports</div><div class="config-desc">Send analysis summaries via WhatsApp</div></div>
+                    <label class="toggle-switch"><input type="checkbox" id="cfgWhatsApp" onchange="saveConfig('whatsapp_reports_enabled', this.checked?'1':'0')"><span class="toggle-track"></span></label>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">WhatsApp Recipients</div><div class="config-desc">Comma-separated phone numbers</div></div>
+                    <input type="text" id="cfgRecipients" placeholder="91XXXXXXXXXX" onchange="saveConfig('whatsapp_report_recipients', this.value)" style="width:180px; padding:0.375rem 0.5rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Runs -->
+        <div class="config-card" style="margin-top:1rem;">
+            <h3>Recent Analysis Runs</h3>
+            <div id="recentRuns" style="font-size:0.8125rem;"></div>
+        </div>
+    </div>
+</main>
+
+<script src="/js/socket-helper.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let currentConvId = null;
+let currentProvider = 'gemini';
+let currentCategory = 'all';
+let isStreaming = false;
+const token = localStorage.getItem('auth_token');
+const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+
+// ═══════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).style.display = '';
+    event.currentTarget.classList.add('active');
+    if (tab === 'insights') loadInsights();
+    if (tab === 'settings') loadSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROVIDER
+// ═══════════════════════════════════════════════════════════════
+function setGlobalProvider(p) {
+    currentProvider = p;
+    document.querySelectorAll('#globalProvider .provider-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.provider === p);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONVERSATIONS
+// ═══════════════════════════════════════════════════════════════
+async function loadConversations() {
+    try {
+        const resp = await fetch('/api/ai/conversations', { headers });
+        const data = await resp.json();
+        const list = document.getElementById('convList');
+        list.innerHTML = '';
+        (data.data || []).forEach(c => {
+            const div = document.createElement('div');
+            div.className = 'conv-item' + (c.id === currentConvId ? ' active' : '');
+            div.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(c.title)}</span>
+                <span class="conv-delete" onclick="event.stopPropagation();deleteConversation(${c.id})">&times;</span>`;
+            div.onclick = () => loadConversation(c.id);
+            list.appendChild(div);
+        });
+    } catch (e) { /* ignore */ }
+}
+
+async function newConversation() {
+    currentConvId = null;
+    document.getElementById('chatMessages').innerHTML = `
+        <div style="text-align:center; color:#9ca3af; padding:3rem 1rem; font-size:0.875rem;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" style="margin:0 auto 1rem"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/><circle cx="12" cy="12" r="2"/></svg>
+            <p style="font-weight:600; color:#6b7280; margin-bottom:0.25rem;">Start a new conversation</p>
+            <p>Ask about revenue, staff, leads, stock, or any business question.</p>
+        </div>`;
+    document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+}
+
+async function loadConversation(id) {
+    currentConvId = id;
+    try {
+        const resp = await fetch(`/api/ai/conversations/${id}/messages`, { headers });
+        const data = await resp.json();
+        const container = document.getElementById('chatMessages');
+        container.innerHTML = '';
+        (data.data || []).forEach(m => {
+            appendMessage(m.role, m.content, m.model);
+        });
+        container.scrollTop = container.scrollHeight;
+        loadConversations(); // refresh active state
+    } catch (e) { /* ignore */ }
+}
+
+async function deleteConversation(id) {
+    if (!confirm('Delete this conversation?')) return;
+    await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE', headers });
+    if (currentConvId === id) newConversation();
+    loadConversations();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHAT
+// ═══════════════════════════════════════════════════════════════
+function quickAsk(text) {
+    document.getElementById('chatInput').value = text;
+    sendMessage();
+}
+
+async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    if (!message || isStreaming) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    isStreaming = true;
+    document.getElementById('sendBtn').disabled = true;
+
+    // Show user message
+    appendMessage('user', message);
+
+    // Show typing indicator
+    const typingEl = document.createElement('div');
+    typingEl.className = 'msg assistant';
+    typingEl.id = 'typing-indicator';
+    typingEl.innerHTML = '<div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>';
+    document.getElementById('chatMessages').appendChild(typingEl);
+    scrollChat();
+
+    try {
+        const resp = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                conversation_id: currentConvId,
+                message,
+                provider: currentProvider
+            })
+        });
+
+        // Remove typing indicator
+        const ti = document.getElementById('typing-indicator');
+        if (ti) ti.remove();
+
+        // Create assistant message element
+        const msgEl = document.createElement('div');
+        msgEl.className = 'msg assistant';
+        msgEl.innerHTML = '<span class="msg-text"></span><div class="msg-meta"></div>';
+        document.getElementById('chatMessages').appendChild(msgEl);
+        const textEl = msgEl.querySelector('.msg-text');
+        const metaEl = msgEl.querySelector('.msg-meta');
+
+        // Read SSE stream
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const event = JSON.parse(line.slice(6));
+                        if (event.type === 'conversation') {
+                            currentConvId = event.id;
+                            loadConversations();
+                        } else if (event.type === 'done') {
+                            metaEl.textContent = `${event.model} | ${event.tokens} tokens`;
+                        } else if (event.type === 'error') {
+                            textEl.textContent = 'Error: ' + event.error;
+                            textEl.style.color = '#ef4444';
+                        } else if (event.text) {
+                            fullText += event.text;
+                            textEl.innerHTML = renderMarkdown(fullText);
+                            scrollChat();
+                        }
+                    } catch (e) { /* skip */ }
+                }
+            }
+        }
+    } catch (e) {
+        const ti = document.getElementById('typing-indicator');
+        if (ti) ti.remove();
+        appendMessage('assistant', 'Error: ' + e.message);
+    }
+
+    isStreaming = false;
+    document.getElementById('sendBtn').disabled = false;
+    scrollChat();
+}
+
+function appendMessage(role, content, model) {
+    const container = document.getElementById('chatMessages');
+    // Remove placeholder if present
+    const placeholder = container.querySelector('div[style*="text-align:center"]');
+    if (placeholder) placeholder.remove();
+
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    if (role === 'assistant') {
+        div.innerHTML = `<span class="msg-text">${renderMarkdown(content)}</span>` +
+            (model ? `<div class="msg-meta">${escHtml(model)}</div>` : '');
+    } else {
+        div.textContent = content;
+    }
+    container.appendChild(div);
+    scrollChat();
+}
+
+function scrollChat() {
+    const el = document.getElementById('chatMessages');
+    el.scrollTop = el.scrollHeight;
+}
+
+function renderMarkdown(text) {
+    // Simple markdown rendering (bold, italic, code, lists, headers)
+    return escHtml(text)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code style="background:#e5e7eb;padding:1px 4px;border-radius:3px;font-size:0.8125em;">$1</code>')
+        .replace(/^### (.+)$/gm, '<strong style="font-size:1em;display:block;margin-top:0.5em;">$1</strong>')
+        .replace(/^## (.+)$/gm, '<strong style="font-size:1.05em;display:block;margin-top:0.75em;">$1</strong>')
+        .replace(/^# (.+)$/gm, '<strong style="font-size:1.1em;display:block;margin-top:1em;">$1</strong>')
+        .replace(/^- (.+)$/gm, '&bull; $1')
+        .replace(/^(\d+)\. (.+)$/gm, '$1. $2')
+        .replace(/\n/g, '<br>');
+}
+
+function escHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Auto-resize textarea
+document.getElementById('chatInput').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// ═══════════════════════════════════════════════════════════════
+// INSIGHTS
+// ═══════════════════════════════════════════════════════════════
+async function loadInsights() {
+    try {
+        const sev = document.getElementById('severityFilter').value;
+        let url = '/api/ai/insights?limit=100';
+        if (currentCategory !== 'all') url += '&category=' + currentCategory;
+        if (sev) url += '&severity=' + sev;
+
+        const resp = await fetch(url, { headers });
+        const data = await resp.json();
+        const grid = document.getElementById('insightsGrid');
+        const empty = document.getElementById('insightsEmpty');
+        grid.innerHTML = '';
+
+        if (!data.data || !data.data.length) {
+            empty.style.display = '';
+            return;
+        }
+        empty.style.display = 'none';
+
+        data.data.forEach(i => {
+            const card = document.createElement('div');
+            card.className = `insight-card severity-${i.severity}${i.is_read ? ' is-read' : ''}`;
+            card.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:0.5rem;">
+                    <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <span class="severity-badge ${i.severity}">${i.severity}</span>
+                        <span style="font-size:0.6875rem;color:#9ca3af;">${i.category}</span>
+                    </div>
+                    <div style="display:flex;gap:0.25rem;">
+                        ${!i.is_read ? `<button onclick="markInsightRead(${i.id}, this)" style="border:none;background:none;cursor:pointer;font-size:0.75rem;color:#6b7280;" title="Mark read">&#10003;</button>` : ''}
+                        <button onclick="dismissInsight(${i.id}, this)" style="border:none;background:none;cursor:pointer;font-size:0.875rem;color:#9ca3af;" title="Dismiss">&times;</button>
+                    </div>
+                </div>
+                <div style="font-weight:600;font-size:0.875rem;color:#1f2937;margin-bottom:0.375rem;">${escHtml(i.title)}</div>
+                <div style="font-size:0.8125rem;color:#4b5563;margin-bottom:0.5rem;">${escHtml(i.description || '')}</div>
+                ${i.action_recommended ? `<div style="font-size:0.8125rem;color:#667eea;font-weight:500;">&#x27A4; ${escHtml(i.action_recommended)}</div>` : ''}
+                <div style="font-size:0.6875rem;color:#9ca3af;margin-top:0.5rem;">${new Date(i.created_at).toLocaleString('en-IN')}</div>`;
+            grid.appendChild(card);
+        });
+    } catch (e) { /* ignore */ }
+
+    loadInsightsSummary();
+}
+
+function filterInsights(category, btn) {
+    currentCategory = category;
+    document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    loadInsights();
+}
+
+async function markInsightRead(id, btn) {
+    await fetch(`/api/ai/insights/${id}/read`, { method: 'PUT', headers });
+    btn.closest('.insight-card').classList.add('is-read');
+    btn.remove();
+    loadInsightsSummary();
+}
+
+async function dismissInsight(id, btn) {
+    await fetch(`/api/ai/insights/${id}/dismiss`, { method: 'PUT', headers });
+    btn.closest('.insight-card').remove();
+    loadInsightsSummary();
+}
+
+async function markAllRead() {
+    const body = currentCategory !== 'all' ? { category: currentCategory } : {};
+    await fetch('/api/ai/insights/read-all', { method: 'POST', headers, body: JSON.stringify(body) });
+    loadInsights();
+}
+
+async function loadInsightsSummary() {
+    try {
+        const resp = await fetch('/api/ai/insights/summary', { headers });
+        const data = await resp.json();
+        const badge = document.getElementById('insightsBadge');
+        if (data.total > 0) {
+            badge.style.display = '';
+            badge.textContent = data.total > 99 ? '99+' : data.total;
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch (e) { /* ignore */ }
+}
+
+async function triggerAnalysis(type, btn) {
+    btn.classList.add('running');
+    btn.textContent = 'Running...';
+    try {
+        await fetch('/api/ai/analysis/run', {
+            method: 'POST', headers,
+            body: JSON.stringify({ type })
+        });
+        // Show toast
+        showToast('Analysis started: ' + type.replace(/_/g, ' '));
+        // Reload insights after a delay
+        setTimeout(() => {
+            loadInsights();
+            btn.classList.remove('running');
+            btn.textContent = btn.textContent.replace('Running...', 'Run ' + type.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' '));
+        }, 3000);
+    } catch (e) {
+        btn.classList.remove('running');
+        showToast('Failed to start analysis', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════════
+async function loadSettings() {
+    try {
+        // Load config
+        const cfgResp = await fetch('/api/ai/config', { headers });
+        const cfg = await cfgResp.json();
+
+        document.getElementById('cfgPrimary').value = cfg.primary_provider || 'gemini';
+        document.getElementById('cfgFallback').value = cfg.fallback_provider || 'claude';
+        document.getElementById('cfgTemp').value = cfg.temperature || '0.3';
+        document.getElementById('cfgMaxTokens').value = cfg.max_tokens_per_request || '4096';
+        document.getElementById('cfgZohoDaily').checked = cfg.zoho_daily_enabled === '1';
+        document.getElementById('cfgStaffDaily').checked = cfg.staff_daily_enabled === '1';
+        document.getElementById('cfgLeadScoring').checked = cfg.lead_scoring_enabled === '1';
+        document.getElementById('cfgMarketing').checked = cfg.marketing_weekly_enabled === '1';
+        document.getElementById('cfgWhatsApp').checked = cfg.whatsapp_reports_enabled === '1';
+        document.getElementById('cfgRecipients').value = cfg.whatsapp_report_recipients || '';
+
+        // Load stats
+        const statsResp = await fetch('/api/ai/stats', { headers });
+        const stats = await statsResp.json();
+
+        document.getElementById('statRuns').textContent = stats.analysis?.total_runs || 0;
+        document.getElementById('statTokens').textContent = formatNumber(stats.analysis?.total_tokens + stats.chat?.chat_tokens || 0);
+        document.getElementById('statInsights').textContent = stats.insights?.total_insights || 0;
+        document.getElementById('statMessages').textContent = stats.chat?.total_messages || 0;
+        document.getElementById('statCost').textContent = '$' + (stats.estimated_cost_usd || '0.00');
+
+        // Recent runs
+        const runsHtml = (stats.recent_runs || []).map(r => {
+            const statusColor = r.status === 'completed' ? '#10b981' : r.status === 'failed' ? '#ef4444' : '#f59e0b';
+            return `<div class="config-row">
+                <div>
+                    <div class="config-label">${r.analysis_type.replace(/_/g, ' ')}</div>
+                    <div class="config-desc">${new Date(r.created_at).toLocaleString('en-IN')}</div>
+                </div>
+                <div style="display:flex;gap:0.75rem;align-items:center;">
+                    <span style="font-size:0.75rem;color:#6b7280;">${r.tokens_used} tokens</span>
+                    <span style="font-size:0.75rem;color:#6b7280;">${r.duration_ms ? (r.duration_ms/1000).toFixed(1)+'s' : '-'}</span>
+                    <span style="color:${statusColor};font-weight:600;font-size:0.75rem;">${r.status}</span>
+                </div>
+            </div>`;
+        }).join('');
+        document.getElementById('recentRuns').innerHTML = runsHtml || '<p style="color:#9ca3af;padding:1rem;">No runs yet</p>';
+
+    } catch (e) {
+        console.error('Failed to load settings:', e);
+    }
+}
+
+async function saveConfig(key, value) {
+    try {
+        await fetch('/api/ai/config', {
+            method: 'PUT', headers,
+            body: JSON.stringify({ [key]: value })
+        });
+        showToast('Setting saved');
+    } catch (e) {
+        showToast('Failed to save setting', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function formatNumber(n) {
+    if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+    return String(n);
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `position:fixed;bottom:2rem;right:2rem;padding:0.75rem 1.25rem;border-radius:10px;font-size:0.8125rem;font-weight:600;z-index:10000;animation:slideIn 0.3s ease;color:white;background:${type==='error'?'#ef4444':'#10b981'};box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 2500);
+}
+
+// Socket.io for real-time updates
+if (window.qcSocket) {
+    window.qcSocket.emit('join_room', 'ai_dashboard');
+    window.qcSocket.on('analysis_complete', function(data) {
+        showToast('Analysis completed: ' + data.type.replace(/_/g, ' '));
+        loadInsights();
+        // Reset run button
+        const btnMap = { zoho_daily: 'runZoho', staff_daily: 'runStaff', lead_scoring: 'runLeads', marketing_tips: 'runMarketing' };
+        const btn = document.getElementById(btnMap[data.type]);
+        if (btn) { btn.classList.remove('running'); }
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+loadConversations();
+loadInsightsSummary();
+</script>
+
+<style>
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>
+
+</body>
+</html>

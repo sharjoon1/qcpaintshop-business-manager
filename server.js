@@ -58,6 +58,8 @@ const waMarketingRoutes = require('./routes/wa-marketing');
 const waCampaignEngine = require('./services/wa-campaign-engine');
 const attendanceReport = require('./services/attendance-report');
 const whatsappChatRoutes = require('./routes/whatsapp-chat');
+const aiRoutes = require('./routes/ai');
+const aiScheduler = require('./services/ai-scheduler');
 
 const app = express();
 
@@ -165,6 +167,9 @@ attendanceReport.setSessionManager(whatsappSessionManager);
 attendanceRoutes.setReportService(attendanceReport);
 whatsappChatRoutes.setPool(pool);
 whatsappChatRoutes.setSessionManager(whatsappSessionManager);
+aiRoutes.setPool(pool);
+aiScheduler.setPool(pool);
+aiScheduler.setSessionManager(whatsappSessionManager);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -295,6 +300,7 @@ app.use('/api/zoho/collections', collectionsRoutes.router);
 app.use('/api/zoho/whatsapp-sessions', whatsappSessionsRoutes.router);
 app.use('/api/wa-marketing', waMarketingRoutes.router);
 app.use('/api/whatsapp-chat', whatsappChatRoutes.router);
+app.use('/api/ai', aiRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3245,6 +3251,8 @@ waMarketingRoutes.setIO(io);
 attendanceReport.setIO(io);
 whatsappChatRoutes.setIO(io);
 attendanceRoutes.setIO(io);
+aiRoutes.setIO(io);
+aiScheduler.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {
@@ -3372,7 +3380,8 @@ server.listen(PORT, () => {
         whatsappProcessor.start();
         whatsappSessionManager.initializeSessions();
         waCampaignEngine.start();
-        console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout');
+        aiScheduler.start();
+        console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler');
     } else {
         console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
     }

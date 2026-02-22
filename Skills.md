@@ -23,7 +23,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | **Design System** | Custom CSS (`design-system.css`, 1274 lines) |
 | **PDF Generation** | PDFKit 0.17 |
 | **Image Processing** | Sharp 0.34 |
-| **AI Models** | Google Gemini 2.0 Flash (img2img) + Pollinations AI Flux (text2img) |
+| **AI Models** | Google Gemini 2.0 Flash (img2img + business analysis) + Anthropic Claude (fallback) + Pollinations AI Flux (text2img) |
 | **Accounting** | Zoho Books API (OAuth 2.0) |
 | **SMS Gateway** | NettyFish (DLT-compliant, Indian regulations) |
 | **Email** | Nodemailer (SMTP) |
@@ -989,6 +989,74 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 - Quick action buttons
 - Page: `staff/dashboard.html`, `dashboard.html`
 
+### 2.23 AI Business Intelligence System
+
+**Architecture**: Dual AI provider system (Google Gemini + Anthropic Claude) with automatic failover. Daily/weekly automated analysis of business data with WhatsApp delivery. Interactive chat interface for natural language business queries.
+
+**Services (6 files)**:
+| File | Purpose |
+|------|---------|
+| `services/ai-engine.js` | Dual LLM abstraction — `generate()`, `streamToResponse()`, `generateWithFailover()`, `streamWithFailover()` |
+| `services/ai-analyzer.js` | Zoho business analysis (revenue, collections, overdue, branch performance, stock alerts) |
+| `services/ai-staff-analyzer.js` | Staff performance (attendance, breaks, overtime, late arrivals, weekly trends) |
+| `services/ai-lead-manager.js` | Deterministic lead scoring (0-100) + AI enhancement, stale lead detection |
+| `services/ai-marketing.js` | Marketing strategy (brand/category trends, customer segments, slow-moving stock) |
+| `services/ai-scheduler.js` | Cron orchestrator for all automated analysis jobs |
+
+**Routes**: `routes/ai.js` — 15+ endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/ai/conversations` | List user's chat conversations |
+| POST | `/api/ai/conversations` | Create new conversation |
+| DELETE | `/api/ai/conversations/:id` | Delete conversation |
+| GET | `/api/ai/conversations/:id/messages` | Get conversation messages |
+| POST | `/api/ai/chat` | SSE streaming chat with business context injection |
+| GET | `/api/ai/insights` | List insights (filter by category, severity) |
+| GET | `/api/ai/insights/summary` | Unread counts by category/severity |
+| PUT | `/api/ai/insights/:id/read` | Mark insight as read |
+| PUT | `/api/ai/insights/:id/dismiss` | Dismiss insight |
+| POST | `/api/ai/insights/read-all` | Mark all insights as read |
+| GET | `/api/ai/analysis-runs` | List analysis run history |
+| POST | `/api/ai/analysis/run` | Manually trigger analysis |
+| GET | `/api/ai/lead-scores` | Get scored leads list |
+| GET | `/api/ai/lead-scores/:leadId` | Single lead score + breakdown |
+| GET | `/api/ai/config` | Get AI configuration |
+| PUT | `/api/ai/config` | Update AI configuration |
+| GET | `/api/ai/stats` | Usage stats (tokens, runs, costs) |
+
+**Database (6 tables)**:
+- `ai_conversations` — Chat sessions per user
+- `ai_messages` — Messages within conversations (user/assistant/system)
+- `ai_analysis_runs` — Automated analysis execution log
+- `ai_insights` — Extracted insights with category, severity, actions
+- `ai_lead_scores` — Deterministic + AI lead scores with breakdown
+- `ai_config` — Key-value configuration for schedules, providers, thresholds
+
+**Automated Schedules** (all configurable via ai_config):
+- Zoho daily analysis: 9 PM IST (revenue, collections, overdue, stock)
+- Staff daily analysis: 10:30 PM IST (attendance, performance, breaks, OT)
+- Lead scoring: Every 6 hours (deterministic + AI recommendations)
+- Weekly Zoho analysis: Monday 8 AM IST
+- Weekly marketing tips: Monday 9 AM IST
+
+**Chat Features**:
+- SSE streaming responses with real-time token display
+- Auto-context injection: detects business intent (revenue/staff/leads/stock) and injects live DB data
+- Conversation history with per-user isolation
+- Provider toggle (Gemini/Claude) per session
+- Quick prompt buttons for common queries
+
+**Lead Scoring Formula** (deterministic, 0-100):
+- Budget: 0-25 pts | Status: 0-20 pts | Recency: 0-20 pts
+- Engagement: 0-15 pts | Source: 0-10 pts | Responsiveness: 0-10 pts
+
+**WhatsApp Delivery**: Analysis summaries sent via General WhatsApp (branch_id=0) to configured recipients.
+
+**Page**: `admin-ai.html` (3 tabs: Chat, Insights, Settings)
+- **Permission**: `system.ai`
+- **Navigation**: System sub-nav → AI tab
+- **Migration**: `migrations/migrate-ai-tables.js`
+
 ---
 
 ## 3. MOBILE APPS (Android)
@@ -1057,7 +1125,7 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 | **Firebase FCM** | Android push notifications | HTTPS (server key) |
 | **Web Push** | Browser push notifications | VAPID |
 
-### 4.2 Database Tables (~59+)
+### 4.2 Database Tables (~65+)
 
 **Core**: `users`, `user_sessions`, `branches`, `customers`, `customer_types`, `settings`
 **Products**: `products`, `brands`, `categories`, `pack_sizes`
@@ -1076,6 +1144,7 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 **Website**: `website_services`, `website_features`, `website_testimonials`, `website_gallery`
 **Stock Check**: `stock_check_assignments`, `stock_check_items`
 **Collections**: `collection_reminders`, `payment_promises`
+**AI**: `ai_conversations`, `ai_messages`, `ai_analysis_runs`, `ai_insights`, `ai_lead_scores`, `ai_config`
 
 ### 4.3 File Upload System
 
@@ -1120,6 +1189,12 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 | **Purchase Suggestions** | `services/purchase-suggestion.js` | Reorder calculation engine |
 | **Notification Service** | `services/notification-service.js` | Multi-channel notification dispatch |
 | **Email Service** | `services/email-service.js` | Shared branded email sending (SMTP/Nodemailer) |
+| **AI Engine** | `services/ai-engine.js` | Dual LLM abstraction (Gemini + Claude) with failover and streaming |
+| **AI Analyzer** | `services/ai-analyzer.js` | Zoho business data analysis (revenue, collections, overdue) |
+| **AI Staff Analyzer** | `services/ai-staff-analyzer.js` | Staff performance analysis (attendance, breaks, OT) |
+| **AI Lead Manager** | `services/ai-lead-manager.js` | Lead scoring (deterministic + AI) and stale lead detection |
+| **AI Marketing** | `services/ai-marketing.js` | Marketing strategy and product trend analysis |
+| **AI Scheduler** | `services/ai-scheduler.js` | Cron orchestrator for all automated AI analysis jobs |
 
 ---
 
@@ -1191,6 +1266,7 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 | Website Management | `admin-website.html` | Public website content CRUD (hero, services, features, testimonials, gallery, social) |
 | Profile | `admin-profile.html` | Admin profile |
 | Guides | `admin-guides.html` | Guide CRUD, categories, analytics (Quill.js editor) |
+| AI Dashboard | `admin-ai.html` | AI chat, insights, config (3 tabs: Chat, Insights, Settings) |
 
 ### Zoho Pages
 | Page | File | Purpose |
@@ -1406,6 +1482,21 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-02-23 - AI Business Intelligence System
+- Full AI-powered business automation with dual provider (Gemini + Claude) and automatic failover
+- 6 new services: ai-engine, ai-analyzer, ai-staff-analyzer, ai-lead-manager, ai-marketing, ai-scheduler
+- Interactive AI chat with SSE streaming, conversation history, business context auto-injection
+- Automated analysis: Zoho daily (9 PM), staff daily (10:30 PM), lead scoring (6h), marketing (weekly Mon 9 AM)
+- Structured insights extraction with category, severity, actions — stored in ai_insights table
+- Lead scoring: deterministic formula (0-100) + AI enhancement for top leads
+- WhatsApp delivery of analysis summaries to configurable recipients via General WhatsApp
+- Admin dashboard: 3-tab UI (Chat, Insights, Settings) with real-time Socket.io updates
+- 6 new tables: ai_conversations, ai_messages, ai_analysis_runs, ai_insights, ai_lead_scores, ai_config
+- 15+ API endpoints including SSE streaming chat
+- Migration: `migrations/migrate-ai-tables.js`
+- Routes: `routes/ai.js`, Page: `admin-ai.html`, Permission: `system.ai`
+- Navigation: System sub-nav → AI tab, SUBNAV_MAP entry added
 
 ### 2026-02-20 - Outstanding Invoice Collections System
 - Centralized tool to manage outstanding invoices, send WhatsApp payment reminders, and track collection efforts

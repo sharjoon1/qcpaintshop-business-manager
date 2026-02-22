@@ -71,6 +71,7 @@
         'profile': CONFIG.SYSTEM_SUBNAV_PATH,
         'website': CONFIG.SYSTEM_SUBNAV_PATH,
         'guides': CONFIG.SYSTEM_SUBNAV_PATH,
+        'ai': CONFIG.SYSTEM_SUBNAV_PATH,
     };
     
     // Skip navigation on login pages and public share pages
