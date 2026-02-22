@@ -300,14 +300,21 @@ router.post('/remind', perm, async (req, res) => {
                 continue;
             }
 
-            // Resolve branch_id: request body → branch filter → customer mapping → null
-            let msgBranchId = r.branch_id || branchId;
-            if (!msgBranchId && r.zoho_customer_id) {
-                const [custRow] = await pool.query(
-                    'SELECT branch_id FROM zoho_customers_map WHERE zoho_contact_id = ?',
-                    [r.zoho_customer_id]
-                );
-                msgBranchId = custRow[0]?.branch_id || null;
+            // Resolve branch for WhatsApp routing
+            let msgBranchId;
+            if (r.session_type === 'general') {
+                // Explicitly route via General WhatsApp (branch_id = 0)
+                msgBranchId = 0;
+            } else {
+                // Auto mode: request body → branch filter → customer mapping → null
+                msgBranchId = r.branch_id || branchId;
+                if (!msgBranchId && r.zoho_customer_id) {
+                    const [custRow] = await pool.query(
+                        'SELECT branch_id FROM zoho_customers_map WHERE zoho_contact_id = ?',
+                        [r.zoho_customer_id]
+                    );
+                    msgBranchId = custRow[0]?.branch_id || null;
+                }
             }
 
             // 1. Insert into whatsapp_followups queue (with branch_id for routing)

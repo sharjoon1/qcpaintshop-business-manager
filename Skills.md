@@ -916,7 +916,7 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 
 **Architecture**:
 - `GENERAL_ID = 0` constant exported from `whatsapp-session-manager.js`
-- FK constraints on `whatsapp_sessions`, `whatsapp_messages`, `whatsapp_contacts` dropped to allow `branch_id = 0`
+- FK constraints dropped on `whatsapp_sessions`, `whatsapp_messages`, `whatsapp_contacts`, `wa_campaigns`, `wa_campaign_leads` to allow `branch_id = 0`
 - General session stored in the same `sessions` Map with key `0`
 
 **Fallback Logic** (in `sendMessage()` / `sendMedia()`):
@@ -925,6 +925,10 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 3. If General also disconnected, return `false`
 4. Messages sent via fallback are recorded with `branch_id = 0` (General)
 5. ALL callers (campaigns, reports, chat replies, processors) automatically benefit from fallback
+
+**Processor Fix** (`whatsapp-processor.js`):
+- JS truthiness bug fixed: `!0 === true` and `0 && x === 0` prevented `branch_id = 0` routing
+- Now uses `== null` / `!= null` checks instead of falsy checks
 
 **Admin Sessions Page** (`admin-whatsapp-sessions.html`):
 - Dedicated "General WhatsApp" card at top with green company-wide badge
@@ -943,7 +947,20 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 - All `:branchId` endpoints work with `0` (connect, disconnect, QR, status, test)
 - Chat conversations query changed from `JOIN` to `LEFT JOIN` for branch_id=0 support
 
-**Migration**: `migrations/migrate-general-whatsapp.js` (drops FK constraints)
+**Marketing Integration** (`wa-marketing.js` + `admin-wa-marketing.html`):
+- "General WhatsApp (Company)" appears as first option in campaign branch dropdown and instant send dropdown
+- Campaign list/detail/dashboard queries show "General WhatsApp" label for `branch_id = 0`
+- Validation uses `== null` checks to allow `branch_id = 0` to pass
+
+**Collections Integration** (`collections.js` + `admin-zoho-collections.html`):
+- Reminder modal has "Send via" dropdown: Auto (Branch / General fallback) or General WhatsApp (Company)
+- `session_type: 'general'` in POST /remind → forces `branch_id = 0` routing
+- `session_type: 'auto'` or absent → existing 4-tier branch resolution with session manager fallback
+- Bulk remind also reads the dropdown value
+
+**Migrations**:
+- `migrations/migrate-general-whatsapp.js` (drops FK on sessions/messages/contacts)
+- `migrations/migrate-general-wa-integration.js` (drops FK on wa_campaigns/wa_campaign_leads)
 
 ---
 
@@ -1688,6 +1705,12 @@ node promote-release.js internal production
 - **Backward compatible**: Existing `sendMessage()`/`sendMedia()` callers unaffected (metadata param is optional, return value still truthy on success)
 - Routes: `routes/whatsapp-chat.js`, Migration: `migrations/migrate-whatsapp-chat.js`
 - Navigation: Added "WA Chat" entry to `zoho-subnav.html`
+
+### Feb 22, 2026 — General WhatsApp: Collections & Marketing Integration
+- **Fixed**: JS truthiness bug in `whatsapp-processor.js` (`!0 === true`) that prevented `branch_id = 0` from routing through the message queue
+- **Marketing**: "General WhatsApp (Company)" option in campaign branch dropdown and instant send; campaign queries show proper label
+- **Collections**: "Send via" dropdown in reminder modal (Auto / General WhatsApp); `session_type` param on POST /remind
+- **Migration**: `migrate-general-wa-integration.js` drops FK constraints on `wa_campaigns` and `wa_campaign_leads`
 
 ---
 

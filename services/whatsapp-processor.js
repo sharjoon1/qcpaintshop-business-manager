@@ -177,13 +177,14 @@ async function processQueue() {
                     let targetBranch = msg.branch_id;
 
                     // If no branch_id on message, try to find any connected session
-                    if (!targetBranch) {
+                    // Note: use == null to allow branch_id = 0 (General WhatsApp)
+                    if (targetBranch == null) {
                         const allStatus = sessionManager.getStatus();
                         const connected = allStatus.find(s => s.status === 'connected');
                         if (connected) targetBranch = connected.branch_id;
                     }
 
-                    if (targetBranch && sessionManager.isConnected(targetBranch)) {
+                    if (targetBranch != null && sessionManager.isConnected(targetBranch)) {
                         try {
                             sent = await sessionManager.sendMessage(targetBranch, msg.phone, body);
                             if (sent) {

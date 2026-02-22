@@ -91,7 +91,7 @@ router.get('/campaigns', viewPerm, async (req, res) => {
         );
 
         const [campaigns] = await pool.query(
-            `SELECT c.*, b.name as branch_name, u.full_name as created_by_name
+            `SELECT c.*, CASE WHEN c.branch_id = 0 THEN 'General WhatsApp' ELSE b.name END as branch_name, u.full_name as created_by_name
              FROM wa_campaigns c
              LEFT JOIN branches b ON c.branch_id = b.id
              LEFT JOIN users u ON c.created_by = u.id
@@ -120,7 +120,7 @@ router.get('/campaigns', viewPerm, async (req, res) => {
 router.get('/campaigns/:id', viewPerm, async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT c.*, b.name as branch_name, u.full_name as created_by_name
+            `SELECT c.*, CASE WHEN c.branch_id = 0 THEN 'General WhatsApp' ELSE b.name END as branch_name, u.full_name as created_by_name
              FROM wa_campaigns c
              LEFT JOIN branches b ON c.branch_id = b.id
              LEFT JOIN users u ON c.created_by = u.id
@@ -152,7 +152,7 @@ router.post('/campaigns', managePerm, async (req, res) => {
         } = req.body;
 
         if (!name) return res.status(400).json({ error: 'Campaign name is required' });
-        if (!branch_id) return res.status(400).json({ error: 'Branch is required' });
+        if (branch_id == null || branch_id === '') return res.status(400).json({ error: 'Branch is required' });
 
         const [result] = await pool.query(
             `INSERT INTO wa_campaigns (name, description, branch_id, message_type, message_body,
@@ -617,7 +617,8 @@ router.get('/dashboard', viewPerm, async (req, res) => {
         // Recent campaigns
         const [recentCampaigns] = await pool.query(`
             SELECT c.id, c.name, c.status, c.total_leads, c.sent_count, c.failed_count,
-                   c.sending_started_at, c.completed_at, b.name as branch_name
+                   c.sending_started_at, c.completed_at,
+                   CASE WHEN c.branch_id = 0 THEN 'General WhatsApp' ELSE b.name END as branch_name
             FROM wa_campaigns c
             LEFT JOIN branches b ON c.branch_id = b.id
             ORDER BY c.updated_at DESC LIMIT 5
@@ -853,7 +854,7 @@ router.post('/instant-send', managePerm, async (req, res) => {
         if (!lead_ids || !lead_ids.length || !message) {
             return res.status(400).json({ success: false, message: 'lead_ids and message are required' });
         }
-        if (!branch_id) {
+        if (branch_id == null || branch_id === '') {
             return res.status(400).json({ success: false, message: 'branch_id (WhatsApp session) is required' });
         }
 
@@ -1034,7 +1035,8 @@ router.get('/instant-history', viewPerm, async (req, res) => {
         );
 
         const [rows] = await pool.query(
-            `SELECT m.*, u.full_name as sent_by_name, b.name as branch_name
+            `SELECT m.*, u.full_name as sent_by_name,
+                    CASE WHEN m.branch_id = 0 THEN 'General WhatsApp' ELSE b.name END as branch_name
              FROM wa_instant_messages m
              LEFT JOIN users u ON m.created_by = u.id
              LEFT JOIN branches b ON m.branch_id = b.id

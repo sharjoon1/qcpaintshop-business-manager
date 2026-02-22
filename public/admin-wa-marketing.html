@@ -855,6 +855,9 @@ async function loadBranches() {
         branches = data.data || [];
         const sel = document.getElementById('wizBranch');
         const imBranch = document.getElementById('imFilterBranch');
+        // Add General WhatsApp as first option
+        sel.insertAdjacentHTML('afterbegin', '<option value="0">General WhatsApp (Company)</option>');
+        imBranch.insertAdjacentHTML('beforeend', '<option value="0">General WhatsApp (Company)</option>');
         branches.forEach(b => {
             sel.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.name}</option>`);
             imBranch.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.name}</option>`);
