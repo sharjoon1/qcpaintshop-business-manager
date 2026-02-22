@@ -203,7 +203,7 @@ async function buildBusinessContext(message) {
             const [att] = await pool.query(`
                 SELECT
                     COUNT(*) as present,
-                    (SELECT COUNT(*) FROM users WHERE role = 'staff' AND is_active = 1) as total_staff,
+                    (SELECT COUNT(*) FROM users WHERE role = 'staff' AND status = 'active') as total_staff,
                     COALESCE(AVG(total_working_minutes), 0) as avg_working,
                     COALESCE(SUM(overtime_minutes), 0) as total_ot
                 FROM staff_attendance WHERE date = CURDATE()
@@ -233,7 +233,7 @@ async function buildBusinessContext(message) {
                     COUNT(*) as total_items,
                     COUNT(CASE WHEN zoho_stock_on_hand <= zoho_reorder_level AND zoho_reorder_level > 0 THEN 1 END) as below_reorder,
                     COUNT(CASE WHEN zoho_stock_on_hand = 0 THEN 1 END) as out_of_stock
-                FROM zoho_items_map WHERE is_active = 1
+                FROM zoho_items_map WHERE zoho_status = 'active'
             `);
             contextParts.push(`Stock: ${stock[0].total_items} items, ${stock[0].below_reorder} below reorder level, ${stock[0].out_of_stock} out of stock`);
         }

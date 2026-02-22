@@ -111,7 +111,7 @@ async function collectMarketingData() {
                 AND zil.id IN (SELECT zil2.id FROM zoho_invoice_line_items zil2
                               JOIN zoho_invoices zi2 ON zil2.invoice_id = zi2.id
                               WHERE zi2.invoice_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY))
-            WHERE im.zoho_stock_on_hand > 0 AND im.is_active = 1
+            WHERE im.zoho_stock_on_hand > 0 AND im.zoho_status = 'active'
                 AND zil.id IS NULL
             ORDER BY im.zoho_stock_on_hand DESC
             LIMIT 20

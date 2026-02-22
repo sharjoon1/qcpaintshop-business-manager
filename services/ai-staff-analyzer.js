@@ -39,7 +39,7 @@ async function collectStaffData(period = 'daily') {
         FROM users u
         LEFT JOIN branches b ON u.branch_id = b.id
         LEFT JOIN staff_attendance sa ON u.id = sa.user_id AND sa.date = CURDATE()
-        WHERE u.role = 'staff' AND u.is_active = 1 AND sa.id IS NULL
+        WHERE u.role = 'staff' AND u.status = 'active' AND sa.id IS NULL
     `);
 
     data.absent_today = absent;
@@ -118,7 +118,7 @@ async function collectStaffData(period = 'daily') {
             FROM users u
             LEFT JOIN staff_attendance sa ON u.id = sa.user_id
                 AND sa.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-            WHERE u.role = 'staff' AND u.is_active = 1
+            WHERE u.role = 'staff' AND u.status = 'active'
             GROUP BY u.id, u.name
             ORDER BY avg_working DESC
         `);
