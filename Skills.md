@@ -1614,6 +1614,29 @@ node promote-release.js internal production
 - Brand/Category displayed as subtle gray text under item name in all table rows + mobile cards
 - No migration needed — uses existing `zoho_brand` and `zoho_category_name` columns in `zoho_items_map`
 
+### 2026-02-22 - WhatsApp Chat History (Admin Panel)
+- **Incoming message capture**: `client.on('message')` in session manager stores all incoming WhatsApp messages (text, images, video, audio, documents, stickers, location, contacts)
+- **Delivery receipts**: `client.on('message_ack')` updates message status (sent → delivered → read) in real-time
+- **Outbound message recording**: `sendMessage()` and `sendMedia()` now record all outbound messages into `whatsapp_messages` with source tracking (admin_reply, campaign, instant, followup, system)
+- **Chat UI**: Full WhatsApp-style admin chat page (`admin-whatsapp-chat.html`) with conversation list + message area
+  - Branch filter, search, conversation list with avatars, unread badges, pinned contacts
+  - WhatsApp-style message bubbles (green=outgoing, white=incoming), date separators
+  - Status indicators: ✓ sent, ✓✓ delivered, ✓✓ (blue) read, ✕ failed
+  - Media support: inline images (click lightbox), video/audio players, document download links
+  - Reply bar with text input + file attachment (multer upload) + send button
+  - Contact management: pin, mute, edit saved name
+  - Infinite scroll up for older messages (cursor pagination)
+  - Mobile responsive: single-panel mode with back button
+- **Real-time updates**: Socket.io room `whatsapp_chat_admin` for incoming messages, outbound confirmations, delivery receipts
+- **Media storage**: Incoming media saved to `uploads/whatsapp/`, served at `/uploads/whatsapp/`
+- **2 Tables**: `whatsapp_messages` (BIGINT PK, branch_id, phone, direction, type, body, media, status, source), `whatsapp_contacts` (denormalized for fast conversation list: unread_count, is_pinned, is_muted, last_message_at)
+- **8 API Endpoints**: `GET /conversations`, `GET /conversations/:phone/messages`, `POST /conversations/:phone/send`, `POST /conversations/:phone/send-media`, `PUT /conversations/:phone/read`, `PUT /contacts/:phone`, `GET /search`, `GET /stats`
+- **Permission**: `zoho.whatsapp_chat` (auto-assigned to admin role)
+- **Backfill**: Migration backfills historical outbound messages from `wa_instant_messages`, `wa_campaign_leads`, `whatsapp_followups`
+- **Backward compatible**: Existing `sendMessage()`/`sendMedia()` callers unaffected (metadata param is optional, return value still truthy on success)
+- Routes: `routes/whatsapp-chat.js`, Migration: `migrations/migrate-whatsapp-chat.js`
+- Navigation: Added "WA Chat" entry to `zoho-subnav.html`
+
 ---
 
 ## 9. KNOWN ISSUES & ROADMAP

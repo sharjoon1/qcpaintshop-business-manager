@@ -57,6 +57,7 @@ const whatsappSessionsRoutes = require('./routes/whatsapp-sessions');
 const waMarketingRoutes = require('./routes/wa-marketing');
 const waCampaignEngine = require('./services/wa-campaign-engine');
 const attendanceReport = require('./services/attendance-report');
+const whatsappChatRoutes = require('./routes/whatsapp-chat');
 
 const app = express();
 
@@ -162,6 +163,8 @@ waCampaignEngine.setSessionManager(whatsappSessionManager);
 attendanceReport.setPool(pool);
 attendanceReport.setSessionManager(whatsappSessionManager);
 attendanceRoutes.setReportService(attendanceReport);
+whatsappChatRoutes.setPool(pool);
+whatsappChatRoutes.setSessionManager(whatsappSessionManager);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -181,7 +184,8 @@ const uploadDirs = [
     'public/uploads/website',
     'uploads/attendance/break',
     'uploads/stock-check',
-    'uploads/wa-marketing'
+    'uploads/wa-marketing',
+    'uploads/whatsapp'
 ];
 uploadDirs.forEach(dir => {
     if (!fs.existsSync(dir)) {
@@ -290,6 +294,7 @@ app.use('/api/zoho/migration', stockMigrationRoutes.router);
 app.use('/api/zoho/collections', collectionsRoutes.router);
 app.use('/api/zoho/whatsapp-sessions', whatsappSessionsRoutes.router);
 app.use('/api/wa-marketing', waMarketingRoutes.router);
+app.use('/api/whatsapp-chat', whatsappChatRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3238,6 +3243,7 @@ whatsappSessionManager.setIO(io);
 waCampaignEngine.setIO(io);
 waMarketingRoutes.setIO(io);
 attendanceReport.setIO(io);
+whatsappChatRoutes.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {
@@ -3290,6 +3296,13 @@ io.on('connection', async (socket) => {
     socket.on('join_wa_marketing_admin', () => {
         if (socket.user.role === 'admin') {
             socket.join('wa_marketing_admin');
+        }
+    });
+
+    // WA Chat admin room
+    socket.on('join_whatsapp_chat_admin', () => {
+        if (socket.user.role === 'admin') {
+            socket.join('whatsapp_chat_admin');
         }
     });
 

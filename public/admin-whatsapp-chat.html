@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>WhatsApp Chat - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/socket-helper.js"></script>
+    <style>
+        body { background: #f0f2f5; margin: 0; }
+
+        .chat-container {
+            display: flex;
+            height: calc(100vh - 52px);
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        /* Left Panel - Conversation List */
+        .conv-panel {
+            width: 360px;
+            min-width: 360px;
+            border-right: 1px solid #e8ecf1;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+
+        .conv-header {
+            padding: 12px 16px;
+            background: #f0f2f5;
+            border-bottom: 1px solid #e8ecf1;
+        }
+        .conv-header h2 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin: 0 0 10px 0;
+        }
+
+        .conv-filters {
+            display: flex;
+            gap: 8px;
+        }
+        .conv-filters select, .conv-filters input {
+            flex: 1;
+            padding: 7px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.8125rem;
+            background: #fff;
+            outline: none;
+        }
+        .conv-filters select:focus, .conv-filters input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102,126,234,0.15);
+        }
+
+        .conv-list {
+            flex: 1;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+
+        .conv-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 0.15s;
+        }
+        .conv-item:hover { background: #f5f6f8; }
+        .conv-item.active { background: #ebebeb; }
+
+        .conv-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 700;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .conv-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .conv-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #111;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .conv-name .pin-icon {
+            color: #667eea;
+            font-size: 0.7rem;
+        }
+        .conv-preview {
+            font-size: 0.8rem;
+            color: #667781;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+        .conv-preview .direction-icon { color: #53bdeb; margin-right: 2px; }
+
+        .conv-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .conv-time {
+            font-size: 0.7rem;
+            color: #667781;
+        }
+        .conv-time.has-unread { color: #25d366; font-weight: 600; }
+
+        .conv-unread {
+            background: #25d366;
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 700;
+            min-width: 20px;
+            height: 20px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+        }
+
+        /* Right Panel - Chat Area */
+        .chat-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #efeae2;
+            position: relative;
+        }
+
+        .chat-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #8696a0;
+            gap: 12px;
+        }
+        .chat-empty svg { width: 80px; height: 80px; opacity: 0.3; }
+        .chat-empty p { font-size: 0.9rem; }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: #f0f2f5;
+            border-bottom: 1px solid #e8ecf1;
+        }
+        .chat-header-back {
+            display: none;
+            padding: 6px;
+            cursor: pointer;
+            border-radius: 50%;
+            background: none;
+            border: none;
+            color: #54656f;
+        }
+        .chat-header-back:hover { background: #e9edef; }
+        .chat-header-back svg { width: 20px; height: 20px; }
+        .chat-header .conv-avatar { width: 40px; height: 40px; font-size: 0.95rem; }
+        .chat-header-info { flex: 1; }
+        .chat-header-name { font-weight: 600; font-size: 0.95rem; color: #111; }
+        .chat-header-phone { font-size: 0.75rem; color: #667781; }
+        .chat-header-actions { display: flex; gap: 8px; }
+        .chat-header-actions button {
+            padding: 6px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #fff;
+            font-size: 0.75rem;
+            cursor: pointer;
+            color: #475569;
+        }
+        .chat-header-actions button:hover { background: #f3f4f6; }
+        .chat-header-actions button.active { background: #667eea; color: #fff; border-color: #667eea; }
+
+        /* Messages Area */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 60px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            scrollbar-width: thin;
+        }
+        .chat-messages .load-more {
+            text-align: center;
+            padding: 8px;
+        }
+        .chat-messages .load-more button {
+            background: rgba(255,255,255,0.9);
+            border: none;
+            border-radius: 16px;
+            padding: 6px 16px;
+            font-size: 0.75rem;
+            color: #667eea;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .date-separator {
+            text-align: center;
+            margin: 12px 0;
+        }
+        .date-separator span {
+            background: #e1f3fb;
+            color: #54656f;
+            font-size: 0.7rem;
+            padding: 4px 12px;
+            border-radius: 8px;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.06);
+        }
+
+        .msg-bubble {
+            max-width: 65%;
+            padding: 6px 8px 4px 9px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            line-height: 1.35;
+            position: relative;
+            word-wrap: break-word;
+            box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+        }
+        .msg-bubble.out {
+            background: #d9fdd3;
+            align-self: flex-end;
+            border-top-right-radius: 0;
+        }
+        .msg-bubble.in {
+            background: #fff;
+            align-self: flex-start;
+            border-top-left-radius: 0;
+        }
+        .msg-bubble .msg-sender {
+            font-size: 0.75rem;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .msg-bubble .msg-text { color: #111b21; }
+        .msg-bubble .msg-caption { color: #111b21; margin-top: 4px; font-size: 0.8125rem; }
+        .msg-bubble .msg-media { border-radius: 6px; max-width: 330px; cursor: pointer; }
+        .msg-bubble .msg-media img { max-width: 100%; border-radius: 6px; display: block; }
+        .msg-bubble .msg-media video { max-width: 100%; border-radius: 6px; }
+        .msg-bubble .msg-media audio { width: 250px; }
+        .msg-bubble .msg-doc {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.04);
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #111;
+        }
+        .msg-bubble .msg-doc svg { width: 28px; height: 28px; color: #667eea; flex-shrink: 0; }
+        .msg-bubble .msg-doc span { font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .msg-footer {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 4px;
+            margin-top: 1px;
+        }
+        .msg-time { font-size: 0.6875rem; color: #667781; }
+        .msg-source {
+            font-size: 0.6rem;
+            color: #8696a0;
+            background: rgba(0,0,0,0.04);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        .msg-status { display: inline-flex; align-items: center; }
+        .msg-status svg { width: 16px; height: 12px; }
+        .msg-status.sent svg { color: #8696a0; }
+        .msg-status.delivered svg { color: #8696a0; }
+        .msg-status.read svg { color: #53bdeb; }
+        .msg-status.failed svg { color: #ea4335; }
+
+        /* Reply Bar */
+        .reply-bar {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #f0f2f5;
+            border-top: 1px solid #e8ecf1;
+        }
+        .reply-bar .attach-btn {
+            padding: 8px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #54656f;
+            border-radius: 50%;
+        }
+        .reply-bar .attach-btn:hover { background: #e9edef; }
+        .reply-bar .attach-btn svg { width: 24px; height: 24px; }
+        .reply-bar input[type="file"] { display: none; }
+
+        .reply-bar .msg-input {
+            flex: 1;
+            padding: 9px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            outline: none;
+            resize: none;
+            max-height: 100px;
+            min-height: 38px;
+            background: #fff;
+            font-family: inherit;
+        }
+        .reply-bar .msg-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102,126,234,0.15);
+        }
+
+        .reply-bar .send-btn {
+            padding: 8px;
+            background: #25d366;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .reply-bar .send-btn:hover { background: #1da851; }
+        .reply-bar .send-btn:disabled { background: #ccc; cursor: default; }
+        .reply-bar .send-btn svg { width: 20px; height: 20px; }
+
+        /* Lightbox */
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .lightbox.show { display: flex; }
+        .lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 16px;
+            padding: 8px 16px;
+            background: #fff;
+            border-bottom: 1px solid #e8ecf1;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        .stats-bar .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .stats-bar .stat-value {
+            font-weight: 700;
+            color: #111;
+        }
+        .stats-bar .stat-value.unread { color: #25d366; }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .conv-panel { width: 100%; min-width: unset; }
+            .chat-panel { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 10; }
+            .chat-panel.mobile-show { display: flex; }
+            .chat-header-back { display: block; }
+            .chat-messages { padding: 12px 16px; }
+            .msg-bubble { max-width: 85%; }
+            .chat-container { height: calc(100vh - 52px); }
+        }
+    </style>
+</head>
+<body data-page="zoho-whatsapp-chat">
+    <div id="subnav-container"></div>
+
+    <div class="chat-container">
+        <!-- Left Panel -->
+        <div class="conv-panel" id="convPanel">
+            <div class="conv-header">
+                <h2>WhatsApp Chat</h2>
+                <div class="conv-filters">
+                    <select id="branchFilter" onchange="loadConversations()">
+                        <option value="">All Branches</option>
+                    </select>
+                    <input type="text" id="searchInput" placeholder="Search..." oninput="debounceSearch()">
+                </div>
+            </div>
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-item">Conversations: <span class="stat-value" id="statConv">-</span></div>
+                <div class="stat-item">Unread: <span class="stat-value unread" id="statUnread">-</span></div>
+                <div class="stat-item">Today: <span class="stat-value" id="statToday">-</span></div>
+            </div>
+            <div class="conv-list" id="convList">
+                <div style="text-align:center;padding:40px;color:#8696a0;">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="chat-panel" id="chatPanel">
+            <div class="chat-empty" id="chatEmpty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                <p>Select a conversation to view messages</p>
+            </div>
+
+            <div id="chatActive" style="display:none;flex-direction:column;height:100%;">
+                <!-- Chat Header -->
+                <div class="chat-header">
+                    <button class="chat-header-back" onclick="closeChat()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <div class="conv-avatar" id="chatAvatar"></div>
+                    <div class="chat-header-info">
+                        <div class="chat-header-name" id="chatName"></div>
+                        <div class="chat-header-phone" id="chatPhone"></div>
+                    </div>
+                    <div class="chat-header-actions">
+                        <button onclick="togglePin()" id="pinBtn" title="Pin">Pin</button>
+                        <button onclick="toggleMute()" id="muteBtn" title="Mute">Mute</button>
+                        <button onclick="editContactName()" title="Edit Name">Edit</button>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div class="chat-messages" id="chatMessages" onscroll="handleScroll()"></div>
+
+                <!-- Reply Bar -->
+                <div class="reply-bar">
+                    <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                        </svg>
+                    </button>
+                    <input type="file" id="fileInput" onchange="sendMediaFile()">
+                    <textarea class="msg-input" id="msgInput" placeholder="Type a message" rows="1"
+                        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendReply()}"
+                        oninput="autoResize(this)"></textarea>
+                    <button class="send-btn" onclick="sendReply()" id="sendBtn" title="Send">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <img id="lightboxImg" src="">
+    </div>
+
+<script>
+const API = '/api/whatsapp-chat';
+const token = localStorage.getItem('auth_token');
+const user = JSON.parse(localStorage.getItem('user') || '{}');
+const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+let currentPhone = null;
+let currentBranchId = null;
+let currentContact = null;
+let conversations = [];
+let oldestMsgId = null;
+let loadingMore = false;
+let searchTimer = null;
+
+// ========================================
+// INIT
+// ========================================
+async function init() {
+    await loadBranches();
+    await loadConversations();
+    loadStats();
+    initSocket();
+}
+
+async function loadBranches() {
+    try {
+        const res = await fetch('/api/branches', { headers });
+        const data = await res.json();
+        const select = document.getElementById('branchFilter');
+        (data.branches || data).forEach(b => {
+            select.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.name}</option>`);
+        });
+    } catch (e) { console.error('Load branches error:', e); }
+}
+
+// ========================================
+// CONVERSATIONS
+// ========================================
+async function loadConversations() {
+    const branchId = document.getElementById('branchFilter').value;
+    const search = document.getElementById('searchInput').value;
+    const params = new URLSearchParams({ limit: 100 });
+    if (branchId) params.set('branch_id', branchId);
+    if (search) params.set('search', search);
+
+    try {
+        const res = await fetch(`${API}/conversations?${params}`, { headers });
+        const data = await res.json();
+        conversations = data.conversations || [];
+        renderConversations();
+    } catch (e) {
+        console.error('Load conversations error:', e);
+        document.getElementById('convList').innerHTML = '<div style="padding:20px;color:#ef4444;text-align:center;">Failed to load</div>';
+    }
+}
+
+function renderConversations() {
+    const list = document.getElementById('convList');
+    if (conversations.length === 0) {
+        list.innerHTML = '<div style="text-align:center;padding:40px;color:#8696a0;">No conversations yet</div>';
+        return;
+    }
+
+    list.innerHTML = conversations.map(c => {
+        const name = c.saved_name || c.pushname || formatPhone(c.phone_number);
+        const initial = (name[0] || '?').toUpperCase();
+        const isActive = currentPhone === c.phone_number && currentBranchId == c.branch_id;
+        const timeStr = c.last_message_at ? formatTime(c.last_message_at) : '';
+        let preview = '';
+        if (c.last_message_type && c.last_message_type !== 'text') {
+            const icons = { image: '📷 Photo', video: '🎥 Video', audio: '🎵 Audio', document: '📄 Document', sticker: '🏷️ Sticker', location: '📍 Location', contact: '👤 Contact' };
+            preview = icons[c.last_message_type] || c.last_message_type;
+        } else {
+            preview = c.last_message || '';
+        }
+        if (c.last_direction === 'out') preview = '<span class="direction-icon">↩</span> ' + preview;
+        const pin = c.is_pinned ? '<span class="pin-icon">📌</span>' : '';
+
+        return `<div class="conv-item${isActive ? ' active' : ''}" onclick="openChat('${c.phone_number}', ${c.branch_id})" data-phone="${c.phone_number}" data-branch="${c.branch_id}">
+            <div class="conv-avatar">${initial}</div>
+            <div class="conv-info">
+                <div class="conv-name">${escHtml(name)} ${pin}</div>
+                <div class="conv-preview">${preview}</div>
+            </div>
+            <div class="conv-meta">
+                <div class="conv-time${c.unread_count > 0 ? ' has-unread' : ''}">${timeStr}</div>
+                ${c.unread_count > 0 ? `<div class="conv-unread">${c.unread_count}</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function debounceSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadConversations(), 300);
+}
+
+// ========================================
+// OPEN CHAT
+// ========================================
+async function openChat(phone, branchId) {
+    currentPhone = phone;
+    currentBranchId = branchId;
+    oldestMsgId = null;
+
+    // Find contact data
+    currentContact = conversations.find(c => c.phone_number === phone && c.branch_id == branchId) || {};
+
+    // Update header
+    const name = currentContact.saved_name || currentContact.pushname || formatPhone(phone);
+    document.getElementById('chatAvatar').textContent = (name[0] || '?').toUpperCase();
+    document.getElementById('chatName').textContent = name;
+    document.getElementById('chatPhone').textContent = '+' + phone + (currentContact.branch_name ? ` · ${currentContact.branch_name}` : '');
+
+    // Update pin/mute buttons
+    updateContactButtons();
+
+    // Show chat panel
+    document.getElementById('chatEmpty').style.display = 'none';
+    document.getElementById('chatActive').style.display = 'flex';
+    document.getElementById('chatPanel').classList.add('mobile-show');
+
+    // Mark active in list
+    document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+    const activeEl = document.querySelector(`.conv-item[data-phone="${phone}"][data-branch="${branchId}"]`);
+    if (activeEl) activeEl.classList.add('active');
+
+    // Load messages
+    await loadMessages();
+
+    // Mark as read
+    markRead();
+
+    // Focus input
+    document.getElementById('msgInput').focus();
+}
+
+async function loadMessages(loadMore = false) {
+    const params = new URLSearchParams({ branch_id: currentBranchId, limit: 50 });
+    if (loadMore && oldestMsgId) params.set('before_id', oldestMsgId);
+
+    try {
+        const res = await fetch(`${API}/conversations/${currentPhone}/messages?${params}`, { headers });
+        const data = await res.json();
+        const msgs = data.messages || [];
+
+        if (msgs.length > 0) {
+            oldestMsgId = msgs[0].id;
+        }
+
+        if (loadMore) {
+            prependMessages(msgs, data.has_more);
+        } else {
+            renderMessages(msgs, data.has_more);
+            scrollToBottom();
+        }
+    } catch (e) {
+        console.error('Load messages error:', e);
+    }
+}
+
+function renderMessages(msgs, hasMore) {
+    const container = document.getElementById('chatMessages');
+    let html = '';
+
+    if (hasMore) {
+        html += '<div class="load-more"><button onclick="loadOlder()">Load older messages</button></div>';
+    }
+
+    html += buildMessageHtml(msgs);
+    container.innerHTML = html;
+}
+
+function prependMessages(msgs, hasMore) {
+    const container = document.getElementById('chatMessages');
+    let html = '';
+    if (hasMore) {
+        html += '<div class="load-more"><button onclick="loadOlder()">Load older messages</button></div>';
+    }
+    html += buildMessageHtml(msgs);
+
+    // Remove existing load-more button
+    const existing = container.querySelector('.load-more');
+    if (existing) existing.remove();
+
+    container.insertAdjacentHTML('afterbegin', html);
+    loadingMore = false;
+}
+
+function buildMessageHtml(msgs) {
+    let html = '';
+    let lastDate = '';
+
+    msgs.forEach(msg => {
+        const msgDate = new Date(msg.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        if (msgDate !== lastDate) {
+            html += `<div class="date-separator"><span>${msgDate}</span></div>`;
+            lastDate = msgDate;
+        }
+        html += renderBubble(msg);
+    });
+
+    return html;
+}
+
+function renderBubble(msg) {
+    const dir = msg.direction;
+    const time = new Date(msg.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    let content = '';
+
+    // Sender name for incoming
+    if (dir === 'in' && msg.sender_name) {
+        content += `<div class="msg-sender">${escHtml(msg.sender_name)}</div>`;
+    }
+
+    // Media content
+    if (msg.message_type === 'image' && msg.media_url) {
+        content += `<div class="msg-media"><img src="${msg.media_url}" loading="lazy" onclick="openLightbox('${msg.media_url}')" alt="Image"></div>`;
+        if (msg.caption) content += `<div class="msg-caption">${escHtml(msg.caption)}</div>`;
+    } else if (msg.message_type === 'video' && msg.media_url) {
+        content += `<div class="msg-media"><video controls preload="metadata" src="${msg.media_url}"></video></div>`;
+        if (msg.caption) content += `<div class="msg-caption">${escHtml(msg.caption)}</div>`;
+    } else if (msg.message_type === 'audio' && msg.media_url) {
+        content += `<div class="msg-media"><audio controls preload="metadata" src="${msg.media_url}"></audio></div>`;
+    } else if (msg.message_type === 'document' && msg.media_url) {
+        const fname = msg.media_filename || 'Document';
+        content += `<a class="msg-doc" href="${msg.media_url}" download="${escHtml(fname)}" target="_blank">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>${escHtml(fname)}</span></a>`;
+        if (msg.caption) content += `<div class="msg-caption">${escHtml(msg.caption)}</div>`;
+    } else if (msg.message_type === 'sticker') {
+        if (msg.media_url) content += `<div class="msg-media"><img src="${msg.media_url}" style="max-width:150px" alt="Sticker"></div>`;
+        else content += `<div class="msg-text" style="font-style:italic;color:#8696a0;">Sticker</div>`;
+    } else if (msg.message_type === 'location') {
+        content += `<div class="msg-text" style="font-style:italic;">📍 Location shared</div>`;
+    } else if (msg.message_type === 'contact') {
+        content += `<div class="msg-text" style="font-style:italic;">👤 Contact shared</div>`;
+    } else {
+        content += `<div class="msg-text">${linkify(escHtml(msg.body || ''))}</div>`;
+    }
+
+    // Footer with time, source, status
+    let footer = `<span class="msg-time">${time}</span>`;
+    if (dir === 'out' && msg.source && msg.source !== 'admin_reply' && msg.source !== 'incoming') {
+        footer += `<span class="msg-source">${msg.source}</span>`;
+    }
+    if (dir === 'out') {
+        footer += statusIcon(msg.status);
+    }
+
+    return `<div class="msg-bubble ${dir}" data-msg-id="${msg.whatsapp_msg_id || ''}" data-id="${msg.id}">
+        ${content}
+        <div class="msg-footer">${footer}</div>
+    </div>`;
+}
+
+function statusIcon(status) {
+    if (status === 'read') return `<span class="msg-status read"><svg viewBox="0 0 16 11"><path d="M11.071.653a.457.457 0 00-.304-.102.493.493 0 00-.381.178l-6.19 7.636-2.011-2.095a.463.463 0 00-.659.003.423.423 0 00-.003.64l2.358 2.46a.465.465 0 00.349.154h.046a.468.468 0 00.34-.186l6.536-8.075a.422.422 0 00-.081-.613z" fill="currentColor"/><path d="M15.071.653a.457.457 0 00-.304-.102.493.493 0 00-.381.178l-6.19 7.636-1.2-1.25-.648.8 1.505 1.57a.465.465 0 00.349.154h.046a.468.468 0 00.34-.186l6.536-8.075a.422.422 0 00-.053-.725z" fill="currentColor"/></svg></span>`;
+    if (status === 'delivered') return `<span class="msg-status delivered"><svg viewBox="0 0 16 11"><path d="M11.071.653a.457.457 0 00-.304-.102.493.493 0 00-.381.178l-6.19 7.636-2.011-2.095a.463.463 0 00-.659.003.423.423 0 00-.003.64l2.358 2.46a.465.465 0 00.349.154h.046a.468.468 0 00.34-.186l6.536-8.075a.422.422 0 00-.081-.613z" fill="currentColor"/><path d="M15.071.653a.457.457 0 00-.304-.102.493.493 0 00-.381.178l-6.19 7.636-1.2-1.25-.648.8 1.505 1.57a.465.465 0 00.349.154h.046a.468.468 0 00.34-.186l6.536-8.075a.422.422 0 00-.053-.725z" fill="currentColor"/></svg></span>`;
+    if (status === 'sent') return `<span class="msg-status sent"><svg viewBox="0 0 16 11"><path d="M11.071.653a.457.457 0 00-.304-.102.493.493 0 00-.381.178l-6.19 7.636-2.011-2.095a.463.463 0 00-.659.003.423.423 0 00-.003.64l2.358 2.46a.465.465 0 00.349.154h.046a.468.468 0 00.34-.186l6.536-8.075a.422.422 0 00-.081-.613z" fill="currentColor"/></svg></span>`;
+    if (status === 'failed') return `<span class="msg-status failed"><svg viewBox="0 0 16 11"><path d="M8 1L1 10h14L8 1z" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="8" y1="4" x2="8" y2="7" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="9" r="0.5" fill="currentColor"/></svg></span>`;
+    return '';
+}
+
+// ========================================
+// SEND
+// ========================================
+async function sendReply() {
+    const input = document.getElementById('msgInput');
+    const message = input.value.trim();
+    if (!message || !currentPhone || !currentBranchId) return;
+
+    input.value = '';
+    autoResize(input);
+
+    // Optimistic render
+    const now = new Date();
+    appendBubble({
+        direction: 'out', message_type: 'text', body: message,
+        timestamp: now.toISOString(), status: 'pending', source: 'admin_reply'
+    });
+
+    try {
+        await fetch(`${API}/conversations/${currentPhone}/send`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ branch_id: currentBranchId, message })
+        });
+    } catch (e) {
+        console.error('Send error:', e);
+    }
+}
+
+async function sendMediaFile() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    if (!file || !currentPhone || !currentBranchId) return;
+
+    const caption = prompt('Caption (optional):') || '';
+
+    const formData = new FormData();
+    formData.append('media', file);
+    formData.append('branch_id', currentBranchId);
+    if (caption) formData.append('caption', caption);
+
+    // Optimistic render
+    const now = new Date();
+    const msgType = file.type.startsWith('image/') ? 'image' : 'document';
+    appendBubble({
+        direction: 'out', message_type: msgType, body: null,
+        media_url: URL.createObjectURL(file), caption,
+        media_filename: file.name,
+        timestamp: now.toISOString(), status: 'pending', source: 'admin_reply'
+    });
+
+    try {
+        await fetch(`${API}/conversations/${currentPhone}/send-media`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+    } catch (e) {
+        console.error('Send media error:', e);
+    }
+
+    fileInput.value = '';
+}
+
+function appendBubble(msg) {
+    const container = document.getElementById('chatMessages');
+    container.insertAdjacentHTML('beforeend', renderBubble(msg));
+    scrollToBottom();
+}
+
+// ========================================
+// MARK READ
+// ========================================
+async function markRead() {
+    if (!currentPhone || !currentBranchId) return;
+    try {
+        await fetch(`${API}/conversations/${currentPhone}/read`, {
+            method: 'PUT', headers,
+            body: JSON.stringify({ branch_id: currentBranchId })
+        });
+        // Update conversation list
+        const conv = conversations.find(c => c.phone_number === currentPhone && c.branch_id == currentBranchId);
+        if (conv) {
+            conv.unread_count = 0;
+            renderConversations();
+        }
+        loadStats();
+    } catch (e) { console.error('Mark read error:', e); }
+}
+
+// ========================================
+// CONTACT ACTIONS
+// ========================================
+function updateContactButtons() {
+    const pinBtn = document.getElementById('pinBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    pinBtn.textContent = currentContact?.is_pinned ? 'Unpin' : 'Pin';
+    pinBtn.classList.toggle('active', !!currentContact?.is_pinned);
+    muteBtn.textContent = currentContact?.is_muted ? 'Unmute' : 'Mute';
+    muteBtn.classList.toggle('active', !!currentContact?.is_muted);
+}
+
+async function togglePin() {
+    const newVal = currentContact?.is_pinned ? 0 : 1;
+    await updateContact({ is_pinned: newVal });
+    if (currentContact) currentContact.is_pinned = newVal;
+    updateContactButtons();
+    loadConversations();
+}
+
+async function toggleMute() {
+    const newVal = currentContact?.is_muted ? 0 : 1;
+    await updateContact({ is_muted: newVal });
+    if (currentContact) currentContact.is_muted = newVal;
+    updateContactButtons();
+}
+
+async function editContactName() {
+    const current = currentContact?.saved_name || '';
+    const name = prompt('Contact name:', current);
+    if (name === null) return;
+    await updateContact({ saved_name: name });
+    if (currentContact) currentContact.saved_name = name;
+    document.getElementById('chatName').textContent = name || currentContact?.pushname || formatPhone(currentPhone);
+    loadConversations();
+}
+
+async function updateContact(data) {
+    try {
+        await fetch(`${API}/contacts/${currentPhone}`, {
+            method: 'PUT', headers,
+            body: JSON.stringify({ branch_id: currentBranchId, ...data })
+        });
+    } catch (e) { console.error('Update contact error:', e); }
+}
+
+// ========================================
+// SCROLL & LOAD MORE
+// ========================================
+function scrollToBottom() {
+    const el = document.getElementById('chatMessages');
+    setTimeout(() => { el.scrollTop = el.scrollHeight; }, 50);
+}
+
+function handleScroll() {
+    const el = document.getElementById('chatMessages');
+    if (el.scrollTop < 50 && !loadingMore && oldestMsgId) {
+        loadOlder();
+    }
+}
+
+async function loadOlder() {
+    if (loadingMore) return;
+    loadingMore = true;
+    await loadMessages(true);
+}
+
+// ========================================
+// STATS
+// ========================================
+async function loadStats() {
+    try {
+        const branchId = document.getElementById('branchFilter').value;
+        const params = branchId ? `?branch_id=${branchId}` : '';
+        const res = await fetch(`${API}/stats${params}`, { headers });
+        const data = await res.json();
+        document.getElementById('statConv').textContent = data.total_conversations || 0;
+        document.getElementById('statUnread').textContent = data.unread_count || 0;
+        document.getElementById('statToday').textContent = data.messages_today || 0;
+    } catch (e) { console.error('Stats error:', e); }
+}
+
+// ========================================
+// SOCKET.IO
+// ========================================
+function initSocket() {
+    if (typeof initSocketConnection !== 'function') return;
+    const socket = initSocketConnection();
+    if (!socket) return;
+
+    socket.emit('join_whatsapp_chat_admin');
+
+    // Incoming message
+    socket.on('whatsapp_message_incoming', (data) => {
+        // Update conversation list
+        updateConvFromSocket(data);
+
+        // If current chat, append bubble
+        if (currentPhone === data.phone_number && currentBranchId == data.branch_id) {
+            appendBubble({
+                direction: 'in',
+                message_type: data.message_type,
+                body: data.body,
+                media_url: data.media_url,
+                media_mime_type: data.media_mime_type,
+                media_filename: data.media_filename,
+                caption: data.caption,
+                sender_name: data.sender_name,
+                timestamp: data.timestamp,
+                status: 'delivered'
+            });
+            markRead();
+        }
+
+        loadStats();
+    });
+
+    // Outbound message sent (from this or another admin)
+    socket.on('whatsapp_message_sent', (data) => {
+        updateConvFromSocket(data);
+        // If current chat and not already rendered (from optimistic), we could refresh
+        // For simplicity, optimistic render handles own messages
+        if (currentPhone === data.phone_number && currentBranchId == data.branch_id) {
+            // Reload to sync (only if sent from another admin session)
+            // We skip this to avoid duplicate renders from optimistic
+        }
+    });
+
+    // Status update (delivery/read receipts)
+    socket.on('whatsapp_message_status', (data) => {
+        const el = document.querySelector(`.msg-bubble[data-msg-id="${data.whatsapp_msg_id}"]`);
+        if (el) {
+            const statusEl = el.querySelector('.msg-status');
+            if (statusEl) {
+                statusEl.className = 'msg-status ' + data.status;
+                statusEl.innerHTML = statusIcon(data.status).replace(/<span[^>]*>|<\/span>/g, '');
+            }
+        }
+    });
+}
+
+function updateConvFromSocket(data) {
+    const idx = conversations.findIndex(c => c.phone_number === data.phone_number && c.branch_id == data.branch_id);
+    if (idx >= 0) {
+        conversations[idx].last_message_at = data.timestamp;
+        conversations[idx].last_message = data.body;
+        conversations[idx].last_message_type = data.message_type;
+        conversations[idx].last_direction = data.direction;
+        if (data.direction === 'in' && !(currentPhone === data.phone_number && currentBranchId == data.branch_id)) {
+            conversations[idx].unread_count = (conversations[idx].unread_count || 0) + 1;
+        }
+        // Move to top (after pinned)
+        const conv = conversations.splice(idx, 1)[0];
+        const pinnedCount = conversations.filter(c => c.is_pinned).length;
+        conversations.splice(conv.is_pinned ? 0 : pinnedCount, 0, conv);
+    } else {
+        // New conversation — reload
+        loadConversations();
+        return;
+    }
+    renderConversations();
+}
+
+// ========================================
+// MOBILE
+// ========================================
+function closeChat() {
+    document.getElementById('chatPanel').classList.remove('mobile-show');
+    currentPhone = null;
+    currentBranchId = null;
+}
+
+// ========================================
+// LIGHTBOX
+// ========================================
+function openLightbox(url) {
+    document.getElementById('lightboxImg').src = url;
+    document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('show');
+}
+
+// ========================================
+// HELPERS
+// ========================================
+function formatPhone(phone) {
+    if (!phone) return '';
+    if (phone.startsWith('91') && phone.length === 12) {
+        return '+91 ' + phone.substring(2, 7) + ' ' + phone.substring(7);
+    }
+    return '+' + phone;
+}
+
+function formatTime(dateStr) {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffDays = Math.floor((now - d) / 86400000);
+
+    if (diffDays === 0) {
+        return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    } else if (diffDays === 1) {
+        return 'Yesterday';
+    } else if (diffDays < 7) {
+        return d.toLocaleDateString('en-IN', { weekday: 'short' });
+    } else {
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    }
+}
+
+function escHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function linkify(text) {
+    return text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#039be5;text-decoration:underline;">$1</a>');
+}
+
+function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+// Start
+init();
+</script>
+</body>
+</html>

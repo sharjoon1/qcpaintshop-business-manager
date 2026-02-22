@@ -13,6 +13,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 
 // whatsapp-web.js is an optional dependency — server runs without it
 let Client, LocalAuth, MessageMedia;
@@ -172,6 +173,135 @@ async function connectBranch(branchId, userId) {
             sessions.delete(branchId);
         });
 
+        // Incoming message listener
+        client.on('message', async (msg) => {
+            try {
+                // Skip group messages and status broadcasts
+                if (msg.from.endsWith('@g.us') || msg.from === 'status@broadcast') return;
+
+                const phone = msg.from.replace('@c.us', '');
+                const contact = await msg.getContact();
+                const pushname = contact?.pushname || contact?.name || '';
+
+                // Determine message type
+                let messageType = 'text';
+                let mediaUrl = null;
+                let mediaMime = null;
+                let mediaFilename = null;
+                let caption = null;
+
+                if (msg.hasMedia) {
+                    const media = await msg.downloadMedia();
+                    if (media) {
+                        // Determine type from mimetype
+                        if (media.mimetype?.startsWith('image/')) messageType = 'image';
+                        else if (media.mimetype?.startsWith('video/')) messageType = 'video';
+                        else if (media.mimetype?.startsWith('audio/')) messageType = 'audio';
+                        else messageType = 'document';
+
+                        mediaMime = media.mimetype;
+                        mediaFilename = media.filename || `${Date.now()}.${getExtFromMime(media.mimetype)}`;
+
+                        // Save to uploads/whatsapp/
+                        const uploadsDir = path.join(process.cwd(), 'uploads', 'whatsapp');
+                        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+                        const safeName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}-${mediaFilename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                        const filePath = path.join(uploadsDir, safeName);
+                        fs.writeFileSync(filePath, Buffer.from(media.data, 'base64'));
+                        mediaUrl = `/uploads/whatsapp/${safeName}`;
+                    }
+                } else if (msg.type === 'sticker') {
+                    messageType = 'sticker';
+                } else if (msg.type === 'location') {
+                    messageType = 'location';
+                } else if (msg.type === 'vcard' || msg.type === 'multi_vcard') {
+                    messageType = 'contact';
+                }
+
+                if (msg.hasMedia && msg.body) {
+                    caption = msg.body;
+                }
+
+                const now = new Date();
+
+                // INSERT into whatsapp_messages
+                if (pool) {
+                    await pool.query(`
+                        INSERT INTO whatsapp_messages (branch_id, phone_number, direction, message_type, body, media_url, media_mime_type, media_filename, caption, whatsapp_msg_id, status, sender_name, is_group, quoted_msg_id, timestamp, is_read, source)
+                        VALUES (?, ?, 'in', ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, 0, ?, ?, 0, 'incoming')
+                    `, [
+                        branchId, phone, messageType,
+                        messageType === 'text' ? msg.body : null,
+                        mediaUrl, mediaMime, mediaFilename, caption,
+                        msg.id?._serialized || null,
+                        pushname,
+                        msg.hasQuotedMsg ? (await msg.getQuotedMessage())?.id?._serialized || null : null,
+                        now
+                    ]);
+
+                    // UPSERT whatsapp_contacts
+                    await pool.query(`
+                        INSERT INTO whatsapp_contacts (branch_id, phone_number, pushname, last_message_at, unread_count)
+                        VALUES (?, ?, ?, ?, 1)
+                        ON DUPLICATE KEY UPDATE
+                            pushname = COALESCE(VALUES(pushname), pushname),
+                            last_message_at = VALUES(last_message_at),
+                            unread_count = unread_count + 1
+                    `, [branchId, phone, pushname, now]);
+                }
+
+                // Emit to Socket.io
+                if (io) {
+                    io.to('whatsapp_chat_admin').emit('whatsapp_message_incoming', {
+                        branch_id: branchId,
+                        phone_number: phone,
+                        direction: 'in',
+                        message_type: messageType,
+                        body: messageType === 'text' ? msg.body : null,
+                        media_url: mediaUrl,
+                        media_mime_type: mediaMime,
+                        media_filename: mediaFilename,
+                        caption,
+                        sender_name: pushname,
+                        timestamp: now.toISOString(),
+                        whatsapp_msg_id: msg.id?._serialized || null
+                    });
+                }
+
+                console.log(`[WhatsApp Chat] Incoming from ${phone} (branch ${branchId}): ${messageType}`);
+            } catch (err) {
+                console.error(`[WhatsApp Chat] Error handling incoming message:`, err.message);
+            }
+        });
+
+        // Message acknowledgement (delivery/read receipts)
+        client.on('message_ack', async (msg, ack) => {
+            try {
+                if (!msg.id?._serialized || !pool) return;
+                // ack: 0=pending, 1=sent(server), 2=delivered, 3=read, 4=played
+                let status = null;
+                if (ack === 1) status = 'sent';
+                else if (ack === 2) status = 'delivered';
+                else if (ack >= 3) status = 'read';
+                if (!status) return;
+
+                await pool.query(
+                    `UPDATE whatsapp_messages SET status = ? WHERE whatsapp_msg_id = ?`,
+                    [status, msg.id._serialized]
+                );
+
+                if (io) {
+                    io.to('whatsapp_chat_admin').emit('whatsapp_message_status', {
+                        whatsapp_msg_id: msg.id._serialized,
+                        status,
+                        branch_id: branchId
+                    });
+                }
+            } catch (err) {
+                console.error(`[WhatsApp Chat] Error handling message_ack:`, err.message);
+            }
+        });
+
         // Initialize
         await client.initialize();
 
@@ -237,9 +367,10 @@ async function disconnectBranch(branchId) {
 
 /**
  * Send a message via branch's WhatsApp session
+ * @param {object} [metadata] - Optional { source, sent_by } for chat recording
  * @returns {boolean} true if sent successfully, false if no session available
  */
-async function sendMessage(branchId, phone, message) {
+async function sendMessage(branchId, phone, message, metadata = {}) {
     branchId = parseInt(branchId);
     const session = sessions.get(branchId);
 
@@ -255,8 +386,18 @@ async function sendMessage(branchId, phone, message) {
     }
     const chatId = normalized + '@c.us';
 
-    await session.client.sendMessage(chatId, message);
-    return true;
+    const sentMsg = await session.client.sendMessage(chatId, message);
+
+    // Record outbound message
+    await recordOutbound(branchId, normalized, {
+        message_type: 'text',
+        body: message,
+        whatsapp_msg_id: sentMsg?.id?._serialized || null,
+        source: metadata.source || 'system',
+        sent_by: metadata.sent_by || null
+    });
+
+    return sentMsg || true;
 }
 
 /**
@@ -264,9 +405,10 @@ async function sendMessage(branchId, phone, message) {
  * @param {number} branchId
  * @param {string} phone
  * @param {object} options - { type: 'image'|'document', mediaPath, caption, filename }
+ * @param {object} [metadata] - Optional { source, sent_by } for chat recording
  * @returns {boolean} true if sent successfully
  */
-async function sendMedia(branchId, phone, options = {}) {
+async function sendMedia(branchId, phone, options = {}, metadata = {}) {
     branchId = parseInt(branchId);
     const session = sessions.get(branchId);
 
@@ -294,8 +436,22 @@ async function sendMedia(branchId, phone, options = {}) {
     if (options.caption) sendOptions.caption = options.caption;
     if (options.type === 'document') sendOptions.sendMediaAsDocument = true;
 
-    await session.client.sendMessage(chatId, media, sendOptions);
-    return true;
+    const sentMsg = await session.client.sendMessage(chatId, media, sendOptions);
+
+    // Record outbound media message
+    const msgType = options.type === 'document' ? 'document' : 'image';
+    await recordOutbound(branchId, normalized, {
+        message_type: msgType,
+        body: null,
+        caption: options.caption || null,
+        media_url: options.mediaPath ? `/uploads/whatsapp/${path.basename(options.mediaPath)}` : null,
+        media_filename: options.filename || null,
+        whatsapp_msg_id: sentMsg?.id?._serialized || null,
+        source: metadata.source || 'system',
+        sent_by: metadata.sent_by || null
+    });
+
+    return sentMsg || true;
 }
 
 // ========================================
@@ -438,6 +594,74 @@ async function upsertSession(branchId, data) {
     }
 }
 
+// ========================================
+// CHAT RECORDING HELPERS
+// ========================================
+
+/**
+ * Record an outbound message into whatsapp_messages + update contact
+ */
+async function recordOutbound(branchId, phone, data) {
+    if (!pool) return;
+    try {
+        const now = new Date();
+        await pool.query(`
+            INSERT INTO whatsapp_messages (branch_id, phone_number, direction, message_type, body, media_url, media_filename, caption, whatsapp_msg_id, status, timestamp, is_read, sent_by, source)
+            VALUES (?, ?, 'out', ?, ?, ?, ?, ?, ?, 'sent', ?, 1, ?, ?)
+        `, [
+            branchId, phone, data.message_type || 'text',
+            data.body || null, data.media_url || null, data.media_filename || null,
+            data.caption || null, data.whatsapp_msg_id || null,
+            now, data.sent_by || null, data.source || 'system'
+        ]);
+
+        await pool.query(`
+            INSERT INTO whatsapp_contacts (branch_id, phone_number, last_message_at)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE last_message_at = VALUES(last_message_at)
+        `, [branchId, phone, now]);
+
+        // Emit to Socket.io
+        if (io) {
+            io.to('whatsapp_chat_admin').emit('whatsapp_message_sent', {
+                branch_id: branchId,
+                phone_number: phone,
+                direction: 'out',
+                message_type: data.message_type || 'text',
+                body: data.body || null,
+                media_url: data.media_url || null,
+                caption: data.caption || null,
+                timestamp: now.toISOString(),
+                whatsapp_msg_id: data.whatsapp_msg_id || null,
+                source: data.source || 'system'
+            });
+        }
+    } catch (err) {
+        console.error('[WhatsApp Chat] Error recording outbound:', err.message);
+    }
+}
+
+function getExtFromMime(mimetype) {
+    if (!mimetype) return 'bin';
+    const map = {
+        'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp',
+        'video/mp4': 'mp4', 'video/3gpp': '3gp',
+        'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a',
+        'application/pdf': 'pdf',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx'
+    };
+    return map[mimetype] || mimetype.split('/')[1] || 'bin';
+}
+
+/**
+ * Get the raw client instance for a branch (for typing indicators etc.)
+ */
+function getClient(branchId) {
+    const session = sessions.get(parseInt(branchId));
+    return session?.client || null;
+}
+
 module.exports = {
     setPool,
     setIO,
@@ -449,5 +673,6 @@ module.exports = {
     getQRForBranch,
     getBranchStatus,
     isConnected,
-    initializeSessions
+    initializeSessions,
+    getClient
 };
