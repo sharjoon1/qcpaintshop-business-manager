@@ -1,11 +1,11 @@
 /**
  * AI Engine - Dual LLM Abstraction (Gemini + Claude)
  * Provides generate(), generateStream(), generateWithFailover()
+ * API keys from ai_config table (fallback to .env)
  * Token tracking, system prompts, configurable providers
  */
 
 const https = require('https');
-const http = require('http');
 
 let pool = null;
 
@@ -14,11 +14,10 @@ function setPool(p) { pool = p; }
 // ─── Provider configs ──────────────────────────────────────────
 
 const GEMINI_BASE = 'generativelanguage.googleapis.com';
-// Use AI_GEMINI_MODEL for text chat (separate from GEMINI_MODEL which is for image generation)
-const GEMINI_MODEL = process.env.AI_GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_DEFAULT_MODEL = 'gemini-2.0-flash';
 
 const CLAUDE_BASE = 'api.anthropic.com';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 const CLAUDE_VERSION = '2023-06-01';
 
 // ─── System prompt ─────────────────────────────────────────────
@@ -55,16 +54,59 @@ When generating insights, output valid JSON with this structure:
 
 // ─── Config loader ─────────────────────────────────────────────
 
+let _configCache = null;
+let _configCacheTime = 0;
+const CONFIG_CACHE_TTL = 30000; // 30 seconds
+
 async function getConfig() {
+    // Cache config for 30s to avoid hammering DB on every request
+    if (_configCache && (Date.now() - _configCacheTime) < CONFIG_CACHE_TTL) return _configCache;
+
     if (!pool) return { primary_provider: 'gemini', fallback_provider: 'claude', max_tokens_per_request: '4096', temperature: '0.3' };
     try {
         const [rows] = await pool.query('SELECT config_key, config_value FROM ai_config');
         const config = {};
         rows.forEach(r => { config[r.config_key] = r.config_value; });
+        _configCache = config;
+        _configCacheTime = Date.now();
         return config;
     } catch (e) {
         return { primary_provider: 'gemini', fallback_provider: 'claude', max_tokens_per_request: '4096', temperature: '0.3' };
     }
+}
+
+// Clear config cache (called when config is updated)
+function clearConfigCache() {
+    _configCache = null;
+    _configCacheTime = 0;
+}
+
+/**
+ * Get API key - checks ai_config first, falls back to .env
+ */
+async function getApiKey(provider) {
+    const config = await getConfig();
+    if (provider === 'gemini') {
+        return config.gemini_api_key || process.env.GEMINI_API_KEY || '';
+    }
+    if (provider === 'claude') {
+        return config.anthropic_api_key || process.env.ANTHROPIC_API_KEY || '';
+    }
+    return '';
+}
+
+/**
+ * Get model name for provider
+ */
+async function getModelName(provider) {
+    const config = await getConfig();
+    if (provider === 'gemini') {
+        return config.gemini_model || process.env.AI_GEMINI_MODEL || GEMINI_DEFAULT_MODEL;
+    }
+    if (provider === 'claude') {
+        return config.claude_model || CLAUDE_DEFAULT_MODEL;
+    }
+    return '';
 }
 
 // ─── HTTPS request helper ──────────────────────────────────────
@@ -91,14 +133,7 @@ function httpsRequest(options, body) {
 
 // ─── Gemini provider ───────────────────────────────────────────
 
-async function geminiGenerate(messages, options = {}) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY not set');
-
-    const temperature = parseFloat(options.temperature || 0.3);
-    const maxTokens = parseInt(options.maxTokens || 4096);
-
-    // Build Gemini contents from messages array
+function buildGeminiPayload(messages, temperature, maxTokens) {
     const contents = [];
     let systemInstruction = null;
 
@@ -113,16 +148,30 @@ async function geminiGenerate(messages, options = {}) {
         }
     }
 
-    const body = JSON.stringify({
+    return {
         contents,
         ...(systemInstruction ? { systemInstruction } : {}),
-        generationConfig: {
-            temperature,
-            maxOutputTokens: maxTokens
-        }
-    });
+        generationConfig: { temperature, maxOutputTokens: maxTokens }
+    };
+}
 
-    const model = options.model || GEMINI_MODEL;
+function parseGeminiTokens(usageMetadata) {
+    if (!usageMetadata) return 0;
+    // Gemini API returns totalTokenCount, or promptTokenCount + candidatesTokenCount
+    return usageMetadata.totalTokenCount ||
+        ((usageMetadata.promptTokenCount || 0) + (usageMetadata.candidatesTokenCount || 0));
+}
+
+async function geminiGenerate(messages, options = {}) {
+    const apiKey = await getApiKey('gemini');
+    if (!apiKey) throw new Error('Gemini API key not configured. Add it in AI Settings.');
+
+    const temperature = parseFloat(options.temperature || 0.3);
+    const maxTokens = parseInt(options.maxTokens || 4096);
+    const model = options.model || await getModelName('gemini');
+
+    const body = JSON.stringify(buildGeminiPayload(messages, temperature, maxTokens));
+
     const resp = await httpsRequest({
         hostname: GEMINI_BASE,
         path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -132,21 +181,80 @@ async function geminiGenerate(messages, options = {}) {
 
     const json = JSON.parse(resp.data);
     const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const tokensUsed = (json.usageMetadata?.promptTokenCount || 0) + (json.usageMetadata?.candidatesTokenCount || 0);
+    const tokensUsed = parseGeminiTokens(json.usageMetadata);
 
     return { text, tokensUsed, model: `gemini/${model}`, provider: 'gemini' };
 }
 
-// ─── Claude provider ───────────────────────────────────────────
-
-async function claudeGenerate(messages, options = {}) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+async function geminiStreamToResponse(messages, res, options = {}) {
+    const apiKey = await getApiKey('gemini');
+    if (!apiKey) throw new Error('Gemini API key not configured. Add it in AI Settings.');
 
     const temperature = parseFloat(options.temperature || 0.3);
     const maxTokens = parseInt(options.maxTokens || 4096);
+    const model = options.model || await getModelName('gemini');
 
-    // Separate system from messages
+    const body = JSON.stringify(buildGeminiPayload(messages, temperature, maxTokens));
+
+    return new Promise((resolve, reject) => {
+        let fullText = '';
+        let tokensUsed = 0;
+
+        const req = https.request({
+            hostname: GEMINI_BASE,
+            path: `/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }, (apiRes) => {
+            // Check for HTTP errors from Gemini
+            if (apiRes.statusCode !== 200) {
+                let errData = '';
+                apiRes.on('data', c => { errData += c; });
+                apiRes.on('end', () => reject(new Error(`Gemini HTTP ${apiRes.statusCode}: ${errData.substring(0, 300)}`)));
+                return;
+            }
+
+            let buffer = '';
+            apiRes.on('data', (chunk) => {
+                buffer += chunk.toString();
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const json = JSON.parse(line.slice(6));
+                            const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                            if (text) {
+                                fullText += text;
+                                res.write(`data: ${JSON.stringify({ text })}\n\n`);
+                            }
+                            // Token count — accumulate from every chunk that has it
+                            const chunkTokens = parseGeminiTokens(json.usageMetadata);
+                            if (chunkTokens > tokensUsed) tokensUsed = chunkTokens;
+                        } catch (e) { /* skip parse errors */ }
+                    }
+                }
+            });
+            apiRes.on('end', () => {
+                // Estimate tokens from text length if API didn't report
+                if (tokensUsed === 0 && fullText.length > 0) {
+                    tokensUsed = Math.ceil(fullText.length / 4); // rough estimate
+                }
+                resolve({ text: fullText, tokensUsed, model: `gemini/${model}`, provider: 'gemini' });
+            });
+            apiRes.on('error', reject);
+        });
+        req.on('error', reject);
+        req.setTimeout(120000, () => { req.destroy(); reject(new Error('Stream timeout')); });
+        req.write(body);
+        req.end();
+    });
+}
+
+// ─── Claude provider ───────────────────────────────────────────
+
+function buildClaudePayload(messages, model, maxTokens, temperature, stream) {
     let system = '';
     const apiMessages = [];
     for (const msg of messages) {
@@ -156,14 +264,25 @@ async function claudeGenerate(messages, options = {}) {
             apiMessages.push({ role: msg.role, content: msg.content });
         }
     }
-
-    const body = JSON.stringify({
-        model: options.model || CLAUDE_MODEL,
+    return {
+        model,
         max_tokens: maxTokens,
         temperature,
+        ...(stream ? { stream: true } : {}),
         ...(system ? { system } : {}),
         messages: apiMessages
-    });
+    };
+}
+
+async function claudeGenerate(messages, options = {}) {
+    const apiKey = await getApiKey('claude');
+    if (!apiKey) throw new Error('Anthropic API key not configured. Add it in AI Settings.');
+
+    const temperature = parseFloat(options.temperature || 0.3);
+    const maxTokens = parseInt(options.maxTokens || 4096);
+    const model = options.model || await getModelName('claude');
+
+    const body = JSON.stringify(buildClaudePayload(messages, model, maxTokens, temperature, false));
 
     const resp = await httpsRequest({
         hostname: CLAUDE_BASE,
@@ -180,35 +299,18 @@ async function claudeGenerate(messages, options = {}) {
     const text = json.content?.[0]?.text || '';
     const tokensUsed = (json.usage?.input_tokens || 0) + (json.usage?.output_tokens || 0);
 
-    return { text, tokensUsed, model: `claude/${options.model || CLAUDE_MODEL}`, provider: 'claude' };
+    return { text, tokensUsed, model: `claude/${model}`, provider: 'claude' };
 }
 
-// Claude streaming - returns SSE-compatible chunks via callback
 async function claudeStreamToResponse(messages, res, options = {}) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+    const apiKey = await getApiKey('claude');
+    if (!apiKey) throw new Error('Anthropic API key not configured. Add it in AI Settings.');
 
     const temperature = parseFloat(options.temperature || 0.3);
     const maxTokens = parseInt(options.maxTokens || 4096);
+    const model = options.model || await getModelName('claude');
 
-    let system = '';
-    const apiMessages = [];
-    for (const msg of messages) {
-        if (msg.role === 'system') {
-            system += (system ? '\n\n' : '') + msg.content;
-        } else {
-            apiMessages.push({ role: msg.role, content: msg.content });
-        }
-    }
-
-    const body = JSON.stringify({
-        model: options.model || CLAUDE_MODEL,
-        max_tokens: maxTokens,
-        temperature,
-        stream: true,
-        ...(system ? { system } : {}),
-        messages: apiMessages
-    });
+    const body = JSON.stringify(buildClaudePayload(messages, model, maxTokens, temperature, true));
 
     return new Promise((resolve, reject) => {
         let fullText = '';
@@ -224,6 +326,13 @@ async function claudeStreamToResponse(messages, res, options = {}) {
                 'anthropic-version': CLAUDE_VERSION
             }
         }, (apiRes) => {
+            if (apiRes.statusCode !== 200) {
+                let errData = '';
+                apiRes.on('data', c => { errData += c; });
+                apiRes.on('end', () => reject(new Error(`Claude HTTP ${apiRes.statusCode}: ${errData.substring(0, 300)}`)));
+                return;
+            }
+
             let buffer = '';
             apiRes.on('data', (chunk) => {
                 buffer += chunk.toString();
@@ -248,79 +357,12 @@ async function claudeStreamToResponse(messages, res, options = {}) {
                     }
                 }
             });
-            apiRes.on('end', () => resolve({ text: fullText, tokensUsed, model: `claude/${options.model || CLAUDE_MODEL}`, provider: 'claude' }));
-            apiRes.on('error', reject);
-        });
-        req.on('error', reject);
-        req.setTimeout(120000, () => { req.destroy(); reject(new Error('Stream timeout')); });
-        req.write(body);
-        req.end();
-    });
-}
-
-// Gemini streaming - pipe to SSE response
-async function geminiStreamToResponse(messages, res, options = {}) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY not set');
-
-    const temperature = parseFloat(options.temperature || 0.3);
-    const maxTokens = parseInt(options.maxTokens || 4096);
-
-    const contents = [];
-    let systemInstruction = null;
-
-    for (const msg of messages) {
-        if (msg.role === 'system') {
-            systemInstruction = { parts: [{ text: msg.content }] };
-        } else {
-            contents.push({
-                role: msg.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: msg.content }]
-            });
-        }
-    }
-
-    const body = JSON.stringify({
-        contents,
-        ...(systemInstruction ? { systemInstruction } : {}),
-        generationConfig: { temperature, maxOutputTokens: maxTokens }
-    });
-
-    const model = options.model || GEMINI_MODEL;
-
-    return new Promise((resolve, reject) => {
-        let fullText = '';
-        let tokensUsed = 0;
-
-        const req = https.request({
-            hostname: GEMINI_BASE,
-            path: `/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        }, (apiRes) => {
-            let buffer = '';
-            apiRes.on('data', (chunk) => {
-                buffer += chunk.toString();
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const json = JSON.parse(line.slice(6));
-                            const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                            if (text) {
-                                fullText += text;
-                                res.write(`data: ${JSON.stringify({ text })}\n\n`);
-                            }
-                            if (json.usageMetadata) {
-                                tokensUsed = (json.usageMetadata.promptTokenCount || 0) + (json.usageMetadata.candidatesTokenCount || 0);
-                            }
-                        } catch (e) { /* skip */ }
-                    }
+            apiRes.on('end', () => {
+                if (tokensUsed === 0 && fullText.length > 0) {
+                    tokensUsed = Math.ceil(fullText.length / 4);
                 }
+                resolve({ text: fullText, tokensUsed, model: `claude/${model}`, provider: 'claude' });
             });
-            apiRes.on('end', () => resolve({ text: fullText, tokensUsed, model: `gemini/${model}`, provider: 'gemini' }));
             apiRes.on('error', reject);
         });
         req.on('error', reject);
@@ -332,12 +374,6 @@ async function geminiStreamToResponse(messages, res, options = {}) {
 
 // ─── Public API ────────────────────────────────────────────────
 
-/**
- * Generate a full response (non-streaming)
- * @param {Array} messages - [{role: 'system'|'user'|'assistant', content: string}]
- * @param {Object} options - {provider, temperature, maxTokens, model}
- * @returns {Object} {text, tokensUsed, model, provider}
- */
 async function generate(messages, options = {}) {
     const config = await getConfig();
     const provider = options.provider || config.primary_provider || 'gemini';
@@ -347,19 +383,10 @@ async function generate(messages, options = {}) {
         model: options.model
     };
 
-    if (provider === 'claude') {
-        return claudeGenerate(messages, opts);
-    }
+    if (provider === 'claude') return claudeGenerate(messages, opts);
     return geminiGenerate(messages, opts);
 }
 
-/**
- * Stream response to an Express SSE response object
- * @param {Array} messages
- * @param {Object} res - Express response (already configured for SSE)
- * @param {Object} options
- * @returns {Object} {text, tokensUsed, model, provider}
- */
 async function streamToResponse(messages, res, options = {}) {
     const config = await getConfig();
     const provider = options.provider || config.primary_provider || 'gemini';
@@ -369,18 +396,10 @@ async function streamToResponse(messages, res, options = {}) {
         model: options.model
     };
 
-    if (provider === 'claude') {
-        return claudeStreamToResponse(messages, res, opts);
-    }
+    if (provider === 'claude') return claudeStreamToResponse(messages, res, opts);
     return geminiStreamToResponse(messages, res, opts);
 }
 
-/**
- * Generate with automatic failover to secondary provider
- * @param {Array} messages
- * @param {Object} options
- * @returns {Object} {text, tokensUsed, model, provider, failedOver}
- */
 async function generateWithFailover(messages, options = {}) {
     const config = await getConfig();
     const primary = options.provider || config.primary_provider || 'gemini';
@@ -406,9 +425,6 @@ async function generateWithFailover(messages, options = {}) {
     }
 }
 
-/**
- * Stream with failover - if primary fails, falls back to non-streaming secondary
- */
 async function streamWithFailover(messages, res, options = {}) {
     const config = await getConfig();
     const primary = options.provider || config.primary_provider || 'gemini';
@@ -431,9 +447,6 @@ async function streamWithFailover(messages, res, options = {}) {
     }
 }
 
-/**
- * Get the business system prompt, optionally with extra context
- */
 function getSystemPrompt(extraContext = '') {
     return BUSINESS_SYSTEM_PROMPT + (extraContext ? '\n\n' + extraContext : '');
 }
@@ -445,5 +458,6 @@ module.exports = {
     generateWithFailover,
     streamWithFailover,
     getSystemPrompt,
-    getConfig
+    getConfig,
+    clearConfigCache
 };

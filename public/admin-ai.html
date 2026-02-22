@@ -245,9 +245,46 @@
         </div>
 
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap:1rem;">
+            <!-- API Keys -->
+            <div class="config-card">
+                <h3>API Keys</h3>
+                <div class="config-row">
+                    <div><div class="config-label">Gemini API Key</div><div class="config-desc">Google AI Studio key (falls back to server .env)</div></div>
+                    <div style="display:flex;gap:4px;align-items:center;">
+                        <input type="password" id="cfgGeminiKey" placeholder="AIza..." style="width:200px; padding:0.375rem 0.5rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem; font-family:monospace;">
+                        <button onclick="toggleKeyVisibility('cfgGeminiKey', this)" style="border:none;background:none;cursor:pointer;font-size:1rem;color:#6b7280;" title="Show/hide">👁</button>
+                        <button onclick="saveApiKey('gemini_api_key', 'cfgGeminiKey')" class="run-btn" style="padding:0.375rem 0.75rem;">Save</button>
+                    </div>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Anthropic API Key</div><div class="config-desc">For Claude fallback provider</div></div>
+                    <div style="display:flex;gap:4px;align-items:center;">
+                        <input type="password" id="cfgClaudeKey" placeholder="sk-ant-..." style="width:200px; padding:0.375rem 0.5rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem; font-family:monospace;">
+                        <button onclick="toggleKeyVisibility('cfgClaudeKey', this)" style="border:none;background:none;cursor:pointer;font-size:1rem;color:#6b7280;" title="Show/hide">👁</button>
+                        <button onclick="saveApiKey('anthropic_api_key', 'cfgClaudeKey')" class="run-btn" style="padding:0.375rem 0.75rem;">Save</button>
+                    </div>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Gemini Model</div><div class="config-desc">Model for text chat/analysis</div></div>
+                    <select id="cfgGeminiModel" onchange="saveConfig('gemini_model', this.value)" style="padding:0.375rem 0.75rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem;">
+                        <option value="gemini-2.0-flash">gemini-2.0-flash (Fast)</option>
+                        <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite (Fastest)</option>
+                        <option value="gemini-2.5-flash-preview-05-20">gemini-2.5-flash-preview (Latest)</option>
+                        <option value="gemini-2.5-pro-preview-05-06">gemini-2.5-pro-preview (Best)</option>
+                    </select>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Claude Model</div><div class="config-desc">Model for Claude provider</div></div>
+                    <select id="cfgClaudeModel" onchange="saveConfig('claude_model', this.value)" style="padding:0.375rem 0.75rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem;">
+                        <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Balanced)</option>
+                        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (Fast)</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Provider Config -->
             <div class="config-card">
-                <h3>AI Provider</h3>
+                <h3>AI Provider Settings</h3>
                 <div class="config-row">
                     <div><div class="config-label">Primary Provider</div><div class="config-desc">Used for all AI requests first</div></div>
                     <select id="cfgPrimary" onchange="saveConfig('primary_provider', this.value)" style="padding:0.375rem 0.75rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem;">
@@ -673,6 +710,17 @@ async function loadSettings() {
         const cfgResp = await fetch('/api/ai/config', { headers });
         const cfg = await cfgResp.json();
 
+        // API Keys — server returns masked version (••••••••xxxx)
+        document.getElementById('cfgGeminiKey').value = cfg.gemini_api_key || '';
+        document.getElementById('cfgGeminiKey').dataset.hasKey = cfg.gemini_api_key ? '1' : '0';
+        document.getElementById('cfgClaudeKey').value = cfg.anthropic_api_key || '';
+        document.getElementById('cfgClaudeKey').dataset.hasKey = cfg.anthropic_api_key ? '1' : '0';
+
+        // Models
+        if (cfg.gemini_model) document.getElementById('cfgGeminiModel').value = cfg.gemini_model;
+        if (cfg.claude_model) document.getElementById('cfgClaudeModel').value = cfg.claude_model;
+
+        // Provider settings
         document.getElementById('cfgPrimary').value = cfg.primary_provider || 'gemini';
         document.getElementById('cfgFallback').value = cfg.fallback_provider || 'claude';
         document.getElementById('cfgTemp').value = cfg.temperature || '0.3';
@@ -727,6 +775,58 @@ async function saveConfig(key, value) {
         showToast('Failed to save setting', 'error');
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// API KEY HELPERS
+// ═══════════════════════════════════════════════════════════════
+function maskKey(key) {
+    if (!key) return '';
+    if (key.startsWith('••••')) return key; // already masked from server
+    return '••••••••' + key.slice(-4);
+}
+
+function toggleKeyVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+        btn.title = 'Hide';
+    } else {
+        input.type = 'password';
+        btn.textContent = '👁';
+        btn.title = 'Show';
+    }
+}
+
+function saveApiKey(configKey, inputId) {
+    const input = document.getElementById(inputId);
+    const value = input.value.trim();
+    // Don't save if it's the masked placeholder
+    if (!value || value.startsWith('••••')) {
+        showToast('Enter a new API key first', 'error');
+        return;
+    }
+    saveConfig(configKey, value);
+    // Re-mask after save
+    input.value = maskKey(value);
+    input.dataset.hasKey = '1';
+    input.type = 'password';
+}
+
+// Clear masked value on focus so user can type a new key
+document.addEventListener('DOMContentLoaded', function() {
+    ['cfgGeminiKey', 'cfgClaudeKey'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('focus', function() {
+                if (this.value.startsWith('••••')) {
+                    this.value = '';
+                    this.type = 'text'; // show what they're typing
+                }
+            });
+        }
+    });
+});
 
 // ═══════════════════════════════════════════════════════════════
 // UTILITIES

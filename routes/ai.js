@@ -431,6 +431,13 @@ router.get('/config', requireAuth, async (req, res) => {
         const [rows] = await pool.query('SELECT config_key, config_value, updated_at FROM ai_config');
         const config = {};
         rows.forEach(r => { config[r.config_key] = r.config_value; });
+        // Mask API keys — only send last 4 chars to frontend
+        const sensitiveKeys = ['gemini_api_key', 'anthropic_api_key'];
+        for (const k of sensitiveKeys) {
+            if (config[k]) {
+                config[k] = '••••••••' + config[k].slice(-4);
+            }
+        }
         res.json(config);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -442,12 +449,18 @@ router.put('/config', requireAuth, async (req, res) => {
     try {
         const updates = req.body;
         for (const [key, value] of Object.entries(updates)) {
+            // Skip masked API key values (starts with ••••) — means user didn't change it
+            if ((key === 'gemini_api_key' || key === 'anthropic_api_key') && String(value).startsWith('••••')) {
+                continue;
+            }
             await pool.query(
                 `INSERT INTO ai_config (config_key, config_value) VALUES (?, ?)
                  ON DUPLICATE KEY UPDATE config_value = ?`,
                 [key, String(value), String(value)]
             );
         }
+        // Clear cached config so changes take effect immediately
+        aiEngine.clearConfigCache();
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
