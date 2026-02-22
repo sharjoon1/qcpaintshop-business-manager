@@ -4,6 +4,7 @@
  */
 
 let qcSocket = null;
+window.qcSocket = null; // Expose on window for cross-script access
 
 function initSocket() {
     if (qcSocket && qcSocket.connected) return qcSocket;
@@ -24,6 +25,7 @@ function initSocket() {
         reconnectionAttempts: 10,
         transports: ['websocket', 'polling']
     });
+    window.qcSocket = qcSocket; // Keep window ref in sync
 
     qcSocket.on('connect', () => {
         console.log('Socket connected');

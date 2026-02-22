@@ -332,8 +332,20 @@
             <div class="mb-3">
                 <label class="block text-xs font-semibold text-gray-500 mb-1">Send via</label>
                 <select id="rmWhatsappAccount" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <option value="general" selected>General WhatsApp (Company)</option>
                     <option value="auto">Auto (Branch / General fallback)</option>
-                    <option value="general">General WhatsApp (Company)</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Template</label>
+                <select id="rmTemplate" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onchange="applyReminderTemplate()">
+                    <option value="en_polite">English - Polite Reminder</option>
+                    <option value="en_overdue">English - Overdue Notice</option>
+                    <option value="en_urgent">English - Urgent Final Notice</option>
+                    <option value="ta_polite">Tamil - Polite Reminder</option>
+                    <option value="ta_overdue">Tamil - Overdue Notice</option>
+                    <option value="ta_urgent">Tamil - Urgent Final Notice</option>
+                    <option value="custom">Custom Message</option>
                 </select>
             </div>
             <div class="mb-4">
@@ -730,17 +742,64 @@
 
     let reminderTarget = null;
 
-    function buildReminderMessage(inv) {
-        const daysOverdue = parseInt(inv.days_overdue) || 0;
-        const balance = formatCurrencyFull(inv.balance);
-        const name = inv.customer_name || 'Customer';
-        const invNum = inv.invoice_number || 'N/A';
-        const dueDate = formatDate(inv.due_date);
-
-        if (daysOverdue > 0) {
-            return `Dear ${name}, your invoice #${invNum} for ${balance} is overdue by ${daysOverdue} days. Kindly settle the payment immediately to avoid any inconvenience. - Quality Colours`;
+    // Payment reminder templates — English & Tamil
+    const reminderTemplates = {
+        en_polite: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const dueDate = formatDate(inv.due_date);
+            return `Dear ${name},\n\nThis is a friendly reminder that your ${invNum ? 'invoice #' + invNum + ' for ' : 'outstanding balance of '}${balance} is pending.${dueDate ? '\nDue date: ' + dueDate : ''}\n\nPlease arrange the payment at your earliest convenience.\n\nThank you,\nQuality Colours`;
+        },
+        en_overdue: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const days = parseInt(inv.days_overdue) || 0;
+            return `Dear ${name},\n\nYour ${invNum ? 'invoice #' + invNum + ' for ' : 'outstanding amount of '}${balance} is overdue${days > 0 ? ' by ' + days + ' days' : ''}.\n\nPlease settle this amount immediately to avoid further action.\n\nRegards,\nQuality Colours`;
+        },
+        en_urgent: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const days = parseInt(inv.days_overdue) || 0;
+            return `URGENT NOTICE\n\nDear ${name},\n\nDespite our previous reminders, your ${invNum ? 'invoice #' + invNum + ' for ' : 'payment of '}${balance} remains unpaid${days > 0 ? ' (' + days + ' days overdue)' : ''}.\n\nThis is a final notice. Please make the payment within 3 days to avoid further collection action.\n\nQuality Colours`;
+        },
+        ta_polite: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const dueDate = formatDate(inv.due_date);
+            return `அன்புள்ள ${name},\n\nஉங்கள் ${invNum ? 'இன்வாய்ஸ் #' + invNum + ' தொகை ' : 'நிலுவைத் தொகை '}${balance} நிலுவையில் உள்ளது என்பதை அன்புடன் நினைவூட்டுகிறோம்.${dueDate ? '\nநிலுவை தேதி: ' + dueDate : ''}\n\nதயவுசெய்து உங்கள் வசதிக்கேற்ப பணம் செலுத்தவும்.\n\nநன்றி,\nQuality Colours`;
+        },
+        ta_overdue: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const days = parseInt(inv.days_overdue) || 0;
+            return `அன்புள்ள ${name},\n\nஉங்கள் ${invNum ? 'இன்வாய்ஸ் #' + invNum + ' தொகை ' : 'நிலுவைத் தொகை '}${balance} ${days > 0 ? days + ' நாட்கள் ' : ''}தாமதமாகியுள்ளது.\n\nதயவுசெய்து உடனடியாக பணம் செலுத்தவும்.\n\nநன்றி,\nQuality Colours`;
+        },
+        ta_urgent: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const days = parseInt(inv.days_overdue) || 0;
+            return `அவசர அறிவிப்பு\n\nஅன்புள்ள ${name},\n\nஎங்கள் முந்தைய நினைவூட்டல்களுக்குப் பிறகும், உங்கள் ${invNum ? 'இன்வாய்ஸ் #' + invNum + ' தொகை ' : 'பணம் '}${balance} செலுத்தப்படாமல் உள்ளது${days > 0 ? ' (' + days + ' நாட்கள் தாமதம்)' : ''}.\n\nஇது இறுதி அறிவிப்பு. 3 நாட்களுக்குள் பணம் செலுத்தவும்.\n\nQuality Colours`;
         }
-        return `Dear ${name}, this is a reminder about your outstanding invoice #${invNum} for ${balance}. Due date: ${dueDate}. Please make the payment at your earliest convenience. - Quality Colours`;
+    };
+
+    function buildReminderMessage(inv, templateKey) {
+        const key = templateKey || document.getElementById('rmTemplate')?.value || 'en_polite';
+        if (key === 'custom') return document.getElementById('rmMessage')?.value || '';
+        const fn = reminderTemplates[key];
+        return fn ? fn(inv) : reminderTemplates.en_polite(inv);
+    }
+
+    function applyReminderTemplate() {
+        if (!reminderTarget) return;
+        const key = document.getElementById('rmTemplate').value;
+        if (key === 'custom') return; // Don't overwrite custom text
+        document.getElementById('rmMessage').value = buildReminderMessage(reminderTarget, key);
     }
 
     function openReminderModal(idx) {
@@ -749,6 +808,9 @@
         document.getElementById('rmCustomerName').textContent = inv.customer_name || 'Unknown';
         document.getElementById('rmPhone').textContent = inv.phone || '--';
         document.getElementById('rmInvoice').textContent = `${inv.invoice_number} - ${formatCurrencyFull(inv.balance)}`;
+        // Auto-select template based on overdue status
+        const days = parseInt(inv.days_overdue) || 0;
+        document.getElementById('rmTemplate').value = days > 30 ? 'en_urgent' : days > 0 ? 'en_overdue' : 'en_polite';
         document.getElementById('rmMessage').value = buildReminderMessage(inv);
         document.getElementById('reminderModal').classList.add('show');
     }
@@ -803,14 +865,15 @@
             customer_name: name,
             phone: phone,
             balance: amount,
-            invoice_number: 'multiple',
+            invoice_number: '',
             due_date: null,
             days_overdue: 0
         };
         document.getElementById('rmCustomerName').textContent = name;
         document.getElementById('rmPhone').textContent = phone;
         document.getElementById('rmInvoice').textContent = `Total outstanding: ${formatCurrencyFull(amount)}`;
-        document.getElementById('rmMessage').value = `Dear ${name}, you have an outstanding balance of ${formatCurrencyFull(amount)} with Quality Colours. Please make the payment at your earliest convenience. - Quality Colours`;
+        document.getElementById('rmTemplate').value = 'en_polite';
+        document.getElementById('rmMessage').value = buildReminderMessage(reminderTarget, 'en_polite');
         document.getElementById('reminderModal').classList.add('show');
     }
 
@@ -825,6 +888,7 @@
 
         try {
             const sessionType = document.getElementById('rmWhatsappAccount').value;
+            const templateKey = document.getElementById('rmTemplate').value;
             const reminders = eligible.map(idx => {
                 const inv = invoicesData[idx];
                 return {
@@ -832,7 +896,7 @@
                     zoho_customer_id: inv.zoho_customer_id,
                     customer_name: inv.customer_name,
                     phone: inv.phone,
-                    message_body: buildReminderMessage(inv),
+                    message_body: buildReminderMessage(inv, templateKey),
                     balance: inv.balance,
                     session_type: sessionType
                 };

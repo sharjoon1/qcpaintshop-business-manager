@@ -2007,44 +2007,38 @@ async function loadInstantHistory() {
 // ========================================
 function setupSocketListeners() {
     const waitForSocket = setInterval(() => {
-        if (window.socket) {
+        if (window.qcSocket && window.qcSocket.connected) {
             clearInterval(waitForSocket);
-            socket.emit('join_wa_marketing_admin');
+            const sock = window.qcSocket;
 
-            socket.on('wa_campaign_progress', data => {
+            sock.emit('join_wa_marketing_admin');
+
+            sock.on('wa_campaign_progress', data => {
                 if (currentTab === 'dashboard') loadDashboard();
                 if (currentTab === 'campaigns') loadCampaigns();
                 if (detailCampaignId === data.campaign_id) loadCampaignLeads();
             });
 
-            socket.on('wa_campaign_paused', data => {
+            sock.on('wa_campaign_paused', data => {
                 showToast(`Campaign #${data.campaign_id} paused: ${data.reason || 'Manual'}`, 'warning');
                 if (currentTab === 'campaigns') loadCampaigns();
                 if (currentTab === 'dashboard') loadDashboard();
             });
 
-            socket.on('wa_campaign_completed', data => {
+            sock.on('wa_campaign_completed', data => {
                 showToast(`Campaign #${data.campaign_id} completed! Sent: ${data.sent_count}`, 'success');
                 if (currentTab === 'campaigns') loadCampaigns();
                 if (currentTab === 'dashboard') loadDashboard();
             });
 
-            socket.on('wa_campaign_started', data => {
+            sock.on('wa_campaign_started', data => {
                 showToast(`Campaign #${data.campaign_id} started`, 'success');
                 if (currentTab === 'campaigns') loadCampaigns();
             });
 
             // Instant send progress events (sent to user's personal room)
-        }
-    }, 500);
-
-    // Also listen via qc-notification custom events (socket-helper dispatches these)
-    // Instant progress uses direct socket events to user room, so we listen via qcSocket
-    const waitForQcSocket = setInterval(() => {
-        if (window.qcSocket && window.qcSocket.connected) {
-            clearInterval(waitForQcSocket);
-            qcSocket.on('wa_instant_progress', onInstantProgress);
-            qcSocket.on('wa_instant_complete', onInstantComplete);
+            sock.on('wa_instant_progress', onInstantProgress);
+            sock.on('wa_instant_complete', onInstantComplete);
         }
     }, 500);
 }
