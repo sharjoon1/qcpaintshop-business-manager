@@ -6,6 +6,7 @@
  */
 
 const https = require('https');
+const { execFile } = require('child_process');
 
 let pool = null;
 
@@ -436,6 +437,59 @@ async function claudeStreamToResponse(messages, res, options = {}) {
     });
 }
 
+// ─── Clawdbot provider (Kai) ──────────────────────────────────
+
+function clawdbotExec(message) {
+    return new Promise((resolve, reject) => {
+        const args = ['agent', '--agent', 'main', '--message', message, '--json', '--timeout', '120'];
+        execFile('clawdbot', args, { timeout: 130000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
+            if (err) return reject(new Error(`Clawdbot exec failed: ${err.message}`));
+            try {
+                const json = JSON.parse(stdout);
+                if (json.status !== 'ok') return reject(new Error(`Clawdbot returned status: ${json.status}`));
+                const text = json.result?.payloads?.[0]?.text || '';
+                const usage = json.result?.meta?.agentMeta?.usage || {};
+                const model = json.result?.meta?.agentMeta?.model || 'clawdbot';
+                const tokensUsed = (usage.input || 0) + (usage.output || 0);
+                resolve({ text, tokensUsed, model: `clawdbot/${model}`, provider: 'clawdbot' });
+            } catch (e) {
+                reject(new Error(`Clawdbot JSON parse failed: ${e.message}`));
+            }
+        });
+    });
+}
+
+async function clawdbotGenerate(messages, options = {}) {
+    // Combine system + user messages into one prompt for Clawdbot
+    let prompt = '';
+    for (const msg of messages) {
+        if (msg.role === 'system') {
+            prompt += `[System Instructions]\n${msg.content}\n\n`;
+        } else if (msg.role === 'user') {
+            prompt += `${msg.content}\n\n`;
+        } else if (msg.role === 'assistant') {
+            prompt += `[Previous Response]\n${msg.content}\n\n`;
+        }
+    }
+    return clawdbotExec(prompt.trim());
+}
+
+async function clawdbotStreamToResponse(messages, res, options = {}) {
+    // Clawdbot doesn't support true streaming, so we get the full response
+    // then emit it in chunks to simulate streaming for the SSE client
+    const result = await clawdbotGenerate(messages, options);
+    const text = result.text;
+
+    // Emit in ~100 char chunks to simulate streaming
+    const chunkSize = 100;
+    for (let i = 0; i < text.length; i += chunkSize) {
+        const chunk = text.slice(i, i + chunkSize);
+        res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+    }
+
+    return result;
+}
+
 // ─── Public API ────────────────────────────────────────────────
 
 async function generate(messages, options = {}) {
@@ -448,6 +502,7 @@ async function generate(messages, options = {}) {
     };
 
     if (provider === 'claude') return claudeGenerate(messages, opts);
+    if (provider === 'clawdbot') return clawdbotGenerate(messages, opts);
     return geminiGenerate(messages, opts);
 }
 
@@ -461,55 +516,61 @@ async function streamToResponse(messages, res, options = {}) {
     };
 
     if (provider === 'claude') return claudeStreamToResponse(messages, res, opts);
+    if (provider === 'clawdbot') return clawdbotStreamToResponse(messages, res, opts);
     return geminiStreamToResponse(messages, res, opts);
 }
 
 async function generateWithFailover(messages, options = {}) {
     const config = await getConfig();
     const primary = options.provider || config.primary_provider || 'gemini';
-    const fallback = primary === 'gemini' ? 'claude' : 'gemini';
+    const fallback = config.fallback_provider || (primary === 'gemini' ? 'claude' : 'gemini');
+    // Build ordered provider chain: primary → fallback → remaining
+    const allProviders = ['gemini', 'claude', 'clawdbot'];
+    const chain = [primary, fallback, ...allProviders.filter(p => p !== primary && p !== fallback)];
+    // Deduplicate while preserving order
+    const providers = [...new Set(chain)];
     const opts = {
         temperature: options.temperature || config.temperature || '0.3',
         maxTokens: options.maxTokens || config.max_tokens_per_request || '4096',
         model: options.model
     };
 
-    try {
-        const result = await generate(messages, { ...opts, provider: primary });
-        return { ...result, failedOver: false };
-    } catch (primaryErr) {
-        console.error(`[AI Engine] Primary provider (${primary}) failed:`, primaryErr.message);
+    const errors = [];
+    for (let i = 0; i < providers.length; i++) {
         try {
-            const result = await generate(messages, { ...opts, provider: fallback });
-            return { ...result, failedOver: true };
-        } catch (fallbackErr) {
-            console.error(`[AI Engine] Fallback provider (${fallback}) also failed:`, fallbackErr.message);
-            throw new Error(`Both AI providers failed. Primary (${primary}): ${primaryErr.message}. Fallback (${fallback}): ${fallbackErr.message}`);
+            const result = await generate(messages, { ...opts, provider: providers[i] });
+            return { ...result, failedOver: i > 0 };
+        } catch (err) {
+            console.error(`[AI Engine] Provider ${providers[i]} failed:`, err.message);
+            errors.push(`${providers[i]}: ${err.message}`);
         }
     }
+    throw new Error(`All AI providers failed. ${errors.join('. ')}`);
 }
 
 async function streamWithFailover(messages, res, options = {}) {
     const config = await getConfig();
     const primary = options.provider || config.primary_provider || 'gemini';
-    const fallback = primary === 'gemini' ? 'claude' : 'gemini';
+    const fallback = config.fallback_provider || (primary === 'gemini' ? 'claude' : 'gemini');
+    const allProviders = ['gemini', 'claude', 'clawdbot'];
+    const chain = [primary, fallback, ...allProviders.filter(p => p !== primary && p !== fallback)];
+    const providers = [...new Set(chain)];
     const opts = {
         temperature: options.temperature || config.temperature || '0.3',
         maxTokens: options.maxTokens || config.max_tokens_per_request || '4096',
         model: options.model
     };
 
-    try {
-        return await streamToResponse(messages, res, { ...opts, provider: primary });
-    } catch (primaryErr) {
-        console.error(`[AI Engine] Primary stream (${primary}) failed:`, primaryErr.message);
+    const errors = [];
+    for (let i = 0; i < providers.length; i++) {
         try {
-            return await streamToResponse(messages, res, { ...opts, provider: fallback });
-        } catch (fallbackErr) {
-            console.error(`[AI Engine] Fallback stream (${fallback}) also failed:`, fallbackErr.message);
-            throw new Error(`Both providers failed for streaming. Primary (${primary}): ${primaryErr.message}. Fallback (${fallback}): ${fallbackErr.message}`);
+            return await streamToResponse(messages, res, { ...opts, provider: providers[i] });
+        } catch (err) {
+            console.error(`[AI Engine] Stream provider ${providers[i]} failed:`, err.message);
+            errors.push(`${providers[i]}: ${err.message}`);
         }
     }
+    throw new Error(`All providers failed for streaming. ${errors.join('. ')}`);
 }
 
 function getSystemPrompt(extraContext = '') {
