@@ -92,7 +92,7 @@ async function buildQuickSummary() {
                 (SELECT COALESCE(SUM(CASE WHEN DATE(invoice_date) = CURDATE() THEN total ELSE 0 END), 0) FROM zoho_invoices) as today_revenue,
                 (SELECT COUNT(CASE WHEN DATE(invoice_date) = CURDATE() THEN 1 END) FROM zoho_invoices) as today_invoice_count,
                 (SELECT COALESCE(SUM(CASE WHEN DATE(invoice_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN total ELSE 0 END), 0) FROM zoho_invoices) as yesterday_revenue,
-                (SELECT COALESCE(SUM(CASE WHEN DATE(payment_date) = CURDATE() THEN payment_amount ELSE 0 END), 0) FROM zoho_payments) as today_collections,
+                (SELECT COALESCE(SUM(CASE WHEN DATE(payment_date) = CURDATE() THEN amount ELSE 0 END), 0) FROM zoho_payments) as today_collections,
                 (SELECT COUNT(*) FROM zoho_invoices WHERE status = 'overdue' AND balance > 0) as overdue_count,
                 (SELECT COALESCE(SUM(balance), 0) FROM zoho_invoices WHERE status = 'overdue' AND balance > 0) as overdue_total,
                 (SELECT COUNT(*) FROM staff_attendance WHERE date = CURDATE()) as staff_present,
@@ -220,7 +220,7 @@ async function buildCollectionsContext() {
         // Collection rate
         const [rates] = await pool.query(`
             SELECT
-                (SELECT COALESCE(SUM(payment_amount), 0) FROM zoho_payments WHERE YEAR(payment_date) = YEAR(CURDATE()) AND MONTH(payment_date) = MONTH(CURDATE())) as month_collected,
+                (SELECT COALESCE(SUM(amount), 0) FROM zoho_payments WHERE YEAR(payment_date) = YEAR(CURDATE()) AND MONTH(payment_date) = MONTH(CURDATE())) as month_collected,
                 (SELECT COALESCE(SUM(total), 0) FROM zoho_invoices WHERE YEAR(invoice_date) = YEAR(CURDATE()) AND MONTH(invoice_date) = MONTH(CURDATE())) as month_invoiced
         `);
 
@@ -624,8 +624,8 @@ async function generateDailySnapshot() {
         // Collections
         const [col] = await pool.query(`
             SELECT
-                COALESCE(SUM(CASE WHEN DATE(payment_date) = CURDATE() THEN payment_amount END), 0) as today,
-                COALESCE(SUM(CASE WHEN YEAR(payment_date) = YEAR(CURDATE()) AND MONTH(payment_date) = MONTH(CURDATE()) THEN payment_amount END), 0) as this_month
+                COALESCE(SUM(CASE WHEN DATE(payment_date) = CURDATE() THEN amount END), 0) as today,
+                COALESCE(SUM(CASE WHEN YEAR(payment_date) = YEAR(CURDATE()) AND MONTH(payment_date) = MONTH(CURDATE()) THEN amount END), 0) as this_month
             FROM zoho_payments
         `);
         data.collections = col[0];
