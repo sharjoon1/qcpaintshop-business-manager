@@ -62,8 +62,21 @@ const aiRoutes = require('./routes/ai');
 const aiScheduler = require('./services/ai-scheduler');
 const paintersRoutes = require('./routes/painters');
 const painterScheduler = require('./services/painter-scheduler');
+const appMetadataCollector = require('./services/app-metadata-collector');
 
 const app = express();
+
+// Global error buffer for App Analyzer
+global._appErrorBuffer = global._appErrorBuffer || [];
+const _originalConsoleError = console.error;
+console.error = function(...args) {
+    _originalConsoleError.apply(console, args);
+    try {
+        const message = args.map(a => typeof a === 'string' ? a : (a instanceof Error ? a.message : JSON.stringify(a))).join(' ');
+        global._appErrorBuffer.push({ message: message.substring(0, 500), stack: (args.find(a => a instanceof Error))?.stack || '', timestamp: new Date().toISOString() });
+        if (global._appErrorBuffer.length > 100) global._appErrorBuffer.shift();
+    } catch (e) { /* never break error logging */ }
+};
 
 // ========================================
 // MIDDLEWARE SETUP
@@ -170,6 +183,8 @@ attendanceRoutes.setReportService(attendanceReport);
 whatsappChatRoutes.setPool(pool);
 whatsappChatRoutes.setSessionManager(whatsappSessionManager);
 aiRoutes.setPool(pool);
+appMetadataCollector.setPool(pool);
+aiRoutes.setCollector(appMetadataCollector);
 aiScheduler.setPool(pool);
 paintersRoutes.setPool(pool);
 paintersRoutes.setSessionManager(whatsappSessionManager);

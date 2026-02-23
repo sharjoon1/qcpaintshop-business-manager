@@ -1082,10 +1082,34 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 
 **WhatsApp Delivery**: Analysis summaries sent via General WhatsApp (branch_id=0) to configured recipients.
 
-**Page**: `admin-ai.html` (4 tabs: Chat, Insights, Suggestions, Settings)
+**Page**: `admin-ai.html` (5 tabs: Chat, Insights, Suggestions, Settings, App Analyzer)
 - **Permission**: `system.ai`
 - **Navigation**: System sub-nav → AI tab
 - **Migrations**: `migrations/migrate-ai-tables.js` (initial), `migrations/migrate-ai-assistant-upgrade.js` (Assistant Manager upgrade)
+
+#### App Analyzer (Tab 5)
+AI-powered application self-analysis that scans database schema, routes, errors, health metrics, and business stats, then uses the AI engine to detect issues, suggest upgrades, and generate ready-to-paste Claude Code prompts.
+
+**Service**: `services/app-metadata-collector.js` — 5 scanners + orchestrator
+- `collectDatabaseSchema()` — SHOW TABLES → DESCRIBE/SHOW INDEX/COUNT for each, auto-detects missing indexes on `*_id` cols, missing `updated_at`, empty/large tables
+- `collectRouteMap()` — reads `server.js` + `routes/*.js`, regex-extracts `router.(get|post|put|delete)` patterns with mount prefixes
+- `collectRecentErrors()` — reads `global._appErrorBuffer` (last 100 console.error calls) + PM2 error log, deduplicates by message
+- `collectHealthMetrics()` — process.memoryUsage(), uptime, os stats, DB connection test
+- `collectBusinessStats()` — entity counts (users, branches, painters, etc.), top 10 largest tables
+- `runFullScan()` — runs all 5 in parallel (Promise.allSettled), 5-minute cache
+
+**Endpoints** (in `routes/ai.js`):
+- `GET /api/ai/app-scan` — runs full scan, returns structured JSON
+- `POST /api/ai/app-analyze` — SSE streaming AI deep analysis of scan data, focus filter (all/database/routes/errors/performance)
+- `POST /api/ai/generate-prompt` — generates implementation prompts: type=fix (from scan issue), type=upgrade (business-aware suggestions), type=custom (plain-language → technical prompt)
+
+**Server.js changes**: imports `app-metadata-collector`, `setPool()`, `setCollector()` to ai routes, global `_appErrorBuffer` (wraps console.error, caps at 100 entries)
+
+**Frontend** (4 sections in Tab 5):
+- Section A: Scan Control — "Scan Application" button + timestamp
+- Section B: Scan Results — 5 collapsible panels (Database, Routes, Errors, Health, Business) with "Generate Fix" buttons per issue
+- Section C: AI Deep Analysis — focus area selector, SSE streaming output with copy-prompt buttons on code blocks, "Upgrade Suggestions" button
+- Section D: Custom Prompt Builder — textarea for plain-language input → AI generates technical Claude Code prompt with "Copy" button
 
 ---
 
@@ -1512,6 +1536,13 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-02-23 - AI App Analyzer (Tab 5)
+- New `services/app-metadata-collector.js` with 5 scanners (database schema, route map, errors, health, business stats) + `runFullScan()` orchestrator with 5-min cache
+- 3 new endpoints in `routes/ai.js`: `GET /app-scan`, `POST /app-analyze` (SSE), `POST /generate-prompt`
+- Tab 5 "App Analyzer" in `admin-ai.html`: scan control, collapsible results panels, AI deep analysis with streaming, custom prompt builder
+- Global error buffer in `server.js` (wraps `console.error`, caps at 100 entries) for error collection
+- "Generate Fix" buttons on detected issues, "Upgrade Suggestions" for business-aware improvements, "Copy" buttons on all code blocks
 
 ### 2026-02-23 - AI Assistant Manager Upgrade
 - Upgraded AI Chat to full "QC Assistant Manager" with dedicated persona and comprehensive business context
