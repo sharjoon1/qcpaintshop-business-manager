@@ -63,6 +63,9 @@ const aiScheduler = require('./services/ai-scheduler');
 const paintersRoutes = require('./routes/painters');
 const painterScheduler = require('./services/painter-scheduler');
 const appMetadataCollector = require('./services/app-metadata-collector');
+const systemRoutes = require('./routes/system');
+const errorHandlerMw = require('./middleware/errorHandler');
+const systemHealthService = require('./services/system-health-service');
 
 const app = express();
 
@@ -190,6 +193,9 @@ paintersRoutes.setPool(pool);
 paintersRoutes.setSessionManager(whatsappSessionManager);
 painterScheduler.setPool(pool);
 aiScheduler.setSessionManager(whatsappSessionManager);
+systemRoutes.setPool(pool);
+systemHealthService.setPool(pool);
+errorHandlerMw.setPool(pool);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -322,6 +328,7 @@ app.use('/api/wa-marketing', waMarketingRoutes.router);
 app.use('/api/whatsapp-chat', whatsappChatRoutes.router);
 app.use('/api/ai', aiRoutes.router);
 app.use('/api/painters', paintersRoutes.router);
+app.use('/api/system', systemRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3224,13 +3231,7 @@ app.get('/', (req, res) => {
 // ERROR HANDLING
 // ========================================
 
-app.use((err, req, res, _next) => {
-    console.error('Unhandled error:', err);
-    res.status(500).json({
-        success: false,
-        message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
-    });
-});
+app.use(errorHandlerMw.globalErrorHandler);
 
 // ========================================
 // START SERVER
@@ -3408,6 +3409,7 @@ server.listen(PORT, () => {
         aiScheduler.start();
         painterScheduler.start();
         console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler, painter-scheduler');
+        systemHealthService.startAutoHealthChecks(300000); // every 5 min
     } else {
         console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
     }
@@ -3415,8 +3417,9 @@ server.listen(PORT, () => {
 
 // Graceful shutdown - persist API usage counter before exit
 async function gracefulShutdown(signal) {
-    console.log(`\n${signal} received. Persisting API usage data...`);
+    console.log(`\n${signal} received. Shutting down gracefully...`);
     try {
+        systemHealthService.stopAutoHealthChecks();
         await rateLimiter.flush();
         console.log('API usage data persisted to DB.');
     } catch (err) {
@@ -3427,3 +3430,17 @@ async function gracefulShutdown(signal) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Catch uncaught exceptions and unhandled rejections
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught Exception:', err);
+    errorHandlerMw.logError(err, null, { type: 'api', severity: 'critical', url: 'uncaughtException' }).catch(() => {});
+    // Give time to log, then exit
+    setTimeout(() => process.exit(1), 1000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    console.error('[WARN] Unhandled Rejection:', err);
+    errorHandlerMw.logError(err, null, { type: 'api', severity: 'high', url: 'unhandledRejection' }).catch(() => {});
+});

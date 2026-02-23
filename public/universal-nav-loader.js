@@ -74,6 +74,7 @@
         'website': CONFIG.SYSTEM_SUBNAV_PATH,
         'guides': CONFIG.SYSTEM_SUBNAV_PATH,
         'ai': CONFIG.SYSTEM_SUBNAV_PATH,
+        'system-health': CONFIG.SYSTEM_SUBNAV_PATH,
         // Painters
         'painters': CONFIG.PAINTERS_SUBNAV_PATH,
         'painter-points': CONFIG.PAINTERS_SUBNAV_PATH,
@@ -94,6 +95,13 @@
         console.log('⏭️ Skipping navigation on login/public page');
         return;
     }
+
+    // Load error prevention script for all admin pages
+    (function loadErrorPrevention() {
+        const ep = document.createElement('script');
+        ep.src = '/js/error-prevention.js';
+        document.head.appendChild(ep);
+    })();
 
     // Load Socket.io client + socket helper for real-time features
     (function loadSocketScripts() {

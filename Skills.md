@@ -1130,6 +1130,61 @@ AI-powered application self-analysis that scans database schema, routes, errors,
 - Section C: AI Deep Analysis — focus area selector, SSE streaming output with copy-prompt buttons on code blocks, "Upgrade Suggestions" button
 - Section D: Custom Prompt Builder — textarea for plain-language input → AI generates technical Claude Code prompt with "Copy" button
 
+#### System Health & Error Prevention (Feb 23)
+
+Comprehensive error tracking, system health monitoring, data integrity validation, and prevention recommendations.
+
+**Tables**: `error_logs`, `system_health_checks`, `code_quality_metrics`
+- `error_logs`: Categorized errors (database/api/frontend/validation/auth/integration) with severity, stack traces, request context, resolution tracking
+- `system_health_checks`: Periodic check results (database, memory, disk, file_system, external_services) with status and details JSON
+- `code_quality_metrics`: File-level complexity scores, LOC, issues
+
+**Middleware**: `middleware/errorHandler.js` (upgraded)
+- `globalErrorHandler` — Express error middleware, logs to DB, classifies errors, sanitizes for production
+- `asyncWrapper` / `asyncHandler` — Promise-catching route wrapper
+- `validateRequest(schema)` — Declarative request validation with field rules
+- `logError(error, req, context)` — Log any error to `error_logs` table
+- `logClientError` — Handler for frontend error reports
+- Backward-compatible: exports both old names (`errorHandler`, `asyncHandler`) and new
+
+**Services**:
+- `services/system-health-service.js` — `performHealthCheck()` (5 checks: DB, memory, disk, filesystem, external services), `checkDatabaseIntegrity()`, `startAutoHealthChecks(intervalMs)` (default 5 min)
+- `services/error-prevention-service.js` — `analyzeErrorPatterns()`, `validateDataIntegrity()` (orphan checks, consistency checks), `performCodeQualityCheck()` (routes/services/middleware scanning), `generatePreventionReport()`
+
+**Routes**: `routes/system.js` (mounted at `/api/system`)
+- `GET /health` — Full health check (auth required)
+- `POST /health-check` — Trigger manual check (system.health permission)
+- `GET /health/history` — Historical health checks
+- `GET /errors` — Error logs with filtering (type, severity, status, search, pagination)
+- `GET /errors/stats` — Error statistics (by type/severity, hourly trend, top endpoints, resolution rate)
+- `POST /errors/:id/resolve` — Mark resolved with notes
+- `POST /errors/:id/ignore` — Mark ignored
+- `POST /errors/log-client` — Client-side error logging (auth only)
+- `GET /prevention-report` — Full prevention report
+- `POST /validate-integrity` — Run data integrity validation
+- `GET /code-quality` — Code quality scan
+- `GET /db-integrity` — Database integrity check
+
+**Client-side**: `public/js/error-prevention.js` (auto-loaded by universal-nav-loader)
+- Global `window.onerror` + `unhandledrejection` handlers → send to backend
+- Fetch interceptor: logs 5xx API errors automatically
+- Rate-limited: max 10 errors/minute to prevent flooding
+- `window.showErrorToast(msg)` / `window.showSuccessToast(msg)` helpers
+- `window.validateFormData(form, rules)` — client-side form validation with field highlighting
+
+**Page**: `admin-system-health.html` (`data-page="system-health"`)
+- **Navigation**: System sub-nav → "System Health" tab
+- **Permission**: `system.health`
+- 5 tabs: Error Logs (filterable table + summary), Error Stats (by type/severity/endpoints/resolution), Data Integrity (validation runner), Prevention (report with recommendations), Services (external service status)
+- Overall status banner (healthy/warning/critical), 5 health status cards
+- Error detail modal with stack trace, request body, resolution actions
+
+**Server.js changes**: imports `system routes`, `errorHandler`, `systemHealthService`; global error handler replaced; `uncaughtException`/`unhandledRejection` handlers added; auto health checks on startup (5 min interval); graceful shutdown stops health checks
+
+**Config**: `error_logging_enabled`, `health_check_interval_ms`, `error_alert_threshold_critical`, `error_alert_threshold_high`, `auto_health_check_enabled`
+
+**Migration**: `migrations/migrate-error-prevention.js`
+
 ---
 
 ## 3. MOBILE APPS (Android)

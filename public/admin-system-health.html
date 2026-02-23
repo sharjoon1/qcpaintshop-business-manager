@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/icons/icon-192x192.png">
+    <title>System Health - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        .health-card { transition: all 0.3s ease; }
+        .health-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .status-healthy { background: linear-gradient(135deg, #22c55e, #16a34a); }
+        .status-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .status-critical { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .status-dot.healthy { background: #22c55e; }
+        .status-dot.warning { background: #f59e0b; }
+        .status-dot.critical { background: #ef4444; }
+        .severity-badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+        .sev-critical { background: #fef2f2; color: #dc2626; }
+        .sev-high { background: #fff7ed; color: #ea580c; }
+        .sev-medium { background: #fefce8; color: #ca8a04; }
+        .sev-low { background: #f0fdf4; color: #16a34a; }
+        .tab-btn { padding: 8px 16px; border-radius: 8px; font-size: 0.8125rem; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
+        .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .tab-btn:not(.active) { color: #64748b; }
+        .tab-btn:not(.active):hover { background: #f1f5f9; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .rec-card { border-left: 4px solid; }
+        .rec-critical { border-color: #dc2626; background: #fef2f2; }
+        .rec-high { border-color: #ea580c; background: #fff7ed; }
+        .rec-medium { border-color: #ca8a04; background: #fefce8; }
+        .rec-low { border-color: #16a34a; background: #f0fdf4; }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="system-health">
+
+<div class="container mx-auto p-4 md:p-6 max-w-7xl">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">System Health Dashboard</h1>
+            <p class="text-sm text-gray-500 mt-1" id="lastCheckTime">Loading...</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="runHealthCheck()" id="healthCheckBtn"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium text-sm"
+                style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                Run Health Check
+            </button>
+            <button onclick="loadPreventionReport()" id="preventionBtn"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 font-medium text-sm hover:bg-gray-50">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Prevention Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Overall Status Banner -->
+    <div class="rounded-xl p-4 mb-6 text-white" id="overallBanner">
+        <div class="flex items-center gap-3">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <div>
+                <div class="text-lg font-bold" id="overallStatus">Checking...</div>
+                <div class="text-sm opacity-80" id="overallUptime"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Health Status Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6" id="healthCards">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center health-card">
+            <div class="text-xs text-gray-400 mb-1">Database</div>
+            <div class="text-lg font-bold" id="dbStatus">--</div>
+            <div class="text-xs text-gray-500" id="dbDetail"></div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center health-card">
+            <div class="text-xs text-gray-400 mb-1">Memory</div>
+            <div class="text-lg font-bold" id="memStatus">--</div>
+            <div class="text-xs text-gray-500" id="memDetail"></div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center health-card">
+            <div class="text-xs text-gray-400 mb-1">Disk</div>
+            <div class="text-lg font-bold" id="diskStatus">--</div>
+            <div class="text-xs text-gray-500" id="diskDetail"></div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center health-card">
+            <div class="text-xs text-gray-400 mb-1">File System</div>
+            <div class="text-lg font-bold" id="fsStatus">--</div>
+            <div class="text-xs text-gray-500" id="fsDetail"></div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center health-card col-span-2 md:col-span-1">
+            <div class="text-xs text-gray-400 mb-1">Services</div>
+            <div class="text-lg font-bold" id="svcStatus">--</div>
+            <div class="text-xs text-gray-500" id="svcDetail"></div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-4 overflow-x-auto pb-1">
+        <button class="tab-btn active" onclick="switchTab('errors')">Error Logs</button>
+        <button class="tab-btn" onclick="switchTab('stats')">Error Stats</button>
+        <button class="tab-btn" onclick="switchTab('integrity')">Data Integrity</button>
+        <button class="tab-btn" onclick="switchTab('prevention')">Prevention</button>
+        <button class="tab-btn" onclick="switchTab('services')">Services</button>
+    </div>
+
+    <!-- Tab: Error Logs -->
+    <div class="tab-content active" id="tab-errors">
+        <!-- Error Summary -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4" id="errorSummaryCards">
+            <div class="bg-white rounded-lg p-3 shadow-sm border text-center">
+                <div class="text-xl font-bold text-gray-800" id="errTotal24h">--</div>
+                <div class="text-xs text-gray-400">Total (24h)</div>
+            </div>
+            <div class="bg-white rounded-lg p-3 shadow-sm border text-center">
+                <div class="text-xl font-bold text-red-600" id="errCritical">--</div>
+                <div class="text-xs text-gray-400">Critical</div>
+            </div>
+            <div class="bg-white rounded-lg p-3 shadow-sm border text-center">
+                <div class="text-xl font-bold text-orange-500" id="errHigh">--</div>
+                <div class="text-xs text-gray-400">High</div>
+            </div>
+            <div class="bg-white rounded-lg p-3 shadow-sm border text-center">
+                <div class="text-xl font-bold text-amber-500" id="errMedium">--</div>
+                <div class="text-xs text-gray-400">Medium</div>
+            </div>
+            <div class="bg-white rounded-lg p-3 shadow-sm border text-center col-span-2 md:col-span-1">
+                <div class="text-xl font-bold text-blue-500" id="errUnresolved">--</div>
+                <div class="text-xs text-gray-400">Unresolved</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-xl p-3 shadow-sm border border-gray-100 mb-4">
+            <div class="flex flex-wrap gap-2 items-center">
+                <select id="filterType" class="text-sm rounded-lg border-gray-200 px-3 py-1.5" onchange="loadErrors()">
+                    <option value="">All Types</option>
+                    <option value="database">Database</option>
+                    <option value="api">API</option>
+                    <option value="frontend">Frontend</option>
+                    <option value="validation">Validation</option>
+                    <option value="authentication">Authentication</option>
+                    <option value="authorization">Authorization</option>
+                    <option value="integration">Integration</option>
+                </select>
+                <select id="filterSeverity" class="text-sm rounded-lg border-gray-200 px-3 py-1.5" onchange="loadErrors()">
+                    <option value="">All Severities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+                <select id="filterStatus" class="text-sm rounded-lg border-gray-200 px-3 py-1.5" onchange="loadErrors()">
+                    <option value="">All Statuses</option>
+                    <option value="new">New</option>
+                    <option value="investigating">Investigating</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="ignored">Ignored</option>
+                </select>
+                <input type="text" id="filterSearch" class="text-sm rounded-lg border-gray-200 px-3 py-1.5 flex-1 min-w-[150px]"
+                    placeholder="Search errors..." onkeyup="if(event.key==='Enter')loadErrors()">
+            </div>
+        </div>
+
+        <!-- Error Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Time</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Severity</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Type</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Message</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">URL</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Status</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="errorsTableBody">
+                        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3 border-t border-gray-100 flex items-center justify-between" id="errorsPagination"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Error Stats -->
+    <div class="tab-content" id="tab-stats">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="statsContent">
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="text-sm font-medium text-gray-700 mb-3">Errors by Type (24h)</div>
+                <div id="statsByType" class="space-y-2"></div>
+            </div>
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="text-sm font-medium text-gray-700 mb-3">Errors by Severity (24h)</div>
+                <div id="statsBySeverity" class="space-y-2"></div>
+            </div>
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 md:col-span-2">
+                <div class="text-sm font-medium text-gray-700 mb-3">Top Error Endpoints</div>
+                <div id="statsTopEndpoints" class="space-y-2"></div>
+            </div>
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 md:col-span-2">
+                <div class="text-sm font-medium text-gray-700 mb-3">Resolution Rate (7 days)</div>
+                <div id="statsResolution"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Data Integrity -->
+    <div class="tab-content" id="tab-integrity">
+        <div class="flex justify-between items-center mb-4">
+            <div class="text-sm text-gray-500" id="integrityStatus">Click "Validate" to check data integrity</div>
+            <button onclick="runIntegrityCheck()" id="integrityBtn"
+                class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background:#667eea;">
+                Validate Integrity
+            </button>
+        </div>
+        <div id="integrityResults" class="space-y-3"></div>
+    </div>
+
+    <!-- Tab: Prevention -->
+    <div class="tab-content" id="tab-prevention">
+        <div id="preventionContent">
+            <div class="text-center text-gray-400 py-8">Click "Prevention Report" to generate recommendations</div>
+        </div>
+    </div>
+
+    <!-- Tab: Services -->
+    <div class="tab-content" id="tab-services">
+        <div id="servicesContent" class="space-y-3"></div>
+    </div>
+</div>
+
+<!-- Error Detail Modal -->
+<div class="fixed inset-0 bg-black/40 z-50 hidden" id="errorModal" onclick="if(event.target===this)closeErrorModal()">
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+            <h3 class="font-bold text-gray-800">Error Details</h3>
+            <button onclick="closeErrorModal()" class="p-1 rounded hover:bg-gray-100">
+                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="p-4" id="errorModalContent"></div>
+    </div>
+</div>
+
+<script>
+const API = '/api/system';
+let currentPage = 1;
+
+// ─── Init ────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    loadHealthData();
+    loadErrors();
+});
+
+// ─── Tabs ────────────────────────────────────────
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    if (tab === 'stats') loadErrorStats();
+    if (tab === 'services') renderServices();
+}
+
+// ─── Health Data ─────────────────────────────────
+async function loadHealthData() {
+    try {
+        const res = await fetch(API + '/health', { headers: getAuthHeaders() });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+        renderHealth(json.data);
+    } catch (err) {
+        document.getElementById('overallStatus').textContent = 'Failed to load';
+        document.getElementById('overallBanner').className = 'rounded-xl p-4 mb-6 text-white status-critical';
+    }
+}
+
+function renderHealth(data) {
+    // Overall banner
+    const bannerEl = document.getElementById('overallBanner');
+    bannerEl.className = 'rounded-xl p-4 mb-6 text-white status-' + data.status;
+    document.getElementById('overallStatus').textContent = 'System ' + data.status.charAt(0).toUpperCase() + data.status.slice(1);
+    document.getElementById('overallUptime').textContent = 'Uptime: ' + data.uptimeFormatted + ' | Check time: ' + data.totalCheckTimeMs + 'ms';
+    document.getElementById('lastCheckTime').textContent = 'Last check: ' + new Date(data.timestamp).toLocaleString('en-IN');
+
+    // Individual cards
+    const c = data.checks;
+
+    // Database
+    renderCard('db', c.database);
+    document.getElementById('dbDetail').textContent = c.database.connected
+        ? c.database.responseTimeMs + 'ms | ' + c.database.sizeMb + 'MB'
+        : c.database.error || 'Disconnected';
+
+    // Memory
+    renderCard('mem', c.memory);
+    document.getElementById('memDetail').textContent = c.memory.process
+        ? 'Heap: ' + c.memory.process.heapUsedMb + '/' + c.memory.process.heapTotalMb + 'MB'
+        : '';
+
+    // Disk
+    renderCard('disk', c.diskSpace);
+    document.getElementById('diskDetail').textContent = c.diskSpace.uploadsSizeMb !== undefined
+        ? 'Uploads: ' + c.diskSpace.uploadsSizeMb + 'MB'
+        : '';
+
+    // File System
+    renderCard('fs', c.fileSystem);
+    document.getElementById('fsDetail').textContent = c.fileSystem.issueCount
+        ? c.fileSystem.issueCount + ' issues'
+        : 'All OK';
+
+    // Services
+    renderCard('svc', c.externalServices);
+    var configured = (c.externalServices.services || []).filter(s => s.configured).length;
+    document.getElementById('svcDetail').textContent = configured + '/' + (c.externalServices.services || []).length + ' configured';
+
+    // Store services for tab
+    window._healthServices = c.externalServices.services || [];
+}
+
+function renderCard(prefix, check) {
+    const colors = { healthy: '#22c55e', warning: '#f59e0b', critical: '#ef4444' };
+    document.getElementById(prefix + 'Status').textContent = check.status.charAt(0).toUpperCase() + check.status.slice(1);
+    document.getElementById(prefix + 'Status').style.color = colors[check.status] || '#6b7280';
+}
+
+// ─── Services Tab ────────────────────────────────
+function renderServices() {
+    var services = window._healthServices || [];
+    var el = document.getElementById('servicesContent');
+    if (services.length === 0) { el.innerHTML = '<div class="text-center text-gray-400 py-8">No service data</div>'; return; }
+
+    el.innerHTML = services.map(function(s) {
+        var colors = { healthy: 'border-green-200 bg-green-50', warning: 'border-yellow-200 bg-yellow-50', critical: 'border-red-200 bg-red-50' };
+        return '<div class="bg-white rounded-lg p-4 shadow-sm border ' + (colors[s.status] || '') + '">' +
+            '<div class="flex items-center justify-between">' +
+            '<div class="flex items-center gap-3"><span class="status-dot ' + s.status + '"></span><span class="font-medium text-gray-800">' + esc(s.name) + '</span></div>' +
+            '<span class="text-xs text-gray-500">' + (s.configured ? 'Configured' : 'Not configured') + '</span>' +
+            '</div></div>';
+    }).join('');
+}
+
+// ─── Error Logs ──────────────────────────────────
+async function loadErrors() {
+    try {
+        var params = new URLSearchParams();
+        var type = document.getElementById('filterType').value;
+        var severity = document.getElementById('filterSeverity').value;
+        var status = document.getElementById('filterStatus').value;
+        var search = document.getElementById('filterSearch').value;
+
+        if (type) params.set('error_type', type);
+        if (severity) params.set('severity', severity);
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+        params.set('page', currentPage);
+        params.set('limit', 30);
+
+        var res = await fetch(API + '/errors?' + params.toString(), { headers: getAuthHeaders() });
+        var json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        renderErrorSummary(json.summary);
+        renderErrorTable(json.data);
+        renderPagination(json.pagination);
+    } catch (err) {
+        document.getElementById('errorsTableBody').innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-red-400">' + esc(err.message) + '</td></tr>';
+    }
+}
+
+function renderErrorSummary(s) {
+    document.getElementById('errTotal24h').textContent = s.total_24h || 0;
+    document.getElementById('errCritical').textContent = s.critical || 0;
+    document.getElementById('errHigh').textContent = s.high || 0;
+    document.getElementById('errMedium').textContent = s.medium || 0;
+    document.getElementById('errUnresolved').textContent = s.unresolved || 0;
+}
+
+function renderErrorTable(errors) {
+    var tbody = document.getElementById('errorsTableBody');
+    if (!errors || errors.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No errors found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = errors.map(function(e) {
+        var time = new Date(e.created_at).toLocaleString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+        var statusColors = { new: 'bg-blue-100 text-blue-700', investigating: 'bg-yellow-100 text-yellow-700', resolved: 'bg-green-100 text-green-700', ignored: 'bg-gray-100 text-gray-500' };
+
+        return '<tr class="border-b border-gray-50 hover:bg-gray-50">' +
+            '<td class="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">' + time + '</td>' +
+            '<td class="px-4 py-2.5"><span class="severity-badge sev-' + e.severity + '">' + e.severity + '</span></td>' +
+            '<td class="px-4 py-2.5 text-xs text-gray-600">' + e.error_type + '</td>' +
+            '<td class="px-4 py-2.5 text-xs text-gray-700 max-w-[250px] truncate">' + esc(e.error_message) + '</td>' +
+            '<td class="px-4 py-2.5 text-xs text-gray-400 max-w-[150px] truncate hidden md:table-cell">' + esc(e.request_url || '--') + '</td>' +
+            '<td class="px-4 py-2.5"><span class="text-xs px-2 py-0.5 rounded-full ' + (statusColors[e.status] || '') + '">' + e.status + '</span></td>' +
+            '<td class="px-4 py-2.5 text-right">' +
+            '<button onclick="showErrorDetail(' + e.id + ')" class="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 mr-1">View</button>' +
+            (e.status === 'new' ? '<button onclick="resolveError(' + e.id + ')" class="text-xs px-2 py-1 rounded bg-green-100 hover:bg-green-200 text-green-700">Resolve</button>' : '') +
+            '</td></tr>';
+    }).join('');
+}
+
+function renderPagination(p) {
+    var el = document.getElementById('errorsPagination');
+    if (!p || p.total === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = '<span class="text-xs text-gray-500">' + p.total + ' errors | Page ' + p.page + '/' + p.total_pages + '</span>' +
+        '<div class="flex gap-1">' +
+        (p.page > 1 ? '<button onclick="currentPage=' + (p.page-1) + ';loadErrors()" class="px-3 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200">Prev</button>' : '') +
+        (p.page < p.total_pages ? '<button onclick="currentPage=' + (p.page+1) + ';loadErrors()" class="px-3 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200">Next</button>' : '') +
+        '</div>';
+}
+
+// ─── Error Detail Modal ──────────────────────────
+var _errorsCache = {};
+async function showErrorDetail(id) {
+    document.getElementById('errorModal').classList.remove('hidden');
+    var content = document.getElementById('errorModalContent');
+    content.innerHTML = '<div class="text-center py-4 text-gray-400">Loading...</div>';
+
+    try {
+        // Fetch full error from list (already loaded)
+        var res = await fetch(API + '/errors?search=' + id + '&limit=1', { headers: getAuthHeaders() });
+        var json = await res.json();
+        var e = json.data?.[0];
+        if (!e) { content.innerHTML = '<div class="text-red-500">Error not found</div>'; return; }
+
+        content.innerHTML = '<div class="space-y-4">' +
+            '<div class="grid grid-cols-2 gap-3 text-sm">' +
+            '<div><span class="text-gray-400">ID:</span> #' + e.id + '</div>' +
+            '<div><span class="text-gray-400">Severity:</span> <span class="severity-badge sev-' + e.severity + '">' + e.severity + '</span></div>' +
+            '<div><span class="text-gray-400">Type:</span> ' + e.error_type + '</div>' +
+            '<div><span class="text-gray-400">Status:</span> ' + e.status + '</div>' +
+            '<div><span class="text-gray-400">Time:</span> ' + new Date(e.created_at).toLocaleString('en-IN') + '</div>' +
+            '<div><span class="text-gray-400">User:</span> ' + esc(e.user_name || 'N/A') + '</div>' +
+            '<div class="col-span-2"><span class="text-gray-400">URL:</span> ' + esc(e.request_method || '') + ' ' + esc(e.request_url || 'N/A') + '</div>' +
+            '<div class="col-span-2"><span class="text-gray-400">IP:</span> ' + esc(e.ip_address || 'N/A') + '</div>' +
+            '</div>' +
+            '<div><div class="text-sm font-medium text-gray-700 mb-1">Error Message</div><div class="bg-red-50 rounded-lg p-3 text-sm text-red-800 break-words">' + esc(e.error_message) + '</div></div>' +
+            (e.stack_trace ? '<div><div class="text-sm font-medium text-gray-700 mb-1">Stack Trace</div><pre class="bg-gray-900 text-green-400 rounded-lg p-3 text-xs overflow-x-auto max-h-[200px]">' + esc(e.stack_trace) + '</pre></div>' : '') +
+            (e.request_body ? '<div><div class="text-sm font-medium text-gray-700 mb-1">Request Body</div><pre class="bg-gray-50 rounded-lg p-3 text-xs overflow-x-auto">' + esc(JSON.stringify(JSON.parse(e.request_body), null, 2)) + '</pre></div>' : '') +
+            (e.resolution_notes ? '<div><div class="text-sm font-medium text-gray-700 mb-1">Resolution</div><div class="bg-green-50 rounded-lg p-3 text-sm text-green-800">' + esc(e.resolution_notes) + '</div></div>' : '') +
+            '<div class="flex gap-2 pt-2 border-t">' +
+            (e.status === 'new' ? '<button onclick="resolveError(' + e.id + ');closeErrorModal()" class="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium">Resolve</button>' : '') +
+            (e.status === 'new' ? '<button onclick="ignoreError(' + e.id + ');closeErrorModal()" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium">Ignore</button>' : '') +
+            '</div></div>';
+    } catch (err) {
+        content.innerHTML = '<div class="text-red-500">' + esc(err.message) + '</div>';
+    }
+}
+
+function closeErrorModal() { document.getElementById('errorModal').classList.add('hidden'); }
+
+// ─── Error Actions ───────────────────────────────
+async function resolveError(id) {
+    var notes = prompt('Resolution notes (optional):');
+    try {
+        await fetch(API + '/errors/' + id + '/resolve', {
+            method: 'POST', headers: getAuthHeaders(),
+            body: JSON.stringify({ resolution_notes: notes || '' })
+        });
+        loadErrors();
+        showToast('Error resolved', 'success');
+    } catch (err) { showToast('Failed to resolve', 'error'); }
+}
+
+async function ignoreError(id) {
+    try {
+        await fetch(API + '/errors/' + id + '/ignore', { method: 'POST', headers: getAuthHeaders() });
+        loadErrors();
+        showToast('Error ignored', 'success');
+    } catch (err) { showToast('Failed', 'error'); }
+}
+
+// ─── Error Stats ─────────────────────────────────
+async function loadErrorStats() {
+    try {
+        var res = await fetch(API + '/errors/stats', { headers: getAuthHeaders() });
+        var json = await res.json();
+        if (!json.success) return;
+        var d = json.data;
+
+        // By Type
+        document.getElementById('statsByType').innerHTML = (d.byType || []).map(function(r) {
+            return '<div class="flex justify-between items-center"><span class="text-sm text-gray-700">' + r.error_type + '</span><span class="font-semibold text-gray-800">' + r.count + '</span></div>';
+        }).join('') || '<div class="text-gray-400 text-sm">No data</div>';
+
+        // By Severity
+        var sevColors = { critical: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a' };
+        document.getElementById('statsBySeverity').innerHTML = (d.bySeverity || []).map(function(r) {
+            return '<div class="flex justify-between items-center"><span class="text-sm" style="color:' + (sevColors[r.severity]||'#6b7280') + '">' + r.severity + '</span><span class="font-semibold text-gray-800">' + r.count + '</span></div>';
+        }).join('') || '<div class="text-gray-400 text-sm">No data</div>';
+
+        // Top Endpoints
+        document.getElementById('statsTopEndpoints').innerHTML = (d.topEndpoints || []).map(function(r) {
+            return '<div class="flex justify-between items-center text-sm"><span class="text-gray-600 truncate max-w-[300px]">' + esc(r.request_method + ' ' + r.request_url) + '</span><span class="font-semibold text-gray-800">' + r.count + '</span></div>';
+        }).join('') || '<div class="text-gray-400 text-sm">No data</div>';
+
+        // Resolution
+        var r = d.resolution || {};
+        var rate = r.total > 0 ? Math.round(r.resolved / r.total * 100) : 0;
+        document.getElementById('statsResolution').innerHTML =
+            '<div class="flex items-center gap-4"><div class="text-3xl font-bold" style="color:' + (rate > 70 ? '#22c55e' : rate > 40 ? '#f59e0b' : '#ef4444') + '">' + rate + '%</div>' +
+            '<div class="text-sm text-gray-500">Resolved: ' + (r.resolved || 0) + ' / ' + (r.total || 0) + ' (7 days)</div></div>';
+    } catch (err) { console.error(err); }
+}
+
+// ─── Data Integrity ──────────────────────────────
+async function runIntegrityCheck() {
+    var btn = document.getElementById('integrityBtn');
+    btn.disabled = true; btn.textContent = 'Checking...';
+
+    try {
+        var res = await fetch(API + '/validate-integrity', { method: 'POST', headers: getAuthHeaders() });
+        var json = await res.json();
+        if (!json.success) throw new Error(json.message);
+        var d = json.data;
+
+        document.getElementById('integrityStatus').textContent = 'Status: ' + d.status + ' | Passed: ' + d.passed + ' | Failed: ' + d.failed + ' | Warnings: ' + d.warnings;
+
+        document.getElementById('integrityResults').innerHTML = (d.checks || []).map(function(c) {
+            var cls = c.status === 'pass' ? 'border-green-200 bg-green-50' : c.status === 'fail' ? 'border-red-200 bg-red-50' : c.status === 'warning' ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200 bg-gray-50';
+            var icon = c.status === 'pass' ? '&#10003;' : c.status === 'fail' ? '&#10007;' : '&#9888;';
+            return '<div class="rounded-lg p-3 border ' + cls + '">' +
+                '<div class="flex items-center justify-between">' +
+                '<span class="text-sm font-medium text-gray-800">' + icon + ' ' + esc(c.name) + '</span>' +
+                '<span class="text-xs text-gray-500">' + (c.count !== undefined ? c.count + ' records' : c.error || '') + '</span>' +
+                '</div></div>';
+        }).join('');
+    } catch (err) {
+        document.getElementById('integrityResults').innerHTML = '<div class="text-red-500">' + esc(err.message) + '</div>';
+    } finally {
+        btn.disabled = false; btn.textContent = 'Validate Integrity';
+    }
+}
+
+// ─── Health Check Button ─────────────────────────
+async function runHealthCheck() {
+    var btn = document.getElementById('healthCheckBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Checking...';
+
+    try {
+        var res = await fetch(API + '/health-check', { method: 'POST', headers: getAuthHeaders() });
+        var json = await res.json();
+        if (json.success) renderHealth(json.data);
+        showToast('Health check completed', 'success');
+    } catch (err) { showToast('Health check failed', 'error'); }
+    finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg> Run Health Check';
+    }
+}
+
+// ─── Prevention Report ───────────────────────────
+async function loadPreventionReport() {
+    var btn = document.getElementById('preventionBtn');
+    btn.disabled = true; btn.textContent = 'Generating...';
+
+    // Switch to prevention tab
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-btn')[3].classList.add('active');
+    document.getElementById('tab-prevention').classList.add('active');
+
+    try {
+        var res = await fetch(API + '/prevention-report', { headers: getAuthHeaders() });
+        var json = await res.json();
+        if (!json.success) throw new Error(json.message);
+        var d = json.data;
+
+        var html = '<div class="space-y-4">';
+
+        // Summary
+        html += '<div class="grid grid-cols-2 md:grid-cols-4 gap-3">' +
+            '<div class="bg-white rounded-lg p-3 shadow-sm border text-center"><div class="text-xl font-bold text-gray-800">' + d.errorStats.total24h + '</div><div class="text-xs text-gray-400">Errors (24h)</div></div>' +
+            '<div class="bg-white rounded-lg p-3 shadow-sm border text-center"><div class="text-xl font-bold text-gray-800">' + d.dataIntegrity.failed + '</div><div class="text-xs text-gray-400">Integrity Issues</div></div>' +
+            '<div class="bg-white rounded-lg p-3 shadow-sm border text-center"><div class="text-xl font-bold text-gray-800">' + d.codeQuality.highComplexity + '</div><div class="text-xs text-gray-400">Complex Files</div></div>' +
+            '<div class="bg-white rounded-lg p-3 shadow-sm border text-center"><div class="text-xl font-bold" style="color:#667eea">' + d.totalRecommendations + '</div><div class="text-xs text-gray-400">Recommendations</div></div>' +
+            '</div>';
+
+        // Recommendations
+        if (d.recommendations && d.recommendations.length > 0) {
+            html += '<div class="text-sm font-medium text-gray-700 mt-4 mb-2">Recommendations</div>';
+            html += d.recommendations.map(function(r) {
+                return '<div class="rec-card rec-' + r.priority + ' rounded-lg p-3">' +
+                    '<div class="flex items-start justify-between">' +
+                    '<div class="flex-1">' +
+                    '<div class="text-sm font-medium text-gray-800">' + esc(r.title) + '</div>' +
+                    '<div class="text-xs text-gray-600 mt-1">' + esc(r.description) + '</div>' +
+                    '</div>' +
+                    '<span class="severity-badge sev-' + r.priority + ' ml-2 flex-shrink-0">' + r.priority + '</span>' +
+                    '</div></div>';
+            }).join('');
+        } else {
+            html += '<div class="text-center text-green-500 py-4 font-medium">No issues detected! System is healthy.</div>';
+        }
+
+        // Patterns
+        if (d.patterns && d.patterns.length > 0) {
+            html += '<div class="text-sm font-medium text-gray-700 mt-4 mb-2">Error Patterns Detected</div>';
+            html += d.patterns.map(function(p) {
+                return '<div class="bg-white rounded-lg p-3 border shadow-sm">' +
+                    '<div class="flex items-center justify-between">' +
+                    '<span class="text-sm text-gray-700">' + esc(p.error_type || p.url || 'Unknown') + '</span>' +
+                    '<span class="text-xs font-medium text-red-500">' + p.count + 'x</span>' +
+                    '</div></div>';
+            }).join('');
+        }
+
+        html += '</div>';
+        document.getElementById('preventionContent').innerHTML = html;
+    } catch (err) {
+        document.getElementById('preventionContent').innerHTML = '<div class="text-red-500">' + esc(err.message) + '</div>';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Prevention Report';
+    }
+}
+
+// ─── Helpers ─────────────────────────────────────
+function esc(str) {
+    if (!str) return '';
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function showToast(msg, type) {
+    var colors = { success: '#22c55e', error: '#ef4444', info: '#667eea' };
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:14px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.15);background:' + (colors[type] || colors.info) + ';';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 3000);
+}
+</script>
+</body>
+</html>
