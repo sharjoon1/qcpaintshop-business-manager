@@ -144,14 +144,14 @@ async function buildRevenueContext() {
         // Branch breakdown (today + yesterday)
         const [branches] = await pool.query(`
             SELECT
-                zlm.location_name as branch,
+                zlm.zoho_location_name as branch,
                 COALESCE(SUM(CASE WHEN DATE(zi.invoice_date) = CURDATE() THEN zi.total ELSE 0 END), 0) as today,
                 COALESCE(SUM(CASE WHEN DATE(zi.invoice_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN zi.total ELSE 0 END), 0) as yesterday,
                 COUNT(CASE WHEN DATE(zi.invoice_date) = CURDATE() THEN 1 END) as today_count
             FROM zoho_invoices zi
             LEFT JOIN zoho_locations_map zlm ON zi.location_id COLLATE utf8mb4_unicode_ci = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
             WHERE zi.invoice_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
-            GROUP BY zlm.location_name
+            GROUP BY zlm.zoho_location_name
             ORDER BY today DESC
         `);
 
