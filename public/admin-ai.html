@@ -115,6 +115,22 @@
         .run-btn:hover { border-color: #667eea; color: #667eea; }
         .run-btn.running { opacity: 0.6; cursor: not-allowed; }
 
+        /* Suggestions */
+        .sug-card { background: white; border-radius: 12px; padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid #d1d5db; transition: all 0.15s; }
+        .sug-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .sug-card.priority-low { border-left-color: #6b7280; }
+        .sug-card.priority-medium { border-left-color: #3b82f6; }
+        .sug-card.priority-high { border-left-color: #f59e0b; }
+        .sug-card.priority-critical { border-left-color: #ef4444; }
+        .priority-badge { padding: 2px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; }
+        .priority-badge.low { background: #f3f4f6; color: #6b7280; }
+        .priority-badge.medium { background: #dbeafe; color: #1d4ed8; }
+        .priority-badge.high { background: #fef3c7; color: #92400e; }
+        .priority-badge.critical { background: #fee2e2; color: #991b1b; }
+        .sug-status-btn { padding: 3px 8px; border-radius: 6px; font-size: 0.6875rem; font-weight: 600; border: 1px solid #d1d5db; cursor: pointer; background: white; color: #4b5563; transition: all 0.15s; }
+        .sug-status-btn:hover { border-color: #667eea; color: #667eea; }
+        .sug-status-btn.active { background: #667eea; color: white; border-color: #667eea; }
+
         @media (max-width: 768px) {
             .chat-sidebar { display: none; }
             .chat-container { height: calc(100vh - 200px); }
@@ -154,6 +170,11 @@
             Insights
             <span class="tab-badge" id="insightsBadge" style="display:none">0</span>
         </button>
+        <button class="tab-btn" onclick="switchTab('suggestions')">
+            <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+            Suggestions
+            <span class="tab-badge" id="suggestionsBadge" style="display:none">0</span>
+        </button>
         <button class="tab-btn" onclick="switchTab('settings')">
             <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
             Settings
@@ -174,21 +195,29 @@
             <!-- Main chat area -->
             <div class="chat-main">
                 <div class="quick-prompts">
-                    <button class="quick-prompt" onclick="quickAsk('What was today\'s revenue and how does it compare to yesterday?')">Today's Revenue</button>
-                    <button class="quick-prompt" onclick="quickAsk('Are there any staff attendance issues today?')">Staff Issues</button>
-                    <button class="quick-prompt" onclick="quickAsk('Which leads should we follow up with today?')">Top Leads</button>
-                    <button class="quick-prompt" onclick="quickAsk('What items are low on stock and need reordering?')">Stock Alerts</button>
-                    <button class="quick-prompt" onclick="quickAsk('Give me a quick business health overview for today')">Business Overview</button>
+                    <button class="quick-prompt" onclick="quickAsk('Give me a full business health check — revenue, staff, collections, leads, stock')">Health Check</button>
+                    <button class="quick-prompt" onclick="quickAsk('What needs my attention today? Flag any problems or urgent items')">Attention Needed</button>
+                    <button class="quick-prompt" onclick="quickAsk('Revenue analysis — branch breakdown, top customers, compare to yesterday and last week')">Revenue Analysis</button>
+                    <button class="quick-prompt" onclick="quickAsk('Collection report — overdue aging, top debtors, collection rate, payment promises due')">Collection Report</button>
+                    <button class="quick-prompt" onclick="quickAsk('Full staff report — who is present, absent, late arrivals, break violations, pending OT')">Staff Report</button>
+                    <button class="quick-prompt" onclick="quickAsk('Today\'s attendance summary — present count, absent list, any late arrivals')">Attendance</button>
+                    <button class="quick-prompt" onclick="quickAsk('Inventory alerts — out of stock items, below reorder level, recent stock checks')">Inventory Alerts</button>
+                    <button class="quick-prompt" onclick="quickAsk('Leads pipeline — status funnel, follow-ups due today, stale leads, top scored leads')">Leads Pipeline</button>
+                    <button class="quick-prompt" onclick="quickAsk('What are some growth ideas for our paint business based on current data?')">Growth Ideas</button>
+                    <button class="quick-prompt" onclick="quickAsk('Customer analysis — top buyers this month, new vs returning, any concerns?')">Customer Analysis</button>
+                    <button class="quick-prompt" onclick="quickAsk('Suggest software improvements for our business manager app based on what you see in the data')">Software Ideas</button>
+                    <button class="quick-prompt" onclick="quickAsk('Compare this week vs last week — revenue, collections, leads, staff performance')">Week Comparison</button>
                 </div>
                 <div class="chat-messages" id="chatMessages">
                     <div style="text-align:center; color:#9ca3af; padding:3rem 1rem; font-size:0.875rem;">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" style="margin:0 auto 1rem"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/><path d="M8.24 4.73A4 4 0 0 1 12 2"/><circle cx="12" cy="12" r="2"/></svg>
-                        <p style="font-weight:600; color:#6b7280; margin-bottom:0.25rem;">Ask me anything about your business</p>
-                        <p>I have access to your Zoho Books, attendance, leads, and stock data.</p>
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="1.5" style="margin:0 auto 1rem"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/><path d="M8.24 4.73A4 4 0 0 1 12 2"/><path d="M5 10a4 4 0 0 1 6.5-3.1"/><path d="M2 14a4 4 0 0 1 3-3.87"/><path d="M7 18a4 4 0 0 1-2-7.46"/><path d="M9.84 21.02A4 4 0 0 1 7 18"/><path d="M14 22a4 4 0 0 1-2.18-3.17"/><path d="M17 18a4 4 0 0 1-5.22 3.81"/><path d="M22 14a4 4 0 0 1-5 3.87"/><path d="M19 10a4 4 0 0 1 3 3.87"/><circle cx="12" cy="12" r="2"/></svg>
+                        <p style="font-weight:700; color:#374151; margin-bottom:0.25rem; font-size:1rem;">QC Assistant Manager</p>
+                        <p style="margin-bottom:0.5rem;">I have full access to all your business data — revenue, staff, leads, stock, collections, and more.</p>
+                        <p style="font-size:0.75rem; color:#9ca3af;">Ask me anything or use the quick prompts above to get started.</p>
                     </div>
                 </div>
                 <div class="chat-input-area">
-                    <textarea id="chatInput" rows="1" placeholder="Ask about revenue, staff, leads, stock..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+                    <textarea id="chatInput" rows="1" placeholder="Ask me anything — revenue, staff, leads, stock, growth ideas..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
                     <button class="chat-send-btn" id="sendBtn" onclick="sendMessage()">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     </button>
@@ -230,6 +259,36 @@
         <div id="insightsEmpty" style="text-align:center; padding:3rem; color:#9ca3af; display:none;">
             <p style="font-weight:600; margin-bottom:0.25rem;">No insights yet</p>
             <p style="font-size:0.8125rem;">Run an analysis to generate AI-powered business insights.</p>
+        </div>
+    </div>
+
+    <!-- Tab: Suggestions -->
+    <div id="tab-suggestions" class="tab-content" style="display:none">
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem; align-items:center;">
+            <button class="category-pill active" onclick="filterSuggestions('all', this)">All</button>
+            <button class="category-pill" onclick="filterSuggestions('operations', this)">Operations</button>
+            <button class="category-pill" onclick="filterSuggestions('software', this)">Software</button>
+            <button class="category-pill" onclick="filterSuggestions('marketing', this)">Marketing</button>
+            <button class="category-pill" onclick="filterSuggestions('staffing', this)">Staffing</button>
+            <button class="category-pill" onclick="filterSuggestions('inventory', this)">Inventory</button>
+            <button class="category-pill" onclick="filterSuggestions('financial', this)">Financial</button>
+            <button class="category-pill" onclick="filterSuggestions('growth', this)">Growth</button>
+            <div style="flex:1"></div>
+            <select id="sugStatusFilter" onchange="filterSuggestions(currentSugCategory)" style="padding:0.375rem 0.75rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem;">
+                <option value="">All Status</option>
+                <option value="new">New</option>
+                <option value="acknowledged">Acknowledged</option>
+                <option value="in_progress">In Progress</option>
+                <option value="implemented">Implemented</option>
+                <option value="dismissed">Dismissed</option>
+            </select>
+        </div>
+
+        <div id="suggestionsGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:1rem;" class="insight-grid"></div>
+        <div id="suggestionsEmpty" style="text-align:center; padding:3rem; color:#9ca3af; display:none;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" style="margin:0 auto 1rem"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+            <p style="font-weight:600; margin-bottom:0.25rem;">No suggestions yet</p>
+            <p style="font-size:0.8125rem;">AI suggestions will appear here as the system analyzes your business data.</p>
         </div>
     </div>
 
@@ -304,8 +363,29 @@
                     <input type="number" id="cfgTemp" min="0.1" max="1" step="0.1" onchange="saveConfig('temperature', this.value)" style="width:70px; padding:0.375rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem; text-align:center;">
                 </div>
                 <div class="config-row">
-                    <div><div class="config-label">Max Tokens</div><div class="config-desc">Max output tokens per request</div></div>
+                    <div><div class="config-label">Max Tokens (Analysis)</div><div class="config-desc">Max output tokens for analysis runs</div></div>
                     <input type="number" id="cfgMaxTokens" min="256" max="8192" step="256" onchange="saveConfig('max_tokens_per_request', this.value)" style="width:80px; padding:0.375rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem; text-align:center;">
+                </div>
+            </div>
+
+            <!-- Chat Config -->
+            <div class="config-card">
+                <h3>Chat Settings (Assistant Manager)</h3>
+                <div class="config-row">
+                    <div><div class="config-label">Chat Max Tokens</div><div class="config-desc">Max output tokens for chat responses</div></div>
+                    <input type="number" id="cfgChatMaxTokens" min="1024" max="16384" step="1024" onchange="saveConfig('chat_max_tokens', this.value)" style="width:80px; padding:0.375rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem; text-align:center;">
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Chat Temperature</div><div class="config-desc">Higher = more creative chat (0.1-1.0)</div></div>
+                    <input type="number" id="cfgChatTemp" min="0.1" max="1" step="0.1" onchange="saveConfig('chat_temperature', this.value)" style="width:70px; padding:0.375rem; border-radius:8px; border:1px solid #d1d5db; font-size:0.8125rem; text-align:center;">
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Daily Snapshots</div><div class="config-desc">Cache business data at 6AM, 12PM, 6PM IST</div></div>
+                    <label class="toggle-switch"><input type="checkbox" id="cfgDailySnapshot" onchange="saveConfig('daily_snapshot_enabled', this.checked?'1':'0')"><span class="toggle-track"></span></label>
+                </div>
+                <div class="config-row">
+                    <div><div class="config-label">Refresh Snapshot Now</div><div class="config-desc">Manually generate a fresh business snapshot</div></div>
+                    <button class="run-btn" id="refreshSnapshotBtn" onclick="refreshSnapshot(this)">Refresh</button>
                 </div>
             </div>
 
@@ -368,6 +448,7 @@ function switchTab(tab) {
     document.getElementById('tab-' + tab).style.display = '';
     event.currentTarget.classList.add('active');
     if (tab === 'insights') loadInsights();
+    if (tab === 'suggestions') loadSuggestions();
     if (tab === 'settings') loadSettings();
 }
 
@@ -405,9 +486,10 @@ async function newConversation() {
     currentConvId = null;
     document.getElementById('chatMessages').innerHTML = `
         <div style="text-align:center; color:#9ca3af; padding:3rem 1rem; font-size:0.875rem;">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" style="margin:0 auto 1rem"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/><circle cx="12" cy="12" r="2"/></svg>
-            <p style="font-weight:600; color:#6b7280; margin-bottom:0.25rem;">Start a new conversation</p>
-            <p>Ask about revenue, staff, leads, stock, or any business question.</p>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="1.5" style="margin:0 auto 1rem"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/><path d="M8.24 4.73A4 4 0 0 1 12 2"/><path d="M5 10a4 4 0 0 1 6.5-3.1"/><path d="M2 14a4 4 0 0 1 3-3.87"/><path d="M7 18a4 4 0 0 1-2-7.46"/><path d="M9.84 21.02A4 4 0 0 1 7 18"/><path d="M14 22a4 4 0 0 1-2.18-3.17"/><path d="M17 18a4 4 0 0 1-5.22 3.81"/><path d="M22 14a4 4 0 0 1-5 3.87"/><path d="M19 10a4 4 0 0 1 3 3.87"/><circle cx="12" cy="12" r="2"/></svg>
+            <p style="font-weight:700; color:#374151; margin-bottom:0.25rem; font-size:1rem;">QC Assistant Manager</p>
+            <p style="margin-bottom:0.5rem;">I have full access to all your business data — revenue, staff, leads, stock, collections, and more.</p>
+            <p style="font-size:0.75rem; color:#9ca3af;">Ask me anything or use the quick prompts above to get started.</p>
         </div>`;
     document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
 }
@@ -702,6 +784,100 @@ async function triggerAnalysis(type, btn) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SUGGESTIONS
+// ═══════════════════════════════════════════════════════════════
+let currentSugCategory = 'all';
+
+async function loadSuggestions() {
+    try {
+        const status = document.getElementById('sugStatusFilter').value;
+        let url = '/api/ai/suggestions?limit=100';
+        if (currentSugCategory !== 'all') url += '&category=' + currentSugCategory;
+        if (status) url += '&status=' + status;
+
+        const resp = await fetch(url, { headers });
+        const data = await resp.json();
+        const grid = document.getElementById('suggestionsGrid');
+        const empty = document.getElementById('suggestionsEmpty');
+        grid.innerHTML = '';
+
+        if (!data.data || !data.data.length) {
+            empty.style.display = '';
+            return;
+        }
+        empty.style.display = 'none';
+
+        data.data.forEach(s => {
+            const card = document.createElement('div');
+            card.className = `sug-card priority-${s.priority}`;
+            card.id = 'sug-' + s.id;
+
+            const statusOptions = ['new','acknowledged','in_progress','implemented','dismissed'];
+            const statusBtns = statusOptions.map(st =>
+                `<button class="sug-status-btn${s.status === st ? ' active' : ''}" onclick="updateSuggestionStatus(${s.id}, '${st}', this)">${st.replace(/_/g, ' ')}</button>`
+            ).join('');
+
+            card.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:0.5rem;">
+                    <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <span class="priority-badge ${s.priority}">${s.priority}</span>
+                        <span style="font-size:0.6875rem;color:#9ca3af;">${s.category}</span>
+                        <span style="font-size:0.6875rem;color:#9ca3af;background:#f3f4f6;padding:1px 6px;border-radius:4px;">${s.source}</span>
+                    </div>
+                </div>
+                <div style="font-weight:600;font-size:0.875rem;color:#1f2937;margin-bottom:0.375rem;">${escHtml(s.suggestion)}</div>
+                ${s.reasoning ? `<div style="font-size:0.8125rem;color:#4b5563;margin-bottom:0.5rem;">${escHtml(s.reasoning)}</div>` : ''}
+                <div style="display:flex;gap:0.25rem;flex-wrap:wrap;margin-top:0.5rem;">${statusBtns}</div>
+                <div style="font-size:0.6875rem;color:#9ca3af;margin-top:0.5rem;">${new Date(s.created_at).toLocaleString('en-IN')}</div>`;
+            grid.appendChild(card);
+        });
+    } catch (e) { /* ignore */ }
+
+    loadSuggestionsSummary();
+}
+
+function filterSuggestions(category, btn) {
+    currentSugCategory = category;
+    document.querySelectorAll('#tab-suggestions .category-pill').forEach(p => p.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    loadSuggestions();
+}
+
+async function updateSuggestionStatus(id, status, btn) {
+    try {
+        await fetch(`/api/ai/suggestions/${id}`, {
+            method: 'PUT', headers,
+            body: JSON.stringify({ status })
+        });
+        // Update UI: highlight clicked button, unhighlight others
+        const card = document.getElementById('sug-' + id);
+        if (card) {
+            card.querySelectorAll('.sug-status-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+        loadSuggestionsSummary();
+        showToast('Status updated');
+    } catch (e) {
+        showToast('Failed to update', 'error');
+    }
+}
+
+async function loadSuggestionsSummary() {
+    try {
+        const resp = await fetch('/api/ai/suggestions/summary', { headers });
+        const data = await resp.json();
+        const badge = document.getElementById('suggestionsBadge');
+        const newCount = data.by_status?.new || 0;
+        if (newCount > 0) {
+            badge.style.display = '';
+            badge.textContent = newCount > 99 ? '99+' : newCount;
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch (e) { /* ignore */ }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════════════════════════════
 async function loadSettings() {
@@ -725,6 +901,9 @@ async function loadSettings() {
         document.getElementById('cfgFallback').value = cfg.fallback_provider || 'claude';
         document.getElementById('cfgTemp').value = cfg.temperature || '0.3';
         document.getElementById('cfgMaxTokens').value = cfg.max_tokens_per_request || '4096';
+        document.getElementById('cfgChatMaxTokens').value = cfg.chat_max_tokens || '8192';
+        document.getElementById('cfgChatTemp').value = cfg.chat_temperature || '0.5';
+        document.getElementById('cfgDailySnapshot').checked = cfg.daily_snapshot_enabled === '1';
         document.getElementById('cfgZohoDaily').checked = cfg.zoho_daily_enabled === '1';
         document.getElementById('cfgStaffDaily').checked = cfg.staff_daily_enabled === '1';
         document.getElementById('cfgLeadScoring').checked = cfg.lead_scoring_enabled === '1';
@@ -762,6 +941,19 @@ async function loadSettings() {
     } catch (e) {
         console.error('Failed to load settings:', e);
     }
+}
+
+async function refreshSnapshot(btn) {
+    btn.classList.add('running');
+    btn.textContent = 'Refreshing...';
+    try {
+        await fetch('/api/ai/context/refresh', { method: 'POST', headers });
+        showToast('Business snapshot refreshed');
+    } catch (e) {
+        showToast('Failed to refresh snapshot', 'error');
+    }
+    btn.classList.remove('running');
+    btn.textContent = 'Refresh';
 }
 
 async function saveConfig(key, value) {
@@ -863,6 +1055,7 @@ if (window.qcSocket) {
 // ═══════════════════════════════════════════════════════════════
 loadConversations();
 loadInsightsSummary();
+loadSuggestionsSummary();
 </script>
 
 <style>

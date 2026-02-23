@@ -993,15 +993,16 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 
 **Architecture**: Dual AI provider system (Google Gemini + Anthropic Claude) with automatic failover. Daily/weekly automated analysis of business data with WhatsApp delivery. Interactive chat interface for natural language business queries.
 
-**Services (6 files)**:
+**Services (7 files)**:
 | File | Purpose |
 |------|---------|
-| `services/ai-engine.js` | Dual LLM abstraction — `generate()`, `streamToResponse()`, `generateWithFailover()`, `streamWithFailover()` |
+| `services/ai-engine.js` | Dual LLM abstraction — `generate()`, `streamToResponse()`, `generateWithFailover()`, `streamWithFailover()`, `getChatSystemPrompt()` |
+| `services/ai-context-builder.js` | **Comprehensive business context for chat** — Tier 1 quick summary + Tier 2 deep category-specific context + daily snapshot generation |
 | `services/ai-analyzer.js` | Zoho business analysis (revenue, collections, overdue, branch performance, stock alerts) |
 | `services/ai-staff-analyzer.js` | Staff performance (attendance, breaks, overtime, late arrivals, weekly trends) |
 | `services/ai-lead-manager.js` | Deterministic lead scoring (0-100) + AI enhancement, stale lead detection |
 | `services/ai-marketing.js` | Marketing strategy (brand/category trends, customer segments, slow-moving stock) |
-| `services/ai-scheduler.js` | Cron orchestrator for all automated analysis jobs |
+| `services/ai-scheduler.js` | Cron orchestrator for all automated analysis jobs + daily snapshot crons |
 
 **Routes**: `routes/ai.js` — 15+ endpoints
 | Method | Endpoint | Purpose |
@@ -1023,14 +1024,20 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 | GET | `/api/ai/config` | Get AI configuration |
 | PUT | `/api/ai/config` | Update AI configuration |
 | GET | `/api/ai/stats` | Usage stats (tokens, runs, costs) |
+| GET | `/api/ai/suggestions` | List AI suggestions (filter by category, status) |
+| GET | `/api/ai/suggestions/summary` | Suggestion counts by status |
+| PUT | `/api/ai/suggestions/:id` | Update suggestion status |
+| POST | `/api/ai/context/refresh` | Manually refresh daily business snapshot |
 
-**Database (6 tables)**:
+**Database (8 tables)**:
 - `ai_conversations` — Chat sessions per user
-- `ai_messages` — Messages within conversations (user/assistant/system)
+- `ai_messages` — Messages within conversations (user/assistant/system, `context_summary` for debug)
 - `ai_analysis_runs` — Automated analysis execution log
 - `ai_insights` — Extracted insights with category, severity, actions
 - `ai_lead_scores` — Deterministic + AI lead scores with breakdown
 - `ai_config` — Key-value configuration for schedules, providers, thresholds
+- `ai_business_context` — Cached daily business snapshots (generated at 6AM/12PM/6PM IST)
+- `ai_suggestions` — AI improvement recommendations with category, priority, status tracking
 
 **Automated Schedules** (all configurable via ai_config):
 - Zoho daily analysis: 9 PM IST (revenue, collections, overdue, stock)
@@ -1038,13 +1045,29 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 - Lead scoring: Every 6 hours (deterministic + AI recommendations)
 - Weekly Zoho analysis: Monday 8 AM IST
 - Weekly marketing tips: Monday 9 AM IST
+- **Daily business snapshots: 6 AM, 12 PM, 6 PM IST** (cached context for chat)
 
-**Chat Features**:
+**Chat Features (Assistant Manager — upgraded Feb 23)**:
+- **Dedicated CHAT_SYSTEM_PROMPT**: Full "QC Assistant Manager" persona — data-first, comparative, proactive, actionable
+- **Two-tier context system** (`ai-context-builder.js`):
+  - Tier 1: Quick summary always injected (~50ms) — today's revenue vs yesterday, collections, overdue, staff, leads, stock
+  - Tier 2: Category-specific deep context triggered by keyword matching (8 categories):
+    - Revenue: branch breakdown, top 5 customers, monthly/weekly comparison
+    - Collections: collection rate, overdue aging brackets (1-30/31-60/61-90/90+), top 10 debtors, payment promises
+    - Staff: currently clocked-in, absent list, late arrivals, break excess, pending OT, completed shifts
+    - Leads: status funnel, stale leads, today's follow-ups, top AI-scored leads
+    - Inventory: out-of-stock items, below reorder level, recent stock checks
+    - WhatsApp: recent campaign stats
+    - Insights: unread critical/warning alerts
+    - General: loads ALL categories above
+- **Daily snapshot caching** in `ai_business_context` table — used as fallback when no specific category detected
 - SSE streaming responses with real-time token display
-- Auto-context injection: detects business intent (revenue/staff/leads/stock) and injects live DB data
 - Conversation history with per-user isolation
 - Provider toggle (Gemini/Claude) per session
-- Quick prompt buttons for common queries
+- **12 quick prompt buttons** (Health Check, Revenue Analysis, Collection Report, Staff Report, etc.)
+- **Suggestions tab** (4th tab): filter by category/status, priority badges, inline status updates
+- Chat-specific config: `chat_max_tokens` (default 8192), `chat_temperature` (default 0.5)
+- Context summary saved in `ai_messages.context_summary` for debugging
 
 **Lead Scoring Formula** (deterministic, 0-100):
 - Budget: 0-25 pts | Status: 0-20 pts | Recency: 0-20 pts
@@ -1052,10 +1075,10 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 
 **WhatsApp Delivery**: Analysis summaries sent via General WhatsApp (branch_id=0) to configured recipients.
 
-**Page**: `admin-ai.html` (3 tabs: Chat, Insights, Settings)
+**Page**: `admin-ai.html` (4 tabs: Chat, Insights, Suggestions, Settings)
 - **Permission**: `system.ai`
 - **Navigation**: System sub-nav → AI tab
-- **Migration**: `migrations/migrate-ai-tables.js`
+- **Migrations**: `migrations/migrate-ai-tables.js` (initial), `migrations/migrate-ai-assistant-upgrade.js` (Assistant Manager upgrade)
 
 ---
 
@@ -1483,7 +1506,18 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
-### 2026-02-23 - AI Business Intelligence System
+### 2026-02-23 - AI Assistant Manager Upgrade
+- Upgraded AI Chat to full "QC Assistant Manager" with dedicated persona and comprehensive business context
+- New `services/ai-context-builder.js`: Two-tier context system (Tier 1 quick summary always injected, Tier 2 deep context keyword-triggered with 8 categories)
+- New `CHAT_SYSTEM_PROMPT` in ai-engine.js: data-first, comparative, proactive, confident Assistant Manager personality
+- New tables: `ai_business_context` (daily snapshots), `ai_suggestions` (AI improvement recommendations)
+- Daily snapshot crons (6 AM, 12 PM, 6 PM IST) for cached business context
+- New endpoints: suggestions CRUD (list/update/summary), context refresh
+- Chat-specific config: `chat_max_tokens` (8192), `chat_temperature` (0.5), `daily_snapshot_enabled`
+- UI: 12 categorized quick prompts, new Suggestions tab with category/status filters, improved welcome text
+- Migration: `migrations/migrate-ai-assistant-upgrade.js`
+
+### 2026-02-23 - AI Business Intelligence System (initial)
 - Full AI-powered business automation with dual provider (Gemini + Claude) and automatic failover
 - 6 new services: ai-engine, ai-analyzer, ai-staff-analyzer, ai-lead-manager, ai-marketing, ai-scheduler
 - Interactive AI chat with SSE streaming, conversation history, business context auto-injection

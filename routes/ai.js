@@ -13,11 +13,12 @@ const aiStaffAnalyzer = require('../services/ai-staff-analyzer');
 const aiLeadManager = require('../services/ai-lead-manager');
 const aiMarketing = require('../services/ai-marketing');
 const aiScheduler = require('../services/ai-scheduler');
+const contextBuilder = require('../services/ai-context-builder');
 
 let pool = null;
 let io = null;
 
-function setPool(p) { pool = p; }
+function setPool(p) { pool = p; contextBuilder.setPool(p); }
 function setIO(i) { io = i; }
 
 // ═══════════════════════════════════════════════════════════════
@@ -119,27 +120,36 @@ router.post('/chat', requireAuth, async (req, res) => {
             [convId, 'user', message]
         );
 
-        // Build context: load conversation history
+        // Build context: load conversation history + business context
         const [history] = await pool.query(
             'SELECT role, content FROM ai_messages WHERE conversation_id = ? ORDER BY created_at ASC',
             [convId]
         );
 
-        // Detect business intent and inject context
-        const businessContext = await buildBusinessContext(message);
+        // Build comprehensive business context via context builder
+        const { contextText, contextSummary } = await contextBuilder.buildChatContext(message);
+
+        // Use chat-specific system prompt + context
+        const config = await aiEngine.getConfig();
+        const chatMaxTokens = config.chat_max_tokens || '8192';
+        const chatTemperature = config.chat_temperature || '0.5';
 
         const messages = [
-            { role: 'system', content: aiEngine.getSystemPrompt(businessContext) },
+            { role: 'system', content: aiEngine.getChatSystemPrompt(contextText) },
             ...history.map(h => ({ role: h.role, content: h.content }))
         ];
 
-        // Stream response
-        const result = await aiEngine.streamWithFailover(messages, res, { provider });
+        // Stream response with chat-specific settings
+        const result = await aiEngine.streamWithFailover(messages, res, {
+            provider,
+            maxTokens: chatMaxTokens,
+            temperature: chatTemperature
+        });
 
-        // Save assistant message
+        // Save assistant message with context summary for debugging
         await pool.query(
-            'INSERT INTO ai_messages (conversation_id, role, content, tokens_used, model) VALUES (?, ?, ?, ?, ?)',
-            [convId, 'assistant', result.text, result.tokensUsed, result.model]
+            'INSERT INTO ai_messages (conversation_id, role, content, tokens_used, model, context_summary) VALUES (?, ?, ?, ?, ?, ?)',
+            [convId, 'assistant', result.text, result.tokensUsed, result.model, contextSummary]
         );
 
         // Update conversation timestamp
@@ -155,98 +165,6 @@ router.post('/chat', requireAuth, async (req, res) => {
         res.end();
     }
 });
-
-// ─── Business Context Injection ────────────────────────────────
-
-async function buildBusinessContext(message) {
-    const lower = message.toLowerCase();
-    const contextParts = [];
-
-    try {
-        // Revenue / sales queries
-        if (lower.match(/revenue|sales|invoice|billing|turnover/)) {
-            const [rev] = await pool.query(`
-                SELECT
-                    COALESCE(SUM(CASE WHEN DATE(invoice_date) = CURDATE() THEN total END), 0) as today,
-                    COALESCE(SUM(CASE WHEN DATE(invoice_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN total END), 0) as yesterday,
-                    COALESCE(SUM(CASE WHEN YEARWEEK(invoice_date, 1) = YEARWEEK(CURDATE(), 1) THEN total END), 0) as this_week,
-                    COALESCE(SUM(CASE WHEN YEAR(invoice_date) = YEAR(CURDATE()) AND MONTH(invoice_date) = MONTH(CURDATE()) THEN total END), 0) as this_month,
-                    COUNT(CASE WHEN DATE(invoice_date) = CURDATE() THEN 1 END) as today_count,
-                    COUNT(CASE WHEN YEAR(invoice_date) = YEAR(CURDATE()) AND MONTH(invoice_date) = MONTH(CURDATE()) THEN 1 END) as month_count
-                FROM zoho_invoices
-            `);
-            contextParts.push(`Current Revenue Data: Today ₹${rev[0].today} (${rev[0].today_count} invoices), Yesterday ₹${rev[0].yesterday}, This Week ₹${rev[0].this_week}, This Month ₹${rev[0].this_month} (${rev[0].month_count} invoices)`);
-        }
-
-        // Collections / payments
-        if (lower.match(/collection|payment|received|paid/)) {
-            const [col] = await pool.query(`
-                SELECT
-                    COALESCE(SUM(CASE WHEN DATE(payment_date) = CURDATE() THEN payment_amount END), 0) as today,
-                    COALESCE(SUM(CASE WHEN YEAR(payment_date) = YEAR(CURDATE()) AND MONTH(payment_date) = MONTH(CURDATE()) THEN payment_amount END), 0) as this_month
-                FROM zoho_payments
-            `);
-            contextParts.push(`Collections: Today ₹${col[0].today}, This Month ₹${col[0].this_month}`);
-        }
-
-        // Overdue
-        if (lower.match(/overdue|outstanding|pending|due|debt/)) {
-            const [od] = await pool.query(`
-                SELECT COUNT(*) as count, COALESCE(SUM(balance), 0) as total
-                FROM zoho_invoices WHERE status = 'overdue' AND balance > 0
-            `);
-            contextParts.push(`Overdue: ${od[0].count} invoices totaling ₹${od[0].total}`);
-        }
-
-        // Staff / attendance
-        if (lower.match(/staff|attendance|employee|worker|present|absent|break|overtime/)) {
-            const [att] = await pool.query(`
-                SELECT
-                    COUNT(*) as present,
-                    (SELECT COUNT(*) FROM users WHERE role = 'staff' AND status = 'active') as total_staff,
-                    COALESCE(AVG(total_working_minutes), 0) as avg_working,
-                    COALESCE(SUM(overtime_minutes), 0) as total_ot
-                FROM staff_attendance WHERE date = CURDATE()
-            `);
-            const absent = att[0].total_staff - att[0].present;
-            contextParts.push(`Staff Today: ${att[0].present} present, ${absent} absent (of ${att[0].total_staff}), Avg work ${Math.round(att[0].avg_working)} min, Total OT ${att[0].total_ot} min`);
-        }
-
-        // Leads
-        if (lower.match(/lead|prospect|pipeline|follow.?up/)) {
-            const [leads] = await pool.query(`
-                SELECT
-                    COUNT(*) as total,
-                    COUNT(CASE WHEN status = 'new' THEN 1 END) as new_leads,
-                    COUNT(CASE WHEN status = 'interested' THEN 1 END) as interested,
-                    COUNT(CASE WHEN status = 'quoted' THEN 1 END) as quoted,
-                    COUNT(CASE WHEN DATEDIFF(CURDATE(), updated_at) > 7 THEN 1 END) as stale
-                FROM leads WHERE status NOT IN ('won', 'lost', 'closed')
-            `);
-            contextParts.push(`Active Leads: ${leads[0].total} total (${leads[0].new_leads} new, ${leads[0].interested} interested, ${leads[0].quoted} quoted, ${leads[0].stale} stale 7+ days)`);
-        }
-
-        // Stock
-        if (lower.match(/stock|inventory|product|item|reorder/)) {
-            const [stock] = await pool.query(`
-                SELECT
-                    COUNT(*) as total_items,
-                    COUNT(CASE WHEN zoho_stock_on_hand <= zoho_reorder_level AND zoho_reorder_level > 0 THEN 1 END) as below_reorder,
-                    COUNT(CASE WHEN zoho_stock_on_hand = 0 THEN 1 END) as out_of_stock
-                FROM zoho_items_map WHERE zoho_status = 'active'
-            `);
-            contextParts.push(`Stock: ${stock[0].total_items} items, ${stock[0].below_reorder} below reorder level, ${stock[0].out_of_stock} out of stock`);
-        }
-    } catch (e) {
-        // Context injection failure is non-fatal
-        console.error('[AI Chat] Context build error:', e.message);
-    }
-
-    if (contextParts.length) {
-        return 'Current business data (auto-fetched from database):\n' + contextParts.join('\n');
-    }
-    return '';
-}
 
 // ═══════════════════════════════════════════════════════════════
 // INSIGHTS
@@ -462,6 +380,70 @@ router.put('/config', requireAuth, async (req, res) => {
         // Clear cached config so changes take effect immediately
         aiEngine.clearConfigCache();
         res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUGGESTIONS
+// ═══════════════════════════════════════════════════════════════
+
+// GET /api/ai/suggestions — list suggestions (filterable)
+router.get('/suggestions', requireAuth, async (req, res) => {
+    try {
+        const { category, status, limit = 50, offset = 0 } = req.query;
+        let where = 'WHERE 1=1';
+        const params = [];
+
+        if (category) { where += ' AND category = ?'; params.push(category); }
+        if (status) { where += ' AND status = ?'; params.push(status); }
+
+        const [rows] = await pool.query(
+            `SELECT id, category, suggestion, reasoning, priority, status, source, conversation_id, created_at, updated_at
+             FROM ai_suggestions ${where} ORDER BY FIELD(priority,'critical','high','medium','low'), created_at DESC LIMIT ? OFFSET ?`,
+            [...params, parseInt(limit), parseInt(offset)]
+        );
+        res.json({ data: rows });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/ai/suggestions/summary — counts by status
+router.get('/suggestions/summary', requireAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT status, COUNT(*) as count FROM ai_suggestions GROUP BY status
+        `);
+        const summary = { total: 0, by_status: {} };
+        rows.forEach(r => { summary.total += r.count; summary.by_status[r.status] = r.count; });
+        res.json(summary);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// PUT /api/ai/suggestions/:id — update status
+router.put('/suggestions/:id', requireAuth, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const validStatuses = ['new', 'acknowledged', 'in_progress', 'implemented', 'dismissed'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: `Invalid status. Valid: ${validStatuses.join(', ')}` });
+        }
+        await pool.query('UPDATE ai_suggestions SET status = ? WHERE id = ?', [status, req.params.id]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/ai/context/refresh — manually refresh daily snapshot
+router.post('/context/refresh', requireAuth, async (req, res) => {
+    try {
+        const data = await contextBuilder.generateDailySnapshot();
+        res.json({ success: true, data });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

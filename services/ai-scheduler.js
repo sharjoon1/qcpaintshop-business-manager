@@ -10,6 +10,7 @@ const aiAnalyzer = require('./ai-analyzer');
 const aiStaffAnalyzer = require('./ai-staff-analyzer');
 const aiLeadManager = require('./ai-lead-manager');
 const aiMarketing = require('./ai-marketing');
+const contextBuilder = require('./ai-context-builder');
 
 let pool = null;
 let sessionManager = null;
@@ -23,6 +24,7 @@ function setPool(p) {
     aiStaffAnalyzer.setPool(p);
     aiLeadManager.setPool(p);
     aiMarketing.setPool(p);
+    contextBuilder.setPool(p);
 }
 function setSessionManager(sm) { sessionManager = sm; }
 function setIO(i) { io = i; }
@@ -170,6 +172,22 @@ async function runMarketingWeekly() {
     }
 }
 
+// ─── Daily Snapshot ───────────────────────────────────────────
+
+async function runDailySnapshot() {
+    try {
+        const enabled = await getConfig('daily_snapshot_enabled');
+        if (enabled !== '1') { console.log('[AI Scheduler] Daily snapshot disabled'); return; }
+
+        console.log('[AI Scheduler] Generating daily business snapshot...');
+        const data = await contextBuilder.generateDailySnapshot();
+        console.log('[AI Scheduler] Daily snapshot generated successfully');
+        return data;
+    } catch (e) {
+        console.error('[AI Scheduler] Daily snapshot failed:', e.message);
+    }
+}
+
 // ─── Start / Stop ──────────────────────────────────────────────
 
 function start() {
@@ -188,7 +206,12 @@ function start() {
     // Weekly marketing tips — Monday 9:00 AM IST
     jobs.marketingWeekly = cron.schedule('0 9 * * 1', runMarketingWeekly, { timezone: 'Asia/Kolkata' });
 
-    console.log('[AI Scheduler] Started: zoho-daily(21:00), staff-daily(22:30), lead-scoring(6h), marketing(Mon 9AM)');
+    // Daily business snapshots — 6 AM, 12 PM, 6 PM IST
+    jobs.snapshotMorning = cron.schedule('0 6 * * *', runDailySnapshot, { timezone: 'Asia/Kolkata' });
+    jobs.snapshotNoon = cron.schedule('0 12 * * *', runDailySnapshot, { timezone: 'Asia/Kolkata' });
+    jobs.snapshotEvening = cron.schedule('0 18 * * *', runDailySnapshot, { timezone: 'Asia/Kolkata' });
+
+    console.log('[AI Scheduler] Started: zoho-daily(21:00), staff-daily(22:30), lead-scoring(6h), marketing(Mon 9AM), snapshots(6AM/12PM/6PM)');
 }
 
 function stop() {
@@ -207,5 +230,6 @@ module.exports = {
     runZohoWeekly,
     runStaffDaily,
     runLeadScoring,
-    runMarketingWeekly
+    runMarketingWeekly,
+    runDailySnapshot
 };
