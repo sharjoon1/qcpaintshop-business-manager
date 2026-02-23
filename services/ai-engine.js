@@ -6,7 +6,7 @@
  */
 
 const https = require('https');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -442,20 +442,26 @@ async function claudeStreamToResponse(messages, res, options = {}) {
 
 // ─── Clawdbot provider (Kai) ──────────────────────────────────
 
+// Clawdbot gateway helper script path — calls gateway WebSocket directly,
+// bypassing CLI argument size limits (kernel ARG_MAX / MAX_ARG_STRLEN)
+const CLAWDBOT_HELPER = path.join(__dirname, '..', 'scripts', 'clawdbot-call.mjs');
+
 function clawdbotExec(message) {
-    // Write prompt to a temp file to avoid E2BIG (argument too long for execve)
-    // Then use shell exec with $(cat file) to read it — the shell handles expansion
-    // internally after the process starts, bypassing the kernel arg limit
+    // Write prompt to temp file, then call the gateway helper which reads
+    // from file and sends via WebSocket (no argument size limit)
     const tmpFile = path.join(os.tmpdir(), `clawdbot-prompt-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`);
     fs.writeFileSync(tmpFile, message, 'utf8');
 
     return new Promise((resolve, reject) => {
-        const cmd = `clawdbot agent --agent main --message "$(cat '${tmpFile}')" --json --timeout 120`;
-        exec(cmd, { timeout: 130000, maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
+        execFile('node', [CLAWDBOT_HELPER, tmpFile], { timeout: 140000, maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
             // Clean up temp file
             try { fs.unlinkSync(tmpFile); } catch (_) {}
 
-            if (err) return reject(new Error(`Clawdbot exec failed: ${err.message}`));
+            if (err) {
+                // Include stderr for better debugging
+                const detail = stderr ? stderr.trim() : err.message;
+                return reject(new Error(`Clawdbot exec failed: ${detail}`));
+            }
             try {
                 const json = JSON.parse(stdout);
                 if (json.status !== 'ok') return reject(new Error(`Clawdbot returned status: ${json.status}`));
@@ -465,7 +471,7 @@ function clawdbotExec(message) {
                 const tokensUsed = (usage.input || 0) + (usage.output || 0);
                 resolve({ text, tokensUsed, model: `clawdbot/${model}`, provider: 'clawdbot' });
             } catch (e) {
-                reject(new Error(`Clawdbot JSON parse failed: ${e.message}`));
+                reject(new Error(`Clawdbot JSON parse failed: ${e.message}. stdout: ${stdout.substring(0, 200)}`));
             }
         });
     });
