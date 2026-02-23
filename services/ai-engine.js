@@ -6,7 +6,10 @@
  */
 
 const https = require('https');
-const { execFile } = require('child_process');
+const { exec } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 let pool = null;
 
@@ -440,9 +443,18 @@ async function claudeStreamToResponse(messages, res, options = {}) {
 // ─── Clawdbot provider (Kai) ──────────────────────────────────
 
 function clawdbotExec(message) {
+    // Write prompt to a temp file to avoid E2BIG (argument too long for execve)
+    // Then use shell exec with $(cat file) to read it — the shell handles expansion
+    // internally after the process starts, bypassing the kernel arg limit
+    const tmpFile = path.join(os.tmpdir(), `clawdbot-prompt-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`);
+    fs.writeFileSync(tmpFile, message, 'utf8');
+
     return new Promise((resolve, reject) => {
-        const args = ['agent', '--agent', 'main', '--message', message, '--json', '--timeout', '120'];
-        execFile('clawdbot', args, { timeout: 130000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
+        const cmd = `clawdbot agent --agent main --message "$(cat '${tmpFile}')" --json --timeout 120`;
+        exec(cmd, { timeout: 130000, maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
+            // Clean up temp file
+            try { fs.unlinkSync(tmpFile); } catch (_) {}
+
             if (err) return reject(new Error(`Clawdbot exec failed: ${err.message}`));
             try {
                 const json = JSON.parse(stdout);
