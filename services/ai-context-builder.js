@@ -546,10 +546,10 @@ async function buildInventoryContext() {
 async function buildWhatsAppContext() {
     try {
         const [campaigns] = await pool.query(`
-            SELECT name, status, total_recipients,
+            SELECT name, status, total_leads as total_recipients,
                    sent_count, delivered_count, read_count, failed_count,
                    created_at
-            FROM whatsapp_campaigns
+            FROM wa_campaigns
             ORDER BY created_at DESC LIMIT 5
         `);
 

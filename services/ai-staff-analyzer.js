@@ -17,7 +17,7 @@ async function collectStaffData(period = 'daily') {
     // Today's attendance with details
     const [attendance] = await pool.query(`
         SELECT
-            u.name, u.id as user_id, b.name as branch_name,
+            u.full_name, u.id as user_id, b.name as branch_name,
             sa.clock_in, sa.clock_out, sa.date,
             sa.total_working_minutes, sa.break_minutes, sa.overtime_minutes,
             sa.prayer_minutes, sa.outside_work_minutes,
@@ -28,14 +28,14 @@ async function collectStaffData(period = 'daily') {
         JOIN users u ON sa.user_id = u.id
         LEFT JOIN branches b ON u.branch_id = b.id
         WHERE sa.date = CURDATE()
-        ORDER BY u.name
+        ORDER BY u.full_name
     `);
 
     data.today_attendance = attendance;
 
     // Absent staff (users who are active but have no attendance today)
     const [absent] = await pool.query(`
-        SELECT u.name, u.id as user_id, b.name as branch_name
+        SELECT u.full_name, u.id as user_id, b.name as branch_name
         FROM users u
         LEFT JOIN branches b ON u.branch_id = b.id
         LEFT JOIN staff_attendance sa ON u.id = sa.user_id AND sa.date = CURDATE()
@@ -48,7 +48,7 @@ async function collectStaffData(period = 'daily') {
     try {
         const [lateArrivals] = await pool.query(`
             SELECT
-                u.name, sa.clock_in,
+                u.full_name, sa.clock_in,
                 shc.expected_start,
                 TIMESTAMPDIFF(MINUTE,
                     CONCAT(sa.date, ' ', shc.expected_start),
@@ -68,7 +68,7 @@ async function collectStaffData(period = 'daily') {
 
     // Break excess
     const [breakExcess] = await pool.query(`
-        SELECT u.name, sa.break_minutes, sa.excess_break_minutes, sa.break_allowance_minutes
+        SELECT u.full_name, sa.break_minutes, sa.excess_break_minutes, sa.break_allowance_minutes
         FROM staff_attendance sa
         JOIN users u ON sa.user_id = u.id
         WHERE sa.date = CURDATE() AND sa.excess_break_minutes > 0
@@ -80,7 +80,7 @@ async function collectStaffData(period = 'daily') {
     // OT requests today
     const [otRequests] = await pool.query(`
         SELECT
-            u.name, otr.status, otr.requested_minutes, otr.approved_minutes,
+            u.full_name, otr.status, otr.requested_minutes, otr.approved_minutes,
             otr.created_at
         FROM overtime_requests otr
         JOIN users u ON otr.user_id = u.id
@@ -109,7 +109,7 @@ async function collectStaffData(period = 'daily') {
     if (period === 'daily') {
         const [weeklyAvg] = await pool.query(`
             SELECT
-                u.name, u.id as user_id,
+                u.full_name, u.id as user_id,
                 COUNT(DISTINCT sa.date) as days_present,
                 COALESCE(AVG(sa.total_working_minutes), 0) as avg_working,
                 COALESCE(AVG(sa.break_minutes), 0) as avg_break,
@@ -119,7 +119,7 @@ async function collectStaffData(period = 'daily') {
             LEFT JOIN staff_attendance sa ON u.id = sa.user_id
                 AND sa.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
             WHERE u.role = 'staff' AND u.status = 'active'
-            GROUP BY u.id, u.name
+            GROUP BY u.id, u.full_name
             ORDER BY avg_working DESC
         `);
         data.weekly_averages = weeklyAvg;

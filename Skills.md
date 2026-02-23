@@ -998,12 +998,12 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 
 ### 2.23 AI Business Intelligence System
 
-**Architecture**: Dual AI provider system (Google Gemini + Anthropic Claude) with automatic failover. Daily/weekly automated analysis of business data with WhatsApp delivery. Interactive chat interface for natural language business queries.
+**Architecture**: Triple AI provider system (Google Gemini + Anthropic Claude + Clawdbot/Kai) with automatic failover chain. Daily/weekly automated analysis of business data with WhatsApp delivery. Interactive chat interface for natural language business queries.
 
 **Services (7 files)**:
 | File | Purpose |
 |------|---------|
-| `services/ai-engine.js` | Dual LLM abstraction — `generate()`, `streamToResponse()`, `generateWithFailover()`, `streamWithFailover()`, `getChatSystemPrompt()` |
+| `services/ai-engine.js` | Triple LLM abstraction (Gemini + Claude + Clawdbot) — `generate()`, `streamToResponse()`, `generateWithFailover()`, `streamWithFailover()`, `getChatSystemPrompt()` |
 | `services/ai-context-builder.js` | **Comprehensive business context for chat** — Tier 1 quick summary + Tier 2 deep category-specific context + daily snapshot generation |
 | `services/ai-analyzer.js` | Zoho business analysis (revenue, collections, overdue, branch performance, stock alerts) |
 | `services/ai-staff-analyzer.js` | Staff performance (attendance, breaks, overtime, late arrivals, weekly trends) |
@@ -1369,7 +1369,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | **Purchase Suggestions** | `services/purchase-suggestion.js` | Reorder calculation engine |
 | **Notification Service** | `services/notification-service.js` | Multi-channel notification dispatch |
 | **Email Service** | `services/email-service.js` | Shared branded email sending (SMTP/Nodemailer) |
-| **AI Engine** | `services/ai-engine.js` | Dual LLM abstraction (Gemini + Claude) with failover and streaming |
+| **AI Engine** | `services/ai-engine.js` | Triple LLM abstraction (Gemini + Claude + Clawdbot/Kai) with 3-provider failover chain and streaming |
 | **AI Analyzer** | `services/ai-analyzer.js` | Zoho business data analysis (revenue, collections, overdue) |
 | **AI Staff Analyzer** | `services/ai-staff-analyzer.js` | Staff performance analysis (attendance, breaks, OT) |
 | **AI Lead Manager** | `services/ai-lead-manager.js` | Lead scoring (deterministic + AI) and stale lead detection |
@@ -1662,6 +1662,25 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-02-23 - App Analysis Bug Fixes (6 Critical + 2 Warning)
+Based on AI App Analyzer report, fixed critical production errors:
+- **`ai-analyzer.js`**: Fixed `payment_amount` → `amount` column name (4 occurrences) — zoho_payments table uses `amount`
+- **`ai-staff-analyzer.js`**: Fixed `u.name` → `u.full_name` (8 occurrences) — users table uses `full_name`
+- **`ai-context-builder.js`**: Fixed `whatsapp_campaigns` → `wa_campaigns` table name; fixed `total_recipients` → `total_leads` column alias
+- **`routes/attendance.js`** + **`services/auto-clockout.js`**: Fixed `notificationService.sendNotification()` → `notificationService.send()` (4 calls), also fixed `message` param → `body` to match actual API signature
+- **`services/whatsapp-session-manager.js`**: Added `sanitizePhone()` helper — strips non-numeric chars except leading +, applied at all 3 insert points (incoming msg, outbound record, session connect)
+- **Migration**: `migrations/fix-app-analysis-issues-v2.js` — widens phone columns VARCHAR(50)→VARCHAR(100), adds 15 FK indexes, adds 6 `updated_at` columns
+- Previous v1 migration (`fix-app-analysis-issues.js`) already handled: user role enum (added manager/accountant), 10 FK indexes, 13 updated_at columns
+
+### 2026-02-23 - Clawdbot (Kai) AI Provider Integration
+- Third AI provider added: Clawdbot via Gateway Bridge Pattern (WebSocket on ws://127.0.0.1:18789)
+- Gateway bridge script `scripts/clawdbot-call.mjs` bypasses Linux ARG_MAX limits
+- 3-provider failover chain: primary → fallback → remaining (deduplicated)
+- Simulated SSE streaming (100-char chunks) since Clawdbot returns full response
+- Nginx `/api/ai/` location block: `proxy_read_timeout 300s`, `proxy_buffering off`
+- Timeout chain: agent 280s → gateway 290s → execFile 300s → Nginx 300s
+- Full guide: `docs/clawdbot-integration-guide.md` (v2.0)
 
 ### 2026-02-23 - AI App Analyzer (Tab 5)
 - New `services/app-metadata-collector.js` with 5 scanners (database schema, route map, errors, health, business stats) + `runFullScan()` orchestrator with 5-min cache

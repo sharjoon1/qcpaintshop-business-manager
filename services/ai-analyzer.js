@@ -41,15 +41,15 @@ async function collectZohoData(period = 'daily') {
 
     // Collections (payments)
     const [todayCol] = await pool.query(`
-        SELECT COALESCE(SUM(payment_amount), 0) as total, COUNT(*) as count
+        SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
         FROM zoho_payments WHERE DATE(payment_date) = CURDATE()
     `);
     const [yesterdayCol] = await pool.query(`
-        SELECT COALESCE(SUM(payment_amount), 0) as total, COUNT(*) as count
+        SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
         FROM zoho_payments WHERE DATE(payment_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
     `);
     const [monthCol] = await pool.query(`
-        SELECT COALESCE(SUM(payment_amount), 0) as total, COUNT(*) as count
+        SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
         FROM zoho_payments WHERE YEAR(payment_date) = YEAR(CURDATE()) AND MONTH(payment_date) = MONTH(CURDATE())
     `);
 
@@ -136,7 +136,7 @@ async function collectZohoData(period = 'daily') {
         const [weeklyCol] = await pool.query(`
             SELECT
                 DATE(payment_date) as date,
-                COALESCE(SUM(payment_amount), 0) as collected
+                COALESCE(SUM(amount), 0) as collected
             FROM zoho_payments
             WHERE payment_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
             GROUP BY DATE(payment_date)

@@ -131,11 +131,10 @@ async function autoClockoutForOTTimeout(record, now) {
                 "SELECT id FROM users WHERE role IN ('admin','super_admin') AND status = 'active'"
             );
             for (const admin of admins) {
-                await notificationService.sendNotification({
-                    userId: admin.id,
+                await notificationService.send(admin.id, {
                     type: 'attendance',
                     title: 'OT Timeout Clock-Out',
-                    message: `${record.full_name} auto-clocked out (no OT prompt response after ${record.ot_auto_timeout_minutes || 15} min)`,
+                    body: `${record.full_name} auto-clocked out (no OT prompt response after ${record.ot_auto_timeout_minutes || 15} min)`,
                     data: { user_id: record.user_id, attendance_id: record.id }
                 });
             }

@@ -28,6 +28,19 @@ try {
 
 const GENERAL_ID = 0; // Sentinel value for company-wide General WhatsApp
 
+/**
+ * Sanitize phone number: strip all non-numeric chars except leading +
+ * Truncate to 50 chars max to fit VARCHAR columns safely
+ */
+function sanitizePhone(phone) {
+    if (!phone) return '';
+    // Keep leading + if present, strip everything else non-numeric
+    const hasPlus = phone.startsWith('+');
+    const digits = phone.replace(/[^0-9]/g, '');
+    const sanitized = (hasPlus ? '+' : '') + digits;
+    return sanitized.substring(0, 50);
+}
+
 let pool;
 let io;
 
@@ -103,7 +116,7 @@ async function connectBranch(branchId, userId) {
         // Ready event
         client.on('ready', async () => {
             const info = client.info;
-            const phoneNumber = info?.wid?.user || '';
+            const phoneNumber = sanitizePhone(info?.wid?.user || '');
             console.log(`[WhatsApp Sessions] Branch ${branchId} connected: ${phoneNumber}`);
 
             sessionEntry.status = 'connected';
@@ -181,7 +194,7 @@ async function connectBranch(branchId, userId) {
                 // Skip group messages and status broadcasts
                 if (msg.from.endsWith('@g.us') || msg.from === 'status@broadcast') return;
 
-                const phone = msg.from.replace('@c.us', '');
+                const phone = sanitizePhone(msg.from.replace('@c.us', ''));
                 const contact = await msg.getContact();
                 const pushname = contact?.pushname || contact?.name || '';
 
@@ -632,6 +645,7 @@ async function upsertSession(branchId, data) {
  */
 async function recordOutbound(branchId, phone, data) {
     if (!pool) return;
+    phone = sanitizePhone(phone);
     try {
         const now = new Date();
         await pool.query(`

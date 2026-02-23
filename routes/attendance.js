@@ -3115,11 +3115,10 @@ router.post('/request-overtime', requireAuth, async (req, res) => {
                 const staffName = staffInfo.length > 0 ? staffInfo[0].full_name : 'Staff';
 
                 for (const admin of admins) {
-                    await notificationService.sendNotification({
-                        userId: admin.id,
+                    await notificationService.send(admin.id, {
                         type: 'attendance',
                         title: 'OT Request',
-                        message: `${staffName} has requested overtime approval${reason ? ': ' + reason : ''}`,
+                        body: `${staffName} has requested overtime approval${reason ? ': ' + reason : ''}`,
                         data: { request_id: requestId, staff_id: userId }
                     });
                 }
@@ -3289,11 +3288,10 @@ router.put('/overtime-request/:id/approve', requireAuth, requirePermission('atte
             const [reviewer] = await pool.query("SELECT full_name FROM users WHERE id = ?", [reviewerId]);
             const reviewerName = reviewer.length > 0 ? reviewer[0].full_name : 'Admin';
 
-            await notificationService.sendNotification({
-                userId: otReq.user_id,
+            await notificationService.send(otReq.user_id, {
                 type: 'attendance',
                 title: 'OT Approved',
-                message: `Your overtime request has been approved by ${reviewerName}`,
+                body: `Your overtime request has been approved by ${reviewerName}`,
                 data: { request_id: requestId }
             });
 
@@ -3360,11 +3358,10 @@ router.put('/overtime-request/:id/reject', requireAuth, requirePermission('atten
             const [reviewer] = await pool.query("SELECT full_name FROM users WHERE id = ?", [reviewerId]);
             const reviewerName = reviewer.length > 0 ? reviewer[0].full_name : 'Admin';
 
-            await notificationService.sendNotification({
-                userId: otReq.user_id,
+            await notificationService.send(otReq.user_id, {
                 type: 'attendance',
                 title: 'OT Rejected',
-                message: `Your overtime request was rejected: ${notes}`,
+                body: `Your overtime request was rejected: ${notes}`,
                 data: { request_id: requestId }
             });
 
