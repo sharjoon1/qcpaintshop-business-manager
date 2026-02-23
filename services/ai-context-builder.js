@@ -297,14 +297,14 @@ async function buildStaffContext() {
     try {
         // Currently clocked-in staff
         const [clockedIn] = await pool.query(`
-            SELECT u.full_name as name, b.name as branch_name, sa.clock_in,
-                   TIMESTAMPDIFF(MINUTE, sa.clock_in, NOW()) as minutes_since_clockin,
+            SELECT u.full_name as name, b.name as branch_name, sa.clock_in_time,
+                   TIMESTAMPDIFF(MINUTE, sa.clock_in_time, NOW()) as minutes_since_clockin,
                    sa.total_break_minutes, sa.overtime_minutes
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
             LEFT JOIN branches b ON sa.branch_id = b.id
-            WHERE sa.date = CURDATE() AND sa.clock_out IS NULL
-            ORDER BY sa.clock_in ASC
+            WHERE sa.date = CURDATE() AND sa.clock_out_time IS NULL
+            ORDER BY sa.clock_in_time ASC
         `);
 
         // Absent staff
@@ -318,12 +318,12 @@ async function buildStaffContext() {
 
         // Late arrivals (clocked in after 9:30 AM)
         const [late] = await pool.query(`
-            SELECT u.full_name as name, sa.clock_in,
-                   TIMESTAMPDIFF(MINUTE, CONCAT(CURDATE(), ' 09:30:00'), sa.clock_in) as minutes_late
+            SELECT u.full_name as name, sa.clock_in_time,
+                   TIMESTAMPDIFF(MINUTE, CONCAT(CURDATE(), ' 09:30:00'), sa.clock_in_time) as minutes_late
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
-            WHERE sa.date = CURDATE() AND TIME(sa.clock_in) > '09:30:00'
-            ORDER BY sa.clock_in DESC
+            WHERE sa.date = CURDATE() AND TIME(sa.clock_in_time) > '09:30:00'
+            ORDER BY sa.clock_in_time DESC
         `);
 
         // Break excess (over 60 min total break)
@@ -337,18 +337,18 @@ async function buildStaffContext() {
 
         // Pending OT requests
         const [otPending] = await pool.query(`
-            SELECT u.full_name as name, sa.overtime_minutes, sa.overtime_status
+            SELECT u.full_name as name, sa.overtime_minutes, sa.ot_request_status
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
-            WHERE sa.date = CURDATE() AND sa.overtime_status = 'pending' AND sa.overtime_minutes > 0
+            WHERE sa.date = CURDATE() AND sa.ot_request_status = 'pending' AND sa.overtime_minutes > 0
         `);
 
         // Today's completed staff stats
         const [completed] = await pool.query(`
-            SELECT u.full_name as name, sa.total_working_minutes, sa.clock_in, sa.clock_out
+            SELECT u.full_name as name, sa.total_working_minutes, sa.clock_in_time, sa.clock_out_time
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
-            WHERE sa.date = CURDATE() AND sa.clock_out IS NOT NULL
+            WHERE sa.date = CURDATE() AND sa.clock_out_time IS NOT NULL
             ORDER BY sa.total_working_minutes DESC
         `);
 
@@ -375,7 +375,7 @@ async function buildStaffContext() {
         if (late.length) {
             text += `\n**Late Arrivals (${late.length}):**\n`;
             late.forEach(s => {
-                text += `- ${s.name}: ${s.minutes_late} min late (arrived ${new Date(s.clock_in).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })})\n`;
+                text += `- ${s.name}: ${s.minutes_late} min late (arrived ${new Date(s.clock_in_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })})\n`;
             });
         }
 

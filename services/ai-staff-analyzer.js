@@ -18,8 +18,8 @@ async function collectStaffData(period = 'daily') {
     const [attendance] = await pool.query(`
         SELECT
             u.full_name, u.id as user_id, b.name as branch_name,
-            sa.clock_in, sa.clock_out, sa.date,
-            sa.total_working_minutes, sa.break_minutes, sa.overtime_minutes,
+            sa.clock_in_time, sa.clock_out_time, sa.date,
+            sa.total_working_minutes, sa.total_break_minutes, sa.overtime_minutes,
             sa.prayer_minutes, sa.outside_work_minutes,
             sa.excess_break_minutes, sa.break_exceeded,
             sa.auto_clockout_type,
@@ -48,17 +48,17 @@ async function collectStaffData(period = 'daily') {
     try {
         const [lateArrivals] = await pool.query(`
             SELECT
-                u.full_name, sa.clock_in,
+                u.full_name, sa.clock_in_time,
                 shc.expected_start,
                 TIMESTAMPDIFF(MINUTE,
                     CONCAT(sa.date, ' ', shc.expected_start),
-                    sa.clock_in
+                    sa.clock_in_time
                 ) as minutes_late
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
             LEFT JOIN shop_hours_config shc ON u.branch_id = shc.branch_id
             WHERE sa.date = CURDATE()
-                AND sa.clock_in > CONCAT(sa.date, ' ', shc.expected_start)
+                AND sa.clock_in_time > CONCAT(sa.date, ' ', shc.expected_start)
             ORDER BY minutes_late DESC
         `);
         data.late_arrivals = lateArrivals;
@@ -68,7 +68,7 @@ async function collectStaffData(period = 'daily') {
 
     // Break excess
     const [breakExcess] = await pool.query(`
-        SELECT u.full_name, sa.break_minutes, sa.excess_break_minutes, sa.break_allowance_minutes
+        SELECT u.full_name, sa.total_break_minutes, sa.excess_break_minutes, sa.break_allowance_minutes
         FROM staff_attendance sa
         JOIN users u ON sa.user_id = u.id
         WHERE sa.date = CURDATE() AND sa.excess_break_minutes > 0
@@ -235,7 +235,7 @@ function buildStaffPrompt(data, period) {
     if (data.late_arrivals.length) {
         lines.push(`### Late Arrivals (${data.late_arrivals.length})`);
         data.late_arrivals.forEach(s => {
-            lines.push(`- ${s.name}: ${s.minutes_late} min late (arrived ${new Date(s.clock_in).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
+            lines.push(`- ${s.name}: ${s.minutes_late} min late (arrived ${new Date(s.clock_in_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
         });
         lines.push('');
     }
@@ -244,7 +244,7 @@ function buildStaffPrompt(data, period) {
     if (data.break_excess.length) {
         lines.push(`### Excess Break Time (${data.break_excess.length} staff)`);
         data.break_excess.forEach(s => {
-            lines.push(`- ${s.name}: ${s.excess_break_minutes} min excess (took ${s.break_minutes} min, allowed ${s.break_allowance_minutes} min)`);
+            lines.push(`- ${s.name}: ${s.excess_break_minutes} min excess (took ${s.total_break_minutes} min, allowed ${s.break_allowance_minutes} min)`);
         });
         lines.push('');
     }
