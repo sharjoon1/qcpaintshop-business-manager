@@ -311,7 +311,7 @@ router.get('/lead-scores', requireAuth, async (req, res) => {
         const { limit = 50, min_score = 0 } = req.query;
         const [rows] = await pool.query(`
             SELECT als.*, l.name as lead_name, l.phone, l.status as lead_status,
-                   l.source, l.estimated_value, u.name as assigned_name
+                   l.source, l.estimated_budget as estimated_value, u.full_name as assigned_name
             FROM ai_lead_scores als
             JOIN leads l ON als.lead_id = l.id
             LEFT JOIN users u ON als.suggested_assignee = u.id

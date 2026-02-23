@@ -297,7 +297,7 @@ async function buildStaffContext() {
     try {
         // Currently clocked-in staff
         const [clockedIn] = await pool.query(`
-            SELECT u.name, b.name as branch_name, sa.clock_in,
+            SELECT u.full_name as name, b.name as branch_name, sa.clock_in,
                    TIMESTAMPDIFF(MINUTE, sa.clock_in, NOW()) as minutes_since_clockin,
                    sa.total_break_minutes, sa.overtime_minutes
             FROM staff_attendance sa
@@ -309,7 +309,7 @@ async function buildStaffContext() {
 
         // Absent staff
         const [absent] = await pool.query(`
-            SELECT u.name, b.name as branch_name
+            SELECT u.full_name as name, b.name as branch_name
             FROM users u
             LEFT JOIN branches b ON u.branch_id = b.id
             WHERE u.role = 'staff' AND u.status = 'active'
@@ -318,7 +318,7 @@ async function buildStaffContext() {
 
         // Late arrivals (clocked in after 9:30 AM)
         const [late] = await pool.query(`
-            SELECT u.name, sa.clock_in,
+            SELECT u.full_name as name, sa.clock_in,
                    TIMESTAMPDIFF(MINUTE, CONCAT(CURDATE(), ' 09:30:00'), sa.clock_in) as minutes_late
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
@@ -328,7 +328,7 @@ async function buildStaffContext() {
 
         // Break excess (over 60 min total break)
         const [breakExcess] = await pool.query(`
-            SELECT u.name, sa.total_break_minutes
+            SELECT u.full_name as name, sa.total_break_minutes
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
             WHERE sa.date = CURDATE() AND sa.total_break_minutes > 60
@@ -337,7 +337,7 @@ async function buildStaffContext() {
 
         // Pending OT requests
         const [otPending] = await pool.query(`
-            SELECT u.name, sa.overtime_minutes, sa.overtime_status
+            SELECT u.full_name as name, sa.overtime_minutes, sa.overtime_status
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
             WHERE sa.date = CURDATE() AND sa.overtime_status = 'pending' AND sa.overtime_minutes > 0
@@ -345,7 +345,7 @@ async function buildStaffContext() {
 
         // Today's completed staff stats
         const [completed] = await pool.query(`
-            SELECT u.name, sa.total_working_minutes, sa.clock_in, sa.clock_out
+            SELECT u.full_name as name, sa.total_working_minutes, sa.clock_in, sa.clock_out
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
             WHERE sa.date = CURDATE() AND sa.clock_out IS NOT NULL
@@ -409,14 +409,14 @@ async function buildLeadsContext() {
     try {
         // Status funnel
         const [funnel] = await pool.query(`
-            SELECT status, COUNT(*) as count, COALESCE(SUM(estimated_value), 0) as total_value
+            SELECT status, COUNT(*) as count, COALESCE(SUM(estimated_budget), 0) as total_value
             FROM leads WHERE status NOT IN ('closed')
             GROUP BY status ORDER BY FIELD(status, 'new','interested','quoted','won','lost')
         `);
 
         // Stale leads (>7 days no activity)
         const [stale] = await pool.query(`
-            SELECT l.name, l.phone, l.status, l.source, u.name as assigned_name,
+            SELECT l.name, l.phone, l.status, l.source, u.full_name as assigned_name,
                    DATEDIFF(CURDATE(), l.updated_at) as days_inactive
             FROM leads l
             LEFT JOIN users u ON l.assigned_to = u.id
@@ -427,18 +427,18 @@ async function buildLeadsContext() {
 
         // Today's follow-ups due
         const [followups] = await pool.query(`
-            SELECT l.name, l.phone, l.status, l.estimated_value, u.name as assigned_name
+            SELECT l.name, l.phone, l.status, l.estimated_budget as estimated_value, u.full_name as assigned_name
             FROM leads l
             LEFT JOIN users u ON l.assigned_to = u.id
-            WHERE DATE(l.follow_up_date) = CURDATE() AND l.status NOT IN ('won','lost','closed')
-            ORDER BY l.estimated_value DESC
+            WHERE DATE(l.next_followup_date) = CURDATE() AND l.status NOT IN ('won','lost','closed')
+            ORDER BY l.estimated_budget DESC
         `);
 
         // Top scored leads
         let topScored = [];
         try {
             const [ts] = await pool.query(`
-                SELECT als.score, als.next_action, l.name, l.phone, l.status, l.estimated_value
+                SELECT als.score, als.next_action, l.name, l.phone, l.status, l.estimated_budget as estimated_value
                 FROM ai_lead_scores als
                 JOIN leads l ON als.lead_id = l.id
                 WHERE l.status NOT IN ('won','lost','closed')
