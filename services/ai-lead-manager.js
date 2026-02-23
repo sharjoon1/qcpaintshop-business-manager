@@ -92,7 +92,7 @@ async function collectLeadData() {
             l.id, l.name, l.email, l.phone, l.source, l.status,
             l.estimated_budget as estimated_value, l.assigned_to, l.branch_id,
             l.created_at, l.updated_at, l.notes,
-            u.name as assigned_name,
+            u.full_name as assigned_name,
             b.name as branch_name,
             (SELECT COUNT(*) FROM lead_followups lf WHERE lf.lead_id = l.id) as followup_count,
             (SELECT MAX(lf.created_at) FROM lead_followups lf WHERE lf.lead_id = l.id) as last_followup
@@ -265,7 +265,7 @@ function buildLeadPrompt(leads) {
 async function getStalLeads(daysInactive = 7) {
     const [stale] = await pool.query(`
         SELECT l.id, l.name, l.phone, l.status, l.assigned_to,
-               u.name as assigned_name, u.phone as assigned_phone,
+               u.full_name as assigned_name, u.phone as assigned_phone,
                DATEDIFF(CURDATE(), l.updated_at) as days_inactive
         FROM leads l
         LEFT JOIN users u ON l.assigned_to = u.id
