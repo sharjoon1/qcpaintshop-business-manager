@@ -72,6 +72,7 @@
                 <button class="tab-btn" onclick="switchTab('rates')">Rates & Slabs</button>
                 <button class="tab-btn" onclick="switchTab('withdrawals')">Withdrawals</button>
                 <button class="tab-btn" onclick="switchTab('reports')">Referrals & Reports</button>
+                <button class="tab-btn" onclick="switchTab('estimates')">Estimates</button>
             </div>
 
             <!-- Tab 1: Painters -->
@@ -295,7 +296,60 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Tab 6: Estimates -->
+            <div id="tab-estimates" class="tab-content">
+                <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <input type="text" id="estSearch" placeholder="Search estimate #, painter..." class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm" oninput="debounceEstimates()">
+                        <select id="estStatusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadEstimates()">
+                            <option value="">All Status</option>
+                            <option value="draft">Draft</option>
+                            <option value="pending_admin">Pending Review</option>
+                            <option value="admin_review">Needs Markup</option>
+                            <option value="approved">Approved</option>
+                            <option value="sent_to_customer">Sent to Customer</option>
+                            <option value="payment_recorded">Payment Recorded</option>
+                            <option value="pushed_to_zoho">Pushed to Zoho</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                        <select id="estTypeFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadEstimates()">
+                            <option value="">All Types</option>
+                            <option value="self">Self Billing</option>
+                            <option value="customer">Customer Billing</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Est #</th>
+                                    <th>Painter</th>
+                                    <th>Type</th>
+                                    <th>Customer</th>
+                                    <th>Items</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="estimatesTableBody">
+                                <tr><td colspan="9" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="estimatesPagination" class="p-3 flex justify-center gap-2"></div>
+                </div>
+            </div>
         </div>
+    </div>
+
+    <!-- Estimate Detail Modal -->
+    <div id="estimateDetailModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEstimateDetail()">
+        <div class="modal-content" style="max-width:720px" id="estimateDetailContent"></div>
     </div>
 
     <!-- Painter Detail Modal -->
@@ -372,6 +426,7 @@
         if (tab === 'rates') loadRatesTab();
         if (tab === 'withdrawals') loadWithdrawals();
         if (tab === 'reports') loadReportsTab();
+        if (tab === 'estimates') loadEstimates();
     }
 
     // ═══════════════════════════════════════
@@ -971,13 +1026,297 @@
     }
 
     // ═══════════════════════════════════════
+    // ESTIMATES TAB
+    // ═══════════════════════════════════════
+    let estDebounce;
+    function debounceEstimates() { clearTimeout(estDebounce); estDebounce = setTimeout(loadEstimates, 300); }
+
+    async function loadEstimates(page = 1) {
+        const search = document.getElementById('estSearch').value;
+        const status = document.getElementById('estStatusFilter').value;
+        const billing_type = document.getElementById('estTypeFilter').value;
+        try {
+            const params = new URLSearchParams({ page, limit: 50 });
+            if (search) params.set('painter', search);
+            if (status) params.set('status', status);
+            if (billing_type) params.set('billing_type', billing_type);
+            const res = await fetch(`${API}/estimates?${params}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            renderEstimatesTable(data.estimates);
+            renderEstPagination(data.total, data.page, data.pages);
+        } catch (err) {
+            document.getElementById('estimatesTableBody').innerHTML = `<tr><td colspan="9" class="text-center py-4 text-red-500">${esc(err.message)}</td></tr>`;
+        }
+    }
+
+    function renderEstimatesTable(estimates) {
+        const body = document.getElementById('estimatesTableBody');
+        if (!estimates.length) {
+            body.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-gray-400">No estimates found</td></tr>';
+            return;
+        }
+        const statusBadge = {
+            draft: 'badge-suspended', pending_admin: 'badge-pending', admin_review: 'badge-pending',
+            approved: 'badge-approved', sent_to_customer: 'badge-paid', payment_recorded: 'badge-paid',
+            pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-suspended'
+        };
+        body.innerHTML = estimates.map(e => {
+            const total = e.billing_type === 'customer' && parseFloat(e.markup_grand_total) > 0
+                ? '₹' + parseFloat(e.markup_grand_total).toLocaleString('en-IN')
+                : '₹' + parseFloat(e.grand_total).toLocaleString('en-IN');
+            return `<tr style="cursor:pointer" onclick="viewEstimate(${e.id})">
+                <td class="font-medium">${esc(e.estimate_number)}</td>
+                <td>${esc(e.painter_name)}<br><span class="text-xs text-gray-400">${esc(e.painter_phone)}</span></td>
+                <td><span class="badge ${e.billing_type === 'self' ? 'badge-paid' : 'badge-pending'}">${e.billing_type}</span></td>
+                <td>${e.billing_type === 'customer' ? esc(e.customer_name || '-') : '-'}</td>
+                <td>${e.item_count || 0}</td>
+                <td class="font-semibold">${total}</td>
+                <td><span class="badge ${statusBadge[e.status] || ''}">${e.status.replace(/_/g, ' ')}</span></td>
+                <td class="text-xs text-gray-500">${new Date(e.created_at).toLocaleDateString()}</td>
+                <td><button class="btn-sm btn-outline" onclick="event.stopPropagation();viewEstimate(${e.id})">View</button></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderEstPagination(total, page, pages) {
+        const container = document.getElementById('estimatesPagination');
+        if (pages <= 1) { container.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 1; i <= pages; i++) {
+            html += `<button class="px-3 py-1 rounded text-sm ${i === page ? 'bg-indigo-600 text-white' : 'bg-gray-100'}" onclick="loadEstimates(${i})">${i}</button>`;
+        }
+        container.innerHTML = html;
+    }
+
+    async function viewEstimate(id) {
+        try {
+            const res = await fetch(`${API}/estimates/${id}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            renderEstimateDetail(data.estimate, data.items);
+            document.getElementById('estimateDetailModal').style.display = 'flex';
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    }
+
+    function closeEstimateDetail() { document.getElementById('estimateDetailModal').style.display = 'none'; }
+
+    function renderEstimateDetail(est, items) {
+        const isCustomer = est.billing_type === 'customer';
+        const statusBadge = {
+            draft: 'badge-suspended', pending_admin: 'badge-pending', admin_review: 'badge-pending',
+            approved: 'badge-approved', sent_to_customer: 'badge-paid', payment_recorded: 'badge-paid',
+            pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-suspended'
+        };
+
+        let actionsHtml = '';
+        if (est.status === 'pending_admin') {
+            if (isCustomer) {
+                actionsHtml = `
+                    <button class="btn-sm btn-success" onclick="reviewEstimate(${est.id},'approve')">Approve & Set Markup</button>
+                    <button class="btn-sm btn-danger" onclick="reviewEstimate(${est.id},'reject')">Reject</button>`;
+            } else {
+                actionsHtml = `
+                    <button class="btn-sm btn-success" onclick="reviewEstimate(${est.id},'approve')">Approve</button>
+                    <button class="btn-sm btn-danger" onclick="reviewEstimate(${est.id},'reject')">Reject</button>`;
+            }
+        } else if (est.status === 'admin_review') {
+            actionsHtml = `<button class="btn-sm btn-primary" onclick="saveMarkupPrices(${est.id})">Save Markup & Approve</button>`;
+        } else if (est.status === 'approved' || est.status === 'sent_to_customer') {
+            if (isCustomer && est.status === 'approved') {
+                actionsHtml += `<button class="btn-sm btn-primary" onclick="shareEstimate(${est.id})">Share with Customer</button> `;
+            }
+            actionsHtml += `<button class="btn-sm btn-success" onclick="showPaymentForm(${est.id})">Record Payment</button>`;
+        } else if (est.status === 'payment_recorded') {
+            actionsHtml = `<button class="btn-sm btn-primary" onclick="pushToZoho(${est.id})">Push to Zoho</button>`;
+        }
+
+        let itemsHtml = items.map((item, idx) => `
+            <tr>
+                <td>${esc(item.item_name)}</td>
+                <td class="text-xs text-gray-500">${esc(item.brand || '')}</td>
+                <td class="text-center">${parseFloat(item.quantity)}</td>
+                <td class="text-right">₹${parseFloat(item.unit_price).toLocaleString('en-IN')}</td>
+                <td class="text-right">₹${parseFloat(item.line_total).toLocaleString('en-IN')}</td>
+                ${isCustomer ? `<td class="text-right">
+                    ${est.status === 'admin_review' ? `<input type="number" step="0.01" min="0" class="markup-price-input" data-item-id="${item.id}" value="${parseFloat(item.markup_unit_price) || ''}" style="width:100px;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;text-align:right;font-size:0.8125rem">` : `₹${parseFloat(item.markup_unit_price || 0).toLocaleString('en-IN')}`}
+                </td>` : ''}
+            </tr>
+        `).join('');
+
+        const content = document.getElementById('estimateDetailContent');
+        content.innerHTML = `
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="text-lg font-bold">${esc(est.estimate_number)}</h3>
+                    <span class="badge ${statusBadge[est.status] || ''}">${est.status.replace(/_/g, ' ')}</span>
+                </div>
+                <button onclick="closeEstimateDetail()" class="text-gray-400 hover:text-gray-600">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+                <div><span class="text-gray-500">Painter:</span> <strong>${esc(est.painter_name)}</strong></div>
+                <div><span class="text-gray-500">Type:</span> <strong>${est.billing_type === 'self' ? 'Self Billing' : 'Customer Billing'}</strong></div>
+                ${isCustomer ? `
+                <div><span class="text-gray-500">Customer:</span> <strong>${esc(est.customer_name || '-')}</strong></div>
+                <div><span class="text-gray-500">Customer Phone:</span> ${esc(est.customer_phone || '-')}</div>
+                ` : ''}
+                <div><span class="text-gray-500">Created:</span> ${new Date(est.created_at).toLocaleString()}</div>
+                ${est.zoho_invoice_number ? `<div><span class="text-gray-500">Zoho Invoice:</span> <strong>${esc(est.zoho_invoice_number)}</strong></div>` : ''}
+                ${est.points_awarded > 0 ? `<div><span class="text-gray-500">Points:</span> <strong>${parseFloat(est.points_awarded).toFixed(2)}</strong> (R:${parseFloat(est.regular_points_awarded).toFixed(2)} A:${parseFloat(est.annual_points_awarded).toFixed(2)})</div>` : ''}
+            </div>
+
+            <div class="overflow-x-auto mb-4">
+                <table class="data-table">
+                    <thead><tr>
+                        <th>Product</th><th>Brand</th><th>Qty</th><th>Unit Price</th><th>Line Total</th>
+                        ${isCustomer ? '<th>Markup Price</th>' : ''}
+                    </tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+            </div>
+
+            <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
+                <div class="flex justify-between mb-1"><span>Subtotal (Cost):</span><span>₹${parseFloat(est.subtotal).toLocaleString('en-IN')}</span></div>
+                <div class="flex justify-between mb-1"><span>GST:</span><span>₹${parseFloat(est.gst_amount).toLocaleString('en-IN')}</span></div>
+                <div class="flex justify-between font-bold border-t pt-1"><span>Grand Total (Cost):</span><span>₹${parseFloat(est.grand_total).toLocaleString('en-IN')}</span></div>
+                ${isCustomer && parseFloat(est.markup_grand_total) > 0 ? `
+                <div class="flex justify-between mt-2 pt-2 border-t font-bold text-indigo-600"><span>Markup Grand Total:</span><span>₹${parseFloat(est.markup_grand_total).toLocaleString('en-IN')}</span></div>
+                ` : ''}
+            </div>
+
+            ${est.notes ? `<div class="text-sm mb-2"><span class="text-gray-500">Notes:</span> ${esc(est.notes)}</div>` : ''}
+            ${est.admin_notes ? `<div class="text-sm mb-2"><span class="text-gray-500">Admin Notes:</span> ${esc(est.admin_notes)}</div>` : ''}
+            ${est.payment_method ? `<div class="text-sm mb-2"><span class="text-gray-500">Payment:</span> ${esc(est.payment_method)} ${est.payment_reference ? '(' + esc(est.payment_reference) + ')' : ''} — ₹${parseFloat(est.payment_amount).toLocaleString('en-IN')}</div>` : ''}
+
+            <!-- Payment Form (hidden) -->
+            <div id="paymentFormSection" style="display:none" class="bg-blue-50 rounded-lg p-4 mb-4">
+                <h4 class="font-semibold mb-2">Record Payment</h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs font-medium mb-1">Method *</label>
+                        <select id="payMethod" class="w-full px-2 py-1.5 border rounded text-sm"><option value="cash">Cash</option><option value="upi">UPI</option><option value="bank">Bank Transfer</option><option value="cheque">Cheque</option></select></div>
+                    <div><label class="block text-xs font-medium mb-1">Reference</label>
+                        <input type="text" id="payRef" class="w-full px-2 py-1.5 border rounded text-sm" placeholder="UPI ID / Cheque #"></div>
+                    <div><label class="block text-xs font-medium mb-1">Amount</label>
+                        <input type="number" id="payAmount" class="w-full px-2 py-1.5 border rounded text-sm" value="${parseFloat(est.grand_total)}"></div>
+                </div>
+                <button class="btn-sm btn-success mt-3" onclick="confirmPayment(${est.id})">Confirm Payment</button>
+            </div>
+
+            <div class="flex gap-2 flex-wrap">${actionsHtml}</div>
+        `;
+    }
+
+    async function reviewEstimate(id, action) {
+        const notes = action === 'reject' ? prompt('Reason for rejection:') : '';
+        if (action === 'reject' && notes === null) return;
+        try {
+            const res = await fetch(`${API}/estimates/${id}/review`, {
+                method: 'PUT', headers: authHeaders(),
+                body: JSON.stringify({ action, admin_notes: notes })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(data.message);
+            closeEstimateDetail();
+            loadEstimates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function saveMarkupPrices(estId) {
+        const inputs = document.querySelectorAll('.markup-price-input');
+        const items = [];
+        inputs.forEach(inp => {
+            const val = parseFloat(inp.value);
+            if (val > 0) items.push({ id: parseInt(inp.dataset.itemId), markup_unit_price: val });
+        });
+        if (!items.length) { alert('Enter markup prices for at least one item'); return; }
+        try {
+            const res = await fetch(`${API}/estimates/${estId}/markup`, {
+                method: 'POST', headers: authHeaders(),
+                body: JSON.stringify({ items })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(data.message);
+            closeEstimateDetail();
+            loadEstimates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function shareEstimate(id) {
+        try {
+            const res = await fetch(`${API}/estimates/${id}/share`, {
+                method: 'POST', headers: authHeaders()
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            if (data.waLink) {
+                window.open(data.waLink, '_blank');
+            } else {
+                navigator.clipboard.writeText(data.shareUrl);
+                alert('Share link copied to clipboard:\n' + data.shareUrl);
+            }
+            closeEstimateDetail();
+            loadEstimates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    function showPaymentForm(id) {
+        document.getElementById('paymentFormSection').style.display = 'block';
+        document.getElementById('paymentFormSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function confirmPayment(id) {
+        const method = document.getElementById('payMethod').value;
+        const reference = document.getElementById('payRef').value;
+        const amount = document.getElementById('payAmount').value;
+        try {
+            const res = await fetch(`${API}/estimates/${id}/payment`, {
+                method: 'POST', headers: authHeaders(),
+                body: JSON.stringify({ payment_method: method, payment_reference: reference, payment_amount: amount })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert('Payment recorded');
+            closeEstimateDetail();
+            loadEstimates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function pushToZoho(id) {
+        if (!confirm('Push this estimate to Zoho Books as an invoice and award points?')) return;
+        try {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Pushing...';
+            const res = await fetch(`${API}/estimates/${id}/push-zoho`, {
+                method: 'POST', headers: authHeaders()
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(`Zoho Invoice: ${data.zohoInvoiceNumber}\nPoints awarded: ${JSON.stringify(data.points)}`);
+            closeEstimateDetail();
+            loadEstimates();
+        } catch (err) {
+            alert('Error: ' + err.message);
+            event.target.disabled = false;
+            event.target.textContent = 'Push to Zoho';
+        }
+    }
+
+    // ═══════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════
     document.addEventListener('DOMContentLoaded', function() {
         // Check URL tab param
         const urlParams = new URLSearchParams(window.location.search);
         const tab = urlParams.get('tab');
-        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports'];
+        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports', 'estimates'];
         const activeTab = tab && tabNames.includes(tab) ? tab : 'painters';
 
         if (activeTab !== 'painters') {
@@ -996,6 +1335,7 @@
         else if (activeTab === 'rates') loadRatesTab();
         else if (activeTab === 'withdrawals') loadWithdrawals();
         else if (activeTab === 'reports') loadReportsTab();
+        else if (activeTab === 'estimates') loadEstimates();
     });
     </script>
 </body>

@@ -312,6 +312,9 @@ app.use('/api/painters', paintersRoutes.router);
 app.get('/share/estimate/:token', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'share', 'estimate.html'));
 });
+app.get('/share/painter-estimate/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'share', 'painter-estimate.html'));
+});
 app.get('/share/design-request/:token', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'share', 'design-request.html'));
 });

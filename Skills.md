@@ -1932,8 +1932,55 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 
 ### Navigation
 - Sidebar: Painters section with "Painter Program" link (admin only)
-- Subnav: 5 tabs mapped via `PAINTERS_SUBNAV_PATH` in `universal-nav-loader.js`
-- Painter pages (register, login, dashboard) excluded from admin nav loading
+- Subnav: 6 tabs mapped via `PAINTERS_SUBNAV_PATH` in `universal-nav-loader.js`
+- Painter pages (register, login, dashboard, estimate-create) excluded from admin nav loading
+
+### Painter Estimate System
+Painters create estimates for paint purchases; admin reviews, records payment, pushes to Zoho as invoice, and awards points.
+
+#### Two Billing Flows
+1. **Self-Billing** — painter sees dealer prices (zoho_rate), submits → admin approves → records payment → push to Zoho → annual points only
+2. **Customer-Billing** — painter does NOT see prices, submits → admin sets markup prices → shares with customer (WhatsApp link) → records payment → push to Zoho → regular + annual points
+
+#### Database Tables
+- `painter_estimates` — estimate_number (PE+YYYYMMDD+4seq), painter_id, billing_type (self/customer), customer fields, cost totals, markup totals, status workflow, payment fields, Zoho fields, points, share_token
+- `painter_estimate_items` — line items with zoho_item_id, unit_price (server-side from zoho_rate), markup prices (admin-set)
+- Status flow: `draft` → `pending_admin` → `approved` / `admin_review` → `sent_to_customer` → `approved` → `payment_recorded` → `pushed_to_zoho` | `rejected` | `cancelled`
+
+#### Endpoints
+**Painter-Auth** (`/me/estimates/*`):
+- `GET /me/estimates/products` — product list (?billing_type=self shows prices)
+- `GET /me/estimates` — list own estimates
+- `POST /me/estimates` — create (draft or submit)
+- `GET /me/estimates/:id` — view single
+- `PUT /me/estimates/:id` — update draft
+- `POST /me/estimates/:id/submit` — submit draft
+- `DELETE /me/estimates/:id` — cancel draft
+
+**Admin** (`/estimates/*`):
+- `GET /estimates` — list all (filter: status, billing_type, painter)
+- `GET /estimates/:id` — detail with painter info
+- `PUT /estimates/:id/review` — approve/reject
+- `POST /estimates/:id/markup` — set markup prices (customer-billing)
+- `POST /estimates/:id/share` — generate share token + WhatsApp link
+- `POST /estimates/:id/payment` — record payment
+- `POST /estimates/:id/push-zoho` — create Zoho invoice + award points
+
+**Public**: `GET /estimates/share/:token` — shared estimate data (no auth)
+
+#### Pages
+- `painter-estimate-create.html` — 3-step builder (billing type → customer details → product picker + cart)
+- `painter-dashboard.html` — "Create Estimate" button + "My Estimates" section
+- `admin-painters.html` — Tab 6 "Estimates" with filter bar, table, detail modal with status-dependent actions
+- `share/painter-estimate.html` — public customer view with print button
+
+#### Key Implementation Details
+- `unit_price` always set SERVER-SIDE from `zoho_items_map.zoho_rate` (never trusts client)
+- Push-to-Zoho resolves contact (painter's zoho_contact_id or creates new), creates invoice, calls `pointsEngine.processInvoice()`
+- Share tokens expire after 7 days
+- GST percentage configurable via `painter_estimate_gst_pct` setting (default 18%)
+- Permission: `painters.estimates`
+- Migration: `node migrations/migrate-painter-estimates.js`
 
 ---
 
