@@ -75,6 +75,7 @@
         'guides': CONFIG.SYSTEM_SUBNAV_PATH,
         'ai': CONFIG.SYSTEM_SUBNAV_PATH,
         'system-health': CONFIG.SYSTEM_SUBNAV_PATH,
+        'bug-reports': CONFIG.SYSTEM_SUBNAV_PATH,
         // Painters
         'painters': CONFIG.PAINTERS_SUBNAV_PATH,
         'painter-points': CONFIG.PAINTERS_SUBNAV_PATH,

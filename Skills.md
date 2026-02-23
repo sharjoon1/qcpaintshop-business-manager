@@ -1185,6 +1185,58 @@ Comprehensive error tracking, system health monitoring, data integrity validatio
 
 **Migration**: `migrations/migrate-error-prevention.js`
 
+#### Bug Reports & Error Analysis System (Feb 23)
+
+Extends the error prevention system with bug tracking, AI-powered fix suggestions, error deduplication, and trend analysis.
+
+**New Tables**: `bug_reports`, `fix_suggestions`
+- `bug_reports`: Bug tracking with title, description, steps_to_reproduce, expected/actual behavior, module, priority (critical/high/medium/low), status workflow (open→investigating→in_progress→fixed→closed|wont_fix), assignment, related_error_id, error_hash
+- `fix_suggestions`: Fix suggestions linked to errors or bug reports, with suggestion_type (code_fix/config_change/data_fix/infrastructure/monitoring), confidence score, complexity, AI-generated flag, status (pending/approved/applied/rejected)
+
+**Enhanced `error_logs` columns**: `frequency_count` (dedup counter), `error_hash` (SHA256 for dedup), `file_path`, `line_number`, `function_name` (parsed from stack trace), `branch_id`, `last_occurrence`
+
+**Middleware enhancement**: `errorHandler.js`
+- `setErrorAnalysisService(svc)` — Connects analysis service for stack trace parsing and deduplication
+- `logError()` now: parses stack traces, computes error hash, deduplicates (increments frequency_count within 24h window instead of creating new rows), auto-escalates severity for frequent errors (20+→high, 50+→critical)
+
+**Service**: `services/error-analysis-service.js`
+- `parseStackTrace(stack)` — Extracts file_path, line_number, function_name from first non-node_modules frame
+- `computeErrorHash(msg, type, url, filePath)` — Normalizes dynamic values (timestamps, IDs) before hashing
+- `deduplicateError({error_hash})` — Checks existing in 24h window, increments or returns false
+- `analyzeErrorTrends({days, module})` — Daily counts, frequent errors, by-module breakdown, new vs recurring, resolution metrics
+- `analyzeByModule(moduleName)` — Module-specific error analysis with endpoint grouping
+- `generateFixSuggestion(errorId)` — AI-powered fix suggestion generation via `ai-engine.generateWithFailover()`
+- `generateBugFix(bugReportId)` — AI fix suggestions for bug reports
+- `getErrorSummary()` — Quick summary for dashboard (errors 24h + bugs + fixes)
+- `autoCreateBugFromError(errorId)` — Auto-creates bug report from chronic errors
+
+**Routes** (added to `routes/system.js`):
+- `GET /errors/analysis` — Error trend analysis (days, module params)
+- `GET /errors/analysis/:module` — Module-specific analysis
+- `GET /errors/summary` — Dashboard summary (errors + bugs + fixes)
+- `POST /errors/:id/fix-suggestions` — Generate AI fix suggestions for error
+- `POST /errors/:id/create-bug` — Auto-create bug from error
+- `GET /bugs` — List bug reports (filter: status, priority, module, assigned_to, search, pagination)
+- `GET /bugs/:id` — Bug detail with fix suggestions and related error
+- `POST /bugs` — Create bug report
+- `PUT /bugs/:id` — Update bug (status, assignment, resolution, fix_commit)
+- `DELETE /bugs/:id` — Delete bug + its fix suggestions
+- `POST /bugs/:id/fix-suggestions` — Generate AI fix for bug
+- `GET /fix-suggestions` — List fix suggestions (filter: status, type, ai_only)
+- `PUT /fix-suggestions/:id` — Update fix status (pending/approved/applied/rejected)
+
+**Page**: `admin-bug-reports.html` (`data-page="bug-reports"`)
+- **Navigation**: System sub-nav → "Bug Reports" tab
+- **Permission**: `system.health`
+- 3 tabs: Bug Reports (filterable table + slide-out detail), Fix Suggestions (list with confidence bars), Error Analysis (trend charts, module bars, frequent errors table)
+- Summary cards: Total/Open/In Progress/Fixed/Critical/Errors 24h
+- Create Bug modal, status update workflow, AI fix generation buttons
+- Error Analysis: daily trend bars, by-module horizontal bars, new vs recurring cards, resolution metrics, frequent errors with "Create Bug" action
+
+**Config**: `bug_tracking_enabled`, `auto_fix_suggestions`, `error_dedup_window_hours`, `fix_suggestion_confidence_threshold`
+
+**Migration**: `migrations/migrate-bug-reports.js`
+
 ---
 
 ## 3. MOBILE APPS (Android)

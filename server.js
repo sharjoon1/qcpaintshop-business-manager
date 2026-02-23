@@ -66,6 +66,8 @@ const appMetadataCollector = require('./services/app-metadata-collector');
 const systemRoutes = require('./routes/system');
 const errorHandlerMw = require('./middleware/errorHandler');
 const systemHealthService = require('./services/system-health-service');
+const errorAnalysisService = require('./services/error-analysis-service');
+const aiEngineForErrors = require('./services/ai-engine');
 
 const app = express();
 
@@ -195,7 +197,11 @@ painterScheduler.setPool(pool);
 aiScheduler.setSessionManager(whatsappSessionManager);
 systemRoutes.setPool(pool);
 systemHealthService.setPool(pool);
+errorAnalysisService.setPool(pool);
+errorAnalysisService.setAiEngine(aiEngineForErrors);
+aiEngineForErrors.setPool(pool);
 errorHandlerMw.setPool(pool);
+errorHandlerMw.setErrorAnalysisService(errorAnalysisService);
 
 // ========================================
 // FILE UPLOAD CONFIG

@@ -1,10 +1,13 @@
 /**
  * Comprehensive Error Handler Middleware
- * Logging to DB, categorization, severity assessment, validation, and prevention
+ * Logging to DB, categorization, severity assessment, validation, deduplication, and prevention
  */
 
 let pool = null;
+let errorAnalysisService = null;
+
 function setPool(p) { pool = p; }
+function setErrorAnalysisService(svc) { errorAnalysisService = svc; }
 
 // ─── Error Severity Assessment ────────────────────────────────
 
@@ -52,24 +55,56 @@ async function logError(error, req, context = {}) {
             sanitizedBody = JSON.stringify(clone);
         }
 
+        const errorType = context.type || classifyError(error, req);
+        const errorMessage = (error.message || 'Unknown error').substring(0, 2000);
+        const requestUrl = (req?.originalUrl || context.url || '').substring(0, 500);
+
+        // Parse stack trace for file/line info
+        let filePath = null, lineNumber = null, functionName = null;
+        if (errorAnalysisService) {
+            const parsed = errorAnalysisService.parseStackTrace(error.stack);
+            filePath = parsed.file_path;
+            lineNumber = parsed.line_number;
+            functionName = parsed.function_name;
+        }
+
+        // Compute error hash for deduplication
+        let errorHash = null;
+        if (errorAnalysisService) {
+            errorHash = errorAnalysisService.computeErrorHash(errorMessage, errorType, requestUrl, filePath);
+
+            // Try to deduplicate
+            const dedupResult = await errorAnalysisService.deduplicateError({ error_hash: errorHash });
+            if (dedupResult && dedupResult.deduplicated) {
+                return dedupResult.existingId;
+            }
+        }
+
         const [result] = await pool.query(`
             INSERT INTO error_logs
             (error_type, error_code, error_message, stack_trace, request_url, request_method,
-             request_body, user_id, session_id, ip_address, user_agent, severity)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             request_body, user_id, session_id, ip_address, user_agent, severity,
+             error_hash, file_path, line_number, function_name, branch_id, last_occurrence)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         `, [
-            context.type || classifyError(error, req),
+            errorType,
             error.code || String(error.statusCode || '') || null,
-            (error.message || 'Unknown error').substring(0, 2000),
+            errorMessage,
             (error.stack || '').substring(0, 5000),
-            (req?.originalUrl || context.url || '').substring(0, 500),
+            requestUrl,
             req?.method || context.method || null,
             sanitizedBody,
             req?.user?.id || context.userId || null,
             req?.headers?.['x-session-id'] || null,
             req?.ip || req?.connection?.remoteAddress || null,
             (req?.headers?.['user-agent'] || '').substring(0, 500),
-            context.severity || assessSeverity(error, req)
+            context.severity || assessSeverity(error, req),
+            errorHash,
+            filePath,
+            lineNumber,
+            functionName,
+            req?.user?.branch_id || null,
+            null // last_occurrence set by NOW() above
         ]);
 
         return result.insertId;
@@ -215,6 +250,7 @@ async function logClientError(req, res) {
 
 module.exports = {
     setPool,
+    setErrorAnalysisService,
     logError,
     globalErrorHandler,
     asyncWrapper,

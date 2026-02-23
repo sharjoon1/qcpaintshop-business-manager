@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/icons/icon-192x192.png">
+    <title>Bug Reports - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        .priority-badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+        .pri-critical { background: #fef2f2; color: #dc2626; }
+        .pri-high { background: #fff7ed; color: #ea580c; }
+        .pri-medium { background: #fefce8; color: #ca8a04; }
+        .pri-low { background: #f0fdf4; color: #16a34a; }
+        .status-badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+        .st-open { background: #fef2f2; color: #dc2626; }
+        .st-investigating { background: #fff7ed; color: #ea580c; }
+        .st-in_progress { background: #eff6ff; color: #2563eb; }
+        .st-fixed { background: #f0fdf4; color: #16a34a; }
+        .st-closed { background: #f1f5f9; color: #64748b; }
+        .st-wont_fix { background: #f5f3ff; color: #7c3aed; }
+        .tab-btn { padding: 8px 16px; border-radius: 8px; font-size: 0.8125rem; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
+        .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .tab-btn:not(.active) { color: #64748b; }
+        .tab-btn:not(.active):hover { background: #f1f5f9; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .confidence-bar { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; }
+        .confidence-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .slide-panel { position: fixed; top: 0; right: -500px; width: 480px; max-width: 100vw; height: 100vh; background: #fff; box-shadow: -4px 0 20px rgba(0,0,0,0.15); z-index: 1050; transition: right 0.3s ease; overflow-y: auto; }
+        .slide-panel.open { right: 0; }
+        .slide-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 1040; display: none; }
+        .slide-overlay.show { display: block; }
+        .complexity-trivial { color: #16a34a; }
+        .complexity-simple { color: #2563eb; }
+        .complexity-moderate { color: #ca8a04; }
+        .complexity-complex { color: #dc2626; }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="bug-reports">
+
+<div class="container mx-auto p-4 md:p-6 max-w-7xl">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Bug Reports & Fix Suggestions</h1>
+            <p class="text-sm text-gray-500 mt-1">Track, analyze, and fix application issues</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="showCreateBugModal()"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium text-sm"
+                style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Report Bug
+            </button>
+            <button onclick="loadErrorAnalysis()"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 font-medium text-sm hover:bg-gray-50">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Error Analysis
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6" id="summaryCards">
+        <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div class="text-2xl font-bold text-gray-800" id="totalBugs">-</div>
+            <div class="text-xs text-gray-500 mt-1">Total Bugs</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div class="text-2xl font-bold text-red-600" id="openBugs">-</div>
+            <div class="text-xs text-gray-500 mt-1">Open</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div class="text-2xl font-bold text-blue-600" id="inProgressBugs">-</div>
+            <div class="text-xs text-gray-500 mt-1">In Progress</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div class="text-2xl font-bold text-green-600" id="fixedBugs">-</div>
+            <div class="text-xs text-gray-500 mt-1">Fixed</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div class="text-2xl font-bold text-orange-600" id="criticalBugs">-</div>
+            <div class="text-xs text-gray-500 mt-1">Critical Open</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div class="text-2xl font-bold text-purple-600" id="errors24h">-</div>
+            <div class="text-xs text-gray-500 mt-1">Errors (24h)</div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-4 overflow-x-auto pb-1" style="scrollbar-width: none;">
+        <button class="tab-btn active" onclick="switchTab('bugs')">Bug Reports</button>
+        <button class="tab-btn" onclick="switchTab('fixes')">Fix Suggestions</button>
+        <button class="tab-btn" onclick="switchTab('analysis')">Error Analysis</button>
+    </div>
+
+    <!-- Tab: Bug Reports -->
+    <div class="tab-content active" id="tab-bugs">
+        <!-- Filters -->
+        <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 shadow-sm">
+            <div class="flex flex-wrap gap-3 items-end">
+                <div>
+                    <label class="text-xs text-gray-500 block mb-1">Status</label>
+                    <select id="filterStatus" onchange="loadBugs()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5">
+                        <option value="">All</option>
+                        <option value="open">Open</option>
+                        <option value="investigating">Investigating</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="fixed">Fixed</option>
+                        <option value="closed">Closed</option>
+                        <option value="wont_fix">Won't Fix</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 block mb-1">Priority</label>
+                    <select id="filterPriority" onchange="loadBugs()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5">
+                        <option value="">All</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 block mb-1">Module</label>
+                    <select id="filterModule" onchange="loadBugs()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5">
+                        <option value="">All</option>
+                        <option value="leads">Leads</option>
+                        <option value="attendance">Attendance</option>
+                        <option value="zoho">Zoho</option>
+                        <option value="painters">Painters</option>
+                        <option value="ai">AI</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="auth">Auth</option>
+                        <option value="frontend">Frontend</option>
+                        <option value="system">System</option>
+                    </select>
+                </div>
+                <div class="flex-1 min-w-[200px]">
+                    <label class="text-xs text-gray-500 block mb-1">Search</label>
+                    <input type="text" id="filterSearch" placeholder="Search bugs..."
+                        class="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5"
+                        onkeyup="if(event.key==='Enter') loadBugs()">
+                </div>
+                <button onclick="loadBugs()" class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-sm hover:bg-gray-200">Search</button>
+            </div>
+        </div>
+
+        <!-- Bugs Table -->
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                            <th class="text-left px-4 py-3 font-medium text-gray-600">Bug</th>
+                            <th class="text-left px-3 py-3 font-medium text-gray-600">Module</th>
+                            <th class="text-center px-3 py-3 font-medium text-gray-600">Priority</th>
+                            <th class="text-center px-3 py-3 font-medium text-gray-600">Status</th>
+                            <th class="text-left px-3 py-3 font-medium text-gray-600">Assigned</th>
+                            <th class="text-center px-3 py-3 font-medium text-gray-600">Fixes</th>
+                            <th class="text-left px-3 py-3 font-medium text-gray-600">Created</th>
+                            <th class="text-center px-3 py-3 font-medium text-gray-600">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bugsTableBody">
+                        <tr><td colspan="8" class="text-center py-12 text-gray-400">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 py-3 border-t border-gray-100 flex items-center justify-between" id="bugsPagination"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Fix Suggestions -->
+    <div class="tab-content" id="tab-fixes">
+        <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 shadow-sm">
+            <div class="flex flex-wrap gap-3 items-end">
+                <div>
+                    <label class="text-xs text-gray-500 block mb-1">Status</label>
+                    <select id="fixFilterStatus" onchange="loadFixSuggestions()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5">
+                        <option value="">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="applied">Applied</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 block mb-1">Type</label>
+                    <select id="fixFilterType" onchange="loadFixSuggestions()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5">
+                        <option value="">All</option>
+                        <option value="code_fix">Code Fix</option>
+                        <option value="config_change">Config Change</option>
+                        <option value="data_fix">Data Fix</option>
+                        <option value="infrastructure">Infrastructure</option>
+                        <option value="monitoring">Monitoring</option>
+                    </select>
+                </div>
+                <label class="flex items-center gap-2 text-sm text-gray-600">
+                    <input type="checkbox" id="fixFilterAI" onchange="loadFixSuggestions()">
+                    AI Generated Only
+                </label>
+            </div>
+        </div>
+
+        <div id="fixSuggestionsList" class="space-y-3">
+            <div class="text-center py-12 text-gray-400">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Tab: Error Analysis -->
+    <div class="tab-content" id="tab-analysis">
+        <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 shadow-sm">
+            <div class="flex flex-wrap gap-3 items-end">
+                <div>
+                    <label class="text-xs text-gray-500 block mb-1">Time Range</label>
+                    <select id="analysisDays" onchange="loadErrorAnalysis()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5">
+                        <option value="1">Last 24h</option>
+                        <option value="7" selected>Last 7 days</option>
+                        <option value="30">Last 30 days</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 block mb-1">Module</label>
+                    <select id="analysisModule" onchange="loadErrorAnalysis()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5">
+                        <option value="">All</option>
+                        <option value="leads">Leads</option>
+                        <option value="attendance">Attendance</option>
+                        <option value="zoho">Zoho</option>
+                        <option value="painters">Painters</option>
+                        <option value="ai">AI</option>
+                        <option value="whatsapp">WhatsApp</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="analysisContent" class="space-y-4">
+            <div class="text-center py-12 text-gray-400">Click "Error Analysis" to load data</div>
+        </div>
+    </div>
+</div>
+
+<!-- Slide-out Panel for Bug Detail -->
+<div class="slide-overlay" id="slideOverlay" onclick="closeDetail()"></div>
+<div class="slide-panel" id="slidePanel">
+    <div class="p-6" id="bugDetailContent">
+        <div class="text-center py-12 text-gray-400">Loading...</div>
+    </div>
+</div>
+
+<!-- Create Bug Modal -->
+<div class="fixed inset-0 bg-black bg-opacity-50 z-[1060] hidden items-center justify-center" id="createBugModal">
+    <div class="bg-white rounded-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto shadow-xl">
+        <div class="p-6 border-b border-gray-100">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-800">Report New Bug</h3>
+                <button onclick="closeCreateModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="text-sm font-medium text-gray-700 block mb-1">Title *</label>
+                <input type="text" id="bugTitle" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Brief description of the bug">
+            </div>
+            <div>
+                <label class="text-sm font-medium text-gray-700 block mb-1">Description</label>
+                <textarea id="bugDescription" rows="3" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Detailed description"></textarea>
+            </div>
+            <div>
+                <label class="text-sm font-medium text-gray-700 block mb-1">Steps to Reproduce</label>
+                <textarea id="bugSteps" rows="3" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="1. Go to...\n2. Click on...\n3. Observe..."></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-sm font-medium text-gray-700 block mb-1">Expected Behavior</label>
+                    <textarea id="bugExpected" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></textarea>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700 block mb-1">Actual Behavior</label>
+                    <textarea id="bugActual" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></textarea>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-sm font-medium text-gray-700 block mb-1">Module</label>
+                    <select id="bugModule" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                        <option value="">Select module</option>
+                        <option value="leads">Leads</option>
+                        <option value="attendance">Attendance</option>
+                        <option value="zoho">Zoho</option>
+                        <option value="painters">Painters</option>
+                        <option value="ai">AI</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="auth">Auth</option>
+                        <option value="frontend">Frontend</option>
+                        <option value="dashboard">Dashboard</option>
+                        <option value="notifications">Notifications</option>
+                        <option value="system">System</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700 block mb-1">Priority</label>
+                    <select id="bugPriority" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="p-6 border-t border-gray-100 flex justify-end gap-3">
+            <button onclick="closeCreateModal()" class="px-4 py-2 rounded-lg text-gray-600 border border-gray-200 text-sm">Cancel</button>
+            <button onclick="createBug()" class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background: linear-gradient(135deg, #667eea, #764ba2);">Create Bug Report</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const API = '/api/system';
+const token = localStorage.getItem('auth_token');
+const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
+// ─── Init ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    loadSummary();
+    loadBugs();
+});
+
+// ─── Tab Switching ─────────────────────────────────────
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['bugs','fixes','analysis'][i] === tab);
+    });
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    if (tab === 'fixes') loadFixSuggestions();
+    if (tab === 'analysis') loadErrorAnalysis();
+}
+
+// ─── Summary ───────────────────────────────────────────
+async function loadSummary() {
+    try {
+        const res = await fetch(`${API}/errors/summary`, { headers });
+        const json = await res.json();
+        if (!json.success) return;
+        const d = json.data;
+
+        document.getElementById('totalBugs').textContent = d.bugs?.total || 0;
+        document.getElementById('openBugs').textContent = d.bugs?.open_bugs || 0;
+        document.getElementById('inProgressBugs').textContent = (d.bugs?.investigating || 0) + (d.bugs?.in_progress || 0);
+        document.getElementById('fixedBugs').textContent = d.bugs?.fixed || 0;
+        document.getElementById('criticalBugs').textContent = d.bugs?.critical_bugs || 0;
+        document.getElementById('errors24h').textContent = d.errors?.total || 0;
+    } catch (e) {
+        console.error('Summary load error:', e);
+    }
+}
+
+// ─── Bug Reports ───────────────────────────────────────
+let currentPage = 1;
+
+async function loadBugs(page = 1) {
+    currentPage = page;
+    const status = document.getElementById('filterStatus').value;
+    const priority = document.getElementById('filterPriority').value;
+    const module = document.getElementById('filterModule').value;
+    const search = document.getElementById('filterSearch').value;
+
+    const params = new URLSearchParams({ page, limit: 25 });
+    if (status) params.set('status', status);
+    if (priority) params.set('priority', priority);
+    if (module) params.set('module', module);
+    if (search) params.set('search', search);
+
+    try {
+        const res = await fetch(`${API}/bugs?${params}`, { headers });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        renderBugsTable(json.data, json.pagination);
+    } catch (e) {
+        document.getElementById('bugsTableBody').innerHTML =
+            `<tr><td colspan="8" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
+    }
+}
+
+function renderBugsTable(bugs, pagination) {
+    const tbody = document.getElementById('bugsTableBody');
+
+    if (bugs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-12 text-gray-400">No bug reports found</td></tr>';
+        document.getElementById('bugsPagination').innerHTML = '';
+        return;
+    }
+
+    tbody.innerHTML = bugs.map(b => `
+        <tr class="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onclick="showBugDetail(${b.id})">
+            <td class="px-4 py-3">
+                <div class="font-medium text-gray-800 text-sm">#${b.id} ${escHtml(b.title).substring(0, 60)}</div>
+                ${b.related_error_id ? `<div class="text-xs text-gray-400 mt-0.5">Error #${b.related_error_id}</div>` : ''}
+            </td>
+            <td class="px-3 py-3 text-xs text-gray-600">${b.module || '-'}</td>
+            <td class="px-3 py-3 text-center"><span class="priority-badge pri-${b.priority}">${b.priority}</span></td>
+            <td class="px-3 py-3 text-center"><span class="status-badge st-${b.status}">${b.status.replace('_', ' ')}</span></td>
+            <td class="px-3 py-3 text-xs text-gray-600">${b.assignee_name || '-'}</td>
+            <td class="px-3 py-3 text-center text-xs">${b.fix_count || 0}</td>
+            <td class="px-3 py-3 text-xs text-gray-500">${formatDate(b.created_at)}</td>
+            <td class="px-3 py-3 text-center">
+                <button onclick="event.stopPropagation(); generateFixForBug(${b.id})"
+                    class="text-xs px-2 py-1 rounded bg-purple-50 text-purple-600 hover:bg-purple-100" title="Generate AI Fix">
+                    AI Fix
+                </button>
+            </td>
+        </tr>
+    `).join('');
+
+    // Pagination
+    const pagDiv = document.getElementById('bugsPagination');
+    pagDiv.innerHTML = `
+        <span class="text-xs text-gray-500">Page ${pagination.page} of ${pagination.total_pages} (${pagination.total} total)</span>
+        <div class="flex gap-1">
+            <button onclick="loadBugs(${pagination.page - 1})" ${pagination.page <= 1 ? 'disabled' : ''}
+                class="px-3 py-1 rounded text-xs border ${pagination.page <= 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}">Prev</button>
+            <button onclick="loadBugs(${pagination.page + 1})" ${pagination.page >= pagination.total_pages ? 'disabled' : ''}
+                class="px-3 py-1 rounded text-xs border ${pagination.page >= pagination.total_pages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}">Next</button>
+        </div>
+    `;
+}
+
+// ─── Bug Detail ────────────────────────────────────────
+async function showBugDetail(id) {
+    document.getElementById('slideOverlay').classList.add('show');
+    document.getElementById('slidePanel').classList.add('open');
+    document.getElementById('bugDetailContent').innerHTML = '<div class="text-center py-12 text-gray-400">Loading...</div>';
+
+    try {
+        const res = await fetch(`${API}/bugs/${id}`, { headers });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        renderBugDetail(json.data);
+    } catch (e) {
+        document.getElementById('bugDetailContent').innerHTML =
+            `<div class="text-center py-8 text-red-500">${e.message}</div>`;
+    }
+}
+
+function renderBugDetail(bug) {
+    const container = document.getElementById('bugDetailContent');
+    container.innerHTML = `
+        <div class="flex items-start justify-between mb-4">
+            <div>
+                <h3 class="text-lg font-bold text-gray-800">#${bug.id} ${escHtml(bug.title)}</h3>
+                <div class="flex gap-2 mt-2">
+                    <span class="priority-badge pri-${bug.priority}">${bug.priority}</span>
+                    <span class="status-badge st-${bug.status}">${bug.status.replace('_', ' ')}</span>
+                    ${bug.module ? `<span class="text-xs bg-gray-100 px-2 py-0.5 rounded">${bug.module}</span>` : ''}
+                </div>
+            </div>
+            <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        ${bug.description ? `<div class="mb-4"><h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Description</h4><p class="text-sm text-gray-700">${escHtml(bug.description)}</p></div>` : ''}
+        ${bug.steps_to_reproduce ? `<div class="mb-4"><h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Steps to Reproduce</h4><pre class="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">${escHtml(bug.steps_to_reproduce)}</pre></div>` : ''}
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            ${bug.expected_behavior ? `<div><h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Expected</h4><p class="text-sm text-gray-700">${escHtml(bug.expected_behavior)}</p></div>` : ''}
+            ${bug.actual_behavior ? `<div><h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Actual</h4><p class="text-sm text-gray-700">${escHtml(bug.actual_behavior)}</p></div>` : ''}
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-sm mb-4 bg-gray-50 rounded-lg p-3">
+            <div><span class="text-gray-500">Reported by:</span> <span class="font-medium">${bug.reporter_name || 'System'}</span></div>
+            <div><span class="text-gray-500">Assigned to:</span> <span class="font-medium">${bug.assignee_name || 'Unassigned'}</span></div>
+            <div><span class="text-gray-500">Created:</span> <span>${formatDate(bug.created_at)}</span></div>
+            <div><span class="text-gray-500">Updated:</span> <span>${formatDate(bug.updated_at)}</span></div>
+            ${bug.related_error_id ? `<div><span class="text-gray-500">Error ID:</span> <span>#${bug.related_error_id}</span></div>` : ''}
+            ${bug.fix_commit ? `<div><span class="text-gray-500">Fix commit:</span> <span class="font-mono text-xs">${escHtml(bug.fix_commit)}</span></div>` : ''}
+        </div>
+
+        <!-- Status Update -->
+        <div class="bg-white border border-gray-200 rounded-lg p-3 mb-4">
+            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Update Status</h4>
+            <div class="flex gap-2 flex-wrap">
+                ${['open','investigating','in_progress','fixed','closed','wont_fix'].map(s =>
+                    `<button onclick="updateBugStatus(${bug.id}, '${s}')"
+                        class="text-xs px-3 py-1 rounded-lg border ${bug.status === s ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}">${s.replace('_',' ')}</button>`
+                ).join('')}
+            </div>
+            <div class="mt-2">
+                <input type="text" id="bugResNotes_${bug.id}" placeholder="Resolution notes..."
+                    value="${escHtml(bug.resolution_notes || '')}"
+                    class="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5">
+            </div>
+        </div>
+
+        <!-- Fix Suggestions -->
+        <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-semibold text-gray-500 uppercase">Fix Suggestions (${(bug.fix_suggestions || []).length})</h4>
+                <button onclick="generateFixForBug(${bug.id})"
+                    class="text-xs px-3 py-1 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100">
+                    Generate AI Fix
+                </button>
+            </div>
+            ${(bug.fix_suggestions || []).length === 0
+                ? '<p class="text-xs text-gray-400">No fix suggestions yet. Click "Generate AI Fix" to get suggestions.</p>'
+                : (bug.fix_suggestions || []).map(fs => renderFixCard(fs)).join('')
+            }
+        </div>
+
+        ${bug.related_error ? `
+        <div class="mb-4">
+            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Related Error</h4>
+            <div class="bg-red-50 border border-red-100 rounded-lg p-3 text-sm">
+                <div class="font-medium text-red-700">${escHtml(bug.related_error.error_message || '').substring(0, 200)}</div>
+                <div class="text-xs text-red-500 mt-1">${bug.related_error.error_type} | ${bug.related_error.severity} | ${bug.related_error.frequency_count || 1}x</div>
+                ${bug.related_error.file_path ? `<div class="text-xs text-gray-500 mt-1 font-mono">${bug.related_error.file_path}:${bug.related_error.line_number || '?'}</div>` : ''}
+            </div>
+        </div>
+        ` : ''}
+
+        <div class="flex gap-2 mt-6">
+            <button onclick="deleteBug(${bug.id})" class="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50">Delete</button>
+        </div>
+    `;
+}
+
+function renderFixCard(fs) {
+    const confColor = fs.confidence >= 80 ? '#16a34a' : fs.confidence >= 50 ? '#ca8a04' : '#dc2626';
+    return `
+        <div class="bg-white border border-gray-200 rounded-lg p-3 mb-2">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="font-medium text-sm text-gray-800">${escHtml(fs.title)}</div>
+                    <div class="flex gap-2 mt-1">
+                        <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">${fs.suggestion_type}</span>
+                        <span class="text-xs complexity-${fs.complexity}">${fs.complexity}</span>
+                        ${fs.ai_generated ? '<span class="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded">AI</span>' : ''}
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs font-semibold" style="color: ${confColor}">${Math.round(fs.confidence)}%</div>
+                    <div class="confidence-bar w-16 mt-1">
+                        <div class="confidence-fill" style="width: ${fs.confidence}%; background: ${confColor}"></div>
+                    </div>
+                </div>
+            </div>
+            ${fs.description ? `<p class="text-xs text-gray-600 mt-2">${escHtml(fs.description)}</p>` : ''}
+            ${fs.suggested_fix ? `<div class="mt-2"><div class="text-xs font-semibold text-gray-500 mb-1">Suggested Fix:</div><pre class="text-xs bg-gray-50 p-2 rounded overflow-x-auto whitespace-pre-wrap">${escHtml(fs.suggested_fix)}</pre></div>` : ''}
+            ${fs.file_path ? `<div class="text-xs text-gray-400 mt-1 font-mono">${escHtml(fs.file_path)}</div>` : ''}
+            <div class="flex gap-2 mt-2">
+                <button onclick="updateFixStatus(${fs.id}, 'approved')" class="text-xs px-2 py-1 rounded ${fs.status === 'approved' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-600 hover:bg-green-100'}">Approve</button>
+                <button onclick="updateFixStatus(${fs.id}, 'applied')" class="text-xs px-2 py-1 rounded ${fs.status === 'applied' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}">Applied</button>
+                <button onclick="updateFixStatus(${fs.id}, 'rejected')" class="text-xs px-2 py-1 rounded ${fs.status === 'rejected' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-100'}">Reject</button>
+            </div>
+        </div>
+    `;
+}
+
+function closeDetail() {
+    document.getElementById('slideOverlay').classList.remove('show');
+    document.getElementById('slidePanel').classList.remove('open');
+}
+
+// ─── Fix Suggestions Tab ───────────────────────────────
+async function loadFixSuggestions() {
+    const status = document.getElementById('fixFilterStatus').value;
+    const type = document.getElementById('fixFilterType').value;
+    const aiOnly = document.getElementById('fixFilterAI').checked;
+
+    const params = new URLSearchParams({ limit: 50 });
+    if (status) params.set('status', status);
+    if (type) params.set('type', type);
+    if (aiOnly) params.set('ai_only', '1');
+
+    try {
+        const res = await fetch(`${API}/fix-suggestions?${params}`, { headers });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        const container = document.getElementById('fixSuggestionsList');
+        if (json.data.length === 0) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No fix suggestions found</div>';
+            return;
+        }
+
+        container.innerHTML = json.data.map(fs => `
+            <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="font-medium text-gray-800">${escHtml(fs.title)}</div>
+                        <div class="flex flex-wrap gap-2 mt-1.5">
+                            <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">${fs.suggestion_type}</span>
+                            <span class="text-xs complexity-${fs.complexity}">${fs.complexity}</span>
+                            <span class="status-badge st-${fs.status === 'pending' ? 'open' : fs.status === 'applied' ? 'fixed' : fs.status === 'rejected' ? 'wont_fix' : 'in_progress'}">${fs.status}</span>
+                            ${fs.ai_generated ? '<span class="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded">AI Generated</span>' : ''}
+                        </div>
+                        ${fs.error_message ? `<div class="text-xs text-red-500 mt-1">${escHtml(fs.error_message).substring(0, 100)}</div>` : ''}
+                        ${fs.bug_title ? `<div class="text-xs text-blue-500 mt-1">Bug: ${escHtml(fs.bug_title).substring(0, 100)}</div>` : ''}
+                    </div>
+                    <div class="text-right ml-4">
+                        <div class="text-sm font-bold" style="color: ${fs.confidence >= 80 ? '#16a34a' : fs.confidence >= 50 ? '#ca8a04' : '#dc2626'}">${Math.round(fs.confidence)}%</div>
+                        <div class="text-xs text-gray-400">confidence</div>
+                    </div>
+                </div>
+                ${fs.description ? `<p class="text-sm text-gray-600 mt-2">${escHtml(fs.description)}</p>` : ''}
+                ${fs.suggested_fix ? `<pre class="text-xs bg-gray-50 p-3 rounded-lg mt-2 overflow-x-auto whitespace-pre-wrap">${escHtml(fs.suggested_fix)}</pre>` : ''}
+                ${fs.file_path ? `<div class="text-xs text-gray-400 mt-1 font-mono">${escHtml(fs.file_path)}</div>` : ''}
+                <div class="flex gap-2 mt-3">
+                    <button onclick="updateFixStatus(${fs.id}, 'approved')" class="text-xs px-3 py-1 rounded-lg ${fs.status === 'approved' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-600 hover:bg-green-100'}">Approve</button>
+                    <button onclick="updateFixStatus(${fs.id}, 'applied')" class="text-xs px-3 py-1 rounded-lg ${fs.status === 'applied' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}">Mark Applied</button>
+                    <button onclick="updateFixStatus(${fs.id}, 'rejected')" class="text-xs px-3 py-1 rounded-lg ${fs.status === 'rejected' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-100'}">Reject</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        document.getElementById('fixSuggestionsList').innerHTML =
+            `<div class="text-center py-8 text-red-500">${e.message}</div>`;
+    }
+}
+
+// ─── Error Analysis Tab ────────────────────────────────
+async function loadErrorAnalysis() {
+    const days = document.getElementById('analysisDays').value;
+    const module = document.getElementById('analysisModule').value;
+
+    const container = document.getElementById('analysisContent');
+    container.innerHTML = '<div class="text-center py-12 text-gray-400">Analyzing errors...</div>';
+
+    try {
+        const params = new URLSearchParams({ days });
+        if (module) params.set('module', module);
+
+        const res = await fetch(`${API}/errors/analysis?${params}`, { headers });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        renderAnalysis(json.data);
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-8 text-red-500">${e.message}</div>`;
+    }
+}
+
+function renderAnalysis(data) {
+    const container = document.getElementById('analysisContent');
+    let html = '';
+
+    // Insights
+    if (data.insights && data.insights.length > 0) {
+        html += '<div class="space-y-2 mb-4">';
+        for (const insight of data.insights) {
+            const color = insight.severity === 'high' ? 'red' : insight.severity === 'warning' ? 'yellow' : 'blue';
+            html += `<div class="bg-${color}-50 border border-${color}-200 rounded-lg p-3 text-sm text-${color}-700">${escHtml(insight.message)}</div>`;
+        }
+        html += '</div>';
+    }
+
+    // Find trend data
+    const dailyData = data.trends?.find(t => t.type === 'daily_errors')?.data || [];
+    const frequentData = data.trends?.find(t => t.type === 'frequent_errors')?.data || [];
+    const moduleData = data.trends?.find(t => t.type === 'by_module')?.data || [];
+    const newVsRecurring = data.trends?.find(t => t.type === 'new_vs_recurring')?.data || {};
+    const resolution = data.trends?.find(t => t.type === 'resolution_metrics')?.data || {};
+
+    // Resolution metrics cards
+    html += `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <div class="text-xl font-bold text-gray-800">${resolution.total || 0}</div>
+            <div class="text-xs text-gray-500">Total Errors</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <div class="text-xl font-bold text-green-600">${resolution.resolved || 0}</div>
+            <div class="text-xs text-gray-500">Resolved</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <div class="text-xl font-bold text-red-600">${resolution.open_new || 0}</div>
+            <div class="text-xs text-gray-500">Unresolved</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <div class="text-xl font-bold text-blue-600">${resolution.avg_resolution_hours ? Math.round(resolution.avg_resolution_hours) + 'h' : '-'}</div>
+            <div class="text-xs text-gray-500">Avg Resolution</div>
+        </div>
+    </div>`;
+
+    // New vs Recurring
+    html += `
+    <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm text-center">
+            <div class="text-lg font-bold text-blue-600">${newVsRecurring.new_errors || 0}</div>
+            <div class="text-xs text-gray-500">New Errors</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm text-center">
+            <div class="text-lg font-bold text-orange-600">${newVsRecurring.recurring_errors || 0}</div>
+            <div class="text-xs text-gray-500">Recurring</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm text-center">
+            <div class="text-lg font-bold text-red-600">${newVsRecurring.chronic_errors || 0}</div>
+            <div class="text-xs text-gray-500">Chronic (10+)</div>
+        </div>
+    </div>`;
+
+    // Errors by Module
+    if (moduleData.length > 0) {
+        const maxCount = Math.max(...moduleData.map(m => m.count));
+        html += `
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm mb-4">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Errors by Module</h3>
+            <div class="space-y-2">
+                ${moduleData.map(m => `
+                    <div class="flex items-center gap-3">
+                        <div class="w-24 text-xs text-gray-600 font-medium">${m.module}</div>
+                        <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+                            <div class="h-full rounded-full flex items-center pl-2 text-xs text-white font-medium"
+                                style="width: ${Math.max(10, (m.count / maxCount) * 100)}%; background: ${m.severe_count > 0 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #667eea, #764ba2)'}">
+                                ${m.count}
+                            </div>
+                        </div>
+                        ${m.severe_count > 0 ? `<span class="text-xs text-red-500">${m.severe_count} severe</span>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+    }
+
+    // Daily Trend
+    if (dailyData.length > 0) {
+        const maxDay = Math.max(...dailyData.map(d => d.count));
+        html += `
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm mb-4">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Daily Error Trend</h3>
+            <div class="flex items-end gap-1" style="height: 120px;">
+                ${dailyData.map(d => {
+                    const pct = maxDay > 0 ? (d.count / maxDay) * 100 : 0;
+                    const hasHigh = (d.critical || 0) + (d.high || 0) > 0;
+                    return `
+                        <div class="flex-1 flex flex-col items-center justify-end gap-1">
+                            <div class="text-xs text-gray-500">${d.count}</div>
+                            <div class="w-full rounded-t" style="height: ${Math.max(4, pct)}%; background: ${hasHigh ? '#ef4444' : '#667eea'}"></div>
+                            <div class="text-[10px] text-gray-400">${d.day?.substring(5, 10) || ''}</div>
+                        </div>`;
+                }).join('')}
+            </div>
+        </div>`;
+    }
+
+    // Frequent Errors
+    if (frequentData.length > 0) {
+        html += `
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
+            <div class="p-4 border-b border-gray-100">
+                <h3 class="text-sm font-semibold text-gray-700">Most Frequent Errors</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="text-left px-4 py-2 font-medium text-gray-600">Error</th>
+                            <th class="text-center px-3 py-2 font-medium text-gray-600">Type</th>
+                            <th class="text-center px-3 py-2 font-medium text-gray-600">Count</th>
+                            <th class="text-left px-3 py-2 font-medium text-gray-600">File</th>
+                            <th class="text-center px-3 py-2 font-medium text-gray-600">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${frequentData.slice(0, 15).map(e => `
+                            <tr class="border-b border-gray-50">
+                                <td class="px-4 py-2 max-w-xs truncate" title="${escAttr(e.error_message)}">${escHtml(e.error_message).substring(0, 80)}</td>
+                                <td class="px-3 py-2 text-center"><span class="priority-badge pri-${e.severity}">${e.severity}</span></td>
+                                <td class="px-3 py-2 text-center font-bold">${e.total_occurrences}</td>
+                                <td class="px-3 py-2 font-mono text-gray-500">${e.file_path ? escHtml(e.file_path).substring(0, 40) : '-'}${e.line_number ? ':' + e.line_number : ''}</td>
+                                <td class="px-3 py-2 text-center">
+                                    <button onclick="createBugFromError(${e.error_hash ? `'${e.error_hash}'` : 'null'})"
+                                        class="text-xs px-2 py-1 rounded bg-orange-50 text-orange-600 hover:bg-orange-100">Create Bug</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    container.innerHTML = html || '<div class="text-center py-12 text-gray-400">No analysis data available</div>';
+}
+
+// ─── Actions ───────────────────────────────────────────
+async function createBug() {
+    const title = document.getElementById('bugTitle').value.trim();
+    if (!title) return alert('Title is required');
+
+    try {
+        const res = await fetch(`${API}/bugs`, {
+            method: 'POST', headers,
+            body: JSON.stringify({
+                title,
+                description: document.getElementById('bugDescription').value,
+                steps_to_reproduce: document.getElementById('bugSteps').value,
+                expected_behavior: document.getElementById('bugExpected').value,
+                actual_behavior: document.getElementById('bugActual').value,
+                module: document.getElementById('bugModule').value || null,
+                priority: document.getElementById('bugPriority').value
+            })
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        closeCreateModal();
+        loadBugs();
+        loadSummary();
+        showToast('Bug report created');
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function updateBugStatus(id, status) {
+    const notes = document.getElementById(`bugResNotes_${id}`)?.value || '';
+    try {
+        const res = await fetch(`${API}/bugs/${id}`, {
+            method: 'PUT', headers,
+            body: JSON.stringify({ status, resolution_notes: notes || undefined })
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        showBugDetail(id);
+        loadBugs(currentPage);
+        loadSummary();
+        showToast(`Bug status updated to ${status}`);
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function deleteBug(id) {
+    if (!confirm('Delete this bug report?')) return;
+    try {
+        const res = await fetch(`${API}/bugs/${id}`, { method: 'DELETE', headers });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        closeDetail();
+        loadBugs(currentPage);
+        loadSummary();
+        showToast('Bug report deleted');
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function generateFixForBug(bugId) {
+    showToast('Generating AI fix suggestions...');
+    try {
+        const res = await fetch(`${API}/bugs/${bugId}/fix-suggestions`, { method: 'POST', headers });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        showToast(`${json.data.length} fix suggestions generated`);
+        // Refresh detail if panel is open
+        if (document.getElementById('slidePanel').classList.contains('open')) {
+            showBugDetail(bugId);
+        }
+        loadBugs(currentPage);
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function updateFixStatus(fixId, status) {
+    try {
+        const res = await fetch(`${API}/fix-suggestions/${fixId}`, {
+            method: 'PUT', headers,
+            body: JSON.stringify({ status })
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        showToast(`Fix suggestion ${status}`);
+        // Refresh whichever view is active
+        if (document.getElementById('tab-fixes').classList.contains('active')) {
+            loadFixSuggestions();
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function createBugFromError(errorHash) {
+    if (!errorHash) return alert('No error hash available');
+    // Find the error ID from the hash first, then create bug
+    try {
+        // Get errors with this hash
+        const res = await fetch(`${API}/errors?search=${encodeURIComponent(errorHash)}&limit=1`, { headers });
+        const json = await res.json();
+        if (json.data && json.data.length > 0) {
+            const errorId = json.data[0].id;
+            const bugRes = await fetch(`${API}/errors/${errorId}/create-bug`, { method: 'POST', headers });
+            const bugJson = await bugRes.json();
+            if (!bugJson.success) throw new Error(bugJson.message);
+            showToast('Bug report created from error');
+            loadBugs();
+            loadSummary();
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+// ─── Modals ────────────────────────────────────────────
+function showCreateBugModal() {
+    document.getElementById('createBugModal').style.display = 'flex';
+    document.getElementById('bugTitle').value = '';
+    document.getElementById('bugDescription').value = '';
+    document.getElementById('bugSteps').value = '';
+    document.getElementById('bugExpected').value = '';
+    document.getElementById('bugActual').value = '';
+    document.getElementById('bugModule').value = '';
+    document.getElementById('bugPriority').value = 'medium';
+}
+function closeCreateModal() {
+    document.getElementById('createBugModal').style.display = 'none';
+}
+
+// ─── Helpers ───────────────────────────────────────────
+function escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(str) {
+    return escHtml(str).replace(/'/g, '&#39;');
+}
+function formatDate(d) {
+    if (!d) return '-';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
+           dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+function showToast(msg) {
+    if (window.showSuccessToast) return window.showSuccessToast(msg);
+    const t = document.createElement('div');
+    t.className = 'fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg text-sm z-[9999] shadow-lg';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+</script>
+</body>
+</html>
