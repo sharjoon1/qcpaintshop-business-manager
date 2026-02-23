@@ -60,6 +60,8 @@ const attendanceReport = require('./services/attendance-report');
 const whatsappChatRoutes = require('./routes/whatsapp-chat');
 const aiRoutes = require('./routes/ai');
 const aiScheduler = require('./services/ai-scheduler');
+const paintersRoutes = require('./routes/painters');
+const painterScheduler = require('./services/painter-scheduler');
 
 const app = express();
 
@@ -169,6 +171,8 @@ whatsappChatRoutes.setPool(pool);
 whatsappChatRoutes.setSessionManager(whatsappSessionManager);
 aiRoutes.setPool(pool);
 aiScheduler.setPool(pool);
+paintersRoutes.setPool(pool);
+painterScheduler.setPool(pool);
 aiScheduler.setSessionManager(whatsappSessionManager);
 
 // ========================================
@@ -301,6 +305,7 @@ app.use('/api/zoho/whatsapp-sessions', whatsappSessionsRoutes.router);
 app.use('/api/wa-marketing', waMarketingRoutes.router);
 app.use('/api/whatsapp-chat', whatsappChatRoutes.router);
 app.use('/api/ai', aiRoutes.router);
+app.use('/api/painters', paintersRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3253,6 +3258,7 @@ whatsappChatRoutes.setIO(io);
 attendanceRoutes.setIO(io);
 aiRoutes.setIO(io);
 aiScheduler.setIO(io);
+paintersRoutes.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {
@@ -3381,7 +3387,8 @@ server.listen(PORT, () => {
         whatsappSessionManager.initializeSessions();
         waCampaignEngine.start();
         aiScheduler.start();
-        console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler');
+        painterScheduler.start();
+        console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler, painter-scheduler');
     } else {
         console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
     }

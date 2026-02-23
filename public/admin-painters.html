@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Painters - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+        .tab-btn { padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; color: #64748b; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
+        .tab-btn:hover { background: #f1f5f9; color: #334155; }
+        .tab-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(102,126,234,0.3); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .stat-card { background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e8ecf1; }
+        .stat-value { font-size: 1.75rem; font-weight: 700; color: #1e293b; }
+        .stat-label { font-size: 0.8125rem; color: #64748b; margin-top: 2px; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th { text-align: left; padding: 0.75rem; font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; border-bottom: 2px solid #e8ecf1; }
+        .data-table td { padding: 0.75rem; font-size: 0.875rem; border-bottom: 1px solid #f1f5f9; }
+        .data-table tr:hover { background: #fafbfd; }
+        .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-approved { background: #d1fae5; color: #065f46; }
+        .badge-rejected { background: #fee2e2; color: #991b1b; }
+        .badge-suspended { background: #e2e8f0; color: #475569; }
+        .badge-paid { background: #dbeafe; color: #1e40af; }
+        .btn-sm { padding: 0.375rem 0.75rem; border-radius: 0.375rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: all 0.15s; border: none; }
+        .btn-primary { background: #667eea; color: #fff; }
+        .btn-primary:hover { background: #5a6fd6; }
+        .btn-success { background: #10b981; color: #fff; }
+        .btn-success:hover { background: #059669; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-outline { background: transparent; border: 1px solid #d1d5db; color: #374151; }
+        .btn-outline:hover { background: #f9fafb; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: #fff; border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; padding: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.8125rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .empty-state { text-align: center; padding: 3rem; color: #94a3b8; }
+        .empty-state svg { width: 48px; height: 48px; margin: 0 auto 1rem; stroke: #cbd5e1; }
+    </style>
+</head>
+<body data-page="painters">
+    <div class="min-h-screen bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <!-- Page Header -->
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <h1 class="text-2xl font-bold text-gray-900">Painter Management</h1>
+                <div class="flex gap-2">
+                    <button onclick="showAddPainterModal()" class="btn-sm btn-primary">+ Add Painter</button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex flex-wrap gap-2 mb-6">
+                <button class="tab-btn active" onclick="switchTab('painters')">Painters</button>
+                <button class="tab-btn" onclick="switchTab('points')">Points & Invoices</button>
+                <button class="tab-btn" onclick="switchTab('rates')">Rates & Slabs</button>
+                <button class="tab-btn" onclick="switchTab('withdrawals')">Withdrawals</button>
+                <button class="tab-btn" onclick="switchTab('reports')">Referrals & Reports</button>
+            </div>
+
+            <!-- Tab 1: Painters -->
+            <div id="tab-painters" class="tab-content active">
+                <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <input type="text" id="painterSearch" placeholder="Search by name, phone, city..." class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm" oninput="debounceLoadPainters()">
+                        <select id="painterStatusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadPainters()">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="suspended">Suspended</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>City</th>
+                                    <th>Status</th>
+                                    <th>Regular Pts</th>
+                                    <th>Annual Pts</th>
+                                    <th>Credit</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="paintersTableBody">
+                                <tr><td colspan="8" class="text-center py-8 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="paintersPagination" class="flex justify-between items-center mt-4 text-sm text-gray-500"></div>
+            </div>
+
+            <!-- Tab 2: Points & Invoices -->
+            <div id="tab-points" class="tab-content">
+                <!-- Invoice Linking Section -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+                    <h3 class="text-lg font-semibold mb-4">Link Invoice to Painter</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="form-group">
+                            <label>Select Painter</label>
+                            <select id="invoicePainterId" class="w-full">
+                                <option value="">Choose painter...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Billing Type</label>
+                            <select id="invoiceBillingType" class="w-full">
+                                <option value="customer">Customer Billing</option>
+                                <option value="self">Self Billing</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Invoice Number</label>
+                            <input type="text" id="invoiceSearchInput" placeholder="Enter Zoho invoice number...">
+                        </div>
+                    </div>
+                    <div id="invoicePreview" class="hidden mt-4 p-4 bg-gray-50 rounded-lg"></div>
+                    <div class="mt-4">
+                        <button onclick="processInvoice()" class="btn-sm btn-primary" id="processInvoiceBtn" disabled>Process Invoice</button>
+                    </div>
+                </div>
+
+                <!-- Manual Point Adjustment -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+                    <h3 class="text-lg font-semibold mb-4">Manual Point Adjustment</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="form-group">
+                            <label>Painter</label>
+                            <select id="adjustPainterId"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Pool</label>
+                            <select id="adjustPool">
+                                <option value="regular">Regular</option>
+                                <option value="annual">Annual</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount (+/-)</label>
+                            <input type="number" id="adjustAmount" step="0.01" placeholder="e.g. 50 or -20">
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="adjustDescription" placeholder="Reason for adjustment">
+                        </div>
+                    </div>
+                    <button onclick="adjustPoints()" class="btn-sm btn-primary mt-2">Apply Adjustment</button>
+                </div>
+
+                <!-- Recent Processed Invoices -->
+                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b"><h3 class="font-semibold">Recent Processed Invoices</h3></div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>Invoice #</th><th>Painter</th><th>Type</th><th>Total</th><th>Regular Pts</th><th>Annual Pts</th><th>Referral Pts</th><th>Date</th></tr>
+                            </thead>
+                            <tbody id="processedInvoicesBody"><tr><td colspan="8" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Rates & Slabs -->
+            <div id="tab-rates" class="tab-content">
+                <!-- Product Rates -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Product Point Rates</h3>
+                        <div class="flex gap-2">
+                            <button onclick="syncProductRates()" class="btn-sm btn-outline">Sync from Zoho</button>
+                            <button onclick="saveProductRates()" class="btn-sm btn-primary">Save Changes</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table" id="ratesTable">
+                            <thead>
+                                <tr><th>Item Name</th><th>Category</th><th>Regular Pts/Unit</th><th>Annual Eligible</th><th>Annual %</th></tr>
+                            </thead>
+                            <tbody id="ratesTableBody"><tr><td colspan="5" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Value Slabs -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Value Slabs</h3>
+                        <button onclick="showSlabModal()" class="btn-sm btn-primary">+ Add Slab</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>Period</th><th>Label</th><th>Min Amount</th><th>Max Amount</th><th>Bonus Points</th><th>Status</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="slabsTableBody"><tr><td colspan="7" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Withdrawals -->
+            <div id="tab-withdrawals" class="tab-content">
+                <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                    <select id="withdrawalStatusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadWithdrawals()">
+                        <option value="">All Status</option>
+                        <option value="pending" selected>Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="paid">Paid</option>
+                    </select>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>Painter</th><th>Phone</th><th>Pool</th><th>Amount</th><th>Status</th><th>Requested</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="withdrawalsTableBody"><tr><td colspan="7" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 5: Referrals & Reports -->
+            <div id="tab-reports" class="tab-content">
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="summaryCards">
+                </div>
+
+                <!-- Top Earners -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h3 class="text-lg font-semibold mb-4">Top Earners</h3>
+                        <div id="topEarnersBody"><div class="empty-state">Loading...</div></div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <h3 class="text-lg font-semibold mb-4">Referral Network</h3>
+                        <div class="overflow-x-auto">
+                            <table class="data-table">
+                                <thead><tr><th>Referrer</th><th>Referred</th><th>Bills</th><th>Tier %</th><th>Points Earned</th></tr></thead>
+                                <tbody id="referralsTableBody"><tr><td colspan="5" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Painter Detail Modal -->
+    <div id="painterDetailModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePainterDetail()">
+        <div class="modal-content" id="painterDetailContent"></div>
+    </div>
+
+    <!-- Add/Edit Slab Modal -->
+    <div id="slabModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeSlabModal()">
+        <div class="modal-content">
+            <h3 class="text-lg font-semibold mb-4" id="slabModalTitle">Add Value Slab</h3>
+            <input type="hidden" id="slabEditId">
+            <div class="form-group">
+                <label>Period Type</label>
+                <select id="slabPeriodType"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option></select>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="form-group"><label>Min Amount</label><input type="number" id="slabMin" step="0.01"></div>
+                <div class="form-group"><label>Max Amount</label><input type="number" id="slabMax" step="0.01" placeholder="Leave empty for no max"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="form-group"><label>Bonus Points</label><input type="number" id="slabPoints" step="0.01"></div>
+                <div class="form-group"><label>Label</label><input type="text" id="slabLabel" placeholder="e.g. Silver Tier"></div>
+            </div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button onclick="closeSlabModal()" class="btn-sm btn-outline">Cancel</button>
+                <button onclick="saveSlab()" class="btn-sm btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Painter Modal -->
+    <div id="addPainterModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAddPainterModal()">
+        <div class="modal-content">
+            <h3 class="text-lg font-semibold mb-4">Add Painter</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-group"><label>Full Name *</label><input type="text" id="addPainterName"></div>
+                <div class="form-group"><label>Phone *</label><input type="text" id="addPainterPhone"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="addPainterEmail"></div>
+                <div class="form-group"><label>City</label><input type="text" id="addPainterCity"></div>
+                <div class="form-group"><label>Experience (years)</label><input type="number" id="addPainterExp" min="0"></div>
+                <div class="form-group">
+                    <label>Specialization</label>
+                    <select id="addPainterSpec"><option value="both">Both</option><option value="interior">Interior</option><option value="exterior">Exterior</option><option value="industrial">Industrial</option></select>
+                </div>
+            </div>
+            <div class="form-group"><label>Status</label>
+                <select id="addPainterStatus"><option value="approved">Approved</option><option value="pending">Pending</option></select>
+            </div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button onclick="closeAddPainterModal()" class="btn-sm btn-outline">Cancel</button>
+                <button onclick="addPainter()" class="btn-sm btn-primary">Add Painter</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const API = '/api/painters';
+    let currentPage = 1;
+    let debounceTimer;
+    let allPainters = [];
+
+    // ═══════════════════════════════════════
+    // TAB MANAGEMENT
+    // ═══════════════════════════════════════
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        event.target.classList.add('active');
+
+        if (tab === 'painters') loadPainters();
+        if (tab === 'points') loadPointsTab();
+        if (tab === 'rates') loadRatesTab();
+        if (tab === 'withdrawals') loadWithdrawals();
+        if (tab === 'reports') loadReportsTab();
+    }
+
+    // ═══════════════════════════════════════
+    // PAINTERS TAB
+    // ═══════════════════════════════════════
+    function debounceLoadPainters() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(loadPainters, 300);
+    }
+
+    async function loadPainters(page = 1) {
+        currentPage = page;
+        const search = document.getElementById('painterSearch').value;
+        const status = document.getElementById('painterStatusFilter').value;
+        try {
+            const params = new URLSearchParams({ page, limit: 50 });
+            if (search) params.set('search', search);
+            if (status) params.set('status', status);
+            const res = await fetch(`${API}?${params}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            allPainters = data.painters;
+            renderPaintersTable(data.painters);
+            renderPagination(data.total, data.page, data.pages);
+        } catch (err) {
+            document.getElementById('paintersTableBody').innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+        }
+    }
+
+    function renderPaintersTable(painters) {
+        if (!painters.length) {
+            document.getElementById('paintersTableBody').innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-400">No painters found</td></tr>';
+            return;
+        }
+        document.getElementById('paintersTableBody').innerHTML = painters.map(p => `
+            <tr class="cursor-pointer" onclick="showPainterDetail(${p.id})">
+                <td class="font-medium">${esc(p.full_name)}</td>
+                <td>${esc(p.phone)}</td>
+                <td>${esc(p.city || '-')}</td>
+                <td><span class="badge badge-${p.status}">${p.status}</span></td>
+                <td>${parseFloat(p.regular_points).toFixed(2)}</td>
+                <td>${parseFloat(p.annual_points).toFixed(2)}</td>
+                <td>${p.credit_enabled ? '₹' + parseFloat(p.credit_limit).toLocaleString() : '-'}</td>
+                <td>
+                    ${p.status === 'pending' ? `
+                        <button onclick="event.stopPropagation();approvePainter(${p.id},'approve')" class="btn-sm btn-success mr-1">Approve</button>
+                        <button onclick="event.stopPropagation();approvePainter(${p.id},'reject')" class="btn-sm btn-danger">Reject</button>
+                    ` : `<button onclick="event.stopPropagation();showPainterDetail(${p.id})" class="btn-sm btn-outline">View</button>`}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function renderPagination(total, page, pages) {
+        if (pages <= 1) { document.getElementById('paintersPagination').innerHTML = ''; return; }
+        document.getElementById('paintersPagination').innerHTML = `
+            <span>Showing page ${page} of ${pages} (${total} total)</span>
+            <div class="flex gap-2">
+                ${page > 1 ? `<button onclick="loadPainters(${page-1})" class="btn-sm btn-outline">Prev</button>` : ''}
+                ${page < pages ? `<button onclick="loadPainters(${page+1})" class="btn-sm btn-outline">Next</button>` : ''}
+            </div>
+        `;
+    }
+
+    async function approvePainter(id, action) {
+        if (!confirm(`${action === 'approve' ? 'Approve' : 'Reject'} this painter?`)) return;
+        try {
+            const res = await fetch(`${API}/${id}/approve`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ action }) });
+            const data = await res.json();
+            alert(data.message);
+            loadPainters(currentPage);
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function showPainterDetail(id) {
+        try {
+            const res = await fetch(`${API}/${id}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            const p = data.painter;
+
+            document.getElementById('painterDetailContent').innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold">${esc(p.full_name)}</h2>
+                        <p class="text-gray-500">${esc(p.phone)} ${p.email ? '| ' + esc(p.email) : ''}</p>
+                    </div>
+                    <button onclick="closePainterDetail()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div class="stat-card"><div class="stat-value text-lg">${parseFloat(p.regular_points).toFixed(2)}</div><div class="stat-label">Regular Points</div></div>
+                    <div class="stat-card"><div class="stat-value text-lg">${parseFloat(p.annual_points).toFixed(2)}</div><div class="stat-label">Annual Points</div></div>
+                    <div class="stat-card"><div class="stat-value text-lg">${p.experience_years || 0}yr</div><div class="stat-label">Experience</div></div>
+                    <div class="stat-card"><div class="stat-value text-lg"><span class="badge badge-${p.status}">${p.status}</span></div><div class="stat-label">Status</div></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                    <div><strong>City:</strong> ${esc(p.city || '-')}</div>
+                    <div><strong>District:</strong> ${esc(p.district || '-')}</div>
+                    <div><strong>Specialization:</strong> ${p.specialization}</div>
+                    <div><strong>Referral Code:</strong> <code>${esc(p.referral_code || '-')}</code></div>
+                    <div><strong>Credit:</strong> ${p.credit_enabled ? '₹' + parseFloat(p.credit_limit).toLocaleString() + ' (used: ₹' + parseFloat(p.credit_used).toLocaleString() + ')' : 'Disabled'}</div>
+                    ${data.referrer ? `<div><strong>Referred by:</strong> ${esc(data.referrer.full_name)} (${data.referrer.phone})</div>` : ''}
+                    <div><strong>Zoho Contact:</strong> ${esc(p.zoho_contact_id || 'Not linked')}</div>
+                    <div><strong>Joined:</strong> ${new Date(p.created_at).toLocaleDateString()}</div>
+                </div>
+                ${p.credit_enabled ? '' : `
+                <div class="border-t pt-4 mt-4">
+                    <h4 class="font-semibold mb-2">Credit Settings</h4>
+                    <div class="flex gap-3 items-end">
+                        <div class="form-group mb-0"><label>Credit Limit (₹)</label><input type="number" id="detailCreditLimit" value="${p.credit_limit}" class="w-32"></div>
+                        <button onclick="updateCredit(${p.id}, true)" class="btn-sm btn-primary">Enable Credit</button>
+                    </div>
+                </div>`}
+                ${p.credit_enabled ? `
+                <div class="border-t pt-4 mt-4">
+                    <h4 class="font-semibold mb-2">Credit Settings</h4>
+                    <div class="flex gap-3 items-end">
+                        <div class="form-group mb-0"><label>Credit Limit (₹)</label><input type="number" id="detailCreditLimit" value="${p.credit_limit}" class="w-32"></div>
+                        <button onclick="updateCredit(${p.id}, true)" class="btn-sm btn-primary">Update</button>
+                        <button onclick="updateCredit(${p.id}, false)" class="btn-sm btn-danger">Disable</button>
+                    </div>
+                </div>` : ''}
+                <div class="border-t pt-4 mt-4">
+                    <h4 class="font-semibold mb-2">Recent Transactions</h4>
+                    ${data.recentTransactions.length ? `
+                    <table class="data-table">
+                        <thead><tr><th>Date</th><th>Pool</th><th>Type</th><th>Amount</th><th>Source</th><th>Description</th></tr></thead>
+                        <tbody>
+                            ${data.recentTransactions.map(t => `
+                                <tr>
+                                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                                    <td>${t.pool}</td>
+                                    <td>${t.type}</td>
+                                    <td class="${parseFloat(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}">${parseFloat(t.amount).toFixed(2)}</td>
+                                    <td>${t.source}</td>
+                                    <td class="text-xs">${esc(t.description || '-')}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>` : '<p class="text-gray-400 text-sm">No transactions yet</p>'}
+                </div>
+            `;
+            document.getElementById('painterDetailModal').style.display = 'flex';
+        } catch (err) { alert('Error loading painter: ' + err.message); }
+    }
+
+    function closePainterDetail() { document.getElementById('painterDetailModal').style.display = 'none'; }
+
+    async function updateCredit(painterId, enabled) {
+        const limit = document.getElementById('detailCreditLimit')?.value || 0;
+        try {
+            const res = await fetch(`${API}/${painterId}/credit`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ credit_enabled: enabled, credit_limit: limit }) });
+            const data = await res.json();
+            alert(data.message);
+            closePainterDetail();
+            loadPainters(currentPage);
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    // ═══════════════════════════════════════
+    // ADD PAINTER
+    // ═══════════════════════════════════════
+    function showAddPainterModal() { document.getElementById('addPainterModal').style.display = 'flex'; }
+    function closeAddPainterModal() { document.getElementById('addPainterModal').style.display = 'none'; }
+
+    async function addPainter() {
+        const name = document.getElementById('addPainterName').value.trim();
+        const phone = document.getElementById('addPainterPhone').value.trim();
+        if (!name || !phone) return alert('Name and phone are required');
+
+        try {
+            const body = {
+                full_name: name,
+                phone,
+                email: document.getElementById('addPainterEmail').value.trim() || undefined,
+                city: document.getElementById('addPainterCity').value.trim() || undefined,
+                experience_years: parseInt(document.getElementById('addPainterExp').value) || 0,
+                specialization: document.getElementById('addPainterSpec').value
+            };
+            const res = await fetch(`${API}/register`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            // Auto-approve if status is approved
+            if (document.getElementById('addPainterStatus').value === 'approved') {
+                await fetch(`${API}/${data.painterId}/approve`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ action: 'approve' }) });
+            }
+
+            alert('Painter added successfully! Referral code: ' + data.referralCode);
+            closeAddPainterModal();
+            loadPainters();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    // ═══════════════════════════════════════
+    // POINTS & INVOICES TAB
+    // ═══════════════════════════════════════
+    async function loadPointsTab() {
+        await loadPainterSelects();
+        // Load recent processed invoices (show all painters)
+        try {
+            const res = await fetch(`${API}/reports/summary`, { headers: authHeaders() });
+            // Just load a generic view - we'd need a separate endpoint for all invoices
+            // For now show instructions
+        } catch (err) {}
+    }
+
+    async function loadPainterSelects() {
+        try {
+            const res = await fetch(`${API}?limit=500&status=approved`, { headers: authHeaders() });
+            const data = await res.json();
+            const opts = data.painters.map(p => `<option value="${p.id}">${esc(p.full_name)} (${p.phone})</option>`).join('');
+            const selectHtml = '<option value="">Choose painter...</option>' + opts;
+            document.getElementById('invoicePainterId').innerHTML = selectHtml;
+            document.getElementById('adjustPainterId').innerHTML = selectHtml;
+        } catch (err) {}
+    }
+
+    async function adjustPoints() {
+        const painterId = document.getElementById('adjustPainterId').value;
+        const pointPool = document.getElementById('adjustPool').value;
+        const amount = document.getElementById('adjustAmount').value;
+        const description = document.getElementById('adjustDescription').value;
+        if (!painterId || !amount) return alert('Painter and amount required');
+
+        try {
+            const res = await fetch(`${API}/${painterId}/points/adjust`, {
+                method: 'POST', headers: authHeaders(),
+                body: JSON.stringify({ pool: pointPool, amount: parseFloat(amount), description })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(`Points adjusted. New ${pointPool} balance: ${data.balance[pointPool]}`);
+            document.getElementById('adjustAmount').value = '';
+            document.getElementById('adjustDescription').value = '';
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function processInvoice() {
+        alert('To process an invoice, search for it in Zoho Books first, then link it here. This feature integrates with the Zoho API.');
+    }
+
+    // ═══════════════════════════════════════
+    // RATES & SLABS TAB
+    // ═══════════════════════════════════════
+    async function loadRatesTab() {
+        await loadProductRates();
+        await loadSlabs();
+    }
+
+    async function loadProductRates() {
+        try {
+            const res = await fetch(`${API}/config/product-rates`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.rates.length) {
+                document.getElementById('ratesTableBody').innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-400">No product rates configured. Click "Sync from Zoho" to import items.</td></tr>';
+                return;
+            }
+            document.getElementById('ratesTableBody').innerHTML = data.rates.map(r => `
+                <tr data-item-id="${esc(r.item_id)}">
+                    <td>${esc(r.item_name || r.item_id)}</td>
+                    <td>${esc(r.category || '-')}</td>
+                    <td><input type="number" value="${r.regular_points_per_unit}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="regular_points_per_unit"></td>
+                    <td><input type="checkbox" ${r.annual_eligible ? 'checked' : ''} class="rate-checkbox" data-field="annual_eligible"></td>
+                    <td><input type="number" value="${r.annual_pct}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="annual_pct"></td>
+                </tr>
+            `).join('');
+        } catch (err) {
+            document.getElementById('ratesTableBody').innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+        }
+    }
+
+    async function saveProductRates() {
+        const rows = document.querySelectorAll('#ratesTableBody tr[data-item-id]');
+        const rates = Array.from(rows).map(row => ({
+            item_id: row.dataset.itemId,
+            regular_points_per_unit: parseFloat(row.querySelector('[data-field="regular_points_per_unit"]').value) || 0,
+            annual_eligible: row.querySelector('[data-field="annual_eligible"]').checked,
+            annual_pct: parseFloat(row.querySelector('[data-field="annual_pct"]').value) || 1.0
+        }));
+
+        try {
+            const res = await fetch(`${API}/config/product-rates`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ rates }) });
+            const data = await res.json();
+            alert(data.message);
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function syncProductRates() {
+        try {
+            const res = await fetch(`${API}/config/product-rates/sync`, { method: 'POST', headers: authHeaders() });
+            const data = await res.json();
+            alert(data.message);
+            loadProductRates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function loadSlabs() {
+        try {
+            const res = await fetch(`${API}/config/slabs`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.slabs.length) {
+                document.getElementById('slabsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-400">No slabs configured</td></tr>';
+                return;
+            }
+            document.getElementById('slabsTableBody').innerHTML = data.slabs.map(s => `
+                <tr>
+                    <td class="capitalize">${s.period_type}</td>
+                    <td>${esc(s.label || '-')}</td>
+                    <td>₹${parseFloat(s.min_amount).toLocaleString()}</td>
+                    <td>${s.max_amount ? '₹' + parseFloat(s.max_amount).toLocaleString() : 'No limit'}</td>
+                    <td>${parseFloat(s.bonus_points).toFixed(2)}</td>
+                    <td><span class="badge ${s.is_active ? 'badge-approved' : 'badge-suspended'}">${s.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td>
+                        <button onclick="editSlab(${s.id}, '${s.period_type}', ${s.min_amount}, ${s.max_amount || 'null'}, ${s.bonus_points}, '${esc(s.label || '')}')" class="btn-sm btn-outline mr-1">Edit</button>
+                        <button onclick="deleteSlab(${s.id})" class="btn-sm btn-danger">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (err) {
+            document.getElementById('slabsTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+        }
+    }
+
+    function showSlabModal() {
+        document.getElementById('slabEditId').value = '';
+        document.getElementById('slabPeriodType').value = 'monthly';
+        document.getElementById('slabMin').value = '';
+        document.getElementById('slabMax').value = '';
+        document.getElementById('slabPoints').value = '';
+        document.getElementById('slabLabel').value = '';
+        document.getElementById('slabModalTitle').textContent = 'Add Value Slab';
+        document.getElementById('slabModal').style.display = 'flex';
+    }
+
+    function editSlab(id, period, min, max, points, label) {
+        document.getElementById('slabEditId').value = id;
+        document.getElementById('slabPeriodType').value = period;
+        document.getElementById('slabMin').value = min;
+        document.getElementById('slabMax').value = max || '';
+        document.getElementById('slabPoints').value = points;
+        document.getElementById('slabLabel').value = label;
+        document.getElementById('slabModalTitle').textContent = 'Edit Value Slab';
+        document.getElementById('slabModal').style.display = 'flex';
+    }
+
+    function closeSlabModal() { document.getElementById('slabModal').style.display = 'none'; }
+
+    async function saveSlab() {
+        const id = document.getElementById('slabEditId').value;
+        const body = {
+            period_type: document.getElementById('slabPeriodType').value,
+            min_amount: parseFloat(document.getElementById('slabMin').value),
+            max_amount: document.getElementById('slabMax').value ? parseFloat(document.getElementById('slabMax').value) : null,
+            bonus_points: parseFloat(document.getElementById('slabPoints').value),
+            label: document.getElementById('slabLabel').value
+        };
+        if (isNaN(body.min_amount) || isNaN(body.bonus_points)) return alert('Min amount and bonus points required');
+
+        try {
+            const url = id ? `${API}/config/slabs/${id}` : `${API}/config/slabs`;
+            const method = id ? 'PUT' : 'POST';
+            const res = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
+            const data = await res.json();
+            alert(data.message);
+            closeSlabModal();
+            loadSlabs();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function deleteSlab(id) {
+        if (!confirm('Delete this slab?')) return;
+        try {
+            const res = await fetch(`${API}/config/slabs/${id}`, { method: 'DELETE', headers: authHeaders() });
+            const data = await res.json();
+            alert(data.message);
+            loadSlabs();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    // ═══════════════════════════════════════
+    // WITHDRAWALS TAB
+    // ═══════════════════════════════════════
+    async function loadWithdrawals() {
+        const status = document.getElementById('withdrawalStatusFilter').value;
+        try {
+            const params = new URLSearchParams({ limit: 100 });
+            if (status) params.set('status', status);
+            const res = await fetch(`${API}/withdrawals?${params}`, { headers: authHeaders() });
+            const data = await res.json();
+
+            if (!data.withdrawals.length) {
+                document.getElementById('withdrawalsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-400">No withdrawals found</td></tr>';
+                return;
+            }
+            document.getElementById('withdrawalsTableBody').innerHTML = data.withdrawals.map(w => `
+                <tr>
+                    <td class="font-medium">${esc(w.full_name)}</td>
+                    <td>${esc(w.phone)}</td>
+                    <td class="capitalize">${w.pool}</td>
+                    <td class="font-semibold">${parseFloat(w.amount).toFixed(2)}</td>
+                    <td><span class="badge badge-${w.status}">${w.status}</span></td>
+                    <td>${new Date(w.requested_at).toLocaleDateString()}</td>
+                    <td>
+                        ${w.status === 'pending' ? `
+                            <button onclick="processWithdrawal(${w.id}, 'approve')" class="btn-sm btn-success mr-1">Approve</button>
+                            <button onclick="processWithdrawal(${w.id}, 'reject')" class="btn-sm btn-danger">Reject</button>
+                        ` : w.status === 'approved' ? `
+                            <button onclick="processWithdrawal(${w.id}, 'paid')" class="btn-sm btn-primary">Mark Paid</button>
+                        ` : '-'}
+                    </td>
+                </tr>
+            `).join('');
+        } catch (err) {
+            document.getElementById('withdrawalsTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+        }
+    }
+
+    async function processWithdrawal(id, action) {
+        let payRef = '';
+        if (action === 'paid') payRef = prompt('Enter payment reference:') || '';
+        if (action === 'reject' && !confirm('Reject this withdrawal?')) return;
+        if (action === 'approve' && !confirm('Approve this withdrawal? Points will be deducted.')) return;
+
+        try {
+            const res = await fetch(`${API}/withdrawals/${id}`, {
+                method: 'PUT', headers: authHeaders(),
+                body: JSON.stringify({ action, payment_reference: payRef })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(`Withdrawal ${action}d`);
+            loadWithdrawals();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    // ═══════════════════════════════════════
+    // REPORTS TAB
+    // ═══════════════════════════════════════
+    async function loadReportsTab() {
+        await loadSummary();
+        await loadTopEarners();
+        await loadReferrals();
+    }
+
+    async function loadSummary() {
+        try {
+            const res = await fetch(`${API}/reports/summary`, { headers: authHeaders() });
+            const data = await res.json();
+            const s = data.summary;
+            document.getElementById('summaryCards').innerHTML = `
+                <div class="stat-card"><div class="stat-value">${s.totalPainters}</div><div class="stat-label">Total Painters (${s.approvedPainters} approved)</div></div>
+                <div class="stat-card"><div class="stat-value">${s.pendingPainters}</div><div class="stat-label">Pending Approval</div></div>
+                <div class="stat-card"><div class="stat-value">${s.totalPointsIssued.toFixed(0)}</div><div class="stat-label">Total Points Issued</div></div>
+                <div class="stat-card"><div class="stat-value">${s.totalPointsRedeemed.toFixed(0)}</div><div class="stat-label">Points Redeemed</div></div>
+            `;
+        } catch (err) {}
+    }
+
+    async function loadTopEarners() {
+        try {
+            const res = await fetch(`${API}/reports/top-earners?limit=10`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.earners.length) {
+                document.getElementById('topEarnersBody').innerHTML = '<p class="text-gray-400 text-sm">No data yet</p>';
+                return;
+            }
+            document.getElementById('topEarnersBody').innerHTML = `
+                <div class="space-y-3">
+                    ${data.earners.map((e, i) => `
+                        <div class="flex items-center justify-between py-2 ${i > 0 ? 'border-t' : ''}">
+                            <div class="flex items-center gap-3">
+                                <span class="w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${i < 3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}">${i + 1}</span>
+                                <div><div class="font-medium text-sm">${esc(e.full_name)}</div><div class="text-xs text-gray-400">${esc(e.city || '')}</div></div>
+                            </div>
+                            <div class="text-right"><div class="font-semibold text-sm">${parseFloat(e.total_earned).toFixed(0)} pts</div><div class="text-xs text-gray-400">R:${parseFloat(e.regular_points).toFixed(0)} A:${parseFloat(e.annual_points).toFixed(0)}</div></div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } catch (err) {}
+    }
+
+    async function loadReferrals() {
+        try {
+            const res = await fetch(`${API}/referrals`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.referrals.length) {
+                document.getElementById('referralsTableBody').innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-400">No referrals yet</td></tr>';
+                return;
+            }
+            document.getElementById('referralsTableBody').innerHTML = data.referrals.map(r => `
+                <tr>
+                    <td>${esc(r.referrer_name)}</td>
+                    <td>${esc(r.referred_name)}</td>
+                    <td>${r.total_bills}</td>
+                    <td>${parseFloat(r.current_tier_pct).toFixed(2)}%</td>
+                    <td>${parseFloat(r.total_referral_points).toFixed(2)}</td>
+                </tr>
+            `).join('');
+        } catch (err) {}
+    }
+
+    // ═══════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════
+    function authHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '')
+        };
+    }
+
+    function esc(s) {
+        if (!s) return '';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+
+    // ═══════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check URL tab param
+        const urlParams = new URLSearchParams(window.location.search);
+        const tab = urlParams.get('tab');
+        if (tab) {
+            const tabBtn = document.querySelector(`.tab-btn`);
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            const tabEl = document.getElementById('tab-' + tab);
+            if (tabEl) {
+                tabEl.classList.add('active');
+                // Find and activate the matching tab button
+                const btns = document.querySelectorAll('.tab-btn');
+                const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports'];
+                const idx = tabNames.indexOf(tab);
+                if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
+            }
+        }
+
+        loadPainters();
+    });
+    </script>
+</body>
+</html>

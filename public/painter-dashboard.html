@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <title>Painter Dashboard - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .stat-card { background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e8ecf1; transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .stat-value { font-size: 1.75rem; font-weight: 700; }
+        .stat-label { font-size: 0.8125rem; color: #64748b; margin-top: 2px; }
+        .action-btn { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: inherit; display: block; }
+        .action-btn:hover { border-color: #667eea; box-shadow: 0 2px 8px rgba(102,126,234,0.15); }
+        .action-btn svg { width: 28px; height: 28px; stroke: #667eea; fill: none; stroke-width: 1.75; margin: 0 auto 0.5rem; }
+        .txn-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9; }
+        .txn-row:last-child { border-bottom: none; }
+        .badge { display: inline-flex; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-earn { background: #d1fae5; color: #065f46; }
+        .badge-debit { background: #fee2e2; color: #991b1b; }
+        .section-card { background: #fff; border-radius: 12px; border: 1px solid #e8ecf1; overflow: hidden; }
+        .section-header { padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; font-weight: 600; font-size: 0.9375rem; }
+        .section-body { padding: 1rem 1.25rem; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: #fff; border-radius: 16px; max-width: 400px; width: 90%; padding: 1.5rem; }
+        .referral-code { background: linear-gradient(135deg, #f0f4ff, #faf5ff); border: 2px dashed #667eea; border-radius: 12px; padding: 1.25rem; text-align: center; }
+        .referral-code code { font-size: 1.5rem; font-weight: 800; color: #667eea; letter-spacing: 2px; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="max-w-lg mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm opacity-80">Welcome back,</p>
+                    <h1 class="text-xl font-bold" id="painterName">Painter</h1>
+                </div>
+                <button onclick="logout()" class="text-sm opacity-80 hover:opacity-100 flex items-center gap-1">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-lg mx-auto px-4 -mt-2 pb-8">
+        <!-- Balance Cards -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="stat-card">
+                <div class="stat-value text-indigo-600" id="regularBalance">0</div>
+                <div class="stat-label">Regular Points</div>
+                <div class="text-xs text-gray-400 mt-1">Withdraw anytime</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value text-purple-600" id="annualBalance">0</div>
+                <div class="stat-label">Annual Points</div>
+                <div class="text-xs text-gray-400 mt-1">Annual withdrawal</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="stat-card">
+                <div class="stat-value text-lg text-green-600" id="totalEarned">0</div>
+                <div class="stat-label">Total Earned</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value text-lg text-blue-600" id="referralCount">0</div>
+                <div class="stat-label">Referrals</div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-3 gap-3 mb-6">
+            <a class="action-btn" onclick="showWithdrawModal()">
+                <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                <div class="text-xs font-medium">Withdraw</div>
+            </a>
+            <a class="action-btn" onclick="showTransactions()">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                <div class="text-xs font-medium">Transactions</div>
+            </a>
+            <a class="action-btn" onclick="showReferrals()">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                <div class="text-xs font-medium">Referrals</div>
+            </a>
+        </div>
+
+        <!-- Referral Code -->
+        <div class="referral-code mb-6">
+            <p class="text-sm text-gray-500 mb-2">Share your referral code</p>
+            <code id="referralCode">---</code>
+            <button onclick="shareReferral()" class="mt-3 text-sm text-indigo-600 font-medium flex items-center gap-1 mx-auto">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                Share
+            </button>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="section-card mb-6">
+            <div class="section-header flex justify-between items-center">
+                <span>Recent Transactions</span>
+                <a href="#" onclick="showTransactions()" class="text-sm text-indigo-600 font-medium">View All</a>
+            </div>
+            <div class="section-body" id="recentTransactions">
+                <div class="text-center py-4 text-gray-400 text-sm">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Withdrawal History -->
+        <div class="section-card" id="withdrawalSection" style="display:none">
+            <div class="section-header">My Withdrawals</div>
+            <div class="section-body" id="withdrawalList"></div>
+        </div>
+
+        <!-- Full Transaction List (hidden by default) -->
+        <div class="section-card" id="fullTransactionSection" style="display:none">
+            <div class="section-header flex justify-between items-center">
+                <span>All Transactions</span>
+                <div class="flex gap-2">
+                    <button onclick="loadFullTransactions('regular')" class="text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-700" id="txnFilterRegular">Regular</button>
+                    <button onclick="loadFullTransactions('annual')" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600" id="txnFilterAnnual">Annual</button>
+                </div>
+            </div>
+            <div class="section-body" id="fullTransactionList"></div>
+        </div>
+
+        <!-- Referral List (hidden by default) -->
+        <div class="section-card" id="referralSection" style="display:none">
+            <div class="section-header">My Referrals</div>
+            <div class="section-body" id="referralList"></div>
+        </div>
+    </div>
+
+    <!-- Withdraw Modal -->
+    <div id="withdrawModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold mb-4">Request Withdrawal</h3>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Pool</label>
+                <select id="withdrawPool" class="w-full p-2 border rounded-lg">
+                    <option value="regular">Regular Points</option>
+                    <option value="annual">Annual Points</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                <input type="number" id="withdrawAmount" class="w-full p-2 border rounded-lg" step="0.01" min="1" placeholder="Enter points to withdraw">
+                <p class="text-xs text-gray-400 mt-1">Available: <span id="withdrawAvailable">0</span> points</p>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="document.getElementById('withdrawModal').style.display='none'" class="flex-1 py-2 border rounded-lg text-gray-600 font-medium">Cancel</button>
+                <button onclick="submitWithdrawal()" class="flex-1 py-2 rounded-lg text-white font-medium" style="background: linear-gradient(135deg, #667eea, #764ba2);">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const API = '/api/painters';
+    let dashboardData = null;
+
+    function painterHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'X-Painter-Token': localStorage.getItem('painter_token') || ''
+        };
+    }
+
+    function logout() {
+        localStorage.removeItem('painter_token');
+        localStorage.removeItem('painter');
+        window.location.href = '/painter-login.html';
+    }
+
+    // Check auth
+    if (!localStorage.getItem('painter_token')) {
+        window.location.href = '/painter-login.html';
+    }
+
+    // Load painter name from localStorage
+    try {
+        const p = JSON.parse(localStorage.getItem('painter') || '{}');
+        if (p.name) document.getElementById('painterName').textContent = p.name;
+    } catch(e) {}
+
+    async function loadDashboard() {
+        try {
+            const res = await fetch(`${API}/me/dashboard`, { headers: painterHeaders() });
+            if (res.status === 401) { logout(); return; }
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            dashboardData = data.dashboard;
+            const b = data.dashboard.balance;
+
+            document.getElementById('regularBalance').textContent = b.regular.toFixed(2);
+            document.getElementById('annualBalance').textContent = b.annual.toFixed(2);
+            document.getElementById('totalEarned').textContent = (b.totalEarnedRegular + b.totalEarnedAnnual).toFixed(0);
+            document.getElementById('referralCount').textContent = data.dashboard.referralCount;
+            document.getElementById('referralCode').textContent = data.dashboard.referralCode || '---';
+
+            // Render recent transactions
+            renderTransactions(data.dashboard.recentTransactions, 'recentTransactions');
+        } catch (err) {
+            console.error('Dashboard error:', err);
+        }
+    }
+
+    function renderTransactions(txns, containerId) {
+        const container = document.getElementById(containerId);
+        if (!txns || !txns.length) {
+            container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">No transactions yet</div>';
+            return;
+        }
+        container.innerHTML = txns.map(t => {
+            const isPositive = parseFloat(t.amount) >= 0;
+            return `
+                <div class="txn-row">
+                    <div>
+                        <div class="text-sm font-medium">${t.source.replace(/_/g, ' ')}</div>
+                        <div class="text-xs text-gray-400">${new Date(t.created_at).toLocaleDateString()} &bull; ${t.pool}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}">${isPositive ? '+' : ''}${parseFloat(t.amount).toFixed(2)}</div>
+                        <span class="badge ${isPositive ? 'badge-earn' : 'badge-debit'}">${t.type}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function showTransactions() {
+        document.getElementById('fullTransactionSection').style.display = 'block';
+        document.getElementById('referralSection').style.display = 'none';
+        loadFullTransactions('regular');
+        document.getElementById('fullTransactionSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function loadFullTransactions(pool) {
+        document.getElementById('txnFilterRegular').className = pool === 'regular' ? 'text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-700' : 'text-xs px-2 py-1 rounded bg-gray-100 text-gray-600';
+        document.getElementById('txnFilterAnnual').className = pool === 'annual' ? 'text-xs px-2 py-1 rounded bg-purple-100 text-purple-700' : 'text-xs px-2 py-1 rounded bg-gray-100 text-gray-600';
+
+        try {
+            const res = await fetch(`${API}/me/points/${pool}?limit=100`, { headers: painterHeaders() });
+            const data = await res.json();
+            renderTransactions(data.transactions, 'fullTransactionList');
+        } catch (err) {
+            document.getElementById('fullTransactionList').innerHTML = '<div class="text-red-500 text-sm py-4">Error loading transactions</div>';
+        }
+    }
+
+    async function showReferrals() {
+        document.getElementById('referralSection').style.display = 'block';
+        document.getElementById('fullTransactionSection').style.display = 'none';
+
+        try {
+            const res = await fetch(`${API}/me/referrals`, { headers: painterHeaders() });
+            const data = await res.json();
+            const container = document.getElementById('referralList');
+
+            if (!data.referrals || !data.referrals.length) {
+                container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">No referrals yet. Share your code to earn bonus points!</div>';
+            } else {
+                container.innerHTML = data.referrals.map(r => `
+                    <div class="flex justify-between items-center py-3 border-b border-gray-100 last:border-0">
+                        <div>
+                            <div class="font-medium text-sm">${esc(r.full_name)}</div>
+                            <div class="text-xs text-gray-400">${esc(r.city || '')} &bull; <span class="badge ${r.painter_status === 'approved' ? 'badge-earn' : 'badge-debit'}">${r.painter_status}</span></div>
+                        </div>
+                        <div class="text-right text-xs text-gray-500">
+                            <div>${r.total_bills} bills</div>
+                            <div>${parseFloat(r.current_tier_pct).toFixed(1)}% tier</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('referralSection').scrollIntoView({ behavior: 'smooth' });
+        } catch (err) {
+            document.getElementById('referralList').innerHTML = '<div class="text-red-500 text-sm py-4">Error loading referrals</div>';
+        }
+    }
+
+    function showWithdrawModal() {
+        if (dashboardData) {
+            const b = dashboardData.balance;
+            document.getElementById('withdrawAvailable').textContent = b.regular.toFixed(2);
+            document.getElementById('withdrawPool').onchange = function() {
+                document.getElementById('withdrawAvailable').textContent =
+                    this.value === 'regular' ? b.regular.toFixed(2) : b.annual.toFixed(2);
+            };
+        }
+        document.getElementById('withdrawAmount').value = '';
+        document.getElementById('withdrawModal').style.display = 'flex';
+    }
+
+    async function submitWithdrawal() {
+        const pool = document.getElementById('withdrawPool').value;
+        const amount = parseFloat(document.getElementById('withdrawAmount').value);
+        if (!amount || amount <= 0) return alert('Enter a valid amount');
+
+        try {
+            const res = await fetch(`${API}/me/withdraw`, {
+                method: 'POST',
+                headers: painterHeaders(),
+                body: JSON.stringify({ pool, amount })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            alert('Withdrawal request submitted! You will be notified when processed.');
+            document.getElementById('withdrawModal').style.display = 'none';
+            loadDashboard();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    }
+
+    async function shareReferral() {
+        const code = dashboardData?.referralCode || document.getElementById('referralCode').textContent;
+        const text = `Join Quality Colours Painter Loyalty Program! Use my referral code: ${code}\n\nRegister here: ${window.location.origin}/painter-register.html`;
+
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: 'Quality Colours Painter Program', text });
+            } catch (e) {}
+        } else {
+            navigator.clipboard.writeText(text).then(() => alert('Referral link copied to clipboard!'));
+        }
+    }
+
+    function esc(s) {
+        if (!s) return '';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+
+    // Init
+    loadDashboard();
+    </script>
+</body>
+</html>

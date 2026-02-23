@@ -28,6 +28,7 @@
         PRODUCTS_SUBNAV_PATH: '/components/products-subnav.html',
         SYSTEM_SUBNAV_PATH: '/components/system-subnav.html',
         MARKETING_SUBNAV_PATH: '/components/marketing-subnav.html',
+        PAINTERS_SUBNAV_PATH: '/components/painters-subnav.html',
         RETRY_ATTEMPTS: 3,
         RETRY_DELAY: 1000
     };
@@ -72,12 +73,21 @@
         'website': CONFIG.SYSTEM_SUBNAV_PATH,
         'guides': CONFIG.SYSTEM_SUBNAV_PATH,
         'ai': CONFIG.SYSTEM_SUBNAV_PATH,
+        // Painters
+        'painters': CONFIG.PAINTERS_SUBNAV_PATH,
+        'painter-points': CONFIG.PAINTERS_SUBNAV_PATH,
+        'painter-rates': CONFIG.PAINTERS_SUBNAV_PATH,
+        'painter-withdrawals': CONFIG.PAINTERS_SUBNAV_PATH,
+        'painter-reports': CONFIG.PAINTERS_SUBNAV_PATH,
     };
     
     // Skip navigation on login pages and public share pages
     const isLoginPage = window.location.pathname.includes('/login.html') ||
                         window.location.pathname.includes('/forgot-password.html') ||
-                        window.location.pathname.startsWith('/share/');
+                        window.location.pathname.startsWith('/share/') ||
+                        window.location.pathname.includes('/painter-register.html') ||
+                        window.location.pathname.includes('/painter-login.html') ||
+                        window.location.pathname.includes('/painter-dashboard.html');
 
     if (isLoginPage) {
         console.log('⏭️ Skipping navigation on login/public page');

@@ -1,0 +1,207 @@
+<!-- Painters Sub-Navigation Component -->
+<style>
+    .painters-subnav {
+        background: #ffffff;
+        border-bottom: 1px solid #e8ecf1;
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        padding: 0;
+    }
+
+    .painters-subnav-inner {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 1rem;
+        position: relative;
+    }
+
+    .painters-subnav-tabs {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: 0.5rem 0;
+    }
+    .painters-subnav-tabs::-webkit-scrollbar { display: none; }
+
+    .painters-subnav-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: #64748b;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        flex-shrink: 0;
+    }
+    .painters-subnav-tab:hover {
+        background: #f1f5f9;
+        color: #334155;
+    }
+    .painters-subnav-tab svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+    }
+    .painters-subnav-tab.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #ffffff;
+        border-color: transparent;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    .painters-subnav-tab.active:hover {
+        background: linear-gradient(135deg, #5a6fd6, #6a4192);
+        color: #ffffff;
+    }
+
+    .painters-subnav-toggle {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.625rem 0;
+        width: 100%;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #475569;
+    }
+    .painters-subnav-toggle svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        transition: transform 0.2s ease;
+    }
+    .painters-subnav-toggle.open svg.chevron-icon {
+        transform: rotate(180deg);
+    }
+
+    .painters-subnav-toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .painters-subnav-toggle-label svg {
+        width: 16px;
+        height: 16px;
+        stroke: #667eea;
+    }
+
+    .painters-subnav-dropdown {
+        display: none;
+        flex-direction: column;
+        gap: 2px;
+        padding-bottom: 0.5rem;
+    }
+    .painters-subnav-dropdown.show {
+        display: flex;
+    }
+    .painters-subnav-dropdown .painters-subnav-tab {
+        width: 100%;
+        padding: 8px 12px;
+        border-radius: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .painters-subnav-tabs {
+            display: none;
+        }
+        .painters-subnav-toggle {
+            display: flex;
+        }
+    }
+</style>
+
+<nav class="painters-subnav" id="paintersSubnav">
+    <div class="painters-subnav-inner">
+        <!-- Mobile toggle -->
+        <button class="painters-subnav-toggle" id="paintersSubnavToggle" onclick="togglePaintersSubnav()">
+            <span class="painters-subnav-toggle-label">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="none"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                <span id="paintersSubnavCurrentPage">Painters</span>
+            </span>
+            <svg class="chevron-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <!-- Mobile dropdown -->
+        <div class="painters-subnav-dropdown" id="paintersSubnavDropdown"></div>
+
+        <!-- Desktop horizontal tabs -->
+        <div class="painters-subnav-tabs" id="paintersSubnavTabs"></div>
+    </div>
+</nav>
+
+<script>
+(function() {
+    var painterPages = [
+        { page: 'painters', label: 'Painters', href: '/admin-painters.html', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' },
+        { page: 'painter-points', label: 'Points & Invoices', href: '/admin-painters.html?tab=points', icon: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' },
+        { page: 'painter-rates', label: 'Rates & Slabs', href: '/admin-painters.html?tab=rates', icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' },
+        { page: 'painter-withdrawals', label: 'Withdrawals', href: '/admin-painters.html?tab=withdrawals', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>' },
+        { page: 'painter-reports', label: 'Referrals & Reports', href: '/admin-painters.html?tab=reports', icon: '<path d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"/>' }
+    ];
+
+    var currentPage = document.body.getAttribute('data-page') || '';
+    var currentPageObj = painterPages.find(function(p) { return p.page === currentPage; }) || painterPages[0];
+
+    var tabsContainer = document.getElementById('paintersSubnavTabs');
+    var dropdownContainer = document.getElementById('paintersSubnavDropdown');
+
+    painterPages.forEach(function(p) {
+        var isActive = p.page === currentPage || (currentPage === 'painters' && p.page === 'painters');
+        var tabHtml = '<a href="' + p.href + '" class="painters-subnav-tab' + (isActive ? ' active' : '') + '" data-painter-page="' + p.page + '">' +
+            '<svg viewBox="0 0 24 24">' + p.icon + '</svg>' +
+            '<span>' + p.label + '</span>' +
+        '</a>';
+
+        tabsContainer.insertAdjacentHTML('beforeend', tabHtml);
+        dropdownContainer.insertAdjacentHTML('beforeend', tabHtml);
+    });
+
+    if (currentPageObj) {
+        document.getElementById('paintersSubnavCurrentPage').textContent = currentPageObj.label;
+    }
+
+    setTimeout(function() {
+        var activeTab = tabsContainer.querySelector('.painters-subnav-tab.active');
+        if (activeTab) {
+            activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+    }, 100);
+})();
+
+function togglePaintersSubnav() {
+    var toggle = document.getElementById('paintersSubnavToggle');
+    var dropdown = document.getElementById('paintersSubnavDropdown');
+    toggle.classList.toggle('open');
+    dropdown.classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+    var subnav = document.getElementById('paintersSubnav');
+    if (subnav && !subnav.contains(e.target)) {
+        var toggle = document.getElementById('paintersSubnavToggle');
+        var dropdown = document.getElementById('paintersSubnavDropdown');
+        if (toggle) toggle.classList.remove('open');
+        if (dropdown) dropdown.classList.remove('show');
+    }
+});
+</script>

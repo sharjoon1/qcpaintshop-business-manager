@@ -1855,7 +1855,74 @@ node promote-release.js internal production
 
 ---
 
-## 9. KNOWN ISSUES & ROADMAP
+## 9. PAINTER MANAGEMENT SYSTEM
+
+### Overview
+Loyalty program for painters who buy or recommend Quality Colours paint products. Painters earn points through billing, referrals, attendance, and volume slabs. Points split into **Regular** (withdraw anytime) and **Annual** (once per year) pools.
+
+### Database Tables (10)
+- `painters` — Core profile (name, phone, referral_code, credit, cached point balances)
+- `painter_sessions` — OTP-based authentication tokens
+- `painter_point_transactions` — Ledger (source of truth for all point movements)
+- `painter_referrals` — Referrer→referred pairs with tier tracking
+- `painter_product_point_rates` — Per-product point config (regular pts/unit, annual %, eligibility)
+- `painter_value_slabs` — Monthly/quarterly volume thresholds → bonus points
+- `painter_withdrawals` — Redemption requests (pending→approved→paid)
+- `painter_attendance` — Store visits, training, events
+- `painter_invoices_processed` — Tracks which Zoho invoices are already processed
+- `painter_slab_evaluations` — Tracks monthly/quarterly slab evaluation results
+
+### Points System
+- **Self-billing**: Only annual points (annual_pct% of line total for eligible items)
+- **Customer billing**: Regular points (per-unit rate) + annual points (if eligible)
+- **Referral tiers**: 1-2 bills → 0.5%, 3-4 → 1%, 5-9 → 1.5%, 10+ → 2% (→ Regular pool)
+- **Attendance**: Configurable points per visit (default 5 → Regular pool)
+- **Value slabs**: Monthly/quarterly purchase volume → bonus points (→ Annual pool)
+- **Credit**: Self-billing painters get credit limits with auto-debit on overdue
+
+### Key Files
+- `migrations/migrate-painters.js` — 10 tables + settings seeds + permissions
+- `services/painter-points-engine.js` — Core points logic (invoice processing, slabs, credit, withdrawals)
+- `routes/painters.js` — ~40 API endpoints (public + painter-auth + admin)
+- `public/admin-painters.html` — Admin 5-tab page (Painters, Points, Rates, Withdrawals, Reports)
+- `public/painter-register.html` — Multi-step self-registration (phone OTP → details → referral)
+- `public/painter-login.html` — OTP-based painter login
+- `public/painter-dashboard.html` — Painter self-service portal (balances, transactions, referrals)
+- `public/components/painters-subnav.html` — Module sub-navigation
+
+### API Endpoints
+- **Public**: POST register, send-otp, verify-otp | GET validate-referral/:code
+- **Painter-Auth** (X-Painter-Token header): GET/PUT /me, /me/points/:pool, /me/referrals, /me/withdrawals, /me/invoices, /me/attendance, /me/dashboard | POST /me/withdraw
+- **Admin**: GET / (list), GET /:id, PUT /:id, PUT /:id/approve, PUT /:id/credit
+- **Points**: GET/POST /:id/points/adjust, POST /invoice/process, GET /invoice/search
+- **Config**: GET/PUT /config/product-rates, POST /config/product-rates/sync, CRUD /config/slabs
+- **Withdrawals**: GET /withdrawals, PUT /withdrawals/:id
+- **Reports**: GET /reports/summary, GET /reports/top-earners, GET /referrals, GET /attendance
+
+### Permissions
+- `painters.view` — View painter list and details
+- `painters.manage` — Approve, edit, manage painters
+- `painters.points` — Adjust points, process invoices, manage withdrawals
+
+### Settings (ai_config table)
+- `painter_annual_withdrawal_month` / `painter_annual_withdrawal_day` — Annual withdrawal window
+- `painter_credit_overdue_days` — Days before auto-debit (default 30)
+- `painter_attendance_points` — Points per attendance (default 5)
+- `painter_referral_enabled` / `painter_system_enabled` — Feature toggles
+
+### Scheduled Jobs (`services/painter-scheduler.js`)
+- **Monthly slab evaluation**: 1st of month, 6:00 AM IST — evaluates previous month's purchase volumes
+- **Quarterly slab evaluation**: 1st of Jan/Apr/Jul/Oct, 6:30 AM IST — evaluates previous quarter
+- **Daily credit overdue check**: 8:00 AM IST — auto-debits points for overdue credit
+
+### Navigation
+- Sidebar: Painters section with "Painter Program" link (admin only)
+- Subnav: 5 tabs mapped via `PAINTERS_SUBNAV_PATH` in `universal-nav-loader.js`
+- Painter pages (register, login, dashboard) excluded from admin nav loading
+
+---
+
+## 10. KNOWN ISSUES & ROADMAP
 
 ### Known Issues
 - Customer auth token not stored in DB (localStorage only - no server-side validation)

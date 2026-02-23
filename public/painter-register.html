@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <title>Painter Registration - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .card { background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+        .step { display: none; }
+        .step.active { display: block; }
+        .step-indicator { display: flex; gap: 8px; justify-content: center; margin-bottom: 2rem; }
+        .step-dot { width: 10px; height: 10px; border-radius: 50%; background: #e2e8f0; transition: all 0.3s; }
+        .step-dot.active { background: #667eea; transform: scale(1.2); }
+        .step-dot.done { background: #10b981; }
+        .input-field { width: 100%; padding: 0.75rem 1rem; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; transition: border-color 0.2s; }
+        .input-field:focus { outline: none; border-color: #667eea; }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 0.75rem 2rem; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; width: 100%; transition: opacity 0.2s; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: transparent; color: #667eea; border: 2px solid #667eea; padding: 0.75rem 2rem; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; width: 100%; }
+        .otp-input { width: 48px; height: 56px; text-align: center; font-size: 1.5rem; font-weight: 700; border: 2px solid #e2e8f0; border-radius: 10px; }
+        .otp-input:focus { outline: none; border-color: #667eea; }
+        .spec-option { border: 2px solid #e2e8f0; border-radius: 10px; padding: 1rem; cursor: pointer; text-align: center; transition: all 0.2s; }
+        .spec-option.selected { border-color: #667eea; background: #f0f4ff; }
+        .error-msg { color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem; }
+        .success-msg { color: #10b981; font-size: 0.875rem; margin-top: 0.25rem; }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="card w-full max-w-md p-8">
+        <!-- Logo -->
+        <div class="text-center mb-6">
+            <div class="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-3" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900">Painter Registration</h1>
+            <p class="text-gray-500 text-sm mt-1">Join the Quality Colours loyalty program</p>
+        </div>
+
+        <!-- Step Indicators -->
+        <div class="step-indicator">
+            <div class="step-dot active" id="dot-1"></div>
+            <div class="step-dot" id="dot-2"></div>
+            <div class="step-dot" id="dot-3"></div>
+        </div>
+
+        <!-- Step 1: Phone & OTP -->
+        <div class="step active" id="step-1">
+            <h2 class="text-lg font-semibold mb-1">Verify your phone</h2>
+            <p class="text-gray-500 text-sm mb-4">We'll send a one-time code to verify</p>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                <input type="tel" id="regPhone" class="input-field" placeholder="Enter your phone number" maxlength="15">
+                <div id="phoneError" class="error-msg" style="display:none"></div>
+            </div>
+
+            <div id="otpSection" style="display:none">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Enter OTP</label>
+                <div class="flex gap-2 justify-center mb-3">
+                    <input type="text" maxlength="1" class="otp-input" data-otp="1">
+                    <input type="text" maxlength="1" class="otp-input" data-otp="2">
+                    <input type="text" maxlength="1" class="otp-input" data-otp="3">
+                    <input type="text" maxlength="1" class="otp-input" data-otp="4">
+                    <input type="text" maxlength="1" class="otp-input" data-otp="5">
+                    <input type="text" maxlength="1" class="otp-input" data-otp="6">
+                </div>
+                <div id="otpError" class="error-msg text-center" style="display:none"></div>
+                <button onclick="verifyOtp()" class="btn-primary mt-3" id="verifyOtpBtn">Verify OTP</button>
+                <p class="text-center text-sm text-gray-400 mt-2">Didn't receive? <a href="#" onclick="sendOtp()" class="text-indigo-600">Resend</a></p>
+            </div>
+
+            <div id="sendOtpSection">
+                <button onclick="sendOtp()" class="btn-primary" id="sendOtpBtn">Send OTP</button>
+            </div>
+
+            <div class="text-center mt-6">
+                <p class="text-sm text-gray-500">Already registered? <a href="/painter-login.html" class="text-indigo-600 font-medium">Login here</a></p>
+            </div>
+        </div>
+
+        <!-- Step 2: Personal Details -->
+        <div class="step" id="step-2">
+            <h2 class="text-lg font-semibold mb-1">Your Details</h2>
+            <p class="text-gray-500 text-sm mb-4">Tell us about yourself</p>
+
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                <input type="text" id="regName" class="input-field" placeholder="Enter your full name">
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <input type="text" id="regCity" class="input-field" placeholder="Your city">
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Experience (years)</label>
+                <input type="number" id="regExp" class="input-field" placeholder="0" min="0" max="50">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Specialization</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="spec-option selected" onclick="selectSpec(this, 'both')">Both</div>
+                    <div class="spec-option" onclick="selectSpec(this, 'interior')">Interior</div>
+                    <div class="spec-option" onclick="selectSpec(this, 'exterior')">Exterior</div>
+                    <div class="spec-option" onclick="selectSpec(this, 'industrial')">Industrial</div>
+                </div>
+            </div>
+            <input type="hidden" id="regSpec" value="both">
+
+            <button onclick="goToStep(3)" class="btn-primary">Continue</button>
+            <button onclick="goToStep(1)" class="btn-secondary mt-2">Back</button>
+        </div>
+
+        <!-- Step 3: Referral & Submit -->
+        <div class="step" id="step-3">
+            <h2 class="text-lg font-semibold mb-1">Almost Done!</h2>
+            <p class="text-gray-500 text-sm mb-4">Optional details</p>
+
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Referral Code (optional)</label>
+                <input type="text" id="regReferral" class="input-field" placeholder="Enter referral code" oninput="validateReferral()">
+                <div id="referralStatus" class="text-sm mt-1" style="display:none"></div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Aadhar Number (optional)</label>
+                <input type="text" id="regAadhar" class="input-field" placeholder="XXXX XXXX XXXX" maxlength="14">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">PAN Number (optional)</label>
+                <input type="text" id="regPan" class="input-field" placeholder="ABCDE1234F" maxlength="10" style="text-transform: uppercase;">
+            </div>
+
+            <button onclick="submitRegistration()" class="btn-primary" id="submitBtn">Submit Registration</button>
+            <button onclick="goToStep(2)" class="btn-secondary mt-2">Back</button>
+        </div>
+
+        <!-- Success -->
+        <div class="step" id="step-success">
+            <div class="text-center py-6">
+                <div class="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-4">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 mb-2">Registration Submitted!</h2>
+                <p class="text-gray-500 mb-4">Your registration is being reviewed. You'll be notified once approved.</p>
+                <p class="text-sm text-gray-400 mb-6">Your referral code: <code class="font-mono font-bold text-indigo-600" id="myReferralCode"></code></p>
+                <a href="/painter-login.html" class="btn-primary inline-block text-center" style="text-decoration:none">Go to Login</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const API = '/api/painters';
+    let verifiedPhone = '';
+    let referralTimer;
+
+    // OTP input auto-focus
+    document.querySelectorAll('.otp-input').forEach((input, idx, inputs) => {
+        input.addEventListener('input', (e) => {
+            if (e.target.value && idx < inputs.length - 1) inputs[idx + 1].focus();
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !e.target.value && idx > 0) inputs[idx - 1].focus();
+        });
+    });
+
+    function goToStep(step) {
+        if (step === 2 && !verifiedPhone) return alert('Please verify your phone first');
+        if (step === 3 && !document.getElementById('regName').value.trim()) return alert('Please enter your name');
+
+        document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+        document.getElementById('step-' + step).classList.add('active');
+        for (let i = 1; i <= 3; i++) {
+            const dot = document.getElementById('dot-' + i);
+            dot.classList.remove('active', 'done');
+            if (i < step) dot.classList.add('done');
+            if (i === step) dot.classList.add('active');
+        }
+    }
+
+    async function sendOtp() {
+        const phone = document.getElementById('regPhone').value.trim();
+        if (!phone) { showError('phoneError', 'Phone number required'); return; }
+
+        document.getElementById('sendOtpBtn').disabled = true;
+        document.getElementById('sendOtpBtn').textContent = 'Sending...';
+
+        try {
+            const res = await fetch(`${API}/send-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // Check if already registered and approved
+                if (data.status === 'approved') {
+                    showError('phoneError', 'Already registered! Please login instead.');
+                    document.getElementById('sendOtpBtn').disabled = false;
+                    document.getElementById('sendOtpBtn').textContent = 'Send OTP';
+                    return;
+                }
+                document.getElementById('otpSection').style.display = 'block';
+                document.getElementById('sendOtpSection').style.display = 'none';
+                document.querySelector('[data-otp="1"]').focus();
+            } else {
+                // Not found = new user, proceed without OTP verification for registration
+                if (res.status === 404) {
+                    verifiedPhone = phone;
+                    goToStep(2);
+                } else {
+                    showError('phoneError', data.message);
+                    document.getElementById('sendOtpBtn').disabled = false;
+                    document.getElementById('sendOtpBtn').textContent = 'Send OTP';
+                }
+            }
+        } catch (err) {
+            showError('phoneError', 'Network error. Try again.');
+            document.getElementById('sendOtpBtn').disabled = false;
+            document.getElementById('sendOtpBtn').textContent = 'Send OTP';
+        }
+    }
+
+    async function verifyOtp() {
+        const otp = Array.from(document.querySelectorAll('.otp-input')).map(i => i.value).join('');
+        if (otp.length !== 6) { showError('otpError', 'Enter complete 6-digit OTP'); return; }
+
+        try {
+            const res = await fetch(`${API}/verify-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: document.getElementById('regPhone').value.trim(), otp })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                verifiedPhone = document.getElementById('regPhone').value.trim();
+                goToStep(2);
+            } else {
+                showError('otpError', data.message);
+            }
+        } catch (err) { showError('otpError', 'Verification failed'); }
+    }
+
+    function selectSpec(el, value) {
+        document.querySelectorAll('.spec-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById('regSpec').value = value;
+    }
+
+    async function validateReferral() {
+        clearTimeout(referralTimer);
+        const code = document.getElementById('regReferral').value.trim();
+        const statusEl = document.getElementById('referralStatus');
+        if (!code) { statusEl.style.display = 'none'; return; }
+
+        referralTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(`${API}/validate-referral/${code}`);
+                const data = await res.json();
+                statusEl.style.display = 'block';
+                if (data.valid) {
+                    statusEl.className = 'text-sm mt-1 success-msg';
+                    statusEl.textContent = `Referred by ${data.referrer.name}${data.referrer.city ? ' from ' + data.referrer.city : ''}`;
+                } else {
+                    statusEl.className = 'text-sm mt-1 error-msg';
+                    statusEl.textContent = 'Invalid referral code';
+                }
+            } catch (err) { statusEl.style.display = 'none'; }
+        }, 500);
+    }
+
+    async function submitRegistration() {
+        const name = document.getElementById('regName').value.trim();
+        if (!name) return alert('Name is required');
+
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('submitBtn').textContent = 'Submitting...';
+
+        try {
+            const body = {
+                full_name: name,
+                phone: verifiedPhone,
+                city: document.getElementById('regCity').value.trim() || undefined,
+                experience_years: parseInt(document.getElementById('regExp').value) || 0,
+                specialization: document.getElementById('regSpec').value,
+                referral_code: document.getElementById('regReferral').value.trim() || undefined,
+                aadhar_number: document.getElementById('regAadhar').value.trim() || undefined,
+                pan_number: document.getElementById('regPan').value.trim().toUpperCase() || undefined
+            };
+
+            const res = await fetch(`${API}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('myReferralCode').textContent = data.referralCode;
+                document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+                document.getElementById('step-success').classList.add('active');
+                document.querySelector('.step-indicator').style.display = 'none';
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('submitBtn').textContent = 'Submit Registration';
+        }
+    }
+
+    function showError(id, msg) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+    </script>
+</body>
+</html>
