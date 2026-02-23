@@ -453,7 +453,7 @@ function clawdbotExec(message) {
     fs.writeFileSync(tmpFile, message, 'utf8');
 
     return new Promise((resolve, reject) => {
-        execFile('node', [CLAWDBOT_HELPER, tmpFile], { timeout: 140000, maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
+        execFile('node', [CLAWDBOT_HELPER, tmpFile], { timeout: 300000, maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
             // Clean up temp file
             try { fs.unlinkSync(tmpFile); } catch (_) {}
 

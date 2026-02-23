@@ -21,11 +21,11 @@ try {
         params: {
             message,
             agentId: "main",
-            timeout: 120,
+            timeout: 280,
             idempotencyKey: randomUUID(),
         },
         expectFinal: true,
-        timeoutMs: 130000,
+        timeoutMs: 290000,
     });
     console.log(JSON.stringify(response));
 } catch (err) {
