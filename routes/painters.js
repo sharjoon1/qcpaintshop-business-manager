@@ -14,6 +14,7 @@ const pointsEngine = require('../services/painter-points-engine');
 
 let pool;
 let io;
+let sessionManager;
 
 function setPool(p) {
     pool = p;
@@ -21,6 +22,7 @@ function setPool(p) {
 }
 
 function setIO(ioInstance) { io = ioInstance; }
+function setSessionManager(sm) { sessionManager = sm; }
 
 // ═══════════════════════════════════════════
 // PAINTER AUTH MIDDLEWARE
@@ -112,7 +114,17 @@ router.post('/send-otp', async (req, res) => {
             [painter.id, token, otp]
         );
 
+        // Send OTP via WhatsApp using General session (branch_id=0)
         console.log(`[Painter OTP] Phone: ${phone}, OTP: ${otp}`);
+        if (sessionManager) {
+            try {
+                const otpMessage = `🎨 *Quality Colours Painter Program*\n\nYour OTP is: *${otp}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
+                await sessionManager.sendMessage(0, phone, otpMessage, { source: 'painter_otp' });
+                console.log(`[Painter OTP] WhatsApp sent to ${phone}`);
+            } catch (waErr) {
+                console.error(`[Painter OTP] WhatsApp send failed for ${phone}:`, waErr.message);
+            }
+        }
         res.json({ success: true, message: 'OTP sent', status: painter.status });
     } catch (error) {
         console.error('Send OTP error:', error);
@@ -679,4 +691,4 @@ router.post('/:id/attendance', requirePermission('painters', 'manage'), async (r
     }
 });
 
-module.exports = { router, setPool, setIO };
+module.exports = { router, setPool, setIO, setSessionManager };

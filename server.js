@@ -172,6 +172,7 @@ whatsappChatRoutes.setSessionManager(whatsappSessionManager);
 aiRoutes.setPool(pool);
 aiScheduler.setPool(pool);
 paintersRoutes.setPool(pool);
+paintersRoutes.setSessionManager(whatsappSessionManager);
 painterScheduler.setPool(pool);
 aiScheduler.setSessionManager(whatsappSessionManager);
 
