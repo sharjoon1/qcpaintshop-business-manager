@@ -250,7 +250,7 @@ async function migrate() {
         ];
         let seeded = 0;
         for (const [key, value] of settings) {
-            const [existing] = await pool.query('SELECT id FROM ai_config WHERE config_key = ?', [key]);
+            const [existing] = await pool.query('SELECT config_key FROM ai_config WHERE config_key = ?', [key]);
             if (existing.length === 0) {
                 await pool.query('INSERT INTO ai_config (config_key, config_value) VALUES (?, ?)', [key, value]);
                 seeded++;
@@ -261,20 +261,20 @@ async function migrate() {
         // 12. Add painter permissions
         console.log('\n12. Checking painter permissions...');
         const permissions = [
-            ['painters.view', 'View Painters', 'painters', 'View painter list and details'],
-            ['painters.manage', 'Manage Painters', 'painters', 'Approve, edit, and manage painters'],
-            ['painters.points', 'Manage Points', 'painters', 'Adjust points, process invoices, manage withdrawals']
+            ['painters', 'view', 'View Painters', 'View painter list and details'],
+            ['painters', 'manage', 'Manage Painters', 'Approve, edit, and manage painters'],
+            ['painters', 'points', 'Manage Points', 'Adjust points, process invoices, manage withdrawals']
         ];
-        for (const [key, name, module, desc] of permissions) {
-            const [existing] = await pool.query('SELECT id FROM permissions WHERE permission_key = ?', [key]);
+        for (const [module, action, displayName, desc] of permissions) {
+            const [existing] = await pool.query('SELECT id FROM permissions WHERE module = ? AND action = ?', [module, action]);
             if (existing.length === 0) {
                 await pool.query(
-                    'INSERT INTO permissions (permission_key, permission_name, module, description) VALUES (?, ?, ?, ?)',
-                    [key, name, module, desc]
+                    'INSERT INTO permissions (module, action, display_name, description) VALUES (?, ?, ?, ?)',
+                    [module, action, displayName, desc]
                 );
-                console.log(`   ✅ Permission '${key}' added`);
+                console.log(`   ✅ Permission '${module}.${action}' added`);
             } else {
-                console.log(`   ⏭️ Permission '${key}' already exists`);
+                console.log(`   ⏭️ Permission '${module}.${action}' already exists`);
             }
         }
 
