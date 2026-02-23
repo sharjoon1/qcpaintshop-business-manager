@@ -187,19 +187,47 @@
             <div id="tab-rates" class="tab-content">
                 <!-- Product Rates -->
                 <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold">Product Point Rates</h3>
-                        <div class="flex gap-2">
-                            <button onclick="syncProductRates()" class="btn-sm btn-outline">Sync from Zoho</button>
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-lg font-semibold">Product Point Rates</h3>
+                            <span id="ratesItemCount" class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full"></span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="syncZohoThenRates()" class="btn-sm btn-outline" id="syncZohoBtn" title="Step 1: Refresh Zoho cache, Step 2: Import to rates table">Sync from Zoho</button>
                             <button onclick="saveProductRates()" class="btn-sm btn-primary">Save Changes</button>
+                        </div>
+                    </div>
+                    <!-- Search & Filter -->
+                    <div class="flex flex-wrap gap-3 mb-4">
+                        <input type="text" id="ratesSearch" placeholder="Search by name or brand..." class="flex-1 min-w-[180px] px-3 py-2 border border-gray-300 rounded-lg text-sm" oninput="filterRatesTable()">
+                        <select id="ratesBrandFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="filterRatesTable()">
+                            <option value="">All Brands</option>
+                        </select>
+                        <select id="ratesCategoryFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="filterRatesTable()">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                    <!-- Sync Progress -->
+                    <div id="syncProgress" class="hidden mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                            <span id="syncProgressText">Syncing...</span>
                         </div>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="data-table" id="ratesTable">
                             <thead>
-                                <tr><th>Item Name</th><th>Category</th><th>Regular Pts/Unit</th><th>Annual Eligible</th><th>Annual %</th></tr>
+                                <tr>
+                                    <th>Item Name</th>
+                                    <th>Brand</th>
+                                    <th>Category</th>
+                                    <th>MRP</th>
+                                    <th>Regular Pts/Unit</th>
+                                    <th>Annual Eligible</th>
+                                    <th>Annual %</th>
+                                </tr>
                             </thead>
-                            <tbody id="ratesTableBody"><tr><td colspan="5" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
+                            <tbody id="ratesTableBody"><tr><td colspan="7" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -590,6 +618,8 @@
     // ═══════════════════════════════════════
     // RATES & SLABS TAB
     // ═══════════════════════════════════════
+    let allRates = [];
+
     async function loadRatesTab() {
         await loadProductRates();
         await loadSlabs();
@@ -599,26 +629,58 @@
         try {
             const res = await fetch(`${API}/config/product-rates`, { headers: authHeaders() });
             const data = await res.json();
-            if (!data.rates.length) {
-                document.getElementById('ratesTableBody').innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-400">No product rates configured. Click "Sync from Zoho" to import items.</td></tr>';
-                return;
-            }
-            document.getElementById('ratesTableBody').innerHTML = data.rates.map(r => `
-                <tr data-item-id="${esc(r.item_id)}">
-                    <td>${esc(r.item_name || r.item_id)}</td>
-                    <td>${esc(r.category || '-')}</td>
-                    <td><input type="number" value="${r.regular_points_per_unit}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="regular_points_per_unit"></td>
-                    <td><input type="checkbox" ${r.annual_eligible ? 'checked' : ''} class="rate-checkbox" data-field="annual_eligible"></td>
-                    <td><input type="number" value="${r.annual_pct}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="annual_pct"></td>
-                </tr>
-            `).join('');
+
+            // Populate filter dropdowns
+            const brandFilter = document.getElementById('ratesBrandFilter');
+            const catFilter = document.getElementById('ratesCategoryFilter');
+            brandFilter.innerHTML = '<option value="">All Brands</option>' +
+                (data.brands || []).map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
+            catFilter.innerHTML = '<option value="">All Categories</option>' +
+                (data.categories || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+
+            allRates = data.rates || [];
+            document.getElementById('ratesItemCount').textContent = `${allRates.length} items`;
+            renderRatesTable(allRates);
         } catch (err) {
-            document.getElementById('ratesTableBody').innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+            document.getElementById('ratesTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
         }
+    }
+
+    function filterRatesTable() {
+        const search = (document.getElementById('ratesSearch').value || '').toLowerCase();
+        const brand = document.getElementById('ratesBrandFilter').value;
+        const category = document.getElementById('ratesCategoryFilter').value;
+
+        const filtered = allRates.filter(r => {
+            if (search && !(r.item_name || '').toLowerCase().includes(search) && !(r.brand || '').toLowerCase().includes(search)) return false;
+            if (brand && r.brand !== brand) return false;
+            if (category && r.category !== category) return false;
+            return true;
+        });
+        renderRatesTable(filtered);
+    }
+
+    function renderRatesTable(rates) {
+        if (!rates.length) {
+            document.getElementById('ratesTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-400">No product rates configured. Click "Sync from Zoho" to import items.</td></tr>';
+            return;
+        }
+        document.getElementById('ratesTableBody').innerHTML = rates.map(r => `
+            <tr data-item-id="${esc(r.item_id)}">
+                <td class="font-medium">${esc(r.item_name || r.item_id)}</td>
+                <td class="text-xs text-gray-500">${esc(r.brand || '-')}</td>
+                <td class="text-xs text-gray-500">${esc(r.category || '-')}</td>
+                <td class="text-xs">${r.mrp ? '₹' + parseFloat(r.mrp).toFixed(2) : '-'}</td>
+                <td><input type="number" value="${r.regular_points_per_unit}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="regular_points_per_unit"></td>
+                <td><input type="checkbox" ${r.annual_eligible ? 'checked' : ''} class="rate-checkbox" data-field="annual_eligible"></td>
+                <td><input type="number" value="${r.annual_pct}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="annual_pct"></td>
+            </tr>
+        `).join('');
     }
 
     async function saveProductRates() {
         const rows = document.querySelectorAll('#ratesTableBody tr[data-item-id]');
+        if (!rows.length) return alert('No rates to save');
         const rates = Array.from(rows).map(row => ({
             item_id: row.dataset.itemId,
             regular_points_per_unit: parseFloat(row.querySelector('[data-field="regular_points_per_unit"]').value) || 0,
@@ -633,13 +695,56 @@
         } catch (err) { alert('Error: ' + err.message); }
     }
 
-    async function syncProductRates() {
+    async function syncZohoThenRates() {
+        const btn = document.getElementById('syncZohoBtn');
+        const progress = document.getElementById('syncProgress');
+        const progressText = document.getElementById('syncProgressText');
+        btn.disabled = true;
+        progress.classList.remove('hidden');
+
         try {
+            // Step 1: Sync Zoho items cache
+            progressText.textContent = 'Step 1/2: Refreshing Zoho items cache...';
+            try {
+                const zohoRes = await fetch('/api/zoho/sync/items', { method: 'POST', headers: authHeaders() });
+                const zohoData = await zohoRes.json();
+                if (!zohoRes.ok && zohoRes.status !== 429) {
+                    progressText.textContent = 'Zoho sync skipped (may require zoho.sync permission). Proceeding with cached data...';
+                    await new Promise(r => setTimeout(r, 1500));
+                }
+            } catch (e) {
+                progressText.textContent = 'Zoho cache refresh skipped. Using existing data...';
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            // Step 2: Sync to rates table
+            progressText.textContent = 'Step 2/2: Importing items to painter rates...';
             const res = await fetch(`${API}/config/product-rates/sync`, { method: 'POST', headers: authHeaders() });
             const data = await res.json();
-            alert(data.message);
-            loadProductRates();
-        } catch (err) { alert('Error: ' + err.message); }
+            if (!data.success) throw new Error(data.message);
+
+            progress.classList.remove('bg-blue-50', 'text-blue-700');
+            progress.classList.add('bg-green-50', 'text-green-700');
+            progressText.innerHTML = `Done! ${data.synced} new items imported, ${data.skipped} already existed. Total: ${data.total} Zoho items.`;
+
+            await loadProductRates();
+            setTimeout(() => {
+                progress.classList.add('hidden');
+                progress.classList.remove('bg-green-50', 'text-green-700');
+                progress.classList.add('bg-blue-50', 'text-blue-700');
+            }, 4000);
+        } catch (err) {
+            progress.classList.remove('bg-blue-50', 'text-blue-700');
+            progress.classList.add('bg-red-50', 'text-red-700');
+            progressText.textContent = 'Error: ' + err.message;
+            setTimeout(() => {
+                progress.classList.add('hidden');
+                progress.classList.remove('bg-red-50', 'text-red-700');
+                progress.classList.add('bg-blue-50', 'text-blue-700');
+            }, 5000);
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     async function loadSlabs() {
@@ -872,22 +977,25 @@
         // Check URL tab param
         const urlParams = new URLSearchParams(window.location.search);
         const tab = urlParams.get('tab');
-        if (tab) {
-            const tabBtn = document.querySelector(`.tab-btn`);
+        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports'];
+        const activeTab = tab && tabNames.includes(tab) ? tab : 'painters';
+
+        if (activeTab !== 'painters') {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            const tabEl = document.getElementById('tab-' + tab);
-            if (tabEl) {
-                tabEl.classList.add('active');
-                // Find and activate the matching tab button
-                const btns = document.querySelectorAll('.tab-btn');
-                const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports'];
-                const idx = tabNames.indexOf(tab);
-                if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
-            }
+            const tabEl = document.getElementById('tab-' + activeTab);
+            if (tabEl) tabEl.classList.add('active');
+            const btns = document.querySelectorAll('.tab-btn');
+            const idx = tabNames.indexOf(activeTab);
+            if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
         }
 
-        loadPainters();
+        // Load the active tab's data
+        if (activeTab === 'painters') loadPainters();
+        else if (activeTab === 'points') loadPointsTab();
+        else if (activeTab === 'rates') loadRatesTab();
+        else if (activeTab === 'withdrawals') loadWithdrawals();
+        else if (activeTab === 'reports') loadReportsTab();
     });
     </script>
 </body>

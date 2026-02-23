@@ -276,6 +276,13 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Searchable dropdowns for brand/category
 - Pages: `admin-products.html`, `admin-brands.html`, `admin-categories.html`
 
+**Zoho Product Import** (`admin-products.html?tab=zoho-import`)
+- Browse all Zoho Books items with brand/category/rate/stock/HSN
+- Sync items from Zoho Books API (`POST /api/zoho/sync/items`)
+- Filter by brand, category; search by name/SKU
+- Paginated item list with summary cards (total items, brands, last sync time)
+- Subnav: 4th tab "Zoho Import" in `products-subnav.html`
+
 **Estimate Calculator**
 - Area-based paint calculation (auto-mix optimization)
 - Size optimization (largest containers first, minimize waste)
@@ -1266,7 +1273,7 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 | Branches | `admin-branches.html` | Branch management |
 | Customers | `admin-customers.html` | Customer CRUD |
 | Customer Types | `admin-customer-types.html` | Customer classification |
-| Products | `admin-products.html` | Product catalog |
+| Products | `admin-products.html` | Product catalog + Zoho Import tab (?tab=zoho-import) |
 | Brands | `admin-brands.html` | Brand management |
 | Categories | `admin-categories.html` | Category management |
 | Roles | `admin-roles.html` | Role management |
@@ -1344,7 +1351,7 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 | Branches Subnav | `components/branches-subnav.html` | Branches & Staff section nav |
 | Salary Subnav | `components/salary-subnav.html` | Salary & Payroll section nav |
 | Sales Subnav | `components/sales-subnav.html` | Sales & Estimates section nav |
-| Products Subnav | `components/products-subnav.html` | Products & Inventory section nav |
+| Products Subnav | `components/products-subnav.html` | Products & Inventory section nav (Products, Categories, Brands, Zoho Import) |
 | System Subnav | `components/system-subnav.html` | System (Reports, Settings, Profile, Website, Guides) section nav |
 
 ### JavaScript Files
@@ -1843,6 +1850,14 @@ node promote-release.js internal production
 - **Collections**: "Send via" dropdown in reminder modal (Auto / General WhatsApp); `session_type` param on POST /remind
 - **Migration**: `migrate-general-wa-integration.js` drops FK constraints on `wa_campaigns` and `wa_campaign_leads`
 
+### Feb 23, 2026 — Zoho Product Import & Painter Rates Fix
+- **Fixed**: Painter Rates "Sync from Zoho" was querying non-existent `zoho_items_cache` table — changed to `zoho_items_map`
+- **Enhanced**: GET `/api/painters/config/product-rates` now JOINs `zoho_items_map` for brand/MRP/stock info, supports `?search`, `?brand`, `?category` filtering
+- **Enhanced**: POST `/api/painters/config/product-rates/sync` returns detailed response with `synced`, `skipped`, `total`, `brands[]`
+- **Added**: Painter Rates tab: search/filter bar, Brand + MRP columns, 2-step sync (Zoho cache → rates table), progress indicator
+- **Added**: Zoho Import tab on `admin-products.html?tab=zoho-import` — browse all Zoho items with brand/category/rate/stock/HSN, sync trigger, pagination
+- **Added**: "Zoho Import" 4th tab in `products-subnav.html`
+
 ### Feb 23, 2026 — Zoho Bulk Edit Bug Fix & Module Analysis
 - **Fixed**: Bulk edit item names showing "--" in job status — `pushChangesToZoho()` searched current page's `items` array; items from other pages weren't found
   - Frontend: `setDirty()` now stores `_itemName` in `dirtyItems` Map; `pushChangesToZoho()` uses stored name
@@ -1895,7 +1910,7 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 - **Painter-Auth** (X-Painter-Token header): GET/PUT /me, /me/points/:pool, /me/referrals, /me/withdrawals, /me/invoices, /me/attendance, /me/dashboard | POST /me/withdraw
 - **Admin**: GET / (list), GET /:id, PUT /:id, PUT /:id/approve, PUT /:id/credit
 - **Points**: GET/POST /:id/points/adjust, POST /invoice/process, GET /invoice/search
-- **Config**: GET/PUT /config/product-rates, POST /config/product-rates/sync, CRUD /config/slabs
+- **Config**: GET /config/product-rates (?search, ?brand, ?category + JOINs zoho_items_map for brand/mrp), PUT /config/product-rates, POST /config/product-rates/sync (reads from `zoho_items_map`), CRUD /config/slabs
 - **Withdrawals**: GET /withdrawals, PUT /withdrawals/:id
 - **Reports**: GET /reports/summary, GET /reports/top-earners, GET /referrals, GET /attendance
 

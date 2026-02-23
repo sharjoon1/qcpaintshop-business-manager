@@ -157,10 +157,16 @@
     var productsPages = [
         { page: 'products', label: 'Products', href: '/admin-products.html', icon: '<path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>' },
         { page: 'categories', label: 'Categories', href: '/admin-categories.html', icon: '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>' },
-        { page: 'brands', label: 'Brands', href: '/admin-brands.html', icon: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>' }
+        { page: 'brands', label: 'Brands', href: '/admin-brands.html', icon: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>' },
+        { page: 'zoho-import', label: 'Zoho Import', href: '/admin-products.html?tab=zoho-import', icon: '<path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>' }
     ];
 
     var currentPage = document.body.getAttribute('data-page') || document.documentElement.getAttribute('data-page') || '';
+    // Check if we're on the zoho-import tab of products page
+    var urlParams = new URLSearchParams(window.location.search);
+    if (currentPage === 'products' && urlParams.get('tab') === 'zoho-import') {
+        currentPage = 'zoho-import';
+    }
     var currentPageObj = productsPages.find(function(p) { return p.page === currentPage; });
 
     var tabsContainer = document.getElementById('productsSubnavTabs');

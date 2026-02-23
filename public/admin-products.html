@@ -22,96 +22,157 @@
     <div class="bg-white shadow-sm px-4 sm:px-6 lg:px-8 py-6">
         <div class="flex items-center justify-between">
             <div>
-                <h2 class="text-2xl font-bold text-gray-800">🎨 Product Management</h2>
-                <p class="text-gray-600 text-sm mt-1">Manage your paint products and inventory</p>
+                <h2 class="text-2xl font-bold text-gray-800" id="pageTitle">Product Management</h2>
+                <p class="text-gray-600 text-sm mt-1" id="pageSubtitle">Manage your paint products and inventory</p>
             </div>
-            <button onclick="openAddModal()" class="btn btn-primary flex items-center" data-permission-module="products" data-permission-action="add">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-                Add Product
-            </button>
+            <div id="headerActions">
+                <button onclick="openAddModal()" class="btn btn-primary flex items-center" data-permission-module="products" data-permission-action="add" id="addProductBtn">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Add Product
+                </button>
+            </div>
         </div>
     </div>
 
     <div class="max-w-7xl mx-auto p-4 sm:p-6">
-        <!-- Search & Filters -->
-        <div class="bg-white rounded-xl shadow-sm p-4 mb-4">
-            <div class="flex flex-col gap-3">
-                <!-- Search Row -->
-                <div class="relative">
-                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        <!-- Products Tab Content -->
+        <div id="tab-products" class="tab-section">
+            <!-- Search & Filters -->
+            <div class="bg-white rounded-xl shadow-sm p-4 mb-4">
+                <div class="flex flex-col gap-3">
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <input type="text" id="searchInput" placeholder="Search by product name..." class="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none text-sm" oninput="applyFilters()">
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <select id="filterBrand" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
+                            <option value="">All Brands</option>
+                        </select>
+                        <select id="filterCategory" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
+                            <option value="">All Categories</option>
+                        </select>
+                        <select id="filterType" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
+                            <option value="">All Types</option>
+                            <option value="unit_wise">Unit Wise</option>
+                            <option value="area_wise">Area Wise</option>
+                        </select>
+                        <select id="filterStatus" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span id="resultsCount" class="text-xs text-gray-500"></span>
+                        <button onclick="clearFilters()" class="text-xs text-purple-600 hover:text-purple-800 font-semibold">Clear Filters</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products List -->
+            <div class="card">
+                <div id="loadingState" class="text-center py-8">
+                    <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <input type="text" id="searchInput" placeholder="Search by product name..." class="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none text-sm" oninput="applyFilters()">
                 </div>
-                <!-- Filter Row -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <select id="filterBrand" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
-                        <option value="">All Brands</option>
-                    </select>
-                    <select id="filterCategory" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
-                        <option value="">All Categories</option>
-                    </select>
-                    <select id="filterType" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
-                        <option value="">All Types</option>
-                        <option value="unit_wise">Unit Wise</option>
-                        <option value="area_wise">Area Wise</option>
-                    </select>
-                    <select id="filterStatus" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
-                        <option value="">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
+                <div id="productsTable" class="hidden overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Name</th><th>Brand</th><th>Category</th><th>Type</th>
+                                <th class="text-right">Price</th><th>Status</th><th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsBody"></tbody>
+                    </table>
                 </div>
-                <!-- Results count & clear -->
-                <div class="flex items-center justify-between">
-                    <span id="resultsCount" class="text-xs text-gray-500"></span>
-                    <button onclick="clearFilters()" class="text-xs text-purple-600 hover:text-purple-800 font-semibold">Clear Filters</button>
+                <div id="emptyState" class="hidden text-center py-12">
+                    <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">No products found</h3>
+                    <p class="text-gray-600 mb-4">Add your first product to get started</p>
+                    <button onclick="openAddModal()" class="btn btn-primary" data-permission-module="products" data-permission-action="add">Add Product</button>
                 </div>
             </div>
         </div>
 
-        <!-- Products List -->
-        <div class="card">
-            <!-- Loading State -->
-            <div id="loadingState" class="text-center py-8">
-                <svg class="inline w-8 h-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+        <!-- Zoho Import Tab Content -->
+        <div id="tab-zoho-import" class="tab-section" style="display:none">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                    <div class="text-2xl font-bold text-gray-900" id="zohoTotalItems">--</div>
+                    <div class="text-sm text-gray-500">Zoho Items (Active)</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                    <div class="text-2xl font-bold text-gray-900" id="zohoTotalBrands">--</div>
+                    <div class="text-sm text-gray-500">Unique Brands</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                    <div class="text-2xl font-bold text-gray-900" id="zohoLastSync">--</div>
+                    <div class="text-sm text-gray-500">Last Synced</div>
+                </div>
             </div>
 
-            <!-- Products Table -->
-            <div id="productsTable" class="hidden overflow-x-auto">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Brand</th>
-                            <th>Category</th>
-                            <th>Type</th>
-                            <th class="text-right">Price</th>
-                            <th>Status</th>
-                            <th class="text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="productsBody">
-                    </tbody>
-                </table>
+            <!-- Search & Sync Bar -->
+            <div class="bg-white rounded-xl shadow-sm p-4 mb-4">
+                <div class="flex flex-wrap gap-3 items-center">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <input type="text" id="zohoSearchInput" placeholder="Search items by name or SKU..." class="w-full pl-9 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none text-sm" oninput="debounceZohoSearch()">
+                    </div>
+                    <select id="zohoFilterBrand" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="loadZohoItems()">
+                        <option value="">All Brands</option>
+                    </select>
+                    <select id="zohoFilterCategory" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="loadZohoItems()">
+                        <option value="">All Categories</option>
+                    </select>
+                    <button onclick="syncZohoItems()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2" id="syncZohoItemsBtn">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Sync from Zoho Books
+                    </button>
+                </div>
             </div>
 
-            <!-- Empty State -->
-            <div id="emptyState" class="hidden text-center py-12">
-                <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                </svg>
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">No products found</h3>
-                <p class="text-gray-600 mb-4">Add your first product to get started</p>
-                <button onclick="openAddModal()" class="btn btn-primary" data-permission-module="products" data-permission-action="add">
-                    Add Product
-                </button>
+            <!-- Sync Status -->
+            <div id="zohoSyncStatus" class="hidden mb-4 p-3 rounded-lg text-sm">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 animate-spin" id="zohoSyncSpinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span id="zohoSyncText">Syncing...</span>
+                </div>
+            </div>
+
+            <!-- Zoho Items Table -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Item Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SKU</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Brand</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Category</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Rate</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Stock</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">HSN</th>
+                            </tr>
+                        </thead>
+                        <tbody id="zohoItemsBody">
+                            <tr><td colspan="7" class="text-center py-8 text-gray-400">Loading Zoho items...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Pagination -->
+                <div id="zohoItemsPagination" class="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-500"></div>
             </div>
         </div>
     </div>
@@ -641,8 +702,189 @@
             }
         }
 
-        // Initialize
-        loadData();
+        // ═══════════════════════════════════════
+        // TAB MANAGEMENT (Products vs Zoho Import)
+        // ═══════════════════════════════════════
+        let currentProductTab = 'products';
+
+        function switchProductTab(tab) {
+            currentProductTab = tab;
+            document.querySelectorAll('.tab-section').forEach(el => el.style.display = 'none');
+            const tabEl = document.getElementById('tab-' + tab);
+            if (tabEl) tabEl.style.display = 'block';
+
+            // Update header
+            if (tab === 'zoho-import') {
+                document.getElementById('pageTitle').textContent = 'Zoho Product Import';
+                document.getElementById('pageSubtitle').textContent = 'Browse and sync products from Zoho Books';
+                document.getElementById('addProductBtn').style.display = 'none';
+                loadZohoItems();
+                loadZohoFilters();
+            } else {
+                document.getElementById('pageTitle').textContent = 'Product Management';
+                document.getElementById('pageSubtitle').textContent = 'Manage your paint products and inventory';
+                document.getElementById('addProductBtn').style.display = '';
+            }
+
+            // Update URL without reload
+            const url = new URL(window.location);
+            if (tab === 'products') url.searchParams.delete('tab');
+            else url.searchParams.set('tab', tab);
+            window.history.replaceState({}, '', url);
+        }
+
+        // ═══════════════════════════════════════
+        // ZOHO IMPORT TAB
+        // ═══════════════════════════════════════
+        let zohoSearchTimer;
+        let zohoCurrentPage = 1;
+
+        function debounceZohoSearch() {
+            clearTimeout(zohoSearchTimer);
+            zohoSearchTimer = setTimeout(() => { zohoCurrentPage = 1; loadZohoItems(); }, 400);
+        }
+
+        async function loadZohoFilters() {
+            try {
+                // Load brands/categories from the existing zoho endpoint
+                const res = await fetch('/api/zoho/items?limit=1', { headers: getAuthHeaders() });
+                const data = await res.json();
+                // We'll populate from the items themselves via a separate query
+                // Use the /api/zoho stock-filters endpoint pattern
+                const bRes = await fetch('/api/zoho/stock/filter-options', { headers: getAuthHeaders() });
+                if (bRes.ok) {
+                    const bData = await bRes.json();
+                    if (bData.success) {
+                        const brandSel = document.getElementById('zohoFilterBrand');
+                        const catSel = document.getElementById('zohoFilterCategory');
+                        brandSel.innerHTML = '<option value="">All Brands</option>' +
+                            (bData.brands || []).map(b => `<option value="${escH(b)}">${escH(b)}</option>`).join('');
+                        catSel.innerHTML = '<option value="">All Categories</option>' +
+                            (bData.categories || []).map(c => `<option value="${escH(c)}">${escH(c)}</option>`).join('');
+                    }
+                }
+            } catch (e) { console.error('Failed to load zoho filters:', e); }
+        }
+
+        async function loadZohoItems(page) {
+            if (page) zohoCurrentPage = page;
+            const search = (document.getElementById('zohoSearchInput')?.value || '').trim();
+            const brand = document.getElementById('zohoFilterBrand')?.value || '';
+            const category = document.getElementById('zohoFilterCategory')?.value || '';
+
+            const params = new URLSearchParams({ page: zohoCurrentPage, limit: 50 });
+            if (search) params.set('search', search);
+
+            try {
+                const res = await fetch(`/api/zoho/items?${params}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+
+                let items = data.data || [];
+
+                // Client-side brand/category filter (server only supports search)
+                if (brand) items = items.filter(i => i.brand === brand);
+                if (category) items = items.filter(i => i.category_name === category);
+
+                // Update summary cards
+                document.getElementById('zohoTotalItems').textContent = data.pagination?.total || items.length;
+                const uniqueBrands = new Set(items.map(i => i.brand).filter(Boolean));
+                document.getElementById('zohoTotalBrands').textContent = uniqueBrands.size || '--';
+                const lastSync = items.length > 0 && items[0].last_synced
+                    ? new Date(items[0].last_synced).toLocaleString()
+                    : '--';
+                document.getElementById('zohoLastSync').textContent = lastSync;
+
+                // Render table
+                if (!items.length) {
+                    document.getElementById('zohoItemsBody').innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">No items found. Click "Sync from Zoho Books" to import.</td></tr>';
+                } else {
+                    document.getElementById('zohoItemsBody').innerHTML = items.map(item => `
+                        <tr class="hover:bg-gray-50 border-b border-gray-100">
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900">${escH(item.name || item.item_name || '')}</td>
+                            <td class="px-4 py-3 text-xs text-gray-500 font-mono">${escH(item.sku || '-')}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600">${escH(item.brand || '-')}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600">${escH(item.category_name || '-')}</td>
+                            <td class="px-4 py-3 text-sm text-right font-semibold">${item.rate ? '₹' + parseFloat(item.rate).toFixed(2) : '-'}</td>
+                            <td class="px-4 py-3 text-sm text-right">${item.stock_on_hand != null ? parseFloat(item.stock_on_hand).toFixed(0) : '-'}</td>
+                            <td class="px-4 py-3 text-xs text-gray-500">${escH(item.hsn_or_sac || '-')}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Pagination
+                const pg = data.pagination;
+                if (pg && pg.pages > 1) {
+                    document.getElementById('zohoItemsPagination').innerHTML = `
+                        <span>Page ${pg.page} of ${pg.pages} (${pg.total} items)</span>
+                        <div class="flex gap-2">
+                            ${pg.page > 1 ? `<button onclick="loadZohoItems(${pg.page - 1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Prev</button>` : ''}
+                            ${pg.page < pg.pages ? `<button onclick="loadZohoItems(${pg.page + 1})" class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Next</button>` : ''}
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('zohoItemsPagination').innerHTML = items.length ? `<span>${items.length} items</span>` : '';
+                }
+            } catch (err) {
+                document.getElementById('zohoItemsBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">${escH(err.message)}</td></tr>`;
+            }
+        }
+
+        async function syncZohoItems() {
+            const btn = document.getElementById('syncZohoItemsBtn');
+            const statusDiv = document.getElementById('zohoSyncStatus');
+            const statusText = document.getElementById('zohoSyncText');
+            const spinner = document.getElementById('zohoSyncSpinner');
+
+            btn.disabled = true;
+            statusDiv.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'bg-red-50', 'text-red-700');
+            statusDiv.classList.add('bg-blue-50', 'text-blue-700');
+            spinner.classList.remove('hidden');
+            statusText.textContent = 'Syncing items from Zoho Books... This may take a moment.';
+
+            try {
+                const res = await fetch('/api/zoho/sync/items', { method: 'POST', headers: getAuthHeaders() });
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.message || 'Sync failed');
+
+                statusDiv.classList.remove('bg-blue-50', 'text-blue-700');
+                statusDiv.classList.add('bg-green-50', 'text-green-700');
+                spinner.classList.add('hidden');
+                const result = data.data || {};
+                statusText.textContent = `Sync complete! ${result.totalSynced || result.total || 'Items'} items synced from Zoho Books.`;
+
+                await loadZohoItems();
+                setTimeout(() => statusDiv.classList.add('hidden'), 5000);
+            } catch (err) {
+                statusDiv.classList.remove('bg-blue-50', 'text-blue-700');
+                statusDiv.classList.add('bg-red-50', 'text-red-700');
+                spinner.classList.add('hidden');
+                statusText.textContent = 'Sync failed: ' + err.message;
+                setTimeout(() => statusDiv.classList.add('hidden'), 6000);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function escH(s) {
+            if (!s) return '';
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        // ═══════════════════════════════════════
+        // INIT
+        // ═══════════════════════════════════════
+        (function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tab = urlParams.get('tab');
+            if (tab === 'zoho-import') {
+                switchProductTab('zoho-import');
+            }
+            loadData();
+        })();
     </script>
 </body>
 </html>

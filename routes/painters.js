@@ -326,9 +326,48 @@ router.get('/invoice/search', requireAuth, async (req, res) => {
 
 router.get('/config/product-rates', requireAuth, async (req, res) => {
     try {
-        const [rates] = await pool.query('SELECT * FROM painter_product_point_rates ORDER BY category, item_name');
-        res.json({ success: true, rates });
+        const { search, brand, category } = req.query;
+        let where = 'WHERE 1=1';
+        const params = [];
+
+        if (search) {
+            where += ' AND (ppr.item_name LIKE ? OR zim.zoho_brand LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`);
+        }
+        if (brand) {
+            where += ' AND zim.zoho_brand = ?';
+            params.push(brand);
+        }
+        if (category) {
+            where += ' AND ppr.category = ?';
+            params.push(category);
+        }
+
+        const [rates] = await pool.query(`
+            SELECT ppr.*, zim.zoho_brand as brand, zim.zoho_rate as mrp,
+                   zim.zoho_stock_on_hand as stock
+            FROM painter_product_point_rates ppr
+            LEFT JOIN zoho_items_map zim ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+            ${where}
+            ORDER BY ppr.category, ppr.item_name
+        `, params);
+
+        // Get unique brands/categories for filter dropdowns
+        const [brands] = await pool.query(`
+            SELECT DISTINCT zim.zoho_brand as brand
+            FROM painter_product_point_rates ppr
+            JOIN zoho_items_map zim ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+            WHERE zim.zoho_brand IS NOT NULL AND zim.zoho_brand != ''
+            ORDER BY zim.zoho_brand
+        `);
+        const [categories] = await pool.query(`
+            SELECT DISTINCT category FROM painter_product_point_rates
+            WHERE category IS NOT NULL AND category != '' ORDER BY category
+        `);
+
+        res.json({ success: true, rates, brands: brands.map(b => b.brand), categories: categories.map(c => c.category) });
     } catch (error) {
+        console.error('Get rates error:', error);
         res.status(500).json({ success: false, message: 'Failed to get rates' });
     }
 });
@@ -357,19 +396,39 @@ router.put('/config/product-rates', requirePermission('painters', 'points'), asy
 
 router.post('/config/product-rates/sync', requirePermission('painters', 'points'), async (req, res) => {
     try {
-        const [items] = await pool.query("SELECT item_id, name, category FROM zoho_items_cache WHERE status = 'active' ORDER BY name");
+        const [items] = await pool.query(`
+            SELECT zoho_item_id as item_id, zoho_item_name as name,
+                   zoho_category_name as category, zoho_brand as brand, zoho_rate as rate
+            FROM zoho_items_map
+            WHERE zoho_status = 'active' OR zoho_status IS NULL
+            ORDER BY zoho_item_name
+        `);
         let synced = 0;
+        let skipped = 0;
+        const uniqueBrands = new Set();
         for (const item of items) {
+            if (item.brand) uniqueBrands.add(item.brand);
             const [existing] = await pool.query('SELECT id FROM painter_product_point_rates WHERE item_id = ?', [item.item_id]);
             if (!existing.length) {
-                await pool.query('INSERT INTO painter_product_point_rates (item_id, item_name, category) VALUES (?, ?, ?)', [item.item_id, item.name, item.category || null]);
+                const categoryDisplay = item.category || (item.brand ? item.brand : null);
+                await pool.query(
+                    'INSERT INTO painter_product_point_rates (item_id, item_name, category) VALUES (?, ?, ?)',
+                    [item.item_id, item.name, categoryDisplay]
+                );
                 synced++;
+            } else {
+                skipped++;
             }
         }
-        res.json({ success: true, message: `${synced} new items synced`, total: items.length });
+        res.json({
+            success: true,
+            message: `${synced} new items synced (${skipped} already exist)`,
+            synced, skipped, total: items.length,
+            brands: Array.from(uniqueBrands).sort()
+        });
     } catch (error) {
         console.error('Sync rates error:', error);
-        res.status(500).json({ success: false, message: 'Failed to sync rates. Zoho items cache may not exist.' });
+        res.status(500).json({ success: false, message: 'Failed to sync rates: ' + error.message });
     }
 });
 
