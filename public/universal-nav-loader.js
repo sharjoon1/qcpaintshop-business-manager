@@ -40,6 +40,7 @@
         'customers': CONFIG.LEADS_SUBNAV_PATH,
         'customer-types': CONFIG.LEADS_SUBNAV_PATH,
         'design-requests': CONFIG.LEADS_SUBNAV_PATH,
+        'lead-scoring': CONFIG.LEADS_SUBNAV_PATH,
         // Branches & Staff
         'branches': CONFIG.BRANCHES_SUBNAV_PATH,
         'staff': CONFIG.BRANCHES_SUBNAV_PATH,

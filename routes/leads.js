@@ -6,12 +6,14 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const leadManager = require('../services/ai-lead-manager');
 
 // Database connection (imported from main app)
 let pool;
 
 function setPool(dbPool) {
     pool = dbPool;
+    leadManager.setPool(dbPool);
 }
 
 // ========================================
@@ -224,6 +226,123 @@ router.get('/stats', requirePermission('leads', 'view'), async (req, res) => {
             success: false,
             message: 'Failed to retrieve lead statistics'
         });
+    }
+});
+
+// ========================================
+// AI SCORING ENDPOINTS (before /:id)
+// ========================================
+
+/**
+ * GET /api/leads/scoring/dashboard
+ * Score distribution, top leads, predictions, last run
+ */
+router.get('/scoring/dashboard', requirePermission('leads', 'view'), async (req, res) => {
+    try {
+        // Score distribution
+        const [distribution] = await pool.query(`
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN lead_score >= 80 THEN 1 ELSE 0 END) as hot,
+                SUM(CASE WHEN lead_score >= 50 AND lead_score < 80 THEN 1 ELSE 0 END) as warm,
+                SUM(CASE WHEN lead_score > 0 AND lead_score < 50 THEN 1 ELSE 0 END) as cold,
+                SUM(CASE WHEN lead_score IS NULL OR lead_score = 0 THEN 1 ELSE 0 END) as unscored,
+                ROUND(AVG(lead_score), 1) as avg_score
+            FROM leads
+            WHERE status NOT IN ('won', 'lost', 'closed', 'inactive')
+        `);
+
+        // Top 20 scored leads
+        const [topLeads] = await pool.query(`
+            SELECT l.id, l.name, l.phone, l.email, l.status, l.source,
+                   l.estimated_budget, l.lead_score, l.lead_score_updated_at,
+                   l.next_followup_date, l.total_followups,
+                   u.full_name as assigned_name, b.name as branch_name,
+                   als.score_breakdown, als.ai_recommendation, als.next_action
+            FROM leads l
+            LEFT JOIN users u ON l.assigned_to = u.id
+            LEFT JOIN branches b ON l.branch_id = b.id
+            LEFT JOIN ai_lead_scores als ON l.id = als.lead_id
+            WHERE l.status NOT IN ('won', 'lost', 'closed', 'inactive')
+                AND l.lead_score IS NOT NULL
+            ORDER BY l.lead_score DESC
+            LIMIT 20
+        `);
+
+        // Recent predictions
+        const [predictions] = await pool.query(`
+            SELECT lcp.*, l.name as lead_name
+            FROM lead_conversion_predictions lcp
+            JOIN leads l ON lcp.lead_id = l.id
+            ORDER BY lcp.predicted_at DESC
+            LIMIT 10
+        `);
+
+        // Last scoring run
+        const [lastRun] = await pool.query(`
+            SELECT id, status, summary, duration_ms, created_at
+            FROM ai_analysis_runs
+            WHERE analysis_type = 'lead_scoring'
+            ORDER BY created_at DESC LIMIT 1
+        `);
+
+        // Predicted conversions count (probability > 60%)
+        const [conversionCount] = await pool.query(`
+            SELECT COUNT(DISTINCT lead_id) as count
+            FROM lead_conversion_predictions
+            WHERE conversion_probability >= 60
+        `);
+
+        res.json({
+            success: true,
+            data: {
+                distribution: distribution[0],
+                topLeads,
+                predictions,
+                lastRun: lastRun[0] || null,
+                predictedConversions: conversionCount[0].count
+            }
+        });
+    } catch (error) {
+        console.error('Scoring dashboard error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load scoring dashboard' });
+    }
+});
+
+/**
+ * POST /api/leads/scoring/nurture
+ * Trigger WA nurture campaign by tier
+ */
+router.post('/scoring/nurture', requirePermission('leads', 'edit'), async (req, res) => {
+    try {
+        const { tier } = req.body; // hot, warm, cold
+        if (!['hot', 'warm', 'cold'].includes(tier)) {
+            return res.status(400).json({ success: false, message: 'Invalid tier. Must be hot, warm, or cold.' });
+        }
+
+        let scoreCondition;
+        if (tier === 'hot') scoreCondition = 'lead_score >= 80';
+        else if (tier === 'warm') scoreCondition = 'lead_score >= 50 AND lead_score < 80';
+        else scoreCondition = 'lead_score > 0 AND lead_score < 50';
+
+        const [leads] = await pool.query(`
+            SELECT id FROM leads
+            WHERE ${scoreCondition}
+                AND status NOT IN ('won', 'lost', 'closed', 'inactive')
+                AND phone IS NOT NULL AND phone != ''
+        `);
+
+        if (leads.length === 0) {
+            return res.json({ success: true, message: `No ${tier} leads with phone numbers found.`, data: { populated: 0 } });
+        }
+
+        const leadIds = leads.map(l => l.id);
+        const result = await leadManager.triggerNurtureCampaign(leadIds, tier, req.user.id);
+
+        res.json({ success: true, message: `Nurture campaign created for ${result.populated} ${tier} leads`, data: result });
+    } catch (error) {
+        console.error('Nurture campaign error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create nurture campaign' });
     }
 });
 
@@ -799,6 +918,131 @@ router.get('/:id/followups', requirePermission('leads', 'view'), async (req, res
             success: false,
             message: 'Failed to retrieve followups'
         });
+    }
+});
+
+// ========================================
+// AI SCORE & PREDICTION PER-LEAD
+// ========================================
+
+/**
+ * GET /api/leads/:id/score
+ * Score + breakdown + prediction + follow-up suggestions
+ */
+router.get('/:id/score', requirePermission('leads', 'view'), async (req, res) => {
+    try {
+        const leadId = req.params.id;
+
+        // Get lead with score
+        const [leads] = await pool.query(`
+            SELECT l.id, l.name, l.phone, l.status, l.source, l.estimated_budget,
+                   l.lead_score, l.lead_score_updated_at, l.total_followups,
+                   l.next_followup_date, l.created_at, l.updated_at,
+                   u.full_name as assigned_name, b.name as branch_name,
+                   als.score, als.score_breakdown, als.ai_recommendation, als.next_action, als.next_action_date
+            FROM leads l
+            LEFT JOIN users u ON l.assigned_to = u.id
+            LEFT JOIN branches b ON l.branch_id = b.id
+            LEFT JOIN ai_lead_scores als ON l.id = als.lead_id
+            WHERE l.id = ?
+        `, [leadId]);
+
+        if (leads.length === 0) {
+            return res.status(404).json({ success: false, message: 'Lead not found' });
+        }
+
+        const lead = leads[0];
+
+        // Parse breakdown
+        let breakdown = null;
+        try { breakdown = lead.score_breakdown ? JSON.parse(lead.score_breakdown) : null; } catch(e) {}
+
+        // Get latest prediction
+        const [predictions] = await pool.query(`
+            SELECT * FROM lead_conversion_predictions
+            WHERE lead_id = ? ORDER BY predicted_at DESC LIMIT 1
+        `, [leadId]);
+
+        let prediction = predictions.length > 0 ? predictions[0] : null;
+        if (prediction && prediction.factors_json) {
+            try { prediction.factors = JSON.parse(prediction.factors_json); } catch(e) { prediction.factors = []; }
+        }
+
+        // Get follow-up suggestions (generated live)
+        let suggestions = [];
+        try {
+            suggestions = await leadManager.generateFollowUpSuggestions(leadId);
+        } catch (e) {
+            console.error('Follow-up suggestions error:', e.message);
+        }
+
+        // Recent followups
+        const [followups] = await pool.query(`
+            SELECT f.followup_type, f.notes, f.outcome, f.created_at, u.full_name as user_name
+            FROM lead_followups f
+            LEFT JOIN users u ON f.user_id = u.id
+            WHERE f.lead_id = ?
+            ORDER BY f.created_at DESC LIMIT 5
+        `, [leadId]);
+
+        res.json({
+            success: true,
+            data: {
+                lead: {
+                    id: lead.id,
+                    name: lead.name,
+                    phone: lead.phone,
+                    status: lead.status,
+                    source: lead.source,
+                    estimated_budget: lead.estimated_budget,
+                    total_followups: lead.total_followups,
+                    next_followup_date: lead.next_followup_date,
+                    assigned_name: lead.assigned_name,
+                    branch_name: lead.branch_name,
+                    created_at: lead.created_at,
+                    updated_at: lead.updated_at
+                },
+                score: lead.score || lead.lead_score || 0,
+                score_updated_at: lead.lead_score_updated_at,
+                breakdown,
+                ai_recommendation: lead.ai_recommendation,
+                next_action: lead.next_action,
+                next_action_date: lead.next_action_date,
+                prediction,
+                suggestions,
+                recentFollowups: followups
+            }
+        });
+    } catch (error) {
+        console.error('Get lead score error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get lead score details' });
+    }
+});
+
+/**
+ * POST /api/leads/:id/predict
+ * Trigger conversion prediction for one lead
+ */
+router.post('/:id/predict', requirePermission('leads', 'edit'), async (req, res) => {
+    try {
+        const leadId = req.params.id;
+
+        // Verify lead exists
+        const [existing] = await pool.query('SELECT id FROM leads WHERE id = ?', [leadId]);
+        if (existing.length === 0) {
+            return res.status(404).json({ success: false, message: 'Lead not found' });
+        }
+
+        const prediction = await leadManager.predictConversion(leadId);
+
+        res.json({
+            success: true,
+            message: 'Conversion prediction generated',
+            data: prediction
+        });
+    } catch (error) {
+        console.error('Predict conversion error:', error);
+        res.status(500).json({ success: false, message: 'Failed to generate prediction' });
     }
 });
 

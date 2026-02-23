@@ -1042,6 +1042,7 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 - `ai_analysis_runs` — Automated analysis execution log
 - `ai_insights` — Extracted insights with category, severity, actions
 - `ai_lead_scores` — Deterministic + AI lead scores with breakdown
+- `lead_conversion_predictions` — AI conversion probability, timeline, confidence, factors (JSON)
 - `ai_config` — Key-value configuration for schedules, providers, thresholds
 - `ai_business_context` — Cached daily business snapshots (generated at 6AM/12PM/6PM IST)
 - `ai_suggestions` — AI improvement recommendations with category, priority, status tracking
@@ -1079,6 +1080,24 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 **Lead Scoring Formula** (deterministic, 0-100):
 - Budget: 0-25 pts | Status: 0-20 pts | Recency: 0-20 pts
 - Engagement: 0-15 pts | Source: 0-10 pts | Responsiveness: 0-10 pts
+- Scores denormalized to `leads.lead_score` + `leads.lead_score_updated_at` for fast sort/filter
+
+**AI Lead Scoring Dashboard** (Feb 23):
+- **Page**: `admin-lead-scoring.html` (`data-page="lead-scoring"`)
+- **Navigation**: Leads subnav → "AI Scoring" tab
+- **Features**: Score overview cards (avg/hot/warm/cold/predicted), distribution bar, nurture campaign buttons, top 20 scored leads table, lead detail slide-out panel
+- **Detail panel**: Large score ring, 6-component breakdown bars, conversion prediction card, AI follow-up suggestions, recent followups
+- **Conversion predictions**: AI-powered probability/timeline/confidence/factors → stored in `lead_conversion_predictions`
+- **Follow-up suggestions**: AI-generated actionable suggestions (type, title, message, timing, priority, reasoning)
+- **Nurture campaigns**: Trigger WhatsApp campaigns by tier (hot/warm/cold) via General WA (branch_id=0)
+- **Endpoints** (in `routes/leads.js`):
+  - `GET /api/leads/scoring/dashboard` — distribution + top leads + predictions + last run
+  - `POST /api/leads/scoring/nurture` — trigger WA nurture by tier
+  - `GET /api/leads/:id/score` — score + breakdown + prediction + suggestions
+  - `POST /api/leads/:id/predict` — generate conversion prediction
+- **Backend** (`services/ai-lead-manager.js`): `syncScoresToLeads()`, `predictConversion(leadId)`, `generateFollowUpSuggestions(leadId)`, `triggerNurtureCampaign(leadIds, type, userId)`
+- **Config**: `lead_nurture_enabled`, `lead_prediction_enabled` in `ai_config`
+- **Migration**: `migrations/migrate-lead-scoring-upgrade.js`
 
 **WhatsApp Delivery**: Analysis summaries sent via General WhatsApp (branch_id=0) to configured recipients.
 
