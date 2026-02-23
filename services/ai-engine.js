@@ -506,7 +506,8 @@ async function streamWithFailover(messages, res, options = {}) {
         try {
             return await streamToResponse(messages, res, { ...opts, provider: fallback });
         } catch (fallbackErr) {
-            throw new Error(`Both providers failed for streaming`);
+            console.error(`[AI Engine] Fallback stream (${fallback}) also failed:`, fallbackErr.message);
+            throw new Error(`Both providers failed for streaming. Primary (${primary}): ${primaryErr.message}. Fallback (${fallback}): ${fallbackErr.message}`);
         }
     }
 }
