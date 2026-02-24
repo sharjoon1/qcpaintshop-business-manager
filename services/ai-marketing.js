@@ -105,7 +105,7 @@ async function collectMarketingData() {
     // Low-moving stock (items with stock but no recent sales)
     try {
         const [slowMoving] = await pool.query(`
-            SELECT im.item_name, im.zoho_stock_on_hand as stock, im.zoho_brand as brand
+            SELECT im.zoho_item_name as item_name, im.zoho_stock_on_hand as stock, im.zoho_brand as brand
             FROM zoho_items_map im
             LEFT JOIN zoho_invoice_line_items zil ON im.zoho_item_id = zil.item_id COLLATE utf8mb4_unicode_ci
                 AND zil.id IN (SELECT zil2.id FROM zoho_invoice_line_items zil2

@@ -110,7 +110,7 @@ async function collectZohoData(period = 'daily') {
 
     // Stock alerts (items at or below reorder level)
     const [stockAlerts] = await pool.query(`
-        SELECT item_name, zoho_stock_on_hand as stock, zoho_reorder_level as reorder_level
+        SELECT zoho_item_name as item_name, zoho_stock_on_hand as stock, zoho_reorder_level as reorder_level
         FROM zoho_items_map
         WHERE zoho_stock_on_hand <= zoho_reorder_level AND zoho_reorder_level > 0 AND zoho_status = 'active'
         ORDER BY (zoho_stock_on_hand / GREATEST(zoho_reorder_level, 1)) ASC

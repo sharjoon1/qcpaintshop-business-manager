@@ -80,7 +80,7 @@ async function collectStaffData(period = 'daily') {
     // OT requests today
     const [otRequests] = await pool.query(`
         SELECT
-            u.full_name, otr.status, otr.requested_minutes, otr.approved_minutes,
+            u.full_name, otr.status, otr.expected_minutes, otr.approved_minutes,
             otr.created_at
         FROM overtime_requests otr
         JOIN users u ON otr.user_id = u.id
@@ -253,7 +253,7 @@ function buildStaffPrompt(data, period) {
     if (data.ot_requests.length) {
         lines.push(`### Overtime Requests Today (${data.ot_requests.length})`);
         data.ot_requests.forEach(r => {
-            lines.push(`- ${r.full_name}: ${r.status} (requested ${r.requested_minutes} min${r.approved_minutes ? ', approved ' + r.approved_minutes + ' min' : ''})`);
+            lines.push(`- ${r.full_name}: ${r.status} (requested ${r.expected_minutes} min${r.approved_minutes ? ', approved ' + r.approved_minutes + ' min' : ''})`);
         });
         lines.push('');
     }
