@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
-    <script>requireAdminOrRedirect();</script>
+    <script>checkAuthOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
         .util-bar { height: 6px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
@@ -78,12 +78,13 @@
             </h1>
             <p style="font-size: 0.8125rem; color: #6b7280;">Manage credit limits for Zoho customers <span class="sync-indicator" id="lastSyncedIndicator"></span></p>
         </div>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="headerButtons">
+            <button class="btn-primary" onclick="openCreateCustomerModal()">+ Create Customer</button>
             <button class="btn-outline" onclick="openRequestsPanel()" id="requestsBtn" style="position:relative;">
                 Requests <span id="requestsBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#ef4444;color:white;font-size:0.625rem;font-weight:700;min-width:18px;height:18px;border-radius:50%;display:none;align-items:center;justify-content:center;">0</span>
             </button>
-            <button class="btn-outline" onclick="syncFromZoho()" id="syncBtn">Sync from Zoho</button>
-            <button class="btn-outline" onclick="showBulkModal()">Bulk Update</button>
+            <button class="btn-outline admin-only" onclick="syncFromZoho()" id="syncBtn">Sync from Zoho</button>
+            <button class="btn-outline admin-only" onclick="showBulkModal()">Bulk Update</button>
             <button class="btn-outline" onclick="exportCSV()">Export CSV</button>
         </div>
     </div>
@@ -227,6 +228,46 @@
     </div>
 </div>
 
+<!-- Create Customer Modal -->
+<div class="modal-overlay" id="createCustModal">
+    <div class="modal-box">
+        <h3 style="font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 1.25rem;">Create New Customer</h3>
+        <div style="background:#eef2ff;border-radius:8px;padding:0.625rem 0.75rem;margin-bottom:1rem;font-size:0.8125rem;color:#4338ca;">
+            Default credit limit of <b>&#8377;100</b> will be set and synced to Zoho immediately.
+        </div>
+        <div style="margin-bottom: 0.875rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Customer Name <span style="color:#ef4444">*</span></label>
+            <input type="text" id="newCustName" class="filter-input" style="width: 100%;" placeholder="Full name">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.875rem;">
+            <div>
+                <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Phone</label>
+                <input type="tel" id="newCustPhone" class="filter-input" style="width: 100%;" placeholder="e.g. 9876543210">
+            </div>
+            <div>
+                <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Email</label>
+                <input type="email" id="newCustEmail" class="filter-input" style="width: 100%;" placeholder="email@example.com">
+            </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <div>
+                <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">GST No.</label>
+                <input type="text" id="newCustGST" class="filter-input" style="width: 100%;" placeholder="Optional">
+            </div>
+            <div>
+                <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Branch</label>
+                <select class="filter-input" id="newCustBranch" style="width: 100%;">
+                    <option value="">Select branch...</option>
+                </select>
+            </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+            <button class="btn-outline" onclick="closeCreateCustomerModal()">Cancel</button>
+            <button class="btn-primary" onclick="createCustomer()" id="createCustBtn">Create & Sync to Zoho</button>
+        </div>
+    </div>
+</div>
+
 <!-- Credit Limit Request Modal (staff submits) -->
 <div class="modal-overlay" id="requestModal">
     <div class="modal-box">
@@ -325,6 +366,11 @@ let allCustomers = [];
 let debounceTimer = null;
 let currentSort = 'name';
 let sortAsc = true;
+
+// Hide admin-only elements for non-admin staff
+if (!isAdmin) {
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+}
 
 function formatINR(n) {
     n = Number(n) || 0;
@@ -518,8 +564,9 @@ function renderTable() {
             </td>
             <td class="hide-mobile" style="font-size:0.6875rem;color:#6b7280">${escHtml(c.branch_name || '')}</td>
             <td style="text-align:center;white-space:nowrap">
-                <button class="btn-outline btn-sm" onclick="openEditModal(${c.id})">Edit</button>
+                ${isAdmin ? `<button class="btn-outline btn-sm" onclick="openEditModal(${c.id})">Edit</button>` : ''}
                 <button class="btn-outline btn-sm" onclick="openDetailsModal(${c.id})" style="margin-left:2px">Details</button>
+                ${!isAdmin && limit === 0 ? `<button class="btn-outline btn-sm" onclick="quickRequest(${c.id})" style="margin-left:2px;color:#667eea;border-color:#667eea;">Request</button>` : ''}
             </td>
         </tr>`;
     }).join('');
@@ -560,7 +607,7 @@ async function saveCreditLimit() {
         const json = await resp.json();
         if (!json.success) throw new Error(json.error);
 
-        showToast('Credit limit updated');
+        showToast('Credit limit updated' + (json.zoho_synced ? ' & synced to Zoho' : ' (Zoho sync pending)'));
         closeEditModal();
         loadCustomers();
         loadOverview();
@@ -786,6 +833,77 @@ function showToast(message, type = 'success') {
     toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity='0'; toast.style.transition='opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 2500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CREATE CUSTOMER
+// ═══════════════════════════════════════════════════════════════
+function openCreateCustomerModal() {
+    document.getElementById('newCustName').value = '';
+    document.getElementById('newCustPhone').value = '';
+    document.getElementById('newCustEmail').value = '';
+    document.getElementById('newCustGST').value = '';
+    // Populate branch dropdown
+    const select = document.getElementById('newCustBranch');
+    select.innerHTML = '<option value="">Select branch...</option>';
+    const branches = new Map();
+    allCustomers.forEach(c => { if (c.branch_id && c.branch_name) branches.set(c.branch_id, c.branch_name); });
+    branches.forEach((name, id) => { select.innerHTML += `<option value="${id}">${escHtml(name)}</option>`; });
+    // Pre-select staff's branch if available
+    if (user.branch_id) select.value = user.branch_id;
+    document.getElementById('createCustModal').classList.add('open');
+}
+function closeCreateCustomerModal() { document.getElementById('createCustModal').classList.remove('open'); }
+
+async function createCustomer() {
+    const name = document.getElementById('newCustName').value.trim();
+    const phone = document.getElementById('newCustPhone').value.trim();
+    const email = document.getElementById('newCustEmail').value.trim();
+    const gst_no = document.getElementById('newCustGST').value.trim();
+    const branch_id = document.getElementById('newCustBranch').value;
+
+    if (!name) { showToast('Customer name is required', 'error'); return; }
+
+    const btn = document.getElementById('createCustBtn');
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+
+    try {
+        const resp = await fetch('/api/credit-limits/create-customer', {
+            method: 'POST', headers,
+            body: JSON.stringify({ customer_name: name, phone, email, gst_no, branch_id: branch_id ? Number(branch_id) : null })
+        });
+        const json = await resp.json();
+        if (json.error) throw new Error(json.error);
+
+        showToast(json.message + (json.zoho_synced ? ' — synced to Zoho' : ''));
+        closeCreateCustomerModal();
+        loadCustomers();
+        loadOverview();
+    } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create & Sync to Zoho';
+    }
+}
+
+// Quick request shortcut for staff on no-limit customers
+function quickRequest(custId) {
+    const c = allCustomers.find(x => x.id === custId);
+    if (!c) return;
+    // Open request modal pre-filled
+    closeRequestsPanel();
+    const select = document.getElementById('reqCustomerSelect');
+    select.innerHTML = '<option value="">Select a customer without limit...</option>';
+    allCustomers.filter(x => Number(x.credit_limit) === 0).forEach(x => {
+        select.innerHTML += `<option value="${x.id}" data-outstanding="${x.credit_used||0}" data-name="${escHtml(x.name||'')}" data-phone="${escHtml(x.phone||'')}">${escHtml(x.name||'')} (${escHtml(x.phone||'')})</option>`;
+    });
+    select.value = custId;
+    onReqCustomerChange();
+    document.getElementById('reqAmount').value = '';
+    document.getElementById('reqReason').value = '';
+    document.getElementById('requestModal').classList.add('open');
 }
 
 // ═══════════════════════════════════════════════════════════════

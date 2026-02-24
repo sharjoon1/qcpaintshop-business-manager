@@ -324,6 +324,83 @@ router.post('/sync', requireAuth, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// CREATE CUSTOMER — any staff can create, default limit ₹100
+// ═══════════════════════════════════════════════════════════════
+const DEFAULT_CREDIT_LIMIT = 100;
+
+router.post('/create-customer', requireAuth, async (req, res) => {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const { customer_name, phone, email, gst_no, branch_id } = req.body;
+
+        if (!customer_name || !customer_name.trim()) {
+            conn.release();
+            return res.status(400).json({ error: 'Customer name is required' });
+        }
+
+        // 1. Create contact in Zoho Books
+        let zohoContactId = null;
+        let zohoSynced = false;
+        try {
+            const contactData = {
+                contact_name: customer_name.trim(),
+                contact_type: 'customer',
+                credit_limit: DEFAULT_CREDIT_LIMIT
+            };
+            if (phone) contactData.phone = phone.trim();
+            if (email) contactData.email = email.trim();
+            if (gst_no) contactData.gst_no = gst_no.trim();
+
+            const zohoRes = await zohoAPI.createContact(contactData);
+            if (zohoRes && zohoRes.contact) {
+                zohoContactId = zohoRes.contact.contact_id;
+                zohoSynced = true;
+            }
+        } catch (zohoErr) {
+            console.error('[CreditLimits] Zoho create contact error:', zohoErr.message);
+            conn.release();
+            return res.status(500).json({ error: 'Failed to create customer in Zoho: ' + zohoErr.message });
+        }
+
+        if (!zohoContactId) {
+            conn.release();
+            return res.status(500).json({ error: 'Zoho did not return a contact ID' });
+        }
+
+        // 2. Insert into zoho_customers_map with default credit limit
+        const [result] = await conn.query(
+            `INSERT INTO zoho_customers_map (zoho_contact_id, zoho_contact_name, zoho_phone, zoho_email, zoho_gst_no, branch_id, credit_limit, credit_limit_updated_at, credit_limit_updated_by, last_synced_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW())`,
+            [zohoContactId, customer_name.trim(), phone || null, email || null, gst_no || null, branch_id || null, DEFAULT_CREDIT_LIMIT, req.user.id]
+        );
+
+        // 3. Log credit history
+        await conn.query(
+            'INSERT INTO customer_credit_history (zoho_customer_map_id, previous_limit, new_limit, changed_by, reason) VALUES (?, 0, ?, ?, ?)',
+            [result.insertId, DEFAULT_CREDIT_LIMIT, req.user.id, 'New customer — default credit limit']
+        );
+
+        await conn.commit();
+        conn.release();
+
+        res.json({
+            success: true,
+            customer_id: result.insertId,
+            zoho_contact_id: zohoContactId,
+            credit_limit: DEFAULT_CREDIT_LIMIT,
+            zoho_synced: zohoSynced,
+            message: `Customer created with ₹${DEFAULT_CREDIT_LIMIT} credit limit`
+        });
+    } catch (e) {
+        await conn.rollback();
+        conn.release();
+        console.error('[CreditLimits] Create customer error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // CREDIT LIMIT REQUEST WORKFLOW (F4)
 // ═══════════════════════════════════════════════════════════════
 
