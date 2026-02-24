@@ -931,12 +931,16 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             console.log(`[Stock Check] Pushing batch adjustment for assignment #${assignment.id}, branch: ${assignment.branch_name}, location: ${locationId}, items: ${lineItems.length} (live stock comparison)`);
             console.log(`[Stock Check] Line items:`, lineItems.map(li => `${li.item_id}: live_diff=${li.quantity_adjusted}`).join(', '));
 
+            // Zoho "reason" field must be < 50 characters
+            const shortBranch = (assignment.branch_name || 'Branch').replace(/^QC\s*-\s*/, '');
+            const batchReason = `SC #${assignment.id} ${shortBranch}`.substring(0, 49);
+
             try {
                 // Try batch push first (most efficient)
                 const adjustmentData = {
                     date: checkDate,
-                    reason: `Stock check #${assignment.id} — ${assignment.branch_name || 'Branch'} (batch)`,
-                    description: `Physical count on ${checkDate}, assignment #${assignment.id}, branch: ${assignment.branch_name || 'Unknown'} (partial batch push)`,
+                    reason: batchReason,
+                    description: `Stock check #${assignment.id}, physical count on ${checkDate}, branch: ${assignment.branch_name || 'Unknown'} (batch push, ${lineItems.length} items)`,
                     adjustment_type: 'quantity',
                     location_id: locationId,
                     line_items: lineItems
@@ -953,8 +957,8 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
                     try {
                         const singleData = {
                             date: checkDate,
-                            reason: `Stock check #${assignment.id} — ${assignment.branch_name || 'Branch'} (item: ${item.item_name})`,
-                            description: `Physical count on ${checkDate}, assignment #${assignment.id}, item: ${item.item_name}`,
+                            reason: batchReason,
+                            description: `Stock check #${assignment.id}, item: ${item.item_name}, diff: ${item.live_difference}`,
                             adjustment_type: 'quantity',
                             location_id: locationId,
                             line_items: [{
