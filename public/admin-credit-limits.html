@@ -46,6 +46,9 @@
         .filter-input { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid #d1d5db; font-size: 0.8125rem; outline: none; }
         .filter-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
 
+        .sync-indicator { font-size: 0.6875rem; color: #9ca3af; display: inline-flex; align-items: center; gap: 0.25rem; }
+        .sync-indicator .dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+
         @media (max-width: 768px) {
             .overview-grid { grid-template-columns: repeat(2, 1fr) !important; }
             .filter-bar { flex-direction: column; }
@@ -68,32 +71,36 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
                 Customer Credit Limits
             </h1>
-            <p style="font-size: 0.8125rem; color: #6b7280;">Manage credit limits and track utilization</p>
+            <p style="font-size: 0.8125rem; color: #6b7280;">Manage credit limits for Zoho customers <span class="sync-indicator" id="lastSyncedIndicator"></span></p>
         </div>
         <div style="display: flex; gap: 0.5rem;">
-            <button class="btn-outline" onclick="recalculateAll()">Recalculate All</button>
+            <button class="btn-outline" onclick="syncFromZoho()" id="syncBtn">Sync from Zoho</button>
             <button class="btn-outline" onclick="showBulkModal()">Bulk Update</button>
             <button class="btn-outline" onclick="exportCSV()">Export CSV</button>
         </div>
     </div>
 
     <!-- Overview Cards -->
-    <div class="overview-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="overview-grid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="ov-card">
+            <div class="ov-value" style="color: #3b82f6;" id="ovTotalCust">--</div>
+            <div class="ov-label">Total Customers</div>
+        </div>
         <div class="ov-card">
             <div class="ov-value" style="color: #667eea;" id="ovTotalLimit">--</div>
             <div class="ov-label">Total Credit Limit</div>
         </div>
         <div class="ov-card">
             <div class="ov-value" style="color: #ef4444;" id="ovTotalUsed">--</div>
-            <div class="ov-label">Total Used</div>
+            <div class="ov-label">Total Outstanding</div>
         </div>
         <div class="ov-card">
             <div class="ov-value" style="color: #22c55e;" id="ovTotalAvail">--</div>
             <div class="ov-label">Total Available</div>
         </div>
         <div class="ov-card">
-            <div class="ov-value" style="color: #3b82f6;" id="ovWithLimit">--</div>
-            <div class="ov-label">Customers with Limit</div>
+            <div class="ov-value" style="color: #8b5cf6;" id="ovWithLimit">--</div>
+            <div class="ov-label">With Limit Set</div>
         </div>
         <div class="ov-card">
             <div class="ov-value" style="color: #ef4444;" id="ovOverLimit">--</div>
@@ -103,7 +110,10 @@
 
     <!-- Filters -->
     <div class="filter-bar" style="display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;">
-        <input type="text" class="filter-input" id="searchInput" placeholder="Search customer or phone..." style="flex: 1; min-width: 200px;" oninput="debounceLoad()">
+        <input type="text" class="filter-input" id="searchInput" placeholder="Search name, phone, email..." style="flex: 1; min-width: 200px;" oninput="debounceLoad()">
+        <select class="filter-input" id="branchFilter" onchange="loadCustomers()">
+            <option value="">All Branches</option>
+        </select>
         <select class="filter-input" id="statusFilter" onchange="loadCustomers()">
             <option value="all">All Customers</option>
             <option value="no_limit">No Limit Set</option>
@@ -115,7 +125,7 @@
         <select class="filter-input" id="sortSelect" onchange="loadCustomers()">
             <option value="name">Sort by Name</option>
             <option value="credit_limit_desc">Credit Limit (High-Low)</option>
-            <option value="credit_used_desc">Credit Used (High-Low)</option>
+            <option value="credit_used_desc">Outstanding (High-Low)</option>
             <option value="utilization_desc">Utilization (High-Low)</option>
         </select>
     </div>
@@ -126,16 +136,17 @@
             <thead>
                 <tr>
                     <th>Customer</th>
+                    <th class="hide-mobile">GST</th>
                     <th style="text-align:right">Credit Limit</th>
-                    <th style="text-align:right">Used</th>
+                    <th style="text-align:right">Outstanding</th>
                     <th style="text-align:right">Available</th>
-                    <th style="width:160px">Utilization</th>
+                    <th style="width:140px">Utilization</th>
                     <th class="hide-mobile">Branch</th>
                     <th style="text-align:center">Actions</th>
                 </tr>
             </thead>
             <tbody id="custTableBody">
-                <tr><td colspan="7" style="text-align:center; padding:3rem; color:#9ca3af;">Loading...</td></tr>
+                <tr><td colspan="8" style="text-align:center; padding:3rem; color:#9ca3af;">Loading...</td></tr>
             </tbody>
         </table>
     </div>
@@ -149,6 +160,7 @@
         <div style="margin-bottom: 1rem;">
             <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem;">Customer</div>
             <div style="font-weight: 600; font-size: 1rem;" id="editCustName"></div>
+            <div style="font-size: 0.6875rem; color: #9ca3af;" id="editCustInfo"></div>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
             <div>
@@ -156,7 +168,7 @@
                 <div style="font-weight: 600;" id="editCurrentLimit"></div>
             </div>
             <div>
-                <div style="font-size: 0.75rem; color: #6b7280;">Currently Used</div>
+                <div style="font-size: 0.75rem; color: #6b7280;">Zoho Outstanding</div>
                 <div style="font-weight: 600;" id="editCurrentUsed"></div>
             </div>
         </div>
@@ -234,6 +246,17 @@ function debounceLoad() {
     debounceTimer = setTimeout(loadCustomers, 300);
 }
 
+function timeAgo(dateStr) {
+    if (!dateStr) return 'Never';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    return Math.floor(hrs / 24) + 'd ago';
+}
+
 // ═══════════════════════════════════════════════════════════════
 // LOAD DATA
 // ═══════════════════════════════════════════════════════════════
@@ -242,19 +265,42 @@ async function loadCustomers() {
         const search = document.getElementById('searchInput').value.trim();
         const status = document.getElementById('statusFilter').value;
         const sort = document.getElementById('sortSelect').value;
+        const branch = document.getElementById('branchFilter').value;
 
         const params = new URLSearchParams();
         if (search) params.set('search', search);
         if (status !== 'all') params.set('status', status);
         if (sort) params.set('sort', sort);
+        if (branch) params.set('branch', branch);
 
         const resp = await fetch('/api/credit-limits/customers?' + params, { headers });
         const json = await resp.json();
         allCustomers = json.data || [];
         renderTable();
+        populateBranchFilter();
     } catch (e) {
         console.error('Load error:', e);
     }
+}
+
+function populateBranchFilter() {
+    const select = document.getElementById('branchFilter');
+    const current = select.value;
+    // Only populate once (check option count)
+    if (select.options.length > 1) return;
+
+    const branches = new Map();
+    allCustomers.forEach(c => {
+        if (c.branch_id && c.branch_name) branches.set(c.branch_id, c.branch_name);
+    });
+
+    branches.forEach((name, id) => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = name;
+        select.appendChild(opt);
+    });
+    if (current) select.value = current;
 }
 
 async function loadOverview() {
@@ -263,11 +309,18 @@ async function loadOverview() {
         const json = await resp.json();
         if (!json.success) return;
         const s = json.summary;
+        document.getElementById('ovTotalCust').textContent = Number(s.total_customers).toLocaleString();
         document.getElementById('ovTotalLimit').textContent = formatINR(s.total_limit);
         document.getElementById('ovTotalUsed').textContent = formatINR(s.total_used);
         document.getElementById('ovTotalAvail').textContent = formatINR(s.total_available);
         document.getElementById('ovWithLimit').textContent = s.customers_with_limit;
         document.getElementById('ovOverLimit').textContent = s.over_limit_count;
+
+        // Last synced indicator
+        const indicator = document.getElementById('lastSyncedIndicator');
+        if (s.last_synced) {
+            indicator.innerHTML = '<span class="dot"></span> Synced ' + timeAgo(s.last_synced);
+        }
     } catch (e) { /* ignore */ }
 }
 
@@ -277,7 +330,7 @@ async function loadOverview() {
 function renderTable() {
     const tbody = document.getElementById('custTableBody');
     if (!allCustomers.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:#9ca3af;">No customers found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:#9ca3af;">No customers found</td></tr>';
         return;
     }
 
@@ -296,9 +349,10 @@ function renderTable() {
 
         return `<tr>
             <td>
-                <div style="font-weight:600;color:#1f2937">${escHtml(c.name)}</div>
-                <div style="font-size:0.6875rem;color:#9ca3af">${escHtml(c.phone || '')}</div>
+                <div style="font-weight:600;color:#1f2937">${escHtml(c.name || '')}</div>
+                <div style="font-size:0.6875rem;color:#9ca3af">${escHtml(c.phone || '')}${c.email ? ' &middot; ' + escHtml(c.email) : ''}</div>
             </td>
+            <td class="hide-mobile" style="font-size:0.6875rem;color:#6b7280">${escHtml(c.gst_no || '--')}</td>
             <td style="text-align:right;font-weight:600">${limit > 0 ? formatINR(limit) : '<span style="color:#9ca3af">Not set</span>'}</td>
             <td style="text-align:right;font-weight:600;color:${used > limit && limit > 0 ? '#ef4444' : '#1f2937'}">${formatINR(used)}</td>
             <td style="text-align:right;font-weight:600;color:${available < 0 ? '#ef4444' : '#22c55e'}">${limit > 0 ? formatINR(available) : '--'}</td>
@@ -325,7 +379,8 @@ function openEditModal(id) {
     const c = allCustomers.find(x => x.id === id);
     if (!c) return;
     document.getElementById('editCustomerId').value = id;
-    document.getElementById('editCustName').textContent = c.name;
+    document.getElementById('editCustName').textContent = c.name || '';
+    document.getElementById('editCustInfo').textContent = [c.phone, c.email, c.gst_no].filter(Boolean).join(' | ');
     document.getElementById('editCurrentLimit').textContent = formatINR(c.credit_limit);
     document.getElementById('editCurrentUsed').textContent = formatINR(c.credit_used);
     document.getElementById('editNewLimit').value = Number(c.credit_limit) || '';
@@ -382,6 +437,17 @@ async function openDetailsModal(id) {
         const history = (hist.data || []);
 
         let html = `
+        <!-- Customer Info -->
+        <div style="background:#f9fafb;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:1.5rem;font-size:0.8125rem;">
+            <div><span style="color:#6b7280">Phone:</span> <b>${escHtml(c.phone || '--')}</b></div>
+            <div><span style="color:#6b7280">Email:</span> <b>${escHtml(c.email || '--')}</b></div>
+            <div><span style="color:#6b7280">GST:</span> <b>${escHtml(c.gst_no || '--')}</b></div>
+            <div><span style="color:#6b7280">Branch:</span> <b>${escHtml(c.branch_name || '--')}</b></div>
+            <div><span style="color:#6b7280">Zoho ID:</span> <b style="font-size:0.6875rem">${escHtml(c.zoho_contact_id || '--')}</b></div>
+            <div><span style="color:#6b7280">Last synced:</span> <b>${timeAgo(c.last_synced_at)}</b></div>
+        </div>
+
+        <!-- Summary Cards -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.5rem;">
             <div style="background:#eef2ff;padding:0.75rem;border-radius:10px;text-align:center">
                 <div style="font-size:1.25rem;font-weight:700;color:#667eea">${formatINR(c.credit_limit)}</div>
@@ -389,7 +455,7 @@ async function openDetailsModal(id) {
             </div>
             <div style="background:#fef2f2;padding:0.75rem;border-radius:10px;text-align:center">
                 <div style="font-size:1.25rem;font-weight:700;color:#ef4444">${formatINR(c.credit_used)}</div>
-                <div style="font-size:0.6875rem;color:#6b7280">Used</div>
+                <div style="font-size:0.6875rem;color:#6b7280">Outstanding</div>
             </div>
             <div style="background:#f0fdf4;padding:0.75rem;border-radius:10px;text-align:center">
                 <div style="font-size:1.25rem;font-weight:700;color:#22c55e">${formatINR(c.credit_available)}</div>
@@ -400,6 +466,12 @@ async function openDetailsModal(id) {
                 <div style="font-size:0.6875rem;color:#6b7280">Utilization</div>
             </div>
         </div>`;
+
+        if (Number(c.unused_credits) > 0) {
+            html += `<div style="background:#dbeafe;border-radius:8px;padding:0.5rem 0.75rem;margin-bottom:1rem;font-size:0.8125rem;color:#1e40af;">
+                Unused credits: <b>${formatINR(c.unused_credits)}</b>
+            </div>`;
+        }
 
         // Outstanding Invoices
         html += '<h4 style="font-weight:700;font-size:0.9375rem;margin-bottom:0.5rem;">Outstanding Invoices (' + invoices.length + ')</h4>';
@@ -509,19 +581,26 @@ async function executeBulk() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RECALCULATE
+// SYNC FROM ZOHO
 // ═══════════════════════════════════════════════════════════════
-async function recalculateAll() {
-    if (!confirm('Recalculate credit used for all customers from outstanding invoices?')) return;
+async function syncFromZoho() {
+    const btn = document.getElementById('syncBtn');
+    if (!confirm('Sync customer data from Zoho? This will update outstanding amounts.')) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
     try {
-        const resp = await fetch('/api/credit-limits/recalculate', { method: 'POST', headers, body: '{}' });
+        const resp = await fetch('/api/credit-limits/sync', { method: 'POST', headers, body: '{}' });
         const json = await resp.json();
         if (!json.success) throw new Error(json.error);
-        showToast('Recalculated ' + json.updated + ' customers');
+        showToast('Synced ' + json.synced + ' customers from Zoho');
         loadCustomers();
         loadOverview();
     } catch (e) {
-        showToast('Failed: ' + e.message, 'error');
+        showToast('Sync failed: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sync from Zoho';
     }
 }
 
@@ -530,11 +609,11 @@ async function recalculateAll() {
 // ═══════════════════════════════════════════════════════════════
 function exportCSV() {
     if (!allCustomers.length) { showToast('No data to export', 'error'); return; }
-    let csv = 'Customer,Phone,Branch,Credit Limit,Credit Used,Available,Utilization %\n';
+    let csv = 'Customer,Phone,Email,GST,Branch,Credit Limit,Outstanding,Available,Utilization %\n';
     allCustomers.forEach(c => {
         const limit = Number(c.credit_limit) || 0;
         const used = Number(c.credit_used) || 0;
-        csv += '"' + (c.name||'').replace(/"/g,'""') + '","' + (c.phone||'') + '","' + (c.branch_name||'') + '",' +
+        csv += '"' + (c.name||'').replace(/"/g,'""') + '","' + (c.phone||'') + '","' + (c.email||'') + '","' + (c.gst_no||'') + '","' + (c.branch_name||'') + '",' +
                limit + ',' + used + ',' + (limit - used) + ',' + (limit > 0 ? ((used/limit)*100).toFixed(1) : 0) + '\n';
     });
     const blob = new Blob([csv], { type: 'text/csv' });

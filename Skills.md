@@ -262,33 +262,37 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Estimate detail view
 - Pages: `customer-login.html`, `customer-dashboard.html`, `customer-estimate-view.html`
 
-**Customer Credit Limits**
-- Set/update credit limit per customer with reason tracking
-- Real-time credit utilization monitoring (limit, used, available, %)
-- Overview dashboard: total limits, total used, near-limit customers, violations
+**Customer Credit Limits (Zoho Customers)**
+- Manages credit limits on **`zoho_customers_map`** (Zoho-synced customers, not local `customers` table)
+- Uses `zoho_outstanding` (receivables from Zoho) as the "credit used" value — no manual recalculation needed
+- Set/update credit limit per Zoho customer with reason tracking
+- Real-time credit utilization monitoring (limit, outstanding, available, %)
+- Overview dashboard: 6 cards (total customers, total limit, outstanding, available, with limit, over limit), last synced indicator
 - Credit check endpoint for invoice validation (0 limit = no limit set, allowed by default)
 - Bulk update credit limits for multiple customers
-- Recalculate credit_used from outstanding Zoho invoices
-- Credit limit change history timeline
-- Credit limit violations log (attempted exceeds)
-- Export CSV of customer credit data
+- "Sync from Zoho" button — calls `zohoAPI.syncCustomers()` to refresh outstanding amounts
+- Branch filter dropdown (from `zoho_customers_map.branch_id`)
+- Credit limit change history timeline (uses `zoho_customer_map_id`)
+- Credit limit violations log (uses `zoho_customer_map_id`)
+- Export CSV with GST, email, phone, branch columns
+- Details modal: customer info (phone, email, GST, Zoho ID, last synced), summary cards, outstanding invoices (via `zoho_contact_id`), unused credits, credit history
 - Utilization color coding: green (<50%), amber (50-80%), red (>80%), critical (exceeded)
 - Pages: `admin-credit-limits.html` (data-page=`credit-limits`, Leads subnav)
-- Routes: `routes/credit-limits.js` (9 endpoints)
-- Tables: `customer_credit_history`, `credit_limit_violations`, credit columns on `customers`
-- Migration: `migrations/migrate-credit-limits.js`
+- Routes: `routes/credit-limits.js` (9 endpoints, imports `zoho-api.js` for sync)
+- Tables: `zoho_customers_map` (credit_limit, credit_limit_updated_at, credit_limit_updated_by), `customer_credit_history` (+zoho_customer_map_id), `credit_limit_violations` (+zoho_customer_map_id)
+- Migrations: `migrations/migrate-credit-limits.js` (original), `migrations/migrate-credit-limits-zoho.js` (Zoho migration)
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/credit-limits/customers` | List customers with credit info |
-| GET | `/api/credit-limits/overview/summary` | Dashboard overview stats |
+| GET | `/api/credit-limits/customers` | List Zoho customers with credit info (search, branch, status, sort) |
+| GET | `/api/credit-limits/overview/summary` | Dashboard overview stats (6 metrics + last synced) |
 | GET | `/api/credit-limits/violations/list` | List credit violations |
-| POST | `/api/credit-limits/check` | Check credit availability |
+| POST | `/api/credit-limits/check` | Check credit availability (zoho_customer_map_id) |
 | POST | `/api/credit-limits/bulk-set` | Bulk update limits |
-| POST | `/api/credit-limits/recalculate` | Recalculate credit_used |
-| GET | `/api/credit-limits/:id` | Single customer credit detail |
+| POST | `/api/credit-limits/sync` | Sync customers from Zoho (replaces recalculate) |
+| GET | `/api/credit-limits/:id` | Single Zoho customer credit detail + outstanding invoices |
 | POST | `/api/credit-limits/:id/set-limit` | Update credit limit |
-| GET | `/api/credit-limits/:id/history` | Credit change history |
+| GET | `/api/credit-limits/:id/history` | Credit change history (via zoho_customer_map_id) |
 
 ---
 
@@ -1739,15 +1743,13 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
-### 2026-02-24 - Customer Credit Limit Management System
-Complete credit limit management for customers:
-- **Database**: Added `credit_limit`, `credit_used`, `credit_limit_updated_at`, `credit_limit_updated_by` columns to `customers` table
-- **Tables**: `customer_credit_history` (change audit trail), `credit_limit_violations` (exceeded attempts)
-- **Backend**: `routes/credit-limits.js` — 9 endpoints (list, detail, set-limit, check, history, bulk-set, overview, recalculate, violations)
-- **Frontend**: `admin-credit-limits.html` — overview cards, customer table with utilization bars, edit/details/bulk modals, CSV export
-- **Navigation**: Sidebar "Credit Limits" under Customers, Leads subnav tab, `credit-limits` in SUBNAV_MAP
-- **Route ordering**: Named routes (`/overview/summary`, `/violations/list`) before `/:customerId` params
-- **Migration**: `migrations/migrate-credit-limits.js` (ALTERs customers, creates 2 tables, syncs initial credit_used)
+### 2026-02-24 - Customer Credit Limits → Zoho Customers Migration
+Migrated credit limit management from local `customers` table to **`zoho_customers_map`** (Zoho-synced customers):
+- **Database**: Added `credit_limit`, `credit_limit_updated_at`, `credit_limit_updated_by` to `zoho_customers_map`; added `zoho_customer_map_id` to `customer_credit_history` and `credit_limit_violations`
+- **Backend**: `routes/credit-limits.js` — fully rewritten, all queries use `zoho_customers_map`. Uses `zoho_outstanding` as credit_used. Imports `zoho-api.js` for sync. `/recalculate` replaced by `/sync` (calls `zohoAPI.syncCustomers()`)
+- **Frontend**: `admin-credit-limits.html` — rebuilt with 6 overview cards, branch filter, "Sync from Zoho" button, GST/email columns, enhanced details modal (Zoho contact ID, unused credits, last synced), CSV export with GST/email
+- **Migration**: `migrations/migrate-credit-limits-zoho.js` (ALTERs `zoho_customers_map`, adds `zoho_customer_map_id` to history/violations, migrates existing data)
+- **Route ordering**: Named routes before `/:customerId` params maintained
 
 ### 2026-02-24 - AI Dashboard Upgrade (Phase 1)
 Rebuilt `admin-ai.html` Tab 1 from Chat into a visual AI Dashboard with:
