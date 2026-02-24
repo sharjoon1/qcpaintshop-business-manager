@@ -150,7 +150,8 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
         );
 
         const [rows] = await pool.query(
-            `SELECT a.*, b.name as branch_name, u.full_name as staff_name,
+            `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,
+                    b.name as branch_name, u.full_name as staff_name,
                     creator.full_name as created_by_name,
                     reviewer.full_name as reviewed_by_name,
                     zlm.zoho_location_name as location_name,
@@ -187,7 +188,8 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
 router.get('/assignments/:id', requireAuth, async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT a.*, b.name as branch_name, u.full_name as staff_name,
+            `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,
+                    b.name as branch_name, u.full_name as staff_name,
                     creator.full_name as created_by_name,
                     reviewer.full_name as reviewed_by_name
              FROM stock_check_assignments a
@@ -255,7 +257,8 @@ router.get('/my-assignments', requireAuth, async (req, res) => {
         // ?pending=1 — return all non-completed assignments (for dashboard widget)
         if (pending === '1') {
             const [rows] = await pool.query(
-                `SELECT a.*, b.name as branch_name,
+                `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,
+                        b.name as branch_name,
                         u.full_name as created_by_name,
                         (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count
                  FROM stock_check_assignments a
@@ -273,7 +276,8 @@ router.get('/my-assignments', requireAuth, async (req, res) => {
         const targetDate = date || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
         const [rows] = await pool.query(
-            `SELECT a.*, b.name as branch_name,
+            `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,
+                    b.name as branch_name,
                     (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
@@ -306,7 +310,8 @@ router.get('/my-submissions', requireAuth, async (req, res) => {
         );
 
         const [rows] = await pool.query(
-            `SELECT a.*, b.name as branch_name,
+            `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,
+                    b.name as branch_name,
                     (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count,
                     (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id AND difference != 0 AND difference IS NOT NULL) as discrepancy_count
              FROM stock_check_assignments a
@@ -578,7 +583,8 @@ router.post('/self-request', requireAuth, upload.any(), async (req, res) => {
 router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT a.*, b.name as branch_name, u.full_name as staff_name,
+            `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,
+                    b.name as branch_name, u.full_name as staff_name,
                     zlm.zoho_location_name as location_name
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
@@ -625,7 +631,8 @@ router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, 
 router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT a.*, b.name as branch_name
+            `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,
+                    b.name as branch_name
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
              WHERE a.id = ?`,
