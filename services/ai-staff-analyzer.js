@@ -96,7 +96,7 @@ async function collectStaffData(period = 'daily') {
             COUNT(*) as total_present,
             COALESCE(AVG(total_working_minutes), 0) as avg_working_minutes,
             COALESCE(SUM(overtime_minutes), 0) as total_overtime_minutes,
-            COALESCE(SUM(break_minutes), 0) as total_break_minutes,
+            COALESCE(SUM(total_break_minutes), 0) as total_break_minutes,
             COUNT(CASE WHEN auto_clockout_type IS NOT NULL THEN 1 END) as auto_clockouts
         FROM staff_attendance
         WHERE date = CURDATE()
@@ -112,7 +112,7 @@ async function collectStaffData(period = 'daily') {
                 u.full_name, u.id as user_id,
                 COUNT(DISTINCT sa.date) as days_present,
                 COALESCE(AVG(sa.total_working_minutes), 0) as avg_working,
-                COALESCE(AVG(sa.break_minutes), 0) as avg_break,
+                COALESCE(AVG(sa.total_break_minutes), 0) as avg_break,
                 COALESCE(SUM(sa.excess_break_minutes), 0) as total_excess_break,
                 COALESCE(SUM(sa.overtime_minutes), 0) as total_overtime
             FROM users u
@@ -227,7 +227,7 @@ function buildStaffPrompt(data, period) {
     // Absent staff
     if (data.absent_today.length) {
         lines.push(`### Absent Today (${data.absent_today.length})`);
-        data.absent_today.forEach(s => lines.push(`- ${s.name} (${s.branch_name || 'No branch'})`));
+        data.absent_today.forEach(s => lines.push(`- ${s.full_name} (${s.branch_name || 'No branch'})`));
         lines.push('');
     }
 
@@ -235,7 +235,7 @@ function buildStaffPrompt(data, period) {
     if (data.late_arrivals.length) {
         lines.push(`### Late Arrivals (${data.late_arrivals.length})`);
         data.late_arrivals.forEach(s => {
-            lines.push(`- ${s.name}: ${s.minutes_late} min late (arrived ${new Date(s.clock_in_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
+            lines.push(`- ${s.full_name}: ${s.minutes_late} min late (arrived ${new Date(s.clock_in_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
         });
         lines.push('');
     }
@@ -244,7 +244,7 @@ function buildStaffPrompt(data, period) {
     if (data.break_excess.length) {
         lines.push(`### Excess Break Time (${data.break_excess.length} staff)`);
         data.break_excess.forEach(s => {
-            lines.push(`- ${s.name}: ${s.excess_break_minutes} min excess (took ${s.total_break_minutes} min, allowed ${s.break_allowance_minutes} min)`);
+            lines.push(`- ${s.full_name}: ${s.excess_break_minutes} min excess (took ${s.total_break_minutes} min, allowed ${s.break_allowance_minutes} min)`);
         });
         lines.push('');
     }
@@ -253,7 +253,7 @@ function buildStaffPrompt(data, period) {
     if (data.ot_requests.length) {
         lines.push(`### Overtime Requests Today (${data.ot_requests.length})`);
         data.ot_requests.forEach(r => {
-            lines.push(`- ${r.name}: ${r.status} (requested ${r.requested_minutes} min${r.approved_minutes ? ', approved ' + r.approved_minutes + ' min' : ''})`);
+            lines.push(`- ${r.full_name}: ${r.status} (requested ${r.requested_minutes} min${r.approved_minutes ? ', approved ' + r.approved_minutes + ' min' : ''})`);
         });
         lines.push('');
     }
@@ -263,7 +263,7 @@ function buildStaffPrompt(data, period) {
         lines.push('### 7-Day Staff Averages');
         data.weekly_averages.forEach(s => {
             if (s.days_present > 0) {
-                lines.push(`- ${s.name}: ${s.days_present} days, avg ${Math.round(s.avg_working)} min work, ${Math.round(s.avg_break)} min break`);
+                lines.push(`- ${s.full_name}: ${s.days_present} days, avg ${Math.round(s.avg_working)} min work, ${Math.round(s.avg_break)} min break`);
             }
         });
         lines.push('');
