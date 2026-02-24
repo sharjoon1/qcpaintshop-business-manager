@@ -877,7 +877,8 @@ async function loadReviewList() {
     const el = document.getElementById('reviewList');
     el.innerHTML = '<div class="skeleton h-8 w-full mb-2"></div>'.repeat(3);
 
-    const res = await apiFetch(API + '/assignments?status=submitted&limit=50');
+    // include_partial=1 also shows pending assignments that have submitted items
+    const res = await apiFetch(API + '/assignments?status=submitted&include_partial=1&limit=50');
     if (!res.success || !res.data || !res.data.length) {
         el.innerHTML = '<p class="text-gray-400 text-center py-4">No submitted assignments to review</p>';
         return;
@@ -886,24 +887,44 @@ async function loadReviewList() {
     el.innerHTML = `
         <table class="sc-table">
             <thead><tr>
-                <th>#</th><th>Branch</th><th>Location</th><th>Staff</th><th>Type</th><th>Date</th><th>Items</th><th>Discrepancies</th><th>Submitted</th><th></th>
+                <th>#</th><th>Branch</th><th>Location</th><th>Staff</th><th>Type</th><th>Date</th><th>Submitted</th><th>Discrepancies</th><th>Status</th><th>Submitted At</th><th></th>
             </tr></thead>
             <tbody>
-                ${res.data.map(a => `<tr>
-                    <td>${a.id}</td>
-                    <td>${a.branch_name || '-'}</td>
-                    <td class="text-xs">${a.location_name || '-'}</td>
-                    <td>${a.staff_name || '-'}</td>
-                    <td>${a.request_type === 'self_requested' ? '<span class="badge-self">Self</span>' : '<span class="text-xs text-gray-400">Assigned</span>'}</td>
-                    <td>${a.check_date ? a.check_date.split('T')[0] : '-'}</td>
-                    <td>${a.item_count}</td>
-                    <td>${a.discrepancy_count > 0 ? '<span class="diff-negative">' + a.discrepancy_count + '</span>' : '<span class="diff-zero">0</span>'}</td>
-                    <td class="text-xs text-gray-500">${a.submitted_at ? new Date(a.submitted_at).toLocaleString() : '-'}</td>
-                    <td><button onclick="openReview(${a.id})" class="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-medium hover:bg-indigo-100">Review</button></td>
-                </tr>`).join('')}
+                ${res.data.map(a => {
+                    const isPartial = a.status === 'pending' && a.submitted_count > 0;
+                    const submittedLabel = `${a.submitted_count || 0}/${a.item_count}`;
+                    return `<tr>
+                        <td>${a.id}</td>
+                        <td>${a.branch_name || '-'}</td>
+                        <td class="text-xs">${a.location_name || '-'}</td>
+                        <td>${a.staff_name || '-'}</td>
+                        <td>${a.request_type === 'self_requested' ? '<span class="badge-self">Self</span>' : '<span class="text-xs text-gray-400">Assigned</span>'}</td>
+                        <td>${a.check_date ? a.check_date.split('T')[0] : '-'}</td>
+                        <td><span class="font-medium">${submittedLabel}</span></td>
+                        <td>${a.discrepancy_count > 0 ? '<span class="diff-negative">' + a.discrepancy_count + '</span>' : '<span class="diff-zero">0</span>'}</td>
+                        <td>${isPartial
+                            ? '<span class="status-badge" style="background:#fff7ed;color:#c2410c;">Partial</span>'
+                            : '<span class="status-badge status-' + a.status + '">' + a.status + '</span>'}</td>
+                        <td class="text-xs text-gray-500">${a.submitted_at ? new Date(a.submitted_at).toLocaleString() : '-'}</td>
+                        <td><button onclick="openReview(${a.id})" class="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-medium hover:bg-indigo-100">Review</button></td>
+                    </tr>`;
+                }).join('')}
             </tbody>
         </table>`;
 }
+
+// Item status badge helper
+function itemStatusBadge(status) {
+    switch (status) {
+        case 'submitted': return '<span class="status-badge status-submitted" style="font-size:0.6rem;">Submitted</span>';
+        case 'adjusted': return '<span class="status-badge status-adjusted" style="font-size:0.6rem;">Adjusted</span>';
+        case 'checked': return '<span class="status-badge" style="background:#fefce8;color:#854d0e;font-size:0.6rem;">Checked</span>';
+        case 'pending': return '<span class="status-badge status-pending" style="font-size:0.6rem;">Pending</span>';
+        default: return '<span class="text-xs text-gray-300">-</span>';
+    }
+}
+
+let reviewFilterMode = 'submitted'; // 'submitted' or 'all'
 
 async function openReview(id) {
     document.getElementById('reviewOverlay').classList.add('show');
@@ -918,6 +939,7 @@ async function openReview(id) {
 
     const d = res.data;
     const s = d.summary;
+    reviewFilterMode = 'submitted';
     document.getElementById('reviewTitle').textContent = `Review #${d.id} - ${d.branch_name} (${d.check_date ? d.check_date.split('T')[0] : ''})`;
 
     let html = `
@@ -931,23 +953,34 @@ async function openReview(id) {
             ${d.requested_reason ? '<div class="mt-2 text-xs text-gray-600 bg-amber-50 rounded px-2 py-1"><strong>Reason:</strong> ' + d.requested_reason + '</div>' : ''}
         </div>
 
-        <div class="grid grid-cols-4 gap-2 mb-4">
+        <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
             <div class="stat-card"><div class="label">Total</div><div class="value text-base">${s.totalItems}</div></div>
+            <div class="stat-card"><div class="label">Submitted</div><div class="value text-base text-blue-600">${s.submittedCount}</div></div>
+            <div class="stat-card"><div class="label">Adjusted</div><div class="value text-base text-purple-600">${s.adjustedCount}</div></div>
             <div class="stat-card"><div class="label">Match</div><div class="value text-base text-green-600">${s.matchCount}</div></div>
             <div class="stat-card"><div class="label">Discrepancy</div><div class="value text-base text-red-600">${s.discrepancyCount}</div></div>
             <div class="stat-card"><div class="label">Pending</div><div class="value text-base text-amber-600">${s.pendingCount}</div></div>
         </div>
 
+        <!-- Filter toggle -->
+        <div class="flex gap-2 mb-3">
+            <button id="reviewFilterSubmitted" onclick="toggleReviewFilter('submitted', ${d.id})" class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-300">Submitted/Adjusted (${s.submittedCount + s.adjustedCount})</button>
+            <button id="reviewFilterAll" onclick="toggleReviewFilter('all', ${d.id})" class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200">All Items (${s.totalItems})</button>
+        </div>
+
         <div style="overflow-x:auto;">
         <table class="sc-table">
-            <thead><tr><th>Item</th><th>System</th><th>Reported</th><th>Diff</th><th>Var%</th><th>Photo</th><th>Notes</th></tr></thead>
-            <tbody>
+            <thead><tr><th>Item</th><th>Status</th><th>System</th><th>Reported</th><th>Diff</th><th>Var%</th><th>Photo</th><th>Notes</th></tr></thead>
+            <tbody id="reviewItemsBody">
                 ${d.items.map(item => {
                     const diff = parseFloat(item.difference);
                     const diffClass = isNaN(diff) ? '' : diff > 0 ? 'diff-positive' : diff < 0 ? 'diff-negative' : 'diff-zero';
                     const diffStr = isNaN(diff) ? '-' : (diff > 0 ? '+' : '') + diff;
-                    return `<tr>
+                    const itemSt = item.item_status || 'pending';
+                    const showDefault = itemSt === 'submitted' || itemSt === 'adjusted';
+                    return `<tr class="review-item-row" data-item-status="${itemSt}" style="${showDefault ? '' : 'display:none'}">
                         <td><div class="font-medium">${item.item_name}</div><div class="text-xs text-gray-400">${item.item_sku || ''}</div></td>
+                        <td>${itemStatusBadge(itemSt)}</td>
                         <td>${item.system_qty}</td>
                         <td>${item.reported_qty !== null ? item.reported_qty : '<span class="text-gray-300">-</span>'}</td>
                         <td class="${diffClass}">${diffStr}</td>
@@ -961,16 +994,57 @@ async function openReview(id) {
         </div>
     `;
 
-    if (d.status === 'submitted') {
+    // Action buttons — show if there are submitted (not yet adjusted) items
+    if (s.submittedCount > 0) {
+        html += `
+            <div class="flex gap-2 mt-4 pt-3 border-t border-gray-200" id="reviewActions-${d.id}">
+                ${s.pushableCount > 0
+                    ? `<button onclick="pushAdjustment(${d.id})" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition">Push ${s.pushableCount} Discrepancies to Zoho</button>`
+                    : ''}
+                <button onclick="markReviewed(${d.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition">${s.pushableCount > 0 ? 'Push All (incl. zero-diff)' : 'Mark as Adjusted (No Discrepancies)'}</button>
+            </div>
+        `;
+    } else if (d.status === 'submitted') {
+        // Fully submitted but no items with submitted status (legacy data or all adjusted)
         html += `
             <div class="flex gap-2 mt-4 pt-3 border-t border-gray-200">
-                <button onclick="markReviewed(${d.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition">Mark Reviewed (No Adjust)</button>
+                <button onclick="markReviewed(${d.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition">Mark Reviewed</button>
                 ${s.discrepancyCount > 0 ? `<button onclick="pushAdjustment(${d.id})" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition">Push Adjustment to Zoho (${s.discrepancyCount} items)</button>` : ''}
+            </div>
+        `;
+    } else if (s.submittedCount === 0 && s.adjustedCount > 0 && s.pendingCount > 0) {
+        html += `
+            <div class="mt-4 pt-3 border-t border-gray-200 text-center">
+                <p class="text-xs text-amber-600 font-medium">Waiting for staff to submit more items (${s.pendingCount} remaining)</p>
             </div>
         `;
     }
 
     document.getElementById('reviewContent').innerHTML = html;
+}
+
+function toggleReviewFilter(mode) {
+    reviewFilterMode = mode;
+    const rows = document.querySelectorAll('.review-item-row');
+    rows.forEach(row => {
+        const st = row.getAttribute('data-item-status');
+        if (mode === 'all') {
+            row.style.display = '';
+        } else {
+            row.style.display = (st === 'submitted' || st === 'adjusted') ? '' : 'none';
+        }
+    });
+
+    // Update button styles
+    const subBtn = document.getElementById('reviewFilterSubmitted');
+    const allBtn = document.getElementById('reviewFilterAll');
+    if (mode === 'submitted') {
+        subBtn.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-300';
+        allBtn.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200';
+    } else {
+        allBtn.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-300';
+        subBtn.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200';
+    }
 }
 
 function closeReview() {
@@ -984,17 +1058,36 @@ function showPhoto(url) {
 }
 
 async function markReviewed(id) {
-    // Use adjust endpoint — it handles the "no discrepancy" case gracefully
+    // Use adjust endpoint — it handles both discrepancies and no-discrepancy cases
     const res = await apiPost(API + '/adjust/' + id, {});
     showToast(res.message || 'Reviewed', res.success ? 'success' : 'error');
-    if (res.success) { closeReview(); loadReviewList(); }
+    if (res.success) {
+        if (res.data && res.data.all_done) {
+            closeReview();
+            loadReviewList();
+        } else {
+            // Partial — refresh panel
+            openReview(id);
+            loadReviewList();
+        }
+    }
 }
 
 async function pushAdjustment(id) {
-    if (!confirm('Push inventory adjustment to Zoho Books? This will modify stock levels.')) return;
+    if (!confirm('Push submitted item discrepancies to Zoho Books? This will modify stock levels.')) return;
     const res = await apiPost(API + '/adjust/' + id, {});
     showToast(res.message || 'Adjustment created', res.success ? 'success' : 'error');
-    if (res.success) { closeReview(); loadReviewList(); }
+    if (res.success) {
+        if (res.data && res.data.all_done) {
+            // All items adjusted — close and refresh
+            closeReview();
+            loadReviewList();
+        } else {
+            // Partial push — refresh the review panel to show updated statuses
+            openReview(id);
+            loadReviewList();
+        }
+    }
 }
 
 // ========================================

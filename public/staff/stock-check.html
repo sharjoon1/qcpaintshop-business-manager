@@ -335,6 +335,61 @@
             font-weight: 700;
             font-size: 0.75rem;
         }
+
+        /* Submitted item styling (locked, blue) */
+        .item-card.item-submitted {
+            border-color: #93c5fd;
+            background: #eff6ff;
+            opacity: 0.85;
+        }
+        .item-card.item-submitted .qty-input,
+        .item-card.item-submitted .notes-input {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        /* Adjusted item styling (locked, purple/green) */
+        .item-card.item-adjusted {
+            border-color: #c4b5fd;
+            background: #f5f3ff;
+            opacity: 0.8;
+        }
+        .item-card.item-adjusted .qty-input,
+        .item-card.item-adjusted .notes-input {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        /* Item status badges */
+        .item-status-badge {
+            display: inline-block;
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .item-badge-submitted { background: #dbeafe; color: #1e40af; }
+        .item-badge-adjusted { background: #ede9fe; color: #5b21b6; }
+
+        /* Submit checked items button */
+        .submit-batch-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            color: white;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            margin-top: 8px;
+        }
+        .submit-batch-btn:active { transform: scale(0.97); }
+        .submit-batch-btn:disabled { opacity: 0.6; cursor: not-allowed; }
     </style>
 </head>
 <body data-page="stock-check">
@@ -563,7 +618,10 @@ function renderAssignment(a) {
     const total = a.items ? a.items.length : 0;
     const checked = prog ? prog.checked : 0;
     const remaining = total - checked;
-    const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+    const submittedProg = prog ? (prog.submitted_count || 0) : 0;
+    const adjustedProg = prog ? (prog.adjusted_count || 0) : 0;
+    const processedCount = submittedProg + adjustedProg;
+    const pct = total > 0 ? Math.round((processedCount / total) * 100) : 0;
     const discrepancies = prog ? (prog.discrepancies || 0) : 0;
 
     let html = `
@@ -582,8 +640,8 @@ function renderAssignment(a) {
                     <div class="progress-fill" id="progress-fill-${a.id}" style="width: ${pct}%"></div>
                 </div>
                 <div class="progress-text">
-                    <span id="progress-count-${a.id}">${checked.toLocaleString()}/${total.toLocaleString()}</span>
-                    <span id="progress-detail-${a.id}">${pct}% Complete &middot; ${remaining.toLocaleString()} Remaining</span>
+                    <span id="progress-count-${a.id}">${processedCount.toLocaleString()}/${total.toLocaleString()}</span>
+                    <span id="progress-detail-${a.id}">${submittedProg ? submittedProg + ' submitted' : ''}${adjustedProg ? (submittedProg ? ' · ' : '') + adjustedProg + ' adjusted' : ''}${(submittedProg || adjustedProg) ? ' · ' : ''}${remaining.toLocaleString()} remaining</span>
                 </div>
             </div>`;
 
@@ -600,11 +658,15 @@ function renderAssignment(a) {
     }
 
     // Filter tabs
+    const submittedCnt = prog ? (prog.submitted_count || 0) : 0;
+    const adjustedCnt = prog ? (prog.adjusted_count || 0) : 0;
+    const lockedCnt = submittedCnt + adjustedCnt;
     html += `
         <div class="filter-tabs" id="filter-tabs-${a.id}">
             <button class="filter-tab active" data-filter="all" onclick="filterItems(${a.id}, 'all', this)">All (${total})</button>
             <button class="filter-tab" data-filter="unchecked" onclick="filterItems(${a.id}, 'unchecked', this)">Unchecked (<span id="filter-unchecked-${a.id}">${remaining}</span>)</button>
             <button class="filter-tab" data-filter="checked" onclick="filterItems(${a.id}, 'checked', this)">Checked (<span id="filter-checked-${a.id}">${checked}</span>)</button>
+            <button class="filter-tab" data-filter="locked" onclick="filterItems(${a.id}, 'locked', this)">Submitted (<span id="filter-locked-${a.id}">${lockedCnt}</span>)</button>
             <button class="filter-tab" data-filter="diff" onclick="filterItems(${a.id}, 'diff', this)">Diff (<span id="filter-diff-${a.id}">${discrepancies}</span>)</button>
         </div>`;
 
@@ -652,8 +714,8 @@ function renderAssignment(a) {
                 <button class="save-progress-btn" id="saveBtn-${a.id}" onclick="saveProgress(${a.id})" disabled>
                     Save Progress
                 </button>
-                <button class="submit-btn" id="submitBtn-${a.id}" onclick="submitCheck(${a.id})" style="display:none">
-                    Submit Final Check
+                <button class="submit-batch-btn" id="submitBtn-${a.id}" onclick="submitCheck(${a.id})" style="display:none">
+                    Submit Checked Items
                 </button>
             </div>`;
     }
@@ -670,9 +732,11 @@ function onQtyInput(el, assignmentId, zohoItemId) {
             if (!dirtyItems[assignmentId]) dirtyItems[assignmentId] = new Set();
             dirtyItems[assignmentId].add(zohoItemId);
             updateSaveButton(assignmentId);
+            updateSubmitButton(assignmentId);
         }
     } else {
         el.classList.remove('has-value');
+        if (assignmentId) updateSubmitButton(assignmentId);
     }
 }
 
@@ -772,6 +836,7 @@ async function saveProgress(assignmentId) {
             dirtyItems[assignmentId] = new Set();
             updateProgressUI(assignmentId, data.data);
             updateSaveButton(assignmentId);
+            updateSubmitButton(assignmentId);
             updateFilterCounts(assignmentId);
         } else {
             showToast(data.message || 'Failed to save', 'error');
@@ -785,23 +850,24 @@ async function saveProgress(assignmentId) {
 }
 
 // ========================================
-// SUBMIT FINAL CHECK
+// SUBMIT CHECKED ITEMS (PARTIAL BATCH)
 // ========================================
 async function submitCheck(assignmentId) {
     const a = assignments.find(x => x.id === assignmentId);
     if (!a || !a.items) return;
 
-    // Check all items have quantities
-    const unchecked = [];
+    // Collect items that have qty entered AND are not yet submitted/adjusted
     const itemsData = [];
     for (const item of a.items) {
+        const card = document.getElementById(`item-${assignmentId}-${item.zoho_item_id}`);
+        const itemStatus = card ? card.getAttribute('data-status') : 'unchecked';
+        // Skip already submitted/adjusted items
+        if (itemStatus === 'submitted' || itemStatus === 'adjusted') continue;
+
         const qtyInput = document.getElementById(`qty-${assignmentId}-${item.zoho_item_id}`);
         const notesInput = document.getElementById(`notes-${assignmentId}-${item.zoho_item_id}`);
 
-        if (!qtyInput || qtyInput.value === '') {
-            unchecked.push(item.item_name);
-            continue;
-        }
+        if (!qtyInput || qtyInput.value === '') continue;
 
         itemsData.push({
             zoho_item_id: item.zoho_item_id,
@@ -810,15 +876,25 @@ async function submitCheck(assignmentId) {
         });
     }
 
-    if (unchecked.length > 0) {
-        showToast(`${unchecked.length} items still unchecked`, 'warning');
+    if (!itemsData.length) {
+        showToast('No checked items to submit', 'warning');
         return;
     }
 
-    // Confirmation
-    if (!confirm(`Submit final stock check?\n\n${itemsData.length} items will be submitted for review.\nThis cannot be undone.`)) {
-        return;
-    }
+    // Count remaining unchecked items
+    const totalItems = a.items.length;
+    const lockedItems = a.items.filter(item => {
+        const card = document.getElementById(`item-${assignmentId}-${item.zoho_item_id}`);
+        const st = card ? card.getAttribute('data-status') : '';
+        return st === 'submitted' || st === 'adjusted';
+    }).length;
+    const remainingAfter = totalItems - lockedItems - itemsData.length;
+
+    const confirmMsg = remainingAfter > 0
+        ? `Submit ${itemsData.length} items to admin for review?\n\nYou can continue checking the remaining ${remainingAfter} items afterwards.`
+        : `Submit all ${itemsData.length} remaining items for review?\n\nThis completes the stock check.`;
+
+    if (!confirm(confirmMsg)) return;
 
     const btn = document.getElementById(`submitBtn-${assignmentId}`);
     btn.disabled = true;
@@ -827,10 +903,11 @@ async function submitCheck(assignmentId) {
     const formData = new FormData();
     formData.append('items', JSON.stringify(itemsData));
 
-    for (const item of a.items) {
-        const key = `${assignmentId}-${item.zoho_item_id}`;
+    // Include photos for items being submitted
+    for (const itemData of itemsData) {
+        const key = `${assignmentId}-${itemData.zoho_item_id}`;
         if (photoFiles[key]) {
-            formData.append(`photo_${item.zoho_item_id}`, photoFiles[key]);
+            formData.append(`photo_${itemData.zoho_item_id}`, photoFiles[key]);
         }
     }
 
@@ -843,32 +920,62 @@ async function submitCheck(assignmentId) {
         const data = await res.json();
 
         if (data.success) {
-            showToast('Stock check submitted!');
-            const card = document.getElementById(`assignment-${assignmentId}`);
-            if (card) {
-                card.innerHTML = `
-                    <div class="assignment-header">
-                        <div>
-                            <div class="assignment-title">${a.branch_name || 'Stock Check'}</div>
-                            <div class="assignment-meta">${a.items.length} items</div>
-                        </div>
-                        <span class="status-badge status-submitted">Submitted</span>
-                    </div>
-                    <div class="submitted-banner">
-                        <div class="icon">&#10004;</div>
-                        <div class="title">Submitted Successfully</div>
-                        <div class="time">${new Date().toLocaleString()}</div>
-                    </div>`;
+            showToast(data.message || 'Items submitted!');
+
+            // Lock submitted items visually
+            for (const itemData of itemsData) {
+                lockItem(assignmentId, itemData.zoho_item_id, 'submitted');
             }
+
+            // Clear dirty tracking for submitted items
+            if (dirtyItems[assignmentId]) {
+                for (const itemData of itemsData) {
+                    dirtyItems[assignmentId].delete(itemData.zoho_item_id);
+                }
+            }
+
+            // Refresh progress from server
+            try {
+                const progRes = await fetch(API + '/progress/' + assignmentId, { headers: headers() });
+                const progData = await progRes.json();
+                if (progData.success) {
+                    progressData[assignmentId] = progData.data;
+                    updateProgressUI(assignmentId, progData.data);
+                    updateFilterCounts(assignmentId);
+                    updateSubmitButton(assignmentId);
+                }
+            } catch (e) { /* ignore */ }
+
+            // If all items done, show completion
+            if (data.data && data.data.remaining === 0) {
+                const card = document.getElementById(`assignment-${assignmentId}`);
+                if (card) {
+                    card.innerHTML = `
+                        <div class="assignment-header">
+                            <div>
+                                <div class="assignment-title">${a.branch_name || 'Stock Check'}</div>
+                                <div class="assignment-meta">${a.items.length} items</div>
+                            </div>
+                            <span class="status-badge status-submitted">Submitted</span>
+                        </div>
+                        <div class="submitted-banner">
+                            <div class="icon">&#10004;</div>
+                            <div class="title">All Items Submitted</div>
+                            <div class="time">${new Date().toLocaleString()}</div>
+                        </div>`;
+                }
+            }
+
+            updateSaveButton(assignmentId);
         } else {
             showToast(data.message || 'Failed to submit', 'error');
             btn.disabled = false;
-            btn.textContent = 'Submit Final Check';
+            updateSubmitButton(assignmentId);
         }
     } catch (err) {
         showToast('Network error', 'error');
         btn.disabled = false;
-        btn.textContent = 'Submit Final Check';
+        updateSubmitButton(assignmentId);
     }
 }
 
@@ -876,7 +983,7 @@ async function submitCheck(assignmentId) {
 // PROGRESS HELPERS
 // ========================================
 
-/** Apply saved progress to items (pre-fill values, mark as checked) */
+/** Apply saved progress to items (pre-fill values, mark as checked, lock submitted/adjusted) */
 function applyProgress(assignmentId, prog) {
     if (!prog || !prog.checked_items || !prog.checked_items.length) return;
 
@@ -885,10 +992,20 @@ function applyProgress(assignmentId, prog) {
     if (banner) {
         banner.style.display = '';
         const txt = document.getElementById(`resume-text-${assignmentId}`);
-        if (txt) txt.textContent = `Resuming from ${prog.progress_pct}% complete (${prog.checked} of ${prog.total} items)`;
+        const submitted = prog.submitted_count || 0;
+        const adjusted = prog.adjusted_count || 0;
+        if (submitted || adjusted) {
+            let parts = [];
+            if (submitted) parts.push(`${submitted} submitted`);
+            if (adjusted) parts.push(`${adjusted} adjusted`);
+            parts.push(`${prog.remaining} remaining`);
+            if (txt) txt.textContent = `Resuming: ${parts.join(', ')} of ${prog.total} items`;
+        } else {
+            if (txt) txt.textContent = `Resuming from ${prog.progress_pct}% complete (${prog.checked} of ${prog.total} items)`;
+        }
     }
 
-    // Pre-fill checked items
+    // Pre-fill checked items and lock submitted/adjusted
     for (const ci of prog.checked_items) {
         const qtyInput = document.getElementById(`qty-${assignmentId}-${ci.zoho_item_id}`);
         if (qtyInput) {
@@ -905,11 +1022,17 @@ function applyProgress(assignmentId, prog) {
             if (preview) { preview.src = ci.photo_url; preview.style.display = 'block'; }
             if (btn) { btn.classList.add('has-photo'); btn.querySelector('span:last-child').textContent = 'Change Photo'; }
         }
-        markItemChecked(assignmentId, ci.zoho_item_id);
+
+        // Lock submitted/adjusted items, otherwise mark as checked
+        if (ci.item_status === 'submitted' || ci.item_status === 'adjusted') {
+            lockItem(assignmentId, ci.zoho_item_id, ci.item_status);
+        } else {
+            markItemChecked(assignmentId, ci.zoho_item_id);
+        }
     }
 
-    // Default to unchecked filter if there's progress
-    if (prog.checked > 0 && prog.remaining > 0) {
+    // Default to unchecked filter if there are remaining items
+    if (prog.remaining > 0) {
         filterItems(assignmentId, 'unchecked');
     }
 
@@ -921,12 +1044,72 @@ function applyProgress(assignmentId, prog) {
 /** Mark a single item as checked visually */
 function markItemChecked(assignmentId, zohoItemId) {
     const card = document.getElementById(`item-${assignmentId}-${zohoItemId}`);
-    if (card) {
-        card.classList.add('checked');
-        card.setAttribute('data-status', 'checked');
-    }
+    if (!card) return;
+    const currentStatus = card.getAttribute('data-status');
+    // Don't downgrade submitted/adjusted to checked
+    if (currentStatus === 'submitted' || currentStatus === 'adjusted') return;
+    card.classList.add('checked');
+    card.setAttribute('data-status', 'checked');
     const ind = document.getElementById(`check-ind-${assignmentId}-${zohoItemId}`);
     if (ind) ind.style.display = '';
+}
+
+/** Lock an item as submitted or adjusted (disable inputs, add badge) */
+function lockItem(assignmentId, zohoItemId, status) {
+    const card = document.getElementById(`item-${assignmentId}-${zohoItemId}`);
+    if (!card) return;
+
+    card.classList.remove('checked', 'item-submitted', 'item-adjusted');
+    card.classList.add(status === 'adjusted' ? 'item-adjusted' : 'item-submitted');
+    card.setAttribute('data-status', status);
+
+    // Disable inputs
+    const qtyInput = document.getElementById(`qty-${assignmentId}-${zohoItemId}`);
+    const notesInput = document.getElementById(`notes-${assignmentId}-${zohoItemId}`);
+    const fileInput = document.getElementById(`file-${assignmentId}-${zohoItemId}`);
+    const photoBtn = document.getElementById(`photobtn-${assignmentId}-${zohoItemId}`);
+
+    if (qtyInput) { qtyInput.disabled = true; qtyInput.style.opacity = '0.7'; }
+    if (notesInput) { notesInput.disabled = true; notesInput.style.opacity = '0.7'; }
+    if (fileInput) fileInput.disabled = true;
+    if (photoBtn) { photoBtn.style.opacity = '0.5'; photoBtn.style.pointerEvents = 'none'; }
+
+    // Add status badge next to check indicator
+    const ind = document.getElementById(`check-ind-${assignmentId}-${zohoItemId}`);
+    if (ind) {
+        ind.style.display = '';
+        const badgeClass = status === 'adjusted' ? 'item-badge-adjusted' : 'item-badge-submitted';
+        const label = status === 'adjusted' ? 'Adjusted' : 'Submitted';
+        ind.innerHTML = `<span class="item-status-badge ${badgeClass}">${label}</span>`;
+    }
+}
+
+/** Update submit button visibility and text based on submittable item count */
+function updateSubmitButton(assignmentId) {
+    const a = assignments.find(x => x.id === assignmentId);
+    if (!a || !a.items) return;
+
+    const btn = document.getElementById(`submitBtn-${assignmentId}`);
+    if (!btn) return;
+
+    // Count items with qty that are NOT submitted/adjusted
+    let submittableCount = 0;
+    for (const item of a.items) {
+        const card = document.getElementById(`item-${assignmentId}-${item.zoho_item_id}`);
+        const itemStatus = card ? card.getAttribute('data-status') : 'unchecked';
+        if (itemStatus === 'submitted' || itemStatus === 'adjusted') continue;
+
+        const qtyInput = document.getElementById(`qty-${assignmentId}-${item.zoho_item_id}`);
+        if (qtyInput && qtyInput.value !== '') submittableCount++;
+    }
+
+    if (submittableCount > 0) {
+        btn.style.display = '';
+        btn.disabled = false;
+        btn.textContent = `Submit ${submittableCount} Checked Item${submittableCount > 1 ? 's' : ''}`;
+    } else {
+        btn.style.display = 'none';
+    }
 }
 
 /** Update progress bar, text, and button visibility */
@@ -935,15 +1118,22 @@ function updateProgressUI(assignmentId, data) {
     const count = document.getElementById(`progress-count-${assignmentId}`);
     const detail = document.getElementById(`progress-detail-${assignmentId}`);
 
-    if (fill) fill.style.width = data.progress_pct + '%';
-    if (count) count.textContent = `${data.checked.toLocaleString()}/${data.total.toLocaleString()}`;
-    if (detail) detail.textContent = `${data.progress_pct}% Complete \u00b7 ${data.remaining.toLocaleString()} Remaining`;
+    const submitted = data.submitted_count || 0;
+    const adjusted = data.adjusted_count || 0;
+    const processed = submitted + adjusted;
+    const pct = data.total > 0 ? Math.round((processed / data.total) * 100) : 0;
 
-    // Show/hide submit button based on completeness
-    const submitBtn = document.getElementById(`submitBtn-${assignmentId}`);
-    if (submitBtn) {
-        submitBtn.style.display = data.remaining === 0 ? '' : 'none';
-    }
+    if (fill) fill.style.width = pct + '%';
+    if (count) count.textContent = `${processed.toLocaleString()}/${data.total.toLocaleString()}`;
+
+    let detailParts = [];
+    if (submitted) detailParts.push(`${submitted} submitted`);
+    if (adjusted) detailParts.push(`${adjusted} adjusted`);
+    detailParts.push(`${data.remaining.toLocaleString()} remaining`);
+    if (detail) detail.textContent = detailParts.join(' \u00b7 ');
+
+    // Update submit button based on submittable items
+    updateSubmitButton(assignmentId);
 }
 
 /** Update save button text with dirty count */
@@ -968,12 +1158,14 @@ function updateFilterCounts(assignmentId) {
     const a = assignments.find(x => x.id === assignmentId);
     if (!a || !a.items) return;
 
-    let checked = 0, unchecked = 0, diff = 0;
+    let checked = 0, unchecked = 0, diff = 0, locked = 0;
     for (const item of a.items) {
         const card = document.getElementById(`item-${assignmentId}-${item.zoho_item_id}`);
         if (!card) continue;
         const status = card.getAttribute('data-status');
-        if (status === 'checked') {
+        if (status === 'submitted' || status === 'adjusted') {
+            locked++;
+        } else if (status === 'checked') {
             checked++;
             const qtyInput = document.getElementById(`qty-${assignmentId}-${item.zoho_item_id}`);
             if (qtyInput && item.system_qty !== undefined) {
@@ -988,9 +1180,11 @@ function updateFilterCounts(assignmentId) {
 
     const uncheckedEl = document.getElementById(`filter-unchecked-${assignmentId}`);
     const checkedEl = document.getElementById(`filter-checked-${assignmentId}`);
+    const lockedEl = document.getElementById(`filter-locked-${assignmentId}`);
     const diffEl = document.getElementById(`filter-diff-${assignmentId}`);
     if (uncheckedEl) uncheckedEl.textContent = unchecked;
     if (checkedEl) checkedEl.textContent = checked;
+    if (lockedEl) lockedEl.textContent = locked;
     if (diffEl) diffEl.textContent = diff;
 }
 
@@ -1027,6 +1221,7 @@ function filterItems(assignmentId, filter, clickedBtn) {
             case 'all': show = true; break;
             case 'unchecked': show = status === 'unchecked'; break;
             case 'checked': show = status === 'checked'; break;
+            case 'locked': show = status === 'submitted' || status === 'adjusted'; break;
             case 'diff':
                 if (status === 'checked') {
                     const zohoId = card.getAttribute('data-zoho-id');

@@ -742,16 +742,22 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - **Unified "Your Work" widget** (`staff/dashboard.html`): Combined stock check assignments + ad-hoc tasks in a single priority-sorted section
   - See "Staff Dashboard → Your Work" section below for full details
 
-**Partial Submission / Save Progress** (Feb 24):
+**Partial Submission / Batch Submit** (Feb 24):
 - Staff can save partial progress on large stock checks (300-1,100+ items)
-- Animated progress bar at top of each assignment: `████████░░░░ 245/1,109 — 22% Complete · 864 Remaining`
-- **Filter tabs**: All | Unchecked | Checked | Diff — toggle visibility of items by status
+- **Batch submission**: Staff checks some items → submits batch → admin reviews & pushes to Zoho → staff continues → repeat
+- `item_status` column on `stock_check_items`: `pending` → `checked` (saved) → `submitted` (sent to admin) → `adjusted` (pushed to Zoho)
+- **Submit Checked Items button**: purple gradient, shows count: "Submit 50 Checked Items" — visible when there are checked-but-unsubmitted items
+- **Locked items**: Submitted items get blue badge + disabled inputs; Adjusted items get purple badge + disabled inputs
+- Progress bar fills based on (submitted + adjusted) / total: `50 submitted · 20 adjusted · 730 remaining`
+- **Filter tabs**: All | Unchecked | Checked | Submitted | Diff — toggle visibility by item status
 - **Save Progress button**: green gradient, shows count of unsaved items: "Save Progress (12 new)"
-- **Resume flow**: On reload, fetches saved progress via `GET /progress/:id`, pre-fills values, shows resume banner
-- **Submit Final**: only shown when ALL items are checked, requires confirmation dialog
+- **Resume flow**: On reload, fetches saved progress via `GET /progress/:id`, pre-fills values, locks submitted/adjusted items, shows resume banner
 - Dirty item tracking via `dirtyItems` Set per assignment — only unsaved items sent to server
 - Items visually marked as checked (green tint + checkmark) after save
 - Default filter switches to "Unchecked" when resuming with partial progress
+- **Admin review**: Review tab shows partial submissions with "Partial (50/1000)" badge, filter toggle (Submitted/Adjusted vs All Items), item_status badges per row
+- **Admin push**: "Push X Discrepancies to Zoho" only processes `item_status='submitted'` items; after push items become `adjusted`; multiple Zoho adjustment IDs stored comma-separated
+- Assignment auto-transitions to `status='adjusted'` only when ALL items are adjusted
 
 **Staff Self-Request** (Feb 21):
 - Staff can initiate stock checks themselves via "New Request" tab
@@ -795,24 +801,24 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 **API Endpoints** (`routes/stock-check.js`, 17 endpoints):
 - `GET /locations/:branchId` — Zoho locations for a branch (admin)
 - `POST /assign` — Create assignment with selected location + role validation (admin)
-- `GET /assignments` — List with filters (admin)
+- `GET /assignments` — List with filters (admin); `?include_partial=1` also includes pending assignments with submitted items
 - `GET /assignments/:id` — Detail (staff sees own, admin sees any)
 - `DELETE /assignments/:id` — Delete pending (admin)
 - `GET /my-assignments` — Staff's assignments by date (default today); `?pending=1` returns all pending/submitted; sorted DESC
 - `GET /my-submissions` — Staff's past submitted/reviewed/adjusted assignments with pagination
-- `POST /save-progress/:id` — Save partial progress (updates items without changing assignment status)
-- `GET /progress/:id` — Get progress stats + list of checked items for resume
-- `POST /submit/:id` — Staff submits counts + photos (multipart)
-- `POST /self-request` — Staff self-initiates stock check (creates assignment + items, `request_type='self_requested'`)
-- `GET /review/:id` — Admin review with comparison + location name
-- `POST /adjust/:id` — Push to Zoho as inventory adjustment (uses per-assignment location)
+- `POST /save-progress/:id` — Save partial progress (sets `item_status='checked'`, skips submitted/adjusted items)
+- `GET /progress/:id` — Get progress stats + list of checked items with `item_status` for resume
+- `POST /submit/:id` — Staff submits checked items as batch (sets `item_status='submitted'`; skips already submitted/adjusted; keeps assignment pending if items remain)
+- `POST /self-request` — Staff self-initiates stock check (creates assignment + items with `item_status='submitted'`, `request_type='self_requested'`)
+- `GET /review/:id` — Admin review with comparison + location name + `submittedCount`, `adjustedCount`, `pushableCount` in summary
+- `POST /adjust/:id` — Push submitted items to Zoho (only `item_status='submitted'` with discrepancies; marks all submitted→adjusted; auto-completes assignment when all items adjusted; stores comma-separated adjustment IDs for multiple pushes)
 - `GET /dashboard` — Summary stats per branch
 - `GET /products/suggest` — Items not checked in 30+ days (accepts `zoho_location_id`)
 - `GET /products/search` — Search products from `zoho_location_stock` with `MAX(submitted_at)` as `last_checked`
 - `GET /products/inventory` — All items for a branch location with price (`zoho_items_map.zoho_rate`) and last_checked (client-side filter/sort/paginate)
 
-**Database Tables**: `stock_check_assignments` (includes `zoho_location_id`, `request_type`, `requested_reason` per assignment), `stock_check_items`
-**Migration**: `migrations/migrate-stock-check.js`, `migrations/migrate-stock-check-enhancements.js` (adds `request_type ENUM('admin_assigned','self_requested')` + `requested_reason TEXT`)
+**Database Tables**: `stock_check_assignments` (includes `zoho_location_id`, `request_type`, `requested_reason` per assignment), `stock_check_items` (includes `item_status ENUM('pending','checked','submitted','adjusted')`)
+**Migration**: `migrations/migrate-stock-check.js`, `migrations/migrate-stock-check-enhancements.js` (adds `request_type`, `requested_reason`), `migrations/migrate-stock-check-partial.js` (adds `item_status` column + index + backfill)
 **Permission**: `zoho.stock_check`
 **Notifications**: `stock_check_assigned` (to staff), `stock_check_submitted` (to admins)
 **Photos**: `uploads/stock-check/` (sharp compressed)
@@ -2058,10 +2064,34 @@ Based on AI App Analyzer report, fixed critical production errors:
 - **Migration**: `migrate-general-wa-integration.js` drops FK constraints on `wa_campaigns` and `wa_campaign_leads`
 
 ### Feb 24, 2026 — Stock Check Partial Submission UI
-- **Added**: `POST /save-progress/:id` — saves partial progress (updates items without changing assignment status), returns `{saved, total, checked, remaining, progress_pct}`
-- **Added**: `GET /progress/:id` — returns progress stats + list of already-checked items for resume
-- **Enhanced**: `staff/stock-check.html` — animated progress bar, filter tabs (All/Unchecked/Checked/Diff), "Save Progress (N new)" button, resume banner, dirty item tracking, "Submit Final" only when 100% checked
+- **Added**: `POST /save-progress/:id` — saves partial progress (sets `item_status='checked'`), returns `{saved, total, checked, remaining, progress_pct}`
+- **Added**: `GET /progress/:id` — returns progress stats + list of already-checked items with `item_status` for resume
+- **Enhanced**: `staff/stock-check.html` — animated progress bar, filter tabs (All/Unchecked/Checked/Diff), "Save Progress (N new)" button, resume banner, dirty item tracking
 - **Total stock-check endpoints**: 15 → 17
+
+### Feb 24, 2026 — Stock Check Batch (Partial) Submission
+- **Major feature**: Staff can submit checked items in batches — admin reviews & pushes each batch to Zoho while staff continues checking remaining items
+- **Flow**: check some → submit batch → admin pushes → check more → submit → push → repeat until done
+- **Migration**: `migrate-stock-check-partial.js` — adds `item_status ENUM('pending','checked','submitted','adjusted')` to `stock_check_items` + index + backfill
+- **Backend changes** (`routes/stock-check.js`):
+  - `save-progress`: sets `item_status='checked'`, skips submitted/adjusted items
+  - `submit`: partial batch support — only submits items with `item_status IN ('pending','checked')`, keeps assignment pending if items remain
+  - `adjust`: only pushes `item_status='submitted'` items to Zoho, marks all submitted→adjusted, stores comma-separated adjustment IDs for multiple pushes, auto-completes assignment when all items adjusted
+  - `assignments`: `?include_partial=1` includes pending assignments with submitted items in review list; adds `submitted_count` subquery
+  - `review`: summary includes `submittedCount`, `adjustedCount`, `pushableCount`
+  - `progress`: returns `submitted_count`, `adjusted_count`, and `item_status` per item
+  - `self-request`: sets `item_status='submitted'` on created items
+- **Staff UI** (`staff/stock-check.html`):
+  - "Submit X Checked Items" button (replaces "Submit Final Check") — visible when checked-but-unsubmitted items exist
+  - Submitted items: blue badge + disabled inputs; Adjusted items: purple badge + disabled inputs
+  - Progress bar: fills based on (submitted + adjusted) / total
+  - Filter tabs: All | Unchecked | Checked | Submitted | Diff
+  - Resume: locks submitted/adjusted items on reload
+- **Admin UI** (`admin-stock-check.html`):
+  - Review tab: shows partial submissions with "Partial" badge, submitted/total column
+  - Review panel: 6 stat cards (Total/Submitted/Adjusted/Match/Discrepancy/Pending), filter toggle (Submitted/Adjusted vs All Items), item_status badge per row
+  - Push button: "Push X Discrepancies to Zoho" (only submitted items); refreshes panel after push instead of closing
+  - Waiting state: shows "Waiting for staff to submit more items" when no submitted items left
 
 ### Feb 23, 2026 — Zoho Product Import & Painter Rates Fix
 - **Fixed**: Painter Rates "Sync from Zoho" was querying non-existent `zoho_items_cache` table — changed to `zoho_items_map`

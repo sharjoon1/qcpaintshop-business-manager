@@ -145,6 +145,12 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
 
         const offset = (parseInt(page) - 1) * parseInt(limit);
 
+        // If status=submitted and include_partial=1, also show pending assignments with submitted items
+        const includePartial = req.query.include_partial === '1';
+        if (includePartial && status === 'submitted') {
+            where = where.replace(' AND a.status = ?', ' AND (a.status = ? OR (a.status = \'pending\' AND EXISTS (SELECT 1 FROM stock_check_items sci WHERE sci.assignment_id = a.id AND sci.item_status = \'submitted\')))');
+        }
+
         const [countResult] = await pool.query(
             `SELECT COUNT(*) as total FROM stock_check_assignments a ${where}`, params
         );
@@ -156,7 +162,8 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
                     reviewer.full_name as reviewed_by_name,
                     zlm.zoho_location_name as location_name,
                     (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count,
-                    (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id AND difference != 0 AND difference IS NOT NULL) as discrepancy_count
+                    (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id AND difference != 0 AND difference IS NOT NULL) as discrepancy_count,
+                    (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id AND item_status IN ('submitted', 'adjusted')) as submitted_count
              FROM stock_check_assignments a
              LEFT JOIN branches b ON a.branch_id = b.id
              LEFT JOIN users u ON a.staff_id = u.id
@@ -388,7 +395,7 @@ router.post('/save-progress/:id', requireAuth, upload.any(), async (req, res) =>
 
             // Get system qty for difference calc
             const [existing] = await pool.query(
-                'SELECT id, system_qty FROM stock_check_items WHERE assignment_id = ? AND zoho_item_id = ?',
+                'SELECT id, system_qty, item_status FROM stock_check_items WHERE assignment_id = ? AND zoho_item_id = ?',
                 [assignmentId, item.zoho_item_id]
             );
             if (!existing.length) continue;
@@ -410,10 +417,16 @@ router.post('/save-progress/:id', requireAuth, upload.any(), async (req, res) =>
                 photoUrl = `/uploads/stock-check/${filename}`;
             }
 
+            // Only update items that haven't been submitted/adjusted yet
+            const currentStatus = existing[0].item_status || 'pending';
+            if (currentStatus === 'submitted' || currentStatus === 'adjusted') {
+                continue; // Skip locked items
+            }
+
             await pool.query(
                 `UPDATE stock_check_items
                  SET reported_qty = ?, difference = ?, variance_pct = ?, photo_url = COALESCE(?, photo_url),
-                     notes = ?, submitted_at = ?
+                     notes = ?, submitted_at = ?, item_status = 'checked'
                  WHERE id = ?`,
                 [reportedQty, difference, Math.round(variancePct * 100) / 100, photoUrl, item.notes || null, now, existing[0].id]
             );
@@ -467,7 +480,7 @@ router.get('/progress/:id', requireAuth, async (req, res) => {
 
         // Get all items with their check status
         const [items] = await pool.query(
-            'SELECT zoho_item_id, reported_qty, difference, variance_pct, notes, photo_url, submitted_at FROM stock_check_items WHERE assignment_id = ? ORDER BY item_name ASC',
+            'SELECT zoho_item_id, reported_qty, difference, variance_pct, notes, photo_url, submitted_at, item_status FROM stock_check_items WHERE assignment_id = ? ORDER BY item_name ASC',
             [assignmentId]
         );
 
@@ -477,6 +490,8 @@ router.get('/progress/:id', requireAuth, async (req, res) => {
         const remaining = total - checked;
         const progressPct = total > 0 ? Math.round((checked / total) * 100) : 0;
         const discrepancies = checkedItems.filter(i => parseFloat(i.difference) !== 0).length;
+        const submittedItems = items.filter(i => i.item_status === 'submitted').length;
+        const adjustedItems = items.filter(i => i.item_status === 'adjusted').length;
 
         res.json({
             success: true,
@@ -486,13 +501,16 @@ router.get('/progress/:id', requireAuth, async (req, res) => {
                 remaining,
                 progress_pct: progressPct,
                 discrepancies,
+                submitted_count: submittedItems,
+                adjusted_count: adjustedItems,
                 checked_items: checkedItems.map(i => ({
                     zoho_item_id: i.zoho_item_id,
                     reported_qty: i.reported_qty,
                     difference: i.difference,
                     variance_pct: i.variance_pct,
                     notes: i.notes,
-                    photo_url: i.photo_url
+                    photo_url: i.photo_url,
+                    item_status: i.item_status || 'checked'
                 }))
             }
         });
@@ -506,19 +524,19 @@ router.get('/progress/:id', requireAuth, async (req, res) => {
 // STAFF: SUBMIT COUNTS
 // ========================================
 
-/** POST /api/stock-check/submit/:id — Staff submits item counts + photos */
+/** POST /api/stock-check/submit/:id — Staff submits checked items as a batch (partial submission) */
 router.post('/submit/:id', requireAuth, upload.any(), async (req, res) => {
     try {
         const assignmentId = req.params.id;
 
-        // Verify assignment belongs to this staff and is pending
+        // Verify assignment belongs to this staff and is still workable
         const [assignments] = await pool.query(
             'SELECT * FROM stock_check_assignments WHERE id = ? AND staff_id = ?',
             [assignmentId, req.user.id]
         );
         if (!assignments.length) return res.status(404).json({ success: false, message: 'Assignment not found' });
-        if (assignments[0].status !== 'pending') {
-            return res.status(400).json({ success: false, message: 'Assignment already submitted' });
+        if (assignments[0].status === 'adjusted') {
+            return res.status(400).json({ success: false, message: 'Assignment already fully adjusted' });
         }
 
         // Parse items from body
@@ -547,17 +565,22 @@ router.post('/submit/:id', requireAuth, upload.any(), async (req, res) => {
         }
 
         const now = new Date();
+        let submittedCount = 0;
 
         for (const item of items) {
             const reportedQty = parseFloat(item.reported_qty);
             if (isNaN(reportedQty)) continue;
 
-            // Get system qty for difference calc
+            // Get system qty + current item_status
             const [existing] = await pool.query(
-                'SELECT id, system_qty FROM stock_check_items WHERE assignment_id = ? AND zoho_item_id = ?',
+                'SELECT id, system_qty, item_status FROM stock_check_items WHERE assignment_id = ? AND zoho_item_id = ?',
                 [assignmentId, item.zoho_item_id]
             );
             if (!existing.length) continue;
+
+            // Skip items already submitted or adjusted
+            const currentStatus = existing[0].item_status || 'pending';
+            if (currentStatus === 'submitted' || currentStatus === 'adjusted') continue;
 
             const systemQty = parseFloat(existing[0].system_qty) || 0;
             const difference = reportedQty - systemQty;
@@ -579,17 +602,35 @@ router.post('/submit/:id', requireAuth, upload.any(), async (req, res) => {
             await pool.query(
                 `UPDATE stock_check_items
                  SET reported_qty = ?, difference = ?, variance_pct = ?, photo_url = COALESCE(?, photo_url),
-                     notes = ?, submitted_at = ?
+                     notes = ?, submitted_at = ?, item_status = 'submitted'
                  WHERE id = ?`,
                 [reportedQty, difference, Math.round(variancePct * 100) / 100, photoUrl, item.notes || null, now, existing[0].id]
             );
+            submittedCount++;
         }
 
-        // Mark assignment as submitted
-        await pool.query(
-            'UPDATE stock_check_assignments SET status = ?, submitted_at = ? WHERE id = ?',
-            ['submitted', now, assignmentId]
+        // Count remaining items that are NOT yet submitted or adjusted
+        const [remainingRows] = await pool.query(
+            `SELECT COUNT(*) as remaining FROM stock_check_items
+             WHERE assignment_id = ? AND item_status NOT IN ('submitted', 'adjusted')`,
+            [assignmentId]
         );
+        const remaining = remainingRows[0].remaining;
+
+        // If all items are submitted/adjusted → mark assignment as submitted
+        // Otherwise keep as pending so staff can continue checking
+        if (remaining === 0) {
+            await pool.query(
+                'UPDATE stock_check_assignments SET status = ?, submitted_at = COALESCE(submitted_at, ?) WHERE id = ?',
+                ['submitted', now, assignmentId]
+            );
+        } else {
+            // Keep pending but record the latest submission time
+            await pool.query(
+                'UPDATE stock_check_assignments SET submitted_at = COALESCE(submitted_at, ?) WHERE id = ?',
+                [now, assignmentId]
+            );
+        }
 
         // Notify admins
         try {
@@ -597,17 +638,27 @@ router.post('/submit/:id', requireAuth, upload.any(), async (req, res) => {
             const [staffRow] = await pool.query('SELECT full_name FROM users WHERE id = ?', [req.user.id]);
             const staffName = staffRow.length ? staffRow[0].full_name : 'Staff';
 
+            const batchMsg = remaining > 0
+                ? `${staffName} submitted ${submittedCount} items for stock check #${assignmentId} (${remaining} remaining)`
+                : `${staffName} submitted final batch for stock check #${assignmentId} (${submittedCount} items, all complete)`;
+
             for (const admin of admins) {
                 await notificationService.send(admin.id, {
                     type: 'stock_check_submitted',
-                    title: 'Stock Check Submitted',
-                    body: `${staffName} submitted stock check #${assignmentId} (${items.length} items)`,
+                    title: 'Stock Check Batch Submitted',
+                    body: batchMsg,
                     data: { assignment_id: assignmentId }
                 });
             }
         } catch (e) { console.error('Stock check submit notification error:', e.message); }
 
-        res.json({ success: true, message: 'Stock check submitted' });
+        res.json({
+            success: true,
+            message: remaining > 0
+                ? `Submitted ${submittedCount} items (${remaining} remaining)`
+                : `All items submitted (${submittedCount} items)`,
+            data: { submitted: submittedCount, remaining }
+        });
     } catch (error) {
         console.error('Submit stock check error:', error);
         res.status(500).json({ success: false, message: 'Failed to submit stock check' });
@@ -713,8 +764,8 @@ router.post('/self-request', requireAuth, upload.any(), async (req, res) => {
 
             await pool.query(
                 `INSERT INTO stock_check_items
-                 (assignment_id, zoho_item_id, item_name, item_sku, system_qty, reported_qty, difference, variance_pct, photo_url, notes, submitted_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                 (assignment_id, zoho_item_id, item_name, item_sku, system_qty, reported_qty, difference, variance_pct, photo_url, notes, submitted_at, item_status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'submitted')`,
                 [assignmentId, item.zoho_item_id, stock.item_name || 'Unknown', stock.sku || '',
                  systemQty, reportedQty, difference, Math.round(variancePct * 100) / 100,
                  photoUrl, item.notes || null, now]
@@ -777,13 +828,17 @@ router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, 
         const matchCount = items.filter(i => i.difference !== null && parseFloat(i.difference) === 0).length;
         const discrepancyCount = items.filter(i => i.difference !== null && parseFloat(i.difference) !== 0).length;
         const pendingCount = items.filter(i => i.reported_qty === null).length;
+        const submittedCount = items.filter(i => i.item_status === 'submitted').length;
+        const adjustedCount = items.filter(i => i.item_status === 'adjusted').length;
+        // Count submitted items with discrepancies (these are pushable to Zoho)
+        const pushableCount = items.filter(i => i.item_status === 'submitted' && i.difference !== null && parseFloat(i.difference) !== 0).length;
 
         res.json({
             success: true,
             data: {
                 ...assignment,
                 items,
-                summary: { totalItems, matchCount, discrepancyCount, pendingCount }
+                summary: { totalItems, matchCount, discrepancyCount, pendingCount, submittedCount, adjustedCount, pushableCount }
             }
         });
     } catch (error) {
@@ -810,9 +865,6 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
         if (!rows.length) return res.status(404).json({ success: false, message: 'Assignment not found' });
 
         const assignment = rows[0];
-        if (assignment.status === 'adjusted') {
-            return res.status(400).json({ success: false, message: 'Already adjusted' });
-        }
 
         // Use assignment's stored location, fall back to branch default
         let locationId = assignment.zoho_location_id;
@@ -824,65 +876,115 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             return res.status(400).json({ success: false, message: 'No Zoho location linked' });
         }
 
-        // Get items with discrepancies
+        // Get ONLY submitted items with discrepancies (not yet adjusted)
         const [items] = await pool.query(
             `SELECT * FROM stock_check_items
-             WHERE assignment_id = ? AND difference IS NOT NULL AND difference != 0`,
+             WHERE assignment_id = ? AND item_status = 'submitted' AND difference IS NOT NULL AND difference != 0`,
             [req.params.id]
         );
 
-        if (!items.length) {
-            // No discrepancies — mark as reviewed
-            await pool.query(
-                'UPDATE stock_check_assignments SET status = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?',
-                ['reviewed', req.user.id, req.params.id]
-            );
-            return res.json({ success: true, message: 'No discrepancies found. Marked as reviewed.' });
-        }
-
-        // Build Zoho inventory adjustment payload
-        const zohoAPI = require('../services/zoho-api');
-
-        // Each line item MUST include location_id — without it Zoho defaults to primary/Main location
-        const lineItems = items.map(item => ({
-            item_id: item.zoho_item_id,
-            location_id: locationId,
-            quantity_adjusted: parseFloat(item.difference)
-        }));
-
-        // Format date as YYYY-MM-DD string (MySQL returns Date object in local time — use local getters, NOT toISOString which converts to UTC)
-        const checkDate = assignment.check_date instanceof Date
-            ? `${assignment.check_date.getFullYear()}-${String(assignment.check_date.getMonth()+1).padStart(2,'0')}-${String(assignment.check_date.getDate()).padStart(2,'0')}`
-            : String(assignment.check_date).split('T')[0];
-
-        const adjustmentData = {
-            date: checkDate,
-            reason: `Stock check #${assignment.id} — ${assignment.branch_name || 'Branch'}`,
-            description: `Physical count on ${checkDate}, assignment #${assignment.id}, branch: ${assignment.branch_name || 'Unknown'}`,
-            adjustment_type: 'quantity',
-            location_id: locationId,
-            line_items: lineItems
-        };
-
-        console.log(`[Stock Check] Pushing adjustment for assignment #${assignment.id}, branch: ${assignment.branch_name}, location: ${locationId}, items: ${lineItems.length}`);
-        console.log(`[Stock Check] Line items:`, lineItems.map(li => `${li.item_id}: diff=${li.quantity_adjusted}`).join(', '));
-
-        const zohoResult = await zohoAPI.createInventoryAdjustment(adjustmentData);
-
-        const adjustmentId = zohoResult?.inventory_adjustment?.inventory_adjustment_id || zohoResult?.inventoryadjustment_id || null;
-
-        // Update assignment status
-        await pool.query(
-            `UPDATE stock_check_assignments
-             SET status = 'adjusted', reviewed_by = ?, reviewed_at = NOW(), adjustment_id = ?
-             WHERE id = ?`,
-            [req.user.id, adjustmentId, req.params.id]
+        // Also get submitted items with zero difference (need to mark as adjusted too)
+        const [zeroDiffItems] = await pool.query(
+            `SELECT id FROM stock_check_items
+             WHERE assignment_id = ? AND item_status = 'submitted' AND (difference IS NULL OR difference = 0)`,
+            [req.params.id]
         );
 
+        if (!items.length && !zeroDiffItems.length) {
+            // No submitted items to process — check if everything is already adjusted
+            const [pendingSubmitted] = await pool.query(
+                `SELECT COUNT(*) as cnt FROM stock_check_items WHERE assignment_id = ? AND item_status = 'submitted'`,
+                [req.params.id]
+            );
+            if (pendingSubmitted[0].cnt === 0) {
+                return res.json({ success: true, message: 'No submitted items to process. Waiting for more items from staff.' });
+            }
+            // Mark as reviewed (all zero-diff)
+            await pool.query(
+                `UPDATE stock_check_items SET item_status = 'adjusted' WHERE assignment_id = ? AND item_status = 'submitted'`,
+                [req.params.id]
+            );
+        }
+
+        let adjustmentId = null;
+
+        if (items.length) {
+            // Build Zoho inventory adjustment payload
+            const zohoAPI = require('../services/zoho-api');
+
+            const lineItems = items.map(item => ({
+                item_id: item.zoho_item_id,
+                location_id: locationId,
+                quantity_adjusted: parseFloat(item.difference)
+            }));
+
+            const checkDate = assignment.check_date instanceof Date
+                ? `${assignment.check_date.getFullYear()}-${String(assignment.check_date.getMonth()+1).padStart(2,'0')}-${String(assignment.check_date.getDate()).padStart(2,'0')}`
+                : String(assignment.check_date).split('T')[0];
+
+            const adjustmentData = {
+                date: checkDate,
+                reason: `Stock check #${assignment.id} — ${assignment.branch_name || 'Branch'} (batch)`,
+                description: `Physical count on ${checkDate}, assignment #${assignment.id}, branch: ${assignment.branch_name || 'Unknown'} (partial batch push)`,
+                adjustment_type: 'quantity',
+                location_id: locationId,
+                line_items: lineItems
+            };
+
+            console.log(`[Stock Check] Pushing batch adjustment for assignment #${assignment.id}, branch: ${assignment.branch_name}, location: ${locationId}, items: ${lineItems.length}`);
+            console.log(`[Stock Check] Line items:`, lineItems.map(li => `${li.item_id}: diff=${li.quantity_adjusted}`).join(', '));
+
+            const zohoResult = await zohoAPI.createInventoryAdjustment(adjustmentData);
+            adjustmentId = zohoResult?.inventory_adjustment?.inventory_adjustment_id || zohoResult?.inventoryadjustment_id || null;
+        }
+
+        // Mark all submitted items as adjusted
+        await pool.query(
+            `UPDATE stock_check_items SET item_status = 'adjusted' WHERE assignment_id = ? AND item_status = 'submitted'`,
+            [req.params.id]
+        );
+
+        // Check if ALL items in the assignment are now adjusted
+        const [remainingItems] = await pool.query(
+            `SELECT COUNT(*) as remaining FROM stock_check_items
+             WHERE assignment_id = ? AND item_status NOT IN ('adjusted')`,
+            [req.params.id]
+        );
+        const allDone = remainingItems[0].remaining === 0;
+
+        if (allDone) {
+            // All items processed → mark assignment as adjusted
+            // Append adjustment_id (comma-separated if multiple pushes)
+            const existingAdjId = assignment.adjustment_id;
+            const newAdjId = adjustmentId
+                ? (existingAdjId ? `${existingAdjId},${adjustmentId}` : adjustmentId)
+                : existingAdjId;
+
+            await pool.query(
+                `UPDATE stock_check_assignments
+                 SET status = 'adjusted', reviewed_by = ?, reviewed_at = NOW(), adjustment_id = ?
+                 WHERE id = ?`,
+                [req.user.id, newAdjId, req.params.id]
+            );
+        } else {
+            // More items still pending/checked — store partial adjustment ID
+            if (adjustmentId) {
+                const existingAdjId = assignment.adjustment_id;
+                const newAdjId = existingAdjId ? `${existingAdjId},${adjustmentId}` : adjustmentId;
+                await pool.query(
+                    `UPDATE stock_check_assignments SET reviewed_by = ?, adjustment_id = ? WHERE id = ?`,
+                    [req.user.id, newAdjId, req.params.id]
+                );
+            }
+        }
+
+        const pushedCount = items.length + zeroDiffItems.length;
         res.json({
             success: true,
-            message: `Inventory adjustment created (${items.length} items)`,
-            data: { adjustment_id: adjustmentId }
+            message: allDone
+                ? `All items adjusted (${pushedCount} items). Assignment complete.`
+                : `Pushed ${items.length} discrepancies to Zoho (${pushedCount} items adjusted, ${remainingItems[0].remaining} remaining).`,
+            data: { adjustment_id: adjustmentId, all_done: allDone, pushed: pushedCount, remaining: remainingItems[0].remaining }
         });
     } catch (error) {
         console.error('Create adjustment error:', error);
