@@ -24,6 +24,173 @@ function setIO(i) { io = i; }
 function setCollector(c) { appCollector = c; }
 
 // ═══════════════════════════════════════════════════════════════
+// DASHBOARD (combined KPI + charts + scorecards)
+// ═══════════════════════════════════════════════════════════════
+
+let _dashboardCache = { data: null, ts: 0 };
+const DASHBOARD_CACHE_TTL = 10000; // 10 seconds
+
+router.get('/dashboard', requireAuth, async (req, res) => {
+    try {
+        const now = Date.now();
+        if (_dashboardCache.data && (now - _dashboardCache.ts) < DASHBOARD_CACHE_TTL) {
+            return res.json({ success: true, data: _dashboardCache.data, cached: true });
+        }
+
+        const [
+            [todayYesterday],
+            [monthRevenue],
+            [todayCollections],
+            [overdue],
+            [staffPresent],
+            [staffTotal],
+            [activeLeads],
+            [newLeadsToday],
+            [stockCounts],
+            revenueTrend,
+            branchRevenue,
+            branchStock,
+            [topInsights],
+            [recentSuggestions]
+        ] = await Promise.all([
+            // 1. Today + Yesterday revenue
+            pool.query(`SELECT
+                COALESCE(SUM(CASE WHEN DATE(invoice_date) = CURDATE() THEN total ELSE 0 END), 0) as today_revenue,
+                COALESCE(SUM(CASE WHEN DATE(invoice_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN total ELSE 0 END), 0) as yesterday_revenue
+                FROM zoho_invoices WHERE invoice_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)`),
+            // 2. This month + last month revenue
+            pool.query(`SELECT
+                COALESCE(SUM(CASE WHEN YEAR(invoice_date)=YEAR(CURDATE()) AND MONTH(invoice_date)=MONTH(CURDATE()) THEN total ELSE 0 END), 0) as this_month,
+                COALESCE(SUM(CASE WHEN YEAR(invoice_date)=YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND MONTH(invoice_date)=MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) THEN total ELSE 0 END), 0) as last_month
+                FROM zoho_invoices WHERE invoice_date >= DATE_SUB(CURDATE(), INTERVAL 2 MONTH)`),
+            // 3. Today collections
+            pool.query(`SELECT COALESCE(SUM(amount), 0) as today FROM zoho_payments WHERE DATE(payment_date) = CURDATE()`),
+            // 4. Overdue with ageing buckets
+            pool.query(`SELECT COUNT(*) as count, COALESCE(SUM(balance), 0) as total,
+                COALESCE(SUM(CASE WHEN DATEDIFF(CURDATE(),due_date) BETWEEN 1 AND 30 THEN balance ELSE 0 END),0) as d30,
+                COALESCE(SUM(CASE WHEN DATEDIFF(CURDATE(),due_date) BETWEEN 31 AND 60 THEN balance ELSE 0 END),0) as d60,
+                COALESCE(SUM(CASE WHEN DATEDIFF(CURDATE(),due_date) BETWEEN 61 AND 90 THEN balance ELSE 0 END),0) as d90,
+                COALESCE(SUM(CASE WHEN DATEDIFF(CURDATE(),due_date) > 90 THEN balance ELSE 0 END),0) as d90plus
+                FROM zoho_invoices WHERE status = 'overdue' AND balance > 0`),
+            // 5. Staff present today
+            pool.query(`SELECT COUNT(DISTINCT user_id) as present FROM staff_attendance WHERE date = CURDATE()`),
+            // 6. Total active staff
+            pool.query(`SELECT COUNT(*) as total FROM users WHERE status = 'active' AND role IN ('staff','admin','manager','accountant')`),
+            // 7. Active leads
+            pool.query(`SELECT COUNT(*) as active FROM leads WHERE status NOT IN ('won','lost','inactive')`),
+            // 8. New leads today
+            pool.query(`SELECT COUNT(*) as count FROM leads WHERE DATE(created_at) = CURDATE()`),
+            // 9. Stock counts
+            pool.query(`SELECT
+                COUNT(CASE WHEN stock_on_hand <= 0 THEN 1 END) as out_of_stock,
+                COUNT(CASE WHEN stock_on_hand > 0 AND stock_on_hand <= 5 THEN 1 END) as low_stock
+                FROM zoho_location_stock`),
+            // 10. Revenue trend (30 days) from zoho_daily_transactions
+            pool.query(`SELECT transaction_date as date,
+                SUM(invoice_amount) as revenue,
+                SUM(payment_received_amount) as collections
+                FROM zoho_daily_transactions
+                WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                GROUP BY transaction_date ORDER BY transaction_date`),
+            // 11. Branch scorecard from zoho_daily_transactions (this month + last month)
+            pool.query(`SELECT
+                COALESCE(zdt.location_name, 'Unknown') as branch,
+                COALESCE(SUM(CASE WHEN YEAR(zdt.transaction_date)=YEAR(CURDATE()) AND MONTH(zdt.transaction_date)=MONTH(CURDATE()) THEN zdt.invoice_amount ELSE 0 END),0) as month_revenue,
+                COALESCE(SUM(CASE WHEN YEAR(zdt.transaction_date)=YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND MONTH(zdt.transaction_date)=MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) THEN zdt.invoice_amount ELSE 0 END),0) as last_month_revenue,
+                COALESCE(SUM(CASE WHEN YEAR(zdt.transaction_date)=YEAR(CURDATE()) AND MONTH(zdt.transaction_date)=MONTH(CURDATE()) THEN zdt.payment_received_amount ELSE 0 END),0) as month_collections
+                FROM zoho_daily_transactions zdt
+                LEFT JOIN zoho_locations_map zlm ON zdt.zoho_location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
+                WHERE zdt.transaction_date >= DATE_SUB(CURDATE(), INTERVAL 2 MONTH)
+                AND (zlm.is_active = 1 OR zlm.id IS NULL)
+                GROUP BY zdt.zoho_location_id, zdt.location_name
+                ORDER BY month_revenue DESC`),
+            // 12. Stock per branch
+            pool.query(`SELECT zlm.zoho_location_name as branch, zlm.zoho_location_id,
+                COUNT(*) as stock_items,
+                COUNT(CASE WHEN zls.stock_on_hand <= 0 THEN 1 END) as out_of_stock
+                FROM zoho_location_stock zls
+                JOIN zoho_locations_map zlm ON zls.zoho_location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
+                WHERE zlm.is_active = 1
+                GROUP BY zlm.zoho_location_id, zlm.zoho_location_name`),
+            // 13. Top unread insights
+            pool.query(`SELECT id, category, severity, title, description, action_recommended, created_at
+                FROM ai_insights WHERE is_read = 0 AND is_dismissed = 0
+                ORDER BY FIELD(severity,'critical','high','medium','low'), created_at DESC LIMIT 10`),
+            // 14. Recent new suggestions
+            pool.query(`SELECT id, category, suggestion, reasoning, priority, created_at
+                FROM ai_suggestions WHERE status = 'new'
+                ORDER BY FIELD(priority,'critical','high','medium','low'), created_at DESC LIMIT 5`)
+        ]);
+
+        const tr = todayYesterday[0];
+        const mr = monthRevenue[0];
+        const od = overdue[0];
+
+        // Build branch scorecard by merging revenue + stock data
+        const stockMap = {};
+        (branchStock[0] || []).forEach(s => { stockMap[s.branch] = s; });
+        const branchScorecard = (branchRevenue[0] || []).map(b => {
+            const stk = stockMap[b.branch] || {};
+            const monthRev = Number(b.month_revenue);
+            const lastMonthRev = Number(b.last_month_revenue);
+            const monthColl = Number(b.month_collections);
+            return {
+                branch: b.branch,
+                monthRevenue: monthRev,
+                lastMonthRevenue: lastMonthRev,
+                revenueChange: lastMonthRev > 0 ? ((monthRev - lastMonthRev) / lastMonthRev * 100) : 0,
+                monthCollections: monthColl,
+                collectionRate: monthRev > 0 ? (monthColl / monthRev * 100) : 0,
+                stockItems: stk.stock_items || 0,
+                outOfStock: stk.out_of_stock || 0
+            };
+        });
+
+        const todayRev = Number(tr.today_revenue);
+        const yesterdayRev = Number(tr.yesterday_revenue);
+
+        const dashData = {
+            kpis: {
+                todayRevenue: todayRev,
+                yesterdayRevenue: yesterdayRev,
+                revenueChange: yesterdayRev > 0 ? ((todayRev - yesterdayRev) / yesterdayRev * 100) : 0,
+                monthRevenue: Number(mr.this_month),
+                lastMonthRevenue: Number(mr.last_month),
+                todayCollections: Number(todayCollections[0].today),
+                totalOverdue: Number(od.total),
+                overdueCount: Number(od.count),
+                overdueAgeing: {
+                    days_1_30: Number(od.d30),
+                    days_31_60: Number(od.d60),
+                    days_61_90: Number(od.d90),
+                    days_90_plus: Number(od.d90plus)
+                },
+                staffPresent: Number(staffPresent[0].present),
+                staffTotal: Number(staffTotal[0].total),
+                activeLeads: Number(activeLeads[0].active),
+                newLeadsToday: Number(newLeadsToday[0].count),
+                outOfStock: Number(stockCounts[0].out_of_stock),
+                lowStock: Number(stockCounts[0].low_stock)
+            },
+            revenueTrend: (revenueTrend[0] || []).map(r => ({
+                date: r.date,
+                revenue: Number(r.revenue),
+                collections: Number(r.collections)
+            })),
+            branchScorecard,
+            topInsights: topInsights || [],
+            recentSuggestions: recentSuggestions || []
+        };
+
+        _dashboardCache = { data: dashData, ts: now };
+        res.json({ success: true, data: dashData });
+    } catch (e) {
+        console.error('[AI Dashboard] Error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // CONVERSATIONS
 // ═══════════════════════════════════════════════════════════════
 

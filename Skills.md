@@ -1129,12 +1129,31 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 
 **WhatsApp Delivery**: Analysis summaries sent via General WhatsApp (branch_id=0) to configured recipients.
 
-**Page**: `admin-ai.html` (5 tabs: Chat, Insights, Suggestions, Settings, App Analyzer)
+**Page**: `admin-ai.html` (6 tabs: Dashboard, Chat, Insights, Suggestions, Settings, App Analyzer)
 - **Permission**: `system.ai`
 - **Navigation**: System sub-nav → AI tab
 - **Migrations**: `migrations/migrate-ai-tables.js` (initial), `migrations/migrate-ai-assistant-upgrade.js` (Assistant Manager upgrade)
 
-#### App Analyzer (Tab 5)
+#### AI Dashboard (Tab 1)
+Visual business command center with real-time KPIs, charts, and branch scorecards — all powered by existing Zoho-synced data.
+
+**Endpoint**: `GET /api/ai/dashboard` — single combined endpoint with 10s in-memory cache, runs 14 parallel SQL queries:
+- KPIs: today/yesterday revenue (`zoho_invoices`), month revenue, today collections (`zoho_payments`), overdue with ageing buckets, staff present (`staff_attendance`), active leads, stock alerts (`zoho_location_stock`)
+- Revenue Trend: 30-day line chart from `zoho_daily_transactions` (revenue + collections)
+- Branch Scorecard: from `zoho_daily_transactions` grouped by `zoho_location_id` — month/last month revenue, collections, collection rate %, plus stock per branch from `zoho_location_stock` JOIN `zoho_locations_map`
+- Top 10 unread insights + Top 5 new suggestions
+
+**Frontend Components**:
+- Quick AI Query Bar: input + 6 quick-query chips → switches to Chat tab and sends message via `sendMessage()`
+- 6 KPI Cards: Today Revenue (vs yesterday %), Month Revenue (vs last month %), Collections, Overdue (with ageing), Staff (present/total), Stock Alerts (out + low)
+- Insights Panel: top 10 unread, severity-coded, click to mark read, "View All" → Insights tab
+- Branch Scorecard Table: branch name, month revenue, change %, collections, collection rate %, stock items, out-of-stock count
+- Chart.js Charts (CDN `chart.js@4.4.7`): Revenue Trend (30-day line) and Branch Comparison (horizontal bar) with tab switcher
+- Auto-refresh every 60 seconds
+
+**Currency**: INR lakhs notation via `formatINR()` — ₹1.07L, ₹22.7Cr etc.
+
+#### App Analyzer (Tab 6)
 AI-powered application self-analysis that scans database schema, routes, errors, health metrics, and business stats, then uses the AI engine to detect issues, suggest upgrades, and generate ready-to-paste Claude Code prompts.
 
 **Service**: `services/app-metadata-collector.js` — 5 scanners + orchestrator
@@ -1475,7 +1494,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | Website Management | `admin-website.html` | Public website content CRUD (hero, services, features, testimonials, gallery, social) |
 | Profile | `admin-profile.html` | Admin profile |
 | Guides | `admin-guides.html` | Guide CRUD, categories, analytics (Quill.js editor) |
-| AI Dashboard | `admin-ai.html` | AI chat, insights, config (3 tabs: Chat, Insights, Settings) |
+| AI Dashboard | `admin-ai.html` | AI dashboard, chat, insights, suggestions, settings, app analyzer (6 tabs) |
 
 ### Zoho Pages
 | Page | File | Purpose |
@@ -1692,6 +1711,18 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-02-24 - AI Dashboard Upgrade (Phase 1)
+Rebuilt `admin-ai.html` Tab 1 from Chat into a visual AI Dashboard with:
+- New `GET /api/ai/dashboard` endpoint (10s cache, 14 parallel SQL queries)
+- 6 KPI cards: Today Revenue, Month Revenue, Collections, Overdue, Staff, Stock Alerts
+- Chart.js (CDN v4.4.7) with Revenue Trend (30-day line) and Branch Comparison (horizontal bar)
+- Branch Performance scorecard table with revenue change %, collection rate %
+- Insights panel (top 10 unread, severity-coded)
+- Quick AI Query bar → switches to Chat tab
+- Chat moved to Tab 2, App Analyzer to Tab 6
+- Auto-refresh every 60 seconds
+- Files: `routes/ai.js` (new endpoint), `public/admin-ai.html` (rebuilt Tab 1)
+
 ### 2026-02-24 - Live Admin Dashboard (Phase 1)
 Real-time monitoring dashboard for admin/managers with 4 panels:
 - **Status Bar**: Green/amber/red system health based on automation failures
@@ -1736,7 +1767,8 @@ Based on AI App Analyzer report, fixed critical production errors:
 ### 2026-02-23 - AI App Analyzer (Tab 5)
 - New `services/app-metadata-collector.js` with 5 scanners (database schema, route map, errors, health, business stats) + `runFullScan()` orchestrator with 5-min cache
 - 3 new endpoints in `routes/ai.js`: `GET /app-scan`, `POST /app-analyze` (SSE), `POST /generate-prompt`
-- Tab 5 "App Analyzer" in `admin-ai.html`: scan control, collapsible results panels, AI deep analysis with streaming, custom prompt builder
+- Tab 1 "Dashboard" in `admin-ai.html`: KPI cards, Chart.js revenue trend + branch comparison, branch scorecards, insights panel, quick AI query bar
+- Tab 6 "App Analyzer" in `admin-ai.html`: scan control, collapsible results panels, AI deep analysis with streaming, custom prompt builder
 - Global error buffer in `server.js` (wraps `console.error`, caps at 100 entries) for error collection
 - "Generate Fix" buttons on detected issues, "Upgrade Suggestions" for business-aware improvements, "Copy" buttons on all code blocks
 

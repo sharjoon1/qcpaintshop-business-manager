@@ -11,6 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>AI Dashboard - Quality Colours Business Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
@@ -157,10 +158,56 @@
         .prompt-output { background: #1f2937; color: #e5e7eb; padding: 1rem; border-radius: 10px; font-size: 0.8125rem; line-height: 1.6; font-family: 'Courier New', monospace; white-space: pre-wrap; word-break: break-word; position: relative; min-height: 60px; max-height: 400px; overflow-y: auto; }
         .focus-select { padding: 0.375rem 0.75rem; border-radius: 8px; border: 1px solid #d1d5db; font-size: 0.8125rem; background: white; }
 
+        /* Dashboard */
+        .dash-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .kpi-card { background: white; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .kpi-label { font-size: 0.6875rem; color: #6b7280; text-transform: uppercase; font-weight: 600; letter-spacing: 0.025em; }
+        .kpi-value { font-size: 1.5rem; font-weight: 700; color: #1f2937; margin: 0.25rem 0; }
+        .kpi-change { font-size: 0.75rem; font-weight: 600; }
+        .kpi-change.up { color: #10b981; }
+        .kpi-change.down { color: #ef4444; }
+        .kpi-change.neutral { color: #6b7280; }
+        .kpi-sub { font-size: 0.6875rem; color: #9ca3af; }
+
+        .dash-split { display: grid; grid-template-columns: 340px 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .dash-panel { background: white; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .dash-panel h3 { font-size: 0.9375rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+
+        .dash-insight-item { padding: 0.625rem; border-radius: 8px; border-left: 3px solid #d1d5db; margin-bottom: 0.5rem; cursor: pointer; transition: background 0.15s; }
+        .dash-insight-item:hover { background: #f9fafb; }
+        .dash-insight-item.sev-critical { border-left-color: #ef4444; }
+        .dash-insight-item.sev-high { border-left-color: #f59e0b; }
+        .dash-insight-item.sev-medium { border-left-color: #3b82f6; }
+        .dash-insight-item.sev-low { border-left-color: #10b981; }
+        .dash-insight-item.sev-info { border-left-color: #3b82f6; }
+        .dash-insight-item.sev-warning { border-left-color: #f59e0b; }
+
+        .scorecard-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+        .scorecard-table th { text-align: left; padding: 0.5rem 0.625rem; font-size: 0.6875rem; color: #6b7280; text-transform: uppercase; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+        .scorecard-table td { padding: 0.5rem 0.625rem; border-bottom: 1px solid #f3f4f6; }
+        .scorecard-table tr:hover { background: #f9fafb; }
+
+        .chart-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
+        .chart-tab { padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 600; border: 1px solid #e5e7eb; cursor: pointer; background: white; color: #6b7280; transition: all 0.15s; }
+        .chart-tab:hover { border-color: #667eea; color: #667eea; }
+        .chart-tab.active { background: #667eea; color: white; border-color: #667eea; }
+
+        .dash-query-bar { background: white; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        .dash-query-input { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+        .dash-query-input input { flex: 1; padding: 0.625rem 1rem; border-radius: 10px; border: 1px solid #d1d5db; font-size: 0.875rem; outline: none; }
+        .dash-query-input input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .dash-query-input button { padding: 0.625rem 1.25rem; border-radius: 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; font-weight: 600; font-size: 0.875rem; cursor: pointer; white-space: nowrap; }
+        .dash-query-input button:hover { opacity: 0.9; }
+        .dash-quick-chips { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+        .dash-quick-chip { padding: 0.25rem 0.625rem; border-radius: 999px; font-size: 0.6875rem; border: 1px solid #e5e7eb; cursor: pointer; background: white; color: #4b5563; transition: all 0.15s; white-space: nowrap; }
+        .dash-quick-chip:hover { border-color: #667eea; color: #667eea; background: #eef2ff; }
+
         @media (max-width: 768px) {
             .chat-sidebar { display: none; }
             .chat-container { height: calc(100vh - 200px); }
             .insight-grid { grid-template-columns: 1fr !important; }
+            .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .dash-split { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -187,7 +234,11 @@
 
     <!-- Tabs -->
     <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('chat')">
+        <button class="tab-btn active" onclick="switchTab('dashboard')">
+            <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            Dashboard
+        </button>
+        <button class="tab-btn" onclick="switchTab('chat')">
             <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
             Chat
         </button>
@@ -211,8 +262,108 @@
         </button>
     </div>
 
+    <!-- Tab: Dashboard -->
+    <div id="tab-dashboard" class="tab-content">
+        <!-- Quick AI Query Bar -->
+        <div class="dash-query-bar">
+            <div class="dash-query-input">
+                <input type="text" id="dashQueryInput" placeholder="Ask anything about your business..." onkeydown="if(event.key==='Enter'){dashQuerySend()}">
+                <button onclick="dashQuerySend()">Ask AI</button>
+            </div>
+            <div class="dash-quick-chips">
+                <span class="dash-quick-chip" onclick="dashQuickQuery('Revenue today?')">Revenue today?</span>
+                <span class="dash-quick-chip" onclick="dashQuickQuery('Branch performance this month')">Branch performance</span>
+                <span class="dash-quick-chip" onclick="dashQuickQuery('Overdue collections breakdown')">Overdue?</span>
+                <span class="dash-quick-chip" onclick="dashQuickQuery('What needs my attention today?')">Attention needed</span>
+                <span class="dash-quick-chip" onclick="dashQuickQuery('Staff attendance today')">Attendance</span>
+                <span class="dash-quick-chip" onclick="dashQuickQuery('Stock alerts - out of stock items')">Stock alerts</span>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="dash-kpi-grid" id="dashKpiGrid">
+            <div class="kpi-card">
+                <div class="kpi-label">Today's Revenue</div>
+                <div class="kpi-value" id="kpiTodayRev">--</div>
+                <div class="kpi-change neutral" id="kpiRevChange">vs yesterday</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Month Revenue</div>
+                <div class="kpi-value" id="kpiMonthRev">--</div>
+                <div class="kpi-sub" id="kpiMonthSub">Loading...</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Today's Collections</div>
+                <div class="kpi-value" id="kpiCollections">--</div>
+                <div class="kpi-sub" id="kpiCollSub">&nbsp;</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Overdue</div>
+                <div class="kpi-value" id="kpiOverdue" style="color:#ef4444">--</div>
+                <div class="kpi-sub" id="kpiOverdueSub">Loading...</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Staff Present</div>
+                <div class="kpi-value" id="kpiStaff">--</div>
+                <div class="kpi-sub" id="kpiStaffSub">&nbsp;</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Stock Alerts</div>
+                <div class="kpi-value" id="kpiStock">--</div>
+                <div class="kpi-sub" id="kpiStockSub">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Insights Panel + Branch Scorecards -->
+        <div class="dash-split">
+            <!-- Insights Panel -->
+            <div class="dash-panel" style="max-height: 420px; overflow-y: auto;">
+                <h3>
+                    <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    Recent Insights
+                </h3>
+                <div id="dashInsightsPanel">
+                    <div style="text-align:center; padding:2rem; color:#9ca3af; font-size:0.8125rem;">Loading...</div>
+                </div>
+                <div style="margin-top:0.75rem;">
+                    <button onclick="switchToTab('insights')" style="width:100%; padding:0.5rem; border-radius:8px; border:1px solid #e5e7eb; background:white; color:#667eea; font-size:0.8125rem; font-weight:600; cursor:pointer;">View All Insights</button>
+                </div>
+            </div>
+            <!-- Branch Scorecards -->
+            <div class="dash-panel" style="overflow-x: auto;">
+                <h3>
+                    <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Branch Performance
+                </h3>
+                <div id="dashBranchScorecard">
+                    <div style="text-align:center; padding:2rem; color:#9ca3af; font-size:0.8125rem;">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="dash-panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h3 style="margin-bottom:0;">
+                    <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    Analytics
+                </h3>
+                <div class="chart-tabs">
+                    <button class="chart-tab active" onclick="showChart('trend', this)">Revenue Trend</button>
+                    <button class="chart-tab" onclick="showChart('branch', this)">Branch Comparison</button>
+                </div>
+            </div>
+            <div id="chartTrend" style="position:relative; height:320px;">
+                <canvas id="revenueTrendChart"></canvas>
+            </div>
+            <div id="chartBranch" style="position:relative; height:320px; display:none;">
+                <canvas id="branchCompareChart"></canvas>
+            </div>
+        </div>
+    </div>
+
     <!-- Tab: Chat -->
-    <div id="tab-chat" class="tab-content">
+    <div id="tab-chat" class="tab-content" style="display:none">
         <div class="chat-container">
             <!-- Sidebar: conversation list -->
             <div class="chat-sidebar">
@@ -610,11 +761,32 @@ function switchTab(tab) {
     document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-' + tab).style.display = '';
-    event.currentTarget.classList.add('active');
+    if (event && event.currentTarget) event.currentTarget.classList.add('active');
+    else {
+        // Find matching tab button by text
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            if (b.textContent.trim().toLowerCase().replace(/\s+/g,'').includes(tab)) b.classList.add('active');
+        });
+    }
+    if (tab === 'dashboard') loadDashboard();
     if (tab === 'insights') loadInsights();
     if (tab === 'suggestions') loadSuggestions();
     if (tab === 'settings') loadSettings();
-    // analyzer: no auto-load (user clicks Scan)
+}
+
+// switchToTab: programmatic tab switch (no event)
+function switchToTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).style.display = '';
+    const tabNames = { dashboard: 'Dashboard', chat: 'Chat', insights: 'Insights', suggestions: 'Suggestions', settings: 'Settings', analyzer: 'App Analyzer' };
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        if (b.textContent.trim() === tabNames[tab]) b.classList.add('active');
+    });
+    if (tab === 'dashboard') loadDashboard();
+    if (tab === 'insights') loadInsights();
+    if (tab === 'suggestions') loadSuggestions();
+    if (tab === 'settings') loadSettings();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1578,8 +1750,226 @@ if (window.qcSocket) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+let revenueTrendChart = null;
+let branchCompareChart = null;
+let dashRefreshTimer = null;
+
+function formatINR(n) {
+    n = Number(n) || 0;
+    if (n >= 10000000) return '\u20B9' + (n/10000000).toFixed(1) + 'Cr';
+    if (n >= 100000) return '\u20B9' + (n/100000).toFixed(1) + 'L';
+    if (n >= 1000) return '\u20B9' + (n/1000).toFixed(1) + 'K';
+    return '\u20B9' + n.toFixed(0);
+}
+
+function changeClass(pct) {
+    return pct > 0 ? 'up' : pct < 0 ? 'down' : 'neutral';
+}
+
+function changeArrow(pct) {
+    return pct > 0 ? '\u2191' : pct < 0 ? '\u2193' : '';
+}
+
+async function loadDashboard() {
+    try {
+        const resp = await fetch('/api/ai/dashboard', { headers });
+        const json = await resp.json();
+        if (!json.success) throw new Error(json.error || 'Failed');
+        const d = json.data;
+        renderKPIs(d.kpis);
+        renderDashInsights(d.topInsights);
+        renderBranchScorecard(d.branchScorecard);
+        renderRevenueTrendChart(d.revenueTrend);
+        renderBranchCompareChart(d.branchScorecard);
+    } catch (e) {
+        console.error('[Dashboard]', e);
+    }
+
+    // Auto-refresh every 60s
+    clearInterval(dashRefreshTimer);
+    dashRefreshTimer = setInterval(() => {
+        if (document.getElementById('tab-dashboard').style.display !== 'none') {
+            loadDashboard();
+        } else {
+            clearInterval(dashRefreshTimer);
+        }
+    }, 60000);
+}
+
+function renderKPIs(k) {
+    document.getElementById('kpiTodayRev').textContent = formatINR(k.todayRevenue);
+    const rc = k.revenueChange;
+    const rcEl = document.getElementById('kpiRevChange');
+    rcEl.className = 'kpi-change ' + changeClass(rc);
+    rcEl.textContent = changeArrow(rc) + ' ' + Math.abs(rc).toFixed(1) + '% vs yesterday' + (k.yesterdayRevenue > 0 ? ' (' + formatINR(k.yesterdayRevenue) + ')' : '');
+
+    document.getElementById('kpiMonthRev').textContent = formatINR(k.monthRevenue);
+    const mc = k.lastMonthRevenue > 0 ? ((k.monthRevenue - k.lastMonthRevenue) / k.lastMonthRevenue * 100) : 0;
+    const mSub = document.getElementById('kpiMonthSub');
+    mSub.className = 'kpi-sub';
+    mSub.innerHTML = '<span class="kpi-change ' + changeClass(mc) + '" style="font-size:0.6875rem">' + changeArrow(mc) + ' ' + Math.abs(mc).toFixed(1) + '%</span> vs last month (' + formatINR(k.lastMonthRevenue) + ')';
+
+    document.getElementById('kpiCollections').textContent = formatINR(k.todayCollections);
+    document.getElementById('kpiCollSub').textContent = 'Collected today';
+
+    document.getElementById('kpiOverdue').textContent = formatINR(k.totalOverdue);
+    document.getElementById('kpiOverdue').style.color = k.totalOverdue > 0 ? '#ef4444' : '#10b981';
+    document.getElementById('kpiOverdueSub').textContent = k.overdueCount + ' invoices | 1-30d: ' + formatINR(k.overdueAgeing.days_1_30) + ', 31-60d: ' + formatINR(k.overdueAgeing.days_31_60);
+
+    const staffPct = k.staffTotal > 0 ? Math.round(k.staffPresent / k.staffTotal * 100) : 0;
+    document.getElementById('kpiStaff').textContent = k.staffPresent + '/' + k.staffTotal;
+    document.getElementById('kpiStaff').style.color = staffPct >= 80 ? '#10b981' : staffPct >= 50 ? '#f59e0b' : '#ef4444';
+    document.getElementById('kpiStaffSub').textContent = staffPct + '% present' + (k.activeLeads > 0 ? ' | ' + k.activeLeads + ' active leads' : '');
+
+    document.getElementById('kpiStock').textContent = k.outOfStock + ' out';
+    document.getElementById('kpiStock').style.color = k.outOfStock > 0 ? '#ef4444' : '#10b981';
+    document.getElementById('kpiStockSub').textContent = k.lowStock + ' low stock items';
+}
+
+function renderDashInsights(insights) {
+    const panel = document.getElementById('dashInsightsPanel');
+    if (!insights || !insights.length) {
+        panel.innerHTML = '<div style="text-align:center; padding:1.5rem; color:#9ca3af; font-size:0.8125rem;">No unread insights</div>';
+        return;
+    }
+    panel.innerHTML = insights.map(i => {
+        const sev = i.severity || 'info';
+        const sevIcon = sev === 'critical' ? '\uD83D\uDD34' : sev === 'high' ? '\uD83D\uDFE0' : sev === 'warning' ? '\uD83D\uDFE1' : sev === 'medium' ? '\uD83D\uDD35' : '\uD83D\uDFE2';
+        return '<div class="dash-insight-item sev-' + sev + '" onclick="markInsightRead(' + i.id + ', null); this.style.opacity=0.5">' +
+            '<div style="display:flex;align-items:center;gap:0.375rem;margin-bottom:0.25rem;">' +
+            '<span style="font-size:0.625rem">' + sevIcon + '</span>' +
+            '<span style="font-size:0.6875rem;font-weight:600;color:#1f2937;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(i.title) + '</span>' +
+            '<span style="font-size:0.5625rem;color:#9ca3af">' + escHtml(i.category || '') + '</span>' +
+            '</div>' +
+            '<div style="font-size:0.6875rem;color:#6b7280;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + escHtml(i.description || '') + '</div>' +
+            '</div>';
+    }).join('');
+}
+
+function renderBranchScorecard(branches) {
+    const el = document.getElementById('dashBranchScorecard');
+    if (!branches || !branches.length) {
+        el.innerHTML = '<div style="text-align:center; padding:1.5rem; color:#9ca3af; font-size:0.8125rem;">No branch data available</div>';
+        return;
+    }
+    let html = '<table class="scorecard-table"><thead><tr>' +
+        '<th>Branch</th><th style="text-align:right">Month Rev</th><th style="text-align:right">Change</th>' +
+        '<th style="text-align:right">Collections</th><th style="text-align:right">Coll %</th>' +
+        '<th style="text-align:center">Stock</th><th style="text-align:center">OOS</th>' +
+        '</tr></thead><tbody>';
+    branches.forEach(b => {
+        const chgClass = changeClass(b.revenueChange);
+        const collPct = b.collectionRate.toFixed(0);
+        const collColor = b.collectionRate >= 80 ? '#10b981' : b.collectionRate >= 60 ? '#f59e0b' : '#ef4444';
+        html += '<tr>' +
+            '<td style="font-weight:600">' + escHtml(b.branch) + '</td>' +
+            '<td style="text-align:right">' + formatINR(b.monthRevenue) + '</td>' +
+            '<td style="text-align:right" class="kpi-change ' + chgClass + '">' + changeArrow(b.revenueChange) + ' ' + Math.abs(b.revenueChange).toFixed(1) + '%</td>' +
+            '<td style="text-align:right">' + formatINR(b.monthCollections) + '</td>' +
+            '<td style="text-align:right;color:' + collColor + ';font-weight:600">' + collPct + '%</td>' +
+            '<td style="text-align:center">' + b.stockItems + '</td>' +
+            '<td style="text-align:center;color:' + (b.outOfStock > 0 ? '#ef4444' : '#10b981') + ';font-weight:600">' + b.outOfStock + '</td>' +
+            '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+}
+
+function renderRevenueTrendChart(trend) {
+    const ctx = document.getElementById('revenueTrendChart');
+    if (!ctx) return;
+    if (revenueTrendChart) revenueTrendChart.destroy();
+
+    const labels = (trend || []).map(r => {
+        const d = new Date(r.date);
+        return d.getDate() + '/' + (d.getMonth() + 1);
+    });
+    const revenues = (trend || []).map(r => r.revenue);
+    const collections = (trend || []).map(r => r.collections);
+
+    revenueTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Revenue', data: revenues, borderColor: '#667eea', backgroundColor: 'rgba(102,126,234,0.1)', fill: true, tension: 0.3, pointRadius: 2 },
+                { label: 'Collections', data: collections, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.3, pointRadius: 2 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+                y: { beginAtZero: true, ticks: { callback: function(v) { return v >= 100000 ? (v/100000).toFixed(0) + 'L' : v >= 1000 ? (v/1000).toFixed(0) + 'K' : v; }, font: { size: 10 } } },
+                x: { ticks: { font: { size: 10 }, maxRotation: 0 } }
+            },
+            interaction: { intersect: false, mode: 'index' }
+        }
+    });
+}
+
+function renderBranchCompareChart(branches) {
+    const ctx = document.getElementById('branchCompareChart');
+    if (!ctx) return;
+    if (branchCompareChart) branchCompareChart.destroy();
+
+    const labels = (branches || []).map(b => b.branch);
+    const thisMonth = (branches || []).map(b => b.monthRevenue);
+    const lastMonth = (branches || []).map(b => b.lastMonthRevenue);
+
+    branchCompareChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'This Month', data: thisMonth, backgroundColor: '#667eea' },
+                { label: 'Last Month', data: lastMonth, backgroundColor: '#e2e8f0' }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+                x: { beginAtZero: true, ticks: { callback: function(v) { return v >= 100000 ? (v/100000).toFixed(0) + 'L' : v >= 1000 ? (v/1000).toFixed(0) + 'K' : v; }, font: { size: 10 } } },
+                y: { ticks: { font: { size: 11 } } }
+            }
+        }
+    });
+}
+
+function showChart(type, btn) {
+    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    document.getElementById('chartTrend').style.display = type === 'trend' ? '' : 'none';
+    document.getElementById('chartBranch').style.display = type === 'branch' ? '' : 'none';
+}
+
+function dashQuerySend() {
+    const input = document.getElementById('dashQueryInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    // Switch to Chat tab and send
+    document.getElementById('chatInput').value = msg;
+    switchToTab('chat');
+    sendMessage();
+}
+
+function dashQuickQuery(text) {
+    document.getElementById('chatInput').value = text;
+    switchToTab('chat');
+    sendMessage();
+}
+
+// ═══════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════
+loadDashboard();
 loadConversations();
 loadInsightsSummary();
 loadSuggestionsSummary();
