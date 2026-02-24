@@ -43,7 +43,7 @@ async function migrate() {
             console.log('  -> credit_limit column already exists, skipping');
         }
 
-        // 2. Add zoho_customer_map_id to customer_credit_history
+        // 2. Add zoho_customer_map_id to customer_credit_history + fix customer_id default
         console.log('[2/5] Adding zoho_customer_map_id to customer_credit_history...');
         const [cols2] = await pool.query(`SHOW COLUMNS FROM customer_credit_history LIKE 'zoho_customer_map_id'`);
         if (cols2.length === 0) {
@@ -54,6 +54,9 @@ async function migrate() {
         } else {
             console.log('  -> zoho_customer_map_id already exists, skipping');
         }
+        // Ensure customer_id has a default (inserts now use zoho_customer_map_id only)
+        await pool.query(`ALTER TABLE customer_credit_history MODIFY customer_id INT NOT NULL DEFAULT 0`);
+        console.log('  -> Ensured customer_id DEFAULT 0');
 
         // 3. Add zoho_customer_map_id to credit_limit_violations
         console.log('[3/5] Adding zoho_customer_map_id to credit_limit_violations...');
