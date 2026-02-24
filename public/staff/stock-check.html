@@ -243,6 +243,98 @@
         .diff-positive { color: #059669; font-weight: 600; }
         .diff-negative { color: #dc2626; font-weight: 600; }
         .diff-zero { color: #64748b; }
+
+        /* Progress bar */
+        .progress-bar-container {
+            background: #e2e8f0;
+            border-radius: 99px;
+            height: 10px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, #667eea, #059669);
+            transition: width 0.5s ease;
+        }
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-bottom: 14px;
+        }
+
+        /* Filter tabs */
+        .filter-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 14px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .filter-tab {
+            padding: 6px 12px;
+            border-radius: 99px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border: 1.5px solid #e2e8f0;
+            background: white;
+            color: #64748b;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .filter-tab.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        /* Save progress button */
+        .save-progress-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            border: none;
+            color: white;
+            background: linear-gradient(135deg, #059669, #10b981);
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
+            margin-bottom: 8px;
+        }
+        .save-progress-btn:active { transform: scale(0.97); }
+        .save-progress-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Resume banner */
+        .resume-banner {
+            background: #fefce8;
+            border: 1px solid #fde68a;
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.78rem;
+            color: #854d0e;
+        }
+        .resume-banner .icon { font-size: 1.2rem; }
+
+        /* Checked item styling */
+        .item-card.checked {
+            border-color: #86efac;
+            background: #f0fdf4;
+        }
+        .item-card.checked .check-indicator {
+            color: #059669;
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
     </style>
 </head>
 <body data-page="stock-check">
@@ -324,6 +416,11 @@ let reqSelectedItems = []; // for self-request
 let reqPhotoFiles = {}; // for self-request photos
 let searchTimeout = null;
 let userBranchId = null;
+
+// Partial submission tracking
+let dirtyItems = {}; // { assignmentId: Set of zoho_item_ids }
+let progressData = {}; // { assignmentId: { total, checked, remaining, progress_pct, checked_items } }
+let activeFilters = {}; // { assignmentId: 'all'|'unchecked'|'checked'|'diff' }
 
 function formatCheckDate(dateStr) {
     if (!dateStr) return 'No date';
@@ -411,12 +508,33 @@ async function loadAssignments() {
                     a.items = detail.data.items;
                     a.show_system_qty = detail.data.show_system_qty;
                     a.notes = detail.data.notes;
+
+                    // Fetch progress for this assignment
+                    try {
+                        const progRes = await fetch(API + '/progress/' + a.id, { headers: headers() });
+                        const progData = await progRes.json();
+                        if (progData.success) {
+                            progressData[a.id] = progData.data;
+                        }
+                    } catch (e) { /* no progress yet */ }
+
+                    dirtyItems[a.id] = new Set();
+                    activeFilters[a.id] = 'all';
                     html += renderAssignment(a);
                 }
             }
         }
 
         container.innerHTML = html;
+
+        // Pre-fill checked items and apply resume state
+        for (const a of assignments) {
+            if (a.status !== 'pending' || !a.items) continue;
+            const prog = progressData[a.id];
+            if (prog && prog.checked > 0) {
+                applyProgress(a.id, prog);
+            }
+        }
     } catch (err) {
         container.innerHTML = `<div class="card" style="text-align:center; color:#ef4444;">Failed to load assignments</div>`;
     }
@@ -441,15 +559,39 @@ function renderSubmitted(a) {
 }
 
 function renderAssignment(a) {
+    const prog = progressData[a.id];
+    const total = a.items ? a.items.length : 0;
+    const checked = prog ? prog.checked : 0;
+    const remaining = total - checked;
+    const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+    const discrepancies = prog ? (prog.discrepancies || 0) : 0;
+
     let html = `
         <div class="card" id="assignment-${a.id}">
             <div class="assignment-header">
                 <div>
                     <div class="assignment-title">${a.branch_name || 'Stock Check'}</div>
-                    <div class="assignment-meta">${a.items ? a.items.length : 0} items &middot; ${formatCheckDate(a.check_date)}</div>
+                    <div class="assignment-meta">${total} items &middot; ${formatCheckDate(a.check_date)}</div>
                 </div>
                 <span class="status-badge status-pending">Pending</span>
+            </div>
+
+            <!-- Progress bar -->
+            <div id="progress-section-${a.id}">
+                <div class="progress-bar-container">
+                    <div class="progress-fill" id="progress-fill-${a.id}" style="width: ${pct}%"></div>
+                </div>
+                <div class="progress-text">
+                    <span id="progress-count-${a.id}">${checked.toLocaleString()}/${total.toLocaleString()}</span>
+                    <span id="progress-detail-${a.id}">${pct}% Complete &middot; ${remaining.toLocaleString()} Remaining</span>
+                </div>
             </div>`;
+
+    // Resume banner (shown if progress exists)
+    html += `<div class="resume-banner" id="resume-banner-${a.id}" style="display:none">
+        <span class="icon">&#9888;&#65039;</span>
+        <span id="resume-text-${a.id}">Resuming from ${pct}% complete</span>
+    </div>`;
 
     if (a.notes) {
         html += `<div style="background:#fffbeb; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:0.75rem; color:#92400e;">
@@ -457,22 +599,36 @@ function renderAssignment(a) {
         </div>`;
     }
 
+    // Filter tabs
+    html += `
+        <div class="filter-tabs" id="filter-tabs-${a.id}">
+            <button class="filter-tab active" data-filter="all" onclick="filterItems(${a.id}, 'all', this)">All (${total})</button>
+            <button class="filter-tab" data-filter="unchecked" onclick="filterItems(${a.id}, 'unchecked', this)">Unchecked (<span id="filter-unchecked-${a.id}">${remaining}</span>)</button>
+            <button class="filter-tab" data-filter="checked" onclick="filterItems(${a.id}, 'checked', this)">Checked (<span id="filter-checked-${a.id}">${checked}</span>)</button>
+            <button class="filter-tab" data-filter="diff" onclick="filterItems(${a.id}, 'diff', this)">Diff (<span id="filter-diff-${a.id}">${discrepancies}</span>)</button>
+        </div>`;
+
     if (a.items) {
+        html += `<div id="items-container-${a.id}">`;
         for (const item of a.items) {
             html += `
-                <div class="item-card" id="item-${item.id}">
+                <div class="item-card" id="item-${a.id}-${item.zoho_item_id}" data-assignment="${a.id}" data-zoho-id="${item.zoho_item_id}" data-status="unchecked">
                     <div class="item-header">
                         <div>
                             <div class="item-name">${item.item_name}</div>
                             ${item.item_sku ? '<div class="item-sku">' + item.item_sku + '</div>' : ''}
                         </div>
-                        ${a.show_system_qty ? '<div class="item-system-qty">Expected: ' + item.system_qty + '</div>' : ''}
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span class="check-indicator" id="check-ind-${a.id}-${item.zoho_item_id}" style="display:none">&#10003;</span>
+                            ${a.show_system_qty ? '<div class="item-system-qty">Expected: ' + item.system_qty + '</div>' : ''}
+                        </div>
                     </div>
 
                     <div class="item-input-row">
                         <label>Count:</label>
                         <input type="number" step="0.01" min="0" class="qty-input" id="qty-${a.id}-${item.zoho_item_id}"
-                               placeholder="Enter quantity" oninput="onQtyInput(this)">
+                               data-assignment="${a.id}" data-zoho-id="${item.zoho_item_id}"
+                               placeholder="Enter quantity" oninput="onQtyInput(this, ${a.id}, '${item.zoho_item_id}')">
                     </div>
 
                     <div class="photo-row">
@@ -488,17 +644,36 @@ function renderAssignment(a) {
                     <textarea class="notes-input" id="notes-${a.id}-${item.zoho_item_id}" rows="1" placeholder="Notes (optional)"></textarea>
                 </div>`;
         }
+        html += '</div>';
 
-        html += `<button class="submit-btn" id="submitBtn-${a.id}" onclick="submitCheck(${a.id})">Submit Stock Check</button>`;
+        // Action buttons
+        html += `
+            <div id="action-buttons-${a.id}">
+                <button class="save-progress-btn" id="saveBtn-${a.id}" onclick="saveProgress(${a.id})" disabled>
+                    Save Progress
+                </button>
+                <button class="submit-btn" id="submitBtn-${a.id}" onclick="submitCheck(${a.id})" style="display:none">
+                    Submit Final Check
+                </button>
+            </div>`;
     }
 
     html += '</div>';
     return html;
 }
 
-function onQtyInput(el) {
-    if (el.value !== '') el.classList.add('has-value');
-    else el.classList.remove('has-value');
+function onQtyInput(el, assignmentId, zohoItemId) {
+    if (el.value !== '') {
+        el.classList.add('has-value');
+        // Track as dirty (newly entered/changed)
+        if (assignmentId && zohoItemId) {
+            if (!dirtyItems[assignmentId]) dirtyItems[assignmentId] = new Set();
+            dirtyItems[assignmentId].add(zohoItemId);
+            updateSaveButton(assignmentId);
+        }
+    } else {
+        el.classList.remove('has-value');
+    }
 }
 
 function onPhotoSelect(input, assignmentId, itemId) {
@@ -520,19 +695,112 @@ function onPhotoSelect(input, assignmentId, itemId) {
     reader.readAsDataURL(file);
 }
 
+// ========================================
+// SAVE PROGRESS (PARTIAL)
+// ========================================
+async function saveProgress(assignmentId) {
+    const a = assignments.find(x => x.id === assignmentId);
+    if (!a || !a.items) return;
+
+    const dirty = dirtyItems[assignmentId];
+    if (!dirty || dirty.size === 0) {
+        showToast('No new items to save', 'info');
+        return;
+    }
+
+    const itemsData = [];
+    for (const zohoId of dirty) {
+        const qtyInput = document.getElementById(`qty-${assignmentId}-${zohoId}`);
+        const notesInput = document.getElementById(`notes-${assignmentId}-${zohoId}`);
+        if (!qtyInput || qtyInput.value === '') continue;
+
+        itemsData.push({
+            zoho_item_id: zohoId,
+            reported_qty: parseFloat(qtyInput.value),
+            notes: notesInput ? notesInput.value.trim() : ''
+        });
+    }
+
+    if (!itemsData.length) {
+        showToast('Enter quantities before saving', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById(`saveBtn-${assignmentId}`);
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const formData = new FormData();
+    formData.append('items', JSON.stringify(itemsData));
+
+    // Include photos for dirty items
+    for (const zohoId of dirty) {
+        const key = `${assignmentId}-${zohoId}`;
+        if (photoFiles[key]) {
+            formData.append(`photo_${zohoId}`, photoFiles[key]);
+        }
+    }
+
+    try {
+        const res = await fetch(API + '/save-progress/' + assignmentId, {
+            method: 'POST',
+            headers: { 'Authorization': headers()['Authorization'] },
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(`Saved ${data.data.saved} items (${data.data.progress_pct}% complete)`);
+            // Update progress data
+            progressData[assignmentId] = {
+                ...progressData[assignmentId],
+                total: data.data.total,
+                checked: data.data.checked,
+                remaining: data.data.remaining,
+                progress_pct: data.data.progress_pct
+            };
+
+            // Mark saved items as checked
+            for (const zohoId of dirty) {
+                const qtyInput = document.getElementById(`qty-${assignmentId}-${zohoId}`);
+                if (qtyInput && qtyInput.value !== '') {
+                    markItemChecked(assignmentId, zohoId);
+                }
+            }
+
+            // Clear dirty set, update UI
+            dirtyItems[assignmentId] = new Set();
+            updateProgressUI(assignmentId, data.data);
+            updateSaveButton(assignmentId);
+            updateFilterCounts(assignmentId);
+        } else {
+            showToast(data.message || 'Failed to save', 'error');
+        }
+    } catch (err) {
+        showToast('Network error', 'error');
+    }
+
+    btn.disabled = false;
+    updateSaveButton(assignmentId);
+}
+
+// ========================================
+// SUBMIT FINAL CHECK
+// ========================================
 async function submitCheck(assignmentId) {
     const a = assignments.find(x => x.id === assignmentId);
     if (!a || !a.items) return;
 
+    // Check all items have quantities
+    const unchecked = [];
     const itemsData = [];
     for (const item of a.items) {
         const qtyInput = document.getElementById(`qty-${assignmentId}-${item.zoho_item_id}`);
         const notesInput = document.getElementById(`notes-${assignmentId}-${item.zoho_item_id}`);
 
         if (!qtyInput || qtyInput.value === '') {
-            showToast('Please enter count for all items', 'warning');
-            if (qtyInput) qtyInput.focus();
-            return;
+            unchecked.push(item.item_name);
+            continue;
         }
 
         itemsData.push({
@@ -540,6 +808,16 @@ async function submitCheck(assignmentId) {
             reported_qty: parseFloat(qtyInput.value),
             notes: notesInput ? notesInput.value.trim() : ''
         });
+    }
+
+    if (unchecked.length > 0) {
+        showToast(`${unchecked.length} items still unchecked`, 'warning');
+        return;
+    }
+
+    // Confirmation
+    if (!confirm(`Submit final stock check?\n\n${itemsData.length} items will be submitted for review.\nThis cannot be undone.`)) {
+        return;
     }
 
     const btn = document.getElementById(`submitBtn-${assignmentId}`);
@@ -585,13 +863,188 @@ async function submitCheck(assignmentId) {
         } else {
             showToast(data.message || 'Failed to submit', 'error');
             btn.disabled = false;
-            btn.textContent = 'Submit Stock Check';
+            btn.textContent = 'Submit Final Check';
         }
     } catch (err) {
         showToast('Network error', 'error');
         btn.disabled = false;
-        btn.textContent = 'Submit Stock Check';
+        btn.textContent = 'Submit Final Check';
     }
+}
+
+// ========================================
+// PROGRESS HELPERS
+// ========================================
+
+/** Apply saved progress to items (pre-fill values, mark as checked) */
+function applyProgress(assignmentId, prog) {
+    if (!prog || !prog.checked_items || !prog.checked_items.length) return;
+
+    // Show resume banner
+    const banner = document.getElementById(`resume-banner-${assignmentId}`);
+    if (banner) {
+        banner.style.display = '';
+        const txt = document.getElementById(`resume-text-${assignmentId}`);
+        if (txt) txt.textContent = `Resuming from ${prog.progress_pct}% complete (${prog.checked} of ${prog.total} items)`;
+    }
+
+    // Pre-fill checked items
+    for (const ci of prog.checked_items) {
+        const qtyInput = document.getElementById(`qty-${assignmentId}-${ci.zoho_item_id}`);
+        if (qtyInput) {
+            qtyInput.value = ci.reported_qty;
+            qtyInput.classList.add('has-value');
+        }
+        if (ci.notes) {
+            const notesInput = document.getElementById(`notes-${assignmentId}-${ci.zoho_item_id}`);
+            if (notesInput) notesInput.value = ci.notes;
+        }
+        if (ci.photo_url) {
+            const preview = document.getElementById(`preview-${assignmentId}-${ci.zoho_item_id}`);
+            const btn = document.getElementById(`photobtn-${assignmentId}-${ci.zoho_item_id}`);
+            if (preview) { preview.src = ci.photo_url; preview.style.display = 'block'; }
+            if (btn) { btn.classList.add('has-photo'); btn.querySelector('span:last-child').textContent = 'Change Photo'; }
+        }
+        markItemChecked(assignmentId, ci.zoho_item_id);
+    }
+
+    // Default to unchecked filter if there's progress
+    if (prog.checked > 0 && prog.remaining > 0) {
+        filterItems(assignmentId, 'unchecked');
+    }
+
+    // Update progress bar and buttons
+    updateProgressUI(assignmentId, prog);
+    updateFilterCounts(assignmentId);
+}
+
+/** Mark a single item as checked visually */
+function markItemChecked(assignmentId, zohoItemId) {
+    const card = document.getElementById(`item-${assignmentId}-${zohoItemId}`);
+    if (card) {
+        card.classList.add('checked');
+        card.setAttribute('data-status', 'checked');
+    }
+    const ind = document.getElementById(`check-ind-${assignmentId}-${zohoItemId}`);
+    if (ind) ind.style.display = '';
+}
+
+/** Update progress bar, text, and button visibility */
+function updateProgressUI(assignmentId, data) {
+    const fill = document.getElementById(`progress-fill-${assignmentId}`);
+    const count = document.getElementById(`progress-count-${assignmentId}`);
+    const detail = document.getElementById(`progress-detail-${assignmentId}`);
+
+    if (fill) fill.style.width = data.progress_pct + '%';
+    if (count) count.textContent = `${data.checked.toLocaleString()}/${data.total.toLocaleString()}`;
+    if (detail) detail.textContent = `${data.progress_pct}% Complete \u00b7 ${data.remaining.toLocaleString()} Remaining`;
+
+    // Show/hide submit button based on completeness
+    const submitBtn = document.getElementById(`submitBtn-${assignmentId}`);
+    if (submitBtn) {
+        submitBtn.style.display = data.remaining === 0 ? '' : 'none';
+    }
+}
+
+/** Update save button text with dirty count */
+function updateSaveButton(assignmentId) {
+    const btn = document.getElementById(`saveBtn-${assignmentId}`);
+    if (!btn) return;
+
+    const dirty = dirtyItems[assignmentId];
+    const count = dirty ? dirty.size : 0;
+
+    if (count > 0) {
+        btn.disabled = false;
+        btn.textContent = `Save Progress (${count} new)`;
+    } else {
+        btn.disabled = true;
+        btn.textContent = 'Save Progress';
+    }
+}
+
+/** Update filter tab counts */
+function updateFilterCounts(assignmentId) {
+    const a = assignments.find(x => x.id === assignmentId);
+    if (!a || !a.items) return;
+
+    let checked = 0, unchecked = 0, diff = 0;
+    for (const item of a.items) {
+        const card = document.getElementById(`item-${assignmentId}-${item.zoho_item_id}`);
+        if (!card) continue;
+        const status = card.getAttribute('data-status');
+        if (status === 'checked') {
+            checked++;
+            const qtyInput = document.getElementById(`qty-${assignmentId}-${item.zoho_item_id}`);
+            if (qtyInput && item.system_qty !== undefined) {
+                const reported = parseFloat(qtyInput.value);
+                const system = parseFloat(item.system_qty) || 0;
+                if (!isNaN(reported) && reported !== system) diff++;
+            }
+        } else {
+            unchecked++;
+        }
+    }
+
+    const uncheckedEl = document.getElementById(`filter-unchecked-${assignmentId}`);
+    const checkedEl = document.getElementById(`filter-checked-${assignmentId}`);
+    const diffEl = document.getElementById(`filter-diff-${assignmentId}`);
+    if (uncheckedEl) uncheckedEl.textContent = unchecked;
+    if (checkedEl) checkedEl.textContent = checked;
+    if (diffEl) diffEl.textContent = diff;
+}
+
+/** Filter items by status */
+function filterItems(assignmentId, filter, clickedBtn) {
+    activeFilters[assignmentId] = filter;
+
+    // Update active tab styling
+    const tabContainer = document.getElementById(`filter-tabs-${assignmentId}`);
+    if (tabContainer) {
+        tabContainer.querySelectorAll('.filter-tab').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-filter') === filter);
+        });
+    }
+    // Also handle when called with a button element directly
+    if (clickedBtn) {
+        const parent = clickedBtn.parentElement;
+        if (parent) {
+            parent.querySelectorAll('.filter-tab').forEach(btn => btn.classList.remove('active'));
+            clickedBtn.classList.add('active');
+        }
+    }
+
+    // Show/hide items
+    const container = document.getElementById(`items-container-${assignmentId}`);
+    if (!container) return;
+
+    const cards = container.querySelectorAll('.item-card');
+    cards.forEach(card => {
+        const status = card.getAttribute('data-status');
+        let show = false;
+
+        switch (filter) {
+            case 'all': show = true; break;
+            case 'unchecked': show = status === 'unchecked'; break;
+            case 'checked': show = status === 'checked'; break;
+            case 'diff':
+                if (status === 'checked') {
+                    const zohoId = card.getAttribute('data-zoho-id');
+                    const aid = card.getAttribute('data-assignment');
+                    const qtyInput = document.getElementById(`qty-${aid}-${zohoId}`);
+                    const a = assignments.find(x => x.id == aid);
+                    const item = a && a.items ? a.items.find(i => i.zoho_item_id === zohoId) : null;
+                    if (qtyInput && item) {
+                        const reported = parseFloat(qtyInput.value);
+                        const system = parseFloat(item.system_qty) || 0;
+                        show = !isNaN(reported) && reported !== system;
+                    }
+                }
+                break;
+        }
+
+        card.style.display = show ? '' : 'none';
+    });
 }
 
 // ========================================
