@@ -38,7 +38,7 @@ async function migrate() {
                 submitted_at DATETIME,
                 reviewed_by INT,
                 reviewed_at DATETIME,
-                adjustment_id VARCHAR(100),
+                adjustment_id VARCHAR(1000),
                 created_by INT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
