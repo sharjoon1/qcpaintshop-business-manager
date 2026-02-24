@@ -16,11 +16,14 @@ async function migrate() {
         console.log('Connected to database. Running Clawdbot primary provider migration...\n');
 
         const configs = [
-            { key: 'gemini_enabled', value: 'false', description: 'Gemini disabled — quota exhausted' },
-            { key: 'claude_enabled', value: 'false', description: 'Claude API disabled — budget resets Mar 1' },
-            { key: 'clawdbot_enabled', value: 'true', description: 'Clawdbot enabled as sole provider' },
-            { key: 'primary_provider', value: 'clawdbot', description: 'Primary AI provider' },
-            { key: 'fallback_provider', value: 'clawdbot', description: 'Fallback AI provider' }
+            { key: 'gemini_enabled', value: 'false' },
+            { key: 'claude_enabled', value: 'false' },
+            { key: 'clawdbot_enabled', value: 'true' },
+            { key: 'primary_provider', value: 'clawdbot' },
+            { key: 'fallback_provider', value: 'clawdbot' },
+            { key: 'clawdbot_model', value: 'anthropic/claude-sonnet-4-5' },
+            { key: 'max_tokens_per_request', value: '2048' },
+            { key: 'chat_max_tokens', value: '2048' }
         ];
 
         for (const cfg of configs) {
