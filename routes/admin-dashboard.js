@@ -124,8 +124,9 @@ async function getActivityFeed(todayStr) {
     try {
         const [rows] = await pool.query(`
             SELECT * FROM (
-                (SELECT 'clock_in' as type, u.full_name as user_name,
-                    CONCAT(u.full_name, ' clocked in', IFNULL(CONCAT(' at ', b.name), '')) as message,
+                (SELECT 'clock_in' COLLATE utf8mb4_unicode_ci as type,
+                    u.full_name COLLATE utf8mb4_unicode_ci as user_name,
+                    CONCAT(u.full_name, ' clocked in', IFNULL(CONCAT(' at ', b.name COLLATE utf8mb4_unicode_ci), '')) COLLATE utf8mb4_unicode_ci as message,
                     sa.clock_in_time as event_time
                 FROM staff_attendance sa
                 JOIN users u ON sa.user_id = u.id
@@ -135,8 +136,9 @@ async function getActivityFeed(todayStr) {
 
                 UNION ALL
 
-                (SELECT 'clock_out' as type, u.full_name as user_name,
-                    CONCAT(u.full_name, ' clocked out') as message,
+                (SELECT 'clock_out' COLLATE utf8mb4_unicode_ci as type,
+                    u.full_name COLLATE utf8mb4_unicode_ci as user_name,
+                    CONCAT(u.full_name, ' clocked out') COLLATE utf8mb4_unicode_ci as message,
                     sa.clock_out_time as event_time
                 FROM staff_attendance sa
                 JOIN users u ON sa.user_id = u.id
@@ -145,8 +147,9 @@ async function getActivityFeed(todayStr) {
 
                 UNION ALL
 
-                (SELECT 'stock_submit' as type, u.full_name as user_name,
-                    CONCAT(u.full_name, ' submitted stock check') as message,
+                (SELECT 'stock_submit' COLLATE utf8mb4_unicode_ci as type,
+                    u.full_name COLLATE utf8mb4_unicode_ci as user_name,
+                    CONCAT(u.full_name, ' submitted stock check') COLLATE utf8mb4_unicode_ci as message,
                     sca.submitted_at as event_time
                 FROM stock_check_assignments sca
                 JOIN users u ON sca.staff_id = u.id
@@ -155,8 +158,9 @@ async function getActivityFeed(todayStr) {
 
                 UNION ALL
 
-                (SELECT 'task_complete' as type, u.full_name as user_name,
-                    CONCAT(u.full_name, ' completed task: ', LEFT(st.title, 40)) as message,
+                (SELECT 'task_complete' COLLATE utf8mb4_unicode_ci as type,
+                    u.full_name COLLATE utf8mb4_unicode_ci as user_name,
+                    CONCAT(u.full_name, ' completed task: ', LEFT(st.title, 40)) COLLATE utf8mb4_unicode_ci as message,
                     st.updated_at as event_time
                 FROM staff_tasks st
                 JOIN users u ON st.assigned_to = u.id
@@ -165,8 +169,9 @@ async function getActivityFeed(todayStr) {
 
                 UNION ALL
 
-                (SELECT 'estimate' as type, p.full_name as user_name,
-                    CONCAT('New estimate #', pe.estimate_number, ' - ', FORMAT(pe.grand_total, 0)) as message,
+                (SELECT 'estimate' COLLATE utf8mb4_unicode_ci as type,
+                    p.full_name COLLATE utf8mb4_unicode_ci as user_name,
+                    CONCAT('New estimate #', pe.estimate_number COLLATE utf8mb4_unicode_ci, ' - ', FORMAT(pe.grand_total, 0)) COLLATE utf8mb4_unicode_ci as message,
                     pe.created_at as event_time
                 FROM painter_estimates pe
                 JOIN painters p ON pe.painter_id = p.id
@@ -175,8 +180,9 @@ async function getActivityFeed(todayStr) {
 
                 UNION ALL
 
-                (SELECT 'new_lead' as type, COALESCE(l.name, 'Unknown') as user_name,
-                    CONCAT('New lead: ', COALESCE(l.name, 'Unknown'), IFNULL(CONCAT(' - ', l.company), '')) as message,
+                (SELECT 'new_lead' COLLATE utf8mb4_unicode_ci as type,
+                    COALESCE(l.name, 'Unknown') COLLATE utf8mb4_unicode_ci as user_name,
+                    CONCAT('New lead: ', COALESCE(l.name, 'Unknown'), IFNULL(CONCAT(' - ', l.company), '')) COLLATE utf8mb4_unicode_ci as message,
                     l.created_at as event_time
                 FROM leads l
                 WHERE DATE(l.created_at) = ?
