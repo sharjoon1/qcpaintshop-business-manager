@@ -25,10 +25,10 @@ async function migrate() {
 
         for (const cfg of configs) {
             await pool.query(
-                `INSERT INTO ai_config (config_key, config_value, description)
-                 VALUES (?, ?, ?)
-                 ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), description = VALUES(description)`,
-                [cfg.key, cfg.value, cfg.description]
+                `INSERT INTO ai_config (config_key, config_value)
+                 VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)`,
+                [cfg.key, cfg.value]
             );
             console.log(`  ✓ ${cfg.key} = ${cfg.value}`);
         }
