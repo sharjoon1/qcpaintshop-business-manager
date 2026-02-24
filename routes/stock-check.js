@@ -260,10 +260,12 @@ router.get('/my-assignments', requireAuth, async (req, res) => {
                 `SELECT a.*, DATE_FORMAT(a.check_date, '%Y-%m-%d') as check_date,
                         b.name as branch_name,
                         u.full_name as created_by_name,
+                        zlm.zoho_location_name as location_name,
                         (SELECT COUNT(*) FROM stock_check_items WHERE assignment_id = a.id) as item_count
                  FROM stock_check_assignments a
                  LEFT JOIN branches b ON a.branch_id = b.id
                  LEFT JOIN users u ON a.created_by = u.id
+                 LEFT JOIN zoho_locations_map zlm ON a.location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
                  WHERE a.staff_id = ? AND a.status IN ('pending', 'submitted')
                  ORDER BY a.check_date DESC, a.created_at DESC
                  LIMIT 10`,
@@ -330,6 +332,173 @@ router.get('/my-submissions', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('My submissions error:', error);
         res.status(500).json({ success: false, message: 'Failed to get submissions' });
+    }
+});
+
+// ========================================
+// STAFF: SAVE PROGRESS (PARTIAL SUBMISSION)
+// ========================================
+
+/** POST /api/stock-check/save-progress/:id — Staff saves partial progress on stock check */
+router.post('/save-progress/:id', requireAuth, upload.any(), async (req, res) => {
+    try {
+        const assignmentId = req.params.id;
+
+        // Verify assignment belongs to this staff and is pending
+        const [assignments] = await pool.query(
+            'SELECT * FROM stock_check_assignments WHERE id = ? AND staff_id = ?',
+            [assignmentId, req.user.id]
+        );
+        if (!assignments.length) return res.status(404).json({ success: false, message: 'Assignment not found' });
+        if (assignments[0].status !== 'pending') {
+            return res.status(400).json({ success: false, message: 'Assignment already submitted' });
+        }
+
+        // Parse items from body
+        let items;
+        try {
+            items = typeof req.body.items === 'string' ? JSON.parse(req.body.items) : req.body.items;
+        } catch (e) {
+            return res.status(400).json({ success: false, message: 'Invalid items data' });
+        }
+
+        if (!items || !items.length) {
+            return res.status(400).json({ success: false, message: 'No items to save' });
+        }
+
+        // Build file map: photo_{item_id} => file buffer
+        const fileMap = {};
+        if (req.files) {
+            for (const file of req.files) {
+                fileMap[file.fieldname] = file;
+            }
+        }
+
+        // Ensure upload dir
+        if (!fs.existsSync(UPLOAD_DIR)) {
+            fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+        }
+
+        const now = new Date();
+        let saved = 0;
+
+        for (const item of items) {
+            const reportedQty = parseFloat(item.reported_qty);
+            if (isNaN(reportedQty)) continue;
+
+            // Get system qty for difference calc
+            const [existing] = await pool.query(
+                'SELECT id, system_qty FROM stock_check_items WHERE assignment_id = ? AND zoho_item_id = ?',
+                [assignmentId, item.zoho_item_id]
+            );
+            if (!existing.length) continue;
+
+            const systemQty = parseFloat(existing[0].system_qty) || 0;
+            const difference = reportedQty - systemQty;
+            const variancePct = systemQty !== 0 ? ((difference / systemQty) * 100) : (reportedQty !== 0 ? 100 : 0);
+
+            // Process photo if uploaded
+            let photoUrl = null;
+            const photoFile = fileMap[`photo_${item.zoho_item_id}`];
+            if (photoFile) {
+                const filename = `sc-${assignmentId}-${item.zoho_item_id}-${Date.now()}.jpg`;
+                const filepath = path.join(UPLOAD_DIR, filename);
+                await sharp(photoFile.buffer)
+                    .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+                    .jpeg({ quality: 80 })
+                    .toFile(filepath);
+                photoUrl = `/uploads/stock-check/${filename}`;
+            }
+
+            await pool.query(
+                `UPDATE stock_check_items
+                 SET reported_qty = ?, difference = ?, variance_pct = ?, photo_url = COALESCE(?, photo_url),
+                     notes = ?, submitted_at = ?
+                 WHERE id = ?`,
+                [reportedQty, difference, Math.round(variancePct * 100) / 100, photoUrl, item.notes || null, now, existing[0].id]
+            );
+            saved++;
+        }
+
+        // Get progress stats (do NOT change assignment status)
+        const [totalRows] = await pool.query(
+            'SELECT COUNT(*) as total FROM stock_check_items WHERE assignment_id = ?',
+            [assignmentId]
+        );
+        const [checkedRows] = await pool.query(
+            'SELECT COUNT(*) as checked FROM stock_check_items WHERE assignment_id = ? AND reported_qty IS NOT NULL',
+            [assignmentId]
+        );
+
+        const total = totalRows[0].total;
+        const checked = checkedRows[0].checked;
+        const remaining = total - checked;
+        const progressPct = total > 0 ? Math.round((checked / total) * 100) : 0;
+
+        res.json({
+            success: true,
+            message: `Saved ${saved} items`,
+            data: { saved, total, checked, remaining, progress_pct: progressPct }
+        });
+    } catch (error) {
+        console.error('Save progress error:', error);
+        res.status(500).json({ success: false, message: 'Failed to save progress' });
+    }
+});
+
+// ========================================
+// STAFF: GET PROGRESS
+// ========================================
+
+/** GET /api/stock-check/progress/:id — Get progress stats + checked items for resume */
+router.get('/progress/:id', requireAuth, async (req, res) => {
+    try {
+        const assignmentId = req.params.id;
+
+        // Verify assignment belongs to this staff
+        const [assignments] = await pool.query(
+            'SELECT id, staff_id, status FROM stock_check_assignments WHERE id = ?',
+            [assignmentId]
+        );
+        if (!assignments.length) return res.status(404).json({ success: false, message: 'Assignment not found' });
+        if (assignments[0].staff_id !== req.user.id) {
+            return res.status(403).json({ success: false, message: 'Access denied' });
+        }
+
+        // Get all items with their check status
+        const [items] = await pool.query(
+            'SELECT zoho_item_id, reported_qty, difference, variance_pct, notes, photo_url, submitted_at FROM stock_check_items WHERE assignment_id = ? ORDER BY item_name ASC',
+            [assignmentId]
+        );
+
+        const total = items.length;
+        const checkedItems = items.filter(i => i.reported_qty !== null);
+        const checked = checkedItems.length;
+        const remaining = total - checked;
+        const progressPct = total > 0 ? Math.round((checked / total) * 100) : 0;
+        const discrepancies = checkedItems.filter(i => parseFloat(i.difference) !== 0).length;
+
+        res.json({
+            success: true,
+            data: {
+                total,
+                checked,
+                remaining,
+                progress_pct: progressPct,
+                discrepancies,
+                checked_items: checkedItems.map(i => ({
+                    zoho_item_id: i.zoho_item_id,
+                    reported_qty: i.reported_qty,
+                    difference: i.difference,
+                    variance_pct: i.variance_pct,
+                    notes: i.notes,
+                    photo_url: i.photo_url
+                }))
+            }
+        });
+    } catch (error) {
+        console.error('Get progress error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get progress' });
     }
 });
 

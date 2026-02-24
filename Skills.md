@@ -739,11 +739,19 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - **Real-time notifications**: Socket.io + socket-helper loaded dynamically, listens for `stock_check_assigned` events
 - **Auto-refresh**: New assignments auto-appear when admin creates them
 - **Visual alert**: Slide-down banner with assignment details, auto-dismiss 8s
-- **Dashboard widget** (`staff/dashboard.html`): "Stock Check Assignments" card shows all pending/submitted assignments
-  - Auto-hides when no assignments, shows count badge for pending
-  - Color-coded: red border for overdue, amber for pending, green for submitted
-  - "Start" button links to `stock-check.html`
-  - Real-time: Socket.io `notification` event with type `stock_check_assigned` triggers toast + auto-refresh
+- **Unified "Your Work" widget** (`staff/dashboard.html`): Combined stock check assignments + ad-hoc tasks in a single priority-sorted section
+  - See "Staff Dashboard → Your Work" section below for full details
+
+**Partial Submission / Save Progress** (Feb 24):
+- Staff can save partial progress on large stock checks (300-1,100+ items)
+- Animated progress bar at top of each assignment: `████████░░░░ 245/1,109 — 22% Complete · 864 Remaining`
+- **Filter tabs**: All | Unchecked | Checked | Diff — toggle visibility of items by status
+- **Save Progress button**: green gradient, shows count of unsaved items: "Save Progress (12 new)"
+- **Resume flow**: On reload, fetches saved progress via `GET /progress/:id`, pre-fills values, shows resume banner
+- **Submit Final**: only shown when ALL items are checked, requires confirmation dialog
+- Dirty item tracking via `dirtyItems` Set per assignment — only unsaved items sent to server
+- Items visually marked as checked (green tint + checkmark) after save
+- Default filter switches to "Unchecked" when resuming with partial progress
 
 **Staff Self-Request** (Feb 21):
 - Staff can initiate stock checks themselves via "New Request" tab
@@ -784,7 +792,7 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 
 **Staff Page Tabs**: 3 tabs — Assignments | History | New Request
 
-**API Endpoints** (`routes/stock-check.js`, 15 endpoints):
+**API Endpoints** (`routes/stock-check.js`, 17 endpoints):
 - `GET /locations/:branchId` — Zoho locations for a branch (admin)
 - `POST /assign` — Create assignment with selected location + role validation (admin)
 - `GET /assignments` — List with filters (admin)
@@ -792,6 +800,8 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - `DELETE /assignments/:id` — Delete pending (admin)
 - `GET /my-assignments` — Staff's assignments by date (default today); `?pending=1` returns all pending/submitted; sorted DESC
 - `GET /my-submissions` — Staff's past submitted/reviewed/adjusted assignments with pagination
+- `POST /save-progress/:id` — Save partial progress (updates items without changing assignment status)
+- `GET /progress/:id` — Get progress stats + list of checked items for resume
 - `POST /submit/:id` — Staff submits counts + photos (multipart)
 - `POST /self-request` — Staff self-initiates stock check (creates assignment + items, `request_type='self_requested'`)
 - `GET /review/:id` — Admin review with comparison + location name
@@ -991,10 +1001,21 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 **Staff Dashboard**
 - Personalized greeting with user's first name ("Hi, John")
 - Profile avatar display (photo or initials fallback)
-- Personal attendance status
-- Assigned tasks
-- Quick action buttons
-- Page: `staff/dashboard.html`, `dashboard.html`
+- Personal attendance status (timer, clock in/out, breaks, prayer, outside work)
+- Daily Tasks checklist widget (progress bar, Open Daily Tasks button)
+- **"Your Work" unified section** — combines stock check assignments + ad-hoc tasks in one priority-sorted view:
+  - Filter tabs: All | Stock Checks | Tasks | Completed (with counts)
+  - Red badge showing urgent item count (new + overdue)
+  - **9-level priority sort**: NEW stock check (red pulse) → Overdue SC → NEW task (red pulse) → In-progress SC → Overdue task → In-progress task → Pending SC (blue) → Pending task (gray) → Completed (green, 24h only)
+  - Stock check cards 20% larger than task cards (17px padding, 15px title)
+  - Progress bars for in-progress stock checks (fetched via `GET /progress/:id`)
+  - "NEW" badge with pulse animation for items created < 5 minutes ago
+  - Real-time: Socket.io listens for `stock_check_assigned` + `task_assigned` → toast + auto-refresh
+  - Auto-refresh every 60 seconds
+  - APIs: `GET /api/stock-check/my-assignments?pending=1` (includes `location_name` via zlm JOIN), `GET /api/tasks/my-tasks?limit=20`, `GET /api/stock-check/progress/:id`
+- Quick action buttons (History, Permission, Activities, Stock Check)
+- Bank Details section (view/edit)
+- Page: `staff/dashboard.html`
 
 ### 2.23 AI Business Intelligence System
 
@@ -2035,6 +2056,12 @@ Based on AI App Analyzer report, fixed critical production errors:
 - **Marketing**: "General WhatsApp (Company)" option in campaign branch dropdown and instant send; campaign queries show proper label
 - **Collections**: "Send via" dropdown in reminder modal (Auto / General WhatsApp); `session_type` param on POST /remind
 - **Migration**: `migrate-general-wa-integration.js` drops FK constraints on `wa_campaigns` and `wa_campaign_leads`
+
+### Feb 24, 2026 — Stock Check Partial Submission UI
+- **Added**: `POST /save-progress/:id` — saves partial progress (updates items without changing assignment status), returns `{saved, total, checked, remaining, progress_pct}`
+- **Added**: `GET /progress/:id` — returns progress stats + list of already-checked items for resume
+- **Enhanced**: `staff/stock-check.html` — animated progress bar, filter tabs (All/Unchecked/Checked/Diff), "Save Progress (N new)" button, resume banner, dirty item tracking, "Submit Final" only when 100% checked
+- **Total stock-check endpoints**: 15 → 17
 
 ### Feb 23, 2026 — Zoho Product Import & Painter Rates Fix
 - **Fixed**: Painter Rates "Sync from Zoho" was querying non-existent `zoho_items_cache` table — changed to `zoho_items_map`

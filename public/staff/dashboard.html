@@ -368,6 +368,190 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.8; }
         }
+        /* ========================================
+           YOUR WORK — Unified Section
+           ======================================== */
+        .your-work-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .your-work-badge {
+            background: #ef4444;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+            min-width: 20px;
+            text-align: center;
+            animation: badgePulse 2s ease-in-out infinite;
+        }
+        @keyframes badgePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .your-work-tabs {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 12px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .your-work-tabs::-webkit-scrollbar { display: none; }
+        .your-work-tab {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid #e5e7eb;
+            background: white;
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .your-work-tab.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .tab-count {
+            font-size: 10px;
+            opacity: 0.8;
+        }
+
+        /* Work Cards */
+        .work-card {
+            padding: 14px;
+            background: #f9fafb;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            border-left: 4px solid #d1d5db;
+            transition: all 0.3s;
+        }
+        .work-card.stock-check {
+            padding: 17px;
+        }
+        .work-card.stock-check .wc-title { font-size: 15px; }
+        .work-card.stock-check .wc-action-btn { font-size: 13px; padding: 7px 16px; }
+
+        .work-card.priority-new {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+            animation: cardPulse 2s ease-in-out infinite;
+        }
+        @keyframes cardPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+            50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15); }
+        }
+        .work-card.priority-overdue {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+        .work-card.priority-overdue-task {
+            border-left-color: #f97316;
+            background: #fff7ed;
+        }
+        .work-card.priority-inprogress {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+        .work-card.priority-pending-sc {
+            border-left-color: #3b82f6;
+            background: #eff6ff;
+        }
+        .work-card.priority-pending-task {
+            border-left-color: #9ca3af;
+            background: #f9fafb;
+        }
+        .work-card.priority-completed {
+            border-left-color: #10b981;
+            background: #f0fdf4;
+            opacity: 0.85;
+        }
+
+        .new-badge {
+            display: inline-block;
+            background: #ef4444;
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
+            animation: badgePulse 2s ease-in-out infinite;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+
+        .work-progress-bar {
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .work-progress-bar .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 3px;
+            transition: width 0.5s;
+        }
+
+        .wc-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1f2937;
+        }
+        .wc-subtitle {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+        .wc-meta {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 6px;
+        }
+        .wc-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .wc-from {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+        .wc-action-btn {
+            padding: 6px 14px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .wc-status-pill {
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .your-work-empty {
+            text-align: center;
+            padding: 24px 16px;
+            color: #9ca3af;
+        }
+        .your-work-empty-icon {
+            font-size: 40px;
+            margin-bottom: 8px;
+        }
     </style>
     <script src="/universal-nav-loader.js"></script>
 </head>
@@ -584,13 +768,26 @@
         </div>
     </div>
 
-    <!-- Stock Check Assignments -->
-    <div class="status-card" id="stockCheckCard" style="display: none;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-            <h3 style="font-size: 16px; font-weight: 600; color: #1f2937;">Stock Check Assignments</h3>
-            <span id="stockCheckBadge" class="badge badge-danger" style="display:none;"></span>
+    <!-- Your Work (Unified Stock Checks + Tasks) -->
+    <div class="status-card" id="yourWorkCard">
+        <div class="your-work-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <h3 style="font-size: 16px; font-weight: 600; color: #1f2937;">Your Work</h3>
+                <span class="your-work-badge" id="yourWorkBadge" style="display:none;">0</span>
+            </div>
+            <button onclick="loadYourWork()" style="background: none; border: none; color: #667eea; font-size: 13px; cursor: pointer; font-weight: 600; padding: 4px 8px;">Refresh</button>
         </div>
-        <div id="stockCheckContent"></div>
+        <div class="your-work-tabs" id="yourWorkTabs">
+            <button class="your-work-tab active" data-filter="all" onclick="filterYourWork('all')">All</button>
+            <button class="your-work-tab" data-filter="stock-checks" onclick="filterYourWork('stock-checks')">Stock Checks <span class="tab-count" id="tabCountSC"></span></button>
+            <button class="your-work-tab" data-filter="tasks" onclick="filterYourWork('tasks')">Tasks <span class="tab-count" id="tabCountTasks"></span></button>
+            <button class="your-work-tab" data-filter="completed" onclick="filterYourWork('completed')">Completed <span class="tab-count" id="tabCountDone"></span></button>
+        </div>
+        <div id="yourWorkContent">
+            <div style="text-align:center;padding:16px;">
+                <div class="loader" style="width:24px;height:24px;border-width:2px;margin:0 auto;"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Quick Actions -->
@@ -2488,81 +2685,317 @@
         }
 
         // ========================================
-        // STOCK CHECK ASSIGNMENTS
+        // YOUR WORK — Unified Stock Checks + Tasks
         // ========================================
-        async function loadStockChecks() {
+        let yourWorkItems = [];
+        let yourWorkFilter = 'all';
+        let yourWorkInterval = null;
+
+        async function loadYourWork() {
             try {
-                const res = await fetch('/api/stock-check/my-assignments?pending=1', { headers: getAuthHeaders() });
-                const data = await res.json();
-                const card = document.getElementById('stockCheckCard');
-                const content = document.getElementById('stockCheckContent');
-                const badge = document.getElementById('stockCheckBadge');
+                const [scRes, taskRes] = await Promise.all([
+                    fetch('/api/stock-check/my-assignments?pending=1', { headers: getAuthHeaders() }).then(r => r.json()).catch(() => ({ success: false, data: [] })),
+                    fetch('/api/tasks/my-tasks?limit=20', { headers: getAuthHeaders() }).then(r => r.json()).catch(() => ({ success: false, data: [] }))
+                ]);
 
-                if (!data.success || !data.data || data.data.length === 0) {
-                    card.style.display = 'none';
-                    return;
-                }
+                const stockChecks = (scRes.success && scRes.data) ? scRes.data : [];
+                const tasks = (taskRes.success && taskRes.data) ? taskRes.data : [];
 
-                card.style.display = 'block';
-                const pending = data.data.filter(a => a.status === 'pending');
-                if (pending.length > 0) {
-                    badge.textContent = `${pending.length} Pending`;
-                    badge.style.display = 'inline-block';
-                } else {
-                    badge.style.display = 'none';
-                }
+                // Fetch progress for pending/in-progress stock checks in parallel
+                const progressPromises = stockChecks
+                    .filter(sc => sc.status === 'pending')
+                    .map(sc => fetch(`/api/stock-check/progress/${sc.id}`, { headers: getAuthHeaders() })
+                        .then(r => r.json())
+                        .then(d => ({ id: sc.id, progress: d.success ? d.data : null }))
+                        .catch(() => ({ id: sc.id, progress: null }))
+                    );
+                const progressResults = await Promise.all(progressPromises);
+                const progressMap = {};
+                progressResults.forEach(p => { if (p.progress) progressMap[p.id] = p.progress; });
 
-                content.innerHTML = data.data.map(a => {
-                    const isPending = a.status === 'pending';
-                    const statusColor = isPending ? '#f59e0b' : '#10b981';
-                    const statusBg = isPending ? '#fef3c7' : '#d1fae5';
-                    const statusText = isPending ? 'Pending' : 'Submitted';
-                    let isToday = false, isOverdue = false, dateStr = 'No date';
-                    if (a.check_date) {
-                        try {
-                            const checkDate = new Date(a.check_date + (a.check_date.includes('T') ? '' : 'T00:00:00'));
-                            if (!isNaN(checkDate.getTime())) {
-                                const today = new Date();
-                                today.setHours(0,0,0,0);
-                                isToday = checkDate.getTime() === today.getTime();
-                                isOverdue = checkDate < today && isPending;
-                                dateStr = isToday ? 'Today' : checkDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-                            }
-                        } catch(e) {}
-                    }
-
-                    return `
-                    <div style="padding: 14px; background: ${isOverdue ? '#fef2f2' : '#f9fafb'}; border-radius: 12px; margin-bottom: 8px; ${isOverdue ? 'border-left: 4px solid #ef4444;' : isPending ? 'border-left: 4px solid #f59e0b;' : 'border-left: 4px solid #10b981;'}">
-                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                            <div>
-                                <div style="font-weight: 600; font-size: 14px; color: #1f2937;">${a.branch_name || 'Branch'}</div>
-                                <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${a.item_count} item${a.item_count !== 1 ? 's' : ''} to check</div>
-                            </div>
-                            <span style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${statusBg}; color: ${statusColor};">
-                                ${isOverdue ? 'Overdue' : statusText}
-                            </span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="font-size: 12px; color: #6b7280;">
-                                📅 ${dateStr}${a.notes ? ' · 📝 ' + (a.notes.length > 30 ? a.notes.substring(0, 30) + '...' : a.notes) : ''}
-                            </div>
-                            ${isPending ? `<a href="stock-check.html" style="padding: 6px 14px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 8px; font-size: 12px; font-weight: 600; text-decoration: none;">Start</a>` : ''}
-                        </div>
-                    </div>`;
-                }).join('');
-
+                yourWorkItems = normalizeWorkItems(stockChecks, tasks, progressMap);
+                renderYourWork();
             } catch (err) {
-                // Silently fail — stock check is not critical
+                console.error('loadYourWork error:', err);
             }
         }
-        loadStockChecks();
 
-        // Listen for stock check assignment notifications via Socket.io
+        function normalizeWorkItems(stockChecks, tasks, progressMap) {
+            const now = new Date();
+            const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000);
+            const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const today = new Date(); today.setHours(0,0,0,0);
+
+            const items = [];
+
+            // Stock checks
+            stockChecks.forEach(sc => {
+                const createdAt = new Date(sc.created_at);
+                const isNew = createdAt > fiveMinAgo;
+                let checkDate = null, isOverdue = false, isToday = false, dateStr = 'No date';
+                if (sc.check_date) {
+                    try {
+                        checkDate = new Date(sc.check_date + (sc.check_date.includes('T') ? '' : 'T00:00:00'));
+                        if (!isNaN(checkDate.getTime())) {
+                            isToday = checkDate.getTime() === today.getTime();
+                            isOverdue = checkDate < today && sc.status === 'pending';
+                            dateStr = isToday ? 'Today' : checkDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                        }
+                    } catch(e) {}
+                }
+                const progress = progressMap[sc.id];
+                const hasProgress = progress && progress.checked > 0;
+                const isCompleted = sc.status === 'submitted';
+
+                items.push({
+                    _type: 'stock-check',
+                    _isNew: isNew && !isCompleted,
+                    _isOverdue: isOverdue,
+                    _hasProgress: hasProgress,
+                    _isCompleted: isCompleted,
+                    _isInProgress: hasProgress && !isCompleted,
+                    _createdAt: createdAt,
+                    _dateStr: dateStr,
+                    _isToday: isToday,
+                    _progress: progress,
+                    ...sc
+                });
+            });
+
+            // Tasks
+            tasks.forEach(t => {
+                const createdAt = new Date(t.created_at);
+                const isNew = createdAt > fiveMinAgo;
+                let isOverdue = false, dueDateStr = '';
+                if (t.due_date) {
+                    const dueDate = new Date(t.due_date);
+                    isOverdue = dueDate < now && t.status !== 'completed' && t.status !== 'cancelled';
+                    const dueToday = new Date(t.due_date);
+                    dueToday.setHours(0,0,0,0);
+                    if (dueToday.getTime() === today.getTime()) {
+                        dueDateStr = 'Due today';
+                        const time = new Date(t.due_date);
+                        if (time.getHours() > 0 || time.getMinutes() > 0) {
+                            dueDateStr += ` at ${time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+                        }
+                    } else {
+                        dueDateStr = `Due ${dueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
+                    }
+                }
+                const isCompleted = t.status === 'completed' || t.status === 'cancelled';
+                // Only show completed from last 24h
+                if (isCompleted && createdAt < oneDayAgo) return;
+
+                items.push({
+                    _type: 'task',
+                    _isNew: isNew && !isCompleted,
+                    _isOverdue: isOverdue,
+                    _hasProgress: t.progress > 0 && !isCompleted,
+                    _isCompleted: isCompleted,
+                    _isInProgress: t.status === 'in_progress',
+                    _createdAt: createdAt,
+                    _dueDateStr: dueDateStr,
+                    ...t
+                });
+            });
+
+            return items;
+        }
+
+        function getWorkPriority(item) {
+            if (item._isNew && item._type === 'stock-check' && !item._isCompleted) return 1;
+            if (item._isOverdue && item._type === 'stock-check') return 2;
+            if (item._isNew && item._type === 'task' && !item._isCompleted) return 3;
+            if (item._isInProgress && item._type === 'stock-check') return 4;
+            if (item._isOverdue && item._type === 'task') return 5;
+            if (item._isInProgress && item._type === 'task') return 6;
+            if (!item._isCompleted && item._type === 'stock-check') return 7;
+            if (!item._isCompleted && item._type === 'task') return 8;
+            if (item._isCompleted) return 9;
+            return 10;
+        }
+
+        function getPriorityClass(item) {
+            if (item._isNew && !item._isCompleted) return 'priority-new';
+            if (item._isCompleted) return 'priority-completed';
+            if (item._isOverdue && item._type === 'stock-check') return 'priority-overdue';
+            if (item._isOverdue && item._type === 'task') return 'priority-overdue-task';
+            if (item._isInProgress) return 'priority-inprogress';
+            if (item._type === 'stock-check') return 'priority-pending-sc';
+            return 'priority-pending-task';
+        }
+
+        function renderYourWork() {
+            const container = document.getElementById('yourWorkContent');
+            const badge = document.getElementById('yourWorkBadge');
+
+            // Count urgent items (new + overdue)
+            const urgentCount = yourWorkItems.filter(i => (i._isNew || i._isOverdue) && !i._isCompleted).length;
+            if (urgentCount > 0) {
+                badge.textContent = urgentCount;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+
+            // Update tab counts
+            const scCount = yourWorkItems.filter(i => i._type === 'stock-check' && !i._isCompleted).length;
+            const taskCount = yourWorkItems.filter(i => i._type === 'task' && !i._isCompleted).length;
+            const doneCount = yourWorkItems.filter(i => i._isCompleted).length;
+            document.getElementById('tabCountSC').textContent = scCount > 0 ? `(${scCount})` : '';
+            document.getElementById('tabCountTasks').textContent = taskCount > 0 ? `(${taskCount})` : '';
+            document.getElementById('tabCountDone').textContent = doneCount > 0 ? `(${doneCount})` : '';
+
+            // Filter
+            let filtered = yourWorkItems;
+            if (yourWorkFilter === 'stock-checks') filtered = yourWorkItems.filter(i => i._type === 'stock-check' && !i._isCompleted);
+            else if (yourWorkFilter === 'tasks') filtered = yourWorkItems.filter(i => i._type === 'task' && !i._isCompleted);
+            else if (yourWorkFilter === 'completed') filtered = yourWorkItems.filter(i => i._isCompleted);
+            else filtered = yourWorkItems.filter(i => !i._isCompleted); // 'all' hides completed
+
+            // Sort by priority
+            filtered.sort((a, b) => getWorkPriority(a) - getWorkPriority(b));
+
+            if (filtered.length === 0) {
+                const emptyMsg = yourWorkFilter === 'completed' ? 'No completed items in last 24 hours'
+                    : yourWorkFilter === 'stock-checks' ? 'No stock check assignments'
+                    : yourWorkFilter === 'tasks' ? 'No tasks assigned'
+                    : 'All caught up! No pending work.';
+                container.innerHTML = `<div class="your-work-empty"><div class="your-work-empty-icon">${yourWorkFilter === 'completed' ? '&#9989;' : '&#127881;'}</div><p style="font-size:13px;">${emptyMsg}</p></div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(item => {
+                if (item._type === 'stock-check') return renderStockCheckCard(item);
+                return renderTaskCard(item);
+            }).join('');
+        }
+
+        function renderStockCheckCard(sc) {
+            const priorityClass = getPriorityClass(sc);
+            const newBadge = sc._isNew ? '<span class="new-badge">NEW</span>' : '';
+
+            let statusPill = '';
+            if (sc._isCompleted) {
+                statusPill = '<span class="wc-status-pill" style="background:#d1fae5;color:#065f46;">Submitted</span>';
+            } else if (sc._isOverdue) {
+                statusPill = '<span class="wc-status-pill" style="background:#fee2e2;color:#991b1b;">Overdue</span>';
+            } else if (sc._isInProgress) {
+                statusPill = '<span class="wc-status-pill" style="background:#fef3c7;color:#92400e;">In Progress</span>';
+            } else {
+                statusPill = '<span class="wc-status-pill" style="background:#dbeafe;color:#1e40af;">Pending</span>';
+            }
+
+            const locationDisplay = sc.location_name || sc.branch_name || 'Branch';
+            const branchDisplay = sc.branch_name || '';
+            const titleLine = locationDisplay !== branchDisplay && branchDisplay
+                ? `${branchDisplay} - ${locationDisplay}` : locationDisplay;
+
+            let progressBar = '';
+            if (sc._progress && sc._progress.total > 0) {
+                const pct = sc._progress.progress_pct;
+                const checked = sc._progress.checked;
+                const total = sc._progress.total;
+                progressBar = `
+                    <div class="work-progress-bar"><div class="fill" style="width:${pct}%"></div></div>
+                    <div style="font-size:11px;color:#6b7280;">${checked}/${total} items (${pct}%)</div>`;
+            }
+
+            const actionLabel = sc._isInProgress ? 'Continue' : (sc._isCompleted ? '' : 'Start');
+            const actionBtn = !sc._isCompleted ? `<a href="stock-check.html" class="wc-action-btn">${actionLabel}</a>` : '';
+
+            return `
+            <div class="work-card stock-check ${priorityClass}">
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                        <div class="wc-title">${titleLine} ${newBadge}</div>
+                        <div class="wc-subtitle">${sc.item_count || '?'} items to verify</div>
+                    </div>
+                    ${statusPill}
+                </div>
+                <div class="wc-meta">
+                    ${sc._dateStr ? `<span style="margin-right:8px;">&#128197; ${sc._dateStr}${sc._isToday ? ' (Due today)' : ''}</span>` : ''}
+                    ${sc.notes ? `<span>&#128221; ${sc.notes.length > 35 ? sc.notes.substring(0, 35) + '...' : sc.notes}</span>` : ''}
+                </div>
+                ${progressBar}
+                <div class="wc-footer">
+                    <span class="wc-from">${sc.created_by_name ? `Assigned by ${sc.created_by_name}` : ''}</span>
+                    ${actionBtn}
+                </div>
+            </div>`;
+        }
+
+        function renderTaskCard(task) {
+            const priorityClass = getPriorityClass(task);
+            const newBadge = task._isNew ? '<span class="new-badge">NEW</span>' : '';
+
+            let statusPill = '';
+            if (task._isCompleted) {
+                statusPill = `<span class="wc-status-pill" style="background:#d1fae5;color:#065f46;">${task.status === 'cancelled' ? 'Cancelled' : 'Completed'}</span>`;
+            } else if (task._isOverdue) {
+                statusPill = '<span class="wc-status-pill" style="background:#fee2e2;color:#991b1b;">Overdue</span>';
+            } else if (task._isInProgress) {
+                statusPill = '<span class="wc-status-pill" style="background:#fef3c7;color:#92400e;">In Progress</span>';
+            } else {
+                statusPill = '<span class="wc-status-pill" style="background:#f3f4f6;color:#6b7280;">Pending</span>';
+            }
+
+            const desc = task.description ? (task.description.length > 60 ? task.description.substring(0, 60) + '...' : task.description) : '';
+
+            let progressInfo = '';
+            if (task.progress > 0 && !task._isCompleted) {
+                progressInfo = `
+                    <div class="work-progress-bar"><div class="fill" style="width:${task.progress}%"></div></div>
+                    <div style="font-size:11px;color:#6b7280;">${task.progress}% complete</div>`;
+            }
+
+            const actionLabel = task._isInProgress ? 'Continue' : (task._isCompleted ? '' : 'Start');
+            const actionBtn = !task._isCompleted ? `<a href="activities.html" class="wc-action-btn">${actionLabel}</a>` : '';
+
+            return `
+            <div class="work-card ${priorityClass}">
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div style="flex:1;min-width:0;">
+                        <div class="wc-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${task.title || 'Task'} ${newBadge}</div>
+                        ${desc ? `<div class="wc-subtitle">${desc}</div>` : ''}
+                    </div>
+                    ${statusPill}
+                </div>
+                <div class="wc-meta">
+                    ${task._dueDateStr ? `<span style="margin-right:8px;">&#128197; ${task._dueDateStr}</span>` : ''}
+                    ${task.branch_name ? `<span>&#128205; ${task.branch_name}</span>` : ''}
+                    ${task.priority && task.priority !== 'medium' ? `<span style="margin-left:8px;font-weight:600;color:${task.priority === 'urgent' ? '#ef4444' : task.priority === 'high' ? '#f97316' : '#6b7280'};">${task.priority.toUpperCase()}</span>` : ''}
+                </div>
+                ${progressInfo}
+                <div class="wc-footer">
+                    <span class="wc-from">${task.assigned_by_name ? `From ${task.assigned_by_name}` : ''}</span>
+                    ${actionBtn}
+                </div>
+            </div>`;
+        }
+
+        function filterYourWork(filter) {
+            yourWorkFilter = filter;
+            document.querySelectorAll('.your-work-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === filter);
+            });
+            renderYourWork();
+        }
+
+        // Load on page init
+        loadYourWork();
+        // Auto-refresh every 60 seconds
+        yourWorkInterval = setInterval(() => loadYourWork(), 60000);
+
+        // Listen for stock check & task assignment notifications via Socket.io
         if (dashboardSocket) {
             dashboardSocket.on('notification', (data) => {
                 if (data && data.type === 'stock_check_assigned') {
                     showToast('New stock check assigned to you!', 'info');
-                    loadStockChecks();
+                    setTimeout(() => loadYourWork(), 500);
+                } else if (data && data.type === 'task_assigned') {
+                    showToast('New task assigned to you!', 'info');
+                    setTimeout(() => loadYourWork(), 500);
                 }
             });
         }
