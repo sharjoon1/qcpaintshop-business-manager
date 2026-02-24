@@ -757,6 +757,7 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - Default filter switches to "Unchecked" when resuming with partial progress
 - **Admin review**: Review tab shows partial submissions with "Partial (50/1000)" badge, filter toggle (Submitted/Adjusted vs All Items), item_status badges per row
 - **Admin push**: "Push X Discrepancies to Zoho" only processes `item_status='submitted'` items; after push items become `adjusted`; multiple Zoho adjustment IDs stored comma-separated
+- **Fresh stock comparison** (Feb 24): On admin review/push, `difference` is recalculated against **live** `zoho_location_stock.stock_on_hand` (not the stale snapshot from assignment creation). Review panel shows "Orig Sys" (creation-time) and "Current" (live) columns; rows with stock changes since assignment highlighted amber. On push, `stock_check_items.system_qty`/`difference`/`variance_pct` are updated to reflect the actual values used, providing an accurate audit trail.
 - Assignment auto-transitions to `status='adjusted'` only when ALL items are adjusted
 
 **Staff Self-Request** (Feb 21):
@@ -810,8 +811,8 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - `GET /progress/:id` — Get progress stats + list of checked items with `item_status` for resume
 - `POST /submit/:id` — Staff submits checked items as batch (sets `item_status='submitted'`; skips already submitted/adjusted; keeps assignment pending if items remain)
 - `POST /self-request` — Staff self-initiates stock check (creates assignment + items with `item_status='submitted'`, `request_type='self_requested'`)
-- `GET /review/:id` — Admin review with comparison + location name + `submittedCount`, `adjustedCount`, `pushableCount` in summary
-- `POST /adjust/:id` — Push submitted items to Zoho (only `item_status='submitted'` with discrepancies; marks all submitted→adjusted; auto-completes assignment when all items adjusted; stores comma-separated adjustment IDs for multiple pushes)
+- `GET /review/:id` — Admin review with **live stock comparison**: LEFT JOINs `zoho_location_stock` for each item, returns `current_system_qty`, `live_difference`, `live_variance_pct` alongside original `system_qty`. Summary stats use live values.
+- `POST /adjust/:id` — Push submitted items to Zoho using **live stock difference** (JOINs `zoho_location_stock` at push time). Updates `stock_check_items.system_qty`/`difference`/`variance_pct` with actual values used for audit trail. Marks all submitted→adjusted; auto-completes assignment when all items adjusted; stores comma-separated adjustment IDs for multiple pushes.
 - `GET /dashboard` — Summary stats per branch
 - `GET /products/suggest` — Items not checked in 30+ days (accepts `zoho_location_id`)
 - `GET /products/search` — Search products from `zoho_location_stock` with `MAX(submitted_at)` as `last_checked`
@@ -2068,6 +2069,17 @@ Based on AI App Analyzer report, fixed critical production errors:
 - **Added**: `GET /progress/:id` — returns progress stats + list of already-checked items with `item_status` for resume
 - **Enhanced**: `staff/stock-check.html` — animated progress bar, filter tabs (All/Unchecked/Checked/Diff), "Save Progress (N new)" button, resume banner, dirty item tracking
 - **Total stock-check endpoints**: 15 → 17
+
+### Feb 24, 2026 — Fresh Stock Comparison on Admin Review/Push
+- **Problem**: `system_qty` is captured at assignment creation; with partial submissions over multiple days, stock changes (sales/purchases) make the original snapshot stale
+- **Solution**: Admin review and push endpoints now JOIN `zoho_location_stock` for live `stock_on_hand` at review/push time
+- **Backend** (`routes/stock-check.js`):
+  - `GET /review/:id`: LEFT JOINs `zoho_location_stock`, returns `current_system_qty`, `live_difference`, `live_variance_pct` per item; summary stats use live values
+  - `POST /adjust/:id`: Fetches all submitted items with live stock JOIN, splits by live difference, builds Zoho payload with fresh values. After push, updates `stock_check_items.system_qty`/`difference`/`variance_pct` with actual values used (audit trail)
+- **Admin UI** (`admin-stock-check.html`):
+  - Review table: "Orig Sys" column (gray, creation snapshot) + "Current" column (bold, live stock)
+  - Rows where stock changed since assignment highlighted with amber background + warning icon
+  - Diff/Var% columns use live calculations
 
 ### Feb 24, 2026 — Stock Check Batch (Partial) Submission
 - **Major feature**: Staff can submit checked items in batches — admin reviews & pushes each batch to Zoho while staff continues checking remaining items

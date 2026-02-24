@@ -817,21 +817,34 @@ router.get('/review/:id', requirePermission('zoho', 'stock_check'), async (req, 
 
         const assignment = rows[0];
 
-        // Get items with comparison data
+        // Get items with live stock comparison from zoho_location_stock
         const [items] = await pool.query(
-            'SELECT * FROM stock_check_items WHERE assignment_id = ? ORDER BY item_name ASC',
-            [req.params.id]
+            `SELECT sci.*,
+                    ls.stock_on_hand AS current_system_qty,
+                    ls.last_synced_at,
+                    CASE WHEN sci.reported_qty IS NOT NULL
+                         THEN sci.reported_qty - COALESCE(ls.stock_on_hand, sci.system_qty)
+                         ELSE NULL END AS live_difference,
+                    CASE WHEN sci.reported_qty IS NOT NULL AND COALESCE(ls.stock_on_hand, sci.system_qty) != 0
+                         THEN ROUND((sci.reported_qty - COALESCE(ls.stock_on_hand, sci.system_qty)) / COALESCE(ls.stock_on_hand, sci.system_qty) * 100, 2)
+                         ELSE NULL END AS live_variance_pct
+             FROM stock_check_items sci
+             LEFT JOIN zoho_location_stock ls
+               ON sci.zoho_item_id = ls.zoho_item_id AND ls.zoho_location_id = ?
+             WHERE sci.assignment_id = ?
+             ORDER BY sci.item_name ASC`,
+            [assignment.zoho_location_id, req.params.id]
         );
 
-        // Summary stats
+        // Summary stats using live values
         const totalItems = items.length;
-        const matchCount = items.filter(i => i.difference !== null && parseFloat(i.difference) === 0).length;
-        const discrepancyCount = items.filter(i => i.difference !== null && parseFloat(i.difference) !== 0).length;
+        const matchCount = items.filter(i => i.live_difference !== null && parseFloat(i.live_difference) === 0).length;
+        const discrepancyCount = items.filter(i => i.live_difference !== null && parseFloat(i.live_difference) !== 0).length;
         const pendingCount = items.filter(i => i.reported_qty === null).length;
         const submittedCount = items.filter(i => i.item_status === 'submitted').length;
         const adjustedCount = items.filter(i => i.item_status === 'adjusted').length;
-        // Count submitted items with discrepancies (these are pushable to Zoho)
-        const pushableCount = items.filter(i => i.item_status === 'submitted' && i.difference !== null && parseFloat(i.difference) !== 0).length;
+        // Count submitted items with live discrepancies (these are pushable to Zoho)
+        const pushableCount = items.filter(i => i.item_status === 'submitted' && i.live_difference !== null && parseFloat(i.live_difference) !== 0).length;
 
         res.json({
             success: true,
@@ -876,46 +889,39 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             return res.status(400).json({ success: false, message: 'No Zoho location linked' });
         }
 
-        // Get ONLY submitted items with discrepancies (not yet adjusted)
+        // Get ALL submitted items with live stock comparison
         const [items] = await pool.query(
-            `SELECT * FROM stock_check_items
-             WHERE assignment_id = ? AND item_status = 'submitted' AND difference IS NOT NULL AND difference != 0`,
-            [req.params.id]
+            `SELECT sci.*,
+                    ls.stock_on_hand AS current_system_qty,
+                    CASE WHEN sci.reported_qty IS NOT NULL
+                         THEN sci.reported_qty - COALESCE(ls.stock_on_hand, sci.system_qty)
+                         ELSE NULL END AS live_difference
+             FROM stock_check_items sci
+             LEFT JOIN zoho_location_stock ls
+               ON sci.zoho_item_id = ls.zoho_item_id AND ls.zoho_location_id = ?
+             WHERE sci.assignment_id = ? AND sci.item_status = 'submitted'`,
+            [locationId, req.params.id]
         );
 
-        // Also get submitted items with zero difference (need to mark as adjusted too)
-        const [zeroDiffItems] = await pool.query(
-            `SELECT id FROM stock_check_items
-             WHERE assignment_id = ? AND item_status = 'submitted' AND (difference IS NULL OR difference = 0)`,
-            [req.params.id]
-        );
-
-        if (!items.length && !zeroDiffItems.length) {
-            // No submitted items to process — check if everything is already adjusted
-            const [pendingSubmitted] = await pool.query(
-                `SELECT COUNT(*) as cnt FROM stock_check_items WHERE assignment_id = ? AND item_status = 'submitted'`,
-                [req.params.id]
-            );
-            if (pendingSubmitted[0].cnt === 0) {
-                return res.json({ success: true, message: 'No submitted items to process. Waiting for more items from staff.' });
-            }
-            // Mark as reviewed (all zero-diff)
-            await pool.query(
-                `UPDATE stock_check_items SET item_status = 'adjusted' WHERE assignment_id = ? AND item_status = 'submitted'`,
-                [req.params.id]
-            );
+        if (!items.length) {
+            // No submitted items to process
+            return res.json({ success: true, message: 'No submitted items to process. Waiting for more items from staff.' });
         }
+
+        // Split into discrepancy vs zero-diff using live values
+        const discrepancyItems = items.filter(i => i.live_difference !== null && parseFloat(i.live_difference) !== 0);
+        const zeroDiffItems = items.filter(i => !i.live_difference || parseFloat(i.live_difference) === 0);
 
         let adjustmentId = null;
 
-        if (items.length) {
-            // Build Zoho inventory adjustment payload
+        if (discrepancyItems.length) {
+            // Build Zoho inventory adjustment payload using live differences
             const zohoAPI = require('../services/zoho-api');
 
-            const lineItems = items.map(item => ({
+            const lineItems = discrepancyItems.map(item => ({
                 item_id: item.zoho_item_id,
                 location_id: locationId,
-                quantity_adjusted: parseFloat(item.difference)
+                quantity_adjusted: parseFloat(item.live_difference)
             }));
 
             const checkDate = assignment.check_date instanceof Date
@@ -931,18 +937,27 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
                 line_items: lineItems
             };
 
-            console.log(`[Stock Check] Pushing batch adjustment for assignment #${assignment.id}, branch: ${assignment.branch_name}, location: ${locationId}, items: ${lineItems.length}`);
-            console.log(`[Stock Check] Line items:`, lineItems.map(li => `${li.item_id}: diff=${li.quantity_adjusted}`).join(', '));
+            console.log(`[Stock Check] Pushing batch adjustment for assignment #${assignment.id}, branch: ${assignment.branch_name}, location: ${locationId}, items: ${lineItems.length} (live stock comparison)`);
+            console.log(`[Stock Check] Line items:`, lineItems.map(li => `${li.item_id}: live_diff=${li.quantity_adjusted}`).join(', '));
 
             const zohoResult = await zohoAPI.createInventoryAdjustment(adjustmentData);
             adjustmentId = zohoResult?.inventory_adjustment?.inventory_adjustment_id || zohoResult?.inventoryadjustment_id || null;
         }
 
-        // Mark all submitted items as adjusted
-        await pool.query(
-            `UPDATE stock_check_items SET item_status = 'adjusted' WHERE assignment_id = ? AND item_status = 'submitted'`,
-            [req.params.id]
-        );
+        // Update stock_check_items with live values used for push (audit trail), then mark adjusted
+        for (const item of items) {
+            const liveSystemQty = item.current_system_qty ?? item.system_qty;
+            const liveDiff = item.live_difference;
+            const liveVariancePct = liveSystemQty && parseFloat(liveSystemQty) !== 0
+                ? Math.round((parseFloat(liveDiff) / parseFloat(liveSystemQty)) * 10000) / 100
+                : null;
+            await pool.query(
+                `UPDATE stock_check_items
+                 SET system_qty = ?, difference = ?, variance_pct = ?, item_status = 'adjusted'
+                 WHERE id = ?`,
+                [liveSystemQty, liveDiff, liveVariancePct, item.id]
+            );
+        }
 
         // Check if ALL items in the assignment are now adjusted
         const [remainingItems] = await pool.query(
@@ -978,13 +993,13 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             }
         }
 
-        const pushedCount = items.length + zeroDiffItems.length;
+        const pushedCount = items.length;
         res.json({
             success: true,
             message: allDone
-                ? `All items adjusted (${pushedCount} items). Assignment complete.`
-                : `Pushed ${items.length} discrepancies to Zoho (${pushedCount} items adjusted, ${remainingItems[0].remaining} remaining).`,
-            data: { adjustment_id: adjustmentId, all_done: allDone, pushed: pushedCount, remaining: remainingItems[0].remaining }
+                ? `All items adjusted (${pushedCount} items, ${discrepancyItems.length} with discrepancies). Assignment complete.`
+                : `Pushed ${discrepancyItems.length} discrepancies to Zoho (${pushedCount} items adjusted, ${remainingItems[0].remaining} remaining).`,
+            data: { adjustment_id: adjustmentId, all_done: allDone, pushed: pushedCount, discrepancies: discrepancyItems.length, remaining: remainingItems[0].remaining }
         });
     } catch (error) {
         console.error('Create adjustment error:', error);

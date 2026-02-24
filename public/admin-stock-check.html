@@ -970,21 +970,25 @@ async function openReview(id) {
 
         <div style="overflow-x:auto;">
         <table class="sc-table">
-            <thead><tr><th>Item</th><th>Status</th><th>System</th><th>Reported</th><th>Diff</th><th>Var%</th><th>Photo</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Item</th><th>Status</th><th>Orig Sys</th><th>Current</th><th>Reported</th><th>Diff</th><th>Var%</th><th>Photo</th><th>Notes</th></tr></thead>
             <tbody id="reviewItemsBody">
                 ${d.items.map(item => {
-                    const diff = parseFloat(item.difference);
+                    const diff = item.live_difference !== null && item.live_difference !== undefined ? parseFloat(item.live_difference) : NaN;
                     const diffClass = isNaN(diff) ? '' : diff > 0 ? 'diff-positive' : diff < 0 ? 'diff-negative' : 'diff-zero';
                     const diffStr = isNaN(diff) ? '-' : (diff > 0 ? '+' : '') + diff;
+                    const varPct = item.live_variance_pct !== null && item.live_variance_pct !== undefined ? parseFloat(item.live_variance_pct) : null;
                     const itemSt = item.item_status || 'pending';
                     const showDefault = itemSt === 'submitted' || itemSt === 'adjusted';
-                    return `<tr class="review-item-row" data-item-status="${itemSt}" style="${showDefault ? '' : 'display:none'}">
+                    const currentQty = item.current_system_qty !== null && item.current_system_qty !== undefined ? item.current_system_qty : item.system_qty;
+                    const stockChanged = item.current_system_qty !== null && item.current_system_qty !== undefined && parseFloat(item.current_system_qty) !== parseFloat(item.system_qty);
+                    return `<tr class="review-item-row" data-item-status="${itemSt}" style="${showDefault ? '' : 'display:none'}${stockChanged ? ';background:rgba(245,158,11,0.08)' : ''}">
                         <td><div class="font-medium">${item.item_name}</div><div class="text-xs text-gray-400">${item.item_sku || ''}</div></td>
                         <td>${itemStatusBadge(itemSt)}</td>
-                        <td>${item.system_qty}</td>
+                        <td class="text-xs text-gray-400">${item.system_qty}</td>
+                        <td class="font-semibold${stockChanged ? ' text-amber-600' : ''}">${currentQty}${stockChanged ? ' <span class="text-xs">⚠</span>' : ''}</td>
                         <td>${item.reported_qty !== null ? item.reported_qty : '<span class="text-gray-300">-</span>'}</td>
                         <td class="${diffClass}">${diffStr}</td>
-                        <td class="text-xs ${Math.abs(item.variance_pct) > 10 ? 'text-red-600 font-semibold' : 'text-gray-500'}">${item.variance_pct !== null ? item.variance_pct + '%' : '-'}</td>
+                        <td class="text-xs ${varPct !== null && Math.abs(varPct) > 10 ? 'text-red-600 font-semibold' : 'text-gray-500'}">${varPct !== null ? varPct + '%' : '-'}</td>
                         <td>${item.photo_url ? '<img src="' + item.photo_url + '" class="photo-thumb" onclick="showPhoto(\'' + item.photo_url + '\')">' : '<span class="text-gray-300">-</span>'}</td>
                         <td class="text-xs text-gray-500 max-w-[120px] truncate">${item.notes || '-'}</td>
                     </tr>`;
