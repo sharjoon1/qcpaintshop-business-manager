@@ -15,6 +15,7 @@ const contextBuilder = require('./ai-context-builder');
 let pool = null;
 let sessionManager = null;
 let io = null;
+let registry = null;
 const jobs = {};
 
 function setPool(p) {
@@ -28,6 +29,7 @@ function setPool(p) {
 }
 function setSessionManager(sm) { sessionManager = sm; }
 function setIO(i) { io = i; }
+function setAutomationRegistry(r) { registry = r; }
 
 // ─── Config Helper ─────────────────────────────────────────────
 
@@ -73,8 +75,10 @@ async function runZohoDaily() {
         if (enabled !== '1') { console.log('[AI Scheduler] Zoho daily analysis disabled'); return; }
 
         console.log('[AI Scheduler] Running Zoho daily analysis...');
+        if (registry) registry.markRunning('ai-zoho-daily');
         const result = await aiAnalyzer.runZohoAnalysis('daily');
         console.log(`[AI Scheduler] Zoho daily done: ${result.insights.length} insights, ${result.tokensUsed} tokens`);
+        if (registry) registry.markCompleted('ai-zoho-daily', { recordsProcessed: result.insights.length });
 
         // Send WhatsApp summary
         const waMessage = aiAnalyzer.buildWhatsAppSummary(result);
@@ -85,6 +89,7 @@ async function runZohoDaily() {
 
     } catch (e) {
         console.error('[AI Scheduler] Zoho daily analysis failed:', e.message);
+        if (registry) registry.markFailed('ai-zoho-daily', { error: e.message });
     }
 }
 
@@ -94,8 +99,10 @@ async function runZohoWeekly() {
         if (enabled !== '1') return;
 
         console.log('[AI Scheduler] Running Zoho weekly analysis...');
+        if (registry) registry.markRunning('ai-zoho-weekly');
         const result = await aiAnalyzer.runZohoAnalysis('weekly');
         console.log(`[AI Scheduler] Zoho weekly done: ${result.insights.length} insights`);
+        if (registry) registry.markCompleted('ai-zoho-weekly', { recordsProcessed: result.insights.length });
 
         const waMessage = aiAnalyzer.buildWhatsAppSummary(result);
         await sendWhatsAppReport(waMessage);
@@ -103,6 +110,7 @@ async function runZohoWeekly() {
         if (io) io.to('ai_dashboard').emit('analysis_complete', { type: 'zoho_weekly', runId: result.runId });
     } catch (e) {
         console.error('[AI Scheduler] Zoho weekly analysis failed:', e.message);
+        if (registry) registry.markFailed('ai-zoho-weekly', { error: e.message });
     }
 }
 
@@ -112,8 +120,10 @@ async function runStaffDaily() {
         if (enabled !== '1') { console.log('[AI Scheduler] Staff daily analysis disabled'); return; }
 
         console.log('[AI Scheduler] Running staff daily analysis...');
+        if (registry) registry.markRunning('ai-staff-daily');
         const result = await aiStaffAnalyzer.runStaffAnalysis('daily');
         console.log(`[AI Scheduler] Staff daily done: ${result.insights.length} insights`);
+        if (registry) registry.markCompleted('ai-staff-daily', { recordsProcessed: result.insights.length });
 
         const waMessage = aiStaffAnalyzer.buildWhatsAppSummary(result);
         await sendWhatsAppReport(waMessage);
@@ -121,6 +131,7 @@ async function runStaffDaily() {
         if (io) io.to('ai_dashboard').emit('analysis_complete', { type: 'staff_daily', runId: result.runId });
     } catch (e) {
         console.error('[AI Scheduler] Staff daily analysis failed:', e.message);
+        if (registry) registry.markFailed('ai-staff-daily', { error: e.message });
     }
 }
 
@@ -130,8 +141,10 @@ async function runLeadScoring() {
         if (enabled !== '1') { console.log('[AI Scheduler] Lead scoring disabled'); return; }
 
         console.log('[AI Scheduler] Running lead scoring...');
+        if (registry) registry.markRunning('ai-lead-scoring');
         const result = await aiLeadManager.scoreAllLeads();
         console.log(`[AI Scheduler] Lead scoring done: ${result.totalScored} leads scored`);
+        if (registry) registry.markCompleted('ai-lead-scoring', { recordsProcessed: result.totalScored });
 
         // Check for stale leads and send alerts
         const staleLeads = await aiLeadManager.getStalLeads(7);
@@ -146,6 +159,7 @@ async function runLeadScoring() {
         if (io) io.to('ai_dashboard').emit('analysis_complete', { type: 'lead_scoring', runId: result.runId });
     } catch (e) {
         console.error('[AI Scheduler] Lead scoring failed:', e.message);
+        if (registry) registry.markFailed('ai-lead-scoring', { error: e.message });
     }
 }
 
@@ -155,8 +169,10 @@ async function runMarketingWeekly() {
         if (enabled !== '1') { console.log('[AI Scheduler] Marketing analysis disabled'); return; }
 
         console.log('[AI Scheduler] Running marketing analysis...');
+        if (registry) registry.markRunning('ai-marketing-weekly');
         const result = await aiMarketing.runMarketingAnalysis();
         console.log(`[AI Scheduler] Marketing done: ${result.insights.length} insights`);
+        if (registry) registry.markCompleted('ai-marketing-weekly', { recordsProcessed: result.insights.length });
 
         if (result.insights.length) {
             let msg = `💡 *Weekly Marketing Tips*\n\n`;
@@ -169,6 +185,7 @@ async function runMarketingWeekly() {
         if (io) io.to('ai_dashboard').emit('analysis_complete', { type: 'marketing_tips', runId: result.runId });
     } catch (e) {
         console.error('[AI Scheduler] Marketing analysis failed:', e.message);
+        if (registry) registry.markFailed('ai-marketing-weekly', { error: e.message });
     }
 }
 
@@ -180,17 +197,30 @@ async function runDailySnapshot() {
         if (enabled !== '1') { console.log('[AI Scheduler] Daily snapshot disabled'); return; }
 
         console.log('[AI Scheduler] Generating daily business snapshot...');
+        if (registry) registry.markRunning('ai-daily-snapshot');
         const data = await contextBuilder.generateDailySnapshot();
         console.log('[AI Scheduler] Daily snapshot generated successfully');
+        if (registry) registry.markCompleted('ai-daily-snapshot', { details: 'Snapshot generated' });
         return data;
     } catch (e) {
         console.error('[AI Scheduler] Daily snapshot failed:', e.message);
+        if (registry) registry.markFailed('ai-daily-snapshot', { error: e.message });
     }
 }
 
 // ─── Start / Stop ──────────────────────────────────────────────
 
 function start() {
+    // Register automations
+    if (registry) {
+        registry.register('ai-zoho-daily', { name: 'AI Zoho Daily', service: 'ai-scheduler', schedule: '9:00 PM IST', description: 'Daily Zoho business analysis' });
+        registry.register('ai-zoho-weekly', { name: 'AI Zoho Weekly', service: 'ai-scheduler', schedule: 'Mon 8:00 AM', description: 'Weekly Zoho trend analysis' });
+        registry.register('ai-staff-daily', { name: 'AI Staff Daily', service: 'ai-scheduler', schedule: '10:30 PM IST', description: 'Daily staff performance analysis' });
+        registry.register('ai-lead-scoring', { name: 'AI Lead Scoring', service: 'ai-scheduler', schedule: 'Every 6h', description: 'Score and rank all leads' });
+        registry.register('ai-marketing-weekly', { name: 'AI Marketing Tips', service: 'ai-scheduler', schedule: 'Mon 9:00 AM', description: 'Weekly marketing insights' });
+        registry.register('ai-daily-snapshot', { name: 'Business Snapshot', service: 'ai-scheduler', schedule: '6AM/12PM/6PM', description: 'Daily business data snapshot' });
+    }
+
     // Daily Zoho analysis — 9:00 PM IST (15:30 UTC)
     jobs.zohoDaily = cron.schedule('30 15 * * *', runZohoDaily, { timezone: 'Asia/Kolkata' });
 
@@ -223,6 +253,7 @@ module.exports = {
     setPool,
     setSessionManager,
     setIO,
+    setAutomationRegistry,
     start,
     stop,
     // Expose runners for manual triggering

@@ -28,11 +28,14 @@ let configCache = {};         // Cached config values
 let isRunning = false;
 let lastSyncAttempt = null;
 let nextSyncTime = null;
+let registry = null;
 
 function setPool(dbPool) {
     pool = dbPool;
     zohoAPI.setPool(dbPool);
 }
+
+function setAutomationRegistry(r) { registry = r; }
 
 // ========================================
 // CONFIG MANAGEMENT
@@ -119,17 +122,20 @@ async function executeSyncCycle() {
         }
 
         console.log('[Scheduler] Starting quick sync cycle (customers, invoices, payments)...');
+        if (registry) registry.markRunning('zoho-quick-sync');
 
         try {
             // Use quickSync instead of fullSync - saves ~300 API calls per cycle
             const result = await zohoAPI.quickSync(null); // null = system-triggered
             console.log(`[Scheduler] Quick sync completed. Results:`, JSON.stringify(result.results || {}));
+            if (registry) registry.markCompleted('zoho-quick-sync', { details: 'Quick sync done', recordsProcessed: Object.values(result.results || {}).reduce((s, v) => s + (v || 0), 0) });
         } finally {
             rateLimiter.releaseSyncLock('quickSync');
         }
 
     } catch (error) {
         console.error('[Scheduler] Auto-sync failed:', error.message);
+        if (registry) registry.markFailed('zoho-quick-sync', { error: error.message });
 
         // Log the failure
         try {
@@ -178,6 +184,7 @@ async function executeStockSync() {
         }
 
         console.log('[Scheduler] Starting stock sync...');
+        if (registry) registry.markRunning('zoho-stock-sync');
 
         try {
             // Sync items first, then locations, then stock
@@ -215,12 +222,14 @@ async function executeStockSync() {
             } catch (e) {
                 console.error('[Scheduler] Reorder check failed:', e.message);
             }
+            if (registry) registry.markCompleted('zoho-stock-sync', { details: 'Stock sync done' });
         } finally {
             rateLimiter.releaseSyncLock('stockSync');
         }
 
     } catch (error) {
         console.error('[Scheduler] Stock sync cycle failed:', error.message);
+        if (registry) registry.markFailed('zoho-stock-sync', { error: error.message });
     }
 }
 
@@ -252,11 +261,14 @@ async function executeBulkJobProcessor() {
         if (jobs.length === 0) return;
 
         console.log(`[Scheduler] Processing bulk job #${jobs[0].id}...`);
+        if (registry) registry.markRunning('zoho-bulk-processor');
         const result = await zohoAPI.processBulkJob(jobs[0].id);
         console.log(`[Scheduler] Bulk job batch done:`, result);
+        if (registry) registry.markCompleted('zoho-bulk-processor', { details: `Job #${jobs[0].id}` });
 
     } catch (error) {
         console.error('[Scheduler] Bulk job processor failed:', error.message);
+        if (registry) registry.markFailed('zoho-bulk-processor', { error: error.message });
     }
 }
 
@@ -274,6 +286,7 @@ async function executeDailyReport() {
         }
 
         console.log('[Scheduler] Generating daily financial report...');
+        if (registry) registry.markRunning('zoho-daily-report');
 
         const today = new Date();
         const fyStart = today.getMonth() >= 3
@@ -298,6 +311,7 @@ async function executeDailyReport() {
         `, [fyStart, todayStr, JSON.stringify(receivables)]);
 
         console.log('[Scheduler] Daily financial report generated successfully');
+        if (registry) registry.markCompleted('zoho-daily-report', { details: 'P&L + receivables' });
 
         // Also generate yesterday's daily transaction report
         try {
@@ -312,6 +326,7 @@ async function executeDailyReport() {
 
     } catch (error) {
         console.error('[Scheduler] Daily report generation failed:', error.message);
+        if (registry) registry.markFailed('zoho-daily-report', { error: error.message });
     }
 }
 
@@ -358,6 +373,14 @@ async function start() {
         const dailyTime = getConfig('daily_report_time', '09:00');
 
         console.log(`[Scheduler] Starting... sync_enabled=${syncEnabled}, interval=${intervalMinutes}min (quick sync, no stock)`);
+
+        // Register automations
+        if (registry) {
+            registry.register('zoho-quick-sync', { name: 'Zoho Quick Sync', service: 'sync-scheduler', schedule: `*/${intervalMinutes} * * * *`, description: 'Sync customers, invoices, payments from Zoho' });
+            registry.register('zoho-stock-sync', { name: 'Zoho Stock Sync', service: 'sync-scheduler', schedule: '0 2,6,12,18 * * *', description: 'Heavy stock level sync from Zoho' });
+            registry.register('zoho-daily-report', { name: 'Daily Financial Report', service: 'sync-scheduler', schedule: `${parseInt((dailyTime || '09:00').split(':')[1]) || 0} ${parseInt((dailyTime || '09:00').split(':')[0]) || 9} * * *`, description: 'Auto P&L + receivables report' });
+            registry.register('zoho-bulk-processor', { name: 'Bulk Job Processor', service: 'sync-scheduler', schedule: '*/5 * * * *', description: 'Process pending Zoho bulk import/export jobs' });
+        }
 
         // Auto-sync cron job
         if (syncEnabled) {
@@ -536,6 +559,7 @@ function calculateNextRun(cronExpr) {
 
 module.exports = {
     setPool,
+    setAutomationRegistry,
     start,
     stop,
     restart,

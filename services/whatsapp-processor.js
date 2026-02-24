@@ -26,6 +26,7 @@ let processorJob = null;
 let isRunning = false;
 let isProcessing = false; // Prevent concurrent processing
 let stats = { sent: 0, failed: 0, lastRun: null };
+let registry = null;
 
 const MAX_RETRIES = 3;
 const BATCH_SIZE = 10; // Process 10 messages per cycle
@@ -37,6 +38,8 @@ function setPool(dbPool) {
 function setSessionManager(sm) {
     sessionManager = sm;
 }
+
+function setAutomationRegistry(r) { registry = r; }
 
 // ========================================
 // MESSAGE TEMPLATES
@@ -104,6 +107,7 @@ async function processQueue() {
 
     isProcessing = true;
     stats.lastRun = new Date();
+    if (registry) registry.markRunning('whatsapp-queue-processor');
 
     try {
         // Load WhatsApp config (needed for HTTP API fallback)
@@ -248,9 +252,11 @@ async function processQueue() {
         }
 
         console.log(`[WhatsApp] Cycle complete. Sent: ${messages.length - stats.failed}, Failed: ${stats.failed}`);
+        if (registry) registry.markCompleted('whatsapp-queue-processor', { recordsProcessed: messages.length });
 
     } catch (error) {
         console.error('[WhatsApp] Queue processing error:', error.message);
+        if (registry) registry.markFailed('whatsapp-queue-processor', { error: error.message });
     } finally {
         isProcessing = false;
     }
@@ -400,6 +406,11 @@ async function queueOverdueReminders() {
 function start() {
     if (isRunning) return;
 
+    // Register automation
+    if (registry) {
+        registry.register('whatsapp-queue-processor', { name: 'WhatsApp Queue', service: 'whatsapp-processor', schedule: '*/5 * * * *', description: 'Process pending WhatsApp message queue' });
+    }
+
     // Process queue every 5 minutes
     processorJob = cron.schedule('*/5 * * * *', processQueue, {
         scheduled: true,
@@ -437,6 +448,7 @@ function getStatus() {
 module.exports = {
     setPool,
     setSessionManager,
+    setAutomationRegistry,
     start,
     stop,
     getStatus,

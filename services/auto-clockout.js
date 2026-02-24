@@ -14,9 +14,11 @@ const notificationService = require('./notification-service');
 
 let pool;
 let io;
+let registry = null;
 
 function setPool(dbPool) { pool = dbPool; }
 function setIO(socketIO) { io = socketIO; }
+function setAutomationRegistry(r) { registry = r; }
 
 /**
  * Get today's date in IST (YYYY-MM-DD)
@@ -328,17 +330,29 @@ async function forceClockoutAll() {
  * Start the overtime and auto clock-out schedulers
  */
 function start() {
+    // Register automations
+    if (registry) {
+        registry.register('auto-clockout-ot-check', { name: 'OT Prompt Check', service: 'auto-clockout', schedule: 'Every 5 min', description: 'Check for overtime prompts' });
+        registry.register('auto-clockout-force', { name: 'Force Clock-out', service: 'auto-clockout', schedule: '59 21 * * *', description: '10 PM force clock-out all staff' });
+    }
+
     // Check overtime prompts every 5 minutes
     checkOvertimePrompts();
     setInterval(checkOvertimePrompts, 5 * 60 * 1000);
     console.log('[Auto-clockout] Overtime check started (every 5 min)');
 
     // Force clock-out at 10 PM IST (21:59 to run just before reports at 22:00)
-    cron.schedule('59 21 * * *', () => {
+    cron.schedule('59 21 * * *', async () => {
         console.log('[Auto-clockout] 10 PM cron triggered');
-        forceClockoutAll();
+        if (registry) registry.markRunning('auto-clockout-force');
+        try {
+            await forceClockoutAll();
+            if (registry) registry.markCompleted('auto-clockout-force', { details: 'Force clock-out done' });
+        } catch (e) {
+            if (registry) registry.markFailed('auto-clockout-force', { error: e.message });
+        }
     }, { timezone: 'Asia/Kolkata' });
     console.log('[Auto-clockout] 10 PM IST force clock-out cron scheduled');
 }
 
-module.exports = { setPool, setIO, start, checkOvertimePrompts, forceClockoutAll, endActivePeriods };
+module.exports = { setPool, setIO, setAutomationRegistry, start, checkOvertimePrompts, forceClockoutAll, endActivePeriods };

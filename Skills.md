@@ -1447,6 +1447,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | Page | File | Purpose |
 |------|------|---------|
 | Admin Dashboard | `admin-dashboard.html` | Business overview |
+| Live Monitor | `admin-live-dashboard.html` | Real-time monitoring (online staff, automations, activity feed) |
 | Staff Management | `admin-staff.html` | User/staff CRUD |
 | Branches | `admin-branches.html` | Branch management |
 | Customers | `admin-customers.html` | Customer CRUD |
@@ -1690,6 +1691,18 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-02-24 - Live Admin Dashboard (Phase 1)
+Real-time monitoring dashboard for admin/managers with 4 panels:
+- **Status Bar**: Green/amber/red system health based on automation failures
+- **Metrics Row**: Staff present, online, pending/overdue tasks, today's estimates, pending stock checks, new leads (10s auto-refresh)
+- **Staff Monitor**: Online users with role badges via Socket.io (real-time connect/disconnect events)
+- **Automation Panel**: 18 registered cron jobs across 6 services with status (idle/running/healthy/failed), run counts, last duration
+- **Activity Feed**: Last 50 events today (clock-ins, stock submissions, task completions, estimates, leads)
+- **Files**: `services/automation-registry.js` (in-memory Map), `routes/admin-dashboard.js` (`GET /api/admin/dashboard/live`), `public/admin-live-dashboard.html`
+- **Server.js**: `onlineUsers` Map tracks connected sockets, `live_dashboard_admin` room for instant updates
+- **Scheduler integration**: All 6 scheduler services (sync, ai, painter, auto-clockout, attendance-report, whatsapp-processor) register jobs and report status
+- **Sidebar**: "Live Monitor" link in Dashboard section (admin/manager only)
 
 ### 2026-02-23 - App Analysis Bug Fixes (6 Critical + 2 Warning)
 Based on AI App Analyzer report, fixed critical production errors:

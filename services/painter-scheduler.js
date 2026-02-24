@@ -9,12 +9,15 @@ const cron = require('node-cron');
 const pointsEngine = require('./painter-points-engine');
 
 let pool = null;
+let registry = null;
 const jobs = {};
 
 function setPool(p) {
     pool = p;
     pointsEngine.setPool(p);
 }
+
+function setAutomationRegistry(r) { registry = r; }
 
 // ─── Config Helper ─────────────────────────────────────────────
 
@@ -41,10 +44,13 @@ async function runMonthlySlabEvaluation() {
         const yearMonth = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
 
         console.log(`[Painter Scheduler] Running monthly slab evaluation for ${yearMonth}...`);
+        if (registry) registry.markRunning('painter-monthly-slabs');
         const result = await pointsEngine.evaluateMonthlySlabs(yearMonth);
         console.log(`[Painter Scheduler] Monthly slabs done: ${result.evaluated} evaluated, ${result.awarded} awarded`);
+        if (registry) registry.markCompleted('painter-monthly-slabs', { recordsProcessed: result.evaluated });
     } catch (error) {
         console.error('[Painter Scheduler] Monthly slab evaluation failed:', error.message);
+        if (registry) registry.markFailed('painter-monthly-slabs', { error: error.message });
     }
 }
 
@@ -61,10 +67,13 @@ async function runQuarterlySlabEvaluation() {
         const yearQuarter = `${year}-Q${quarter}`;
 
         console.log(`[Painter Scheduler] Running quarterly slab evaluation for ${yearQuarter}...`);
+        if (registry) registry.markRunning('painter-quarterly-slabs');
         const result = await pointsEngine.evaluateQuarterlySlabs(yearQuarter);
         console.log(`[Painter Scheduler] Quarterly slabs done: ${result.evaluated} evaluated, ${result.awarded} awarded`);
+        if (registry) registry.markCompleted('painter-quarterly-slabs', { recordsProcessed: result.evaluated });
     } catch (error) {
         console.error('[Painter Scheduler] Quarterly slab evaluation failed:', error.message);
+        if (registry) registry.markFailed('painter-quarterly-slabs', { error: error.message });
     }
 }
 
@@ -74,16 +83,26 @@ async function runCreditOverdueCheck() {
         if (enabled !== '1') { console.log('[Painter Scheduler] System disabled, skipping credit check'); return; }
 
         console.log('[Painter Scheduler] Running credit overdue check...');
+        if (registry) registry.markRunning('painter-credit-check');
         const result = await pointsEngine.checkOverdueCredits();
         console.log(`[Painter Scheduler] Credit check done: ${result.processed} painters processed`);
+        if (registry) registry.markCompleted('painter-credit-check', { recordsProcessed: result.processed });
     } catch (error) {
         console.error('[Painter Scheduler] Credit overdue check failed:', error.message);
+        if (registry) registry.markFailed('painter-credit-check', { error: error.message });
     }
 }
 
 // ─── Scheduler Start/Stop ────────────────────────────────────
 
 function start() {
+    // Register automations
+    if (registry) {
+        registry.register('painter-monthly-slabs', { name: 'Monthly Slab Eval', service: 'painter-scheduler', schedule: '0 6 1 * *', description: 'Monthly painter value slab evaluation' });
+        registry.register('painter-quarterly-slabs', { name: 'Quarterly Slab Eval', service: 'painter-scheduler', schedule: '30 6 1 1,4,7,10 *', description: 'Quarterly painter slab evaluation' });
+        registry.register('painter-credit-check', { name: 'Credit Overdue Check', service: 'painter-scheduler', schedule: '0 8 * * *', description: 'Daily painter credit overdue check' });
+    }
+
     // Monthly slab evaluation — 1st of every month, 6:00 AM IST
     jobs.monthlySlabs = cron.schedule('0 6 1 * *', runMonthlySlabEvaluation, { timezone: 'Asia/Kolkata' });
 
@@ -103,6 +122,7 @@ function stop() {
 
 module.exports = {
     setPool,
+    setAutomationRegistry,
     start,
     stop,
     // Expose runners for manual triggering

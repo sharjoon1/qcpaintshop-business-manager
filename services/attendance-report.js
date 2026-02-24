@@ -9,10 +9,12 @@ const cron = require('node-cron');
 let pool;
 let io;
 let whatsappSessionManager;
+let registry = null;
 
 function setPool(dbPool) { pool = dbPool; }
 function setIO(socketIO) { io = socketIO; }
 function setSessionManager(sm) { whatsappSessionManager = sm; }
+function setAutomationRegistry(r) { registry = r; }
 
 /**
  * Format minutes into "Xh Ym" display
@@ -241,15 +243,26 @@ async function sendAllReports(date, sentBy) {
  * Start the 10 PM IST cron job
  */
 function start() {
+    // Register automation
+    if (registry) {
+        registry.register('attendance-daily-report', { name: 'Attendance Reports', service: 'attendance-report', schedule: '5 22 * * *', description: 'Daily attendance WhatsApp reports at 10:05 PM' });
+    }
+
     // Run at 10:05 PM IST every day (after 10 PM force clock-out)
     cron.schedule('5 22 * * *', async () => {
         console.log('[AttendanceReport] 10:05 PM cron triggered - sending daily reports');
-        const now = new Date();
-        // Get today's date in IST
-        const istOffset = 5.5 * 60 * 60 * 1000;
-        const istNow = new Date(now.getTime() + istOffset);
-        const today = istNow.toISOString().split('T')[0];
-        await sendAllReports(today);
+        if (registry) registry.markRunning('attendance-daily-report');
+        try {
+            const now = new Date();
+            // Get today's date in IST
+            const istOffset = 5.5 * 60 * 60 * 1000;
+            const istNow = new Date(now.getTime() + istOffset);
+            const today = istNow.toISOString().split('T')[0];
+            await sendAllReports(today);
+            if (registry) registry.markCompleted('attendance-daily-report', { details: 'Reports sent' });
+        } catch (e) {
+            if (registry) registry.markFailed('attendance-daily-report', { error: e.message });
+        }
     }, { timezone: 'Asia/Kolkata' });
 
     console.log('[AttendanceReport] 10:05 PM IST cron scheduled');
@@ -259,6 +272,7 @@ module.exports = {
     setPool,
     setIO,
     setSessionManager,
+    setAutomationRegistry,
     start,
     generateReport,
     sendReport,

@@ -68,6 +68,8 @@ const errorHandlerMw = require('./middleware/errorHandler');
 const systemHealthService = require('./services/system-health-service');
 const errorAnalysisService = require('./services/error-analysis-service');
 const aiEngineForErrors = require('./services/ai-engine');
+const automationRegistry = require('./services/automation-registry');
+const adminDashboardRoutes = require('./routes/admin-dashboard');
 
 const app = express();
 
@@ -335,6 +337,7 @@ app.use('/api/whatsapp-chat', whatsappChatRoutes.router);
 app.use('/api/ai', aiRoutes.router);
 app.use('/api/painters', paintersRoutes.router);
 app.use('/api/system', systemRoutes.router);
+app.use('/api/admin/dashboard', adminDashboardRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3274,6 +3277,14 @@ const io = new SocketIO(server, {
 
 // Make io accessible to routes
 app.set('io', io);
+
+// Online user tracking for live dashboard
+const onlineUsers = new Map(); // userId → Set<socketId>
+app.set('onlineUsers', onlineUsers);
+
+// Pass dependencies to admin dashboard route
+adminDashboardRoutes.setDependencies({ pool, onlineUsers: () => app.get('onlineUsers'), automationRegistry });
+
 notificationService.setIO(io);
 autoClockout.setIO(io);
 whatsappSessionManager.setIO(io);
@@ -3317,6 +3328,15 @@ io.use(async (socket, next) => {
 io.on('connection', async (socket) => {
     const userId = socket.user.id;
     console.log(`Socket connected: ${socket.user.full_name} (${userId})`);
+
+    // Track online status for live dashboard
+    if (!onlineUsers.has(userId)) {
+        onlineUsers.set(userId, new Set());
+        io.to('live_dashboard_admin').emit('user_online', {
+            id: userId, full_name: socket.user.full_name, role: socket.user.role
+        });
+    }
+    onlineUsers.get(userId).add(socket.id);
 
     // Join user's personal room for notifications
     socket.join(`user_${userId}`);
@@ -3391,7 +3411,23 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // Join live dashboard room (admin/manager only)
+    socket.on('join_live_dashboard', () => {
+        if (socket.user.role === 'admin' || socket.user.role === 'manager') {
+            socket.join('live_dashboard_admin');
+        }
+    });
+
     socket.on('disconnect', () => {
+        // Track online status for live dashboard
+        const userSockets = onlineUsers.get(userId);
+        if (userSockets) {
+            userSockets.delete(socket.id);
+            if (userSockets.size === 0) {
+                onlineUsers.delete(userId);
+                io.to('live_dashboard_admin').emit('user_offline', { id: userId });
+            }
+        }
         console.log(`Socket disconnected: ${socket.user.full_name}`);
     });
 });
@@ -3400,6 +3436,14 @@ server.listen(PORT, () => {
     console.log(`QC Business Manager API v2.0.0 running on port ${PORT}`);
     console.log(`Modules loaded: auth, roles, branches, users, customers, leads, products, estimates, attendance, salary, activities, tasks, settings, zoho-books, chat, notifications, pdf, share`);
     console.log(`Socket.io ready`);
+
+    // Pass automation registry to all schedulers
+    syncScheduler.setAutomationRegistry(automationRegistry);
+    aiScheduler.setAutomationRegistry(automationRegistry);
+    painterScheduler.setAutomationRegistry(automationRegistry);
+    autoClockout.setAutomationRegistry(automationRegistry);
+    attendanceReport.setAutomationRegistry(automationRegistry);
+    whatsappProcessor.setAutomationRegistry(automationRegistry);
 
     // Start background services after server is ready
     autoClockout.start();
