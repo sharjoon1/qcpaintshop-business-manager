@@ -2107,6 +2107,14 @@ Based on AI App Analyzer report, fixed critical production errors:
 - Daily snapshots generating at 6PM IST
 - 42 AI config entries properly configured
 
+### 2026-02-25 - WhatsApp Attendance Report Fix
+- **Root cause**: `whatsapp-web.js` npm package was not installed on production server — the session manager gracefully degrades (try/catch on require) so no crash, but all message sends silently fail
+- **Fix**: Installed `chromium` (headless browser dependency), `whatsapp-web.js`, and `qrcode` packages on production server
+- **Added to package.json**: `"whatsapp-web.js": "^1.26.1"` and `"qrcode": "^1.5.4"` as explicit dependencies
+- **Verified**: WhatsApp General session (branch 0) authenticates and connects on server restart, phone: 916385574463
+- **Cron**: `[AttendanceReport] 10:05 PM IST cron scheduled` — confirmed active after restart
+- **History**: All `attendance_daily_reports` entries had `delivery_status = 'failed'` prior to fix
+
 ### 2026-02-20 - Permission-Based Staff Sidebar Filtering (superseded by Feb 25 redesign)
 - Original implementation — see 2026-02-25 entry for current state
 
