@@ -892,7 +892,8 @@ async function loadReviewList() {
             <tbody>
                 ${res.data.map(a => {
                     const isPartial = a.status === 'pending' && a.submitted_count > 0;
-                    const submittedLabel = `${a.submitted_count || 0}/${a.item_count}`;
+                    const adjCount = a.adjusted_count || 0;
+                    const submittedLabel = `${a.submitted_count || 0}/${a.item_count}` + (adjCount > 0 ? ` <span class="text-purple-600">(${adjCount} adj)</span>` : '');
                     return `<tr>
                         <td>${a.id}</td>
                         <td>${a.branch_name || '-'}</td>
@@ -1206,7 +1207,13 @@ async function loadHistory(page) {
         <table class="sc-table">
             <thead><tr><th>#</th><th>Branch</th><th>Location</th><th>Staff</th><th>Type</th><th>Date</th><th>Items</th><th>Discrepancies</th><th>Status</th><th>Created By</th><th></th></tr></thead>
             <tbody>
-                ${res.data.map(a => `<tr>
+                ${res.data.map(a => {
+                    const hasAdjusted = a.adjusted_count > 0;
+                    const isPartial = a.status === 'pending' && hasAdjusted;
+                    const statusHtml = isPartial
+                        ? '<span class="status-badge" style="background:#f3e8ff;color:#7c3aed;">Partial (' + a.adjusted_count + '/' + a.item_count + ')</span>'
+                        : '<span class="status-badge status-' + a.status + '">' + a.status + '</span>';
+                    return `<tr>
                     <td>${a.id}</td>
                     <td>${a.branch_name || '-'}</td>
                     <td class="text-xs">${a.location_name || '-'}</td>
@@ -1215,14 +1222,16 @@ async function loadHistory(page) {
                     <td>${a.check_date ? a.check_date.split('T')[0] : '-'}</td>
                     <td>${a.item_count}</td>
                     <td>${a.discrepancy_count > 0 ? '<span class="diff-negative">' + a.discrepancy_count + '</span>' : '0'}</td>
-                    <td><span class="status-badge status-${a.status}">${a.status}</span></td>
+                    <td>${statusHtml}</td>
                     <td class="text-xs text-gray-500">${a.created_by_name || '-'}</td>
                     <td>
-                        ${a.status === 'pending' ? '<button onclick="deleteAssignment(' + a.id + ')" class="text-xs text-red-500 hover:text-red-700">Delete</button>' : ''}
-                        ${a.status === 'submitted' ? '<button onclick="openReview(' + a.id + ')" class="text-xs text-indigo-600 hover:text-indigo-800">Review</button>' : ''}
+                        ${a.status === 'pending' && !hasAdjusted ? '<button onclick="deleteAssignment(' + a.id + ')" class="text-xs text-red-500 hover:text-red-700">Delete</button>' : ''}
+                        ${a.status === 'submitted' || isPartial ? '<button onclick="openReview(' + a.id + ')" class="text-xs text-indigo-600 hover:text-indigo-800">Review</button>' : ''}
                         ${a.status !== 'pending' ? '<button onclick="viewDetail(' + a.id + ')" class="text-xs text-gray-500 hover:text-gray-700 ml-1">View</button>' : ''}
+                        ${isPartial ? '<button onclick="viewDetail(' + a.id + ')" class="text-xs text-gray-500 hover:text-gray-700 ml-1">View</button>' : ''}
                     </td>
-                </tr>`).join('')}
+                </tr>`;
+                }).join('')}
             </tbody>
         </table>`;
 
