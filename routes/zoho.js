@@ -675,7 +675,10 @@ router.get('/invoices', requirePermission('zoho', 'invoices'), async (req, res) 
         );
 
         const [invoices] = await pool.query(`
-            SELECT zi.*, zcm.local_customer_id
+            SELECT zi.*, zcm.local_customer_id,
+                   zcm.credit_limit, zcm.zoho_outstanding as credit_outstanding,
+                   CASE WHEN zcm.credit_limit > 0
+                        THEN ROUND((zcm.zoho_outstanding / zcm.credit_limit) * 100, 1) ELSE 0 END as credit_utilization
             FROM zoho_invoices zi
             LEFT JOIN zoho_customers_map zcm ON zi.zoho_customer_id = zcm.zoho_contact_id
             ${where}

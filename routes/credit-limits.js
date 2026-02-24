@@ -9,9 +9,99 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth, requireRole } = require('../middleware/permissionMiddleware');
 const zohoAPI = require('../services/zoho-api');
+const notificationService = require('../services/notification-service');
 
 let pool = null;
+let io = null;
 function setPool(p) { pool = p; }
+function setIO(i) { io = i; }
+
+// ═══════════════════════════════════════════════════════════════
+// ZOHO SYNC HELPER — sync credit limit to Zoho Books contact
+// ═══════════════════════════════════════════════════════════════
+async function syncLimitToZoho(zohoCustomerMapId) {
+    try {
+        const [rows] = await pool.query(
+            'SELECT zoho_contact_id, credit_limit FROM zoho_customers_map WHERE id = ?',
+            [zohoCustomerMapId]
+        );
+        if (!rows.length || !rows[0].zoho_contact_id) return { synced: false, reason: 'no_contact_id' };
+
+        await zohoAPI.updateContact(rows[0].zoho_contact_id, {
+            credit_limit: Number(rows[0].credit_limit)
+        });
+        return { synced: true };
+    } catch (err) {
+        console.error('[CreditLimits] Zoho sync error for map_id', zohoCustomerMapId, ':', err.message);
+        return { synced: false, reason: err.message };
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CREDIT CHECK UTILITY — used by painters push-to-Zoho etc.
+// ═══════════════════════════════════════════════════════════════
+async function checkCreditBeforeInvoice(dbPool, zohoContactId, invoiceAmount) {
+    const [rows] = await dbPool.query(
+        `SELECT id, zoho_contact_name, credit_limit, zoho_outstanding
+         FROM zoho_customers_map WHERE zoho_contact_id = ? LIMIT 1`,
+        [zohoContactId]
+    );
+
+    if (!rows.length) {
+        return { allowed: true, reason: 'Customer not in credit system' };
+    }
+
+    const c = rows[0];
+    const limit = Number(c.credit_limit);
+    const outstanding = Number(c.zoho_outstanding);
+    const amount = Number(invoiceAmount);
+
+    // No limit set → BLOCKED (must request a limit first)
+    if (limit === 0) {
+        // Check if there's a pending request already
+        const [pending] = await dbPool.query(
+            'SELECT id FROM credit_limit_requests WHERE zoho_customer_map_id = ? AND status = ? LIMIT 1',
+            [c.id, 'pending']
+        );
+        return {
+            allowed: false,
+            reason: 'No credit limit set for ' + c.zoho_contact_name + '. Please request a credit limit from admin.',
+            credit_limit: 0,
+            outstanding,
+            available: 0,
+            no_limit_set: true,
+            has_pending_request: pending.length > 0,
+            customer_name: c.zoho_contact_name,
+            zoho_customer_map_id: c.id
+        };
+    }
+
+    const available = limit - outstanding;
+    if (available < amount) {
+        return {
+            allowed: false,
+            reason: `Credit limit exceeded for ${c.zoho_contact_name}. Available: ₹${available.toLocaleString('en-IN')}, Required: ₹${amount.toLocaleString('en-IN')}`,
+            credit_limit: limit,
+            outstanding,
+            available,
+            shortage: amount - available,
+            no_limit_set: false,
+            has_pending_request: false,
+            customer_name: c.zoho_contact_name,
+            zoho_customer_map_id: c.id
+        };
+    }
+
+    return {
+        allowed: true,
+        credit_limit: limit,
+        outstanding,
+        available,
+        no_limit_set: false,
+        customer_name: c.zoho_contact_name,
+        zoho_customer_map_id: c.id
+    };
+}
 
 // ═══════════════════════════════════════════════════════════════
 // NAMED ROUTES FIRST (before /:customerId to avoid interception)
@@ -205,7 +295,15 @@ router.post('/bulk-set', requireAuth, async (req, res) => {
 
         await conn.commit();
         conn.release();
-        res.json({ success: true, updated });
+
+        // Best-effort Zoho sync for each customer
+        const zohoResults = [];
+        for (const item of customers) {
+            const result = await syncLimitToZoho(item.id);
+            zohoResults.push({ id: item.id, ...result });
+        }
+
+        res.json({ success: true, updated, zoho_sync: zohoResults });
     } catch (e) {
         await conn.rollback();
         conn.release();
@@ -221,6 +319,214 @@ router.post('/sync', requireAuth, async (req, res) => {
         res.json({ success: true, synced: result.synced, message: `Synced ${result.synced} customers from Zoho` });
     } catch (e) {
         console.error('[CreditLimits] Sync error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// CREDIT LIMIT REQUEST WORKFLOW (F4)
+// ═══════════════════════════════════════════════════════════════
+
+// POST /api/credit-limits/requests — submit a credit limit request
+router.post('/requests', requireAuth, async (req, res) => {
+    try {
+        const { zoho_customer_map_id, requested_amount, reason } = req.body;
+        if (!zoho_customer_map_id || !requested_amount || requested_amount <= 0) {
+            return res.status(400).json({ error: 'zoho_customer_map_id and requested_amount (>0) required' });
+        }
+
+        // Get customer info
+        const [cust] = await pool.query(
+            'SELECT id, zoho_contact_name, branch_id FROM zoho_customers_map WHERE id = ?',
+            [zoho_customer_map_id]
+        );
+        if (!cust.length) return res.status(404).json({ error: 'Customer not found' });
+
+        // Check for existing pending request
+        const [existing] = await pool.query(
+            'SELECT id FROM credit_limit_requests WHERE zoho_customer_map_id = ? AND status = ?',
+            [zoho_customer_map_id, 'pending']
+        );
+        if (existing.length) {
+            return res.status(409).json({ error: 'A pending request already exists for this customer', existing_request_id: existing[0].id });
+        }
+
+        const [result] = await pool.query(
+            `INSERT INTO credit_limit_requests (branch_id, requested_by, zoho_customer_map_id, customer_name, requested_amount, reason)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [cust[0].branch_id || 0, req.user.id, zoho_customer_map_id, cust[0].zoho_contact_name, requested_amount, reason || null]
+        );
+
+        // Notify all admin/super_admin users
+        try {
+            const [admins] = await pool.query(
+                "SELECT id FROM users WHERE role IN ('admin','super_admin') AND status = 'active'"
+            );
+            for (const admin of admins) {
+                await notificationService.send(admin.id, {
+                    type: 'credit_limit_request',
+                    title: 'New Credit Limit Request',
+                    body: `${req.user.full_name || req.user.username} requested ₹${Number(requested_amount).toLocaleString('en-IN')} limit for ${cust[0].zoho_contact_name}`,
+                    data: { request_id: result.insertId, customer_name: cust[0].zoho_contact_name }
+                });
+                if (io) io.to(`user_${admin.id}`).emit('credit_limit_request_new', {
+                    id: result.insertId,
+                    customer_name: cust[0].zoho_contact_name,
+                    requested_amount,
+                    requested_by: req.user.full_name || req.user.username
+                });
+            }
+        } catch (notifErr) { console.error('[CreditLimits] Notify error:', notifErr.message); }
+
+        res.json({ success: true, request_id: result.insertId });
+    } catch (e) {
+        console.error('[CreditLimits] Request submit error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/credit-limits/requests — list requests (staff=own, admin=all)
+router.get('/requests', requireAuth, async (req, res) => {
+    try {
+        const { status: statusFilter } = req.query;
+        const isAdmin = ['admin', 'super_admin', 'manager'].includes(req.user.role);
+
+        let where = 'WHERE 1=1';
+        const params = [];
+
+        if (!isAdmin) {
+            where += ' AND r.requested_by = ?';
+            params.push(req.user.id);
+        }
+        if (statusFilter && statusFilter !== 'all') {
+            where += ' AND r.status = ?';
+            params.push(statusFilter);
+        }
+
+        const [rows] = await pool.query(`
+            SELECT r.*, u.full_name as requested_by_name, rv.full_name as reviewed_by_name,
+                   zcm.credit_limit as current_limit, zcm.zoho_outstanding
+            FROM credit_limit_requests r
+            LEFT JOIN users u ON r.requested_by = u.id
+            LEFT JOIN users rv ON r.reviewed_by = rv.id
+            LEFT JOIN zoho_customers_map zcm ON r.zoho_customer_map_id = zcm.id
+            ${where}
+            ORDER BY FIELD(r.status, 'pending', 'approved', 'rejected'), r.created_at DESC
+            LIMIT 200
+        `, params);
+
+        // Pending count for badge
+        const countWhere = isAdmin ? '' : ' AND requested_by = ' + pool.escape(req.user.id);
+        const [[{ pending_count }]] = await pool.query(
+            `SELECT COUNT(*) as pending_count FROM credit_limit_requests WHERE status = 'pending'${countWhere}`
+        );
+
+        res.json({ success: true, data: rows, pending_count });
+    } catch (e) {
+        console.error('[CreditLimits] Requests list error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// PUT /api/credit-limits/requests/:id/approve — admin approves request
+router.put('/requests/:id/approve', requireAuth, requireRole('admin', 'super_admin', 'manager'), async (req, res) => {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const { approved_amount, review_notes } = req.body;
+        const requestId = req.params.id;
+
+        const [request] = await conn.query('SELECT * FROM credit_limit_requests WHERE id = ? AND status = ?', [requestId, 'pending']);
+        if (!request.length) {
+            conn.release();
+            return res.status(404).json({ error: 'Pending request not found' });
+        }
+        const r = request[0];
+        const finalAmount = approved_amount != null ? Number(approved_amount) : Number(r.requested_amount);
+
+        // Update request
+        await conn.query(
+            `UPDATE credit_limit_requests SET status = 'approved', approved_amount = ?, reviewed_by = ?, reviewed_at = NOW(), review_notes = ? WHERE id = ?`,
+            [finalAmount, req.user.id, review_notes || null, requestId]
+        );
+
+        // Get current limit for history
+        const [current] = await conn.query('SELECT credit_limit FROM zoho_customers_map WHERE id = ?', [r.zoho_customer_map_id]);
+        const previousLimit = current.length ? Number(current[0].credit_limit) : 0;
+
+        // Set the credit limit
+        await conn.query(
+            'UPDATE zoho_customers_map SET credit_limit = ?, credit_limit_updated_at = NOW(), credit_limit_updated_by = ? WHERE id = ?',
+            [finalAmount, req.user.id, r.zoho_customer_map_id]
+        );
+
+        // Insert history
+        await conn.query(
+            'INSERT INTO customer_credit_history (zoho_customer_map_id, previous_limit, new_limit, changed_by, reason) VALUES (?, ?, ?, ?, ?)',
+            [r.zoho_customer_map_id, previousLimit, finalAmount, req.user.id, `Approved request #${requestId}` + (review_notes ? ': ' + review_notes : '')]
+        );
+
+        await conn.commit();
+        conn.release();
+
+        // Zoho sync (best-effort)
+        const zohoSync = await syncLimitToZoho(r.zoho_customer_map_id);
+
+        // Notify requester
+        try {
+            await notificationService.send(r.requested_by, {
+                type: 'credit_limit_approved',
+                title: 'Credit Limit Approved',
+                body: `Your request for ${r.customer_name} was approved: ₹${finalAmount.toLocaleString('en-IN')}`,
+                data: { request_id: requestId, approved_amount: finalAmount }
+            });
+            if (io) io.to(`user_${r.requested_by}`).emit('credit_limit_request_resolved', {
+                id: requestId, status: 'approved', approved_amount: finalAmount, customer_name: r.customer_name
+            });
+        } catch (notifErr) { console.error('[CreditLimits] Notify error:', notifErr.message); }
+
+        res.json({ success: true, approved_amount: finalAmount, zoho_synced: zohoSync.synced });
+    } catch (e) {
+        await conn.rollback();
+        conn.release();
+        console.error('[CreditLimits] Approve error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// PUT /api/credit-limits/requests/:id/reject — admin rejects request
+router.put('/requests/:id/reject', requireAuth, requireRole('admin', 'super_admin', 'manager'), async (req, res) => {
+    try {
+        const { review_notes } = req.body;
+        if (!review_notes || !review_notes.trim()) {
+            return res.status(400).json({ error: 'Reason for rejection is required' });
+        }
+
+        const [request] = await pool.query('SELECT * FROM credit_limit_requests WHERE id = ? AND status = ?', [req.params.id, 'pending']);
+        if (!request.length) return res.status(404).json({ error: 'Pending request not found' });
+        const r = request[0];
+
+        await pool.query(
+            `UPDATE credit_limit_requests SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW(), review_notes = ? WHERE id = ?`,
+            [req.user.id, review_notes, req.params.id]
+        );
+
+        // Notify requester
+        try {
+            await notificationService.send(r.requested_by, {
+                type: 'credit_limit_rejected',
+                title: 'Credit Limit Request Rejected',
+                body: `Your request for ${r.customer_name} was rejected: ${review_notes}`,
+                data: { request_id: req.params.id, reason: review_notes }
+            });
+            if (io) io.to(`user_${r.requested_by}`).emit('credit_limit_request_resolved', {
+                id: Number(req.params.id), status: 'rejected', customer_name: r.customer_name, reason: review_notes
+            });
+        } catch (notifErr) { console.error('[CreditLimits] Notify error:', notifErr.message); }
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[CreditLimits] Reject error:', e.message);
         res.status(500).json({ error: e.message });
     }
 });
@@ -304,12 +610,16 @@ router.post('/:customerId/set-limit', requireAuth, async (req, res) => {
         await conn.commit();
         conn.release();
 
+        // Best-effort Zoho sync
+        const zohoSync = await syncLimitToZoho(customerId);
+
         res.json({
             success: true,
             previous_limit: previousLimit,
             new_limit: Number(credit_limit),
             credit_used: Number(current[0].zoho_outstanding),
-            credit_available: Number(credit_limit) - Number(current[0].zoho_outstanding)
+            credit_available: Number(credit_limit) - Number(current[0].zoho_outstanding),
+            zoho_synced: zohoSync.synced
         });
     } catch (e) {
         await conn.rollback();
@@ -337,4 +647,4 @@ router.get('/:customerId/history', requireAuth, async (req, res) => {
     }
 });
 
-module.exports = { router, setPool };
+module.exports = { router, setPool, setIO, checkCreditBeforeInvoice };

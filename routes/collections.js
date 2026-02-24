@@ -149,6 +149,9 @@ router.get('/customers', perm, async (req, res) => {
                 zcm.zoho_contact_name as customer_name,
                 zcm.zoho_phone as phone,
                 zcm.branch_id,
+                zcm.credit_limit,
+                CASE WHEN zcm.credit_limit > 0
+                     THEN ROUND((zcm.zoho_outstanding / zcm.credit_limit) * 100, 1) ELSE 0 END as credit_utilization,
                 COUNT(*) as invoice_count,
                 SUM(zi.balance) as total_outstanding,
                 SUM(zi.total) as total_invoiced,
@@ -161,7 +164,7 @@ router.get('/customers', perm, async (req, res) => {
             FROM zoho_invoices zi
             LEFT JOIN zoho_customers_map zcm ON zi.zoho_customer_id = zcm.zoho_contact_id
             ${where}
-            GROUP BY zi.zoho_customer_id, zcm.zoho_contact_name, zcm.zoho_phone, zcm.branch_id
+            GROUP BY zi.zoho_customer_id, zcm.zoho_contact_name, zcm.zoho_phone, zcm.branch_id, zcm.credit_limit, zcm.zoho_outstanding
             ORDER BY ${getSortColumn(sort, 'total_outstanding')} ${order === 'asc' ? 'ASC' : 'DESC'}
             LIMIT ? OFFSET ?
         `, [...params, parseInt(limit), offset]);

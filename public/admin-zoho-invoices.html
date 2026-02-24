@@ -143,6 +143,7 @@
                                 <th class="px-4 py-3 font-semibold text-gray-600">Due Date</th>
                                 <th class="px-4 py-3 font-semibold text-gray-600 text-right">Total</th>
                                 <th class="px-4 py-3 font-semibold text-gray-600 text-right">Balance</th>
+                                <th class="px-4 py-3 font-semibold text-gray-600 text-center">Credit</th>
                                 <th class="px-4 py-3 font-semibold text-gray-600 text-center">Status</th>
                             </tr>
                         </thead>
@@ -298,6 +299,21 @@
             const cls = map[(status || '').toLowerCase()] || 'bg-gray-100 text-gray-700';
             const label = (status || 'unknown').replace(/_/g, ' ');
             return '<span class="inline-block px-2.5 py-1 rounded-full text-xs font-semibold capitalize ' + cls + '">' + label + '</span>';
+        }
+
+        function creditBadge(limit, utilization, balance) {
+            limit = Number(limit) || 0;
+            utilization = Number(utilization) || 0;
+            balance = Number(balance) || 0;
+            // Only show for unpaid invoices
+            if (balance <= 0) return '<span class="text-gray-300 text-xs">--</span>';
+            if (limit === 0) return '<span class="inline-block px-1.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-400" title="No credit limit set">--</span>';
+            var bg, fg;
+            if (utilization > 100) { bg = '#fecaca'; fg = '#991b1b'; }
+            else if (utilization > 80) { bg = '#fee2e2'; fg = '#dc2626'; }
+            else if (utilization > 50) { bg = '#fef3c7'; fg = '#92400e'; }
+            else { bg = '#d1fae5'; fg = '#065f46'; }
+            return '<span class="inline-block px-1.5 py-0.5 rounded-full text-xs font-semibold" style="background:' + bg + ';color:' + fg + '" title="Credit limit: ₹' + limit.toLocaleString('en-IN') + '">' + utilization + '%</span>';
         }
 
         function getSortParams() {
@@ -497,6 +513,7 @@
                     '<td class="px-4 py-3 text-gray-600 whitespace-nowrap">' + formatDate(inv.due_date) + '</td>' +
                     '<td class="px-4 py-3 text-gray-800 font-medium text-right whitespace-nowrap">' + formatINR(inv.total) + '</td>' +
                     '<td class="px-4 py-3 text-gray-800 font-medium text-right whitespace-nowrap">' + formatINR(inv.balance) + '</td>' +
+                    '<td class="px-4 py-3 text-center">' + creditBadge(inv.credit_limit, inv.credit_utilization, inv.balance) + '</td>' +
                     '<td class="px-4 py-3 text-center">' + getStatusBadge(inv.status) + '</td>' +
                 '</tr>';
             }).join('');

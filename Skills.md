@@ -268,19 +268,25 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Set/update credit limit per Zoho customer with reason tracking
 - Real-time credit utilization monitoring (limit, outstanding, available, %)
 - Overview dashboard: 6 cards (total customers, total limit, outstanding, available, with limit, over limit), last synced indicator
-- Credit check endpoint for invoice validation (0 limit = no limit set, allowed by default)
-- Bulk update credit limits for multiple customers
+- **Zoho sync**: Setting/bulk-setting limits auto-syncs to Zoho Books via `updateContact()` (best-effort, response includes `zoho_synced`)
+- **Invoice enforcement**: `checkCreditBeforeInvoice(pool, zohoContactId, amount)` — blocks invoicing if no limit set or limit exceeded. Integrated in painter push-to-Zoho. Logs violations.
+- **Request workflow**: Staff submit credit limit requests → admin approves/rejects → auto-sets limit + Zoho sync + notifications
+- Credit check endpoint for invoice validation (0 limit = BLOCKED, must request limit)
+- Bulk update credit limits for multiple customers (with Zoho sync)
 - "Sync from Zoho" button — calls `zohoAPI.syncCustomers()` to refresh outstanding amounts
 - Branch filter dropdown (from `zoho_customers_map.branch_id`)
 - Credit limit change history timeline (uses `zoho_customer_map_id`)
 - Credit limit violations log (uses `zoho_customer_map_id`)
 - Export CSV with GST, email, phone, branch columns
 - Details modal: customer info (phone, email, GST, Zoho ID, last synced), summary cards, outstanding invoices (via `zoho_contact_id`), unused credits, credit history
+- **Transaction page badges**: Collections Customers tab + Invoices page show credit utilization badges (green/amber/red/exceeded)
 - Utilization color coding: green (<50%), amber (50-80%), red (>80%), critical (exceeded)
 - Pages: `admin-credit-limits.html` (data-page=`credit-limits`, Leads subnav)
-- Routes: `routes/credit-limits.js` (9 endpoints, imports `zoho-api.js` for sync)
-- Tables: `zoho_customers_map` (credit_limit, credit_limit_updated_at, credit_limit_updated_by), `customer_credit_history` (+zoho_customer_map_id), `credit_limit_violations` (+zoho_customer_map_id)
-- Migrations: `migrations/migrate-credit-limits.js` (original), `migrations/migrate-credit-limits-zoho.js` (Zoho migration)
+- Routes: `routes/credit-limits.js` (13 endpoints, exports `checkCreditBeforeInvoice`, imports `zoho-api.js` + `notification-service.js`)
+- Tables: `zoho_customers_map` (credit_limit columns), `customer_credit_history`, `credit_limit_violations`, `credit_limit_requests` (request workflow)
+- Migrations: `migrate-credit-limits.js`, `migrate-credit-limits-zoho.js`, `migrate-credit-limit-requests.js`
+- Socket events: `credit_limit_request_new`, `credit_limit_request_resolved` (via `user_${userId}` rooms)
+- server.js: `creditLimitRoutes.setIO(io)` at Socket.io init
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
@@ -288,10 +294,14 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | GET | `/api/credit-limits/overview/summary` | Dashboard overview stats (6 metrics + last synced) |
 | GET | `/api/credit-limits/violations/list` | List credit violations |
 | POST | `/api/credit-limits/check` | Check credit availability (zoho_customer_map_id) |
-| POST | `/api/credit-limits/bulk-set` | Bulk update limits |
+| POST | `/api/credit-limits/bulk-set` | Bulk update limits (+ Zoho sync) |
 | POST | `/api/credit-limits/sync` | Sync customers from Zoho (replaces recalculate) |
+| POST | `/api/credit-limits/requests` | Submit credit limit request (any auth user) |
+| GET | `/api/credit-limits/requests` | List requests (staff=own, admin=all, pending_count) |
+| PUT | `/api/credit-limits/requests/:id/approve` | Approve → auto-set limit + Zoho sync + notify |
+| PUT | `/api/credit-limits/requests/:id/reject` | Reject with mandatory reason + notify |
 | GET | `/api/credit-limits/:id` | Single Zoho customer credit detail + outstanding invoices |
-| POST | `/api/credit-limits/:id/set-limit` | Update credit limit |
+| POST | `/api/credit-limits/:id/set-limit` | Update credit limit (+ Zoho sync) |
 | GET | `/api/credit-limits/:id/history` | Credit change history (via zoho_customer_map_id) |
 
 ---
@@ -1742,6 +1752,12 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-02-24 - Credit Limit System Enhancement (4 Features)
+1. **F1: Transaction Page Badges** — Collections Customers tab and Invoices page now show credit utilization badges (green/amber/red/exceeded). Backend: JOINs `zcm.credit_limit` + computed `credit_utilization` in `routes/collections.js` and `routes/zoho.js`. Frontend: `creditBadge()` helper on both pages.
+2. **F2: Zoho Sync on Limit Changes** — `updateContact()` added to `services/zoho-api.js`. Setting/bulk-setting limits auto-syncs to Zoho Books (best-effort). Response includes `zoho_synced` flag.
+3. **F3: Invoice Restriction** — `checkCreditBeforeInvoice(pool, zohoContactId, amount)` exported from `routes/credit-limits.js`. Blocks invoicing if no limit set or exceeded. Integrated before painter push-to-Zoho. Logs violations to `credit_limit_violations`.
+4. **F4: Request Workflow** — `credit_limit_requests` table (migration: `migrate-credit-limit-requests.js`). 4 endpoints: POST/GET requests, PUT approve/reject. Approve auto-sets limit + Zoho sync + notification. Socket events: `credit_limit_request_new/resolved`. Frontend: Requests button with badge, request/approve/reject modals in `admin-credit-limits.html`.
 
 ### 2026-02-24 - Customer Credit Limits → Zoho Customers Migration
 Migrated credit limit management from local `customers` table to **`zoho_customers_map`** (Zoho-synced customers):

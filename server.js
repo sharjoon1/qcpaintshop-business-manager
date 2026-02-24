@@ -3299,6 +3299,7 @@ attendanceRoutes.setIO(io);
 aiRoutes.setIO(io);
 aiScheduler.setIO(io);
 paintersRoutes.setIO(io);
+creditLimitRoutes.setIO(io);
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {

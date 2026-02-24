@@ -1250,6 +1250,32 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
             return res.status(500).json({ success: false, message: 'Could not resolve Zoho contact ID' });
         }
 
+        // 1b. Credit limit check before invoicing
+        try {
+            const { checkCreditBeforeInvoice } = require('./credit-limits');
+            const creditCheck = await checkCreditBeforeInvoice(pool, zohoContactId, parseFloat(estimate.grand_total));
+            if (!creditCheck.allowed) {
+                // Log violation
+                try {
+                    await pool.query(
+                        `INSERT INTO credit_limit_violations (zoho_customer_map_id, violation_type, invoice_amount, credit_limit, credit_used, staff_id)
+                         VALUES (?, ?, ?, ?, ?, ?)`,
+                        [creditCheck.zoho_customer_map_id || null, creditCheck.no_limit_set ? 'no_limit' : 'exceeded',
+                         parseFloat(estimate.grand_total), creditCheck.credit_limit || 0, creditCheck.outstanding || 0, req.user.id]
+                    );
+                } catch (logErr) { console.error('Credit violation log error:', logErr.message); }
+
+                return res.status(403).json({
+                    success: false,
+                    message: creditCheck.reason,
+                    credit_check: creditCheck
+                });
+            }
+        } catch (creditErr) {
+            console.error('Credit check error (non-blocking):', creditErr.message);
+            // If credit check fails (e.g. table missing), allow the invoice to proceed
+        }
+
         // 2. Create Zoho invoice
         const isCustomer = estimate.billing_type === 'customer';
         const lineItems = items.map(i => ({

@@ -73,7 +73,10 @@
             </h1>
             <p style="font-size: 0.8125rem; color: #6b7280;">Manage credit limits for Zoho customers <span class="sync-indicator" id="lastSyncedIndicator"></span></p>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn-outline" onclick="openRequestsPanel()" id="requestsBtn" style="position:relative;">
+                Requests <span id="requestsBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#ef4444;color:white;font-size:0.625rem;font-weight:700;min-width:18px;height:18px;border-radius:50%;display:none;align-items:center;justify-content:center;">0</span>
+            </button>
             <button class="btn-outline" onclick="syncFromZoho()" id="syncBtn">Sync from Zoho</button>
             <button class="btn-outline" onclick="showBulkModal()">Bulk Update</button>
             <button class="btn-outline" onclick="exportCSV()">Export CSV</button>
@@ -225,8 +228,99 @@
     </div>
 </div>
 
+<!-- Credit Limit Request Modal (staff submits) -->
+<div class="modal-overlay" id="requestModal">
+    <div class="modal-box">
+        <h3 style="font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 1.25rem;">Request Credit Limit</h3>
+        <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Customer</label>
+            <select class="filter-input" id="reqCustomerSelect" style="width: 100%;" onchange="onReqCustomerChange()">
+                <option value="">Select a customer without limit...</option>
+            </select>
+        </div>
+        <div id="reqCustomerInfo" style="display:none; background:#f9fafb; border-radius:8px; padding:0.75rem; margin-bottom:1rem; font-size:0.8125rem;">
+            <div id="reqCustDetails"></div>
+        </div>
+        <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Requested Amount</label>
+            <input type="number" id="reqAmount" class="filter-input" style="width: 100%;" min="1000" step="1000" placeholder="e.g. 50000">
+        </div>
+        <div style="margin-bottom: 1.25rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Reason</label>
+            <textarea id="reqReason" class="filter-input" style="width: 100%; resize: vertical; min-height: 60px;" placeholder="Why does this customer need a credit limit?"></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+            <button class="btn-outline" onclick="closeRequestModal()">Cancel</button>
+            <button class="btn-primary" onclick="submitRequest()">Submit Request</button>
+        </div>
+    </div>
+</div>
+
+<!-- Requests Panel (admin reviews) -->
+<div class="modal-overlay" id="requestsPanel">
+    <div class="modal-box modal-box-lg">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <h3 style="font-size: 1.125rem; font-weight: 700; color: #1f2937;">Credit Limit Requests</h3>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <select class="filter-input btn-sm" id="reqStatusFilter" onchange="loadRequests()" style="padding:0.25rem 0.5rem;">
+                    <option value="all">All</option>
+                    <option value="pending" selected>Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <button class="btn-outline btn-sm" onclick="openNewRequestModal()">+ New Request</button>
+                <button onclick="closeRequestsPanel()" style="border:none;background:none;font-size:1.25rem;cursor:pointer;color:#9ca3af;">&times;</button>
+            </div>
+        </div>
+        <div id="requestsList" style="max-height: 65vh; overflow-y: auto;">
+            <div style="text-align:center;padding:2rem;color:#9ca3af;">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal-overlay" id="approveModal">
+    <div class="modal-box">
+        <h3 style="font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 1.25rem;">Approve Credit Limit Request</h3>
+        <input type="hidden" id="approveReqId">
+        <div style="background:#f9fafb; border-radius:8px; padding:0.75rem; margin-bottom:1rem; font-size:0.8125rem;" id="approveInfo"></div>
+        <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Approved Amount</label>
+            <input type="number" id="approveAmount" class="filter-input" style="width: 100%;" min="0" step="1000">
+            <div style="font-size:0.6875rem;color:#6b7280;margin-top:0.25rem;">You can adjust the amount. Leave as-is to approve the requested amount.</div>
+        </div>
+        <div style="margin-bottom: 1.25rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Notes (optional)</label>
+            <textarea id="approveNotes" class="filter-input" style="width: 100%; resize: vertical; min-height: 50px;" placeholder="Optional notes..."></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+            <button class="btn-outline" onclick="closeApproveModal()">Cancel</button>
+            <button class="btn-primary" onclick="confirmApprove()">Approve</button>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal-overlay" id="rejectModal">
+    <div class="modal-box">
+        <h3 style="font-size: 1.125rem; font-weight: 700; color: #ef4444; margin-bottom: 1.25rem;">Reject Credit Limit Request</h3>
+        <input type="hidden" id="rejectReqId">
+        <div style="background:#fef2f2; border-radius:8px; padding:0.75rem; margin-bottom:1rem; font-size:0.8125rem;" id="rejectInfo"></div>
+        <div style="margin-bottom: 1.25rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Reason for Rejection (required)</label>
+            <textarea id="rejectNotes" class="filter-input" style="width: 100%; resize: vertical; min-height: 60px;" placeholder="Explain why this request is being rejected..."></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+            <button class="btn-outline" onclick="closeRejectModal()">Cancel</button>
+            <button style="padding:0.5rem 1.25rem;border-radius:8px;background:#ef4444;color:white;border:none;font-weight:600;font-size:0.8125rem;cursor:pointer;" onclick="confirmReject()">Reject</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const token = localStorage.getItem('auth_token');
+const user = JSON.parse(localStorage.getItem('user') || '{}');
+const isAdmin = ['admin', 'super_admin', 'manager'].includes(user.role);
 const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
 let allCustomers = [];
 let debounceTimer = null;
@@ -636,10 +730,226 @@ function showToast(message, type = 'success') {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// CREDIT LIMIT REQUESTS (F4)
+// ═══════════════════════════════════════════════════════════════
+
+// --- Requests Panel ---
+async function openRequestsPanel() {
+    document.getElementById('requestsPanel').classList.add('open');
+    await loadRequests();
+}
+function closeRequestsPanel() { document.getElementById('requestsPanel').classList.remove('open'); }
+
+async function loadRequests() {
+    const statusFilter = document.getElementById('reqStatusFilter').value;
+    const container = document.getElementById('requestsList');
+    container.innerHTML = '<div style="text-align:center;padding:2rem;color:#9ca3af;">Loading...</div>';
+
+    try {
+        const resp = await fetch('/api/credit-limits/requests?status=' + statusFilter, { headers });
+        const json = await resp.json();
+        if (!json.success) throw new Error(json.error);
+
+        updateRequestBadge(json.pending_count);
+
+        if (!json.data.length) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:#9ca3af;">No requests found</div>';
+            return;
+        }
+
+        container.innerHTML = json.data.map(r => {
+            const statusColors = { pending: '#f59e0b', approved: '#22c55e', rejected: '#ef4444' };
+            const statusBg = { pending: '#fef3c7', approved: '#d1fae5', rejected: '#fee2e2' };
+            return `<div style="border:1px solid #e5e7eb;border-radius:10px;padding:1rem;margin-bottom:0.75rem;${r.status==='pending'?'border-left:3px solid #f59e0b;':''}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
+                    <div>
+                        <div style="font-weight:700;font-size:0.9375rem;color:#1f2937;">${escHtml(r.customer_name || '')}</div>
+                        <div style="font-size:0.6875rem;color:#6b7280;">by ${escHtml(r.requested_by_name || '')} &middot; ${new Date(r.created_at).toLocaleDateString('en-IN')} ${new Date(r.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
+                    </div>
+                    <span style="font-size:0.6875rem;font-weight:600;padding:2px 8px;border-radius:999px;background:${statusBg[r.status]||'#f3f4f6'};color:${statusColors[r.status]||'#6b7280'};text-transform:capitalize;">${r.status}</span>
+                </div>
+                <div style="display:flex;gap:1.5rem;font-size:0.8125rem;margin-bottom:0.5rem;">
+                    <div><span style="color:#6b7280">Requested:</span> <b style="color:#667eea">${formatINR(r.requested_amount)}</b></div>
+                    <div><span style="color:#6b7280">Current Limit:</span> <b>${r.current_limit > 0 ? formatINR(r.current_limit) : 'None'}</b></div>
+                    <div><span style="color:#6b7280">Outstanding:</span> <b>${formatINR(r.zoho_outstanding)}</b></div>
+                </div>
+                ${r.reason ? `<div style="font-size:0.8125rem;color:#374151;margin-bottom:0.5rem;"><span style="color:#6b7280">Reason:</span> ${escHtml(r.reason)}</div>` : ''}
+                ${r.status === 'approved' ? `<div style="font-size:0.8125rem;color:#065f46;">Approved: <b>${formatINR(r.approved_amount)}</b> by ${escHtml(r.reviewed_by_name||'')}${r.review_notes ? ' — ' + escHtml(r.review_notes) : ''}</div>` : ''}
+                ${r.status === 'rejected' ? `<div style="font-size:0.8125rem;color:#991b1b;">Rejected by ${escHtml(r.reviewed_by_name||'')}${r.review_notes ? ': ' + escHtml(r.review_notes) : ''}</div>` : ''}
+                ${r.status === 'pending' && isAdmin ? `
+                <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+                    <button class="btn-primary btn-sm" onclick="openApproveModal(${r.id}, '${escHtml(r.customer_name)}', ${r.requested_amount}, ${r.current_limit||0}, ${r.zoho_outstanding||0})">Approve</button>
+                    <button class="btn-outline btn-sm" style="color:#ef4444;border-color:#fca5a5;" onclick="openRejectModal(${r.id}, '${escHtml(r.customer_name)}', ${r.requested_amount})">Reject</button>
+                </div>` : ''}
+            </div>`;
+        }).join('');
+    } catch (e) {
+        container.innerHTML = '<div style="color:#ef4444;text-align:center;padding:1rem;">Error: ' + escHtml(e.message) + '</div>';
+    }
+}
+
+function updateRequestBadge(count) {
+    const badge = document.getElementById('requestsBadge');
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+// --- New Request Modal ---
+function openNewRequestModal() {
+    closeRequestsPanel();
+    // Populate customer select with no-limit customers
+    const select = document.getElementById('reqCustomerSelect');
+    select.innerHTML = '<option value="">Select a customer without limit...</option>';
+    allCustomers.filter(c => Number(c.credit_limit) === 0).forEach(c => {
+        select.innerHTML += `<option value="${c.id}" data-outstanding="${c.credit_used||0}" data-name="${escHtml(c.name||'')}" data-phone="${escHtml(c.phone||'')}">${escHtml(c.name||'')} (${escHtml(c.phone||'')})</option>`;
+    });
+    document.getElementById('reqAmount').value = '';
+    document.getElementById('reqReason').value = '';
+    document.getElementById('reqCustomerInfo').style.display = 'none';
+    document.getElementById('requestModal').classList.add('open');
+}
+function closeRequestModal() { document.getElementById('requestModal').classList.remove('open'); }
+
+function onReqCustomerChange() {
+    const select = document.getElementById('reqCustomerSelect');
+    const opt = select.selectedOptions[0];
+    if (!opt || !opt.value) {
+        document.getElementById('reqCustomerInfo').style.display = 'none';
+        return;
+    }
+    document.getElementById('reqCustomerInfo').style.display = 'block';
+    document.getElementById('reqCustDetails').innerHTML = `
+        <b>${opt.dataset.name}</b> &middot; ${opt.dataset.phone || 'No phone'}<br>
+        <span style="color:#6b7280">Outstanding: <b style="color:#ef4444">${formatINR(opt.dataset.outstanding)}</b> &middot; Credit Limit: <b>Not set</b></span>
+    `;
+}
+
+async function submitRequest() {
+    const zoho_customer_map_id = document.getElementById('reqCustomerSelect').value;
+    const requested_amount = parseFloat(document.getElementById('reqAmount').value);
+    const reason = document.getElementById('reqReason').value.trim();
+
+    if (!zoho_customer_map_id) { showToast('Select a customer', 'error'); return; }
+    if (isNaN(requested_amount) || requested_amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
+
+    try {
+        const resp = await fetch('/api/credit-limits/requests', {
+            method: 'POST', headers,
+            body: JSON.stringify({ zoho_customer_map_id: Number(zoho_customer_map_id), requested_amount, reason })
+        });
+        const json = await resp.json();
+        if (json.error) throw new Error(json.error);
+        showToast('Credit limit request submitted');
+        closeRequestModal();
+        openRequestsPanel();
+    } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+    }
+}
+
+// --- Approve Modal ---
+function openApproveModal(id, name, amount, currentLimit, outstanding) {
+    document.getElementById('approveReqId').value = id;
+    document.getElementById('approveAmount').value = amount;
+    document.getElementById('approveNotes').value = '';
+    document.getElementById('approveInfo').innerHTML = `
+        <b>${escHtml(name)}</b><br>
+        <span style="color:#6b7280">Requested: <b style="color:#667eea">${formatINR(amount)}</b> &middot; Current Limit: <b>${currentLimit > 0 ? formatINR(currentLimit) : 'None'}</b> &middot; Outstanding: <b>${formatINR(outstanding)}</b></span>
+    `;
+    document.getElementById('approveModal').classList.add('open');
+}
+function closeApproveModal() { document.getElementById('approveModal').classList.remove('open'); }
+
+async function confirmApprove() {
+    const id = document.getElementById('approveReqId').value;
+    const approved_amount = parseFloat(document.getElementById('approveAmount').value);
+    const review_notes = document.getElementById('approveNotes').value.trim();
+
+    if (isNaN(approved_amount) || approved_amount < 0) { showToast('Enter a valid amount', 'error'); return; }
+
+    try {
+        const resp = await fetch(`/api/credit-limits/requests/${id}/approve`, {
+            method: 'PUT', headers,
+            body: JSON.stringify({ approved_amount, review_notes })
+        });
+        const json = await resp.json();
+        if (json.error) throw new Error(json.error);
+        showToast('Request approved — credit limit set' + (json.zoho_synced ? ' & synced to Zoho' : ''));
+        closeApproveModal();
+        loadRequests();
+        loadCustomers();
+        loadOverview();
+    } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+    }
+}
+
+// --- Reject Modal ---
+function openRejectModal(id, name, amount) {
+    document.getElementById('rejectReqId').value = id;
+    document.getElementById('rejectNotes').value = '';
+    document.getElementById('rejectInfo').innerHTML = `<b>${escHtml(name)}</b> — Requested: <b>${formatINR(amount)}</b>`;
+    document.getElementById('rejectModal').classList.add('open');
+}
+function closeRejectModal() { document.getElementById('rejectModal').classList.remove('open'); }
+
+async function confirmReject() {
+    const id = document.getElementById('rejectReqId').value;
+    const review_notes = document.getElementById('rejectNotes').value.trim();
+
+    if (!review_notes) { showToast('Rejection reason is required', 'error'); return; }
+
+    try {
+        const resp = await fetch(`/api/credit-limits/requests/${id}/reject`, {
+            method: 'PUT', headers,
+            body: JSON.stringify({ review_notes })
+        });
+        const json = await resp.json();
+        if (json.error) throw new Error(json.error);
+        showToast('Request rejected');
+        closeRejectModal();
+        loadRequests();
+    } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+    }
+}
+
+// --- Socket.io listeners ---
+function initRequestSocket() {
+    if (typeof window.qcSocket === 'undefined') return;
+    const socket = window.qcSocket;
+    socket.on('credit_limit_request_new', (data) => {
+        showToast('New credit limit request: ' + (data.customer_name || ''));
+        // Refresh badge
+        loadRequestBadge();
+    });
+    socket.on('credit_limit_request_resolved', (data) => {
+        showToast('Credit request ' + data.status + ': ' + (data.customer_name || ''));
+        loadRequestBadge();
+        loadCustomers();
+        loadOverview();
+    });
+}
+
+async function loadRequestBadge() {
+    try {
+        const resp = await fetch('/api/credit-limits/requests?status=pending', { headers });
+        const json = await resp.json();
+        if (json.success) updateRequestBadge(json.pending_count);
+    } catch (e) { /* ignore */ }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════
 loadCustomers();
 loadOverview();
+loadRequestBadge();
+setTimeout(initRequestSocket, 1000);
 </script>
 </body>
 </html>

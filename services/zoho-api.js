@@ -146,6 +146,14 @@ async function createContact(contactData) {
 }
 
 /**
+ * Update contact in Zoho Books (e.g. credit_limit sync)
+ */
+async function updateContact(contactId, data) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPut(`/contacts/${contactId}?organization_id=${orgId}`, data);
+}
+
+/**
  * Get customer balance (outstanding)
  */
 async function getCustomerBalance(contactId) {
@@ -2224,6 +2232,7 @@ module.exports = {
     getContacts,
     getContact,
     createContact,
+    updateContact,
     getCustomerBalance,
     // Items
     getItems,
