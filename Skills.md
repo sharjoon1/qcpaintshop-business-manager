@@ -281,10 +281,11 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Details modal: customer info (phone, email, GST, Zoho ID, last synced), summary cards, outstanding invoices (via `zoho_contact_id`), unused credits, credit history
 - **Transaction page badges**: Collections Customers tab + Invoices page show credit utilization badges (green/amber/red/exceeded)
 - Utilization color coding: green (<50%), amber (50-80%), red (>80%), critical (exceeded)
-- Pages: `admin-credit-limits.html` (data-page=`credit-limits`, Leads subnav)
-- Routes: `routes/credit-limits.js` (13 endpoints, exports `checkCreditBeforeInvoice`, imports `zoho-api.js` + `notification-service.js`)
+- **Permissions**: 3-tier access via `credit_limits.view` / `credit_limits.request` / `credit_limits.manage` (migration: `migrate-credit-limits-permissions.js`)
+- Pages: `admin-credit-limits.html` (data-page=`credit-limits`, Leads subnav, uses PermissionManager for UI gating)
+- Routes: `routes/credit-limits.js` (14 endpoints, exports `checkCreditBeforeInvoice`, uses `requirePermission` middleware)
 - Tables: `zoho_customers_map` (credit_limit columns), `customer_credit_history`, `credit_limit_violations`, `credit_limit_requests` (request workflow)
-- Migrations: `migrate-credit-limits.js`, `migrate-credit-limits-zoho.js`, `migrate-credit-limit-requests.js`
+- Migrations: `migrate-credit-limits.js`, `migrate-credit-limits-zoho.js`, `migrate-credit-limit-requests.js`, `migrate-credit-limits-permissions.js`
 - Socket events: `credit_limit_request_new`, `credit_limit_request_resolved` (via `user_${userId}` rooms)
 - server.js: `creditLimitRoutes.setIO(io)` at Socket.io init
 
@@ -2078,13 +2079,36 @@ Based on AI App Analyzer report, fixed critical production errors:
 - **UTC date bug**: `my-assignments` used `toISOString().split('T')[0]` (UTC date); on CET server, midnight→1AM returns previous day; fixed to use local date getters
 - **DATE→string CET drift**: `toISOString()` on mysql2 DATE objects (local midnight) converts to previous day in UTC; fixed to use `getFullYear()/getMonth()/getDate()`
 
-### 2026-02-20 - Permission-Based Staff Sidebar Filtering
-- **Permission-based sidebar filtering**: Staff sidebar (`staff-sidebar.html`) filters nav items by user permissions
-  - `data-requires="module.action"` attribute on 7 gated items (estimates.view, attendance.view×4, zoho.stock_check, zoho.collections)
-  - `filterSidebarByPermissions()` reads cached `user_permissions` from localStorage (1-hour TTL), fetches `/api/auth/permissions` if expired
-  - Admin bypass: `is_admin === true` shows all items
-  - Empty sections auto-hidden when all child nav items are permission-gated and hidden
-  - Always-visible items: My Dashboard, Main Dashboard, My Requests, Guides & Help, My Profile
+### 2026-02-25 - Staff Sidebar Redesign & Permission Fixes
+- **Complete staff sidebar rewrite** (`staff-sidebar.html`): Redesigned to match admin sidebar's premium light design (white bg, SVG stroke icons, Inter font, icon-rail collapse on desktop, hover-to-preview, click-to-pin)
+- **Permission filtering**: Only Credit Limits uses `data-requires="credit_limits.view"` — core staff items (attendance, estimates, stock, collections, salary) always visible
+- **Fresh permissions**: `filterSidebarByPermissions()` now always fetches from `/api/auth/permissions` API (no stale 1-hour cache)
+- **Desktop icon rail**: 60px collapsed / 256px expanded, localStorage key `staffSidebarCollapsed` (separate from admin's `sidebarCollapsed`)
+
+### 2026-02-25 - Comprehensive Site Analysis & Bug Fixes
+**Production Bug Fixes (7 total):**
+- **LiveDashboard activity feed**: `p.name` → `p.full_name` in `routes/admin-dashboard.js` (painters table uses `full_name`)
+- **LiveDashboard UNION collation**: Added `COLLATE utf8mb4_unicode_ci` to all string columns in the 6-table UNION ALL query (mixed table collations caused "Illegal mix of collations" error every 10s)
+- **Socket duplicate load**: `socket-helper.js` wrapped in `window._qcSocketHelperLoaded` idempotent guard, `let` → `var` (prevented `Identifier 'qcSocket' has already been declared` error, freq: 21)
+- **SQL injection risk**: Replaced `pool.escape()` with parameterized query in `routes/credit-limits.js` (pending count query)
+- **Undefined function**: `apiRequest()` → `apiFetch()` in `admin-zoho-collections.html` (loadBranches function was broken)
+- **AI staff_daily failure**: `otr.requested_minutes` → `otr.expected_minutes` in `services/ai-staff-analyzer.js` (overtime_requests column name mismatch)
+- **AI zoho_daily failure**: `item_name` → `zoho_item_name` in `services/ai-analyzer.js` and `services/ai-marketing.js` (zoho_items_map column name)
+
+**Database Optimizations:**
+- **Collation standardization**: Converted all 52 `utf8mb4_general_ci` tables to `utf8mb4_unicode_ci` (migration: `fix-collation-standardize.js`). Database default also set. Eliminates all future UNION/JOIN collation errors.
+- **Missing indexes added** (migration: `fix-missing-indexes.js`): `staff_tasks.created_at`, `ai_messages.created_at`, `stock_check_assignments.submitted_at`, `painter_estimates.created_at`
+
+**AI System Audit Results:**
+- Clawdbot gateway running (port 18789), Sonnet 4.5 model active
+- Lead scoring: fully operational (runs every 6 hours, all completing successfully)
+- Staff daily analysis: NOW FIXED (was failing due to column name error)
+- Zoho daily analysis: NOW FIXED (was failing due to column name error)
+- Daily snapshots generating at 6PM IST
+- 42 AI config entries properly configured
+
+### 2026-02-20 - Permission-Based Staff Sidebar Filtering (superseded by Feb 25 redesign)
+- Original implementation — see 2026-02-25 entry for current state
 
 ### 2026-02-21 - Stock Check Enhancements
 - **Collation fix**: Added `COLLATE utf8mb4_unicode_ci` to `zoho_locations_map` JOINs in assignments list and review queries
