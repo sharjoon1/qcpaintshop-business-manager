@@ -456,17 +456,14 @@ async function claudeStreamToResponse(messages, res, options = {}) {
 // bypassing CLI argument size limits (kernel ARG_MAX / MAX_ARG_STRLEN)
 const CLAWDBOT_HELPER = path.join(__dirname, '..', 'scripts', 'clawdbot-call.mjs');
 
-function clawdbotExec(message, model) {
+function clawdbotExec(message) {
     // Write prompt to temp file, then call the gateway helper which reads
     // from file and sends via WebSocket (no argument size limit)
     const tmpFile = path.join(os.tmpdir(), `clawdbot-prompt-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`);
     fs.writeFileSync(tmpFile, message, 'utf8');
 
-    const args = [CLAWDBOT_HELPER, tmpFile];
-    if (model) args.push(model);
-
     return new Promise((resolve, reject) => {
-        execFile('node', args, { timeout: 300000, maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
+        execFile('node', [CLAWDBOT_HELPER, tmpFile], { timeout: 300000, maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
             // Clean up temp file
             try { fs.unlinkSync(tmpFile); } catch (_) {}
 
@@ -491,9 +488,8 @@ function clawdbotExec(message, model) {
 }
 
 async function clawdbotGenerate(messages, options = {}) {
-    // Read model override from ai_config (e.g. "anthropic/claude-sonnet-4-5")
-    const config = await getConfig();
-    const model = options.model || config.clawdbot_model || null;
+    // Model is controlled by clawdbot global config (~/.clawdbot/clawdbot.json)
+    // Currently set to anthropic/claude-sonnet-4-5
 
     // Combine system + user messages into one prompt for Clawdbot
     let prompt = '';
@@ -506,7 +502,7 @@ async function clawdbotGenerate(messages, options = {}) {
             prompt += `[Previous Response]\n${msg.content}\n\n`;
         }
     }
-    return clawdbotExec(prompt.trim(), model);
+    return clawdbotExec(prompt.trim());
 }
 
 async function clawdbotStreamToResponse(messages, res, options = {}) {
