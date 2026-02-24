@@ -1,9 +1,14 @@
 /**
  * Socket.io Client Helper for QC Paint Shop
  * Auto-connects with auth token, handles real-time events
+ * Safe to load multiple times (idempotent guard)
  */
 
-let qcSocket = null;
+// Guard against double-loading
+if (!window._qcSocketHelperLoaded) {
+window._qcSocketHelperLoaded = true;
+
+var qcSocket = null;
 window.qcSocket = null; // Expose on window for cross-script access
 
 function initSocket() {
@@ -74,3 +79,5 @@ if (document.readyState === 'loading') {
 } else {
     initSocket();
 }
+
+} // end guard

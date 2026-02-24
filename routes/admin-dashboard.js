@@ -165,7 +165,7 @@ async function getActivityFeed(todayStr) {
 
                 UNION ALL
 
-                (SELECT 'estimate' as type, p.name as user_name,
+                (SELECT 'estimate' as type, p.full_name as user_name,
                     CONCAT('New estimate #', pe.estimate_number, ' - ', FORMAT(pe.grand_total, 0)) as message,
                     pe.created_at as event_time
                 FROM painter_estimates pe
