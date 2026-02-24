@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Credit Limits - Quality Colours Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+        .util-bar { height: 6px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+        .util-fill { height: 100%; border-radius: 999px; transition: width 0.3s; }
+        .util-green { background: #22c55e; }
+        .util-yellow { background: #f59e0b; }
+        .util-red { background: #ef4444; }
+
+        .ov-card { background: white; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center; }
+        .ov-value { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .ov-label { font-size: 0.75rem; color: #6b7280; }
+
+        .cust-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+        .cust-table th { text-align: left; padding: 0.625rem 0.75rem; font-size: 0.6875rem; color: #6b7280; text-transform: uppercase; font-weight: 600; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+        .cust-table td { padding: 0.625rem 0.75rem; border-bottom: 1px solid #f3f4f6; }
+        .cust-table tr:hover { background: #f9fafb; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: white; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .modal-box-lg { max-width: 800px; }
+
+        .btn-primary { padding: 0.5rem 1.25rem; border-radius: 8px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; font-weight: 600; font-size: 0.8125rem; cursor: pointer; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-outline { padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #d1d5db; background: white; color: #374151; font-weight: 600; font-size: 0.8125rem; cursor: pointer; }
+        .btn-outline:hover { border-color: #667eea; color: #667eea; }
+        .btn-sm { padding: 0.25rem 0.625rem; font-size: 0.6875rem; border-radius: 6px; }
+
+        .filter-input { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid #d1d5db; font-size: 0.8125rem; outline: none; }
+        .filter-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+
+        @media (max-width: 768px) {
+            .overview-grid { grid-template-columns: repeat(2, 1fr) !important; }
+            .filter-bar { flex-direction: column; }
+            .cust-table { font-size: 0.75rem; }
+            .cust-table th, .cust-table td { padding: 0.5rem; }
+            .hide-mobile { display: none; }
+        }
+    </style>
+</head>
+<body data-page="credit-limits">
+
+<div id="nav-placeholder"></div>
+<div id="subnav-placeholder"></div>
+
+<main style="max-width: 1400px; margin: 0 auto; padding: 1rem;">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+            <h1 style="font-size: 1.375rem; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 0.5rem;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                Customer Credit Limits
+            </h1>
+            <p style="font-size: 0.8125rem; color: #6b7280;">Manage credit limits and track utilization</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-outline" onclick="recalculateAll()">Recalculate All</button>
+            <button class="btn-outline" onclick="showBulkModal()">Bulk Update</button>
+            <button class="btn-outline" onclick="exportCSV()">Export CSV</button>
+        </div>
+    </div>
+
+    <!-- Overview Cards -->
+    <div class="overview-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="ov-card">
+            <div class="ov-value" style="color: #667eea;" id="ovTotalLimit">--</div>
+            <div class="ov-label">Total Credit Limit</div>
+        </div>
+        <div class="ov-card">
+            <div class="ov-value" style="color: #ef4444;" id="ovTotalUsed">--</div>
+            <div class="ov-label">Total Used</div>
+        </div>
+        <div class="ov-card">
+            <div class="ov-value" style="color: #22c55e;" id="ovTotalAvail">--</div>
+            <div class="ov-label">Total Available</div>
+        </div>
+        <div class="ov-card">
+            <div class="ov-value" style="color: #3b82f6;" id="ovWithLimit">--</div>
+            <div class="ov-label">Customers with Limit</div>
+        </div>
+        <div class="ov-card">
+            <div class="ov-value" style="color: #ef4444;" id="ovOverLimit">--</div>
+            <div class="ov-label">Over Limit</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-bar" style="display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;">
+        <input type="text" class="filter-input" id="searchInput" placeholder="Search customer or phone..." style="flex: 1; min-width: 200px;" oninput="debounceLoad()">
+        <select class="filter-input" id="statusFilter" onchange="loadCustomers()">
+            <option value="all">All Customers</option>
+            <option value="no_limit">No Limit Set</option>
+            <option value="under_50">Under 50% Used</option>
+            <option value="50_to_80">50-80% Used</option>
+            <option value="over_80">Over 80% Used</option>
+            <option value="exceeded">Limit Exceeded</option>
+        </select>
+        <select class="filter-input" id="sortSelect" onchange="loadCustomers()">
+            <option value="name">Sort by Name</option>
+            <option value="credit_limit_desc">Credit Limit (High-Low)</option>
+            <option value="credit_used_desc">Credit Used (High-Low)</option>
+            <option value="utilization_desc">Utilization (High-Low)</option>
+        </select>
+    </div>
+
+    <!-- Customers Table -->
+    <div style="background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow-x: auto;">
+        <table class="cust-table">
+            <thead>
+                <tr>
+                    <th>Customer</th>
+                    <th style="text-align:right">Credit Limit</th>
+                    <th style="text-align:right">Used</th>
+                    <th style="text-align:right">Available</th>
+                    <th style="width:160px">Utilization</th>
+                    <th class="hide-mobile">Branch</th>
+                    <th style="text-align:center">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="custTableBody">
+                <tr><td colspan="7" style="text-align:center; padding:3rem; color:#9ca3af;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+
+<!-- Edit Credit Limit Modal -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal-box">
+        <h3 style="font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 1.25rem;">Update Credit Limit</h3>
+        <input type="hidden" id="editCustomerId">
+        <div style="margin-bottom: 1rem;">
+            <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem;">Customer</div>
+            <div style="font-weight: 600; font-size: 1rem;" id="editCustName"></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+                <div style="font-size: 0.75rem; color: #6b7280;">Current Limit</div>
+                <div style="font-weight: 600;" id="editCurrentLimit"></div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; color: #6b7280;">Currently Used</div>
+                <div style="font-weight: 600;" id="editCurrentUsed"></div>
+            </div>
+        </div>
+        <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">New Credit Limit</label>
+            <input type="number" id="editNewLimit" class="filter-input" style="width: 100%;" min="0" step="1000" placeholder="Enter amount...">
+        </div>
+        <div style="margin-bottom: 1.25rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Reason (optional)</label>
+            <textarea id="editReason" class="filter-input" style="width: 100%; resize: vertical; min-height: 60px;" placeholder="Why is this limit being changed?"></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+            <button class="btn-outline" onclick="closeEditModal()">Cancel</button>
+            <button class="btn-primary" onclick="saveCreditLimit()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div class="modal-overlay" id="detailsModal">
+    <div class="modal-box modal-box-lg">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <h3 style="font-size: 1.125rem; font-weight: 700; color: #1f2937;">Credit Details</h3>
+            <button onclick="closeDetailsModal()" style="border:none;background:none;font-size:1.25rem;cursor:pointer;color:#9ca3af;">&times;</button>
+        </div>
+        <div id="detailsContent">Loading...</div>
+    </div>
+</div>
+
+<!-- Bulk Update Modal -->
+<div class="modal-overlay" id="bulkModal">
+    <div class="modal-box">
+        <h3 style="font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 1.25rem;">Bulk Update Credit Limits</h3>
+        <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Apply to</label>
+            <select class="filter-input" id="bulkTarget" style="width: 100%;">
+                <option value="no_limit">All customers without a limit</option>
+                <option value="all">All customers</option>
+            </select>
+        </div>
+        <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Credit Limit Amount</label>
+            <input type="number" id="bulkAmount" class="filter-input" style="width: 100%;" min="0" step="10000" placeholder="e.g. 100000">
+        </div>
+        <div style="margin-bottom: 1.25rem;">
+            <label style="font-size: 0.8125rem; font-weight: 600; display: block; margin-bottom: 0.375rem;">Reason</label>
+            <input type="text" id="bulkReason" class="filter-input" style="width: 100%;" placeholder="e.g. Initial credit limit setup">
+        </div>
+        <div id="bulkPreview" style="font-size: 0.8125rem; color: #6b7280; margin-bottom: 1rem;"></div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+            <button class="btn-outline" onclick="closeBulkModal()">Cancel</button>
+            <button class="btn-primary" onclick="executeBulk()">Apply</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const token = localStorage.getItem('auth_token');
+const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+let allCustomers = [];
+let debounceTimer = null;
+
+function formatINR(n) {
+    n = Number(n) || 0;
+    if (n >= 10000000) return '\u20B9' + (n/10000000).toFixed(1) + 'Cr';
+    if (n >= 100000) return '\u20B9' + (n/100000).toFixed(1) + 'L';
+    if (n >= 1000) return '\u20B9' + (n/1000).toFixed(1) + 'K';
+    return '\u20B9' + n.toLocaleString('en-IN');
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function debounceLoad() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(loadCustomers, 300);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD DATA
+// ═══════════════════════════════════════════════════════════════
+async function loadCustomers() {
+    try {
+        const search = document.getElementById('searchInput').value.trim();
+        const status = document.getElementById('statusFilter').value;
+        const sort = document.getElementById('sortSelect').value;
+
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (status !== 'all') params.set('status', status);
+        if (sort) params.set('sort', sort);
+
+        const resp = await fetch('/api/credit-limits/customers?' + params, { headers });
+        const json = await resp.json();
+        allCustomers = json.data || [];
+        renderTable();
+    } catch (e) {
+        console.error('Load error:', e);
+    }
+}
+
+async function loadOverview() {
+    try {
+        const resp = await fetch('/api/credit-limits/overview/summary', { headers });
+        const json = await resp.json();
+        if (!json.success) return;
+        const s = json.summary;
+        document.getElementById('ovTotalLimit').textContent = formatINR(s.total_limit);
+        document.getElementById('ovTotalUsed').textContent = formatINR(s.total_used);
+        document.getElementById('ovTotalAvail').textContent = formatINR(s.total_available);
+        document.getElementById('ovWithLimit').textContent = s.customers_with_limit;
+        document.getElementById('ovOverLimit').textContent = s.over_limit_count;
+    } catch (e) { /* ignore */ }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER TABLE
+// ═══════════════════════════════════════════════════════════════
+function renderTable() {
+    const tbody = document.getElementById('custTableBody');
+    if (!allCustomers.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:#9ca3af;">No customers found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = allCustomers.map(c => {
+        const limit = Number(c.credit_limit) || 0;
+        const used = Number(c.credit_used) || 0;
+        const available = limit - used;
+        const util = limit > 0 ? Math.min((used / limit) * 100, 150) : 0;
+        const utilDisplay = limit > 0 ? util.toFixed(1) + '%' : '--';
+
+        let utilColor = 'util-green';
+        let utilTextColor = '#22c55e';
+        if (util > 100) { utilColor = 'util-red'; utilTextColor = '#ef4444'; }
+        else if (util > 80) { utilColor = 'util-red'; utilTextColor = '#ef4444'; }
+        else if (util > 50) { utilColor = 'util-yellow'; utilTextColor = '#f59e0b'; }
+
+        return `<tr>
+            <td>
+                <div style="font-weight:600;color:#1f2937">${escHtml(c.name)}</div>
+                <div style="font-size:0.6875rem;color:#9ca3af">${escHtml(c.phone || '')}</div>
+            </td>
+            <td style="text-align:right;font-weight:600">${limit > 0 ? formatINR(limit) : '<span style="color:#9ca3af">Not set</span>'}</td>
+            <td style="text-align:right;font-weight:600;color:${used > limit && limit > 0 ? '#ef4444' : '#1f2937'}">${formatINR(used)}</td>
+            <td style="text-align:right;font-weight:600;color:${available < 0 ? '#ef4444' : '#22c55e'}">${limit > 0 ? formatINR(available) : '--'}</td>
+            <td>
+                ${limit > 0 ? `
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <div class="util-bar" style="flex:1"><div class="util-fill ${utilColor}" style="width:${Math.min(util, 100)}%"></div></div>
+                    <span style="font-size:0.6875rem;font-weight:600;color:${utilTextColor};min-width:40px;text-align:right">${utilDisplay}</span>
+                </div>` : '<span style="color:#9ca3af;font-size:0.6875rem">--</span>'}
+            </td>
+            <td class="hide-mobile" style="font-size:0.6875rem;color:#6b7280">${escHtml(c.branch_name || '')}</td>
+            <td style="text-align:center;white-space:nowrap">
+                <button class="btn-outline btn-sm" onclick="openEditModal(${c.id})">Edit</button>
+                <button class="btn-outline btn-sm" onclick="openDetailsModal(${c.id})" style="margin-left:2px">Details</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EDIT MODAL
+// ═══════════════════════════════════════════════════════════════
+function openEditModal(id) {
+    const c = allCustomers.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('editCustomerId').value = id;
+    document.getElementById('editCustName').textContent = c.name;
+    document.getElementById('editCurrentLimit').textContent = formatINR(c.credit_limit);
+    document.getElementById('editCurrentUsed').textContent = formatINR(c.credit_used);
+    document.getElementById('editNewLimit').value = Number(c.credit_limit) || '';
+    document.getElementById('editReason').value = '';
+    document.getElementById('editModal').classList.add('open');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.remove('open');
+}
+
+async function saveCreditLimit() {
+    const id = document.getElementById('editCustomerId').value;
+    const newLimit = parseFloat(document.getElementById('editNewLimit').value);
+    const reason = document.getElementById('editReason').value.trim();
+
+    if (isNaN(newLimit) || newLimit < 0) { showToast('Enter a valid credit limit', 'error'); return; }
+
+    try {
+        const resp = await fetch(`/api/credit-limits/${id}/set-limit`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ credit_limit: newLimit, reason })
+        });
+        const json = await resp.json();
+        if (!json.success) throw new Error(json.error);
+
+        showToast('Credit limit updated');
+        closeEditModal();
+        loadCustomers();
+        loadOverview();
+    } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DETAILS MODAL
+// ═══════════════════════════════════════════════════════════════
+async function openDetailsModal(id) {
+    document.getElementById('detailsContent').innerHTML = '<div style="text-align:center;padding:2rem;color:#9ca3af">Loading...</div>';
+    document.getElementById('detailsModal').classList.add('open');
+
+    try {
+        const [infoResp, histResp] = await Promise.all([
+            fetch(`/api/credit-limits/${id}`, { headers }),
+            fetch(`/api/credit-limits/${id}/history`, { headers })
+        ]);
+        const info = await infoResp.json();
+        const hist = await histResp.json();
+
+        if (!info.success) throw new Error(info.error);
+        const c = info.customer;
+        const invoices = info.outstanding_invoices || [];
+        const history = (hist.data || []);
+
+        let html = `
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.5rem;">
+            <div style="background:#eef2ff;padding:0.75rem;border-radius:10px;text-align:center">
+                <div style="font-size:1.25rem;font-weight:700;color:#667eea">${formatINR(c.credit_limit)}</div>
+                <div style="font-size:0.6875rem;color:#6b7280">Credit Limit</div>
+            </div>
+            <div style="background:#fef2f2;padding:0.75rem;border-radius:10px;text-align:center">
+                <div style="font-size:1.25rem;font-weight:700;color:#ef4444">${formatINR(c.credit_used)}</div>
+                <div style="font-size:0.6875rem;color:#6b7280">Used</div>
+            </div>
+            <div style="background:#f0fdf4;padding:0.75rem;border-radius:10px;text-align:center">
+                <div style="font-size:1.25rem;font-weight:700;color:#22c55e">${formatINR(c.credit_available)}</div>
+                <div style="font-size:0.6875rem;color:#6b7280">Available</div>
+            </div>
+            <div style="background:#fefce8;padding:0.75rem;border-radius:10px;text-align:center">
+                <div style="font-size:1.25rem;font-weight:700;color:#f59e0b">${c.utilization}%</div>
+                <div style="font-size:0.6875rem;color:#6b7280">Utilization</div>
+            </div>
+        </div>`;
+
+        // Outstanding Invoices
+        html += '<h4 style="font-weight:700;font-size:0.9375rem;margin-bottom:0.5rem;">Outstanding Invoices (' + invoices.length + ')</h4>';
+        if (invoices.length) {
+            html += '<table style="width:100%;border-collapse:collapse;font-size:0.8125rem;margin-bottom:1.25rem;"><thead><tr>' +
+                '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #e5e7eb;font-size:0.6875rem;color:#6b7280">Invoice</th>' +
+                '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #e5e7eb;font-size:0.6875rem;color:#6b7280">Date</th>' +
+                '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #e5e7eb;font-size:0.6875rem;color:#6b7280">Due</th>' +
+                '<th style="text-align:right;padding:0.5rem;border-bottom:1px solid #e5e7eb;font-size:0.6875rem;color:#6b7280">Total</th>' +
+                '<th style="text-align:right;padding:0.5rem;border-bottom:1px solid #e5e7eb;font-size:0.6875rem;color:#6b7280">Balance</th>' +
+                '<th style="padding:0.5rem;border-bottom:1px solid #e5e7eb;font-size:0.6875rem;color:#6b7280">Status</th>' +
+                '</tr></thead><tbody>';
+            invoices.forEach(inv => {
+                const statusColor = inv.status === 'overdue' ? '#ef4444' : inv.status === 'partially_paid' ? '#f59e0b' : '#3b82f6';
+                html += '<tr>' +
+                    '<td style="padding:0.375rem 0.5rem;border-bottom:1px solid #f3f4f6;font-weight:500">' + escHtml(inv.invoice_number || '') + '</td>' +
+                    '<td style="padding:0.375rem 0.5rem;border-bottom:1px solid #f3f4f6">' + (inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-IN') : '') + '</td>' +
+                    '<td style="padding:0.375rem 0.5rem;border-bottom:1px solid #f3f4f6">' + (inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-IN') : '') + '</td>' +
+                    '<td style="padding:0.375rem 0.5rem;border-bottom:1px solid #f3f4f6;text-align:right">' + formatINR(inv.total) + '</td>' +
+                    '<td style="padding:0.375rem 0.5rem;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;color:#ef4444">' + formatINR(inv.balance) + '</td>' +
+                    '<td style="padding:0.375rem 0.5rem;border-bottom:1px solid #f3f4f6"><span style="font-size:0.6875rem;font-weight:600;color:' + statusColor + '">' + escHtml(inv.status) + '</span></td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table>';
+        } else {
+            html += '<p style="color:#9ca3af;font-size:0.8125rem;margin-bottom:1.25rem;">No outstanding invoices</p>';
+        }
+
+        // Credit History
+        html += '<h4 style="font-weight:700;font-size:0.9375rem;margin-bottom:0.5rem;">Credit Limit History</h4>';
+        if (history.length) {
+            html += '<div style="max-height:200px;overflow-y:auto;">';
+            history.forEach(h => {
+                const arrow = Number(h.new_limit) > Number(h.previous_limit) ? '<span style="color:#22c55e">&#x2191;</span>' : Number(h.new_limit) < Number(h.previous_limit) ? '<span style="color:#ef4444">&#x2193;</span>' : '';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.375rem 0;border-bottom:1px solid #f3f4f6;font-size:0.8125rem;">' +
+                    '<div>' + arrow + ' ' + formatINR(h.previous_limit) + ' &rarr; ' + formatINR(h.new_limit) +
+                    (h.reason ? '<span style="color:#6b7280;font-size:0.6875rem;margin-left:0.5rem">' + escHtml(h.reason) + '</span>' : '') + '</div>' +
+                    '<div style="font-size:0.6875rem;color:#9ca3af">' + escHtml(h.changed_by_name || '') + ' &middot; ' + new Date(h.created_at).toLocaleDateString('en-IN') + '</div>' +
+                    '</div>';
+            });
+            html += '</div>';
+        } else {
+            html += '<p style="color:#9ca3af;font-size:0.8125rem;">No history yet</p>';
+        }
+
+        document.getElementById('detailsContent').innerHTML = html;
+    } catch (e) {
+        document.getElementById('detailsContent').innerHTML = '<div style="color:#ef4444">Error: ' + escHtml(e.message) + '</div>';
+    }
+}
+
+function closeDetailsModal() {
+    document.getElementById('detailsModal').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BULK UPDATE
+// ═══════════════════════════════════════════════════════════════
+function showBulkModal() {
+    document.getElementById('bulkAmount').value = '';
+    document.getElementById('bulkReason').value = '';
+    updateBulkPreview();
+    document.getElementById('bulkModal').classList.add('open');
+}
+function closeBulkModal() { document.getElementById('bulkModal').classList.remove('open'); }
+
+function updateBulkPreview() {
+    const target = document.getElementById('bulkTarget').value;
+    const count = target === 'no_limit'
+        ? allCustomers.filter(c => Number(c.credit_limit) === 0).length
+        : allCustomers.length;
+    document.getElementById('bulkPreview').textContent = 'This will update ' + count + ' customer(s)';
+}
+
+document.getElementById('bulkTarget').addEventListener('change', updateBulkPreview);
+
+async function executeBulk() {
+    const target = document.getElementById('bulkTarget').value;
+    const amount = parseFloat(document.getElementById('bulkAmount').value);
+    const reason = document.getElementById('bulkReason').value.trim();
+
+    if (isNaN(amount) || amount < 0) { showToast('Enter a valid amount', 'error'); return; }
+
+    const customers = (target === 'no_limit'
+        ? allCustomers.filter(c => Number(c.credit_limit) === 0)
+        : allCustomers
+    ).map(c => ({ id: c.id, credit_limit: amount }));
+
+    if (!customers.length) { showToast('No customers to update', 'error'); return; }
+    if (!confirm('Update credit limit to ' + formatINR(amount) + ' for ' + customers.length + ' customers?')) return;
+
+    try {
+        const resp = await fetch('/api/credit-limits/bulk-set', {
+            method: 'POST', headers,
+            body: JSON.stringify({ customers, reason })
+        });
+        const json = await resp.json();
+        if (!json.success) throw new Error(json.error);
+
+        showToast('Updated ' + json.updated + ' customers');
+        closeBulkModal();
+        loadCustomers();
+        loadOverview();
+    } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RECALCULATE
+// ═══════════════════════════════════════════════════════════════
+async function recalculateAll() {
+    if (!confirm('Recalculate credit used for all customers from outstanding invoices?')) return;
+    try {
+        const resp = await fetch('/api/credit-limits/recalculate', { method: 'POST', headers, body: '{}' });
+        const json = await resp.json();
+        if (!json.success) throw new Error(json.error);
+        showToast('Recalculated ' + json.updated + ' customers');
+        loadCustomers();
+        loadOverview();
+    } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORT CSV
+// ═══════════════════════════════════════════════════════════════
+function exportCSV() {
+    if (!allCustomers.length) { showToast('No data to export', 'error'); return; }
+    let csv = 'Customer,Phone,Branch,Credit Limit,Credit Used,Available,Utilization %\n';
+    allCustomers.forEach(c => {
+        const limit = Number(c.credit_limit) || 0;
+        const used = Number(c.credit_used) || 0;
+        csv += '"' + (c.name||'').replace(/"/g,'""') + '","' + (c.phone||'') + '","' + (c.branch_name||'') + '",' +
+               limit + ',' + used + ',' + (limit - used) + ',' + (limit > 0 ? ((used/limit)*100).toFixed(1) : 0) + '\n';
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'credit-limits-' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+    showToast('CSV exported');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:2rem;right:2rem;padding:0.75rem 1.25rem;border-radius:10px;font-size:0.8125rem;font-weight:600;z-index:10000;color:white;background:' + (type==='error'?'#ef4444':'#10b981') + ';box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity='0'; toast.style.transition='opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 2500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+loadCustomers();
+loadOverview();
+</script>
+</body>
+</html>

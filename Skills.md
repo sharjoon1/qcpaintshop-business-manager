@@ -262,6 +262,34 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Estimate detail view
 - Pages: `customer-login.html`, `customer-dashboard.html`, `customer-estimate-view.html`
 
+**Customer Credit Limits**
+- Set/update credit limit per customer with reason tracking
+- Real-time credit utilization monitoring (limit, used, available, %)
+- Overview dashboard: total limits, total used, near-limit customers, violations
+- Credit check endpoint for invoice validation (0 limit = no limit set, allowed by default)
+- Bulk update credit limits for multiple customers
+- Recalculate credit_used from outstanding Zoho invoices
+- Credit limit change history timeline
+- Credit limit violations log (attempted exceeds)
+- Export CSV of customer credit data
+- Utilization color coding: green (<50%), amber (50-80%), red (>80%), critical (exceeded)
+- Pages: `admin-credit-limits.html` (data-page=`credit-limits`, Leads subnav)
+- Routes: `routes/credit-limits.js` (9 endpoints)
+- Tables: `customer_credit_history`, `credit_limit_violations`, credit columns on `customers`
+- Migration: `migrations/migrate-credit-limits.js`
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/credit-limits/customers` | List customers with credit info |
+| GET | `/api/credit-limits/overview/summary` | Dashboard overview stats |
+| GET | `/api/credit-limits/violations/list` | List credit violations |
+| POST | `/api/credit-limits/check` | Check credit availability |
+| POST | `/api/credit-limits/bulk-set` | Bulk update limits |
+| POST | `/api/credit-limits/recalculate` | Recalculate credit_used |
+| GET | `/api/credit-limits/:id` | Single customer credit detail |
+| POST | `/api/credit-limits/:id/set-limit` | Update credit limit |
+| GET | `/api/credit-limits/:id/history` | Credit change history |
+
 ---
 
 ### 2.7 Product & Catalog Management
@@ -1710,6 +1738,16 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-02-24 - Customer Credit Limit Management System
+Complete credit limit management for customers:
+- **Database**: Added `credit_limit`, `credit_used`, `credit_limit_updated_at`, `credit_limit_updated_by` columns to `customers` table
+- **Tables**: `customer_credit_history` (change audit trail), `credit_limit_violations` (exceeded attempts)
+- **Backend**: `routes/credit-limits.js` — 9 endpoints (list, detail, set-limit, check, history, bulk-set, overview, recalculate, violations)
+- **Frontend**: `admin-credit-limits.html` — overview cards, customer table with utilization bars, edit/details/bulk modals, CSV export
+- **Navigation**: Sidebar "Credit Limits" under Customers, Leads subnav tab, `credit-limits` in SUBNAV_MAP
+- **Route ordering**: Named routes (`/overview/summary`, `/violations/list`) before `/:customerId` params
+- **Migration**: `migrations/migrate-credit-limits.js` (ALTERs customers, creates 2 tables, syncs initial credit_used)
 
 ### 2026-02-24 - AI Dashboard Upgrade (Phase 1)
 Rebuilt `admin-ai.html` Tab 1 from Chat into a visual AI Dashboard with:

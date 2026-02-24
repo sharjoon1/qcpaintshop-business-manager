@@ -64,6 +64,7 @@ const paintersRoutes = require('./routes/painters');
 const painterScheduler = require('./services/painter-scheduler');
 const appMetadataCollector = require('./services/app-metadata-collector');
 const systemRoutes = require('./routes/system');
+const creditLimitRoutes = require('./routes/credit-limits');
 const errorHandlerMw = require('./middleware/errorHandler');
 const systemHealthService = require('./services/system-health-service');
 const errorAnalysisService = require('./services/error-analysis-service');
@@ -198,6 +199,7 @@ paintersRoutes.setSessionManager(whatsappSessionManager);
 painterScheduler.setPool(pool);
 aiScheduler.setSessionManager(whatsappSessionManager);
 systemRoutes.setPool(pool);
+creditLimitRoutes.setPool(pool);
 systemHealthService.setPool(pool);
 errorAnalysisService.setPool(pool);
 errorAnalysisService.setAiEngine(aiEngineForErrors);
@@ -337,6 +339,7 @@ app.use('/api/whatsapp-chat', whatsappChatRoutes.router);
 app.use('/api/ai', aiRoutes.router);
 app.use('/api/painters', paintersRoutes.router);
 app.use('/api/system', systemRoutes.router);
+app.use('/api/credit-limits', creditLimitRoutes.router);
 app.use('/api/admin/dashboard', adminDashboardRoutes.router);
 
 // Share page routes (serve HTML for public share links)

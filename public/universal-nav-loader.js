@@ -39,6 +39,7 @@
         'leads': CONFIG.LEADS_SUBNAV_PATH,
         'customers': CONFIG.LEADS_SUBNAV_PATH,
         'customer-types': CONFIG.LEADS_SUBNAV_PATH,
+        'credit-limits': CONFIG.LEADS_SUBNAV_PATH,
         'design-requests': CONFIG.LEADS_SUBNAV_PATH,
         'lead-scoring': CONFIG.LEADS_SUBNAV_PATH,
         // Branches & Staff
