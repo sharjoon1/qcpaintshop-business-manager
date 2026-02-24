@@ -28,13 +28,14 @@
         .ov-label { font-size: 0.75rem; color: #6b7280; }
 
         .cust-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
-        .cust-table th { text-align: left; padding: 0.625rem 0.75rem; font-size: 0.6875rem; color: #6b7280; text-transform: uppercase; font-weight: 600; border-bottom: 2px solid #e5e7eb; white-space: nowrap; user-select: none; }
-        .cust-table th.sortable { cursor: pointer; transition: color 0.15s; }
+        .cust-table thead { background: white; }
+        .cust-table th { text-align: left; padding: 0.625rem 0.75rem; font-size: 0.6875rem; color: #6b7280; text-transform: uppercase; font-weight: 600; border-bottom: 2px solid #e5e7eb; white-space: nowrap; user-select: none; background: white; }
+        .cust-table th.sortable { cursor: pointer; }
         .cust-table th.sortable:hover { color: #667eea; }
         .cust-table th.sortable .sort-arrow { display: inline-block; margin-left: 3px; font-size: 0.625rem; opacity: 0.3; }
         .cust-table th.sortable.sort-active .sort-arrow { opacity: 1; color: #667eea; }
         .cust-table td { padding: 0.625rem 0.75rem; border-bottom: 1px solid #f3f4f6; }
-        .cust-table tr:hover { background: #f9fafb; }
+        .cust-table tbody tr:hover { background: #f9fafb; }
 
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
         .modal-overlay.open { display: flex; }
