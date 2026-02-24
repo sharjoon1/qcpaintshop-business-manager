@@ -28,7 +28,11 @@
         .ov-label { font-size: 0.75rem; color: #6b7280; }
 
         .cust-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
-        .cust-table th { text-align: left; padding: 0.625rem 0.75rem; font-size: 0.6875rem; color: #6b7280; text-transform: uppercase; font-weight: 600; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+        .cust-table th { text-align: left; padding: 0.625rem 0.75rem; font-size: 0.6875rem; color: #6b7280; text-transform: uppercase; font-weight: 600; border-bottom: 2px solid #e5e7eb; white-space: nowrap; user-select: none; }
+        .cust-table th.sortable { cursor: pointer; transition: color 0.15s; }
+        .cust-table th.sortable:hover { color: #667eea; }
+        .cust-table th.sortable .sort-arrow { display: inline-block; margin-left: 3px; font-size: 0.625rem; opacity: 0.3; }
+        .cust-table th.sortable.sort-active .sort-arrow { opacity: 1; color: #667eea; }
         .cust-table td { padding: 0.625rem 0.75rem; border-bottom: 1px solid #f3f4f6; }
         .cust-table tr:hover { background: #f9fafb; }
 
@@ -125,12 +129,6 @@
             <option value="over_80">Over 80% Used</option>
             <option value="exceeded">Limit Exceeded</option>
         </select>
-        <select class="filter-input" id="sortSelect" onchange="loadCustomers()">
-            <option value="name">Sort by Name</option>
-            <option value="credit_limit_desc">Credit Limit (High-Low)</option>
-            <option value="credit_used_desc">Outstanding (High-Low)</option>
-            <option value="utilization_desc">Utilization (High-Low)</option>
-        </select>
     </div>
 
     <!-- Customers Table -->
@@ -138,13 +136,13 @@
         <table class="cust-table">
             <thead>
                 <tr>
-                    <th>Customer</th>
-                    <th class="hide-mobile">GST</th>
-                    <th style="text-align:right">Credit Limit</th>
-                    <th style="text-align:right">Outstanding</th>
-                    <th style="text-align:right">Available</th>
-                    <th style="width:140px">Utilization</th>
-                    <th class="hide-mobile">Branch</th>
+                    <th class="sortable sort-active" data-sort="name" onclick="sortBy('name')">Customer <span class="sort-arrow">&#9650;</span></th>
+                    <th class="hide-mobile sortable" data-sort="gst_no" onclick="sortBy('gst_no')">GST <span class="sort-arrow">&#9650;</span></th>
+                    <th class="sortable" data-sort="credit_limit" style="text-align:right" onclick="sortBy('credit_limit')">Credit Limit <span class="sort-arrow">&#9650;</span></th>
+                    <th class="sortable" data-sort="credit_used" style="text-align:right" onclick="sortBy('credit_used')">Outstanding <span class="sort-arrow">&#9650;</span></th>
+                    <th class="sortable" data-sort="available" style="text-align:right" onclick="sortBy('available')">Available <span class="sort-arrow">&#9650;</span></th>
+                    <th class="sortable" data-sort="utilization" style="width:140px" onclick="sortBy('utilization')">Utilization <span class="sort-arrow">&#9650;</span></th>
+                    <th class="hide-mobile sortable" data-sort="branch_name" onclick="sortBy('branch_name')">Branch <span class="sort-arrow">&#9650;</span></th>
                     <th style="text-align:center">Actions</th>
                 </tr>
             </thead>
@@ -324,6 +322,8 @@ const isAdmin = ['admin', 'super_admin', 'manager'].includes(user.role);
 const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
 let allCustomers = [];
 let debounceTimer = null;
+let currentSort = 'name';
+let sortAsc = true;
 
 function formatINR(n) {
     n = Number(n) || 0;
@@ -358,23 +358,81 @@ async function loadCustomers() {
     try {
         const search = document.getElementById('searchInput').value.trim();
         const status = document.getElementById('statusFilter').value;
-        const sort = document.getElementById('sortSelect').value;
         const branch = document.getElementById('branchFilter').value;
 
         const params = new URLSearchParams();
         if (search) params.set('search', search);
         if (status !== 'all') params.set('status', status);
-        if (sort) params.set('sort', sort);
         if (branch) params.set('branch', branch);
 
         const resp = await fetch('/api/credit-limits/customers?' + params, { headers });
         const json = await resp.json();
         allCustomers = json.data || [];
-        renderTable();
+        applySortAndRender();
         populateBranchFilter();
     } catch (e) {
         console.error('Load error:', e);
     }
+}
+
+function sortBy(col) {
+    if (currentSort === col) {
+        sortAsc = !sortAsc;
+    } else {
+        currentSort = col;
+        // Default descending for numeric columns, ascending for text
+        sortAsc = ['name', 'gst_no', 'branch_name'].includes(col);
+    }
+    applySortAndRender();
+}
+
+function applySortAndRender() {
+    // Update header arrows
+    document.querySelectorAll('.cust-table th.sortable').forEach(th => {
+        const isActive = th.dataset.sort === currentSort;
+        th.classList.toggle('sort-active', isActive);
+        const arrow = th.querySelector('.sort-arrow');
+        if (arrow) arrow.innerHTML = isActive ? (sortAsc ? '&#9650;' : '&#9660;') : '&#9650;';
+    });
+
+    // Sort allCustomers in-place
+    allCustomers.sort((a, b) => {
+        let va, vb;
+        switch (currentSort) {
+            case 'name':
+                va = (a.name || '').toLowerCase();
+                vb = (b.name || '').toLowerCase();
+                return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+            case 'gst_no':
+                va = (a.gst_no || '').toLowerCase();
+                vb = (b.gst_no || '').toLowerCase();
+                return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+            case 'branch_name':
+                va = (a.branch_name || '').toLowerCase();
+                vb = (b.branch_name || '').toLowerCase();
+                return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+            case 'credit_limit':
+                va = Number(a.credit_limit) || 0;
+                vb = Number(b.credit_limit) || 0;
+                return sortAsc ? va - vb : vb - va;
+            case 'credit_used':
+                va = Number(a.credit_used) || 0;
+                vb = Number(b.credit_used) || 0;
+                return sortAsc ? va - vb : vb - va;
+            case 'available':
+                va = (Number(a.credit_limit) || 0) - (Number(a.credit_used) || 0);
+                vb = (Number(b.credit_limit) || 0) - (Number(b.credit_used) || 0);
+                return sortAsc ? va - vb : vb - va;
+            case 'utilization':
+                va = Number(a.utilization) || 0;
+                vb = Number(b.utilization) || 0;
+                return sortAsc ? va - vb : vb - va;
+            default:
+                return 0;
+        }
+    });
+
+    renderTable();
 }
 
 function populateBranchFilter() {
