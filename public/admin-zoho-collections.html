@@ -1349,7 +1349,7 @@
 
     async function loadBranches() {
         try {
-            const resp = await apiRequest('/api/branches');
+            const resp = await apiFetch('/api/branches');
             if (!resp) return;
             const data = await resp.json();
             if (data.success && data.data) {

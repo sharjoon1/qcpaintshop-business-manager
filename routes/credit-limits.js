@@ -493,9 +493,15 @@ router.get('/requests', requirePermission('credit_limits', 'view'), async (req, 
         `, params);
 
         // Pending count for badge
-        const countWhere = isAdmin ? '' : ' AND requested_by = ' + pool.escape(req.user.id);
+        const countParams = [];
+        let countWhere = '';
+        if (!isAdmin) {
+            countWhere = ' AND requested_by = ?';
+            countParams.push(req.user.id);
+        }
         const [[{ pending_count }]] = await pool.query(
-            `SELECT COUNT(*) as pending_count FROM credit_limit_requests WHERE status = 'pending'${countWhere}`
+            `SELECT COUNT(*) as pending_count FROM credit_limit_requests WHERE status = 'pending'${countWhere}`,
+            countParams
         );
 
         res.json({ success: true, data: rows, pending_count });
