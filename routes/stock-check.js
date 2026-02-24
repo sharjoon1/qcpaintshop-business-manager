@@ -265,7 +265,7 @@ router.get('/my-assignments', requireAuth, async (req, res) => {
                  FROM stock_check_assignments a
                  LEFT JOIN branches b ON a.branch_id = b.id
                  LEFT JOIN users u ON a.created_by = u.id
-                 LEFT JOIN zoho_locations_map zlm ON a.location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
+                 LEFT JOIN zoho_locations_map zlm ON a.zoho_location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
                  WHERE a.staff_id = ? AND a.status IN ('pending', 'submitted')
                  ORDER BY a.check_date DESC, a.created_at DESC
                  LIMIT 10`,
