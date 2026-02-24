@@ -998,12 +998,12 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 
 ### 2.23 AI Business Intelligence System
 
-**Architecture**: Triple AI provider system (Google Gemini + Anthropic Claude + Clawdbot/Kai) with automatic failover chain. Daily/weekly automated analysis of business data with WhatsApp delivery. Interactive chat interface for natural language business queries.
+**Architecture**: Triple AI provider system (Google Gemini + Anthropic Claude + Clawdbot/Kai) with automatic failover chain and config-driven provider enablement. Currently **Clawdbot is the sole active provider** (Gemini/Claude disabled via `ai_config` flags). Daily/weekly automated analysis of business data with WhatsApp delivery. Interactive chat interface for natural language business queries.
 
 **Services (7 files)**:
 | File | Purpose |
 |------|---------|
-| `services/ai-engine.js` | Triple LLM abstraction (Gemini + Claude + Clawdbot) — `generate()`, `streamToResponse()`, `generateWithFailover()`, `streamWithFailover()`, `getChatSystemPrompt()` |
+| `services/ai-engine.js` | Triple LLM abstraction (Gemini + Claude + Clawdbot) with `isProviderEnabled()` config filter — `generate()`, `streamToResponse()`, `generateWithFailover()`, `streamWithFailover()`, `getChatSystemPrompt()` |
 | `services/ai-context-builder.js` | **Comprehensive business context for chat** — Tier 1 quick summary + Tier 2 deep category-specific context + daily snapshot generation |
 | `services/ai-analyzer.js` | Zoho business analysis (revenue, collections, overdue, branch performance, stock alerts) |
 | `services/ai-staff-analyzer.js` | Staff performance (attendance, breaks, overtime, late arrivals, weekly trends) |
@@ -1043,7 +1043,7 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 - `ai_insights` — Extracted insights with category, severity, actions
 - `ai_lead_scores` — Deterministic + AI lead scores with breakdown
 - `lead_conversion_predictions` — AI conversion probability, timeline, confidence, factors (JSON)
-- `ai_config` — Key-value configuration for schedules, providers, thresholds
+- `ai_config` — Key-value configuration for schedules, providers, thresholds, provider enable flags (`gemini_enabled`, `claude_enabled`, `clawdbot_enabled`)
 - `ai_business_context` — Cached daily business snapshots (generated at 6AM/12PM/6PM IST)
 - `ai_suggestions` — AI improvement recommendations with category, priority, status tracking
 
@@ -1672,6 +1672,16 @@ Based on AI App Analyzer report, fixed critical production errors:
 - **`services/whatsapp-session-manager.js`**: Added `sanitizePhone()` helper — strips non-numeric chars except leading +, applied at all 3 insert points (incoming msg, outbound record, session connect)
 - **Migration**: `migrations/fix-app-analysis-issues-v2.js` — widens phone columns VARCHAR(50)→VARCHAR(100), adds 15 FK indexes, adds 6 `updated_at` columns
 - Previous v1 migration (`fix-app-analysis-issues.js`) already handled: user role enum (added manager/accountant), 10 FK indexes, 13 updated_at columns
+
+### 2026-02-24 - Clawdbot as Sole AI Provider
+- Gemini disabled (`gemini_enabled=false`) — quota exhausted (429 errors)
+- Claude API disabled (`claude_enabled=false`) — budget resets Mar 1
+- Clawdbot set as sole active provider (`clawdbot_enabled=true`, `primary_provider=clawdbot`, `fallback_provider=clawdbot`)
+- New `isProviderEnabled()` helper in `ai-engine.js` — checks `*_enabled` flags in `ai_config`
+- `generateWithFailover()` and `streamWithFailover()` now filter disabled providers before failover loop
+- Default fallbacks in `getConfig()` changed from gemini/claude to clawdbot
+- **Fully reversible**: `UPDATE ai_config SET config_value = 'true' WHERE config_key = 'gemini_enabled'` re-enables any provider
+- Migration: `migrations/migrate-clawdbot-primary.js`
 
 ### 2026-02-23 - Clawdbot (Kai) AI Provider Integration
 - Third AI provider added: Clawdbot via Gateway Bridge Pattern (WebSocket on ws://127.0.0.1:18789)

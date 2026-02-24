@@ -130,7 +130,7 @@ async function getConfig() {
     // Cache config for 30s to avoid hammering DB on every request
     if (_configCache && (Date.now() - _configCacheTime) < CONFIG_CACHE_TTL) return _configCache;
 
-    if (!pool) return { primary_provider: 'gemini', fallback_provider: 'claude', max_tokens_per_request: '4096', temperature: '0.3' };
+    if (!pool) return { primary_provider: 'clawdbot', fallback_provider: 'clawdbot', max_tokens_per_request: '4096', temperature: '0.3' };
     try {
         const [rows] = await pool.query('SELECT config_key, config_value FROM ai_config');
         const config = {};
@@ -139,7 +139,7 @@ async function getConfig() {
         _configCacheTime = Date.now();
         return config;
     } catch (e) {
-        return { primary_provider: 'gemini', fallback_provider: 'claude', max_tokens_per_request: '4096', temperature: '0.3' };
+        return { primary_provider: 'clawdbot', fallback_provider: 'clawdbot', max_tokens_per_request: '4096', temperature: '0.3' };
     }
 }
 
@@ -161,6 +161,16 @@ async function getApiKey(provider) {
         return config.anthropic_api_key || process.env.ANTHROPIC_API_KEY || '';
     }
     return '';
+}
+
+/**
+ * Check if a provider is enabled via ai_config flags
+ * Enabled by default if no flag set — only disabled by explicit 'false'/'0'
+ */
+async function isProviderEnabled(provider) {
+    const config = await getConfig();
+    const key = provider === 'claude' ? 'claude_enabled' : `${provider}_enabled`;
+    return config[key] !== 'false' && config[key] !== '0';
 }
 
 /**
@@ -540,13 +550,18 @@ async function streamToResponse(messages, res, options = {}) {
 
 async function generateWithFailover(messages, options = {}) {
     const config = await getConfig();
-    const primary = options.provider || config.primary_provider || 'gemini';
+    const primary = options.provider || config.primary_provider || 'clawdbot';
     const fallback = config.fallback_provider || (primary === 'gemini' ? 'claude' : 'gemini');
     // Build ordered provider chain: primary → fallback → remaining
     const allProviders = ['gemini', 'claude', 'clawdbot'];
     const chain = [primary, fallback, ...allProviders.filter(p => p !== primary && p !== fallback)];
-    // Deduplicate while preserving order
-    const providers = [...new Set(chain)];
+    // Deduplicate while preserving order, then filter disabled providers
+    const deduped = [...new Set(chain)];
+    const providers = [];
+    for (const p of deduped) {
+        if (await isProviderEnabled(p)) providers.push(p);
+    }
+    if (providers.length === 0) throw new Error('No AI providers enabled. Check ai_config flags.');
     const opts = {
         temperature: options.temperature || config.temperature || '0.3',
         maxTokens: options.maxTokens || config.max_tokens_per_request || '4096',
@@ -568,11 +583,17 @@ async function generateWithFailover(messages, options = {}) {
 
 async function streamWithFailover(messages, res, options = {}) {
     const config = await getConfig();
-    const primary = options.provider || config.primary_provider || 'gemini';
+    const primary = options.provider || config.primary_provider || 'clawdbot';
     const fallback = config.fallback_provider || (primary === 'gemini' ? 'claude' : 'gemini');
     const allProviders = ['gemini', 'claude', 'clawdbot'];
     const chain = [primary, fallback, ...allProviders.filter(p => p !== primary && p !== fallback)];
-    const providers = [...new Set(chain)];
+    // Deduplicate and filter disabled providers
+    const deduped = [...new Set(chain)];
+    const providers = [];
+    for (const p of deduped) {
+        if (await isProviderEnabled(p)) providers.push(p);
+    }
+    if (providers.length === 0) throw new Error('No AI providers enabled. Check ai_config flags.');
     const opts = {
         temperature: options.temperature || config.temperature || '0.3',
         maxTokens: options.maxTokens || config.max_tokens_per_request || '4096',
