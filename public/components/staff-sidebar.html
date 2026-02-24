@@ -583,7 +583,7 @@
         <!-- My Work -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">My Work</div>
-            <a href="/staff-estimates.html" class="qc-nav-item" data-page="estimates" data-requires="estimates.view">
+            <a href="/staff-estimates.html" class="qc-nav-item" data-page="estimates">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
                 <span class="qc-nav-item-text">My Estimates</span>
                 <span class="qc-nav-tooltip">My Estimates</span>
@@ -608,22 +608,22 @@
         <!-- HR & Attendance -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">HR & Attendance</div>
-            <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in" data-requires="attendance.view">
+            <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
                 <span class="qc-nav-item-text">Clock In</span>
                 <span class="qc-nav-tooltip">Clock In</span>
             </a>
-            <a href="/staff/clock-out.html" class="qc-nav-item" data-page="clock-out" data-requires="attendance.view">
+            <a href="/staff/clock-out.html" class="qc-nav-item" data-page="clock-out">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
                 <span class="qc-nav-item-text">Clock Out</span>
                 <span class="qc-nav-tooltip">Clock Out</span>
             </a>
-            <a href="/staff/history.html" class="qc-nav-item" data-page="history" data-requires="attendance.view">
+            <a href="/staff/history.html" class="qc-nav-item" data-page="history">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
                 <span class="qc-nav-item-text">My History</span>
                 <span class="qc-nav-tooltip">My History</span>
             </a>
-            <a href="/staff/permission-request.html" class="qc-nav-item" data-page="permission" data-requires="attendance.view">
+            <a href="/staff/permission-request.html" class="qc-nav-item" data-page="permission">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span>
                 <span class="qc-nav-item-text">Permission Request</span>
                 <span class="qc-nav-tooltip">Permission Request</span>
@@ -648,12 +648,12 @@
         <!-- Inventory -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Inventory</div>
-            <a href="/staff/stock-check.html" class="qc-nav-item" data-page="stock-check" data-requires="zoho.stock_check">
+            <a href="/staff/stock-check.html" class="qc-nav-item" data-page="stock-check">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
                 <span class="qc-nav-item-text">Stock Check</span>
                 <span class="qc-nav-tooltip">Stock Check</span>
             </a>
-            <a href="/staff/collections.html" class="qc-nav-item" data-page="collections" data-requires="zoho.collections">
+            <a href="/staff/collections.html" class="qc-nav-item" data-page="collections">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
                 <span class="qc-nav-item-text">Collections</span>
                 <span class="qc-nav-tooltip">Collections</span>
@@ -897,39 +897,34 @@ function highlightActiveSidebarPage() {
 }
 
 // ── Filter sidebar items by user permissions ──
+// ALWAYS fetches fresh from API (no stale cache issues when admin updates permissions)
 
 async function filterSidebarByPermissions() {
     try {
-        let permData = null;
-        const cached = localStorage.getItem('user_permissions');
-        if (cached) {
-            try {
-                const parsed = JSON.parse(cached);
-                if (parsed.timestamp && (Date.now() - parsed.timestamp) < 3600000) {
-                    permData = parsed;
-                }
-            } catch(e) {}
-        }
+        const token = localStorage.getItem('auth_token');
+        if (!token) return;
 
-        if (!permData) {
-            const token = localStorage.getItem('auth_token');
-            if (!token) return;
-            const resp = await fetch('/api/auth/permissions', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!resp.ok) return;
-            permData = await resp.json();
-            permData.timestamp = Date.now();
-            localStorage.setItem('user_permissions', JSON.stringify(permData));
-        }
+        const resp = await fetch('/api/auth/permissions', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) return;
+        const permData = await resp.json();
 
+        // Update localStorage cache for other pages (PermissionManager, credit-limits page, etc.)
+        permData.timestamp = Date.now();
+        permData.loadedAt = Date.now();
+        localStorage.setItem('user_permissions', JSON.stringify(permData));
+
+        // Admin bypass — show everything
         if (permData.is_admin) return;
 
+        // Build permission set for fast lookup
         const permSet = new Set();
         if (Array.isArray(permData.permissions)) {
             permData.permissions.forEach(p => permSet.add(`${p.module}.${p.action}`));
         }
 
+        // Hide gated items the user lacks permission for
         document.querySelectorAll('[data-requires]').forEach(el => {
             const required = el.getAttribute('data-requires');
             if (!permSet.has(required)) {
@@ -937,7 +932,7 @@ async function filterSidebarByPermissions() {
             }
         });
 
-        // Hide sections where all nav items are hidden
+        // Hide sections where ALL nav items are hidden
         document.querySelectorAll('.qc-nav-section').forEach(section => {
             const items = section.querySelectorAll('.qc-nav-item');
             if (items.length === 0) return;
@@ -958,7 +953,7 @@ async function filterSidebarByPermissions() {
             }
         });
     } catch(e) {
-        // On error, leave sidebar as-is
+        // On error, leave sidebar as-is (show all)
     }
 }
 
