@@ -912,11 +912,15 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
         const discrepancyItems = items.filter(i => i.live_difference !== null && parseFloat(i.live_difference) !== 0);
         const zeroDiffItems = items.filter(i => !i.live_difference || parseFloat(i.live_difference) === 0);
 
-        let adjustmentId = null;
+        let adjustmentIds = [];
+        const failedItems = []; // Items that Zoho rejected (e.g. insufficient stock)
 
         if (discrepancyItems.length) {
-            // Build Zoho inventory adjustment payload using live differences
             const zohoAPI = require('../services/zoho-api');
+
+            const checkDate = assignment.check_date instanceof Date
+                ? `${assignment.check_date.getFullYear()}-${String(assignment.check_date.getMonth()+1).padStart(2,'0')}-${String(assignment.check_date.getDate()).padStart(2,'0')}`
+                : String(assignment.check_date).split('T')[0];
 
             const lineItems = discrepancyItems.map(item => ({
                 item_id: item.zoho_item_id,
@@ -924,40 +928,83 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
                 quantity_adjusted: parseFloat(item.live_difference)
             }));
 
-            const checkDate = assignment.check_date instanceof Date
-                ? `${assignment.check_date.getFullYear()}-${String(assignment.check_date.getMonth()+1).padStart(2,'0')}-${String(assignment.check_date.getDate()).padStart(2,'0')}`
-                : String(assignment.check_date).split('T')[0];
-
-            const adjustmentData = {
-                date: checkDate,
-                reason: `Stock check #${assignment.id} — ${assignment.branch_name || 'Branch'} (batch)`,
-                description: `Physical count on ${checkDate}, assignment #${assignment.id}, branch: ${assignment.branch_name || 'Unknown'} (partial batch push)`,
-                adjustment_type: 'quantity',
-                location_id: locationId,
-                line_items: lineItems
-            };
-
             console.log(`[Stock Check] Pushing batch adjustment for assignment #${assignment.id}, branch: ${assignment.branch_name}, location: ${locationId}, items: ${lineItems.length} (live stock comparison)`);
             console.log(`[Stock Check] Line items:`, lineItems.map(li => `${li.item_id}: live_diff=${li.quantity_adjusted}`).join(', '));
 
-            const zohoResult = await zohoAPI.createInventoryAdjustment(adjustmentData);
-            adjustmentId = zohoResult?.inventory_adjustment?.inventory_adjustment_id || zohoResult?.inventoryadjustment_id || null;
+            try {
+                // Try batch push first (most efficient)
+                const adjustmentData = {
+                    date: checkDate,
+                    reason: `Stock check #${assignment.id} — ${assignment.branch_name || 'Branch'} (batch)`,
+                    description: `Physical count on ${checkDate}, assignment #${assignment.id}, branch: ${assignment.branch_name || 'Unknown'} (partial batch push)`,
+                    adjustment_type: 'quantity',
+                    location_id: locationId,
+                    line_items: lineItems
+                };
+
+                const zohoResult = await zohoAPI.createInventoryAdjustment(adjustmentData);
+                const adjId = zohoResult?.inventory_adjustment?.inventory_adjustment_id || zohoResult?.inventoryadjustment_id || null;
+                if (adjId) adjustmentIds.push(adjId);
+            } catch (batchErr) {
+                // Batch failed (e.g. Zoho 9205 insufficient stock) — fall back to individual pushes
+                console.warn(`[Stock Check] Batch push failed for assignment #${assignment.id}: ${batchErr.message}. Falling back to individual item pushes.`);
+
+                for (const item of discrepancyItems) {
+                    try {
+                        const singleData = {
+                            date: checkDate,
+                            reason: `Stock check #${assignment.id} — ${assignment.branch_name || 'Branch'} (item: ${item.item_name})`,
+                            description: `Physical count on ${checkDate}, assignment #${assignment.id}, item: ${item.item_name}`,
+                            adjustment_type: 'quantity',
+                            location_id: locationId,
+                            line_items: [{
+                                item_id: item.zoho_item_id,
+                                location_id: locationId,
+                                quantity_adjusted: parseFloat(item.live_difference)
+                            }]
+                        };
+                        const singleResult = await zohoAPI.createInventoryAdjustment(singleData);
+                        const adjId = singleResult?.inventory_adjustment?.inventory_adjustment_id || singleResult?.inventoryadjustment_id || null;
+                        if (adjId) adjustmentIds.push(adjId);
+                    } catch (itemErr) {
+                        console.error(`[Stock Check] Individual push failed for item "${item.item_name}" (${item.zoho_item_id}): ${itemErr.message}`);
+                        failedItems.push({ id: item.id, name: item.item_name, error: itemErr.message });
+                    }
+                }
+            }
         }
 
-        // Update stock_check_items with live values used for push (audit trail), then mark adjusted
+        // Build set of failed item IDs for skipping
+        const failedIds = new Set(failedItems.map(f => f.id));
+
+        // Update stock_check_items with live values — mark adjusted (or keep submitted if Zoho rejected)
         for (const item of items) {
             const liveSystemQty = item.current_system_qty ?? item.system_qty;
             const liveDiff = item.live_difference;
             const liveVariancePct = liveSystemQty && parseFloat(liveSystemQty) !== 0
                 ? Math.round((parseFloat(liveDiff) / parseFloat(liveSystemQty)) * 10000) / 100
                 : null;
-            await pool.query(
-                `UPDATE stock_check_items
-                 SET system_qty = ?, difference = ?, variance_pct = ?, item_status = 'adjusted'
-                 WHERE id = ?`,
-                [liveSystemQty, liveDiff, liveVariancePct, item.id]
-            );
+
+            if (failedIds.has(item.id)) {
+                // Zoho rejected this item — update values but keep status as 'submitted' so admin can retry
+                await pool.query(
+                    `UPDATE stock_check_items
+                     SET system_qty = ?, difference = ?, variance_pct = ?,
+                         notes = CONCAT(COALESCE(notes, ''), '\n[Zoho push failed: insufficient stock]')
+                     WHERE id = ?`,
+                    [liveSystemQty, liveDiff, liveVariancePct, item.id]
+                );
+            } else {
+                await pool.query(
+                    `UPDATE stock_check_items
+                     SET system_qty = ?, difference = ?, variance_pct = ?, item_status = 'adjusted'
+                     WHERE id = ?`,
+                    [liveSystemQty, liveDiff, liveVariancePct, item.id]
+                );
+            }
         }
+
+        const adjustmentId = adjustmentIds.length ? adjustmentIds.join(',') : null;
 
         // Check if ALL items in the assignment are now adjusted
         const [remainingItems] = await pool.query(
@@ -969,7 +1016,6 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
 
         if (allDone) {
             // All items processed → mark assignment as adjusted
-            // Append adjustment_id (comma-separated if multiple pushes)
             const existingAdjId = assignment.adjustment_id;
             const newAdjId = adjustmentId
                 ? (existingAdjId ? `${existingAdjId},${adjustmentId}` : adjustmentId)
@@ -982,7 +1028,7 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
                 [req.user.id, newAdjId, req.params.id]
             );
         } else {
-            // More items still pending/checked — store partial adjustment ID
+            // More items still pending/checked/failed — store partial adjustment ID
             if (adjustmentId) {
                 const existingAdjId = assignment.adjustment_id;
                 const newAdjId = existingAdjId ? `${existingAdjId},${adjustmentId}` : adjustmentId;
@@ -993,13 +1039,21 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             }
         }
 
-        const pushedCount = items.length;
+        const successCount = items.length - failedItems.length;
+        const failedMsg = failedItems.length
+            ? ` ${failedItems.length} item(s) failed (insufficient stock in Zoho): ${failedItems.map(f => f.name).join(', ')}.`
+            : '';
         res.json({
             success: true,
             message: allDone
-                ? `All items adjusted (${pushedCount} items, ${discrepancyItems.length} with discrepancies). Assignment complete.`
-                : `Pushed ${discrepancyItems.length} discrepancies to Zoho (${pushedCount} items adjusted, ${remainingItems[0].remaining} remaining).`,
-            data: { adjustment_id: adjustmentId, all_done: allDone, pushed: pushedCount, discrepancies: discrepancyItems.length, remaining: remainingItems[0].remaining }
+                ? `All items adjusted (${successCount} items, ${discrepancyItems.length - failedItems.length} discrepancies pushed). Assignment complete.`
+                : `Pushed ${discrepancyItems.length - failedItems.length} discrepancies to Zoho (${successCount} adjusted, ${remainingItems[0].remaining} remaining).${failedMsg}`,
+            data: {
+                adjustment_id: adjustmentId, all_done: allDone,
+                pushed: successCount, discrepancies: discrepancyItems.length,
+                remaining: remainingItems[0].remaining,
+                failed: failedItems
+            }
         });
     } catch (error) {
         console.error('Create adjustment error:', error);

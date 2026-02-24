@@ -1080,14 +1080,20 @@ async function markReviewed(id) {
 async function pushAdjustment(id) {
     if (!confirm('Push submitted item discrepancies to Zoho Books? This will modify stock levels.')) return;
     const res = await apiPost(API + '/adjust/' + id, {});
-    showToast(res.message || 'Adjustment created', res.success ? 'success' : 'error');
+    if (res.success && res.data && res.data.failed && res.data.failed.length > 0) {
+        // Some items failed — show warning with details
+        const failedNames = res.data.failed.map(f => f.name).join('\n  - ');
+        showToast(`${res.data.pushed} items adjusted, ${res.data.failed.length} failed (insufficient stock in Zoho)`, 'warning');
+        alert(`⚠️ ${res.data.failed.length} item(s) could not be pushed to Zoho (insufficient stock):\n\n  - ${failedNames}\n\nThese items remain as "Submitted" — you can retry after restocking in Zoho, or adjust manually.`);
+    } else {
+        showToast(res.message || 'Adjustment created', res.success ? 'success' : 'error');
+    }
     if (res.success) {
         if (res.data && res.data.all_done) {
-            // All items adjusted — close and refresh
             closeReview();
             loadReviewList();
         } else {
-            // Partial push — refresh the review panel to show updated statuses
+            // Partial push or failed items — refresh review panel
             openReview(id);
             loadReviewList();
         }
