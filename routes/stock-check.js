@@ -890,24 +890,39 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             return res.status(400).json({ success: false, message: 'No Zoho location linked' });
         }
 
-        // Get ALL submitted items with live stock comparison
+        // Get ALL submitted items
         const [items] = await pool.query(
-            `SELECT sci.*,
-                    ls.stock_on_hand AS current_system_qty,
-                    CASE WHEN sci.reported_qty IS NOT NULL
-                         THEN sci.reported_qty - COALESCE(ls.stock_on_hand, sci.system_qty)
-                         ELSE NULL END AS live_difference
-             FROM stock_check_items sci
-             LEFT JOIN zoho_location_stock ls
-               ON sci.zoho_item_id = ls.zoho_item_id AND ls.zoho_location_id = ?
-             WHERE sci.assignment_id = ? AND sci.item_status = 'submitted'`,
-            [locationId, req.params.id]
+            `SELECT * FROM stock_check_items WHERE assignment_id = ? AND item_status = 'submitted'`,
+            [req.params.id]
         );
 
         if (!items.length) {
-            // No submitted items to process
             return res.json({ success: true, message: 'No submitted items to process. Waiting for more items from staff.' });
         }
+
+        // Fetch LIVE stock from Zoho API for each item (not from stale cache)
+        const zohoAPI = require('../services/zoho-api');
+        console.log(`[Stock Check] Fetching live Zoho stock for ${items.length} items at location ${locationId}...`);
+
+        for (const item of items) {
+            try {
+                const result = await zohoAPI.getItem(item.zoho_item_id);
+                const zohoItem = result?.item || result;
+                const locations = zohoItem?.locations || [];
+                const loc = locations.find(l => l.location_id === locationId);
+                item.current_system_qty = loc ? parseFloat(loc.location_stock_on_hand) : null;
+            } catch (fetchErr) {
+                console.warn(`[Stock Check] Could not fetch live stock for "${item.item_name}": ${fetchErr.message}`);
+                item.current_system_qty = null; // Will fall back to cached system_qty
+            }
+            // Compute live difference: reported - live_zoho_stock (fall back to cached system_qty)
+            const baseQty = item.current_system_qty ?? parseFloat(item.system_qty);
+            item.live_difference = item.reported_qty !== null
+                ? parseFloat(item.reported_qty) - baseQty
+                : null;
+        }
+
+        console.log(`[Stock Check] Live stock fetched. Items:`, items.map(i => `${i.item_name}: zoho=${i.current_system_qty}, reported=${i.reported_qty}, diff=${i.live_difference}`).join('; '));
 
         // Split into discrepancy vs zero-diff using live values
         const discrepancyItems = items.filter(i => i.live_difference !== null && parseFloat(i.live_difference) !== 0);
@@ -917,8 +932,6 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
         const failedItems = []; // Items that Zoho rejected (e.g. insufficient stock)
 
         if (discrepancyItems.length) {
-            const zohoAPI = require('../services/zoho-api');
-
             const checkDate = assignment.check_date instanceof Date
                 ? `${assignment.check_date.getFullYear()}-${String(assignment.check_date.getMonth()+1).padStart(2,'0')}-${String(assignment.check_date.getDate()).padStart(2,'0')}`
                 : String(assignment.check_date).split('T')[0];
@@ -1008,6 +1021,17 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
                      SET system_qty = ?, difference = ?, variance_pct = ?, item_status = 'adjusted'
                      WHERE id = ?`,
                     [liveSystemQty, liveDiff, liveVariancePct, item.id]
+                );
+            }
+        }
+
+        // Also update zoho_location_stock cache with live values we fetched
+        for (const item of items) {
+            if (item.current_system_qty !== null && item.current_system_qty !== undefined) {
+                await pool.query(
+                    `UPDATE zoho_location_stock SET stock_on_hand = ?, available_stock = ?, last_synced_at = NOW()
+                     WHERE zoho_item_id = ? AND zoho_location_id = ?`,
+                    [item.current_system_qty, item.current_system_qty, item.zoho_item_id, locationId]
                 );
             }
         }
