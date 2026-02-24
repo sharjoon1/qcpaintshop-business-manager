@@ -1,50 +1,520 @@
-<!-- Staff Sidebar Navigation Component -->
+<!-- Staff Sidebar Navigation - Premium Light Design (matches admin sidebar) -->
 <style>
-    /* Sidebar Styles (same base as admin) */
-    .qc-sidebar { position: fixed; top: 0; left: -320px; width: 320px; height: 100vh; background: linear-gradient(180deg, #0891b2 0%, #06b6d4 100%); box-shadow: 4px 0 20px rgba(0,0,0,0.3); transition: left 0.3s; z-index: 1002; overflow-y: auto; display: flex; flex-direction: column; }
+    /* ═══════════════════════════════════════════════
+       STAFF SIDEBAR - Light/White with Icon Rail
+       (mirrors sidebar-complete.html design exactly)
+       ═══════════════════════════════════════════════ */
+
+    /* Custom scrollbar */
+    .qc-sidebar::-webkit-scrollbar { width: 3px; }
+    .qc-sidebar::-webkit-scrollbar-track { background: transparent; }
+    .qc-sidebar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 3px; }
+    .qc-sidebar::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.14); }
+
+    /* Sidebar Base */
+    .qc-sidebar {
+        position: fixed;
+        top: 0;
+        left: -320px;
+        width: 320px;
+        height: 100vh;
+        background: #ffffff;
+        border-right: 1px solid #e8ecf1;
+        transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                    width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1002;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
     .qc-sidebar.open { left: 0; }
-    
-    .qc-sidebar-header { padding: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.15); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-    .qc-sidebar-brand { color: white; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
-    .qc-sidebar-close { background: rgba(255,255,255,0.1); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; transition: all 0.2s; }
-    .qc-sidebar-close:hover { background: rgba(255,255,255,0.2); transform: rotate(90deg); }
-    
-    .qc-sidebar-user { padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.15); color: white; flex-shrink: 0; }
-    .qc-sidebar-user-info { display: flex; align-items: center; gap: 1rem; }
-    .qc-sidebar-user-avatar { width: 48px; height: 48px; border-radius: 50%; background: white; color: #0891b2; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.25rem; }
-    .qc-sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-    .qc-sidebar-user-details { flex: 1; }
-    .qc-sidebar-user-name { font-weight: 600; font-size: 0.95rem; }
-    .qc-sidebar-user-role { font-size: 0.75rem; opacity: 0.9; }
-    .qc-sidebar-user-branch { font-size: 0.7rem; opacity: 0.8; margin-top: 0.25rem; }
-    
-    .qc-sidebar-nav { padding: 1rem 0; flex: 1; overflow-y: auto; }
-    .qc-nav-section { margin-bottom: 1.5rem; }
-    .qc-nav-section-title { padding: 0.5rem 1.5rem; color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-    
-    .qc-nav-item { display: block; padding: 0.85rem 1.5rem; color: rgba(255,255,255,0.9); text-decoration: none; transition: all 0.2s; display: flex; align-items: center; gap: 0.75rem; font-weight: 500; font-size: 0.9rem; }
-    .qc-nav-item:hover { background: rgba(255,255,255,0.15); color: white; padding-left: 2rem; }
-    .qc-nav-item.active { background: rgba(255,255,255,0.2); color: white; border-left: 4px solid white; padding-left: calc(1.5rem - 4px); }
-    .qc-nav-item-icon { font-size: 1.1rem; width: 24px; text-align: center; }
-    
-    .qc-sidebar-footer { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
-    .qc-sidebar-logout { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; transition: all 0.2s; }
-    .qc-sidebar-logout:hover { background: rgba(239, 68, 68, 0.8); }
-    
-    .qc-sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1001; }
+
+    /* Sidebar Header / Brand */
+    .qc-sidebar-header {
+        padding: 1rem 1.25rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+        border-bottom: 1px solid #f1f5f9;
+        min-height: 56px;
+    }
+    .qc-sidebar-brand {
+        color: #1e293b;
+        font-size: 0.9375rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .qc-sidebar-brand-icon {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+    .qc-sidebar-brand-text {
+        transition: opacity 0.25s ease, width 0.25s ease;
+    }
+    .qc-sidebar-close {
+        background: transparent;
+        border: 1px solid #e2e8f0;
+        color: #94a3b8;
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        border-radius: 6px;
+        font-size: 1.125rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+    .qc-sidebar-close:hover {
+        background: #f8fafc;
+        color: #64748b;
+        border-color: #cbd5e1;
+    }
+
+    /* Sidebar hamburger toggle (desktop only) */
+    .qc-sidebar-toggle {
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+        background: transparent;
+        border: 1px solid #e2e8f0;
+        padding: 7px;
+        border-radius: 7px;
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.25s ease;
+    }
+    .qc-sidebar-toggle:hover {
+        background: #f0f4ff;
+        border-color: #93b4fd;
+    }
+    .qc-sidebar-toggle span {
+        width: 16px;
+        height: 2px;
+        background: #64748b;
+        border-radius: 1px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .qc-sidebar-toggle:hover span { background: #3b82f6; }
+
+    /* User Info Card */
+    .qc-sidebar-user {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        flex-shrink: 0;
+    }
+    .qc-sidebar-user-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.625rem;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #f1f5f9;
+    }
+    .qc-sidebar-user-avatar {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.875rem;
+    }
+    .qc-sidebar-user-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 8px;
+    }
+    .qc-sidebar-user-details {
+        flex: 1;
+        overflow: hidden;
+        transition: opacity 0.25s ease;
+    }
+    .qc-sidebar-user-name {
+        font-weight: 600;
+        font-size: 0.8125rem;
+        color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .qc-sidebar-user-role {
+        font-size: 0.6875rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+    .qc-sidebar-user-branch {
+        font-size: 0.625rem;
+        color: #94a3b8;
+        margin-top: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Navigation Container */
+    .qc-sidebar-nav {
+        padding: 0.5rem 0;
+        flex: 1;
+    }
+
+    /* Section Titles */
+    .qc-nav-section { margin-bottom: 0.125rem; }
+    .qc-nav-section-title {
+        padding: 0.75rem 1.25rem 0.3rem;
+        color: #94a3b8;
+        font-size: 0.625rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        white-space: nowrap;
+        overflow: hidden;
+        transition: opacity 0.25s ease;
+    }
+
+    /* Navigation Items */
+    .qc-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 1rem;
+        margin: 1px 0.5rem;
+        color: #64748b;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.8125rem;
+        border-radius: 8px;
+        transition: all 0.18s ease;
+        position: relative;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .qc-nav-item:hover {
+        background: #f8fafc;
+        color: #334155;
+    }
+    .qc-nav-item.active {
+        background: #eff6ff;
+        color: #2563eb;
+        font-weight: 600;
+    }
+    .qc-nav-item.active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 18px;
+        background: #3b82f6;
+        border-radius: 0 3px 3px 0;
+    }
+
+    /* Nav Item Icons */
+    .qc-nav-item-icon {
+        font-size: 1rem;
+        width: 20px;
+        min-width: 20px;
+        text-align: center;
+        flex-shrink: 0;
+        line-height: 1;
+    }
+    .qc-nav-item-icon svg {
+        width: 17px;
+        height: 17px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    /* Nav item text */
+    .qc-nav-item-text {
+        transition: opacity 0.25s ease;
+    }
+
+    /* Section Divider */
+    .qc-nav-divider {
+        height: 1px;
+        background: #f1f5f9;
+        margin: 0.375rem 1rem;
+    }
+
+    /* Tooltip for collapsed icon rail */
+    .qc-nav-tooltip {
+        display: none;
+    }
+
+    /* Footer */
+    .qc-sidebar-footer {
+        padding: 0.625rem 0.75rem;
+        border-top: 1px solid #f1f5f9;
+        flex-shrink: 0;
+    }
+    .qc-sidebar-logout {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        border-radius: 8px;
+        cursor: pointer;
+        width: 100%;
+        font-weight: 600;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+        font-family: inherit;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .qc-sidebar-logout:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
+    }
+    .qc-sidebar-logout svg {
+        width: 17px;
+        height: 17px;
+        min-width: 17px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+    }
+    .qc-sidebar-logout-text {
+        transition: opacity 0.25s ease;
+    }
+
+    /* Overlay */
+    .qc-sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background: rgba(0,0,0,0.3);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 1001;
+        transition: opacity 0.3s;
+    }
     .qc-sidebar-overlay.show { display: block; }
 
-    @media (max-width: 768px) { .qc-sidebar { width: 85%; max-width: 320px; } }
+    /* App Version */
+    .qc-sidebar-version {
+        padding: 0.375rem 1rem 0.5rem;
+        text-align: center;
+        font-size: 0.5625rem;
+        color: #cbd5e1;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+        overflow: hidden;
+    }
 
-    /* Desktop: always visible sidebar */
-    @media (min-width: 769px) {
-        .qc-sidebar { left: 0; width: 240px; box-shadow: none; }
+    /* ─── MOBILE ─── */
+    @media (max-width: 767px) {
+        .qc-sidebar { width: 85%; max-width: 320px; }
+    }
+
+    /* ─── DESKTOP ≥ 768px: Sidebar with icon-rail collapsed state ─── */
+    @media (min-width: 768px) {
+        .qc-sidebar {
+            left: 0;
+            width: 256px;
+            box-shadow: none;
+            transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* COLLAPSED = icon rail */
+        .qc-sidebar.collapsed {
+            width: 60px;
+            left: 0;
+        }
+
+        /* Show the sidebar toggle on desktop */
+        .qc-sidebar-toggle { display: flex; }
+
+        /* Hide text elements when collapsed */
+        .qc-sidebar.collapsed .qc-sidebar-brand-text,
+        .qc-sidebar.collapsed .qc-nav-section-title,
+        .qc-sidebar.collapsed .qc-nav-item-text,
+        .qc-sidebar.collapsed .qc-sidebar-logout-text,
+        .qc-sidebar.collapsed .qc-sidebar-version,
+        .qc-sidebar.collapsed .qc-sidebar-close,
+        .qc-sidebar.collapsed .qc-sidebar-user-details {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        /* Hide user card when collapsed */
+        .qc-sidebar.collapsed .qc-sidebar-user {
+            padding: 0.5rem 0.375rem;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-user-info {
+            padding: 0.375rem;
+            justify-content: center;
+            gap: 0;
+            border: none;
+            background: transparent;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-user-avatar {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            font-size: 0.75rem;
+        }
+
+        /* Adjust spacing for collapsed */
+        .qc-sidebar.collapsed .qc-sidebar-header {
+            padding: 0.75rem 0;
+            justify-content: center;
+            border-bottom-color: transparent;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-brand {
+            display: none;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-toggle {
+            margin: 0 auto;
+        }
+        .qc-sidebar.collapsed .qc-nav-item {
+            padding: 0.5rem;
+            margin: 2px 0.375rem;
+            justify-content: center;
+            gap: 0;
+            border-radius: 8px;
+        }
+        .qc-sidebar.collapsed .qc-nav-item-icon {
+            width: 22px;
+        }
+        .qc-sidebar.collapsed .qc-nav-item.active::before {
+            height: 14px;
+            width: 2px;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-footer {
+            padding: 0.5rem 0.375rem;
+        }
+        .qc-sidebar.collapsed .qc-sidebar-logout {
+            padding: 0.5rem;
+            justify-content: center;
+            gap: 0;
+        }
+        .qc-sidebar.collapsed .qc-nav-divider {
+            margin: 0.25rem 0.5rem;
+        }
+        .qc-sidebar.collapsed .qc-nav-section {
+            margin-bottom: 0;
+        }
+
+        /* Tooltip on hover for collapsed items */
+        .qc-sidebar.collapsed .qc-nav-item {
+            position: relative;
+        }
+        .qc-sidebar.collapsed .qc-nav-tooltip {
+            display: none;
+            position: absolute;
+            left: calc(100% + 8px);
+            top: 50%;
+            transform: translateY(-50%);
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 0.375rem 0.625rem;
+            border-radius: 6px;
+            font-size: 0.725rem;
+            font-weight: 500;
+            white-space: nowrap;
+            z-index: 1100;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .qc-sidebar.collapsed .qc-nav-item:hover .qc-nav-tooltip {
+            display: block;
+        }
+
+        /* Hide the x close on desktop */
         .qc-sidebar-close { display: none; }
+
+        /* Overlay hidden on desktop */
         .qc-sidebar-overlay { display: none !important; }
-        /* Push page content right */
-        body > main, body > div#nav-placeholder + div#subnav-placeholder + main,
-        .qc-unified-header { margin-left: 240px; }
-        body > div#subnav-placeholder { margin-left: 240px; }
+
+        /* Push page content */
+        body {
+            margin-left: 256px;
+            transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body.sidebar-collapsed {
+            margin-left: 60px;
+        }
+
+        /* Header adjustments */
+        .qc-unified-header {
+            margin-left: -256px;
+            padding-left: calc(256px);
+            transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                        padding-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body.sidebar-collapsed .qc-unified-header {
+            margin-left: -60px;
+            padding-left: 60px;
+        }
+
+        /* Compact desktop sizing */
+        .qc-sidebar-header { padding: 0.875rem 1rem; }
+        .qc-sidebar-brand { font-size: 0.875rem; }
+        .qc-sidebar-brand-icon { width: 30px; height: 30px; min-width: 30px; font-size: 0.875rem; border-radius: 7px; }
+        .qc-nav-item { padding: 0.45rem 0.875rem; margin: 1px 0.375rem; font-size: 0.775rem; gap: 0.625rem; border-radius: 7px; }
+        .qc-nav-item-icon { font-size: 0.9rem; width: 20px; min-width: 20px; }
+        .qc-nav-item-icon svg { width: 16px; height: 16px; }
+        .qc-nav-section-title { padding: 0.625rem 1rem 0.25rem; font-size: 0.575rem; }
+        .qc-sidebar-footer { padding: 0.5rem 0.75rem; }
+        .qc-sidebar-logout { padding: 0.45rem 0.625rem; font-size: 0.775rem; border-radius: 7px; }
+        .qc-sidebar-logout svg { width: 16px; height: 16px; min-width: 16px; }
+    }
+
+    /* ─── LARGE DESKTOP ≥ 1280px ─── */
+    @media (min-width: 1280px) {
+        .qc-sidebar { width: 268px; }
+        .qc-sidebar.collapsed { width: 64px; }
+        body { margin-left: 268px; }
+        body.sidebar-collapsed { margin-left: 64px; }
+        .qc-unified-header {
+            margin-left: -268px;
+            padding-left: 268px;
+        }
+        body.sidebar-collapsed .qc-unified-header {
+            margin-left: -64px;
+            padding-left: 64px;
+        }
     }
 </style>
 
@@ -56,12 +526,19 @@
     <!-- Header -->
     <div class="qc-sidebar-header">
         <div class="qc-sidebar-brand">
-            <span>👤</span>
-            <span>Staff Portal</span>
+            <div class="qc-sidebar-brand-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <span class="qc-sidebar-brand-text">Staff Portal</span>
         </div>
-        <button class="qc-sidebar-close" onclick="closeSidebar()">×</button>
+        <!-- Desktop: 3-dash toggle (pin / unpin) -->
+        <button class="qc-sidebar-toggle" id="sidebarToggleBtn" title="Toggle menu">
+            <span></span><span></span><span></span>
+        </button>
+        <!-- Mobile: x close button -->
+        <button class="qc-sidebar-close" onclick="closeSidebar()" title="Close menu">&times;</button>
     </div>
-    
+
     <!-- User Info -->
     <div class="qc-sidebar-user">
         <div class="qc-sidebar-user-info">
@@ -71,70 +548,100 @@
             <div class="qc-sidebar-user-details">
                 <div class="qc-sidebar-user-name" id="sidebarName">Staff Member</div>
                 <div class="qc-sidebar-user-role" id="sidebarRole">Employee</div>
-                <div class="qc-sidebar-user-branch" id="sidebarBranch">📍 Branch Name</div>
+                <div class="qc-sidebar-user-branch" id="sidebarBranch">Branch Name</div>
             </div>
         </div>
     </div>
-    
+
     <!-- Navigation -->
     <nav class="qc-sidebar-nav">
-        <!-- Main -->
+        <!-- Dashboard -->
         <div class="qc-nav-section">
             <a href="/staff/dashboard.html" class="qc-nav-item" data-page="dashboard">
-                <span class="qc-nav-item-icon">🏠</span>
-                <span>My Dashboard</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+                <span class="qc-nav-item-text">My Dashboard</span>
+                <span class="qc-nav-tooltip">My Dashboard</span>
             </a>
             <a href="/dashboard.html" class="qc-nav-item" data-page="main-dashboard">
-                <span class="qc-nav-item-icon">📊</span>
-                <span>Main Dashboard</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <span class="qc-nav-item-text">Main Dashboard</span>
+                <span class="qc-nav-tooltip">Main Dashboard</span>
             </a>
         </div>
-        
+
+        <!-- Chat -->
+        <div class="qc-nav-section">
+            <a href="/chat.html" class="qc-nav-item" data-page="chat">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="qc-nav-item-text">Chat</span>
+                <span class="qc-nav-tooltip">Chat</span>
+            </a>
+        </div>
+
+        <div class="qc-nav-divider"></div>
+
         <!-- My Work -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">My Work</div>
             <a href="/staff-estimates.html" class="qc-nav-item" data-page="estimates" data-requires="estimates.view">
-                <span class="qc-nav-item-icon">📋</span>
-                <span>My Estimates</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+                <span class="qc-nav-item-text">My Estimates</span>
+                <span class="qc-nav-tooltip">My Estimates</span>
             </a>
             <a href="/staff-requests.html" class="qc-nav-item" data-page="requests">
-                <span class="qc-nav-item-icon">📝</span>
-                <span>My Requests</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
+                <span class="qc-nav-item-text">My Requests</span>
+                <span class="qc-nav-tooltip">My Requests</span>
             </a>
         </div>
-        
-        <!-- Attendance -->
-        <div class="qc-nav-section">
-            <div class="qc-nav-section-title">Attendance</div>
-            <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in" data-requires="attendance.view">
-                <span class="qc-nav-item-icon">🟢</span>
-                <span>Clock In</span>
-            </a>
-            <a href="/staff/clock-out.html" class="qc-nav-item" data-page="clock-out" data-requires="attendance.view">
-                <span class="qc-nav-item-icon">🔴</span>
-                <span>Clock Out</span>
-            </a>
-            <a href="/staff/history.html" class="qc-nav-item" data-page="history" data-requires="attendance.view">
-                <span class="qc-nav-item-icon">📜</span>
-                <span>My History</span>
-            </a>
-        </div>
-        
-        <!-- Permissions -->
-        <div class="qc-nav-section">
-            <div class="qc-nav-section-title">Permissions</div>
-            <a href="/staff/permission-request.html" class="qc-nav-item" data-page="permission" data-requires="attendance.view">
-                <span class="qc-nav-item-icon">✋</span>
-                <span>Request Permission</span>
-            </a>
-        </div>
-        
+
         <!-- Customers -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Customers</div>
             <a href="/admin-credit-limits.html" class="qc-nav-item" data-page="credit-limits">
-                <span class="qc-nav-item-icon">💳</span>
-                <span>Credit Limits</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
+                <span class="qc-nav-item-text">Credit Limits</span>
+                <span class="qc-nav-tooltip">Credit Limits</span>
+            </a>
+        </div>
+
+        <!-- HR & Attendance -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">HR & Attendance</div>
+            <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in" data-requires="attendance.view">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+                <span class="qc-nav-item-text">Clock In</span>
+                <span class="qc-nav-tooltip">Clock In</span>
+            </a>
+            <a href="/staff/clock-out.html" class="qc-nav-item" data-page="clock-out" data-requires="attendance.view">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                <span class="qc-nav-item-text">Clock Out</span>
+                <span class="qc-nav-tooltip">Clock Out</span>
+            </a>
+            <a href="/staff/history.html" class="qc-nav-item" data-page="history" data-requires="attendance.view">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                <span class="qc-nav-item-text">My History</span>
+                <span class="qc-nav-tooltip">My History</span>
+            </a>
+            <a href="/staff/permission-request.html" class="qc-nav-item" data-page="permission" data-requires="attendance.view">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span>
+                <span class="qc-nav-item-text">Permission Request</span>
+                <span class="qc-nav-tooltip">Permission Request</span>
+            </a>
+        </div>
+
+        <!-- Salary -->
+        <div class="qc-nav-section">
+            <div class="qc-nav-section-title">Salary</div>
+            <a href="/staff/salary.html" class="qc-nav-item" data-page="my-salary">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                <span class="qc-nav-item-text">My Salary</span>
+                <span class="qc-nav-tooltip">My Salary</span>
+            </a>
+            <a href="/staff/advance-request.html" class="qc-nav-item" data-page="advance-request">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><polyline points="7 2 12 1 17 2"/></svg></span>
+                <span class="qc-nav-item-text">Advance Request</span>
+                <span class="qc-nav-tooltip">Advance Request</span>
             </a>
         </div>
 
@@ -142,77 +649,234 @@
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Inventory</div>
             <a href="/staff/stock-check.html" class="qc-nav-item" data-page="stock-check" data-requires="zoho.stock_check">
-                <span class="qc-nav-item-icon">📦</span>
-                <span>Stock Check</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
+                <span class="qc-nav-item-text">Stock Check</span>
+                <span class="qc-nav-tooltip">Stock Check</span>
             </a>
             <a href="/staff/collections.html" class="qc-nav-item" data-page="collections" data-requires="zoho.collections">
-                <span class="qc-nav-item-icon">💰</span>
-                <span>Collections</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+                <span class="qc-nav-item-text">Collections</span>
+                <span class="qc-nav-tooltip">Collections</span>
             </a>
         </div>
+
+        <div class="qc-nav-divider"></div>
 
         <!-- Help & Guides -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Help</div>
             <a href="/staff/guides.html" class="qc-nav-item" data-page="guides">
-                <span class="qc-nav-item-icon">📖</span>
-                <span>Guides & Help</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
+                <span class="qc-nav-item-text">Guides & Help</span>
+                <span class="qc-nav-tooltip">Guides & Help</span>
             </a>
         </div>
 
-        <!-- Profile -->
+        <!-- Account -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Account</div>
             <a href="/admin-profile.html" class="qc-nav-item" data-page="profile">
-                <span class="qc-nav-item-icon">👤</span>
-                <span>My Profile</span>
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <span class="qc-nav-item-text">My Profile</span>
+                <span class="qc-nav-tooltip">My Profile</span>
             </a>
         </div>
     </nav>
-    
+
     <!-- Footer -->
     <div class="qc-sidebar-footer">
         <button class="qc-sidebar-logout" onclick="logoutUser()">
-            <span>🚪</span>
-            <span>Logout</span>
+            <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span class="qc-sidebar-logout-text">Logout</span>
         </button>
     </div>
+
+    <!-- Version -->
+    <div class="qc-sidebar-version">QC Staff Portal v2.0</div>
 </aside>
 
 <script>
-// Sidebar Controls
+// ═══════════════════════════════════════════════════════════════
+// STAFF SIDEBAR CONTROLS  –  Hover-to-preview  +  Click-to-pin
+// (mirrors sidebar-complete.html behavior exactly)
+// ═══════════════════════════════════════════════════════════════
+
+let sidebarPinned   = false;
+let hoverActive     = false;
+let hoverLeaveTimer = null;
+const HOVER_DELAY   = 200;
+
+// ── helpers ──
+
+function expandSidebar() {
+    const s = document.getElementById('mainSidebar');
+    s.classList.remove('collapsed');
+    document.body.classList.remove('sidebar-collapsed');
+}
+
+function collapseSidebar() {
+    const s = document.getElementById('mainSidebar');
+    s.classList.add('collapsed');
+    document.body.classList.add('sidebar-collapsed');
+}
+
+// ── toggle (click the 3-dash button inside sidebar) ──
+
 function toggleSidebar() {
-    document.getElementById('mainSidebar').classList.toggle('open');
-    document.getElementById('sidebarOverlay').classList.toggle('show');
+    const sidebar = document.getElementById('mainSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const isDesktop = window.innerWidth >= 768;
+
+    if (isDesktop) {
+        if (sidebarPinned) {
+            sidebarPinned = false;
+            hoverActive   = false;
+            collapseSidebar();
+            localStorage.setItem('staffSidebarCollapsed', 'true');
+            document.removeEventListener('click', handleClickOutside, true);
+        } else {
+            clearTimeout(hoverLeaveTimer);
+            sidebarPinned = true;
+            hoverActive   = false;
+            expandSidebar();
+            localStorage.setItem('staffSidebarCollapsed', 'false');
+            setTimeout(() => {
+                document.addEventListener('click', handleClickOutside, true);
+            }, 60);
+        }
+    } else {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('show');
+    }
 }
 
 function closeSidebar() {
-    document.getElementById('mainSidebar').classList.remove('open');
-    document.getElementById('sidebarOverlay').classList.remove('show');
+    const sidebar = document.getElementById('mainSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const isDesktop = window.innerWidth >= 768;
+
+    if (isDesktop) {
+        sidebarPinned = false;
+        hoverActive   = false;
+        collapseSidebar();
+        localStorage.setItem('staffSidebarCollapsed', 'true');
+        document.removeEventListener('click', handleClickOutside, true);
+    } else {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+    }
 }
 
-// Load User Info into Sidebar
+// ── click-outside (active only when pinned) ──
+
+function handleClickOutside(e) {
+    const sidebar = document.getElementById('mainSidebar');
+    if (!sidebar || window.innerWidth < 768) return;
+
+    if (sidebar.classList.contains('collapsed')) {
+        sidebarPinned = false;
+        document.removeEventListener('click', handleClickOutside, true);
+        return;
+    }
+
+    if (sidebar.contains(e.target)) return;
+
+    const headerHamburger = document.getElementById('hamburgerBtn');
+    if (headerHamburger && headerHamburger.contains(e.target)) return;
+
+    closeSidebar();
+}
+
+// ── hover on the sidebar rail (desktop) ──
+
+function onSidebarMouseEnter() {
+    if (window.innerWidth < 768 || sidebarPinned) return;
+    clearTimeout(hoverLeaveTimer);
+    hoverActive = true;
+    expandSidebar();
+}
+
+function onSidebarMouseLeave() {
+    if (window.innerWidth < 768 || sidebarPinned) return;
+
+    hoverLeaveTimer = setTimeout(() => {
+        if (!sidebarPinned && hoverActive) {
+            hoverActive = false;
+            collapseSidebar();
+        }
+    }, HOVER_DELAY);
+}
+
+// ── wire up all listeners ──
+
+function attachSidebarListeners() {
+    const sidebar       = document.getElementById('mainSidebar');
+    const toggleBtn     = document.getElementById('sidebarToggleBtn');
+    const headerHamburger = document.getElementById('hamburgerBtn');
+
+    if (!sidebar) return;
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleSidebar();
+        });
+    }
+
+    if (headerHamburger) {
+        headerHamburger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleSidebar();
+        });
+    }
+
+    sidebar.addEventListener('mouseenter', onSidebarMouseEnter);
+    sidebar.addEventListener('mouseleave', onSidebarMouseLeave);
+}
+
+// ── restore persisted state ──
+
+function restoreSidebarState() {
+    if (window.innerWidth < 768) return;
+
+    const saved = localStorage.getItem('staffSidebarCollapsed');
+    const shouldCollapse = saved !== 'false';   // default = collapsed
+
+    if (shouldCollapse) {
+        collapseSidebar();
+        sidebarPinned = false;
+    } else {
+        expandSidebar();
+        sidebarPinned = true;
+        setTimeout(() => {
+            document.addEventListener('click', handleClickOutside, true);
+        }, 100);
+    }
+}
+
+// ── Load User Info into Sidebar ──
+
 function loadSidebarUserInfo() {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    
+
     const nameEl = document.getElementById('sidebarName');
     if (nameEl && user.full_name) {
         nameEl.textContent = user.full_name;
     }
-    
+
     const roleEl = document.getElementById('sidebarRole');
     if (roleEl && user.role) {
         roleEl.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
     }
-    
+
     const branchEl = document.getElementById('sidebarBranch');
     if (branchEl && user.branch_name) {
-        branchEl.textContent = `📍 ${user.branch_name}`;
+        branchEl.textContent = user.branch_name;
     }
-    
+
     const avatarEl = document.getElementById('sidebarAvatar');
     const initialEl = document.getElementById('sidebarInitial');
-    
+
     if (user.profile_image_url) {
         avatarEl.innerHTML = `<img src="${user.profile_image_url}" alt="Profile">`;
     } else if (user.full_name && initialEl) {
@@ -220,7 +884,8 @@ function loadSidebarUserInfo() {
     }
 }
 
-// Highlight Active Page
+// ── Highlight Active Page ──
+
 function highlightActiveSidebarPage() {
     const path = window.location.pathname;
     document.querySelectorAll('.qc-nav-item[data-page]').forEach(item => {
@@ -231,10 +896,10 @@ function highlightActiveSidebarPage() {
     });
 }
 
-// Filter sidebar items by user permissions
+// ── Filter sidebar items by user permissions ──
+
 async function filterSidebarByPermissions() {
     try {
-        // Check localStorage cache first (same key as PermissionManager)
         let permData = null;
         const cached = localStorage.getItem('user_permissions');
         if (cached) {
@@ -246,7 +911,6 @@ async function filterSidebarByPermissions() {
             } catch(e) {}
         }
 
-        // Fetch from API if no valid cache
         if (!permData) {
             const token = localStorage.getItem('auth_token');
             if (!token) return;
@@ -259,16 +923,13 @@ async function filterSidebarByPermissions() {
             localStorage.setItem('user_permissions', JSON.stringify(permData));
         }
 
-        // Admin bypass — show everything
         if (permData.is_admin) return;
 
-        // Build permission set for fast lookup
         const permSet = new Set();
         if (Array.isArray(permData.permissions)) {
             permData.permissions.forEach(p => permSet.add(`${p.module}.${p.action}`));
         }
 
-        // Hide gated items the user lacks permission for
         document.querySelectorAll('[data-requires]').forEach(el => {
             const required = el.getAttribute('data-requires');
             if (!permSet.has(required)) {
@@ -285,12 +946,24 @@ async function filterSidebarByPermissions() {
                 section.style.display = 'none';
             }
         });
+
+        // Hide dividers next to hidden sections
+        document.querySelectorAll('.qc-nav-divider').forEach(divider => {
+            const next = divider.nextElementSibling;
+            const prev = divider.previousElementSibling;
+            const nextHidden = next && next.style.display === 'none';
+            const prevHidden = prev && prev.style.display === 'none';
+            if (nextHidden || prevHidden) {
+                divider.style.display = 'none';
+            }
+        });
     } catch(e) {
-        // On error, leave sidebar as-is (show all)
+        // On error, leave sidebar as-is
     }
 }
 
-// Logout
+// ── Logout ──
+
 function logoutUser() {
     if (confirm('Are you sure you want to logout?')) {
         localStorage.removeItem('auth_token');
@@ -299,16 +972,39 @@ function logoutUser() {
     }
 }
 
-// Initialize on load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        loadSidebarUserInfo();
-        highlightActiveSidebarPage();
-        filterSidebarByPermissions();
-    });
-} else {
+// ── responsive resize ──
+
+window.addEventListener('resize', function() {
+    const sidebar = document.getElementById('mainSidebar');
+    const isDesktop = window.innerWidth >= 768;
+
+    if (!isDesktop) {
+        document.removeEventListener('click', handleClickOutside, true);
+        sidebar.classList.remove('collapsed');
+        document.body.classList.remove('sidebar-collapsed');
+        sidebarPinned = false;
+        hoverActive   = false;
+        clearTimeout(hoverLeaveTimer);
+    } else {
+        sidebar.classList.remove('open');
+        document.getElementById('sidebarOverlay').classList.remove('show');
+        restoreSidebarState();
+    }
+});
+
+// ── init ──
+
+function initSidebar() {
     loadSidebarUserInfo();
     highlightActiveSidebarPage();
     filterSidebarByPermissions();
+    restoreSidebarState();
+    attachSidebarListeners();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSidebar);
+} else {
+    initSidebar();
 }
 </script>
