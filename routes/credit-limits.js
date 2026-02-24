@@ -328,7 +328,7 @@ router.post('/sync', requirePermission('credit_limits', 'manage'), async (req, r
 // ═══════════════════════════════════════════════════════════════
 const DEFAULT_CREDIT_LIMIT = 100;
 
-router.post('/create-customer', requirePermission('credit_limits', 'manage'), async (req, res) => {
+router.post('/create-customer', requirePermission('credit_limits', 'request'), async (req, res) => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
@@ -405,7 +405,7 @@ router.post('/create-customer', requirePermission('credit_limits', 'manage'), as
 // ═══════════════════════════════════════════════════════════════
 
 // POST /api/credit-limits/requests — submit a credit limit request
-router.post('/requests', requirePermission('credit_limits', 'view'), async (req, res) => {
+router.post('/requests', requirePermission('credit_limits', 'request'), async (req, res) => {
     try {
         const { zoho_customer_map_id, requested_amount, reason } = req.body;
         if (!zoho_customer_map_id || !requested_amount || requested_amount <= 0) {

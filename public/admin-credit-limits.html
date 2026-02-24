@@ -80,8 +80,8 @@
             <p style="font-size: 0.8125rem; color: #6b7280;">Manage credit limits for Zoho customers <span class="sync-indicator" id="lastSyncedIndicator"></span></p>
         </div>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="headerButtons">
-            <button class="btn-primary" onclick="openCreateCustomerModal()">+ Create Customer</button>
-            <button class="btn-outline" onclick="openRequestsPanel()" id="requestsBtn" style="position:relative;">
+            <button class="btn-primary request-only" onclick="openCreateCustomerModal()">+ Create Customer</button>
+            <button class="btn-outline request-only" onclick="openRequestsPanel()" id="requestsBtn" style="position:relative;">
                 Requests <span id="requestsBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#ef4444;color:white;font-size:0.625rem;font-weight:700;min-width:18px;height:18px;border-radius:50%;display:none;align-items:center;justify-content:center;">0</span>
             </button>
             <button class="btn-outline admin-only" onclick="syncFromZoho()" id="syncBtn">Sync from Zoho</button>
@@ -369,6 +369,7 @@ let currentSort = 'name';
 let sortAsc = true;
 let permManager = null;
 let canManage = false;
+let canRequest = false;
 
 // Permission-based UI control (replaces simple role check)
 async function checkPagePermissions() {
@@ -382,12 +383,18 @@ async function checkPagePermissions() {
         return false;
     }
 
-    // Determine manage permission (replaces isAdmin for action gating)
+    // Determine permission tiers
     canManage = permManager.can('credit_limits', 'manage');
+    canRequest = permManager.can('credit_limits', 'request');
 
-    // Hide manage-only elements if user only has view permission
+    // Hide manage-only elements (edit limits, bulk-set, sync, approve/reject)
     if (!canManage) {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+    }
+
+    // Hide request-only elements (create customer, request buttons)
+    if (!canRequest && !canManage) {
+        document.querySelectorAll('.request-only').forEach(el => el.style.display = 'none');
     }
 
     return true;
@@ -587,7 +594,7 @@ function renderTable() {
             <td style="text-align:center;white-space:nowrap">
                 ${canManage ? `<button class="btn-outline btn-sm" onclick="openEditModal(${c.id})">Edit</button>` : ''}
                 <button class="btn-outline btn-sm" onclick="openDetailsModal(${c.id})" style="margin-left:2px">Details</button>
-                ${!canManage && limit === 0 ? `<button class="btn-outline btn-sm" onclick="quickRequest(${c.id})" style="margin-left:2px;color:#667eea;border-color:#667eea;">Request</button>` : ''}
+                ${!canManage && (canRequest) && limit === 0 ? `<button class="btn-outline btn-sm" onclick="quickRequest(${c.id})" style="margin-left:2px;color:#667eea;border-color:#667eea;">Request</button>` : ''}
             </td>
         </tr>`;
     }).join('');

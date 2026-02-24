@@ -26,7 +26,8 @@ async function migrate() {
         console.log('[1/2] Adding credit_limits permissions...');
         const perms = [
             ['credit_limits', 'view', 'View Credit Limits', 'View credit limits page, customer list, and credit status'],
-            ['credit_limits', 'manage', 'Manage Credit Limits', 'Set/edit credit limits, create customers, approve/reject requests, sync to Zoho']
+            ['credit_limits', 'request', 'Request Credit Limits', 'Submit credit limit requests and create new customers'],
+            ['credit_limits', 'manage', 'Manage Credit Limits', 'Set/edit credit limits, approve/reject requests, bulk operations, sync to Zoho']
         ];
 
         let added = 0;
