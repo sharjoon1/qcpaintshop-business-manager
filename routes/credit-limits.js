@@ -7,7 +7,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requireAuth, requireRole } = require('../middleware/permissionMiddleware');
+const { requireAuth, requireRole, requirePermission } = require('../middleware/permissionMiddleware');
 const zohoAPI = require('../services/zoho-api');
 const notificationService = require('../services/notification-service');
 
@@ -108,7 +108,7 @@ async function checkCreditBeforeInvoice(dbPool, zohoContactId, invoiceAmount) {
 // ═══════════════════════════════════════════════════════════════
 
 // GET /api/credit-limits/customers — list all Zoho customers with credit info
-router.get('/customers', requireAuth, async (req, res) => {
+router.get('/customers', requirePermission('credit_limits', 'view'), async (req, res) => {
     try {
         const { search, status, sort, branch } = req.query;
         let where = 'WHERE 1=1';
@@ -171,7 +171,7 @@ router.get('/customers', requireAuth, async (req, res) => {
 });
 
 // GET /api/credit-limits/overview/summary — dashboard overview
-router.get('/overview/summary', requireAuth, async (req, res) => {
+router.get('/overview/summary', requirePermission('credit_limits', 'view'), async (req, res) => {
     try {
         const [summary] = await pool.query(`
             SELECT
@@ -214,7 +214,7 @@ router.get('/overview/summary', requireAuth, async (req, res) => {
 });
 
 // GET /api/credit-limits/violations/list — list violations
-router.get('/violations/list', requireAuth, async (req, res) => {
+router.get('/violations/list', requirePermission('credit_limits', 'view'), async (req, res) => {
     try {
         const [rows] = await pool.query(`
             SELECT v.*, zcm.zoho_contact_name as customer_name, u.full_name as staff_name
@@ -231,7 +231,7 @@ router.get('/violations/list', requireAuth, async (req, res) => {
 });
 
 // POST /api/credit-limits/check — check credit availability
-router.post('/check', requireAuth, async (req, res) => {
+router.post('/check', requirePermission('credit_limits', 'view'), async (req, res) => {
     try {
         const { zoho_customer_map_id, amount } = req.body;
         if (!zoho_customer_map_id || !amount) return res.status(400).json({ error: 'zoho_customer_map_id and amount required' });
@@ -267,7 +267,7 @@ router.post('/check', requireAuth, async (req, res) => {
 });
 
 // POST /api/credit-limits/bulk-set — bulk update credit limits
-router.post('/bulk-set', requireAuth, async (req, res) => {
+router.post('/bulk-set', requirePermission('credit_limits', 'manage'), async (req, res) => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
@@ -313,7 +313,7 @@ router.post('/bulk-set', requireAuth, async (req, res) => {
 });
 
 // POST /api/credit-limits/sync — sync customers from Zoho (replaces recalculate)
-router.post('/sync', requireAuth, async (req, res) => {
+router.post('/sync', requirePermission('credit_limits', 'manage'), async (req, res) => {
     try {
         const result = await zohoAPI.syncCustomers('credit-limits-page');
         res.json({ success: true, synced: result.synced, message: `Synced ${result.synced} customers from Zoho` });
@@ -328,7 +328,7 @@ router.post('/sync', requireAuth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 const DEFAULT_CREDIT_LIMIT = 100;
 
-router.post('/create-customer', requireAuth, async (req, res) => {
+router.post('/create-customer', requirePermission('credit_limits', 'manage'), async (req, res) => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
@@ -405,7 +405,7 @@ router.post('/create-customer', requireAuth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 
 // POST /api/credit-limits/requests — submit a credit limit request
-router.post('/requests', requireAuth, async (req, res) => {
+router.post('/requests', requirePermission('credit_limits', 'view'), async (req, res) => {
     try {
         const { zoho_customer_map_id, requested_amount, reason } = req.body;
         if (!zoho_customer_map_id || !requested_amount || requested_amount <= 0) {
@@ -463,7 +463,7 @@ router.post('/requests', requireAuth, async (req, res) => {
 });
 
 // GET /api/credit-limits/requests — list requests (staff=own, admin=all)
-router.get('/requests', requireAuth, async (req, res) => {
+router.get('/requests', requirePermission('credit_limits', 'view'), async (req, res) => {
     try {
         const { status: statusFilter } = req.query;
         const isAdmin = ['admin', 'super_admin', 'manager'].includes(req.user.role);
@@ -506,7 +506,7 @@ router.get('/requests', requireAuth, async (req, res) => {
 });
 
 // PUT /api/credit-limits/requests/:id/approve — admin approves request
-router.put('/requests/:id/approve', requireAuth, requireRole('admin', 'super_admin', 'manager'), async (req, res) => {
+router.put('/requests/:id/approve', requirePermission('credit_limits', 'manage'), async (req, res) => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
@@ -572,7 +572,7 @@ router.put('/requests/:id/approve', requireAuth, requireRole('admin', 'super_adm
 });
 
 // PUT /api/credit-limits/requests/:id/reject — admin rejects request
-router.put('/requests/:id/reject', requireAuth, requireRole('admin', 'super_admin', 'manager'), async (req, res) => {
+router.put('/requests/:id/reject', requirePermission('credit_limits', 'manage'), async (req, res) => {
     try {
         const { review_notes } = req.body;
         if (!review_notes || !review_notes.trim()) {
@@ -613,7 +613,7 @@ router.put('/requests/:id/reject', requireAuth, requireRole('admin', 'super_admi
 // ═══════════════════════════════════════════════════════════════
 
 // GET /api/credit-limits/:customerId — get single Zoho customer credit info
-router.get('/:customerId', requireAuth, async (req, res) => {
+router.get('/:customerId', requirePermission('credit_limits', 'view'), async (req, res) => {
     try {
         const [customer] = await pool.query(`
             SELECT zcm.id, zcm.zoho_contact_name as name, zcm.zoho_phone as phone,
@@ -652,7 +652,7 @@ router.get('/:customerId', requireAuth, async (req, res) => {
 });
 
 // POST /api/credit-limits/:customerId/set-limit — update credit limit
-router.post('/:customerId/set-limit', requireAuth, async (req, res) => {
+router.post('/:customerId/set-limit', requirePermission('credit_limits', 'manage'), async (req, res) => {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
@@ -707,7 +707,7 @@ router.post('/:customerId/set-limit', requireAuth, async (req, res) => {
 });
 
 // GET /api/credit-limits/:customerId/history — credit limit change history
-router.get('/:customerId/history', requireAuth, async (req, res) => {
+router.get('/:customerId/history', requirePermission('credit_limits', 'view'), async (req, res) => {
     try {
         const [rows] = await pool.query(`
             SELECT h.*, u.full_name as changed_by_name

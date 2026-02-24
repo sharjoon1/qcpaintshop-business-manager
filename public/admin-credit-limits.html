@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
+    <script src="/js/permissions.js"></script>
     <script>checkAuthOrRedirect();</script>
     <style>
         body { background: #f9fafb; }
@@ -366,10 +367,30 @@ let allCustomers = [];
 let debounceTimer = null;
 let currentSort = 'name';
 let sortAsc = true;
+let permManager = null;
+let canManage = false;
 
-// Hide admin-only elements for non-admin staff
-if (!isAdmin) {
-    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+// Permission-based UI control (replaces simple role check)
+async function checkPagePermissions() {
+    permManager = new PermissionManager();
+    await permManager.loadPermissions();
+
+    // If user doesn't have credit_limits.view, redirect away
+    if (!permManager.can('credit_limits', 'view')) {
+        alert('You do not have permission to access Credit Limits. Contact your admin.');
+        window.location.href = user.role === 'admin' ? '/dashboard.html' : '/staff/dashboard.html';
+        return false;
+    }
+
+    // Determine manage permission (replaces isAdmin for action gating)
+    canManage = permManager.can('credit_limits', 'manage');
+
+    // Hide manage-only elements if user only has view permission
+    if (!canManage) {
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+    }
+
+    return true;
 }
 
 function formatINR(n) {
@@ -564,9 +585,9 @@ function renderTable() {
             </td>
             <td class="hide-mobile" style="font-size:0.6875rem;color:#6b7280">${escHtml(c.branch_name || '')}</td>
             <td style="text-align:center;white-space:nowrap">
-                ${isAdmin ? `<button class="btn-outline btn-sm" onclick="openEditModal(${c.id})">Edit</button>` : ''}
+                ${canManage ? `<button class="btn-outline btn-sm" onclick="openEditModal(${c.id})">Edit</button>` : ''}
                 <button class="btn-outline btn-sm" onclick="openDetailsModal(${c.id})" style="margin-left:2px">Details</button>
-                ${!isAdmin && limit === 0 ? `<button class="btn-outline btn-sm" onclick="quickRequest(${c.id})" style="margin-left:2px;color:#667eea;border-color:#667eea;">Request</button>` : ''}
+                ${!canManage && limit === 0 ? `<button class="btn-outline btn-sm" onclick="quickRequest(${c.id})" style="margin-left:2px;color:#667eea;border-color:#667eea;">Request</button>` : ''}
             </td>
         </tr>`;
     }).join('');
@@ -953,7 +974,7 @@ async function loadRequests() {
                 ${r.reason ? `<div style="font-size:0.8125rem;color:#374151;margin-bottom:0.5rem;"><span style="color:#6b7280">Reason:</span> ${escHtml(r.reason)}</div>` : ''}
                 ${r.status === 'approved' ? `<div style="font-size:0.8125rem;color:#065f46;">Approved: <b>${formatINR(r.approved_amount)}</b> by ${escHtml(r.reviewed_by_name||'')}${r.review_notes ? ' — ' + escHtml(r.review_notes) : ''}</div>` : ''}
                 ${r.status === 'rejected' ? `<div style="font-size:0.8125rem;color:#991b1b;">Rejected by ${escHtml(r.reviewed_by_name||'')}${r.review_notes ? ': ' + escHtml(r.review_notes) : ''}</div>` : ''}
-                ${r.status === 'pending' && isAdmin ? `
+                ${r.status === 'pending' && canManage ? `
                 <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
                     <button class="btn-primary btn-sm" onclick="openApproveModal(${r.id}, '${escHtml(r.customer_name)}', ${r.requested_amount}, ${r.current_limit||0}, ${r.zoho_outstanding||0})">Approve</button>
                     <button class="btn-outline btn-sm" style="color:#ef4444;border-color:#fca5a5;" onclick="openRejectModal(${r.id}, '${escHtml(r.customer_name)}', ${r.requested_amount})">Reject</button>
@@ -1121,12 +1142,17 @@ async function loadRequestBadge() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// INIT
+// INIT — check permissions first, then load data
 // ═══════════════════════════════════════════════════════════════
-loadCustomers();
-loadOverview();
-loadRequestBadge();
-setTimeout(initRequestSocket, 1000);
+(async function init() {
+    const allowed = await checkPagePermissions();
+    if (!allowed) return;
+
+    loadCustomers();
+    loadOverview();
+    loadRequestBadge();
+    setTimeout(initRequestSocket, 1000);
+})();
 </script>
 </body>
 </html>
