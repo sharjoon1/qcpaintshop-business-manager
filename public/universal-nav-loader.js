@@ -128,10 +128,12 @@
         try {
             console.log(`🔄 Loading ${url} (attempt ${attemptNum}/${CONFIG.RETRY_ATTEMPTS})`);
             
-            const response = await fetch(url, {
-                cache: 'no-cache',
+            const cacheBust = url + (url.includes('?') ? '&' : '?') + '_v=' + Date.now();
+            const response = await fetch(cacheBust, {
+                cache: 'no-store',
                 headers: {
-                    'Cache-Control': 'no-cache'
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
                 }
             });
             
