@@ -265,6 +265,21 @@
         transition: opacity 0.25s ease;
     }
 
+    /* Credit Limits highlight */
+    .qc-nav-credit-highlight {
+        background: linear-gradient(135deg, #eff6ff, #f0fdf4) !important;
+        border: 1px solid #93c5fd !important;
+        color: #1d4ed8 !important;
+        font-weight: 600 !important;
+    }
+    .qc-nav-credit-highlight:hover {
+        background: linear-gradient(135deg, #dbeafe, #dcfce7) !important;
+        border-color: #60a5fa !important;
+    }
+    .qc-nav-credit-highlight .qc-nav-item-icon svg {
+        stroke: #2563eb;
+    }
+
     /* Section Divider */
     .qc-nav-divider {
         height: 1px;
@@ -644,6 +659,15 @@
             </a>
         </div>
 
+        <!-- Credit Limits - Top-level quick access -->
+        <div class="qc-nav-section">
+            <a href="/admin-credit-limits.html" class="qc-nav-item qc-nav-credit-highlight" data-page="credit-limits">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
+                <span class="qc-nav-item-text">Credit Limits</span>
+                <span class="qc-nav-tooltip">Credit Limits</span>
+            </a>
+        </div>
+
         <!-- Chat -->
         <div class="qc-nav-section">
             <a href="/chat.html" class="qc-nav-item" data-page="chat">
@@ -670,14 +694,9 @@
             </a>
         </div>
 
-        <!-- Customers & Credit -->
+        <!-- Customers -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Customers</div>
-            <a href="/admin-credit-limits.html" class="qc-nav-item" data-page="credit-limits">
-                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
-                <span class="qc-nav-item-text">Credit Limits</span>
-                <span class="qc-nav-tooltip">Credit Limits</span>
-            </a>
             <a href="/admin-customers.html" class="qc-nav-item" data-page="customers">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
                 <span class="qc-nav-item-text">Customer List</span>
@@ -1136,6 +1155,11 @@ function initSidebar() {
     filterSidebarByPermissions();
     restoreSidebarState();
     attachSidebarListeners();
+    // Debug: log sidebar nav items count
+    var navItems = document.querySelectorAll('#mainSidebar .qc-nav-item');
+    console.log('[Sidebar] Staff sidebar loaded with ' + navItems.length + ' nav items');
+    var creditItem = document.querySelector('[data-page="credit-limits"]');
+    console.log('[Sidebar] Credit Limits item:', creditItem ? 'FOUND' : 'MISSING');
 }
 
 if (document.readyState === 'loading') {
