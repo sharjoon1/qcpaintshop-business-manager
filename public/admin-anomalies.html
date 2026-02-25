@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/icons/icon-192x192.png">
+    <title>Anomaly Detection - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        .anomaly-card { transition: all 0.3s ease; }
+        .anomaly-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .severity-critical { border-left: 4px solid #ef4444; }
+        .severity-high { border-left: 4px solid #f97316; }
+        .severity-medium { border-left: 4px solid #eab308; }
+        .severity-low { border-left: 4px solid #22c55e; }
+        .badge-critical { background: #fef2f2; color: #dc2626; }
+        .badge-high { background: #fff7ed; color: #ea580c; }
+        .badge-medium { background: #fefce8; color: #ca8a04; }
+        .badge-low { background: #f0fdf4; color: #16a34a; }
+        .badge-new { background: #eff6ff; color: #2563eb; }
+        .badge-acknowledged { background: #f5f3ff; color: #7c3aed; }
+        .badge-investigating { background: #fef3c7; color: #d97706; }
+        .badge-resolved { background: #f0fdf4; color: #16a34a; }
+        .badge-false_positive { background: #f1f5f9; color: #64748b; }
+        .type-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .type-revenue { background: linear-gradient(135deg, #667eea20, #764ba220); color: #667eea; }
+        .type-attendance { background: linear-gradient(135deg, #06b6d420, #0891b220); color: #0891b2; }
+        .type-stock { background: linear-gradient(135deg, #f5970020, #ea580c20); color: #ea580c; }
+        .type-collection { background: linear-gradient(135deg, #22c55e20, #16a34a20); color: #16a34a; }
+        .type-api_usage { background: linear-gradient(135deg, #ef444420, #dc262620); color: #dc2626; }
+        .filter-btn { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 500; border: 1px solid #e2e8f0; cursor: pointer; transition: all 0.2s; }
+        .filter-btn:hover { border-color: #667eea; color: #667eea; }
+        .filter-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-color: transparent; }
+        .scan-pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .slide-panel { position: fixed; top: 0; right: -480px; width: 480px; max-width: 100vw; height: 100vh; background: white; box-shadow: -4px 0 20px rgba(0,0,0,0.15); z-index: 1050; transition: right 0.3s ease; overflow-y: auto; }
+        .slide-panel.open { right: 0; }
+        .slide-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 1040; }
+        .slide-overlay.open { display: block; }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="anomalies">
+
+<div class="container mx-auto p-4 md:p-6 max-w-7xl">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Anomaly Detection</h1>
+            <p class="text-sm text-gray-500 mt-1" id="lastScanTime">Loading...</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="runScan()" id="scanBtn"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium text-sm"
+                style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Run Scan
+            </button>
+            <button onclick="loadDashboard()" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-600 text-sm hover:bg-gray-50">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 anomaly-card">
+            <div class="text-xs text-gray-400 mb-1">Total (30d)</div>
+            <div class="text-2xl font-bold text-gray-800" id="totalCount">--</div>
+            <div class="text-xs text-gray-500 mt-1" id="newCount">-- new</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 anomaly-card">
+            <div class="text-xs text-gray-400 mb-1">Critical / High</div>
+            <div class="text-2xl font-bold text-red-600" id="criticalHighCount">--</div>
+            <div class="text-xs text-gray-500 mt-1">Active alerts</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 anomaly-card">
+            <div class="text-xs text-gray-400 mb-1">Resolved</div>
+            <div class="text-2xl font-bold text-green-600" id="resolvedCount">--</div>
+            <div class="text-xs text-gray-500 mt-1" id="falsePositiveCount">-- false positive</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 anomaly-card">
+            <div class="text-xs text-gray-400 mb-1">Detection Rate</div>
+            <div class="text-2xl font-bold" style="color: #667eea;" id="detectionRate">--</div>
+            <div class="text-xs text-gray-500 mt-1">avg/day (14d)</div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Anomaly Trend (14 days)</h3>
+            <canvas id="trendChart" height="200"></canvas>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">By Category</h3>
+            <canvas id="categoryChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-2 mb-4" id="filterBar">
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
+        <button class="filter-btn" data-filter="new" onclick="setFilter('new', this)">New</button>
+        <button class="filter-btn" data-filter="critical" onclick="setFilter('critical', this)">Critical</button>
+        <button class="filter-btn" data-filter="high" onclick="setFilter('high', this)">High</button>
+        <button class="filter-btn" data-filter="revenue" onclick="setFilter('revenue', this)">Revenue</button>
+        <button class="filter-btn" data-filter="attendance" onclick="setFilter('attendance', this)">Attendance</button>
+        <button class="filter-btn" data-filter="stock" onclick="setFilter('stock', this)">Stock</button>
+        <button class="filter-btn" data-filter="collection" onclick="setFilter('collection', this)">Collections</button>
+        <button class="filter-btn" data-filter="api_usage" onclick="setFilter('api_usage', this)">API/Errors</button>
+    </div>
+
+    <!-- Anomaly List -->
+    <div id="anomalyList" class="space-y-2">
+        <div class="text-center py-12 text-gray-400">Loading anomalies...</div>
+    </div>
+
+    <!-- Load More -->
+    <div id="loadMoreWrap" class="text-center mt-4 hidden">
+        <button onclick="loadMore()" class="px-6 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Load More</button>
+    </div>
+</div>
+
+<!-- Detail Slide Panel -->
+<div class="slide-overlay" id="slideOverlay" onclick="closeDetail()"></div>
+<div class="slide-panel" id="slidePanel">
+    <div class="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
+        <h3 class="font-semibold text-gray-800">Anomaly Detail</h3>
+        <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+    <div id="detailContent" class="p-6"></div>
+</div>
+
+<!-- Scan Result Toast -->
+<div id="toast" class="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-3 rounded-xl shadow-lg text-sm z-50 transition-all duration-300 translate-y-20 opacity-0">
+    <span id="toastMsg"></span>
+</div>
+
+<script>
+const API = '/api/anomalies';
+let currentFilter = 'all';
+let currentPage = 1;
+let trendChart = null;
+let categoryChart = null;
+
+function getHeaders() {
+    return { 'Authorization': 'Bearer ' + localStorage.getItem('auth_token'), 'Content-Type': 'application/json' };
+}
+
+async function loadDashboard() {
+    try {
+        const res = await fetch(API + '/dashboard', { headers: getHeaders() });
+        const json = await res.json();
+        if (!json.success) return;
+        const d = json.data;
+        const s = d.summary;
+
+        document.getElementById('totalCount').textContent = s.total || 0;
+        document.getElementById('newCount').textContent = (s.new_count || 0) + ' new';
+        document.getElementById('criticalHighCount').textContent = ((s.critical_active || 0) + (s.high_active || 0));
+        document.getElementById('resolvedCount').textContent = s.resolved || 0;
+        document.getElementById('falsePositiveCount').textContent = (s.false_positive || 0) + ' false positive';
+
+        const trendDays = d.trend.length || 1;
+        const totalInTrend = d.trend.reduce((sum, t) => sum + t.count, 0);
+        document.getElementById('detectionRate').textContent = (totalInTrend / trendDays).toFixed(1);
+
+        document.getElementById('lastScanTime').textContent = d.lastScanAt
+            ? 'Last scan: ' + new Date(d.lastScanAt).toLocaleString('en-IN')
+            : 'No scans yet — click Run Scan';
+
+        renderTrendChart(d.trend);
+        renderCategoryChart(d.byType);
+    } catch (err) {
+        console.error('Dashboard load error:', err);
+    }
+}
+
+function renderTrendChart(trend) {
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: trend.map(t => new Date(t.day).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })),
+            datasets: [
+                { label: 'Total', data: trend.map(t => t.count), backgroundColor: 'rgba(102,126,234,0.3)', borderColor: '#667eea', borderWidth: 1 },
+                { label: 'Critical', data: trend.map(t => t.critical), backgroundColor: 'rgba(239,68,68,0.6)', borderColor: '#ef4444', borderWidth: 1 },
+                { label: 'High', data: trend.map(t => t.high), backgroundColor: 'rgba(249,115,22,0.6)', borderColor: '#f97316', borderWidth: 1 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
+        }
+    });
+}
+
+function renderCategoryChart(byType) {
+    const ctx = document.getElementById('categoryChart').getContext('2d');
+    if (categoryChart) categoryChart.destroy();
+    const colors = { revenue: '#667eea', attendance: '#0891b2', stock: '#ea580c', collection: '#22c55e', api_usage: '#ef4444', custom: '#8b5cf6' };
+    categoryChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: byType.map(t => t.anomaly_type.replace('_', ' ')),
+            datasets: [{
+                data: byType.map(t => t.count),
+                backgroundColor: byType.map(t => colors[t.anomaly_type] || '#94a3b8')
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+        }
+    });
+}
+
+async function loadAnomalies(append = false) {
+    try {
+        let url = API + '?page=' + currentPage + '&limit=25';
+        if (['new', 'acknowledged', 'investigating', 'resolved'].includes(currentFilter)) url += '&status=' + currentFilter;
+        else if (['critical', 'high', 'medium', 'low'].includes(currentFilter)) url += '&severity=' + currentFilter;
+        else if (['revenue', 'attendance', 'stock', 'collection', 'api_usage'].includes(currentFilter)) url += '&type=' + currentFilter;
+
+        const res = await fetch(url, { headers: getHeaders() });
+        const json = await res.json();
+        if (!json.success) return;
+
+        const container = document.getElementById('anomalyList');
+        if (!append) container.innerHTML = '';
+
+        if (json.data.length === 0 && !append) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No anomalies found</div>';
+            document.getElementById('loadMoreWrap').classList.add('hidden');
+            return;
+        }
+
+        for (const a of json.data) {
+            container.insertAdjacentHTML('beforeend', renderAnomalyRow(a));
+        }
+
+        const pg = json.pagination;
+        document.getElementById('loadMoreWrap').classList.toggle('hidden', pg.page >= pg.pages);
+    } catch (err) {
+        console.error('Load anomalies error:', err);
+    }
+}
+
+function renderAnomalyRow(a) {
+    const meta = a.metadata ? (typeof a.metadata === 'string' ? JSON.parse(a.metadata) : a.metadata) : {};
+    const timeAgo = getTimeAgo(new Date(a.detected_at));
+    return `
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 anomaly-card severity-${a.severity} cursor-pointer hover:border-gray-200" onclick="openDetail(${a.id})">
+            <div class="flex items-start gap-3">
+                <div class="type-icon type-${a.anomaly_type}">
+                    ${getTypeIcon(a.anomaly_type)}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                        <h4 class="text-sm font-semibold text-gray-800 truncate">${escHtml(a.title)}</h4>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium badge-${a.severity}">${a.severity}</span>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium badge-${a.status}">${a.status.replace('_', ' ')}</span>
+                    </div>
+                    <p class="text-xs text-gray-500 line-clamp-2">${escHtml(a.description || '')}</p>
+                    <div class="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                        <span>${a.anomaly_type.replace('_', ' ')}</span>
+                        ${a.deviation_pct ? '<span>Deviation: ' + a.deviation_pct + '%</span>' : ''}
+                        ${a.z_score ? '<span>Z: ' + parseFloat(a.z_score).toFixed(2) + '</span>' : ''}
+                        <span class="ml-auto">${timeAgo}</span>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+}
+
+function getTypeIcon(type) {
+    const icons = {
+        revenue: '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+        attendance: '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+        stock: '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>',
+        collection: '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>',
+        api_usage: '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>',
+        custom: '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+    };
+    return icons[type] || icons.custom;
+}
+
+function getTimeAgo(date) {
+    const mins = Math.floor((Date.now() - date.getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    const days = Math.floor(hrs / 24);
+    return days + 'd ago';
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function setFilter(filter, btn) {
+    currentFilter = filter;
+    currentPage = 1;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadAnomalies();
+}
+
+function loadMore() {
+    currentPage++;
+    loadAnomalies(true);
+}
+
+async function openDetail(id) {
+    try {
+        const res = await fetch(API + '/' + id, { headers: getHeaders() });
+        const json = await res.json();
+        if (!json.success) return;
+        const a = json.data;
+        const meta = a.metadata ? (typeof a.metadata === 'string' ? JSON.parse(a.metadata) : a.metadata) : {};
+
+        var html = '<div class="mb-4">' +
+            '<div class="flex items-center gap-2 mb-2">' +
+            '<span class="px-2 py-0.5 rounded-full text-xs font-medium badge-' + a.severity + '">' + a.severity + '</span>' +
+            '<span class="px-2 py-0.5 rounded-full text-xs font-medium badge-' + a.status + '">' + a.status.replace('_', ' ') + '</span>' +
+            '<span class="text-xs text-gray-400">#' + a.id + '</span></div>' +
+            '<h2 class="text-lg font-bold text-gray-800">' + escHtml(a.title) + '</h2>' +
+            '<p class="text-sm text-gray-600 mt-2">' + escHtml(a.description || '') + '</p></div>' +
+            '<div class="grid grid-cols-2 gap-3 mb-4">' +
+            '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Type</div><div class="text-sm font-medium">' + a.anomaly_type.replace('_', ' ') + '</div></div>' +
+            '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Detected</div><div class="text-sm font-medium">' + new Date(a.detected_at).toLocaleString('en-IN') + '</div></div>';
+        if (a.expected_value != null) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Expected</div><div class="text-sm font-medium">' + Number(a.expected_value).toLocaleString('en-IN') + '</div></div>';
+        if (a.actual_value != null) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Actual</div><div class="text-sm font-medium">' + Number(a.actual_value).toLocaleString('en-IN') + '</div></div>';
+        if (a.deviation_pct != null) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Deviation</div><div class="text-sm font-medium">' + a.deviation_pct + '%</div></div>';
+        if (a.z_score != null) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Z-Score</div><div class="text-sm font-medium">' + parseFloat(a.z_score).toFixed(2) + '</div></div>';
+        if (a.entity_type) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Entity</div><div class="text-sm font-medium">' + a.entity_type + ': ' + (a.entity_id || '-') + '</div></div>';
+        if (a.branch_id) html += '<div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-400">Branch ID</div><div class="text-sm font-medium">' + a.branch_id + '</div></div>';
+        html += '</div>';
+        if (Object.keys(meta).length > 0) {
+            html += '<div class="mb-4"><div class="text-xs text-gray-400 mb-1">Metadata</div><pre class="bg-gray-50 rounded-lg p-3 text-xs overflow-x-auto">' + JSON.stringify(meta, null, 2) + '</pre></div>';
+        }
+        if (a.resolved_at) {
+            html += '<div class="mb-4 bg-green-50 rounded-lg p-3"><div class="text-xs text-green-700 font-medium">Resolved ' + new Date(a.resolved_at).toLocaleString('en-IN') + ' by ' + escHtml(a.resolved_by_name || 'System') + '</div>';
+            if (a.resolution_notes) html += '<div class="text-xs text-green-600 mt-1">' + escHtml(a.resolution_notes) + '</div>';
+            html += '</div>';
+        }
+        if (['new', 'acknowledged', 'investigating'].indexOf(a.status) >= 0) {
+            html += '<div class="border-t pt-4 mt-4"><div class="text-xs text-gray-400 mb-2">Update Status</div><div class="flex flex-wrap gap-2">';
+            if (a.status === 'new') html += '<button onclick="updateStatus(' + a.id + ', \'acknowledged\')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100">Acknowledge</button>';
+            if (['new', 'acknowledged'].indexOf(a.status) >= 0) html += '<button onclick="updateStatus(' + a.id + ', \'investigating\')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100">Investigate</button>';
+            html += '<button onclick="resolveAnomaly(' + a.id + ')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-700 hover:bg-green-100">Resolve</button>';
+            html += '<button onclick="updateStatus(' + a.id + ', \'false_positive\')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">False Positive</button>';
+            html += '</div></div>';
+        }
+
+        document.getElementById('detailContent').innerHTML = html;
+        document.getElementById('slideOverlay').classList.add('open');
+        document.getElementById('slidePanel').classList.add('open');
+    } catch (err) {
+        console.error('Detail load error:', err);
+    }
+}
+
+function closeDetail() {
+    document.getElementById('slideOverlay').classList.remove('open');
+    document.getElementById('slidePanel').classList.remove('open');
+}
+
+async function updateStatus(id, status, notes) {
+    try {
+        const res = await fetch(API + '/' + id + '/status', {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify({ status, notes })
+        });
+        const json = await res.json();
+        if (json.success) {
+            showToast('Status updated to: ' + status);
+            closeDetail();
+            loadAnomalies();
+            loadDashboard();
+        }
+    } catch (err) {
+        console.error('Status update error:', err);
+    }
+}
+
+function resolveAnomaly(id) {
+    const notes = prompt('Resolution notes (optional):');
+    if (notes === null) return;
+    updateStatus(id, 'resolved', notes || undefined);
+}
+
+async function runScan() {
+    const btn = document.getElementById('scanBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-4 h-4 scan-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg> Scanning...';
+    try {
+        const res = await fetch(API + '/scan', { method: 'POST', headers: getHeaders() });
+        const json = await res.json();
+        if (json.success) {
+            const d = json.data;
+            showToast(`Scan complete: ${d.inserted} new anomalies found (${d.duration})`);
+            loadDashboard();
+            loadAnomalies();
+        } else {
+            showToast('Scan failed: ' + (json.message || 'Unknown error'));
+        }
+    } catch (err) {
+        showToast('Scan error: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg> Run Scan';
+    }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = msg;
+    t.classList.remove('translate-y-20', 'opacity-0');
+    setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 4000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashboard();
+    loadAnomalies();
+});
+</script>
+</body>
+</html>

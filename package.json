@@ -6,9 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "migrate": "node migrate.js",
-    "migrate:status": "node migrate.js --status"
+    "migrate:status": "node migrate.js --status",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [],
   "author": "",
@@ -33,5 +35,8 @@
     "web-push": "^3.6.7",
     "whatsapp-web.js": "^1.26.1",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0"
   }
 }

@@ -70,6 +70,8 @@ const errorAnalysisService = require('./services/error-analysis-service');
 const aiEngineForErrors = require('./services/ai-engine');
 const automationRegistry = require('./services/automation-registry');
 const adminDashboardRoutes = require('./routes/admin-dashboard');
+const anomalyRoutes = require('./routes/anomalies');
+const anomalyDetector = require('./services/anomaly-detector');
 
 const app = express();
 
@@ -202,6 +204,8 @@ errorAnalysisService.setAiEngine(aiEngineForErrors);
 aiEngineForErrors.setPool(pool);
 errorHandlerMw.setPool(pool);
 errorHandlerMw.setErrorAnalysisService(errorAnalysisService);
+anomalyRoutes.setPool(pool);
+anomalyDetector.setPool(pool);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -242,6 +246,7 @@ app.use('/api/painters', paintersRoutes.router);
 app.use('/api/system', systemRoutes.router);
 app.use('/api/credit-limits', creditLimitRoutes.router);
 app.use('/api/admin/dashboard', adminDashboardRoutes.router);
+app.use('/api/anomalies', anomalyRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3365,6 +3370,14 @@ server.listen(PORT, () => {
         painterScheduler.start();
         console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler, painter-scheduler');
         systemHealthService.startAutoHealthChecks(300000); // every 5 min
+        // Anomaly detection scan every 6 hours
+        setInterval(async () => {
+            try {
+                const result = await anomalyDetector.runFullScan();
+                if (result.inserted > 0) console.log(`[Anomaly] Scheduled scan: ${result.inserted} new anomalies`);
+            } catch (err) { console.error('[Anomaly] Scheduled scan error:', err.message); }
+        }, 6 * 60 * 60 * 1000);
+        console.log('[Anomaly] Scheduled scan every 6 hours');
     } else {
         console.log('Zoho not configured (ZOHO_ORGANIZATION_ID missing) - sync/whatsapp skipped');
     }

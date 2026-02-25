@@ -8,7 +8,7 @@ const { z } = require('zod');
 // ─── Helper: Format Zod errors into field-level details ──────
 
 function formatZodErrors(zodError) {
-    return zodError.errors.map(err => ({
+    return zodError.issues.map(err => ({
         field: err.path.join('.') || '_root',
         message: err.message
     }));
