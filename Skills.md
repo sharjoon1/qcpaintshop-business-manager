@@ -1754,6 +1754,31 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-02-25 - BMAD Sprint 3: Production Monitoring & Self-Healing
+
+**Production Monitor** — `services/production-monitor.js`: Real-time health monitoring with self-healing:
+- Monitors: memory (heap %, RSS), event loop lag, DB pool stats, API response times, Socket.io connections
+- Self-healing: `healMemoryPressure()` (clears caches, forces GC), `healDbPool()` (tests new connection), `healStaleSessions()` (removes expired sessions >72h)
+- Circuit breaker for Zoho API: `canCallApi()`, `recordApiFailure()`, `recordApiSuccess()` — closed→open (5 failures)→half-open (5min)→closed (success)
+- Alert dispatch: WhatsApp + in-app notifications for critical anomalies, 1hr throttle per alert type
+- Health snapshots persisted to `production_health_snapshots` table every 5 minutes
+- Safety caps: max 10 healing actions/hour to prevent runaway recovery loops
+
+**Response Time Tracker** — `middleware/responseTracker.js`: Ring buffer (1000 entries) API response tracking:
+- Hooks `res.end` for `/api/` routes, tracks duration via `process.hrtime.bigint()`
+- Metrics: p50, p95, p99, avg, RPM, errorRate, statusBreakdown (2xx/3xx/4xx/5xx), slowest endpoints (>3s)
+
+**Production Metrics API** — 3 endpoints in `routes/system.js`:
+- `GET /api/system/production-metrics` — real-time health (memory, event loop, DB, response times, circuit breaker)
+- `GET /api/system/production-metrics/history` — historical snapshots (max 7 days, query params: hours, limit)
+- `GET /api/system/circuit-breaker` — Zoho API circuit breaker state
+
+**Anomaly Alert Integration** — `services/anomaly-detector.js`: Added `setAlertCallback()` — critical/high anomalies trigger WhatsApp alerts to admins + in-app notifications via production monitor
+
+**Migration** — `migrations/migrate-production-monitor.js`: `production_health_snapshots` table (15 metric columns, 3 indexes), 5 `ai_config` entries
+
+**Tests** — 58 unit tests (all passing) across 6 suites: +20 new tests (production-monitor: 11, responseTracker: 9)
+
 ### 2026-02-25 - BMAD Sprint 2: Anomaly Detection & Automated Testing
 
 **Anomaly Detection System** — Z-score based statistical anomaly detection across 5 business domains:
