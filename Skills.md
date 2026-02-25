@@ -1754,6 +1754,21 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-02-25 - BMAD Sprint 1: Technical Foundation
+Implemented foundational infrastructure improvements as part of the BMAD (Breakthrough Method for Agile AI-Driven Development) initiative:
+
+1. **API Rate Limiting** — `middleware/rateLimiter.js`: Three-tier rate limiting using `express-rate-limit`. Global (100 req/min per IP on `/api`), Auth (10 req/min on login/forgot-password), OTP (5 req/min per phone number). Wired into `server.js` on auth and OTP endpoints.
+
+2. **LRU Cache Fix** — `routes/zoho.js`: Replaced unbounded `_apiCache` plain object (memory leak risk) with `lru-cache` (max 500 entries, 5-min TTL auto-eviction). `getCached()`, `setCache()`, `clearCache()` API preserved.
+
+3. **Server.js Modular Extraction** — Extracted database config to `config/database.js` and upload configs to `config/uploads.js`. Removes ~100 lines of boilerplate from server.js (3,499 → 3,400 lines). `multer` and `mysql2` imports removed from server.js.
+
+4. **Zod Validation Middleware** — `middleware/validate.js`: `validate(schema)`, `validateQuery(schema)`, `validateParams(schema)` middleware. Common schemas: `paginationSchema`, `idParamSchema`, `dateRangeSchema`, `branchFilterSchema`. Returns structured `VALIDATION_ERROR` responses.
+
+5. **Migration Runner** — `migrate.js`: Database migration tracking with `_migrations` table. Commands: `node migrate.js` (run pending), `--status` (show state), `--mark-existing` (mark all applied). npm scripts: `npm run migrate`, `npm run migrate:status`.
+
+6. **BMAD Planning Docs** — `bmad/` directory: PRD (`bmad/PRD.md`), user stories (`bmad/user-stories.md`), architecture (`bmad/architecture.md`), sprint tracker (`bmad/README.md`).
+
 ### 2026-02-24 - Credit Limit System Enhancement (4 Features)
 1. **F1: Transaction Page Badges** — Collections Customers tab and Invoices page now show credit utilization badges (green/amber/red/exceeded). Backend: JOINs `zcm.credit_limit` + computed `credit_utilization` in `routes/collections.js` and `routes/zoho.js`. Frontend: `creditBadge()` helper on both pages.
 2. **F2: Zoho Sync on Limit Changes** — `updateContact()` added to `services/zoho-api.js`. Setting/bulk-setting limits auto-syncs to Zoho Books (best-effort). Response includes `zoho_synced` flag.
