@@ -1,0 +1,25 @@
+{
+  "description": "Data archival configuration — moves old records to _archive tables",
+  "schedule": "0 3 1 * *",
+  "schedule_description": "1st of every month at 3:00 AM IST",
+  "command": "cd /www/wwwroot/act.qcpaintshop.com && node scripts/archive-old-data.js --execute >> /var/log/qc-archival.log 2>&1",
+  "cutoff_months": 24,
+  "tables": [
+    {
+      "table": "zoho_invoices",
+      "date_column": "invoice_date",
+      "archive_table": "zoho_invoices_archive"
+    },
+    {
+      "table": "zoho_payments",
+      "date_column": "payment_date",
+      "archive_table": "zoho_payments_archive"
+    },
+    {
+      "table": "zoho_stock_history",
+      "date_column": "recorded_at",
+      "archive_table": "zoho_stock_history_archive"
+    }
+  ],
+  "setup_cron": "crontab -e → add: 0 3 1 * * cd /www/wwwroot/act.qcpaintshop.com && node scripts/archive-old-data.js --execute >> /var/log/qc-archival.log 2>&1"
+}
