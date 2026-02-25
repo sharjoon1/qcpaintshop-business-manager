@@ -25,7 +25,7 @@
         margin: 0 auto;
         padding: 0.75rem 1.5rem;
         display: grid;
-        grid-template-columns: auto 1fr auto;
+        grid-template-columns: 1fr auto;
         align-items: center;
         gap: 1rem;
         transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -35,8 +35,8 @@
         padding: 0.35rem 1.5rem;
     }
 
-    /* Left section */
-    .qc-left-section { display: flex; align-items: center; justify-content: flex-start; }
+    /* Left section - hidden by default (mobile quick bar handles sidebar toggle) */
+    .qc-left-section { display: none; align-items: center; justify-content: flex-start; }
 
     /* Center: Logo */
     .qc-logo-section {
@@ -345,11 +345,8 @@
 
     /* ─── DESKTOP ─── */
     @media (min-width: 768px) {
-        /* Hide header hamburger on desktop - toggle is inside sidebar */
-        .qc-left-section { display: none; }
         .qc-header-content {
             max-width: none;
-            grid-template-columns: 1fr auto;
         }
         .qc-logo-section { justify-content: flex-start; }
         .qc-profile-info { display: block; }
