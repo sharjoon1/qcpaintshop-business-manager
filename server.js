@@ -72,6 +72,8 @@ const automationRegistry = require('./services/automation-registry');
 const adminDashboardRoutes = require('./routes/admin-dashboard');
 const anomalyRoutes = require('./routes/anomalies');
 const anomalyDetector = require('./services/anomaly-detector');
+const productionMonitor = require('./services/production-monitor');
+const responseTracker = require('./middleware/responseTracker');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)
@@ -137,6 +139,9 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Rate limiting — global on all API routes
 app.use('/api', globalLimiter);
+
+// Response time tracking
+app.use(responseTracker.middleware);
 
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
@@ -207,6 +212,9 @@ errorHandlerMw.setPool(pool);
 errorHandlerMw.setErrorAnalysisService(errorAnalysisService);
 anomalyRoutes.setPool(pool);
 anomalyDetector.setPool(pool);
+productionMonitor.setPool(pool);
+productionMonitor.setNotificationService(notificationService);
+productionMonitor.setResponseTracker(responseTracker);
 
 // ========================================
 // FILE UPLOAD CONFIG
@@ -3207,6 +3215,33 @@ aiRoutes.setIO(io);
 aiScheduler.setIO(io);
 paintersRoutes.setIO(io);
 creditLimitRoutes.setIO(io);
+productionMonitor.setIO(io);
+productionMonitor.setSessionManager(whatsappSessionManager);
+
+// Connect anomaly detector alerts to notification system
+const _anomalyAlertThrottle = {};
+anomalyDetector.setAlertCallback(async (key, severity, title, message) => {
+    // Throttle: max 1 alert per type per hour
+    const now = Date.now();
+    if (_anomalyAlertThrottle[key] && (now - _anomalyAlertThrottle[key]) < 3600000) return;
+    _anomalyAlertThrottle[key] = now;
+
+    console.log(`[Anomaly Alert] ${severity}: ${title}`);
+
+    // Send WhatsApp to admins for critical anomalies
+    if (severity === 'critical' && whatsappSessionManager) {
+        try {
+            const [admins] = await pool.query(`SELECT phone FROM users WHERE role = 'admin' AND status = 'active' AND phone IS NOT NULL LIMIT 3`);
+            const alertMsg = `⚠️ [${severity.toUpperCase()}] ${title}\n${message}\nTime: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
+            for (const a of admins) await whatsappSessionManager.sendMessage(0, a.phone, alertMsg, { source: 'anomaly-detector' });
+        } catch (e) { console.error('[Anomaly Alert] WhatsApp error:', e.message); }
+    }
+    // In-app notification to admins/managers
+    try {
+        const [admins] = await pool.query(`SELECT id FROM users WHERE role IN ('admin','manager') AND status = 'active' LIMIT 10`);
+        for (const a of admins) await notificationService.send(a.id, { type: 'system_alert', title: `[${severity}] ${title}`, body: message });
+    } catch (e) { console.error('[Anomaly Alert] Notification error:', e.message); }
+});
 
 // Socket.io auth middleware
 io.use(async (socket, next) => {
@@ -3371,6 +3406,7 @@ server.listen(PORT, () => {
         painterScheduler.start();
         console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler, painter-scheduler');
         systemHealthService.startAutoHealthChecks(300000); // every 5 min
+        productionMonitor.start(); // Production health monitoring + self-healing
         // Anomaly detection scan every 6 hours
         setInterval(async () => {
             try {
@@ -3389,6 +3425,7 @@ async function gracefulShutdown(signal) {
     console.log(`\n${signal} received. Shutting down gracefully...`);
     try {
         systemHealthService.stopAutoHealthChecks();
+        productionMonitor.stop();
         await rateLimiter.flush();
         console.log('API usage data persisted to DB.');
     } catch (err) {

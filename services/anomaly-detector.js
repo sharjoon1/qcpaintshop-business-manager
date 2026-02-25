@@ -5,7 +5,9 @@
  */
 
 let pool = null;
+let alertCallback = null;  // Called with (severity, title, message) for critical/high anomalies
 function setPool(p) { pool = p; }
+function setAlertCallback(fn) { alertCallback = fn; }
 
 // ─── Statistical Helpers ────────────────────────────────────────
 
@@ -488,6 +490,20 @@ async function runFullScan() {
     };
     
     console.log(`[Anomaly] Scan complete: ${inserted} new, ${skipped} skipped, ${duration}s`);
+
+    // Alert for critical/high anomalies
+    if (alertCallback && inserted > 0) {
+        const criticalCount = toInsert.filter(a => a.severity === 'critical').length;
+        const highCount = toInsert.filter(a => a.severity === 'high').length;
+        if (criticalCount > 0) {
+            const titles = toInsert.filter(a => a.severity === 'critical').map(a => a.title).join(', ');
+            alertCallback('anomaly_critical', 'critical', `${criticalCount} Critical Anomalies Detected`, titles);
+        } else if (highCount > 0) {
+            const titles = toInsert.filter(a => a.severity === 'high').slice(0, 3).map(a => a.title).join(', ');
+            alertCallback('anomaly_high', 'high', `${highCount} High-Severity Anomalies`, titles);
+        }
+    }
+
     return result;
 }
 
@@ -551,6 +567,7 @@ async function getDashboardStats() {
 
 module.exports = {
     setPool,
+    setAlertCallback,
     runFullScan,
     getDashboardStats,
     getConfig,

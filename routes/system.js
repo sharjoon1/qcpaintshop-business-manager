@@ -10,6 +10,7 @@ const healthService = require('../services/system-health-service');
 const preventionService = require('../services/error-prevention-service');
 const errorAnalysisService = require('../services/error-analysis-service');
 const errorHandler = require('../middleware/errorHandler');
+const productionMonitor = require('../services/production-monitor');
 
 let pool = null;
 function setPool(p) {
@@ -685,6 +686,56 @@ router.put('/fix-suggestions/:id', requirePermission('system', 'health'), async 
     } catch (error) {
         console.error('Update fix suggestion error:', error);
         res.status(500).json({ success: false, message: 'Failed to update fix suggestion' });
+    }
+});
+
+// ========================================
+// PRODUCTION MONITOR ENDPOINTS
+// ========================================
+
+/**
+ * GET /api/system/production-metrics
+ * Real-time production health metrics
+ */
+router.get('/production-metrics', requirePermission('system', 'health'), async (req, res) => {
+    try {
+        const status = productionMonitor.getStatus();
+        res.json({ success: true, data: status });
+    } catch (error) {
+        console.error('Production metrics error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load production metrics' });
+    }
+});
+
+/**
+ * GET /api/system/production-metrics/history
+ * Historical health snapshots (last 24h or custom range)
+ */
+router.get('/production-metrics/history', requirePermission('system', 'health'), async (req, res) => {
+    try {
+        const hours = parseInt(req.query.hours) || 24;
+        const [snapshots] = await pool.query(
+            `SELECT * FROM production_health_snapshots
+             WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+             ORDER BY created_at ASC`,
+            [Math.min(hours, 168)] // Max 7 days
+        );
+        res.json({ success: true, data: snapshots });
+    } catch (error) {
+        console.error('Production metrics history error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load metrics history' });
+    }
+});
+
+/**
+ * GET /api/system/circuit-breaker
+ * Zoho API circuit breaker state
+ */
+router.get('/circuit-breaker', requirePermission('system', 'health'), async (req, res) => {
+    try {
+        res.json({ success: true, data: productionMonitor.getCircuitState() });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to get circuit breaker state' });
     }
 });
 
