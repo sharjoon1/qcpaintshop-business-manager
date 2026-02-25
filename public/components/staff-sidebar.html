@@ -669,6 +669,11 @@
         <!-- Customers -->
         <div class="qc-nav-section">
             <div class="qc-nav-section-title">Customers</div>
+            <a href="/admin-customers.html" class="qc-nav-item" data-page="customers">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                <span class="qc-nav-item-text">Customer List</span>
+                <span class="qc-nav-tooltip">Customer List</span>
+            </a>
             <a href="/admin-credit-limits.html" class="qc-nav-item" data-page="credit-limits" data-requires="credit_limits.view">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
                 <span class="qc-nav-item-text">Credit Limits</span>
@@ -1001,6 +1006,13 @@ async function filterSidebarByPermissions() {
         const token = localStorage.getItem('auth_token');
         if (!token) return;
 
+        // Get user role for role-based filtering
+        let userRole = null;
+        try {
+            const user = JSON.parse(localStorage.getItem('user'));
+            userRole = user && user.role;
+        } catch(e) {}
+
         const resp = await fetch('/api/auth/permissions', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -1021,7 +1033,7 @@ async function filterSidebarByPermissions() {
             permData.permissions.forEach(p => permSet.add(`${p.module}.${p.action}`));
         }
 
-        // Hide gated items the user lacks permission for
+        // Hide items gated by data-requires (permission-based)
         document.querySelectorAll('[data-requires]').forEach(el => {
             const required = el.getAttribute('data-requires');
             if (!permSet.has(required)) {
@@ -1029,8 +1041,25 @@ async function filterSidebarByPermissions() {
             }
         });
 
+        // Hide items gated by data-roles (role-based)
+        if (userRole) {
+            document.querySelectorAll('.qc-nav-section[data-roles]').forEach(section => {
+                const allowed = section.getAttribute('data-roles').split(',');
+                if (!allowed.includes(userRole)) {
+                    section.style.display = 'none';
+                }
+            });
+            document.querySelectorAll('.qc-nav-item[data-roles]').forEach(item => {
+                const allowed = item.getAttribute('data-roles').split(',');
+                if (!allowed.includes(userRole)) {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
         // Hide sections where ALL nav items are hidden
         document.querySelectorAll('.qc-nav-section').forEach(section => {
+            if (section.style.display === 'none') return;
             const items = section.querySelectorAll('.qc-nav-item');
             if (items.length === 0) return;
             const allHidden = Array.from(items).every(item => item.style.display === 'none');

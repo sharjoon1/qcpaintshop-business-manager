@@ -300,9 +300,66 @@
         display: none;
     }
 
+    /* ─── MOBILE QUICK-ACCESS BOTTOM BAR ─── */
+    .qc-mobile-quickbar {
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #ffffff;
+        border-top: 1px solid #e8ecf1;
+        z-index: 1000;
+        padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+    }
+    .qc-mobile-quickbar-inner {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+    .qc-quickbar-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 6px 8px;
+        text-decoration: none;
+        color: #64748b;
+        font-size: 10px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: color 0.2s;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .qc-quickbar-item:active { transform: scale(0.92); }
+    .qc-quickbar-item.active { color: #2563eb; }
+    .qc-quickbar-item svg {
+        width: 22px; height: 22px;
+        stroke: currentColor; fill: none;
+        stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .qc-quickbar-menu-icon {
+        display: flex; flex-direction: column; gap: 3px;
+        width: 22px; height: 22px;
+        align-items: center; justify-content: center;
+    }
+    .qc-quickbar-menu-icon span {
+        width: 18px; height: 2px;
+        background: currentColor; border-radius: 1px;
+    }
+
     /* ─── MOBILE ─── */
     @media (max-width: 767px) {
         .qc-sidebar { width: 85%; max-width: 320px; }
+        .qc-mobile-quickbar { display: block; }
+        body { padding-bottom: 64px !important; }
     }
 
     /* ─── DESKTOP ≥ 768px: Sidebar with icon-rail collapsed state ─── */
@@ -832,6 +889,32 @@
     <div class="qc-sidebar-version">QC Business Manager v2.0</div>
 </aside>
 
+<!-- Mobile Quick-Access Bottom Bar -->
+<div class="qc-mobile-quickbar" id="mobileQuickbar">
+    <div class="qc-mobile-quickbar-inner">
+        <a href="/dashboard.html" class="qc-quickbar-item" data-qb-page="dashboard">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="/admin-leads.html" class="qc-quickbar-item" data-qb-page="leads">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            <span>Leads</span>
+        </a>
+        <a href="/admin-customers.html" class="qc-quickbar-item" data-qb-page="customers">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Customers</span>
+        </a>
+        <a href="/estimates.html" class="qc-quickbar-item" data-qb-page="estimates">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Estimates</span>
+        </a>
+        <button class="qc-quickbar-item" onclick="toggleSidebar()" aria-label="Open menu">
+            <div class="qc-quickbar-menu-icon"><span></span><span></span><span></span></div>
+            <span>Menu</span>
+        </button>
+    </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════════
 // SIDEBAR CONTROLS  –  Hover-to-preview  +  Click-to-pin
@@ -1109,10 +1192,21 @@ function filterNavByRole() {
 
 // ── init ──
 
+function highlightQuickbar() {
+    const path = window.location.pathname;
+    document.querySelectorAll('.qc-quickbar-item[data-qb-page]').forEach(item => {
+        const page = item.getAttribute('data-qb-page');
+        if (path.includes(page)) {
+            item.classList.add('active');
+        }
+    });
+}
+
 function initSidebar() {
     filterNavByRole();
     restoreSidebarState();
     highlightActiveSidebarPage();
+    highlightQuickbar();
     attachSidebarListeners();
 }
 
