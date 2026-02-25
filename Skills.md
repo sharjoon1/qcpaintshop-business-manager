@@ -2085,6 +2085,15 @@ Based on AI App Analyzer report, fixed critical production errors:
 - **Fresh permissions**: `filterSidebarByPermissions()` now always fetches from `/api/auth/permissions` API (no stale 1-hour cache)
 - **Desktop icon rail**: 60px collapsed / 256px expanded, localStorage key `staffSidebarCollapsed` (separate from admin's `sidebarCollapsed`)
 
+### 2026-02-25 - Staff Navigation Unification (Bottom-Nav Removal)
+- **Removed hardcoded bottom-nav** from 6 staff pages: `dashboard.html`, `history.html`, `permission-request.html`, `daily-tasks.html`, `salary.html`, `advance-request.html`
+- Removed `.bottom-nav` CSS, `.nav-item` CSS, bottom-nav HTML blocks, and `padding-bottom: 80px` from body on all 6 pages
+- **Added mobile quick-access bar** (`.qc-mobile-quickbar`) to `staff-sidebar.html` — visible on mobile only (<768px), hidden on desktop
+- Quick bar has 5 items: Dashboard, Attendance (clock-in), Stock Check, Collections, Menu (opens sidebar)
+- Active page highlighting via `data-qb-page` attribute + `highlightQuickbar()` function
+- `body { padding-bottom: 64px !important; }` on mobile to prevent content overlap with quick bar
+- **Result**: Consistent navigation across all 12 staff pages — sidebar on desktop, quick-bar + sidebar on mobile
+
 ### 2026-02-25 - Comprehensive Site Analysis & Bug Fixes
 **Production Bug Fixes (7 total):**
 - **LiveDashboard activity feed**: `p.name` → `p.full_name` in `routes/admin-dashboard.js` (painters table uses `full_name`)
