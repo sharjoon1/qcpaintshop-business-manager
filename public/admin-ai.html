@@ -66,9 +66,13 @@
         .chat-send-btn:hover { opacity: 0.9; }
         .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .quick-prompts { display: flex; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem 1rem; border-bottom: 1px solid #e5e7eb; }
+        .quick-prompts { display: flex; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem 1rem; border-bottom: 1px solid #e5e7eb; align-items: center; }
+        .quick-prompts.collapsed .quick-prompt { display: none; }
         .quick-prompt { padding: 0.375rem 0.75rem; border-radius: 999px; font-size: 0.75rem; border: 1px solid #d1d5db; cursor: pointer; background: white; color: #4b5563; transition: all 0.15s; white-space: nowrap; }
         .quick-prompt:hover { border-color: #667eea; color: #667eea; background: #eef2ff; }
+        .quick-prompts-toggle { display: none; background: none; border: 1px solid #d1d5db; border-radius: 999px; width: 28px; height: 28px; font-size: 0.625rem; color: #9ca3af; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+        .quick-prompts-toggle:hover { border-color: #667eea; color: #667eea; }
+        .quick-prompts.collapsed .quick-prompts-toggle { transform: rotate(-90deg); }
 
         .provider-toggle { display: flex; gap: 4px; background: #f3f4f6; border-radius: 8px; padding: 2px; }
         .provider-btn { padding: 4px 10px; border-radius: 6px; font-size: 0.6875rem; font-weight: 600; border: none; cursor: pointer; background: transparent; color: #6b7280; }
@@ -208,6 +212,23 @@
             .insight-grid { grid-template-columns: 1fr !important; }
             .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); }
             .dash-split { grid-template-columns: 1fr; }
+            /* Compact quick-prompts: single scrollable row on mobile */
+            .quick-prompts-toggle { display: flex; align-items: center; justify-content: center; }
+            .quick-prompts {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding: 0.375rem 0.75rem;
+                gap: 0.375rem;
+                scrollbar-width: none; /* Firefox */
+            }
+            .quick-prompts::-webkit-scrollbar { display: none; }
+            .quick-prompts.collapsed { padding: 0.25rem 0.75rem; border-bottom: none; }
+            .quick-prompt { font-size: 0.6875rem; padding: 0.25rem 0.625rem; flex-shrink: 0; }
+            .chat-messages { padding: 0.75rem; gap: 0.625rem; }
+            .chat-input-area { padding: 0.5rem 0.75rem; }
+            .chat-input-area textarea { font-size: 0.8125rem; padding: 0.5rem 0.75rem; }
+            .msg { font-size: 0.8125rem; padding: 0.625rem 0.875rem; }
         }
     </style>
 </head>
@@ -375,7 +396,8 @@
 
             <!-- Main chat area -->
             <div class="chat-main">
-                <div class="quick-prompts">
+                <div class="quick-prompts" id="quickPromptsBar">
+                    <button class="quick-prompts-toggle" id="promptsToggle" onclick="toggleQuickPrompts()" title="Toggle suggestions">&#x25BC;</button>
                     <button class="quick-prompt" onclick="quickAsk('Give me a full business health check — revenue, staff, collections, leads, stock')">Health Check</button>
                     <button class="quick-prompt" onclick="quickAsk('What needs my attention today? Flag any problems or urgent items')">Attention Needed</button>
                     <button class="quick-prompt" onclick="quickAsk('Revenue analysis — branch breakdown, top customers, compare to yesterday and last week')">Revenue Analysis</button>
@@ -859,6 +881,11 @@ async function deleteConversation(id) {
 function quickAsk(text) {
     document.getElementById('chatInput').value = text;
     sendMessage();
+}
+
+function toggleQuickPrompts() {
+    const bar = document.getElementById('quickPromptsBar');
+    bar.classList.toggle('collapsed');
 }
 
 async function sendMessage() {
