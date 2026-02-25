@@ -94,13 +94,12 @@ async function collectZohoData(period = 'daily') {
     try {
         const [branchRev] = await pool.query(`
             SELECT
-                COALESCE(wl.branch_name, 'Unknown') as branch_name,
-                COUNT(*) as invoice_count,
-                COALESCE(SUM(zi.total), 0) as revenue
-            FROM zoho_invoices zi
-            LEFT JOIN zoho_locations_map wl ON zi.location_id = wl.zoho_location_id COLLATE utf8mb4_unicode_ci
-            WHERE DATE(zi.invoice_date) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-            GROUP BY wl.branch_name
+                COALESCE(location_name, 'Unknown') as branch_name,
+                COALESCE(SUM(invoice_count), 0) as invoice_count,
+                COALESCE(SUM(invoice_amount), 0) as revenue
+            FROM zoho_daily_transactions
+            WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+            GROUP BY location_name
             ORDER BY revenue DESC
         `);
         data.branch_performance = branchRev;
