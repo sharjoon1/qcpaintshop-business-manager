@@ -11,12 +11,10 @@
 
 const express = require('express');
 const http = require('http');
-const mysql = require('mysql2/promise');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
-const multer = require('multer');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
@@ -66,6 +64,7 @@ const appMetadataCollector = require('./services/app-metadata-collector');
 const systemRoutes = require('./routes/system');
 const creditLimitRoutes = require('./routes/credit-limits');
 const errorHandlerMw = require('./middleware/errorHandler');
+const { globalLimiter, authLimiter, otpLimiter } = require('./middleware/rateLimiter');
 const systemHealthService = require('./services/system-health-service');
 const errorAnalysisService = require('./services/error-analysis-service');
 const aiEngineForErrors = require('./services/ai-engine');
@@ -132,6 +131,10 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Rate limiting — global on all API routes
+app.use('/api', globalLimiter);
+
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
@@ -139,15 +142,8 @@ app.use('/uploads', express.static('uploads'));
 // DATABASE CONNECTION
 // ========================================
 
-const pool = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 20,
-    queueLimit: 0
-});
+const { createPool } = require('./config/database');
+const pool = createPool();
 
 // Initialize shared pool for middleware and all route modules
 initPool(pool);
@@ -211,103 +207,8 @@ errorHandlerMw.setErrorAnalysisService(errorAnalysisService);
 // FILE UPLOAD CONFIG
 // ========================================
 
-// Ensure upload directories exist
-const uploadDirs = [
-    'public/uploads/logos',
-    'public/uploads/profiles',
-    'public/uploads/attendance/clock-in',
-    'public/uploads/attendance/clock-out',
-    'public/uploads/documents',
-    'public/uploads/design-requests',
-    'public/uploads/visualizations',
-    'public/uploads/aadhar',
-    'public/uploads/daily-tasks',
-    'public/uploads/website',
-    'uploads/attendance/break',
-    'uploads/stock-check',
-    'uploads/wa-marketing',
-    'uploads/whatsapp'
-];
-uploadDirs.forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-});
-
-const logoStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'public/uploads/logos/'),
-    filename: (req, file, cb) => {
-        const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'logo-' + uniqueName + path.extname(file.originalname));
-    }
-});
-
-const uploadLogo = multer({
-    storage: logoStorage,
-    limits: { fileSize: 2 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image files allowed'));
-        }
-    }
-});
-
-// Profile picture upload config
-const profileStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'public/uploads/profiles/'),
-    filename: (req, file, cb) => {
-        const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'profile-' + uniqueName + path.extname(file.originalname));
-    }
-});
-
-const uploadProfile = multer({
-    storage: profileStorage,
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image files allowed'));
-        }
-    }
-});
-
-// Aadhar proof upload config
-const aadharStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'public/uploads/aadhar/'),
-    filename: (req, file, cb) => {
-        const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'aadhar-' + uniqueName + path.extname(file.originalname));
-    }
-});
-
-const uploadAadhar = multer({
-    storage: aadharStorage,
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image and PDF files allowed'));
-        }
-    }
-});
-
-// Design request photo upload config (memory storage + sharp compression)
-const designRequestUpload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image files allowed'));
-        }
-    }
-});
+const { ensureUploadDirs, uploadLogo, uploadProfile, uploadAadhar, designRequestUpload } = require('./config/uploads');
+ensureUploadDirs();
 
 // ========================================
 // MOUNT ROUTE MODULES
@@ -382,7 +283,7 @@ app.post('/api/zoho/oauth/exchange', requireRole('admin'), async (req, res) => {
 // ========================================
 
 // Login
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
     try {
         const { username, password, remember } = req.body;
 
@@ -572,7 +473,7 @@ app.post('/api/auth/logout', async (req, res) => {
 });
 
 // Forgot Password (with proper reset token instead of overwriting password)
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     try {
         const { email } = req.body;
 
@@ -656,7 +557,7 @@ app.get('/api/auth/permissions', getUserPermissions);
 // ========================================
 
 // Send OTP
-app.post('/api/otp/send', async (req, res) => {
+app.post('/api/otp/send', otpLimiter, async (req, res) => {
     try {
         const { mobile, purpose } = req.body;
 
@@ -811,7 +712,7 @@ app.post('/api/otp/send', async (req, res) => {
 });
 
 // Verify OTP
-app.post('/api/otp/verify', async (req, res) => {
+app.post('/api/otp/verify', otpLimiter, async (req, res) => {
     try {
         const { mobile, otp_code, purpose } = req.body;
 
@@ -854,7 +755,7 @@ app.post('/api/otp/verify', async (req, res) => {
 });
 
 // Resend OTP (FIXED: proper implementation instead of broken app._router.handle)
-app.post('/api/otp/resend', async (req, res) => {
+app.post('/api/otp/resend', otpLimiter, async (req, res) => {
     try {
         const { mobile, purpose } = req.body;
 

@@ -56,26 +56,30 @@ function isSyncDebounced(operation) {
     return 0;
 }
 
-// In-memory cache for expensive API responses
-const _apiCache = {}; // { key: { data, timestamp } }
+// LRU cache for expensive API responses (replaces plain object — auto-evicts)
+const { LRUCache } = require('lru-cache');
+const _apiCache = new LRUCache({ max: 500, ttl: 300000 }); // 500 entries, 5-min TTL
 
-function getCached(key, maxAgeMs = 300000) { // 5 min default
-    const entry = _apiCache[key];
-    if (entry && (Date.now() - entry.timestamp) < maxAgeMs) {
-        return entry.data;
+function getCached(key, maxAgeMs = 300000) {
+    const entry = _apiCache.get(key);
+    if (entry === undefined) return null;
+    // If caller requests a shorter TTL than default, check manually
+    if (maxAgeMs < 300000) {
+        const age = Date.now() - (entry._ts || 0);
+        if (age > maxAgeMs) { _apiCache.delete(key); return null; }
     }
-    return null;
+    return entry.data;
 }
 
 function setCache(key, data) {
-    _apiCache[key] = { data, timestamp: Date.now() };
+    _apiCache.set(key, { data, _ts: Date.now() });
 }
 
 function clearCache(prefix) {
     if (prefix) {
-        Object.keys(_apiCache).forEach(k => { if (k.startsWith(prefix)) delete _apiCache[k]; });
+        for (const k of _apiCache.keys()) { if (k.startsWith(prefix)) _apiCache.delete(k); }
     } else {
-        Object.keys(_apiCache).forEach(k => delete _apiCache[k]);
+        _apiCache.clear();
     }
 }
 
