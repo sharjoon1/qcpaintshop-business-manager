@@ -85,9 +85,9 @@ async function detectRevenueAnomalies(config) {
     try {
         // Get daily revenue for last 30 days per branch
         const [dailyRevenue] = await pool.query(`
-            SELECT zoho_location_id as branch_id, 
+            SELECT zoho_location_id as branch_id,
                    DATE(transaction_date) as day,
-                   SUM(CASE WHEN transaction_type = 'invoice' THEN amount ELSE 0 END) as daily_revenue
+                   SUM(invoice_amount) as daily_revenue
             FROM zoho_daily_transactions
             WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
             GROUP BY zoho_location_id, DATE(transaction_date)
@@ -151,13 +151,13 @@ async function detectAttendanceAnomalies(config) {
         // Detect unusual clock-in times (much earlier/later than usual)
         const [clockIns] = await pool.query(`
             SELECT sa.user_id, u.full_name, u.branch_id,
-                   TIME_TO_SEC(TIME(sa.clock_in)) / 3600 as clock_in_hour,
-                   DATE(sa.clock_in) as day
+                   TIME_TO_SEC(TIME(sa.clock_in_time)) / 3600 as clock_in_hour,
+                   DATE(sa.clock_in_time) as day
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
-            WHERE sa.clock_in >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-              AND sa.clock_in IS NOT NULL
-            ORDER BY sa.user_id, sa.clock_in
+            WHERE sa.clock_in_time >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+              AND sa.clock_in_time IS NOT NULL
+            ORDER BY sa.user_id, sa.clock_in_time
         `);
 
         // Group by user
@@ -205,9 +205,9 @@ async function detectAttendanceAnomalies(config) {
             SELECT sa.user_id, u.full_name, u.branch_id, COUNT(*) as missing_count
             FROM staff_attendance sa
             JOIN users u ON sa.user_id = u.id
-            WHERE sa.clock_in >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-              AND sa.clock_out IS NULL
-              AND sa.clock_in < DATE_SUB(NOW(), INTERVAL 14 HOUR)
+            WHERE sa.clock_in_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+              AND sa.clock_out_time IS NULL
+              AND sa.clock_in_time < DATE_SUB(NOW(), INTERVAL 14 HOUR)
             GROUP BY sa.user_id, u.full_name, u.branch_id
             HAVING missing_count >= 2
         `);
@@ -241,16 +241,16 @@ async function detectStockAnomalies(config) {
         // Detect items with large stock changes in the last 24 hours
         const [stockChanges] = await pool.query(`
             SELECT zls.item_name, zls.stock_on_hand as current_stock,
-                   zlm.location_name, zlm.id as location_id,
+                   zlm.zoho_location_name as location_name, zlm.id as location_id,
                    zsh.previous_stock, zsh.new_stock,
                    ABS(zsh.new_stock - zsh.previous_stock) as change_amount,
                    CASE WHEN zsh.previous_stock > 0 
                         THEN ABS((zsh.new_stock - zsh.previous_stock) / zsh.previous_stock * 100)
                         ELSE 100 END as change_pct
             FROM zoho_stock_history zsh
-            JOIN zoho_location_stock zls ON zsh.item_id = zls.zoho_item_id AND zsh.location_id = zls.zoho_location_id
-            JOIN zoho_locations_map zlm ON zsh.location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
-            WHERE zsh.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            JOIN zoho_location_stock zls ON zsh.zoho_item_id = zls.zoho_item_id AND zsh.zoho_location_id = zls.zoho_location_id
+            JOIN zoho_locations_map zlm ON zsh.zoho_location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
+            WHERE zsh.recorded_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
               AND zsh.previous_stock > 0
               AND ABS((zsh.new_stock - zsh.previous_stock) / zsh.previous_stock * 100) > ?
             ORDER BY change_pct DESC
@@ -289,17 +289,17 @@ async function detectCollectionAnomalies(config) {
     try {
         // Find customers with overdue invoices exceeding threshold
         const [overdueCustomers] = await pool.query(`
-            SELECT zcm.customer_name, zcm.zoho_outstanding, zcm.credit_limit,
+            SELECT zcm.zoho_contact_name as customer_name, zcm.zoho_outstanding, zcm.credit_limit,
                    zcm.id as customer_map_id,
                    COUNT(zi.id) as overdue_invoice_count,
                    MIN(zi.invoice_date) as oldest_invoice_date,
                    SUM(zi.balance) as total_overdue
             FROM zoho_customers_map zcm
-            JOIN zoho_invoices zi ON zi.customer_name = zcm.customer_name COLLATE utf8mb4_unicode_ci
+            JOIN zoho_invoices zi ON zi.customer_name = zcm.zoho_contact_name COLLATE utf8mb4_unicode_ci
             WHERE zi.status IN ('sent', 'overdue')
               AND zi.due_date < DATE_SUB(CURDATE(), INTERVAL ? DAY)
               AND zi.balance > 0
-            GROUP BY zcm.id, zcm.customer_name, zcm.zoho_outstanding, zcm.credit_limit
+            GROUP BY zcm.id, zcm.zoho_contact_name, zcm.zoho_outstanding, zcm.credit_limit
             HAVING total_overdue > 5000
             ORDER BY total_overdue DESC
             LIMIT 20
