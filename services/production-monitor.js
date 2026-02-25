@@ -275,7 +275,7 @@ async function sendAlert(key, severity, title, message) {
                 `SELECT phone FROM users WHERE role = 'admin' AND status = 'active' AND phone IS NOT NULL LIMIT 3`
             );
             for (const admin of admins) {
-                await whatsappSessionManager.sendMessage(0, admin.phone, alertMsg, { source: 'production-monitor' });
+                await whatsappSessionManager.sendMessage(0, admin.phone, alertMsg, { source: 'production_alert' });
             }
         } catch (err) {
             console.error('[Monitor] WhatsApp alert error:', err.message);

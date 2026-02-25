@@ -3233,7 +3233,7 @@ anomalyDetector.setAlertCallback(async (key, severity, title, message) => {
         try {
             const [admins] = await pool.query(`SELECT phone FROM users WHERE role = 'admin' AND status = 'active' AND phone IS NOT NULL LIMIT 3`);
             const alertMsg = `⚠️ [${severity.toUpperCase()}] ${title}\n${message}\nTime: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
-            for (const a of admins) await whatsappSessionManager.sendMessage(0, a.phone, alertMsg, { source: 'anomaly-detector' });
+            for (const a of admins) await whatsappSessionManager.sendMessage(0, a.phone, alertMsg, { source: 'anomaly_alert' });
         } catch (e) { console.error('[Anomaly Alert] WhatsApp error:', e.message); }
     }
     // In-app notification to admins/managers
