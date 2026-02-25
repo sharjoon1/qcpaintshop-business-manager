@@ -73,10 +73,10 @@ async function migrate() {
             ['anomaly_last_scan_at', '', 'Timestamp of last anomaly scan']
         ];
 
-        for (const [key, value, desc] of configs) {
+        for (const [key, value] of configs) {
             await pool.query(
-                `INSERT IGNORE INTO ai_config (config_key, config_value, description) VALUES (?, ?, ?)`,
-                [key, value, desc]
+                `INSERT IGNORE INTO ai_config (config_key, config_value) VALUES (?, ?)`,
+                [key, value]
             );
         }
         console.log('   ✅ Config entries added');
