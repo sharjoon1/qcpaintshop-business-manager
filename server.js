@@ -74,6 +74,7 @@ const anomalyRoutes = require('./routes/anomalies');
 const anomalyDetector = require('./services/anomaly-detector');
 
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)
 
 // Global error buffer for App Analyzer
 global._appErrorBuffer = global._appErrorBuffer || [];

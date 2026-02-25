@@ -1754,6 +1754,19 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-02-25 - BMAD Sprint 2: Anomaly Detection & Automated Testing
+
+**Anomaly Detection System** — Z-score based statistical anomaly detection across 5 business domains:
+- `services/anomaly-detector.js` — Core detection engine: revenue (daily vs 30-day avg), attendance (unusual clock-in times, missing clock-outs), stock (large quantity changes), collections (overdue invoices), API errors (error rate spikes, repeated errors)
+- `routes/anomalies.js` — API: `GET /dashboard`, `GET /` (filtered list), `GET /:id`, `PUT /:id/status`, `POST /scan`, `GET/PUT /config`. Permission: `system.health`
+- `public/admin-anomalies.html` — Dashboard page (data-page=`anomalies`): 4 summary cards, Chart.js trend/category charts, filter pills, severity-bordered anomaly list, detail slide-out with status workflow
+- `migrations/migrate-anomaly-detection.js` — `detected_anomalies` table (7 indexes), 10 `ai_config` entries
+- Scheduled scan every 6 hours, deduplication (24h window), auto-resolve (30 days)
+
+**Automated Testing** — Jest framework, 38 unit tests (all passing):
+- Tests: anomaly-detector (17), validate (12), rateLimiter (3), config (6)
+- npm scripts: `npm test`, `npm run test:watch`, `npm run test:coverage`
+
 ### 2026-02-25 - BMAD Sprint 1: Technical Foundation
 Implemented foundational infrastructure improvements as part of the BMAD (Breakthrough Method for Agile AI-Driven Development) initiative:
 

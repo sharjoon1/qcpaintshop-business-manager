@@ -24,7 +24,8 @@ const globalLimiter = rateLimit({
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-    handler: rateLimitHandler
+    handler: rateLimitHandler,
+    validate: { xForwardedForHeader: false }
 });
 
 // ─── Auth Limiter (10 req/min per IP) ────────────────────────
@@ -34,7 +35,8 @@ const authLimiter = rateLimit({
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    handler: rateLimitHandler
+    handler: rateLimitHandler,
+    validate: { xForwardedForHeader: false }
 });
 
 // ─── OTP Limiter (5 req/min per phone or IP) ─────────────────
@@ -51,7 +53,7 @@ const otpLimiter = rateLimit({
         return undefined;
     },
     handler: rateLimitHandler,
-    validate: { keyGeneratorIpFallback: false }
+    validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false }
 });
 
 module.exports = { globalLimiter, authLimiter, otpLimiter };
