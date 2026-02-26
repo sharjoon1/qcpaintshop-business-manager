@@ -2485,22 +2485,25 @@
             geoWatchId = navigator.geolocation.watchPosition(
                 async (pos) => {
                     try {
-                        // Skip geofence enforcement during break
+                        // Skip geofence enforcement during break — reset grace timer
                         if (attendanceData && attendanceData.data &&
                             attendanceData.data.break_start_time && !attendanceData.data.break_end_time) {
                             hideGeofenceAlert();
+                            graceViolationStart = null;
                             return;
                         }
 
-                        // Skip geofence enforcement during outside work
+                        // Skip geofence enforcement during outside work — reset grace timer
                         if (outsideWorkActive) {
                             hideGeofenceAlert();
+                            graceViolationStart = null;
                             return;
                         }
 
-                        // Skip geofence enforcement during prayer
+                        // Skip geofence enforcement during prayer — reset grace timer
                         if (prayerActive) {
                             hideGeofenceAlert();
+                            graceViolationStart = null;
                             return;
                         }
 
@@ -2512,6 +2515,11 @@
                         const data = await res.json();
 
                         if (data.success && data.data) {
+                            // Resume countdown from server-side timestamp if available
+                            if (data.data.geo_warning_started_at && !graceViolationStart) {
+                                graceViolationStart = new Date(data.data.geo_warning_started_at).getTime();
+                            }
+
                             if (!data.data.allowed) {
                                 // Outside fence
                                 if (!isOutsideFence) {
@@ -2953,6 +2961,17 @@
             await origLoadTodayAttendance();
             // Start geo-fence monitoring if clocked in
             if (attendanceData && attendanceData.has_clocked_in && !(attendanceData.data && attendanceData.data.clock_out_time)) {
+                // Pre-initialize grace timer from server state (survives page reloads)
+                if (attendanceData.data && attendanceData.data.geo_warning_started_at && !graceViolationStart) {
+                    graceViolationStart = new Date(attendanceData.data.geo_warning_started_at).getTime();
+                    isOutsideFence = true;
+                    // Show alert immediately with countdown
+                    const elapsed = Date.now() - graceViolationStart;
+                    if (elapsed < GRACE_PERIOD_MS) {
+                        const remainSec = Math.ceil((GRACE_PERIOD_MS - elapsed) / 1000);
+                        showGeofenceAlert(attendanceData.data.last_geo_distance || 0, null, true, remainSec);
+                    }
+                }
                 startGeoFenceMonitoring();
             } else {
                 stopGeoFenceMonitoring();

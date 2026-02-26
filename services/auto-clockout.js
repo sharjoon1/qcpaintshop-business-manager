@@ -151,6 +151,128 @@ async function autoClockoutForOTTimeout(record, now) {
 }
 
 /**
+ * Check for staff with geo-fence warnings that have expired (5+ minutes outside).
+ * Server-side enforcement — works even if client closes browser.
+ * Runs every 5 minutes alongside checkOvertimePrompts.
+ */
+async function checkGeoWarnings() {
+    if (!pool) return;
+
+    try {
+        const now = new Date();
+        const today = getTodayIST();
+
+        // Find staff with geo_warning_started_at set > 5 minutes ago, still clocked in
+        const [records] = await pool.query(
+            `SELECT a.id, a.user_id, a.clock_in_time, a.branch_id,
+                    a.break_duration_minutes, a.break_start_time, a.break_end_time,
+                    a.expected_hours, a.geo_warning_started_at, a.last_geo_distance,
+                    u.full_name
+             FROM staff_attendance a
+             JOIN users u ON a.user_id = u.id
+             WHERE a.date = ? AND a.clock_out_time IS NULL
+               AND a.geo_warning_started_at IS NOT NULL
+               AND a.geo_warning_started_at <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)`,
+            [today]
+        );
+
+        for (const record of records) {
+            try {
+                // Skip if on break
+                if (record.break_start_time && !record.break_end_time) continue;
+
+                // Skip if on prayer
+                const [activePrayer] = await pool.query(
+                    "SELECT id FROM prayer_periods WHERE user_id = ? AND status = 'active' LIMIT 1",
+                    [record.user_id]
+                );
+                if (activePrayer.length > 0) continue;
+
+                // Skip if on outside work
+                const [activeOW] = await pool.query(
+                    "SELECT id FROM outside_work_periods WHERE user_id = ? AND status = 'active' LIMIT 1",
+                    [record.user_id]
+                );
+                if (activeOW.length > 0) continue;
+
+                // All checks passed — auto-clock-out
+                const distance = record.last_geo_distance || 0;
+
+                // End all active periods FIRST (safety — may update break_duration_minutes)
+                await endActivePeriods(record, now);
+
+                // Re-fetch break duration after ending any active periods
+                const [refreshed] = await pool.query(
+                    'SELECT break_duration_minutes FROM staff_attendance WHERE id = ?',
+                    [record.id]
+                );
+                const breakMinutes = (refreshed[0] && refreshed[0].break_duration_minutes) || record.break_duration_minutes || 0;
+                const clockIn = new Date(record.clock_in_time);
+                const elapsedMinutes = (now - clockIn) / 1000 / 60;
+                const workingMinutes = Math.round(elapsedMinutes - breakMinutes);
+
+                const geoNote = `\n[Server auto clock-out: ${distance}m from branch - geo warning expired]`;
+
+                await pool.query(
+                    `UPDATE staff_attendance
+                     SET clock_out_time = ?, total_working_minutes = ?,
+                         auto_clockout_type = 'geo', auto_clockout_distance = ?,
+                         geo_warning_started_at = NULL,
+                         notes = CONCAT(COALESCE(notes, ''), ?)
+                     WHERE id = ?`,
+                    [now, workingMinutes, distance, geoNote, record.id]
+                );
+
+                // Notify staff via Socket.io
+                if (io) {
+                    io.to(`user_${record.user_id}`).emit('auto_clockout', {
+                        type: 'geo',
+                        message: `You were automatically clocked out (${distance}m from branch for 5+ minutes).`,
+                        attendance_id: record.id,
+                        total_working_minutes: workingMinutes
+                    });
+                }
+
+                // Notify staff via notification
+                try {
+                    await notificationService.send(record.user_id, {
+                        type: 'geo_auto_clockout',
+                        title: 'Auto Clock-Out (Geo)',
+                        body: `You were automatically clocked out — ${distance}m from branch for 5+ minutes.`,
+                        data: { type: 'geo_auto_clockout', attendance_id: record.id, distance }
+                    });
+                } catch (notifErr) {
+                    console.error('[Geo-Enforce] Staff notification error:', notifErr.message);
+                }
+
+                // Notify admins
+                try {
+                    const [admins] = await pool.query(
+                        "SELECT id FROM users WHERE role IN ('admin','super_admin') AND status = 'active'"
+                    );
+                    for (const admin of admins) {
+                        await notificationService.send(admin.id, {
+                            type: 'geo_auto_clockout_admin',
+                            title: 'Staff Geo Auto Clock-Out',
+                            body: `${record.full_name} was auto-clocked out (${distance}m from branch, server-enforced).`,
+                            data: { user_id: record.user_id, attendance_id: record.id, distance }
+                        });
+                    }
+                } catch (notifErr) {
+                    console.error('[Geo-Enforce] Admin notification error:', notifErr.message);
+                }
+
+                console.log(`[Geo-Enforce] ${record.full_name} auto-clocked out (${distance}m from branch, warning started ${record.geo_warning_started_at})`);
+            } catch (err) {
+                console.error(`[Geo-Enforce] Error clocking out ${record.full_name}:`, err.message);
+            }
+        }
+    } catch (error) {
+        console.error('[Geo-Enforce] Check error:', error.message);
+    }
+}
+
+/**
  * Check for staff who exceeded expected hours.
  * - Emit prompt ONCE (set ot_prompt_shown_at)
  * - Auto-clock-out if timeout exceeded
@@ -333,6 +455,7 @@ function start() {
     // Register automations
     if (registry) {
         registry.register('auto-clockout-ot-check', { name: 'OT Prompt Check', service: 'auto-clockout', schedule: 'Every 5 min', description: 'Check for overtime prompts' });
+        registry.register('auto-clockout-geo-enforce', { name: 'Geo-Fence Enforce', service: 'auto-clockout', schedule: 'Every 5 min', description: 'Server-side geo-fence auto clock-out' });
         registry.register('auto-clockout-force', { name: 'Force Clock-out', service: 'auto-clockout', schedule: '59 21 * * *', description: '10 PM force clock-out all staff' });
     }
 
@@ -340,6 +463,11 @@ function start() {
     checkOvertimePrompts();
     setInterval(checkOvertimePrompts, 5 * 60 * 1000);
     console.log('[Auto-clockout] Overtime check started (every 5 min)');
+
+    // Check geo-fence warnings every 5 minutes (server-side enforcement)
+    checkGeoWarnings();
+    setInterval(checkGeoWarnings, 5 * 60 * 1000);
+    console.log('[Auto-clockout] Geo-fence enforcement started (every 5 min)');
 
     // Force clock-out at 10 PM IST (21:59 to run just before reports at 22:00)
     cron.schedule('59 21 * * *', async () => {
@@ -355,4 +483,4 @@ function start() {
     console.log('[Auto-clockout] 10 PM IST force clock-out cron scheduled');
 }
 
-module.exports = { setPool, setIO, setAutomationRegistry, start, checkOvertimePrompts, forceClockoutAll, endActivePeriods };
+module.exports = { setPool, setIO, setAutomationRegistry, start, checkOvertimePrompts, checkGeoWarnings, forceClockoutAll, endActivePeriods };

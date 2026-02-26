@@ -940,11 +940,13 @@ router.post('/break-start', requireAuth, upload.single('photo'), async (req, res
         const photoPath = await saveAttendancePhoto(photo.buffer, userId, 'break');
 
         // Update attendance with break start + photo + GPS (reset end fields for new break)
+        // Clear geo_warning_started_at — geo enforcement paused during break
         await pool.query(
             `UPDATE staff_attendance SET break_start_time = ?,
              break_start_photo = ?, break_start_lat = ?, break_start_lng = ?,
              break_end_time = NULL, break_end_photo = NULL, break_end_lat = NULL, break_end_lng = NULL,
-             break_duration_minutes = ?
+             break_duration_minutes = ?,
+             geo_warning_started_at = NULL
              WHERE id = ?`,
             [now, photoPath, latitude, longitude, previousBreakMinutes, record.id]
         );
@@ -2099,30 +2101,82 @@ router.get('/geofence-check', requireAuth, async (req, res) => {
             [req.user.id]
         );
 
+        let finalResult;
         if (assignedBranches.length > 0) {
             let bestResult = { allowed: false, distance: Infinity, radius: 0 };
             for (const branch of assignedBranches) {
                 const result = await checkGeoFence(branch.branch_id, latitude, longitude);
                 if (result.allowed) {
-                    return res.json({ success: true, data: { allowed: true, distance: result.distance, radius: result.radius, branch_name: branch.name } });
+                    bestResult = { ...result, branch_name: branch.name, allowed: true };
+                    break;
                 }
                 if (result.distance !== null && result.distance < bestResult.distance) {
                     bestResult = { ...result, branch_name: branch.name };
                 }
             }
-            return res.json({ success: true, data: bestResult });
+            finalResult = bestResult;
+        } else {
+            // Fallback: single branch
+            const branchId = req.user.branch_id;
+            finalResult = await checkGeoFence(branchId, latitude, longitude);
         }
 
-        // Fallback: single branch
-        const branchId = req.user.branch_id;
-        const result = await checkGeoFence(branchId, latitude, longitude);
+        // Track geo state on active attendance record (server-side enforcement)
+        const today = getTodayIST();
+        const [activeRec] = await pool.query(
+            `SELECT id, geo_warning_started_at FROM staff_attendance
+             WHERE user_id = ? AND date = ? AND clock_out_time IS NULL
+             ORDER BY id DESC LIMIT 1`,
+            [req.user.id, today]
+        );
+        let geoWarningStartedAt = null;
+        if (activeRec.length > 0) {
+            const attId = activeRec[0].id;
+            const dist = finalResult.distance != null ? Math.round(finalResult.distance) : null;
+
+            if (!finalResult.allowed && dist !== null && dist >= 300) {
+                // Outside fence at 300m+ — start or continue warning
+                if (!activeRec[0].geo_warning_started_at) {
+                    const now = new Date();
+                    await pool.query(
+                        `UPDATE staff_attendance
+                         SET geo_warning_started_at = ?, last_geo_check_at = ?, last_geo_distance = ?
+                         WHERE id = ?`,
+                        [now, now, dist, attId]
+                    );
+                    geoWarningStartedAt = now.toISOString();
+                } else {
+                    await pool.query(
+                        `UPDATE staff_attendance SET last_geo_check_at = NOW(), last_geo_distance = ? WHERE id = ?`,
+                        [dist, attId]
+                    );
+                    geoWarningStartedAt = new Date(activeRec[0].geo_warning_started_at).toISOString();
+                }
+            } else if (finalResult.allowed) {
+                // Back inside fence — clear warning
+                await pool.query(
+                    `UPDATE staff_attendance
+                     SET geo_warning_started_at = NULL, last_geo_check_at = NOW(), last_geo_distance = ?
+                     WHERE id = ?`,
+                    [dist, attId]
+                );
+            } else {
+                // Outside fence but < 300m — just update tracking, no warning
+                await pool.query(
+                    `UPDATE staff_attendance SET last_geo_check_at = NOW(), last_geo_distance = ? WHERE id = ?`,
+                    [dist, attId]
+                );
+            }
+        }
 
         res.json({
             success: true,
             data: {
-                allowed: result.allowed,
-                distance: result.distance,
-                radius: result.radius
+                allowed: finalResult.allowed,
+                distance: finalResult.distance,
+                radius: finalResult.radius,
+                branch_name: finalResult.branch_name || null,
+                geo_warning_started_at: geoWarningStartedAt
             }
         });
     } catch (error) {
@@ -2240,6 +2294,7 @@ router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
              SET clock_out_time = ?, total_working_minutes = ?,
                  clock_out_lat = ?, clock_out_lng = ?, clock_out_distance = ?,
                  auto_clockout_type = 'geo', auto_clockout_distance = ?,
+                 geo_warning_started_at = NULL,
                  notes = CONCAT(COALESCE(notes, ''), ?)
              WHERE id = ?`,
             [now, workingMinutes, latitude, longitude, distance, distance, geoNote, record.id]
@@ -2519,6 +2574,12 @@ router.post('/outside-work/start', requireAuth, async (req, res) => {
             `INSERT INTO outside_work_periods (attendance_id, user_id, reason, start_time, start_lat, start_lng)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [record.id, userId, reason.trim(), now, latitude || null, longitude || null]
+        );
+
+        // Clear geo warning — geo enforcement paused during outside work
+        await pool.query(
+            'UPDATE staff_attendance SET geo_warning_started_at = NULL WHERE id = ?',
+            [record.id]
         );
 
         res.json({
@@ -2874,6 +2935,12 @@ router.post('/prayer/start', requireAuth, async (req, res) => {
             `INSERT INTO prayer_periods (attendance_id, user_id, start_time, start_lat, start_lng)
              VALUES (?, ?, ?, ?, ?)`,
             [record.id, userId, now, latitude || null, longitude || null]
+        );
+
+        // Clear geo warning — geo enforcement paused during prayer
+        await pool.query(
+            'UPDATE staff_attendance SET geo_warning_started_at = NULL WHERE id = ?',
+            [record.id]
         );
 
         res.json({

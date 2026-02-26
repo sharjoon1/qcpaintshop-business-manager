@@ -265,6 +265,7 @@
         { key: 'hsn_or_sac', label: 'HSN/SAC', type: 'text', zohoField: 'hsn_or_sac', visible: true, filterable: true, width: 90 },
         { key: 'tax_percentage', label: 'Tax %', type: 'number', zohoField: 'tax_percentage', step: '0.01', visible: false, filterable: true, width: 65 },
         { key: 'brand', label: 'Brand', type: 'text', zohoField: 'brand', visible: true, filterable: true, width: 110 },
+        { key: 'category_name', label: 'Category', type: 'text', zohoField: 'category_name', visible: true, filterable: true, width: 120 },
         { key: 'manufacturer', label: 'Manufacturer', type: 'text', zohoField: 'manufacturer', visible: false, filterable: true, width: 110 },
         { key: 'reorder_level', label: 'Reorder Lvl', type: 'number', zohoField: 'reorder_level', step: '1', visible: false, filterable: true, width: 80 },
         { key: 'description', label: 'Description', type: 'textarea', zohoField: 'description', visible: false, filterable: true, width: 180 },
@@ -336,7 +337,7 @@
         document.getElementById('colDropdown').innerHTML = html;
     }
     function toggleColumn(idx, visible) { allColumns[idx].visible = visible; renderTableHead(); renderTable(); }
-    function setAllCols(show) { allColumns.forEach(function(c) { if (!c.sticky) c.visible = show; }); if (!show) { ['sku','rate','purchase_rate','cf_dpl','unit','brand','stock_on_hand'].forEach(function(k) { var c = allColumns.find(function(x){return x.key===k;}); if(c) c.visible = true; }); } buildColDropdown(); renderTableHead(); renderTable(); }
+    function setAllCols(show) { allColumns.forEach(function(c) { if (!c.sticky) c.visible = show; }); if (!show) { ['sku','rate','purchase_rate','cf_dpl','unit','brand','category_name','stock_on_hand'].forEach(function(k) { var c = allColumns.find(function(x){return x.key===k;}); if(c) c.visible = true; }); } buildColDropdown(); renderTableHead(); renderTable(); }
 
     // ============ % ADJUSTMENT ============
     function togglePctPopover() { document.getElementById('pctPopover').classList.toggle('hidden'); }

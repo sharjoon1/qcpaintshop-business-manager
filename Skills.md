@@ -393,7 +393,8 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Automatic nearest-branch detection on clock-in (uses GPS to match assigned branches)
 - Geo-fence violation logging
 - **Geo-fence auto clock-out**: staff 300m+ from branch → 5-minute grace period → auto clocked out with notification to BOTH staff AND all admins
-- **Auto-clockout tracking**: `auto_clockout_type` (geo/max_hours/admin/end_of_day) and `auto_clockout_distance` columns on attendance record
+- **Server-side geo enforcement**: `geo_warning_started_at`, `last_geo_check_at`, `last_geo_distance` columns on `staff_attendance`. Server checks every 5 min via `checkGeoWarnings()` in `auto-clockout.js` — auto-clocks out staff with expired geo warnings even if client is closed. Client resumes countdown from server timestamp on page reload (prevents refresh exploit).
+- **Auto-clockout tracking**: `auto_clockout_type` (geo/max_hours/admin/end_of_day/ot_timeout) and `auto_clockout_distance` columns on attendance record
 - **10 PM end-of-day force clock-out**: cron at 21:59 IST auto-clocks out all staff, ends active breaks/prayer/outside work, notifies via Socket.io
 - Late detection (configurable threshold per branch, shop opens 08:30 AM)
 - Work hours calculation
@@ -1754,6 +1755,16 @@ node promote-release.js internal production
 
 ## 8. RECENT UPDATES & CHANGELOG
 
+### 2026-02-26 - Server-Side Geo-Fence Enforcement
+- **Problem**: Client-side geo-fence monitoring reset on page refresh/app close — staff could exploit by refreshing
+- **Solution**: Server-side tracking + enforcement in `services/auto-clockout.js`
+- 3 new columns on `staff_attendance`: `geo_warning_started_at`, `last_geo_check_at`, `last_geo_distance`
+- `GET /geofence-check` now writes geo state to DB + returns `geo_warning_started_at` in response
+- `checkGeoWarnings()` runs every 5 min — finds expired geo warnings (>5 min), verifies not on break/prayer/outside-work, auto-clocks out
+- Client resumes countdown from server timestamp on page reload (no more refresh exploit)
+- Registered as `auto-clockout-geo-enforce` automation
+- **Migration**: `migrations/migrate-geo-enforcement.js`
+
 ### 2026-02-25 - BMAD Sprint 3: Production Monitoring & Self-Healing
 
 **Production Monitor** — `services/production-monitor.js`: Real-time health monitoring with self-healing:
@@ -2049,7 +2060,7 @@ Based on AI App Analyzer report, fixed critical production errors:
 - Android app v3.3.0 (versionCode 8) built and uploaded to Play Store internal track
 - Migration: `scripts/migrate-fix-break-enum.js` (ENUM fix + VAPID key generation)
 - Migration: `scripts/migrate-login-attendance-update.js` (distance columns + review_notes)
-- **Auto clock-out scheduler** (`services/auto-clockout.js`): Runs every 15 min, clocks out staff after 10h (weekdays) or 5h (Sunday), ends active breaks, notifies via Socket.io
+- **Auto clock-out scheduler** (`services/auto-clockout.js`): OT check + geo enforce every 5 min, 10 PM force clock-out. `checkGeoWarnings()` finds staff with `geo_warning_started_at` > 5 min, verifies no break/prayer/outside-work, auto-clocks out. 3 automations registered.
 - **Admin forced clock-out**: `POST /api/attendance/admin/force-clockout` + "Clock Out" button in Live Today table for staff still clocked in
 - Notifies staff on forced clock-out
 - **Break photo preview fix**: Moved `breakPreview` img out of camera container into separate `breakPhotoPreview` div (matches clock-in pattern)
