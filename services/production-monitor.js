@@ -24,8 +24,8 @@ function setResponseTracker(rt) { responseTracker = rt; }
 const DEFAULTS = {
     checkIntervalMs: 60000,          // Health check every 60s
     snapshotIntervalMs: 300000,      // Persist snapshot every 5 min
-    memoryWarningPct: 80,            // Warn at 80% heap usage
-    memoryCriticalPct: 90,           // Critical at 90% heap usage
+    memoryWarningMB: 512,             // Warn at 512MB RSS
+    memoryCriticalMB: 768,            // Critical at 768MB RSS
     eventLoopLagWarnMs: 100,         // Warn if event loop lag > 100ms
     eventLoopLagCriticalMs: 500,     // Critical if > 500ms
     dbPoolWarnPct: 80,               // Warn if 80% of connections used
@@ -86,8 +86,8 @@ function checkMemory() {
     const systemTotalMB = Math.round(os.totalmem() / 1024 / 1024);
 
     let status = 'healthy';
-    if (heapPct >= DEFAULTS.memoryCriticalPct) status = 'critical';
-    else if (heapPct >= DEFAULTS.memoryWarningPct) status = 'warning';
+    if (rssMB >= DEFAULTS.memoryCriticalMB) status = 'critical';
+    else if (rssMB >= DEFAULTS.memoryWarningMB) status = 'warning';
 
     return {
         status,
