@@ -133,7 +133,7 @@ router.post('/assign', requirePermission('zoho', 'stock_check'), async (req, res
 /** GET /api/stock-check/assignments — List assignments with filters */
 router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req, res) => {
     try {
-        const { branch_id, staff_id, status, from_date, to_date, page = 1, limit = 25 } = req.query;
+        const { branch_id, staff_id, status, from_date, to_date, page = 1, limit = 25, sort_by, sort_dir } = req.query;
         let where = 'WHERE 1=1';
         const params = [];
 
@@ -172,7 +172,7 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
              LEFT JOIN users reviewer ON a.reviewed_by = reviewer.id
              LEFT JOIN zoho_locations_map zlm ON a.zoho_location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
              ${where}
-             ORDER BY a.check_date DESC, a.created_at DESC
+             ORDER BY ${sort_by === 'status' ? `FIELD(a.status, 'pending','submitted','reviewed','adjusted') ${sort_dir === 'desc' ? 'DESC' : 'ASC'}, a.check_date DESC` : 'a.check_date DESC, a.created_at DESC'}
              LIMIT ? OFFSET ?`,
             [...params, parseInt(limit), offset]
         );

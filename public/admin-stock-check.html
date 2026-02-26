@@ -336,6 +336,8 @@ const API = '/api/stock-check';
 let selectedItems = []; // { zoho_item_id, item_name, sku, stock_on_hand }
 let searchTimeout = null;
 let histPage = 1;
+let histSortBy = '';
+let histSortDir = 'asc';
 
 // Branch Inventory state
 let allInventoryItems = [];
@@ -1195,6 +1197,7 @@ async function loadHistory(page) {
     if (status) params.set('status', status);
     if (from) params.set('from_date', from);
     if (to) params.set('to_date', to);
+    if (histSortBy) { params.set('sort_by', histSortBy); params.set('sort_dir', histSortDir); }
 
     const res = await apiFetch(API + '/assignments?' + params.toString());
     if (!res.success || !res.data || !res.data.length) {
@@ -1205,7 +1208,7 @@ async function loadHistory(page) {
 
     el.innerHTML = `
         <table class="sc-table">
-            <thead><tr><th>#</th><th>Branch</th><th>Location</th><th>Staff</th><th>Type</th><th>Date</th><th>Items</th><th>Discrepancies</th><th>Status</th><th>Created By</th><th></th></tr></thead>
+            <thead><tr><th>#</th><th>Branch</th><th>Location</th><th>Staff</th><th>Type</th><th>Date</th><th>Items</th><th>Discrepancies</th><th style="cursor:pointer;user-select:none" onclick="toggleHistSort('status')">${histSortBy === 'status' ? (histSortDir === 'asc' ? 'Status ▲' : 'Status ▼') : 'Status ⇅'}</th><th>Created By</th><th></th></tr></thead>
             <tbody>
                 ${res.data.map(a => {
                     const hasAdjusted = a.adjusted_count > 0;
@@ -1245,6 +1248,17 @@ async function loadHistory(page) {
         }
     }
     document.getElementById('histPagination').innerHTML = pHtml;
+}
+
+function toggleHistSort(col) {
+    if (histSortBy === col) {
+        if (histSortDir === 'asc') histSortDir = 'desc';
+        else { histSortBy = ''; histSortDir = 'asc'; } // 3rd click clears sort
+    } else {
+        histSortBy = col;
+        histSortDir = 'asc';
+    }
+    loadHistory(1);
 }
 
 async function deleteAssignment(id) {
