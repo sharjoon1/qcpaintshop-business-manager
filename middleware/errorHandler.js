@@ -76,9 +76,15 @@ async function logError(error, req, context = {}) {
             // Try to deduplicate
             const dedupResult = await errorAnalysisService.deduplicateError({ error_hash: errorHash });
             if (dedupResult && dedupResult.deduplicated) {
+                // Auto-create bug when chronic error crosses threshold (20 or 50 occurrences)
+                if (dedupResult.newCount === 20 || dedupResult.newCount === 50) {
+                    triggerAutoBugCreation(dedupResult.existingId);
+                }
                 return dedupResult.existingId;
             }
         }
+
+        const severity = context.severity || assessSeverity(error, req);
 
         const [result] = await pool.query(`
             INSERT INTO error_logs
@@ -98,7 +104,7 @@ async function logError(error, req, context = {}) {
             req?.headers?.['x-session-id'] || null,
             req?.ip || req?.connection?.remoteAddress || null,
             (req?.headers?.['user-agent'] || '').substring(0, 500),
-            context.severity || assessSeverity(error, req),
+            severity,
             errorHash,
             filePath,
             lineNumber,
@@ -107,12 +113,52 @@ async function logError(error, req, context = {}) {
             null // last_occurrence set by NOW() above
         ]);
 
-        return result.insertId;
+        const errorId = result.insertId;
+
+        // Auto-create bug report for critical/high severity errors
+        if (errorId && errorAnalysisService && (severity === 'critical' || severity === 'high')) {
+            triggerAutoBugCreation(errorId);
+        }
+
+        return errorId;
     } catch (logErr) {
         // Never let error logging break the app
         console.error('[ErrorHandler] Failed to log to DB:', logErr.message);
         return null;
     }
+}
+
+// ─── Auto Bug Creation (fire-and-forget) ─────────────────────
+
+function triggerAutoBugCreation(errorId) {
+    // Run async — never block error logging
+    setImmediate(async () => {
+        try {
+            // Check if bug tracking is enabled
+            const [configRows] = await pool.query(
+                "SELECT config_key, config_value FROM ai_config WHERE config_key IN ('bug_tracking_enabled', 'auto_fix_suggestions')"
+            );
+            const config = {};
+            for (const row of configRows) config[row.config_key] = row.config_value;
+
+            if (config.bug_tracking_enabled !== '1' && config.bug_tracking_enabled !== 'true') return;
+
+            const bugId = await errorAnalysisService.autoCreateBugFromError(errorId);
+            if (bugId) {
+                console.log(`[ErrorHandler] Auto-created bug #${bugId} from error #${errorId}`);
+                // Also trigger AI fix suggestion if enabled
+                if (config.auto_fix_suggestions === '1' || config.auto_fix_suggestions === 'true') {
+                    errorAnalysisService.generateFixSuggestion(errorId).then(suggestions => {
+                        if (suggestions && suggestions.length > 0) {
+                            console.log(`[ErrorHandler] Generated ${suggestions.length} AI fix suggestion(s) for error #${errorId}`);
+                        }
+                    }).catch(() => {}); // silent fail for AI suggestions
+                }
+            }
+        } catch (err) {
+            console.error('[ErrorHandler] Auto bug creation failed:', err.message);
+        }
+    });
 }
 
 // ─── Async Route Wrapper ──────────────────────────────────────

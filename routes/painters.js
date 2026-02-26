@@ -26,6 +26,19 @@ function setPool(p) {
 function setIO(ioInstance) { io = ioInstance; }
 function setSessionManager(sm) { sessionManager = sm; }
 
+// ─── Estimate Status History Logging ─────────────────────────
+async function logEstimateStatusChange(estimateId, oldStatus, newStatus, changedBy, notes) {
+    try {
+        await pool.query(
+            `INSERT INTO estimate_status_history (estimate_id, estimate_type, old_status, new_status, changed_by_user_id, notes, timestamp)
+             VALUES (?, 'painter', ?, ?, ?, ?, NOW())`,
+            [estimateId, oldStatus, newStatus, changedBy, notes || null]
+        );
+    } catch (err) {
+        console.error('[Painters] Failed to log estimate status change:', err.message);
+    }
+}
+
 // ═══════════════════════════════════════════
 // PAINTER AUTH MIDDLEWARE
 // ═══════════════════════════════════════════
@@ -646,6 +659,7 @@ router.post('/me/estimates/:estimateId/submit', requirePainterAuth, async (req, 
         if (items[0].cnt === 0) return res.status(400).json({ success: false, message: 'Add at least one item before submitting' });
 
         await pool.query("UPDATE painter_estimates SET status = 'pending_admin' WHERE id = ?", [estimates[0].id]);
+        await logEstimateStatusChange(estimates[0].id, 'draft', 'pending_admin', req.painter.id, 'Painter submitted for review');
         res.json({ success: true, message: 'Estimate submitted for admin review' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to submit estimate' });
@@ -662,6 +676,7 @@ router.delete('/me/estimates/:estimateId', requirePainterAuth, async (req, res) 
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Draft estimate not found' });
 
         await pool.query("UPDATE painter_estimates SET status = 'cancelled' WHERE id = ?", [estimates[0].id]);
+        await logEstimateStatusChange(estimates[0].id, 'draft', 'cancelled', req.painter.id, 'Painter cancelled estimate');
         res.json({ success: true, message: 'Estimate cancelled' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to cancel estimate' });
@@ -1063,6 +1078,7 @@ router.put('/estimates/:estimateId/review', requirePermission('painters', 'estim
                 "UPDATE painter_estimates SET status = 'rejected', admin_notes = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?",
                 [admin_notes || null, req.user.id, estimate.id]
             );
+            await logEstimateStatusChange(estimate.id, estimate.status, 'rejected', req.user.id, admin_notes || 'Rejected by admin');
             return res.json({ success: true, message: 'Estimate rejected' });
         }
 
@@ -1083,6 +1099,7 @@ router.put('/estimates/:estimateId/review', requirePermission('painters', 'estim
             "UPDATE painter_estimates SET status = ?, admin_notes = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?",
             [newStatus, admin_notes || null, req.user.id, estimate.id]
         );
+        await logEstimateStatusChange(estimate.id, estimate.status, newStatus, req.user.id, admin_notes || 'Approved by admin');
 
         res.json({ success: true, message: `Estimate ${newStatus === 'admin_review' ? 'approved - set markup prices next' : 'approved'}`, status: newStatus });
     } catch (error) {
@@ -1127,6 +1144,7 @@ router.post('/estimates/:estimateId/markup', requirePermission('painters', 'esti
              status = 'approved', reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
             [markupSubtotal, markupGst, markupGrandTotal, req.user.id, estimates[0].id]
         );
+        await logEstimateStatusChange(estimates[0].id, estimates[0].status, 'approved', req.user.id, 'Markup prices set and approved');
 
         res.json({ success: true, message: 'Markup prices set and estimate approved', markupGrandTotal });
     } catch (error) {
@@ -1148,10 +1166,12 @@ router.post('/estimates/:estimateId/share', requirePermission('painters', 'estim
         const token = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
+        const oldStatus = estimate.status;
         await pool.query(
             "UPDATE painter_estimates SET share_token = ?, share_token_expires_at = ?, status = 'sent_to_customer' WHERE id = ?",
             [token, expiresAt, estimate.id]
         );
+        await logEstimateStatusChange(estimate.id, oldStatus, 'sent_to_customer', req.user.id, 'Share link generated for customer');
 
         const shareUrl = `${req.protocol}://${req.get('host')}/share/painter-estimate/${token}`;
         const waText = `Hi ${estimate.customer_name || 'Customer'},\n\nHere is your paint estimate from Quality Colours:\n${shareUrl}\n\nEstimate #: ${estimate.estimate_number}\nTotal: ₹${parseFloat(estimate.markup_grand_total).toLocaleString('en-IN')}\n\nPlease review and confirm. Thank you!`;
@@ -1186,6 +1206,7 @@ router.post('/estimates/:estimateId/payment', requirePermission('painters', 'est
              payment_amount = ?, payment_recorded_by = ?, payment_recorded_at = NOW() WHERE id = ?`,
             [payment_method, payment_reference || null, amount, req.user.id, estimate.id]
         );
+        await logEstimateStatusChange(estimate.id, estimate.status, 'payment_recorded', req.user.id, `Payment: ${payment_method}${payment_reference ? ' ref:' + payment_reference : ''}`);
 
         res.json({ success: true, message: 'Payment recorded' });
     } catch (error) {
@@ -1329,6 +1350,7 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
              pointsResult.regularPoints || 0, pointsResult.annualPoints || 0,
              estimate.id]
         );
+        await logEstimateStatusChange(estimate.id, 'payment_recorded', 'pushed_to_zoho', req.user.id, `Zoho invoice: ${invoiceNumber}`);
 
         res.json({
             success: true,
