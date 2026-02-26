@@ -172,7 +172,7 @@ router.get('/assignments', requirePermission('zoho', 'stock_check'), async (req,
              LEFT JOIN users reviewer ON a.reviewed_by = reviewer.id
              LEFT JOIN zoho_locations_map zlm ON a.zoho_location_id = zlm.zoho_location_id COLLATE utf8mb4_unicode_ci
              ${where}
-             ORDER BY ${sort_by === 'status' ? `FIELD(a.status, 'pending','submitted','reviewed','adjusted') ${sort_dir === 'desc' ? 'DESC' : 'ASC'}, a.check_date DESC` : 'a.check_date DESC, a.created_at DESC'}
+             ORDER BY ${sort_by === 'status' ? `FIELD(a.status, 'pending','submitted','reviewed','adjusted','cancelled') ${sort_dir === 'desc' ? 'DESC' : 'ASC'}, a.check_date DESC` : 'a.check_date DESC, a.created_at DESC'}
              LIMIT ? OFFSET ?`,
             [...params, parseInt(limit), offset]
         );
@@ -1094,6 +1094,73 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
 });
 
 // ========================================
+// ADMIN: CANCEL ASSIGNMENT
+// ========================================
+
+/** POST /api/stock-check/assignments/:id/cancel — Cancel a submitted stock check */
+router.post('/assignments/:id/cancel', requirePermission('zoho', 'stock_check'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+
+        const [assignment] = await pool.query(
+            'SELECT id, status FROM stock_check_assignments WHERE id = ?', [id]
+        );
+        if (!assignment.length) return res.status(404).json({ success: false, message: 'Assignment not found' });
+
+        const current = assignment[0].status;
+        if (current === 'adjusted') {
+            return res.status(400).json({ success: false, message: 'Cannot cancel an already adjusted assignment' });
+        }
+        if (current === 'cancelled') {
+            return res.status(400).json({ success: false, message: 'Assignment is already cancelled' });
+        }
+
+        await pool.query(
+            `UPDATE stock_check_assignments SET status = 'cancelled', cancelled_by = ?, cancelled_at = NOW(), cancel_reason = ? WHERE id = ?`,
+            [req.user.id, reason || null, id]
+        );
+
+        res.json({ success: true, message: 'Assignment cancelled' });
+    } catch (error) {
+        console.error('Cancel assignment error:', error);
+        res.status(500).json({ success: false, message: 'Failed to cancel assignment' });
+    }
+});
+
+/** POST /api/stock-check/assignments/:id/reopen — Reopen a cancelled assignment back to submitted */
+router.post('/assignments/:id/reopen', requirePermission('zoho', 'stock_check'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [assignment] = await pool.query(
+            'SELECT id, status FROM stock_check_assignments WHERE id = ?', [id]
+        );
+        if (!assignment.length) return res.status(404).json({ success: false, message: 'Assignment not found' });
+
+        if (assignment[0].status !== 'cancelled') {
+            return res.status(400).json({ success: false, message: 'Only cancelled assignments can be reopened' });
+        }
+
+        // Check if there are submitted items — reopen as submitted; otherwise as pending
+        const [items] = await pool.query(
+            `SELECT COUNT(*) as submitted FROM stock_check_items WHERE assignment_id = ? AND item_status = 'submitted'`, [id]
+        );
+        const newStatus = items[0].submitted > 0 ? 'submitted' : 'pending';
+
+        await pool.query(
+            `UPDATE stock_check_assignments SET status = ?, cancelled_by = NULL, cancelled_at = NULL, cancel_reason = NULL WHERE id = ?`,
+            [newStatus, id]
+        );
+
+        res.json({ success: true, message: `Assignment reopened as ${newStatus}` });
+    } catch (error) {
+        console.error('Reopen assignment error:', error);
+        res.status(500).json({ success: false, message: 'Failed to reopen assignment' });
+    }
+});
+
+// ========================================
 // ADMIN: DASHBOARD STATS
 // ========================================
 
@@ -1113,7 +1180,8 @@ router.get('/dashboard', requirePermission('zoho', 'stock_check'), async (req, r
                     SUM(CASE WHEN a.status = 'pending' THEN 1 ELSE 0 END) as pending_count,
                     SUM(CASE WHEN a.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
                     SUM(CASE WHEN a.status = 'reviewed' THEN 1 ELSE 0 END) as reviewed_count,
-                    SUM(CASE WHEN a.status = 'adjusted' THEN 1 ELSE 0 END) as adjusted_count
+                    SUM(CASE WHEN a.status = 'adjusted' THEN 1 ELSE 0 END) as adjusted_count,
+                    SUM(CASE WHEN a.status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_count
              FROM branches b
              LEFT JOIN stock_check_assignments a ON b.id = a.branch_id ${dateFilter}
              WHERE b.status = 'active'

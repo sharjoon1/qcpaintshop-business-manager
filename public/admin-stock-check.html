@@ -40,6 +40,7 @@
         .status-submitted { background: #dbeafe; color: #1e40af; }
         .status-reviewed { background: #d1fae5; color: #065f46; }
         .status-adjusted { background: #ede9fe; color: #5b21b6; }
+        .status-cancelled { background: #fee2e2; color: #991b1b; }
 
         .diff-positive { color: #059669; font-weight: 600; }
         .diff-negative { color: #dc2626; font-weight: 600; }
@@ -296,6 +297,7 @@
                             <option value="submitted">Submitted</option>
                             <option value="reviewed">Reviewed</option>
                             <option value="adjusted">Adjusted</option>
+                            <option value="cancelled">Cancelled</option>
                         </select>
                     </div>
                     <div>
@@ -1001,22 +1003,42 @@ async function openReview(id) {
         </div>
     `;
 
-    // Action buttons — show if there are submitted (not yet adjusted) items
-    if (s.submittedCount > 0) {
+    // Action buttons
+    const cancelBtn = `<button onclick="cancelAssignment(${d.id})" class="px-4 py-2 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition ml-auto">Cancel</button>`;
+    const reopenBtn = `<button onclick="reopenAssignment(${d.id})" class="px-4 py-2 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition">Reopen for Review</button>`;
+
+    if (d.status === 'cancelled') {
         html += `
-            <div class="flex gap-2 mt-4 pt-3 border-t border-gray-200" id="reviewActions-${d.id}">
+            <div class="flex gap-2 mt-4 pt-3 border-t border-gray-200 items-center">
+                <span class="text-xs text-red-600 font-medium">Cancelled${d.cancel_reason ? ': ' + d.cancel_reason : ''}</span>
+                ${reopenBtn}
+            </div>
+        `;
+    } else if (s.submittedCount > 0) {
+        html += `
+            <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-gray-200 items-center" id="reviewActions-${d.id}">
                 ${s.pushableCount > 0
                     ? `<button onclick="pushAdjustment(${d.id})" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition">Push ${s.pushableCount} Discrepancies to Zoho</button>`
                     : ''}
                 <button onclick="markReviewed(${d.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition">${s.pushableCount > 0 ? 'Push All (incl. zero-diff)' : 'Mark as Adjusted (No Discrepancies)'}</button>
+                ${cancelBtn}
             </div>
         `;
     } else if (d.status === 'submitted') {
-        // Fully submitted but no items with submitted status (legacy data or all adjusted)
         html += `
-            <div class="flex gap-2 mt-4 pt-3 border-t border-gray-200">
+            <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-gray-200 items-center">
                 <button onclick="markReviewed(${d.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition">Mark Reviewed</button>
                 ${s.discrepancyCount > 0 ? `<button onclick="pushAdjustment(${d.id})" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition">Push Adjustment to Zoho (${s.discrepancyCount} items)</button>` : ''}
+                ${cancelBtn}
+            </div>
+        `;
+    } else if (d.status === 'pending') {
+        html += `
+            <div class="flex gap-2 mt-4 pt-3 border-t border-gray-200 items-center">
+                ${s.submittedCount === 0 && s.adjustedCount > 0 && s.pendingCount > 0
+                    ? '<p class="text-xs text-amber-600 font-medium">Waiting for staff to submit more items (' + s.pendingCount + ' remaining)</p>'
+                    : ''}
+                ${cancelBtn}
             </div>
         `;
     } else if (s.submittedCount === 0 && s.adjustedCount > 0 && s.pendingCount > 0) {
@@ -1062,6 +1084,27 @@ function closeReview() {
 function showPhoto(url) {
     document.getElementById('photoModalImg').src = url;
     document.getElementById('photoModal').style.display = 'block';
+}
+
+async function cancelAssignment(id) {
+    const reason = prompt('Reason for cancellation (optional):');
+    if (reason === null) return; // user pressed Cancel on prompt
+    const res = await apiPost(API + '/assignments/' + id + '/cancel', { reason: reason || '' });
+    showToast(res.message || 'Cancelled', res.success ? 'success' : 'error');
+    if (res.success) {
+        openReview(id);
+        loadReviewList();
+    }
+}
+
+async function reopenAssignment(id) {
+    if (!confirm('Reopen this cancelled assignment for review?')) return;
+    const res = await apiPost(API + '/assignments/' + id + '/reopen', {});
+    showToast(res.message || 'Reopened', res.success ? 'success' : 'error');
+    if (res.success) {
+        openReview(id);
+        loadReviewList();
+    }
 }
 
 async function markReviewed(id) {
@@ -1230,6 +1273,7 @@ async function loadHistory(page) {
                     <td>
                         ${a.status === 'pending' && !hasAdjusted ? '<button onclick="deleteAssignment(' + a.id + ')" class="text-xs text-red-500 hover:text-red-700">Delete</button>' : ''}
                         ${a.status === 'submitted' || isPartial ? '<button onclick="openReview(' + a.id + ')" class="text-xs text-indigo-600 hover:text-indigo-800">Review</button>' : ''}
+                        ${a.status === 'cancelled' ? '<button onclick="reopenAssignment(' + a.id + ')" class="text-xs text-amber-600 hover:text-amber-800">Reopen</button>' : ''}
                         ${a.status !== 'pending' ? '<button onclick="viewDetail(' + a.id + ')" class="text-xs text-gray-500 hover:text-gray-700 ml-1">View</button>' : ''}
                         ${isPartial ? '<button onclick="viewDetail(' + a.id + ')" class="text-xs text-gray-500 hover:text-gray-700 ml-1">View</button>' : ''}
                     </td>
