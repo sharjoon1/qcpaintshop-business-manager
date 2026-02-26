@@ -36,6 +36,15 @@ async function migrate() {
         console.log('- cancelled columns already exist');
     }
 
+    // Also fix whatsapp_messages source column — ENUM too restrictive, change to VARCHAR
+    const [srcCol] = await pool.query(`SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'whatsapp_messages' AND COLUMN_NAME = 'source'`);
+    if (srcCol.length && srcCol[0].COLUMN_TYPE.startsWith('enum')) {
+        await pool.query(`ALTER TABLE whatsapp_messages MODIFY COLUMN source VARCHAR(50) DEFAULT 'incoming'`);
+        console.log('✓ Changed whatsapp_messages.source from ENUM to VARCHAR(50)');
+    } else {
+        console.log('- whatsapp_messages.source already VARCHAR');
+    }
+
     console.log('Done!');
     await pool.end();
     process.exit(0);
