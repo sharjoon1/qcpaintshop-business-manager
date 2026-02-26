@@ -292,6 +292,42 @@
             border-color: #667eea;
         }
 
+        /* Item search */
+        .item-search-wrap {
+            position: relative;
+            margin-bottom: 12px;
+        }
+        .item-search-wrap svg {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: #94a3b8;
+            pointer-events: none;
+        }
+        .item-search {
+            width: 100%;
+            padding: 10px 12px 10px 36px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            outline: none;
+            transition: border-color 0.2s;
+            background: #f8fafc;
+        }
+        .item-search:focus { border-color: #667eea; background: white; }
+        .item-search-count {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.65rem;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
         /* Save progress button */
         .save-progress-btn {
             width: 100%;
@@ -669,6 +705,16 @@ function renderAssignment(a) {
             <button class="filter-tab" data-filter="locked" onclick="filterItems(${a.id}, 'locked', this)">Submitted (<span id="filter-locked-${a.id}">${lockedCnt}</span>)</button>
             <button class="filter-tab" data-filter="diff" onclick="filterItems(${a.id}, 'diff', this)">Diff (<span id="filter-diff-${a.id}">${discrepancies}</span>)</button>
         </div>`;
+
+    // Search input for filtering items by name/SKU
+    if (total > 10) {
+        html += `
+            <div class="item-search-wrap" id="search-wrap-${a.id}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" class="item-search" id="item-search-${a.id}" placeholder="Search items by name or SKU..." oninput="searchItems(${a.id}, this.value)">
+                <span class="item-search-count" id="search-count-${a.id}"></span>
+            </div>`;
+    }
 
     if (a.items) {
         html += `<div id="items-container-${a.id}">`;
@@ -1208,20 +1254,23 @@ function filterItems(assignmentId, filter, clickedBtn) {
         }
     }
 
-    // Show/hide items
+    // Show/hide items (respects both filter tab and search term)
     const container = document.getElementById(`items-container-${assignmentId}`);
     if (!container) return;
 
+    const searchTerm = (activeSearches[assignmentId] || '').toLowerCase();
     const cards = container.querySelectorAll('.item-card');
+    let visible = 0;
+
     cards.forEach(card => {
         const status = card.getAttribute('data-status');
-        let show = false;
+        let matchesFilter = false;
 
         switch (filter) {
-            case 'all': show = true; break;
-            case 'unchecked': show = status === 'unchecked'; break;
-            case 'checked': show = status === 'checked'; break;
-            case 'locked': show = status === 'submitted' || status === 'adjusted'; break;
+            case 'all': matchesFilter = true; break;
+            case 'unchecked': matchesFilter = status === 'unchecked'; break;
+            case 'checked': matchesFilter = status === 'checked'; break;
+            case 'locked': matchesFilter = status === 'submitted' || status === 'adjusted'; break;
             case 'diff':
                 if (status === 'checked') {
                     const zohoId = card.getAttribute('data-zoho-id');
@@ -1232,14 +1281,87 @@ function filterItems(assignmentId, filter, clickedBtn) {
                     if (qtyInput && item) {
                         const reported = parseFloat(qtyInput.value);
                         const system = parseFloat(item.system_qty) || 0;
-                        show = !isNaN(reported) && reported !== system;
+                        matchesFilter = !isNaN(reported) && reported !== system;
                     }
                 }
                 break;
         }
 
+        // Also respect search term
+        let matchesSearch = true;
+        if (searchTerm) {
+            const name = (card.querySelector('.item-name') || {}).textContent || '';
+            const sku = (card.querySelector('.item-sku') || {}).textContent || '';
+            matchesSearch = name.toLowerCase().indexOf(searchTerm) !== -1 || sku.toLowerCase().indexOf(searchTerm) !== -1;
+        }
+
+        const show = matchesFilter && matchesSearch;
         card.style.display = show ? '' : 'none';
+        if (show) visible++;
     });
+
+    // Update search count if search is active
+    const countEl = document.getElementById(`search-count-${assignmentId}`);
+    if (countEl && searchTerm) {
+        countEl.textContent = visible + ' found';
+    }
+}
+
+// ========================================
+// ITEM SEARCH (within assignment)
+// ========================================
+var activeSearches = {}; // { assignmentId: searchTerm }
+
+function searchItems(assignmentId, term) {
+    term = (term || '').trim().toLowerCase();
+    activeSearches[assignmentId] = term;
+
+    const container = document.getElementById(`items-container-${assignmentId}`);
+    if (!container) return;
+
+    const activeFilter = activeFilters[assignmentId] || 'all';
+    const cards = container.querySelectorAll('.item-card');
+    let visible = 0;
+
+    cards.forEach(card => {
+        const name = (card.querySelector('.item-name') || {}).textContent || '';
+        const sku = (card.querySelector('.item-sku') || {}).textContent || '';
+        const matchesSearch = !term || name.toLowerCase().indexOf(term) !== -1 || sku.toLowerCase().indexOf(term) !== -1;
+
+        // Also respect the active filter tab
+        const status = card.getAttribute('data-status');
+        let matchesFilter = true;
+        switch (activeFilter) {
+            case 'unchecked': matchesFilter = status === 'unchecked'; break;
+            case 'checked': matchesFilter = status === 'checked'; break;
+            case 'locked': matchesFilter = status === 'submitted' || status === 'adjusted'; break;
+            case 'diff':
+                matchesFilter = false;
+                if (status === 'checked') {
+                    const zohoId = card.getAttribute('data-zoho-id');
+                    const aid = card.getAttribute('data-assignment');
+                    const qtyInput = document.getElementById(`qty-${aid}-${zohoId}`);
+                    const a = assignments.find(x => x.id == aid);
+                    const item = a && a.items ? a.items.find(i => i.zoho_item_id === zohoId) : null;
+                    if (qtyInput && item) {
+                        const reported = parseFloat(qtyInput.value);
+                        const system = parseFloat(item.system_qty) || 0;
+                        matchesFilter = !isNaN(reported) && reported !== system;
+                    }
+                }
+                break;
+        }
+
+        const show = matchesSearch && matchesFilter;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+
+    // Update search count badge
+    const countEl = document.getElementById(`search-count-${assignmentId}`);
+    if (countEl) {
+        countEl.textContent = term ? visible + ' found' : '';
+    }
 }
 
 // ========================================
