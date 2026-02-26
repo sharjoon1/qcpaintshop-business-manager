@@ -19,7 +19,7 @@ async function collectStaffData(period = 'daily') {
         SELECT
             u.full_name, u.id as user_id, b.name as branch_name,
             sa.clock_in_time, sa.clock_out_time, sa.date,
-            sa.total_working_minutes, sa.total_break_minutes, sa.overtime_minutes,
+            sa.total_working_minutes, sa.break_duration_minutes as total_break_minutes, sa.overtime_minutes,
             sa.prayer_minutes, sa.outside_work_minutes,
             sa.excess_break_minutes, sa.break_exceeded,
             sa.auto_clockout_type,
@@ -68,7 +68,7 @@ async function collectStaffData(period = 'daily') {
 
     // Break excess
     const [breakExcess] = await pool.query(`
-        SELECT u.full_name, sa.total_break_minutes, sa.excess_break_minutes, sa.break_allowance_minutes
+        SELECT u.full_name, sa.break_duration_minutes as total_break_minutes, sa.excess_break_minutes, sa.break_allowance_minutes
         FROM staff_attendance sa
         JOIN users u ON sa.user_id = u.id
         WHERE sa.date = CURDATE() AND sa.excess_break_minutes > 0
@@ -96,7 +96,7 @@ async function collectStaffData(period = 'daily') {
             COUNT(*) as total_present,
             COALESCE(AVG(total_working_minutes), 0) as avg_working_minutes,
             COALESCE(SUM(overtime_minutes), 0) as total_overtime_minutes,
-            COALESCE(SUM(total_break_minutes), 0) as total_break_minutes,
+            COALESCE(SUM(break_duration_minutes), 0) as total_break_minutes,
             COUNT(CASE WHEN auto_clockout_type IS NOT NULL THEN 1 END) as auto_clockouts
         FROM staff_attendance
         WHERE date = CURDATE()
@@ -112,7 +112,7 @@ async function collectStaffData(period = 'daily') {
                 u.full_name, u.id as user_id,
                 COUNT(DISTINCT sa.date) as days_present,
                 COALESCE(AVG(sa.total_working_minutes), 0) as avg_working,
-                COALESCE(AVG(sa.total_break_minutes), 0) as avg_break,
+                COALESCE(AVG(sa.break_duration_minutes), 0) as avg_break,
                 COALESCE(SUM(sa.excess_break_minutes), 0) as total_excess_break,
                 COALESCE(SUM(sa.overtime_minutes), 0) as total_overtime
             FROM users u
