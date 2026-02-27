@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>My Leads - QC Paint Shop Business Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        /* Scrollbar for horizontal scroll containers */
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Lead card hover lift */
+        .lead-card {
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .lead-card:active { transform: scale(0.985); }
+        @media (hover: hover) {
+            .lead-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1); }
+        }
+
+        /* Priority border pulse for overdue */
+        .lead-card.overdue { animation: overdue-pulse 2.5s ease-in-out infinite; }
+        @keyframes overdue-pulse {
+            0%, 100% { border-left-color: #ef4444; }
+            50% { border-left-color: #fca5a5; }
+        }
+
+        /* Pipeline column drag feel */
+        .pipe-col { min-height: 120px; }
+        .pipe-card {
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .pipe-card:active { transform: scale(0.97); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+        /* Detail panel slide */
+        .detail-panel {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(100%);
+        }
+        .detail-panel.open { transform: translateX(0); }
+
+        /* Modal backdrop */
+        .modal-backdrop {
+            transition: opacity 0.2s ease;
+        }
+
+        /* Tab active underline effect */
+        .filter-tab {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .filter-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 3px;
+            border-radius: 2px;
+            background: white;
+        }
+
+        /* Status flow buttons */
+        .status-btn {
+            transition: all 0.15s ease;
+        }
+        .status-btn:hover { transform: translateY(-1px); }
+        .status-btn.current {
+            ring: 2px;
+            box-shadow: 0 0 0 2px #667eea;
+        }
+
+        /* Followup timeline */
+        .timeline-line {
+            position: absolute;
+            left: 15px;
+            top: 32px;
+            bottom: 0;
+            width: 2px;
+            background: #e5e7eb;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: 8px;
+            top: 6px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 3px solid;
+            background: white;
+            z-index: 1;
+        }
+
+        /* Skeleton loading */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Toast animation */
+        .toast-enter { animation: toast-in 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards; }
+        .toast-exit { animation: toast-out 0.3s ease forwards; }
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes toast-out {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(10px) scale(0.95); }
+        }
+
+        /* View toggle */
+        .view-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        /* Stat card micro-interaction */
+        .stat-card-custom {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stat-card-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px -4px rgba(0,0,0,0.12);
+        }
+
+        /* Action button ripple */
+        .action-btn {
+            position: relative;
+            overflow: hidden;
+        }
+        .action-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: currentColor;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .action-btn:active::after { opacity: 0.08; }
+
+        /* Safe area padding for mobile */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="my-leads">
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <div id="mainContent" class="px-4 sm:px-6 lg:px-8 py-4 pb-6 max-w-5xl mx-auto">
+
+        <!-- SECTION 1: Header -->
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white rounded-2xl shadow-lg p-5 sm:p-6 mb-5 relative overflow-hidden">
+            <!-- Decorative circles -->
+            <div class="absolute -top-8 -right-8 w-32 h-32 bg-white/5 rounded-full"></div>
+            <div class="absolute -bottom-4 -left-4 w-20 h-20 bg-white/5 rounded-full"></div>
+            <div class="flex items-center justify-between relative z-10">
+                <div>
+                    <h1 class="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">My Leads</h1>
+                    <p class="text-indigo-200 mt-1 text-xs sm:text-sm">Manage your leads and follow-ups</p>
+                </div>
+                <button onclick="openAddModal()" class="bg-white text-indigo-600 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-semibold hover:bg-indigo-50 transition flex items-center gap-1.5 shadow-md text-sm sm:text-base">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                    <span class="hidden sm:inline">Add Lead</span>
+                    <span class="sm:hidden">Add</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- SECTION 2: Stats Cards (horizontal scroll on mobile) -->
+        <div class="flex gap-3 overflow-x-auto scroll-hide pb-1 mb-5 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div class="stat-card-custom bg-white rounded-xl shadow-sm p-3.5 sm:p-4 min-w-[130px] flex-shrink-0 sm:flex-1 border border-gray-100">
+                <div class="flex items-center gap-2 mb-1.5">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total</span>
+                </div>
+                <div id="statTotal" class="text-2xl font-bold text-gray-800">-</div>
+            </div>
+            <div class="stat-card-custom bg-white rounded-xl shadow-sm p-3.5 sm:p-4 min-w-[130px] flex-shrink-0 sm:flex-1 border border-gray-100">
+                <div class="flex items-center gap-2 mb-1.5">
+                    <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                    </div>
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">New Today</span>
+                </div>
+                <div id="statNewToday" class="text-2xl font-bold text-blue-600">-</div>
+            </div>
+            <div class="stat-card-custom bg-white rounded-xl shadow-sm p-3.5 sm:p-4 min-w-[130px] flex-shrink-0 sm:flex-1 border border-gray-100">
+                <div class="flex items-center gap-2 mb-1.5">
+                    <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Follow-ups</span>
+                </div>
+                <div id="statFollowupsToday" class="text-2xl font-bold text-amber-600">-</div>
+            </div>
+            <div class="stat-card-custom bg-white rounded-xl shadow-sm p-3.5 sm:p-4 min-w-[130px] flex-shrink-0 sm:flex-1 border border-gray-100">
+                <div class="flex items-center gap-2 mb-1.5">
+                    <div class="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Overdue</span>
+                </div>
+                <div id="statOverdue" class="text-2xl font-bold text-red-500">-</div>
+            </div>
+            <div class="stat-card-custom bg-white rounded-xl shadow-sm p-3.5 sm:p-4 min-w-[130px] flex-shrink-0 sm:flex-1 border border-gray-100">
+                <div class="flex items-center gap-2 mb-1.5">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Converted</span>
+                </div>
+                <div id="statConverted" class="text-2xl font-bold text-emerald-600">-</div>
+            </div>
+        </div>
+
+        <!-- SECTION 3: Filter Tabs -->
+        <div class="flex gap-2 overflow-x-auto scroll-hide mb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <button data-tab="all" onclick="loadLeads('all')" class="filter-tab active flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold bg-indigo-600 text-white transition-all">
+                All
+            </button>
+            <button data-tab="today" onclick="loadLeads('today')" class="filter-tab flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-200 transition-all hover:border-indigo-300">
+                Today's
+            </button>
+            <button data-tab="overdue" onclick="loadLeads('overdue')" class="filter-tab flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-200 transition-all hover:border-indigo-300">
+                Overdue
+            </button>
+            <button data-tab="new" onclick="loadLeads('new')" class="filter-tab flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-200 transition-all hover:border-indigo-300">
+                New
+            </button>
+            <button data-tab="hot" onclick="loadLeads('hot')" class="filter-tab flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-200 transition-all hover:border-indigo-300">
+                Hot (80+)
+            </button>
+        </div>
+
+        <!-- SECTION 4: Search Bar -->
+        <div class="mb-4 relative">
+            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" id="searchInput" placeholder="Search leads by name, phone, email..."
+                class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm bg-white shadow-sm transition-shadow focus:shadow-md">
+            <button id="clearSearch" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1" onclick="clearSearchInput()">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <!-- SECTION 5: View Toggle -->
+        <div class="flex items-center justify-between mb-4">
+            <div class="text-sm text-gray-500" id="leadCount">Loading...</div>
+            <div class="flex bg-gray-100 rounded-lg p-0.5">
+                <button onclick="toggleView('list')" id="viewList" class="view-btn active px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    List
+                </button>
+                <button onclick="toggleView('pipeline')" id="viewPipeline" class="view-btn px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 text-gray-500 transition-all">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+                    Pipeline
+                </button>
+            </div>
+        </div>
+
+        <!-- SECTION 6: Lead Cards (List View) -->
+        <div id="leadsContainer" class="space-y-3">
+            <!-- Skeleton loading -->
+            <div class="skeleton h-32 w-full"></div>
+            <div class="skeleton h-32 w-full"></div>
+            <div class="skeleton h-32 w-full"></div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-16 px-6">
+            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <p class="text-gray-800 font-semibold text-lg mb-1">No leads found</p>
+            <p class="text-gray-400 text-sm mb-5">Try adjusting your filters or add a new lead</p>
+            <button onclick="openAddModal()" class="inline-flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                Add Your First Lead
+            </button>
+        </div>
+
+        <!-- SECTION 7: Pipeline View -->
+        <div id="pipelineView" class="hidden overflow-x-auto scroll-hide pb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div class="flex gap-3 min-w-max">
+                <!-- New -->
+                <div class="w-56 sm:w-64 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <h3 class="font-semibold text-xs mb-3 text-gray-600 flex items-center justify-between uppercase tracking-wider">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span> New
+                        </span>
+                        <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold" id="pipeNew">0</span>
+                    </h3>
+                    <div class="space-y-2 pipe-col" id="pipeNewCards"></div>
+                </div>
+                <!-- Contacted -->
+                <div class="w-56 sm:w-64 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <h3 class="font-semibold text-xs mb-3 text-gray-600 flex items-center justify-between uppercase tracking-wider">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-yellow-500"></span> Contacted
+                        </span>
+                        <span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-xs font-bold" id="pipeContacted">0</span>
+                    </h3>
+                    <div class="space-y-2 pipe-col" id="pipeContactedCards"></div>
+                </div>
+                <!-- Interested -->
+                <div class="w-56 sm:w-64 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <h3 class="font-semibold text-xs mb-3 text-gray-600 flex items-center justify-between uppercase tracking-wider">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-green-500"></span> Interested
+                        </span>
+                        <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold" id="pipeInterested">0</span>
+                    </h3>
+                    <div class="space-y-2 pipe-col" id="pipeInterestedCards"></div>
+                </div>
+                <!-- Quoted -->
+                <div class="w-56 sm:w-64 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <h3 class="font-semibold text-xs mb-3 text-gray-600 flex items-center justify-between uppercase tracking-wider">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-purple-500"></span> Quoted
+                        </span>
+                        <span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-bold" id="pipeQuoted">0</span>
+                    </h3>
+                    <div class="space-y-2 pipe-col" id="pipeQuotedCards"></div>
+                </div>
+                <!-- Negotiating -->
+                <div class="w-56 sm:w-64 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <h3 class="font-semibold text-xs mb-3 text-gray-600 flex items-center justify-between uppercase tracking-wider">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-orange-500"></span> Negotiating
+                        </span>
+                        <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-bold" id="pipeNegotiating">0</span>
+                    </h3>
+                    <div class="space-y-2 pipe-col" id="pipeNegotiatingCards"></div>
+                </div>
+                <!-- Won -->
+                <div class="w-56 sm:w-64 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <h3 class="font-semibold text-xs mb-3 text-gray-600 flex items-center justify-between uppercase tracking-wider">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Won
+                        </span>
+                        <span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-xs font-bold" id="pipeWon">0</span>
+                    </h3>
+                    <div class="space-y-2 pipe-col" id="pipeWonCards"></div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /mainContent -->
+
+    <!-- ========== ADD/EDIT LEAD MODAL ========== -->
+    <div id="leadModal" class="hidden fixed inset-0 z-[9999]">
+        <div class="modal-backdrop absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('leadModal')"></div>
+        <div class="absolute inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:w-full sm:max-h-[90vh] bg-white sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-4 sm:p-5 border-b border-gray-100 bg-gradient-to-r from-indigo-600 to-purple-700 text-white sm:rounded-t-2xl flex-shrink-0">
+                <h2 id="modalTitle" class="text-lg font-bold">Add New Lead</h2>
+                <button onclick="closeModal('leadModal')" class="p-1.5 hover:bg-white/20 rounded-lg transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <!-- Modal Body -->
+            <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 min-h-0">
+                <input type="hidden" id="leadId" value="">
+
+                <!-- Name (required) -->
+                <div>
+                    <label class="form-label">Name <span class="text-red-500">*</span></label>
+                    <input type="text" id="leadName" placeholder="Full name" class="form-input">
+                </div>
+
+                <!-- Phone / Email row -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">Phone</label>
+                        <input type="tel" id="leadPhone" placeholder="Phone number" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Email</label>
+                        <input type="email" id="leadEmail" placeholder="Email address" class="form-input">
+                    </div>
+                </div>
+
+                <!-- Source / Priority row -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">Source</label>
+                        <select id="leadSource" class="form-select">
+                            <option value="walk_in">Walk In</option>
+                            <option value="phone">Phone</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="website">Website</option>
+                            <option value="referral">Referral</option>
+                            <option value="social_media">Social Media</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Priority</label>
+                        <select id="leadPriority" class="form-select">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Project / Property Type -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">Project Type</label>
+                        <select id="leadProjectType" class="form-select">
+                            <option value="interior">Interior</option>
+                            <option value="exterior">Exterior</option>
+                            <option value="both">Both</option>
+                            <option value="commercial">Commercial</option>
+                            <option value="industrial">Industrial</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Property Type</label>
+                        <select id="leadPropertyType" class="form-select">
+                            <option value="house">House</option>
+                            <option value="apartment">Apartment</option>
+                            <option value="villa">Villa</option>
+                            <option value="office">Office</option>
+                            <option value="shop">Shop</option>
+                            <option value="warehouse">Warehouse</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Budget / Timeline -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">Estimated Budget</label>
+                        <input type="number" id="leadBudget" placeholder="Amount" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Timeline</label>
+                        <select id="leadTimeline" class="form-select">
+                            <option value="">Select...</option>
+                            <option value="immediate">Immediate</option>
+                            <option value="1_week">Within 1 Week</option>
+                            <option value="2_weeks">Within 2 Weeks</option>
+                            <option value="1_month">Within 1 Month</option>
+                            <option value="3_months">Within 3 Months</option>
+                            <option value="6_months">Within 6 Months</option>
+                            <option value="undecided">Undecided</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Next Followup Date -->
+                <div>
+                    <label class="form-label">Next Follow-up Date</label>
+                    <input type="date" id="leadNextFollowup" class="form-input">
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="form-label">Notes</label>
+                    <textarea id="leadNotes" rows="3" placeholder="Additional details..." class="form-textarea" style="min-height:80px;"></textarea>
+                </div>
+            </div>
+            <!-- Modal Footer -->
+            <div class="p-4 sm:p-5 border-t border-gray-100 bg-gray-50 sm:rounded-b-2xl flex-shrink-0 safe-bottom">
+                <div class="flex gap-3">
+                    <button onclick="closeModal('leadModal')" class="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition">Cancel</button>
+                    <button onclick="saveLead()" id="saveLeadBtn" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                        <span id="saveLeadText">Save Lead</span>
+                        <div id="saveLeadSpinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== LEAD DETAIL PANEL (Slide-out) ========== -->
+    <div id="detailPanel" class="hidden fixed inset-0 z-[9998]">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeDetailPanel()"></div>
+        <div class="detail-panel absolute top-0 right-0 bottom-0 w-full sm:w-[440px] bg-white shadow-2xl flex flex-col overflow-hidden">
+            <!-- Detail Header -->
+            <div class="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-indigo-600 to-purple-700 text-white flex-shrink-0">
+                <div class="flex-1 min-w-0">
+                    <h2 id="detailName" class="text-lg font-bold truncate">Lead Name</h2>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span id="detailLeadNumber" class="text-xs text-indigo-200">#LDR-0001</span>
+                        <span id="detailStatusBadge" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/20">new</span>
+                    </div>
+                </div>
+                <button onclick="closeDetailPanel()" class="p-1.5 hover:bg-white/20 rounded-lg transition ml-2 flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Detail Body -->
+            <div class="flex-1 overflow-y-auto min-h-0" id="detailBody">
+                <!-- Quick Actions -->
+                <div class="p-4 flex gap-2 border-b border-gray-100">
+                    <a id="detailCallBtn" href="tel:" class="action-btn flex-1 text-center py-2.5 bg-green-50 text-green-700 rounded-xl text-sm font-semibold hover:bg-green-100 transition flex items-center justify-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                        Call
+                    </a>
+                    <a id="detailWhatsappBtn" href="#" target="_blank" class="action-btn flex-1 text-center py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition flex items-center justify-center gap-1.5">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.556-1.467A11.948 11.948 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22a9.94 9.94 0 01-5.39-1.583l-.386-.232-2.706.871.889-2.637-.253-.402A9.935 9.935 0 012 12c0-5.514 4.486-10 10-10s10 4.486 10 10-4.486 10-10 10z"/></svg>
+                        WhatsApp
+                    </a>
+                    <button id="detailEditBtn" onclick="editCurrentLead()" class="action-btn flex-1 text-center py-2.5 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition flex items-center justify-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        Edit
+                    </button>
+                </div>
+
+                <!-- Contact & Lead Info -->
+                <div class="p-4 border-b border-gray-100" id="detailInfo">
+                    <!-- Filled by JS -->
+                </div>
+
+                <!-- Status Flow -->
+                <div class="p-4 border-b border-gray-100">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Update Status</h4>
+                    <div class="flex flex-wrap gap-2" id="statusButtons">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
+                <!-- AI Score -->
+                <div id="detailAiSection" class="hidden p-4 border-b border-gray-100">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">AI Insights</h4>
+                    <div class="bg-purple-50 rounded-xl p-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                                <span id="detailAiScore" class="text-lg font-bold text-purple-700">--</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-semibold text-purple-800">AI Lead Score</div>
+                                <p id="detailAiRec" class="text-xs text-purple-600 mt-0.5 line-clamp-2">No recommendation available</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Followup History -->
+                <div class="p-4 border-b border-gray-100">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Follow-up History</h4>
+                    <div id="followupTimeline" class="space-y-0">
+                        <div class="text-sm text-gray-400 py-4 text-center">Loading follow-ups...</div>
+                    </div>
+                </div>
+
+                <!-- Add Followup Form -->
+                <div class="p-4">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Log a Follow-up</h4>
+                    <div class="space-y-3 bg-gray-50 rounded-xl p-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs font-medium text-gray-600 mb-1 block">Type</label>
+                                <select id="fuType" class="form-select text-sm py-2">
+                                    <option value="call">Call</option>
+                                    <option value="visit">Visit</option>
+                                    <option value="email">Email</option>
+                                    <option value="whatsapp">WhatsApp</option>
+                                    <option value="sms">SMS</option>
+                                    <option value="meeting">Meeting</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs font-medium text-gray-600 mb-1 block">Outcome</label>
+                                <select id="fuOutcome" class="form-select text-sm py-2">
+                                    <option value="callback">Callback</option>
+                                    <option value="interested">Interested</option>
+                                    <option value="not_interested">Not Interested</option>
+                                    <option value="follow_up">Follow Up</option>
+                                    <option value="closed">Closed</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-gray-600 mb-1 block">Notes <span class="text-red-500">*</span></label>
+                            <textarea id="fuNotes" rows="2" placeholder="What happened?" class="form-textarea text-sm py-2" style="min-height:60px;"></textarea>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-gray-600 mb-1 block">Next Follow-up</label>
+                            <input type="date" id="fuNextDate" class="form-input text-sm py-2">
+                        </div>
+                        <button onclick="saveFollowup()" id="saveFollowupBtn" class="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                            <span id="saveFollowupText">Save Follow-up</span>
+                            <div id="saveFollowupSpinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== LOST REASON MODAL ========== -->
+    <div id="lostModal" class="hidden fixed inset-0 z-[10000]">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('lostModal')"></div>
+        <div class="absolute bottom-0 sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
+            <div class="p-5">
+                <h3 class="text-lg font-bold text-gray-800 mb-1">Mark as Lost</h3>
+                <p class="text-sm text-gray-500 mb-4">Why was this lead lost?</p>
+                <textarea id="lostReason" rows="3" placeholder="Enter the reason..." class="form-textarea text-sm" style="min-height:80px;"></textarea>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="closeModal('lostModal')" class="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition">Cancel</button>
+                    <button onclick="confirmLost()" class="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition">Mark Lost</button>
+                </div>
+            </div>
+            <div class="safe-bottom"></div>
+        </div>
+    </div>
+
+    <!-- ========== JAVASCRIPT ========== -->
+    <script>
+    const API_BASE = '/api/leads';
+    let currentFilter = 'all';
+    let currentView = 'list';
+    let currentLeadId = null;
+    let currentLeadData = null;
+    let allLeads = [];
+    let isLoading = false;
+
+    // ---- Auth & Headers ----
+    function getHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        };
+    }
+
+    // ---- Utility Functions ----
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function capitalize(str) {
+        if (!str) return '';
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    function cleanPhone(phone) {
+        if (!phone) return '';
+        return phone.replace(/[^0-9+]/g, '');
+    }
+
+    function formatPhone(phone) {
+        if (!phone) return '';
+        const digits = phone.replace(/\D/g, '');
+        if (digits.length === 10) return digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3');
+        return phone;
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const diff = Math.floor((target - today) / 86400000);
+
+        if (diff === 0) return 'Today';
+        if (diff === 1) return 'Tomorrow';
+        if (diff === -1) return 'Yesterday';
+        if (diff > 1 && diff <= 6) return `In ${diff} days`;
+        if (diff < -1 && diff >= -6) return `${Math.abs(diff)} days ago`;
+
+        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    }
+
+    function formatDateTime(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatBudget(amount) {
+        if (!amount) return '';
+        const n = parseFloat(amount);
+        if (isNaN(n)) return amount;
+        if (n >= 100000) return (n / 100000).toFixed(1).replace(/\.0$/, '') + 'L';
+        if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+        return n.toLocaleString('en-IN');
+    }
+
+    // ---- Color/Style Helpers ----
+    const STATUS_CONFIG = {
+        new:         { label: 'New',         bg: 'bg-blue-100',    text: 'text-blue-700',    dot: 'bg-blue-500' },
+        contacted:   { label: 'Contacted',   bg: 'bg-yellow-100',  text: 'text-yellow-700',  dot: 'bg-yellow-500' },
+        interested:  { label: 'Interested',  bg: 'bg-green-100',   text: 'text-green-700',   dot: 'bg-green-500' },
+        quoted:      { label: 'Quoted',      bg: 'bg-purple-100',  text: 'text-purple-700',  dot: 'bg-purple-500' },
+        negotiating: { label: 'Negotiating', bg: 'bg-orange-100',  text: 'text-orange-700',  dot: 'bg-orange-500' },
+        won:         { label: 'Won',         bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+        lost:        { label: 'Lost',        bg: 'bg-red-100',     text: 'text-red-700',     dot: 'bg-red-500' },
+        inactive:    { label: 'Inactive',    bg: 'bg-gray-100',    text: 'text-gray-600',    dot: 'bg-gray-400' },
+    };
+
+    const PRIORITY_CONFIG = {
+        high:   { label: 'High',   border: 'border-red-500',    bg: 'bg-red-50',    text: 'text-red-700' },
+        medium: { label: 'Medium', border: 'border-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-700' },
+        low:    { label: 'Low',    border: 'border-green-500',  bg: 'bg-green-50',  text: 'text-green-700' },
+    };
+
+    const SOURCE_LABELS = {
+        walk_in: 'Walk In', phone: 'Phone', whatsapp: 'WhatsApp', website: 'Website',
+        referral: 'Referral', social_media: 'Social Media', other: 'Other'
+    };
+
+    const FOLLOWUP_ICONS = {
+        call: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>',
+        visit: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+        email: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>',
+        whatsapp: '<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>',
+        sms: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>',
+        meeting: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>',
+        other: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>',
+    };
+
+    const FOLLOWUP_DOT_COLORS = {
+        call: 'border-green-500', visit: 'border-blue-500', email: 'border-indigo-500',
+        whatsapp: 'border-emerald-500', sms: 'border-purple-500', meeting: 'border-orange-500', other: 'border-gray-400',
+    };
+
+    // ---- Load Stats ----
+    async function loadStats() {
+        try {
+            const res = await fetch(`${API_BASE}/my/stats`, { headers: getHeaders() });
+            const data = await res.json();
+            if (data.success) {
+                const s = data.data;
+                animateNumber('statTotal', s.total || 0);
+                animateNumber('statNewToday', s.added_today || 0);
+                animateNumber('statFollowupsToday', s.followups_today || 0);
+                animateNumber('statOverdue', s.overdue || 0);
+                animateNumber('statConverted', s.converted_this_month || 0);
+            }
+        } catch (e) {
+            console.error('Stats load error:', e);
+        }
+    }
+
+    function animateNumber(elemId, target) {
+        const el = document.getElementById(elemId);
+        if (!el) return;
+        const current = parseInt(el.textContent) || 0;
+        if (current === target) { el.textContent = target; return; }
+        const diff = target - current;
+        const steps = Math.min(Math.abs(diff), 15);
+        const stepTime = 300 / steps;
+        let step = 0;
+        const timer = setInterval(() => {
+            step++;
+            el.textContent = Math.round(current + (diff * (step / steps)));
+            if (step >= steps) { clearInterval(timer); el.textContent = target; }
+        }, stepTime);
+    }
+
+    // ---- Load Leads ----
+    async function loadLeads(filterTab = 'all') {
+        if (isLoading) return;
+        isLoading = true;
+        currentFilter = filterTab;
+
+        // Update active tab
+        document.querySelectorAll('[data-tab]').forEach(t => {
+            const active = t.dataset.tab === filterTab;
+            t.classList.toggle('bg-indigo-600', active);
+            t.classList.toggle('text-white', active);
+            t.classList.toggle('active', active);
+            t.classList.toggle('bg-white', !active);
+            t.classList.toggle('text-gray-600', !active);
+            t.classList.toggle('border', !active);
+            t.classList.toggle('border-gray-200', !active);
+        });
+
+        const search = document.getElementById('searchInput').value.trim();
+        const params = new URLSearchParams({ filter_tab: filterTab, limit: 50 });
+        if (search) params.set('search', search);
+
+        // Show skeleton
+        const container = document.getElementById('leadsContainer');
+        if (!allLeads.length) {
+            container.innerHTML = `
+                <div class="skeleton h-28 w-full mb-3"></div>
+                <div class="skeleton h-28 w-full mb-3"></div>
+                <div class="skeleton h-28 w-full"></div>`;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/my/list?${params}`, { headers: getHeaders() });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.success) {
+                allLeads = data.data;
+                const total = data.pagination ? data.pagination.total : data.data.length;
+                document.getElementById('leadCount').textContent = `${total} lead${total !== 1 ? 's' : ''}`;
+                renderLeads(data.data);
+                renderPipeline(data.data);
+            }
+        } catch (e) {
+            console.error('Load leads error:', e);
+            container.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-red-400 mb-2">
+                        <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    </div>
+                    <p class="text-gray-500 text-sm">Failed to load leads</p>
+                    <button onclick="loadLeads(currentFilter)" class="mt-3 text-indigo-600 text-sm font-semibold hover:underline">Try again</button>
+                </div>`;
+        } finally {
+            isLoading = false;
+        }
+    }
+
+    // ---- Render Lead List ----
+    function renderLeads(leads) {
+        const container = document.getElementById('leadsContainer');
+        const empty = document.getElementById('emptyState');
+
+        if (!leads || leads.length === 0) {
+            container.innerHTML = '';
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+        container.innerHTML = leads.map(lead => createLeadCard(lead)).join('');
+    }
+
+    function createLeadCard(lead) {
+        const sc = STATUS_CONFIG[lead.status] || STATUS_CONFIG.new;
+        const pc = PRIORITY_CONFIG[lead.priority] || PRIORITY_CONFIG.medium;
+        const phoneClean = cleanPhone(lead.phone);
+        const phoneDisplay = formatPhone(lead.phone);
+        const sourceLabel = SOURCE_LABELS[lead.source] || capitalize(lead.source || '');
+
+        // Is overdue?
+        const isOverdue = lead.next_followup_date && new Date(lead.next_followup_date) < new Date(new Date().toDateString()) && !['won','lost','inactive'].includes(lead.status);
+        const overdueClass = isOverdue ? ' overdue' : '';
+
+        // Follow-up text
+        let followupHtml = '';
+        if (lead.next_followup_date) {
+            const fd = formatDate(lead.next_followup_date);
+            const color = isOverdue ? 'text-red-500 font-medium' : 'text-gray-400';
+            followupHtml = `<div class="text-xs ${color} flex items-center gap-1">
+                <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                ${isOverdue ? 'Overdue: ' : 'Follow-up: '}${escapeHtml(fd)}
+            </div>`;
+        } else {
+            followupHtml = `<div class="text-xs text-gray-300">No follow-up scheduled</div>`;
+        }
+
+        // AI Score badge
+        const aiHtml = lead.ai_score ? `<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            ${lead.ai_score}
+        </span>` : '';
+
+        // Budget
+        const budgetHtml = lead.estimated_budget ? `<span class="text-xs text-gray-400">&#8377;${escapeHtml(formatBudget(lead.estimated_budget))}</span>` : '';
+
+        return `<div class="lead-card bg-white rounded-xl shadow-sm p-4 border-l-4 ${pc.border} border border-gray-100 cursor-pointer${overdueClass}" onclick="viewLead(${lead.id})">
+            <div class="flex items-start justify-between gap-2">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 class="font-semibold text-gray-800 text-sm sm:text-base truncate">${escapeHtml(lead.name)}</h3>
+                        <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${sc.bg} ${sc.text}">${sc.label}</span>
+                        ${aiHtml}
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-gray-500 mb-1.5 flex-wrap">
+                        ${lead.phone ? `<span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>${escapeHtml(phoneDisplay)}</span>` : ''}
+                        ${sourceLabel ? `<span class="text-gray-300">|</span><span>${escapeHtml(sourceLabel)}</span>` : ''}
+                        ${budgetHtml ? `<span class="text-gray-300">|</span>${budgetHtml}` : ''}
+                    </div>
+                    ${followupHtml}
+                </div>
+                <span class="text-[10px] font-bold uppercase px-2 py-1 rounded-lg ${pc.bg} ${pc.text} flex-shrink-0">${pc.label}</span>
+            </div>
+            <div class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-50">
+                ${lead.phone ? `<a href="tel:${phoneClean}" onclick="event.stopPropagation()" class="action-btn flex-1 text-center py-2 bg-green-50 text-green-600 rounded-lg text-xs font-semibold hover:bg-green-100 transition flex items-center justify-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    Call
+                </a>` : ''}
+                ${lead.phone ? `<a href="https://wa.me/91${phoneClean.replace(/^(\+?91)/, '')}" target="_blank" onclick="event.stopPropagation()" class="action-btn flex-1 text-center py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition flex items-center justify-center gap-1">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                    WhatsApp
+                </a>` : ''}
+                <button onclick="event.stopPropagation(); viewLead(${lead.id})" class="action-btn flex-1 text-center py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition flex items-center justify-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    View
+                </button>
+            </div>
+        </div>`;
+    }
+
+    // ---- Render Pipeline ----
+    function renderPipeline(leads) {
+        const statuses = ['new', 'contacted', 'interested', 'quoted', 'negotiating', 'won'];
+        statuses.forEach(status => {
+            const filtered = (leads || []).filter(l => l.status === status);
+            const countEl = document.getElementById(`pipe${capitalize(status)}`);
+            const cardsEl = document.getElementById(`pipe${capitalize(status)}Cards`);
+            if (countEl) countEl.textContent = filtered.length;
+            if (cardsEl) {
+                if (filtered.length === 0) {
+                    cardsEl.innerHTML = `<div class="text-xs text-gray-300 text-center py-4">No leads</div>`;
+                } else {
+                    cardsEl.innerHTML = filtered.map(l => {
+                        const pc = PRIORITY_CONFIG[l.priority] || PRIORITY_CONFIG.medium;
+                        return `<div class="pipe-card bg-white rounded-lg p-3 shadow-sm border border-gray-100 cursor-pointer" onclick="viewLead(${l.id})">
+                            <div class="flex items-start gap-2">
+                                <div class="w-2 h-2 rounded-full ${pc.border.replace('border-', 'bg-')} mt-1.5 flex-shrink-0"></div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium text-sm text-gray-800 truncate">${escapeHtml(l.name)}</p>
+                                    <p class="text-xs text-gray-400 mt-0.5">${l.phone ? escapeHtml(formatPhone(l.phone)) : 'No phone'}</p>
+                                    ${l.estimated_budget ? `<p class="text-xs text-gray-400 mt-0.5">&#8377;${escapeHtml(formatBudget(l.estimated_budget))}</p>` : ''}
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            }
+        });
+    }
+
+    // ---- View Toggle ----
+    function toggleView(view) {
+        currentView = view;
+        document.getElementById('leadsContainer').classList.toggle('hidden', view === 'pipeline');
+        document.getElementById('emptyState').classList.toggle('hidden', view === 'pipeline' || allLeads.length > 0);
+        document.getElementById('pipelineView').classList.toggle('hidden', view === 'list');
+
+        document.getElementById('viewList').classList.toggle('active', view === 'list');
+        document.getElementById('viewPipeline').classList.toggle('active', view === 'pipeline');
+        // Remove text color from inactive
+        if (view === 'list') {
+            document.getElementById('viewPipeline').classList.add('text-gray-500');
+            document.getElementById('viewList').classList.remove('text-gray-500');
+        } else {
+            document.getElementById('viewList').classList.add('text-gray-500');
+            document.getElementById('viewPipeline').classList.remove('text-gray-500');
+        }
+    }
+
+    // ---- Add/Edit Modal ----
+    function openAddModal(leadData = null) {
+        document.getElementById('leadId').value = '';
+        document.getElementById('leadName').value = '';
+        document.getElementById('leadPhone').value = '';
+        document.getElementById('leadEmail').value = '';
+        document.getElementById('leadSource').value = 'walk_in';
+        document.getElementById('leadPriority').value = 'medium';
+        document.getElementById('leadProjectType').value = 'interior';
+        document.getElementById('leadPropertyType').value = 'house';
+        document.getElementById('leadBudget').value = '';
+        document.getElementById('leadTimeline').value = '';
+        document.getElementById('leadNextFollowup').value = '';
+        document.getElementById('leadNotes').value = '';
+        document.getElementById('modalTitle').textContent = 'Add New Lead';
+        document.getElementById('saveLeadText').textContent = 'Save Lead';
+
+        if (leadData) {
+            document.getElementById('leadId').value = leadData.id;
+            document.getElementById('leadName').value = leadData.name || '';
+            document.getElementById('leadPhone').value = leadData.phone || '';
+            document.getElementById('leadEmail').value = leadData.email || '';
+            document.getElementById('leadSource').value = leadData.source || 'walk_in';
+            document.getElementById('leadPriority').value = leadData.priority || 'medium';
+            document.getElementById('leadProjectType').value = leadData.project_type || 'interior';
+            document.getElementById('leadPropertyType').value = leadData.property_type || 'house';
+            document.getElementById('leadBudget').value = leadData.estimated_budget || '';
+            document.getElementById('leadTimeline').value = leadData.timeline || '';
+            document.getElementById('leadNextFollowup').value = leadData.next_followup_date ? leadData.next_followup_date.substring(0, 10) : '';
+            document.getElementById('leadNotes').value = leadData.notes || '';
+            document.getElementById('modalTitle').textContent = 'Edit Lead';
+            document.getElementById('saveLeadText').textContent = 'Update Lead';
+        }
+
+        document.getElementById('leadModal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('leadName').focus(), 200);
+    }
+
+    async function saveLead() {
+        const btn = document.getElementById('saveLeadBtn');
+        const spinner = document.getElementById('saveLeadSpinner');
+        const text = document.getElementById('saveLeadText');
+
+        const name = document.getElementById('leadName').value.trim();
+        if (!name) {
+            showToast('Lead name is required', 'error');
+            document.getElementById('leadName').focus();
+            return;
+        }
+
+        btn.disabled = true;
+        spinner.classList.remove('hidden');
+
+        const leadId = document.getElementById('leadId').value;
+        const body = {
+            name,
+            phone: document.getElementById('leadPhone').value.trim() || null,
+            email: document.getElementById('leadEmail').value.trim() || null,
+            source: document.getElementById('leadSource').value,
+            priority: document.getElementById('leadPriority').value,
+            project_type: document.getElementById('leadProjectType').value,
+            property_type: document.getElementById('leadPropertyType').value,
+            estimated_budget: document.getElementById('leadBudget').value || null,
+            timeline: document.getElementById('leadTimeline').value || null,
+            next_followup_date: document.getElementById('leadNextFollowup').value || null,
+            notes: document.getElementById('leadNotes').value.trim() || null,
+        };
+
+        const url = leadId ? `${API_BASE}/my/${leadId}` : `${API_BASE}/my/create`;
+        const method = leadId ? 'PUT' : 'POST';
+
+        try {
+            const res = await fetch(url, { method, headers: getHeaders(), body: JSON.stringify(body) });
+            const data = await res.json();
+            if (data.success) {
+                closeModal('leadModal');
+                showToast(leadId ? 'Lead updated successfully' : 'Lead created successfully');
+                loadStats();
+                loadLeads(currentFilter);
+            } else {
+                showToast(data.message || 'Error saving lead', 'error');
+            }
+        } catch (e) {
+            console.error('Save lead error:', e);
+            showToast('Network error. Please try again.', 'error');
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('hidden');
+        }
+    }
+
+    // ---- View Lead Detail ----
+    async function viewLead(id) {
+        currentLeadId = id;
+        const lead = allLeads.find(l => l.id === id);
+        if (!lead) return;
+        currentLeadData = lead;
+
+        const panel = document.getElementById('detailPanel');
+        panel.classList.remove('hidden');
+        // Trigger slide animation
+        requestAnimationFrame(() => {
+            panel.querySelector('.detail-panel').classList.add('open');
+        });
+
+        // Populate header
+        document.getElementById('detailName').textContent = lead.name || 'Unnamed Lead';
+        document.getElementById('detailLeadNumber').textContent = lead.lead_number ? `#${lead.lead_number}` : '';
+        const sc = STATUS_CONFIG[lead.status] || STATUS_CONFIG.new;
+        document.getElementById('detailStatusBadge').className = `px-2 py-0.5 rounded-full text-xs font-semibold ${sc.bg} ${sc.text}`;
+        document.getElementById('detailStatusBadge').textContent = sc.label;
+
+        // Contact buttons
+        const phoneClean = cleanPhone(lead.phone);
+        const waPhone = phoneClean.replace(/^(\+?91)/, '');
+        document.getElementById('detailCallBtn').href = lead.phone ? `tel:${phoneClean}` : '#';
+        document.getElementById('detailWhatsappBtn').href = lead.phone ? `https://wa.me/91${waPhone}` : '#';
+        if (!lead.phone) {
+            document.getElementById('detailCallBtn').classList.add('opacity-40', 'pointer-events-none');
+            document.getElementById('detailWhatsappBtn').classList.add('opacity-40', 'pointer-events-none');
+        } else {
+            document.getElementById('detailCallBtn').classList.remove('opacity-40', 'pointer-events-none');
+            document.getElementById('detailWhatsappBtn').classList.remove('opacity-40', 'pointer-events-none');
+        }
+
+        // Info section
+        const pc = PRIORITY_CONFIG[lead.priority] || PRIORITY_CONFIG.medium;
+        const infoHtml = `
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                ${infoRow('Phone', escapeHtml(lead.phone ? formatPhone(lead.phone) : '-'))}
+                ${infoRow('Email', escapeHtml(lead.email || '-'))}
+                ${infoRow('Source', SOURCE_LABELS[lead.source] || capitalize(lead.source || '-'))}
+                ${infoRow('Priority', `<span class="px-2 py-0.5 rounded-full text-xs font-semibold ${pc.bg} ${pc.text}">${pc.label}</span>`)}
+                ${infoRow('Project', capitalize(lead.project_type || '-'))}
+                ${infoRow('Property', capitalize(lead.property_type || '-'))}
+                ${lead.estimated_budget ? infoRow('Budget', `&#8377;${formatBudget(lead.estimated_budget)}`) : ''}
+                ${lead.timeline ? infoRow('Timeline', capitalize((lead.timeline || '').replace(/_/g, ' '))) : ''}
+                ${infoRow('Follow-ups', lead.total_followups || 0)}
+                ${lead.next_followup_date ? infoRow('Next Follow-up', formatDate(lead.next_followup_date)) : ''}
+            </div>
+            ${lead.notes ? `<div class="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-600"><span class="font-medium text-gray-700">Notes:</span> ${escapeHtml(lead.notes)}</div>` : ''}
+        `;
+        document.getElementById('detailInfo').innerHTML = infoHtml;
+
+        // Status buttons
+        const statuses = ['new', 'contacted', 'interested', 'quoted', 'negotiating', 'lost'];
+        let statusHtml = '';
+        statuses.forEach(s => {
+            const cfg = STATUS_CONFIG[s];
+            const isCurrent = lead.status === s;
+            statusHtml += `<button onclick="updateLeadStatus(${lead.id}, '${s}')" class="status-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition ${isCurrent ? cfg.bg + ' ' + cfg.text + ' ring-2 ring-offset-1 ring-current' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}">${cfg.label}</button>`;
+        });
+        document.getElementById('statusButtons').innerHTML = statusHtml;
+
+        // AI Section
+        const aiSection = document.getElementById('detailAiSection');
+        if (lead.ai_score) {
+            aiSection.classList.remove('hidden');
+            document.getElementById('detailAiScore').textContent = lead.ai_score;
+            document.getElementById('detailAiRec').textContent = lead.ai_recommendation || 'No specific recommendation';
+        } else {
+            aiSection.classList.add('hidden');
+        }
+
+        // Load followups
+        loadFollowups(id);
+
+        // Set next followup date default to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        document.getElementById('fuNextDate').value = tomorrow.toISOString().split('T')[0];
+        document.getElementById('fuNotes').value = '';
+        document.getElementById('fuType').value = 'call';
+        document.getElementById('fuOutcome').value = 'callback';
+    }
+
+    function infoRow(label, value) {
+        return `<div>
+            <div class="text-xs text-gray-400 mb-0.5">${escapeHtml(label)}</div>
+            <div class="text-gray-800 font-medium">${value}</div>
+        </div>`;
+    }
+
+    function editCurrentLead() {
+        if (!currentLeadData) return;
+        closeDetailPanel();
+        setTimeout(() => openAddModal(currentLeadData), 300);
+    }
+
+    // ---- Load Followups ----
+    async function loadFollowups(leadId) {
+        const container = document.getElementById('followupTimeline');
+        container.innerHTML = '<div class="text-sm text-gray-400 py-4 text-center">Loading...</div>';
+
+        try {
+            const res = await fetch(`${API_BASE}/my/${leadId}/followups`, { headers: getHeaders() });
+            const data = await res.json();
+            if (data.success && data.data.length > 0) {
+                container.innerHTML = data.data.map((f, i) => {
+                    const dotColor = FOLLOWUP_DOT_COLORS[f.followup_type] || 'border-gray-400';
+                    const icon = FOLLOWUP_ICONS[f.followup_type] || FOLLOWUP_ICONS.other;
+                    const isLast = i === data.data.length - 1;
+                    return `<div class="relative pl-9 pb-${isLast ? '0' : '5'}">
+                        ${!isLast ? '<div class="timeline-line"></div>' : ''}
+                        <div class="timeline-dot ${dotColor}"></div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="inline-flex items-center gap-1 text-xs font-semibold text-gray-700">
+                                    ${icon}
+                                    ${capitalize(f.followup_type)}
+                                </span>
+                                <span class="text-[10px] text-gray-400">${escapeHtml(formatDateTime(f.created_at))}</span>
+                            </div>
+                            <p class="text-sm text-gray-600">${escapeHtml(f.notes)}</p>
+                            ${f.outcome ? `<span class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">${capitalize((f.outcome || '').replace(/_/g, ' '))}</span>` : ''}
+                            ${f.next_followup_date ? `<div class="text-[10px] text-indigo-500 mt-1">Next: ${escapeHtml(formatDate(f.next_followup_date))}</div>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+            } else {
+                container.innerHTML = `<div class="text-center py-6">
+                    <svg class="w-8 h-8 text-gray-200 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                    <p class="text-xs text-gray-400">No follow-ups yet</p>
+                </div>`;
+            }
+        } catch (e) {
+            container.innerHTML = '<div class="text-sm text-red-400 py-4 text-center">Failed to load follow-ups</div>';
+        }
+    }
+
+    // ---- Update Lead Status ----
+    async function updateLeadStatus(id, status) {
+        if (status === 'lost') {
+            pendingLostId = id;
+            document.getElementById('lostReason').value = '';
+            document.getElementById('lostModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('lostReason').focus(), 200);
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/my/${id}/status`, {
+                method: 'PATCH',
+                headers: getHeaders(),
+                body: JSON.stringify({ status })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`Status updated to ${capitalize(status)}`);
+                // Update in-memory
+                const lead = allLeads.find(l => l.id === id);
+                if (lead) lead.status = status;
+                if (currentLeadData && currentLeadData.id === id) currentLeadData.status = status;
+
+                loadStats();
+                loadLeads(currentFilter);
+                if (currentLeadId === id) viewLead(id);
+            } else {
+                showToast(data.message || 'Failed to update status', 'error');
+            }
+        } catch (e) {
+            showToast('Network error', 'error');
+        }
+    }
+
+    let pendingLostId = null;
+    async function confirmLost() {
+        const reason = document.getElementById('lostReason').value.trim();
+        if (!reason) {
+            showToast('Please enter a reason', 'error');
+            document.getElementById('lostReason').focus();
+            return;
+        }
+        try {
+            const res = await fetch(`${API_BASE}/my/${pendingLostId}/status`, {
+                method: 'PATCH',
+                headers: getHeaders(),
+                body: JSON.stringify({ status: 'lost', lost_reason: reason })
+            });
+            const data = await res.json();
+            if (data.success) {
+                closeModal('lostModal');
+                showToast('Lead marked as lost');
+                loadStats();
+                loadLeads(currentFilter);
+                if (currentLeadId === pendingLostId) viewLead(pendingLostId);
+            } else {
+                showToast(data.message || 'Failed', 'error');
+            }
+        } catch (e) {
+            showToast('Network error', 'error');
+        }
+        pendingLostId = null;
+    }
+
+    // ---- Save Followup ----
+    async function saveFollowup() {
+        if (!currentLeadId) return;
+        const btn = document.getElementById('saveFollowupBtn');
+        const spinner = document.getElementById('saveFollowupSpinner');
+
+        const notes = document.getElementById('fuNotes').value.trim();
+        if (!notes) {
+            showToast('Notes are required', 'error');
+            document.getElementById('fuNotes').focus();
+            return;
+        }
+
+        btn.disabled = true;
+        spinner.classList.remove('hidden');
+
+        const body = {
+            followup_type: document.getElementById('fuType').value,
+            notes,
+            outcome: document.getElementById('fuOutcome').value,
+            next_followup_date: document.getElementById('fuNextDate').value || null,
+        };
+
+        try {
+            const res = await fetch(`${API_BASE}/my/${currentLeadId}/followup`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Follow-up logged');
+                document.getElementById('fuNotes').value = '';
+                loadFollowups(currentLeadId);
+                loadStats();
+                // Refresh leads list in background
+                loadLeads(currentFilter);
+            } else {
+                showToast(data.message || 'Error', 'error');
+            }
+        } catch (e) {
+            showToast('Network error', 'error');
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('hidden');
+        }
+    }
+
+    // ---- Modal/Panel Helpers ----
+    function closeModal(id) {
+        document.getElementById(id).classList.add('hidden');
+    }
+
+    function closeDetailPanel() {
+        const panel = document.getElementById('detailPanel');
+        panel.querySelector('.detail-panel').classList.remove('open');
+        setTimeout(() => {
+            panel.classList.add('hidden');
+            currentLeadId = null;
+            currentLeadData = null;
+        }, 300);
+    }
+
+    // ---- Search ----
+    function clearSearchInput() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('clearSearch').classList.add('hidden');
+        loadLeads(currentFilter);
+    }
+
+    let searchTimeout;
+    document.getElementById('searchInput')?.addEventListener('input', function() {
+        const hasVal = this.value.trim().length > 0;
+        document.getElementById('clearSearch').classList.toggle('hidden', !hasVal);
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => loadLeads(currentFilter), 300);
+    });
+
+    // ---- Toast ----
+    function showToast(msg, type = 'success') {
+        const toast = document.createElement('div');
+        const bgColor = type === 'error' ? 'bg-red-600' : type === 'warning' ? 'bg-amber-500' : 'bg-emerald-600';
+        const icon = type === 'error'
+            ? '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>'
+            : '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+
+        toast.className = `fixed bottom-20 sm:bottom-6 right-4 left-4 sm:left-auto z-[11000] px-4 py-3 rounded-xl shadow-lg text-white ${bgColor} flex items-center gap-2 text-sm font-medium toast-enter max-w-sm`;
+        toast.innerHTML = `${icon}<span>${escapeHtml(msg)}</span>`;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.remove('toast-enter');
+            toast.classList.add('toast-exit');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // ---- Socket.io ----
+    function initSocket() {
+        if (window.qcSocket) {
+            window.qcSocket.on('lead_assigned', (data) => {
+                showToast(`New lead assigned: ${data.lead_name || 'Unknown'}`);
+                loadStats();
+                loadLeads(currentFilter);
+            });
+            window.qcSocket.on('lead_followup_reminder', (data) => {
+                showToast(`Reminder: Follow up with ${data.lead_name || 'a lead'}`, 'warning');
+            });
+        }
+    }
+
+    // ---- Keyboard Shortcuts ----
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (!document.getElementById('lostModal').classList.contains('hidden')) {
+                closeModal('lostModal');
+            } else if (!document.getElementById('leadModal').classList.contains('hidden')) {
+                closeModal('leadModal');
+            } else if (!document.getElementById('detailPanel').classList.contains('hidden')) {
+                closeDetailPanel();
+            }
+        }
+    });
+
+    // ---- Init ----
+    document.addEventListener('DOMContentLoaded', () => {
+        loadStats();
+        loadLeads('all');
+        initSocket();
+
+        // Auto-refresh every 60 seconds
+        setInterval(() => {
+            loadStats();
+            // Only auto-refresh list if detail panel is closed
+            if (document.getElementById('detailPanel').classList.contains('hidden')) {
+                loadLeads(currentFilter);
+            }
+        }, 60000);
+    });
+    </script>
+
+    <script src="/components/logo-loader.js"></script>
+</body>
+</html>
