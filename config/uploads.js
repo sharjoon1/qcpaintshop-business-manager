@@ -22,7 +22,11 @@ const uploadDirs = [
     'uploads/attendance/break',
     'uploads/stock-check',
     'uploads/wa-marketing',
-    'uploads/whatsapp'
+    'uploads/whatsapp',
+    'public/uploads/products',
+    'public/uploads/offers',
+    'public/uploads/training',
+    'public/uploads/painter-attendance'
 ];
 
 function ensureUploadDirs() {
@@ -87,10 +91,48 @@ const designRequestUpload = multer({
     fileFilter: imageFilter
 });
 
+// Product catalog image upload (5MB, images only)
+const uploadProductImage = multer({
+    storage: createDiskStorage('public/uploads/products/', 'product'),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: imageFilter
+});
+
+// Special offer banner upload (3MB, images only)
+const uploadOfferBanner = multer({
+    storage: createDiskStorage('public/uploads/offers/', 'offer'),
+    limits: { fileSize: 3 * 1024 * 1024 },
+    fileFilter: imageFilter
+});
+
+// Training content upload (10MB, images + PDF)
+const uploadTraining = multer({
+    storage: createDiskStorage('public/uploads/training/', 'training'),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image and PDF files allowed'));
+        }
+    }
+});
+
+// Painter attendance check-in photo upload (5MB, images only)
+const uploadPainterAttendance = multer({
+    storage: createDiskStorage('public/uploads/painter-attendance/', 'checkin'),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: imageFilter
+});
+
 module.exports = {
     ensureUploadDirs,
     uploadLogo,
     uploadProfile,
     uploadAadhar,
-    designRequestUpload
+    designRequestUpload,
+    uploadProductImage,
+    uploadOfferBanner,
+    uploadTraining,
+    uploadPainterAttendance
 };
