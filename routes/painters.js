@@ -765,7 +765,7 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
                    zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
                    zim.image_url,
-                   ppr.points_per_unit, ppr.points_type
+                   ppr.regular_points_per_unit as points_per_unit, ppr.annual_eligible, ppr.annual_pct
             FROM zoho_items_map zim
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
@@ -779,16 +779,16 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         const [offers] = await pool.query(`
             SELECT * FROM painter_special_offers
             WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
-            ORDER BY priority DESC, created_at DESC
+            ORDER BY created_at DESC
         `, [now, now]);
 
         // Match offers to products
         const productsWithOffers = products.map(p => {
             const matchedOffers = offers.filter(o => {
                 if (o.applies_to === 'all') return true;
-                if (o.applies_to === 'brand' && o.applies_to_value === p.brand) return true;
-                if (o.applies_to === 'category' && o.applies_to_value === p.category) return true;
-                if (o.applies_to === 'product' && o.applies_to_value === p.item_id) return true;
+                if (o.applies_to === 'brand' && o.target_id === p.brand) return true;
+                if (o.applies_to === 'category' && o.target_id === p.category) return true;
+                if (o.applies_to === 'product' && o.target_id === p.item_id) return true;
                 return false;
             });
             return {
@@ -820,7 +820,7 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
             offers: offers.map(o => ({
                 ...o,
                 bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
-                bonus_multiplier: o.bonus_multiplier ? parseFloat(o.bonus_multiplier) : null
+                multiplier_value: o.multiplier_value ? parseFloat(o.multiplier_value) : null
             })),
             brands: brands.map(b => b.brand),
             categories: categories.map(c => c.category),
@@ -842,7 +842,7 @@ router.get('/me/catalog/:itemId', requirePainterAuth, async (req, res) => {
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
                    zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
                    zim.image_url,
-                   ppr.points_per_unit, ppr.points_type
+                   ppr.regular_points_per_unit as points_per_unit, ppr.annual_eligible, ppr.annual_pct
             FROM zoho_items_map zim
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
@@ -865,11 +865,11 @@ router.get('/me/catalog/:itemId', requirePainterAuth, async (req, res) => {
             WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
             AND (
                 applies_to = 'all'
-                OR (applies_to = 'product' AND applies_to_value = ?)
-                OR (applies_to = 'brand' AND applies_to_value = ?)
-                OR (applies_to = 'category' AND applies_to_value = ?)
+                OR (applies_to = 'product' AND target_id = ?)
+                OR (applies_to = 'brand' AND target_id = ?)
+                OR (applies_to = 'category' AND target_id = ?)
             )
-            ORDER BY priority DESC
+            ORDER BY created_at DESC
         `, [now, now, itemId, product.brand, product.category]);
 
         res.json({
@@ -878,7 +878,7 @@ router.get('/me/catalog/:itemId', requirePainterAuth, async (req, res) => {
             offers: offers.map(o => ({
                 ...o,
                 bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
-                bonus_multiplier: o.bonus_multiplier ? parseFloat(o.bonus_multiplier) : null
+                multiplier_value: o.multiplier_value ? parseFloat(o.multiplier_value) : null
             }))
         });
     } catch (error) {
@@ -894,7 +894,7 @@ router.get('/me/offers', requirePainterAuth, async (req, res) => {
         const [offers] = await pool.query(`
             SELECT * FROM painter_special_offers
             WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
-            ORDER BY priority DESC, created_at DESC
+            ORDER BY created_at DESC
         `, [now, now]);
 
         res.json({
@@ -902,7 +902,7 @@ router.get('/me/offers', requirePainterAuth, async (req, res) => {
             offers: offers.map(o => ({
                 ...o,
                 bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
-                bonus_multiplier: o.bonus_multiplier ? parseFloat(o.bonus_multiplier) : null
+                multiplier_value: o.multiplier_value ? parseFloat(o.multiplier_value) : null
             }))
         });
     } catch (error) {
@@ -932,7 +932,7 @@ router.get('/me/training', requirePainterAuth, async (req, res) => {
             params.push(type);
         }
         if (search) {
-            where += ' AND (tc.title LIKE ? OR tc.title_ta LIKE ? OR tc.description LIKE ?)';
+            where += ' AND (tc.title LIKE ? OR tc.title_ta LIKE ? OR tc.summary LIKE ?)';
             params.push(`%${search}%`, `%${search}%`, `%${search}%`);
         }
 
@@ -941,7 +941,7 @@ router.get('/me/training', requirePainterAuth, async (req, res) => {
             FROM painter_training_content tc
             LEFT JOIN painter_training_categories cat ON tc.category_id = cat.id
             ${where}
-            ORDER BY tc.sort_order ASC, tc.created_at DESC
+            ORDER BY tc.is_featured DESC, tc.created_at DESC
         `, params);
 
         const [categories] = await pool.query(`
@@ -1251,7 +1251,7 @@ router.get('/offers', requireAuth, async (req, res) => {
             offers: offers.map(o => ({
                 ...o,
                 bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
-                bonus_multiplier: o.bonus_multiplier ? parseFloat(o.bonus_multiplier) : null
+                multiplier_value: o.multiplier_value ? parseFloat(o.multiplier_value) : null
             }))
         });
     } catch (error) {
@@ -1265,9 +1265,9 @@ router.post('/offers', requirePermission('painters', 'manage'), uploadOfferBanne
     try {
         const {
             title, title_ta, description, description_ta,
-            offer_type, bonus_points, bonus_multiplier,
-            applies_to, applies_to_value,
-            start_date, end_date, priority
+            offer_type, bonus_points, multiplier_value,
+            applies_to, target_id,
+            start_date, end_date
         } = req.body;
 
         if (!title || !offer_type || !start_date || !end_date) {
@@ -1279,17 +1279,16 @@ router.post('/offers', requirePermission('painters', 'manage'), uploadOfferBanne
         const [result] = await pool.query(`
             INSERT INTO painter_special_offers
             (title, title_ta, description, description_ta, offer_type,
-             bonus_points, bonus_multiplier, applies_to, applies_to_value,
-             banner_image_url, start_date, end_date, priority, is_active, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+             bonus_points, multiplier_value, applies_to, target_id,
+             banner_image_url, start_date, end_date, is_active, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         `, [
             title, title_ta || null, description || null, description_ta || null,
             offer_type,
             bonus_points ? parseFloat(bonus_points) : null,
-            bonus_multiplier ? parseFloat(bonus_multiplier) : null,
-            applies_to || 'all', applies_to_value || null,
+            multiplier_value ? parseFloat(multiplier_value) : null,
+            applies_to || 'all', target_id || null,
             bannerUrl, start_date, end_date,
-            parseInt(priority) || 0,
             req.user.id
         ]);
 
@@ -1306,9 +1305,9 @@ router.put('/offers/:id', requirePermission('painters', 'manage'), uploadOfferBa
         const { id } = req.params;
         const {
             title, title_ta, description, description_ta,
-            offer_type, bonus_points, bonus_multiplier,
-            applies_to, applies_to_value,
-            start_date, end_date, priority, is_active
+            offer_type, bonus_points, multiplier_value,
+            applies_to, target_id,
+            start_date, end_date, is_active
         } = req.body;
 
         // Check offer exists
@@ -1327,20 +1326,18 @@ router.put('/offers/:id', requirePermission('painters', 'manage'), uploadOfferBa
                 description_ta = COALESCE(?, description_ta),
                 offer_type = COALESCE(?, offer_type),
                 bonus_points = COALESCE(?, bonus_points),
-                bonus_multiplier = COALESCE(?, bonus_multiplier),
+                multiplier_value = COALESCE(?, multiplier_value),
                 applies_to = COALESCE(?, applies_to),
-                applies_to_value = COALESCE(?, applies_to_value),
+                target_id = COALESCE(?, target_id),
                 start_date = COALESCE(?, start_date),
-                end_date = COALESCE(?, end_date),
-                priority = COALESCE(?, priority)`;
+                end_date = COALESCE(?, end_date)`;
         const updateParams = [
             title || null, title_ta || null, description || null, description_ta || null,
             offer_type || null,
             bonus_points ? parseFloat(bonus_points) : null,
-            bonus_multiplier ? parseFloat(bonus_multiplier) : null,
-            applies_to || null, applies_to_value || null,
-            start_date || null, end_date || null,
-            priority != null ? parseInt(priority) : null
+            multiplier_value ? parseFloat(multiplier_value) : null,
+            applies_to || null, target_id || null,
+            start_date || null, end_date || null
         ];
 
         if (bannerUrl !== undefined) {
