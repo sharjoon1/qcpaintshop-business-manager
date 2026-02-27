@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <title>Shop Attendance - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/js/painter-i18n.js"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding-bottom: 80px; }
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .section-card { background: #fff; border-radius: 16px; border: 1px solid #e8ecf1; overflow: hidden; }
+        .section-header { padding: 1rem 1.25rem; font-weight: 600; font-size: 0.9375rem; }
+
+        /* Check-in button */
+        .checkin-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff; border: none; border-radius: 16px; padding: 1rem 2rem;
+            font-size: 1.125rem; font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+            width: 100%; transition: all 0.3s ease; position: relative; overflow: hidden;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+        }
+        .checkin-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5); }
+        .checkin-btn:active { transform: translateY(0); }
+        .checkin-btn:disabled { background: #9ca3af; box-shadow: none; cursor: not-allowed; transform: none; }
+        .checkin-btn .spinner { display: none; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .checkin-btn.loading .spinner { display: block; }
+        .checkin-btn.loading .btn-text { display: none; }
+        .checkin-btn.loading .btn-icon { display: none; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Calendar grid */
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .cal-header { text-align: center; font-size: 0.6875rem; font-weight: 600; color: #94a3b8; padding: 4px 0; text-transform: uppercase; }
+        .cal-day {
+            aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+            border-radius: 10px; font-size: 0.8125rem; font-weight: 500; position: relative;
+            transition: all 0.2s;
+        }
+        .cal-day.empty { visibility: hidden; }
+        .cal-day.visited { background: #d1fae5; color: #065f46; font-weight: 700; }
+        .cal-day.visited::after { content: ''; position: absolute; bottom: 3px; width: 4px; height: 4px; border-radius: 50%; background: #10b981; }
+        .cal-day.today { box-shadow: inset 0 0 0 2px #667eea; font-weight: 700; color: #667eea; }
+        .cal-day.today.visited { box-shadow: inset 0 0 0 2px #059669; color: #065f46; }
+        .cal-day.future { color: #cbd5e1; }
+        .cal-day.past { color: #64748b; }
+
+        /* Success animation overlay */
+        .success-overlay {
+            position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .success-card {
+            background: #fff; border-radius: 24px; padding: 2.5rem 2rem; text-align: center;
+            max-width: 320px; width: 85%; animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .success-icon {
+            width: 80px; height: 80px; margin: 0 auto 1rem;
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            animation: bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+        }
+        .success-icon svg { width: 40px; height: 40px; stroke: #059669; stroke-width: 3; fill: none; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+        @keyframes bounceIn { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+
+        /* Confetti */
+        .confetti-piece {
+            position: fixed; width: 10px; height: 10px; z-index: 10000;
+            animation: confettiFall 2s ease-out forwards;
+        }
+        @keyframes confettiFall {
+            0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+            100% { opacity: 0; transform: translateY(100vh) rotate(720deg); }
+        }
+
+        /* Bottom nav */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0; background: #fff;
+            border-top: 1px solid #e2e8f0; display: flex; z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom, 0);
+        }
+        .bottom-nav a {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            padding: 0.5rem 0; font-size: 0.625rem; color: #94a3b8; text-decoration: none;
+            transition: color 0.2s;
+        }
+        .bottom-nav a.active { color: #667eea; }
+        .bottom-nav a svg { width: 22px; height: 22px; margin-bottom: 2px; }
+
+        /* Visit row */
+        .visit-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9;
+        }
+        .visit-row:last-child { border-bottom: none; }
+
+        /* Stat mini cards */
+        .stat-mini {
+            background: linear-gradient(135deg, #f0f4ff, #faf5ff);
+            border-radius: 12px; padding: 1rem; text-align: center; flex: 1;
+        }
+        .stat-mini-value { font-size: 1.5rem; font-weight: 800; }
+        .stat-mini-label { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+        /* Photo capture */
+        .photo-btn {
+            background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 12px;
+            padding: 0.75rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+            cursor: pointer; transition: all 0.2s; color: #64748b; font-size: 0.875rem;
+        }
+        .photo-btn:hover { border-color: #667eea; color: #667eea; }
+        .photo-btn.has-photo { border-color: #10b981; background: #f0fdf4; color: #065f46; border-style: solid; }
+
+        /* Pulse for check-in btn */
+        .checkin-btn:not(:disabled)::before {
+            content: ''; position: absolute; inset: -4px; border-radius: 20px;
+            border: 2px solid rgba(16, 185, 129, 0.4);
+            animation: pulse-ring 2s ease-out infinite;
+        }
+        @keyframes pulse-ring {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1.08); }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed; top: 1rem; left: 50%; transform: translateX(-50%);
+            z-index: 10001; background: #1e293b; color: #fff; padding: 0.75rem 1.5rem;
+            border-radius: 12px; font-size: 0.875rem; font-weight: 500;
+            animation: toastIn 0.3s ease;
+            max-width: 90%; text-align: center;
+        }
+        .toast.error { background: #dc2626; }
+        .toast.success { background: #059669; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="max-w-lg mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <a href="/painter-dashboard.html" class="p-1 rounded-lg hover:bg-white/10">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+                    </a>
+                    <h1 class="text-lg font-bold" data-i18n="attendance.title">Shop Attendance</h1>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="/painter-notifications.html" class="p-2 rounded-lg hover:bg-white/10 relative" id="notifBtn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                        <span class="absolute top-1 right-1 w-2 h-2 bg-red-400 rounded-full hidden" id="notifDot"></span>
+                    </a>
+                    <button onclick="window.painterI18n && window.painterI18n.toggleLanguage()" id="langToggle" class="text-xs px-2 py-1 rounded bg-white/15 hover:bg-white/25 font-medium">EN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-lg mx-auto px-4 py-4 space-y-4">
+
+        <!-- Today's Status Card -->
+        <div class="section-card" id="todayCard">
+            <div class="p-5">
+                <!-- Date -->
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500" data-i18n="attendance.today">Today</p>
+                        <p class="text-sm font-semibold text-gray-800" id="todayDate"></p>
+                    </div>
+                </div>
+
+                <!-- Status display -->
+                <div id="statusArea" class="mb-4">
+                    <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50" id="statusBadge">
+                        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center" id="statusIcon">
+                            <span class="text-lg">-</span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800" id="statusText" data-i18n="attendance.not_checked_in">Not Checked In</p>
+                            <p class="text-sm text-gray-500" id="statusSubtext"></p>
+                        </div>
+                        <div class="text-right" id="statusPoints" style="display:none;">
+                            <p class="text-lg font-bold text-amber-500" id="pointsValue">0</p>
+                            <p class="text-xs text-gray-400" data-i18n="common.pts">pts</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Photo capture (optional) -->
+                <div id="photoSection" class="mb-4" style="display:none;">
+                    <label class="photo-btn" id="photoLabel">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        <span id="photoText">Add Photo (Optional)</span>
+                        <input type="file" accept="image/*" capture="environment" id="photoInput" class="hidden" onchange="handlePhoto(this)">
+                    </label>
+                    <div id="photoPreview" class="mt-2 hidden">
+                        <div class="relative inline-block">
+                            <img id="previewImg" class="w-16 h-16 object-cover rounded-lg border">
+                            <button onclick="removePhoto()" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">&times;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Check-in Button -->
+                <button class="checkin-btn" id="checkinBtn" onclick="doCheckIn()">
+                    <span class="btn-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>
+                    </span>
+                    <span class="btn-text" data-i18n="attendance.check_in_now">Check In Now</span>
+                    <div class="spinner"></div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Monthly Stats -->
+        <div class="section-card">
+            <div class="section-header flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span data-i18n="attendance.this_month">This Month</span>
+                </div>
+                <!-- Month navigation -->
+                <div class="flex items-center gap-2">
+                    <button onclick="changeMonth(-1)" class="p-1 rounded hover:bg-gray-100" id="prevMonthBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                    <span class="text-sm font-medium text-gray-600 min-w-[100px] text-center" id="monthLabel"></span>
+                    <button onclick="changeMonth(1)" class="p-1 rounded hover:bg-gray-100" id="nextMonthBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats row -->
+            <div class="flex gap-3 px-5 pt-4 pb-3">
+                <div class="stat-mini">
+                    <div class="stat-mini-value text-indigo-600" id="monthVisits">0</div>
+                    <div class="stat-mini-label" data-i18n="attendance.visits">Visits</div>
+                </div>
+                <div class="stat-mini">
+                    <div class="stat-mini-value text-amber-500" id="monthPoints">0</div>
+                    <div class="stat-mini-label" data-i18n="attendance.total_points">Total Points</div>
+                </div>
+            </div>
+
+            <!-- Calendar heatmap -->
+            <div class="px-5 pb-5">
+                <div class="cal-grid mb-1" id="calHeaders"></div>
+                <div class="cal-grid" id="calGrid"></div>
+            </div>
+        </div>
+
+        <!-- Recent Visits -->
+        <div class="section-card">
+            <div class="section-header flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span data-i18n="attendance.recent_visits">Recent Visits</span>
+            </div>
+            <div class="px-5 pb-4" id="recentVisits">
+                <div class="text-center py-6 text-gray-400 text-sm" data-i18n="common.loading">Loading...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="/painter-dashboard.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span data-i18n="common.home">Home</span>
+        </a>
+        <a href="/painter-catalog.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+            <span data-i18n="common.catalog">Catalog</span>
+        </a>
+        <a href="/painter-estimate-create.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            <span data-i18n="common.estimate">Estimate</span>
+        </a>
+        <a href="/painter-training.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+            <span data-i18n="common.training">Training</span>
+        </a>
+        <a href="/painter-attendance.html" class="active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>
+            <span data-i18n="common.attendance">Attendance</span>
+        </a>
+    </nav>
+
+    <!-- Success Overlay (hidden) -->
+    <div id="successOverlay" class="success-overlay" style="display:none;" onclick="dismissSuccess()">
+        <div class="success-card" onclick="event.stopPropagation()">
+            <div class="success-icon">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-1" data-i18n="attendance.check_in_success">Check-in Successful!</h2>
+            <p class="text-gray-500 mb-1" id="successBranch"></p>
+            <div class="flex items-center justify-center gap-1 mb-4">
+                <span class="text-2xl font-bold text-amber-500" id="successPoints">+5</span>
+                <span class="text-amber-500 text-lg">pts</span>
+            </div>
+            <button onclick="dismissSuccess()" class="w-full py-2.5 rounded-xl font-semibold text-white" style="background: linear-gradient(135deg, #667eea, #764ba2);" data-i18n="common.close">Close</button>
+        </div>
+    </div>
+
+    <script>
+    // ──────────────────────────────────────────────
+    // Config & State
+    // ──────────────────────────────────────────────
+    const API = '/api/painters';
+    let currentMonth, currentYear;
+    let todayData = null;
+    let monthlyData = null;
+    let selectedPhoto = null;
+
+    function painterHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'X-Painter-Token': localStorage.getItem('painter_token') || ''
+        };
+    }
+
+    function painterTokenHeader() {
+        return { 'X-Painter-Token': localStorage.getItem('painter_token') || '' };
+    }
+
+    // Auth check
+    if (!localStorage.getItem('painter_token')) {
+        window.location.href = '/painter-login.html';
+    }
+
+    // ──────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────
+    function esc(s) {
+        if (!s) return '';
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatTime(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+
+    function formatMonthYear(month, year) {
+        const d = new Date(year, month - 1, 1);
+        return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    }
+
+    function showToast(msg, type = '') {
+        const existing = document.querySelector('.toast');
+        if (existing) existing.remove();
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 3500);
+    }
+
+    // ──────────────────────────────────────────────
+    // Init
+    // ──────────────────────────────────────────────
+    const now = new Date();
+    currentMonth = now.getMonth() + 1;
+    currentYear = now.getFullYear();
+
+    // Set today's date display
+    document.getElementById('todayDate').textContent = now.toLocaleDateString('en-IN', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+    });
+
+    // Calendar day headers
+    const dayNames = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    document.getElementById('calHeaders').innerHTML = dayNames.map(d =>
+        `<div class="cal-header">${d}</div>`
+    ).join('');
+
+    // Start loading
+    loadToday();
+    loadMonthly(currentMonth, currentYear);
+
+    // ──────────────────────────────────────────────
+    // Load Today's Status
+    // ──────────────────────────────────────────────
+    async function loadToday() {
+        try {
+            const res = await fetch(`${API}/me/attendance/today`, { headers: painterHeaders() });
+            if (res.status === 401) { window.location.href = '/painter-login.html'; return; }
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            todayData = data;
+            renderTodayStatus(data);
+        } catch (err) {
+            console.error('Today status error:', err);
+            showToast('Failed to load today\'s status', 'error');
+        }
+    }
+
+    function renderTodayStatus(data) {
+        const btn = document.getElementById('checkinBtn');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusIcon = document.getElementById('statusIcon');
+        const statusText = document.getElementById('statusText');
+        const statusSubtext = document.getElementById('statusSubtext');
+        const statusPoints = document.getElementById('statusPoints');
+        const photoSection = document.getElementById('photoSection');
+
+        if (data.checkedIn && data.attendance) {
+            const att = data.attendance;
+            // Checked in state
+            statusBadge.className = 'flex items-center gap-3 p-3 rounded-xl bg-green-50';
+            statusIcon.className = 'w-10 h-10 rounded-full bg-green-100 flex items-center justify-center';
+            statusIcon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+            statusText.textContent = window.painterI18n ? window.painterI18n.t('attendance.checked_in') : 'Checked In';
+            statusText.className = 'font-semibold text-green-700';
+
+            const timeStr = formatTime(att.check_in_at);
+            // Try to show branch name — the table stores branch_id, not name
+            const branchInfo = att.branch_name ? att.branch_name : '';
+            statusSubtext.textContent = branchInfo ? `${branchInfo} at ${timeStr}` : `at ${timeStr}`;
+
+            statusPoints.style.display = 'block';
+            document.getElementById('pointsValue').textContent = att.points_awarded || 5;
+
+            // Hide check-in button
+            btn.style.display = 'none';
+            photoSection.style.display = 'none';
+        } else {
+            // Not checked in
+            statusBadge.className = 'flex items-center gap-3 p-3 rounded-xl bg-gray-50';
+            statusIcon.className = 'w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center';
+            statusIcon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>';
+            statusText.textContent = window.painterI18n ? window.painterI18n.t('attendance.not_checked_in') : 'Not Checked In';
+            statusText.className = 'font-semibold text-gray-800';
+            statusSubtext.textContent = '';
+
+            statusPoints.style.display = 'none';
+
+            // Show check-in button and photo
+            btn.style.display = 'flex';
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            photoSection.style.display = 'block';
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // Photo Handling
+    // ──────────────────────────────────────────────
+    function handlePhoto(input) {
+        if (input.files && input.files[0]) {
+            selectedPhoto = input.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('photoPreview').classList.remove('hidden');
+                document.getElementById('photoLabel').classList.add('has-photo');
+                document.getElementById('photoText').textContent = 'Photo added';
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function removePhoto() {
+        selectedPhoto = null;
+        document.getElementById('photoInput').value = '';
+        document.getElementById('photoPreview').classList.add('hidden');
+        document.getElementById('photoLabel').classList.remove('has-photo');
+        document.getElementById('photoText').textContent = 'Add Photo (Optional)';
+    }
+
+    // ──────────────────────────────────────────────
+    // GPS Check-In
+    // ──────────────────────────────────────────────
+    async function doCheckIn() {
+        const btn = document.getElementById('checkinBtn');
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        // Request GPS
+        if (!navigator.geolocation) {
+            showToast(window.painterI18n ? window.painterI18n.t('attendance.location_required') : 'Location services not supported', 'error');
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            return;
+        }
+
+        try {
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+            });
+
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            // Build form data (multipart for photo)
+            const formData = new FormData();
+            formData.append('latitude', lat);
+            formData.append('longitude', lng);
+            if (selectedPhoto) {
+                formData.append('photo', selectedPhoto);
+            }
+
+            const res = await fetch(`${API}/me/attendance/check-in`, {
+                method: 'POST',
+                headers: painterTokenHeader(), // No Content-Type — let browser set multipart boundary
+                body: formData
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                if (data.distance && data.required) {
+                    // Too far
+                    showToast(`${data.message}`, 'error');
+                } else if (data.message && data.message.includes('Already')) {
+                    showToast(window.painterI18n ? window.painterI18n.t('attendance.already_checked_in') : data.message, 'error');
+                } else {
+                    showToast(data.message || 'Check-in failed', 'error');
+                }
+                btn.disabled = false;
+                btn.classList.remove('loading');
+                return;
+            }
+
+            // Success!
+            showSuccessAnimation(data.attendance);
+
+            // Update today card
+            todayData = { success: true, checkedIn: true, attendance: data.attendance };
+            renderTodayStatus(todayData);
+
+            // Refresh monthly
+            loadMonthly(currentMonth, currentYear);
+
+        } catch (geoErr) {
+            let msg = window.painterI18n ? window.painterI18n.t('attendance.enable_location') : 'Enable Location';
+            if (geoErr.code === 1) {
+                msg = window.painterI18n ? window.painterI18n.t('attendance.location_required') : 'Location permission denied. Please enable location access in your browser/app settings.';
+            } else if (geoErr.code === 2) {
+                msg = 'Position unavailable. Please try again in an open area.';
+            } else if (geoErr.code === 3) {
+                msg = 'Location request timed out. Please try again.';
+            }
+            showToast(msg, 'error');
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // Success Animation
+    // ──────────────────────────────────────────────
+    function showSuccessAnimation(attendance) {
+        const overlay = document.getElementById('successOverlay');
+        const branchEl = document.getElementById('successBranch');
+        const pointsEl = document.getElementById('successPoints');
+
+        branchEl.textContent = attendance.branch || '';
+        pointsEl.textContent = `+${attendance.points || 5}`;
+        overlay.style.display = 'flex';
+
+        // Confetti
+        spawnConfetti();
+
+        // Auto-dismiss after 3s
+        setTimeout(() => dismissSuccess(), 3000);
+    }
+
+    function dismissSuccess() {
+        document.getElementById('successOverlay').style.display = 'none';
+        // Remove confetti
+        document.querySelectorAll('.confetti-piece').forEach(c => c.remove());
+    }
+
+    function spawnConfetti() {
+        const colors = ['#667eea', '#764ba2', '#10b981', '#f59e0b', '#ef4444', '#3b82f6'];
+        for (let i = 0; i < 30; i++) {
+            const piece = document.createElement('div');
+            piece.className = 'confetti-piece';
+            piece.style.left = Math.random() * 100 + 'vw';
+            piece.style.top = '-10px';
+            piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+            piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+            piece.style.width = (Math.random() * 8 + 6) + 'px';
+            piece.style.height = (Math.random() * 8 + 6) + 'px';
+            piece.style.animationDelay = (Math.random() * 0.5) + 's';
+            piece.style.animationDuration = (Math.random() * 1 + 1.5) + 's';
+            document.body.appendChild(piece);
+        }
+        // Cleanup confetti after animations
+        setTimeout(() => {
+            document.querySelectorAll('.confetti-piece').forEach(c => c.remove());
+        }, 3000);
+    }
+
+    // ──────────────────────────────────────────────
+    // Monthly Data & Calendar
+    // ──────────────────────────────────────────────
+    function changeMonth(delta) {
+        currentMonth += delta;
+        if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+        if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+
+        // Don't allow future months
+        const now = new Date();
+        const nowMonth = now.getMonth() + 1;
+        const nowYear = now.getFullYear();
+        if (currentYear > nowYear || (currentYear === nowYear && currentMonth > nowMonth)) {
+            currentMonth -= delta;
+            if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+            if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+            return;
+        }
+
+        loadMonthly(currentMonth, currentYear);
+    }
+
+    async function loadMonthly(month, year) {
+        document.getElementById('monthLabel').textContent = formatMonthYear(month, year);
+
+        // Enable/disable next button
+        const now = new Date();
+        const isCurrentMonth = (year === now.getFullYear() && month === now.getMonth() + 1);
+        document.getElementById('nextMonthBtn').style.opacity = isCurrentMonth ? '0.3' : '1';
+        document.getElementById('nextMonthBtn').style.pointerEvents = isCurrentMonth ? 'none' : 'auto';
+
+        try {
+            const res = await fetch(`${API}/me/attendance/monthly?month=${month}&year=${year}`, {
+                headers: painterHeaders()
+            });
+            if (res.status === 401) { window.location.href = '/painter-login.html'; return; }
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            monthlyData = data;
+
+            // Update stats
+            document.getElementById('monthVisits').textContent = data.totalVisits || 0;
+            document.getElementById('monthPoints').textContent = data.totalPoints || 0;
+
+            // Build calendar
+            buildCalendar(month, year, data.visits || []);
+
+            // Build recent visits list
+            renderRecentVisits(data.visits || []);
+
+        } catch (err) {
+            console.error('Monthly load error:', err);
+            document.getElementById('monthVisits').textContent = '-';
+            document.getElementById('monthPoints').textContent = '-';
+        }
+    }
+
+    function buildCalendar(month, year, visits) {
+        const grid = document.getElementById('calGrid');
+        const now = new Date();
+        const today = now.getDate();
+        const isCurrentMonth = (year === now.getFullYear() && month === now.getMonth() + 1);
+
+        // First day of month (0=Sunday, convert to Monday-start: Mon=0, Sun=6)
+        const firstDay = new Date(year, month - 1, 1).getDay();
+        const mondayStart = firstDay === 0 ? 6 : firstDay - 1;
+
+        // Days in month
+        const daysInMonth = new Date(year, month, 0).getDate();
+
+        // Build set of visited dates
+        const visitedDates = new Set();
+        visits.forEach(v => {
+            // v.date could be "2026-02-27" or a Date object
+            const d = new Date(v.date);
+            visitedDates.add(d.getDate());
+        });
+
+        let html = '';
+
+        // Empty cells for offset
+        for (let i = 0; i < mondayStart; i++) {
+            html += '<div class="cal-day empty"></div>';
+        }
+
+        // Day cells
+        for (let day = 1; day <= daysInMonth; day++) {
+            const isToday = isCurrentMonth && day === today;
+            const isFuture = isCurrentMonth && day > today;
+            const isVisited = visitedDates.has(day);
+            const isPast = !isCurrentMonth || day < today;
+
+            let classes = 'cal-day';
+            if (isToday) classes += ' today';
+            if (isVisited) classes += ' visited';
+            else if (isFuture) classes += ' future';
+            else if (isPast) classes += ' past';
+
+            html += `<div class="${classes}">${day}</div>`;
+        }
+
+        grid.innerHTML = html;
+    }
+
+    function renderRecentVisits(visits) {
+        const container = document.getElementById('recentVisits');
+
+        if (!visits || !visits.length) {
+            const noDataText = window.painterI18n ? window.painterI18n.t('common.no_data') : 'No visits this month';
+            container.innerHTML = `<div class="text-center py-6 text-gray-400 text-sm">${esc(noDataText)}</div>`;
+            return;
+        }
+
+        // Show most recent first, limit to 10
+        const sorted = [...visits].reverse().slice(0, 10);
+
+        container.innerHTML = sorted.map(v => {
+            const visitDate = new Date(v.check_in_time || v.date);
+            const dayStr = visitDate.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' });
+            const timeStr = v.check_in_time ? formatTime(v.check_in_time) : '--:--';
+            const pts = v.points || 0;
+
+            return `
+                <div class="visit-row">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-800">${esc(dayStr)}</p>
+                            <p class="text-xs text-gray-400">${esc(timeStr)}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="text-sm font-bold text-amber-500">${pts}</span>
+                        <span class="text-xs text-amber-400">pts</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    </script>
+</body>
+</html>
