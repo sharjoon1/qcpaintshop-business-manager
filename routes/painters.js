@@ -153,13 +153,15 @@ router.post('/send-otp', async (req, res) => {
             if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
                 const http = require('http');
                 const querystring = require('querystring');
-                const smsText = `Your OTP for Quality Colours Painter App is ${otp}. Valid for 10 minutes. Do not share. - QUALITY COLOURS.`;
+                // Must use DLT-registered template (same as customer OTP)
+                const smsText = `Your verification OTP for Quality Colours registration is ${otp}. Please enter this code at https://qcpaintshop.com/ to complete setup. - QUALITY COLOURS.`;
+                const cleanPhone = phone.replace(/\D/g, '');
                 const smsParams = querystring.stringify({
                     user: process.env.SMS_USER,
                     password: process.env.SMS_PASSWORD,
                     senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
                     channel: 'Trans', DCS: '0', flashsms: '0',
-                    number: phone.startsWith('91') ? phone : '91' + phone.replace(/\D/g, ''),
+                    number: cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone,
                     text: smsText, route: '4'
                 });
                 http.get(`http://retailsms.nettyfish.com/api/mt/SendSMS?${smsParams}`, (smsRes) => {
