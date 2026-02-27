@@ -73,6 +73,8 @@
                 <button class="tab-btn" onclick="switchTab('withdrawals')">Withdrawals</button>
                 <button class="tab-btn" onclick="switchTab('reports')">Referrals & Reports</button>
                 <button class="tab-btn" onclick="switchTab('estimates')">Estimates</button>
+                <button class="tab-btn" onclick="switchTab('offers')">🎁 Offers</button>
+                <button class="tab-btn" onclick="switchTab('training')">📚 Training</button>
             </div>
 
             <!-- Tab 1: Painters -->
@@ -344,6 +346,189 @@
                     <div id="estimatesPagination" class="p-3 flex justify-center gap-2"></div>
                 </div>
             </div>
+
+            <!-- Tab 7: Offers -->
+            <div id="tab-offers" class="tab-content">
+                <!-- Create/Edit Offer Form -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+                    <h3 class="text-lg font-semibold mb-4" id="offerFormTitle">Create Special Offer</h3>
+                    <form id="offerForm" onsubmit="return handleOfferSubmit(event)">
+                        <input type="hidden" id="offerEditId">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Title (English) *</label>
+                                <input type="text" id="offerTitle" required class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>Title (Tamil)</label>
+                                <input type="text" id="offerTitleTa" class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>Description (English)</label>
+                                <textarea id="offerDesc" class="w-full" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Description (Tamil)</label>
+                                <textarea id="offerDescTa" class="w-full" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Offer Type</label>
+                                <select id="offerType" class="w-full">
+                                    <option value="multiplier">Points Multiplier (e.g., 2x)</option>
+                                    <option value="bonus_points">Bonus Points</option>
+                                    <option value="discount">Discount</option>
+                                    <option value="free_product">Free Product</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Multiplier / Bonus Value</label>
+                                <input type="number" id="offerValue" step="0.01" value="2.00" class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>Applies To</label>
+                                <select id="offerAppliesTo" class="w-full" onchange="toggleOfferTarget()">
+                                    <option value="all">All Products</option>
+                                    <option value="brand">Specific Brand</option>
+                                    <option value="category">Specific Category</option>
+                                    <option value="product">Specific Product</option>
+                                </select>
+                            </div>
+                            <div id="offerTargetDiv" class="form-group hidden">
+                                <label>Target</label>
+                                <input type="text" id="offerTarget" placeholder="Brand/Category/Product ID" class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>Start Date *</label>
+                                <input type="date" id="offerStart" required class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>End Date *</label>
+                                <input type="date" id="offerEnd" required class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>Banner Image</label>
+                                <input type="file" id="offerBanner" accept="image/*" class="w-full">
+                            </div>
+                        </div>
+                        <div class="mt-4 flex gap-2">
+                            <button type="submit" class="btn-sm btn-primary" id="offerSubmitBtn">Create Offer</button>
+                            <button type="button" onclick="resetOfferForm()" class="btn-sm btn-outline">Reset</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Offers List Table -->
+                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b"><h3 class="font-semibold">All Offers</h3></div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Type</th>
+                                    <th>Value</th>
+                                    <th>Applies To</th>
+                                    <th>Dates</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="offersTableBody">
+                                <tr><td colspan="7" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 8: Training -->
+            <div id="tab-training" class="tab-content">
+                <!-- Create Training Content Form -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+                    <h3 class="text-lg font-semibold mb-4" id="trainingFormTitle">Create Training Content</h3>
+                    <form id="trainingForm" onsubmit="return handleTrainingSubmit(event)">
+                        <input type="hidden" id="trainingEditId">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Title (English) *</label>
+                                <input type="text" id="trainingTitle" required class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>Title (Tamil)</label>
+                                <input type="text" id="trainingTitleTa" class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>Content Type</label>
+                                <select id="trainingType" class="w-full" onchange="toggleTrainingFields()">
+                                    <option value="article">Article</option>
+                                    <option value="video">Video (YouTube)</option>
+                                    <option value="pdf">PDF Document</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Category</label>
+                                <select id="trainingCategory" class="w-full">
+                                    <option value="">Select category...</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="youtubeUrlDiv">
+                                <label>YouTube URL</label>
+                                <input type="url" id="trainingYoutubeUrl" placeholder="https://youtube.com/watch?v=..." class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>Summary (English)</label>
+                                <textarea id="trainingSummary" class="w-full" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Summary (Tamil)</label>
+                                <textarea id="trainingSummaryTa" class="w-full" rows="2"></textarea>
+                            </div>
+                            <div class="form-group md:col-span-2" id="articleContentDiv">
+                                <label>Content (English)</label>
+                                <textarea id="trainingContentEn" class="w-full" rows="6"></textarea>
+                            </div>
+                            <div class="form-group md:col-span-2" id="articleContentTaDiv">
+                                <label>Content (Tamil)</label>
+                                <textarea id="trainingContentTa" class="w-full" rows="6"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>File (Thumbnail or PDF)</label>
+                                <input type="file" id="trainingFile" accept="image/*,application/pdf" class="w-full">
+                            </div>
+                            <div class="form-group flex items-center gap-2" style="padding-top:1.5rem">
+                                <input type="checkbox" id="trainingFeatured">
+                                <label for="trainingFeatured" style="margin-bottom:0">Featured content</label>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex gap-2">
+                            <button type="submit" class="btn-sm btn-primary" id="trainingSubmitBtn">Create Content</button>
+                            <button type="button" onclick="resetTrainingForm()" class="btn-sm btn-outline">Reset</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Training Content List Table -->
+                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b"><h3 class="font-semibold">All Training Content</h3></div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Type</th>
+                                    <th>Category</th>
+                                    <th>Status</th>
+                                    <th>Views</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trainingTableBody">
+                                <tr><td colspan="6" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -427,6 +612,8 @@
         if (tab === 'withdrawals') loadWithdrawals();
         if (tab === 'reports') loadReportsTab();
         if (tab === 'estimates') loadEstimates();
+        if (tab === 'offers') loadOffers();
+        if (tab === 'training') loadTrainingContent();
     }
 
     // ═══════════════════════════════════════
@@ -1310,13 +1497,323 @@
     }
 
     // ═══════════════════════════════════════
+    // OFFERS TAB
+    // ═══════════════════════════════════════
+    let allOffers = [];
+    let editingOfferId = null;
+
+    async function loadOffers() {
+        try {
+            const res = await fetch(`${API}/offers`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            allOffers = data.offers || [];
+            renderOffersTable(allOffers);
+        } catch (err) {
+            document.getElementById('offersTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">${esc(err.message)}</td></tr>`;
+        }
+    }
+
+    function renderOffersTable(offers) {
+        const body = document.getElementById('offersTableBody');
+        if (!offers.length) {
+            body.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">No offers found. Create one above.</td></tr>';
+            return;
+        }
+        const now = new Date();
+        body.innerHTML = offers.map(o => {
+            const start = new Date(o.start_date);
+            const end = new Date(o.end_date);
+            const isActive = o.is_active && now >= start && now <= end;
+            const isExpired = now > end;
+            const statusLabel = !o.is_active ? 'Inactive' : isExpired ? 'Expired' : isActive ? 'Active' : 'Scheduled';
+            const statusClass = !o.is_active ? 'badge-suspended' : isExpired ? 'badge-rejected' : isActive ? 'badge-approved' : 'badge-pending';
+            const typeLabels = { multiplier: 'Multiplier', bonus_points: 'Bonus Points', discount: 'Discount', free_product: 'Free Product' };
+            return `<tr>
+                <td class="font-medium">${esc(o.title_en)}${o.title_ta ? '<br><span class="text-xs text-gray-400">' + esc(o.title_ta) + '</span>' : ''}</td>
+                <td class="capitalize">${typeLabels[o.offer_type] || o.offer_type}</td>
+                <td>${parseFloat(o.offer_value).toFixed(2)}</td>
+                <td class="capitalize">${o.applies_to === 'all' ? 'All Products' : esc(o.applies_to) + ': ' + esc(o.target_id || '-')}</td>
+                <td class="text-xs">${start.toLocaleDateString()} — ${end.toLocaleDateString()}</td>
+                <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+                <td>
+                    <button onclick="editOffer(${o.id})" class="btn-sm btn-outline mr-1">Edit</button>
+                    <button onclick="toggleOfferActive(${o.id}, ${o.is_active ? 0 : 1})" class="btn-sm ${o.is_active ? 'btn-danger' : 'btn-success'}">${o.is_active ? 'Deactivate' : 'Activate'}</button>
+                    <button onclick="deleteOffer(${o.id})" class="btn-sm btn-danger ml-1">Delete</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    async function handleOfferSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('title_en', document.getElementById('offerTitle').value.trim());
+        formData.append('title_ta', document.getElementById('offerTitleTa').value.trim());
+        formData.append('description_en', document.getElementById('offerDesc').value.trim());
+        formData.append('description_ta', document.getElementById('offerDescTa').value.trim());
+        formData.append('offer_type', document.getElementById('offerType').value);
+        formData.append('offer_value', document.getElementById('offerValue').value);
+        formData.append('applies_to', document.getElementById('offerAppliesTo').value);
+        formData.append('target_id', document.getElementById('offerTarget').value.trim());
+        formData.append('start_date', document.getElementById('offerStart').value);
+        formData.append('end_date', document.getElementById('offerEnd').value);
+
+        const bannerFile = document.getElementById('offerBanner').files[0];
+        if (bannerFile) formData.append('banner', bannerFile);
+
+        const editId = document.getElementById('offerEditId').value;
+        const url = editId ? `${API}/offers/${editId}` : `${API}/offers`;
+        const method = editId ? 'PUT' : 'POST';
+
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') },
+                body: formData
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(data.message || (editId ? 'Offer updated' : 'Offer created'));
+            resetOfferForm();
+            loadOffers();
+        } catch (err) { alert('Error: ' + err.message); }
+        return false;
+    }
+
+    function editOffer(id) {
+        const offer = allOffers.find(o => o.id === id);
+        if (!offer) return;
+        document.getElementById('offerEditId').value = offer.id;
+        document.getElementById('offerTitle').value = offer.title_en || '';
+        document.getElementById('offerTitleTa').value = offer.title_ta || '';
+        document.getElementById('offerDesc').value = offer.description_en || '';
+        document.getElementById('offerDescTa').value = offer.description_ta || '';
+        document.getElementById('offerType').value = offer.offer_type || 'multiplier';
+        document.getElementById('offerValue').value = offer.offer_value || 2;
+        document.getElementById('offerAppliesTo').value = offer.applies_to || 'all';
+        document.getElementById('offerTarget').value = offer.target_id || '';
+        document.getElementById('offerStart').value = offer.start_date ? offer.start_date.substring(0, 10) : '';
+        document.getElementById('offerEnd').value = offer.end_date ? offer.end_date.substring(0, 10) : '';
+        toggleOfferTarget();
+        document.getElementById('offerFormTitle').textContent = 'Edit Offer';
+        document.getElementById('offerSubmitBtn').textContent = 'Update Offer';
+        document.getElementById('tab-offers').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function deleteOffer(id) {
+        if (!confirm('Delete this offer? This cannot be undone.')) return;
+        try {
+            const res = await fetch(`${API}/offers/${id}`, { method: 'DELETE', headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert('Offer deleted');
+            loadOffers();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function toggleOfferActive(id, active) {
+        try {
+            const formData = new FormData();
+            formData.append('is_active', active);
+            const res = await fetch(`${API}/offers/${id}`, {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') },
+                body: formData
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            loadOffers();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    function toggleOfferTarget() {
+        const val = document.getElementById('offerAppliesTo').value;
+        const div = document.getElementById('offerTargetDiv');
+        if (val === 'all') {
+            div.classList.add('hidden');
+            document.getElementById('offerTarget').value = '';
+        } else {
+            div.classList.remove('hidden');
+        }
+    }
+
+    function resetOfferForm() {
+        document.getElementById('offerForm').reset();
+        document.getElementById('offerEditId').value = '';
+        document.getElementById('offerFormTitle').textContent = 'Create Special Offer';
+        document.getElementById('offerSubmitBtn').textContent = 'Create Offer';
+        document.getElementById('offerValue').value = '2.00';
+        toggleOfferTarget();
+    }
+
+    // ═══════════════════════════════════════
+    // TRAINING TAB
+    // ═══════════════════════════════════════
+    let allTraining = [];
+    let trainingCategories = [];
+
+    async function loadTrainingContent() {
+        try {
+            // Load categories for the dropdown
+            loadTrainingCategories();
+            const res = await fetch(`${API}/training`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            allTraining = data.content || [];
+            renderTrainingTable(allTraining);
+        } catch (err) {
+            document.getElementById('trainingTableBody').innerHTML = `<tr><td colspan="6" class="text-center py-4 text-red-500">${esc(err.message)}</td></tr>`;
+        }
+    }
+
+    async function loadTrainingCategories() {
+        try {
+            const res = await fetch(`${API}/training/categories`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) return;
+            trainingCategories = data.categories || [];
+            const sel = document.getElementById('trainingCategory');
+            sel.innerHTML = '<option value="">Select category...</option>' +
+                trainingCategories.map(c => `<option value="${c.id}">${esc(c.name_en)}${c.name_ta ? ' / ' + esc(c.name_ta) : ''}</option>`).join('');
+        } catch (err) {}
+    }
+
+    function renderTrainingTable(items) {
+        const body = document.getElementById('trainingTableBody');
+        if (!items.length) {
+            body.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">No training content found. Create one above.</td></tr>';
+            return;
+        }
+        const typeIcons = { article: '📄', video: '🎬', pdf: '📋' };
+        body.innerHTML = items.map(t => {
+            const statusClass = t.is_published ? 'badge-approved' : 'badge-suspended';
+            const statusLabel = t.is_published ? 'Published' : 'Draft';
+            return `<tr>
+                <td class="font-medium">${esc(t.title_en)}${t.title_ta ? '<br><span class="text-xs text-gray-400">' + esc(t.title_ta) + '</span>' : ''}</td>
+                <td>${typeIcons[t.content_type] || ''} <span class="capitalize">${esc(t.content_type)}</span></td>
+                <td>${esc(t.category_name || '-')}</td>
+                <td><span class="badge ${statusClass}">${statusLabel}</span>${t.is_featured ? ' <span class="badge badge-pending">Featured</span>' : ''}</td>
+                <td>${t.view_count || 0}</td>
+                <td>
+                    <button onclick="editTrainingContent(${t.id})" class="btn-sm btn-outline mr-1">Edit</button>
+                    <button onclick="toggleTrainingPublish(${t.id}, ${t.is_published ? 0 : 1})" class="btn-sm ${t.is_published ? 'btn-danger' : 'btn-success'}">${t.is_published ? 'Unpublish' : 'Publish'}</button>
+                    <button onclick="deleteTrainingContent(${t.id})" class="btn-sm btn-danger ml-1">Delete</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    async function handleTrainingSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('title_en', document.getElementById('trainingTitle').value.trim());
+        formData.append('title_ta', document.getElementById('trainingTitleTa').value.trim());
+        formData.append('content_type', document.getElementById('trainingType').value);
+        formData.append('category_id', document.getElementById('trainingCategory').value);
+        formData.append('youtube_url', document.getElementById('trainingYoutubeUrl').value.trim());
+        formData.append('summary_en', document.getElementById('trainingSummary').value.trim());
+        formData.append('summary_ta', document.getElementById('trainingSummaryTa').value.trim());
+        formData.append('content_en', document.getElementById('trainingContentEn').value.trim());
+        formData.append('content_ta', document.getElementById('trainingContentTa').value.trim());
+        formData.append('is_featured', document.getElementById('trainingFeatured').checked ? '1' : '0');
+
+        const file = document.getElementById('trainingFile').files[0];
+        if (file) formData.append('file', file);
+
+        const editId = document.getElementById('trainingEditId').value;
+        const url = editId ? `${API}/training/${editId}` : `${API}/training`;
+        const method = editId ? 'PUT' : 'POST';
+
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') },
+                body: formData
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(data.message || (editId ? 'Content updated' : 'Content created'));
+            resetTrainingForm();
+            loadTrainingContent();
+        } catch (err) { alert('Error: ' + err.message); }
+        return false;
+    }
+
+    function editTrainingContent(id) {
+        const item = allTraining.find(t => t.id === id);
+        if (!item) return;
+        document.getElementById('trainingEditId').value = item.id;
+        document.getElementById('trainingTitle').value = item.title_en || '';
+        document.getElementById('trainingTitleTa').value = item.title_ta || '';
+        document.getElementById('trainingType').value = item.content_type || 'article';
+        document.getElementById('trainingCategory').value = item.category_id || '';
+        document.getElementById('trainingYoutubeUrl').value = item.youtube_url || '';
+        document.getElementById('trainingSummary').value = item.summary_en || '';
+        document.getElementById('trainingSummaryTa').value = item.summary_ta || '';
+        document.getElementById('trainingContentEn').value = item.content_en || '';
+        document.getElementById('trainingContentTa').value = item.content_ta || '';
+        document.getElementById('trainingFeatured').checked = !!item.is_featured;
+        toggleTrainingFields();
+        document.getElementById('trainingFormTitle').textContent = 'Edit Training Content';
+        document.getElementById('trainingSubmitBtn').textContent = 'Update Content';
+        document.getElementById('tab-training').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function deleteTrainingContent(id) {
+        if (!confirm('Delete this training content? This cannot be undone.')) return;
+        try {
+            const res = await fetch(`${API}/training/${id}`, { method: 'DELETE', headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert('Training content deleted');
+            loadTrainingContent();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function toggleTrainingPublish(id, publish) {
+        try {
+            const formData = new FormData();
+            formData.append('is_published', publish);
+            const res = await fetch(`${API}/training/${id}`, {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') },
+                body: formData
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            loadTrainingContent();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    function toggleTrainingFields() {
+        const type = document.getElementById('trainingType').value;
+        const youtubeDiv = document.getElementById('youtubeUrlDiv');
+        const articleDiv = document.getElementById('articleContentDiv');
+        const articleTaDiv = document.getElementById('articleContentTaDiv');
+
+        // Show/hide based on type
+        youtubeDiv.style.display = type === 'video' ? '' : 'none';
+        articleDiv.style.display = type === 'article' ? '' : 'none';
+        articleTaDiv.style.display = type === 'article' ? '' : 'none';
+    }
+
+    function resetTrainingForm() {
+        document.getElementById('trainingForm').reset();
+        document.getElementById('trainingEditId').value = '';
+        document.getElementById('trainingFormTitle').textContent = 'Create Training Content';
+        document.getElementById('trainingSubmitBtn').textContent = 'Create Content';
+        toggleTrainingFields();
+    }
+
+    // ═══════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════
     document.addEventListener('DOMContentLoaded', function() {
         // Check URL tab param
         const urlParams = new URLSearchParams(window.location.search);
         const tab = urlParams.get('tab');
-        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports', 'estimates'];
+        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports', 'estimates', 'offers', 'training'];
         const activeTab = tab && tabNames.includes(tab) ? tab : 'painters';
 
         if (activeTab !== 'painters') {
@@ -1336,6 +1833,11 @@
         else if (activeTab === 'withdrawals') loadWithdrawals();
         else if (activeTab === 'reports') loadReportsTab();
         else if (activeTab === 'estimates') loadEstimates();
+        else if (activeTab === 'offers') loadOffers();
+        else if (activeTab === 'training') loadTrainingContent();
+
+        // Initialize training fields visibility
+        toggleTrainingFields();
     });
     </script>
 </body>
