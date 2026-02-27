@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <title>Training Hub - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/js/painter-i18n.js"></script>
+    <style>
+        body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .cat-tab { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 9999px; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; cursor: pointer; border: 1px solid #e2e8f0; background: #fff; color: #475569; transition: all 0.2s; flex-shrink: 0; }
+        .cat-tab.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-color: transparent; }
+        .cat-tabs-scroll { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding: 0 1rem; }
+        .cat-tabs-scroll::-webkit-scrollbar { display: none; }
+        .featured-scroll { display: flex; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding: 0 1rem; }
+        .featured-scroll::-webkit-scrollbar { display: none; }
+        .featured-card { flex-shrink: 0; width: 240px; border-radius: 12px; overflow: hidden; background: #fff; border: 1px solid #e8ecf1; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .featured-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .featured-card .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #e8ecf1; }
+        .content-card { background: #fff; border-radius: 12px; border: 1px solid #e8ecf1; overflow: hidden; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .content-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        .badge { display: inline-flex; padding: 2px 8px; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; }
+        .badge-article { background: #dbeafe; color: #1e40af; }
+        .badge-video { background: #fee2e2; color: #991b1b; }
+        .badge-pdf { background: #d1fae5; color: #065f46; }
+        .section-title { font-size: 1rem; font-weight: 700; color: #1e293b; padding: 0 1rem; }
+
+        /* Detail panel slide-up */
+        .detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .detail-overlay.active { opacity: 1; pointer-events: auto; }
+        .detail-panel { position: fixed; bottom: 0; left: 0; right: 0; max-height: 92vh; background: #fff; border-radius: 16px 16px 0 0; z-index: 101; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .detail-panel.active { transform: translateY(0); }
+        .detail-handle { width: 36px; height: 4px; background: #d1d5db; border-radius: 2px; margin: 10px auto; }
+
+        /* Bottom nav */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e8ecf1; padding: 6px 0 calc(6px + env(safe-area-inset-bottom)); z-index: 50; }
+        .bottom-nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.6875rem; color: #94a3b8; text-decoration: none; padding: 4px 0; }
+        .bottom-nav a.active { color: #667eea; font-weight: 600; }
+        .bottom-nav a.active svg { stroke: #667eea; }
+
+        /* YouTube responsive embed */
+        .video-wrapper { position: relative; width: 100%; padding-bottom: 56.25%; border-radius: 12px; overflow: hidden; background: #000; }
+        .video-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+
+        /* Search bar */
+        .search-bar { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; padding: 0 12px; gap: 8px; transition: border-color 0.2s; }
+        .search-bar:focus-within { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .search-bar input { border: none; outline: none; flex: 1; font-size: 0.875rem; padding: 10px 0; background: transparent; }
+
+        /* Play icon overlay on video thumbnails */
+        .play-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); }
+        .play-overlay svg { width: 48px; height: 48px; fill: #fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="max-w-lg mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <a href="/painter-dashboard.html" class="opacity-80 hover:opacity-100">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    </a>
+                    <h1 class="text-lg font-bold" data-i18n="training.title">Training Hub</h1>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="/painter-notifications.html" class="relative opacity-80 hover:opacity-100">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                        <span id="notifBadge" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center" style="display:none">0</span>
+                    </a>
+                    <button onclick="painterI18n.toggleLanguage()" id="langToggle" class="text-sm font-medium opacity-80 hover:opacity-100 bg-white/20 px-2 py-0.5 rounded">EN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="max-w-lg mx-auto px-4 mt-3">
+        <div class="search-bar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" data-i18n-placeholder="common.search" placeholder="Search..." oninput="onSearch(this.value)">
+        </div>
+    </div>
+
+    <!-- Category Tabs -->
+    <div class="max-w-lg mx-auto mt-3">
+        <div class="cat-tabs-scroll" id="categoryTabs">
+            <button class="cat-tab active" data-cat="all" onclick="filterCategory('all', this)" data-i18n="training.all">All</button>
+            <!-- Dynamic categories inserted here -->
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-lg mx-auto pb-24 mt-4" id="mainContent">
+        <!-- Loading -->
+        <div id="loadingState" class="text-center py-12">
+            <div class="inline-block w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style="border-width:3px"></div>
+            <p class="text-gray-400 text-sm mt-3" data-i18n="common.loading">Loading...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-12 px-6" style="display:none">
+            <div class="text-5xl mb-4">📚</div>
+            <p class="text-gray-500 font-medium" data-i18n="training.no_content">No content available</p>
+            <p class="text-gray-400 text-sm mt-1">Check back soon for new training materials</p>
+        </div>
+
+        <!-- Featured Videos Section -->
+        <div id="featuredSection" style="display:none">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-base">🎥</span>
+                <h2 class="section-title px-0" data-i18n="training.featured_videos">Featured Videos</h2>
+            </div>
+            <div class="featured-scroll" id="featuredList"></div>
+        </div>
+
+        <!-- Guides & Articles Section -->
+        <div id="guidesSection" class="mt-6 px-4" style="display:none">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-base">📄</span>
+                <h2 class="section-title px-0" data-i18n="training.guides_articles">Guides & Articles</h2>
+            </div>
+            <div class="flex flex-col gap-3" id="guidesList"></div>
+        </div>
+    </div>
+
+    <!-- Detail Panel Overlay -->
+    <div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+
+    <!-- Detail Panel -->
+    <div class="detail-panel" id="detailPanel">
+        <div class="detail-handle"></div>
+        <div class="px-4 pb-8" id="detailContent">
+            <!-- Dynamically filled -->
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <div class="max-w-lg mx-auto flex justify-around">
+            <a href="/painter-dashboard.html">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span data-i18n="common.home">Home</span>
+            </a>
+            <a href="/painter-catalog.html">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                <span data-i18n="common.catalog">Catalog</span>
+            </a>
+            <a href="/painter-estimate-create.html">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                <span data-i18n="common.estimate">Estimate</span>
+            </a>
+            <a href="/painter-training.html" class="active">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                <span data-i18n="common.training">Training</span>
+            </a>
+            <a href="/painter-attendance.html">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
+                <span data-i18n="common.attendance">Attendance</span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+    const API = '/api/painters';
+    let allContent = [];
+    let allCategories = [];
+    let currentCategory = 'all';
+    let searchQuery = '';
+    let searchTimer = null;
+
+    function painterHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'X-Painter-Token': localStorage.getItem('painter_token') || ''
+        };
+    }
+
+    function logout() {
+        localStorage.removeItem('painter_token');
+        localStorage.removeItem('painter');
+        window.location.href = '/painter-login.html';
+    }
+
+    // Auth check
+    if (!localStorage.getItem('painter_token')) {
+        window.location.href = '/painter-login.html';
+    }
+
+    // Escape HTML
+    function esc(s) {
+        if (!s) return '';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+
+    // YouTube helpers
+    function getYouTubeId(url) {
+        if (!url) return null;
+        const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=))([^?&]+)/);
+        return match ? match[1] : null;
+    }
+
+    function getYouTubeThumbnail(url) {
+        const id = getYouTubeId(url);
+        return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : null;
+    }
+
+    // Language-aware field getter
+    function localized(item, field) {
+        const lang = window.painterI18n ? painterI18n.getLang() : 'en';
+        if (lang === 'ta') {
+            return item[field + '_ta'] || item[field + '_en'] || item[field] || '';
+        }
+        return item[field + '_en'] || item[field] || '';
+    }
+
+    function localizedTitle(item) {
+        const lang = window.painterI18n ? painterI18n.getLang() : 'en';
+        if (lang === 'ta') {
+            return item.title_ta || item.title || '';
+        }
+        return item.title || '';
+    }
+
+    function localizedSummary(item) {
+        const lang = window.painterI18n ? painterI18n.getLang() : 'en';
+        if (lang === 'ta') {
+            return item.summary_ta || item.summary || '';
+        }
+        return item.summary || '';
+    }
+
+    function localizedContent(item) {
+        const lang = window.painterI18n ? painterI18n.getLang() : 'en';
+        if (lang === 'ta') {
+            return item.content_ta || item.content_en || '';
+        }
+        return item.content_en || '';
+    }
+
+    function localizedCategoryName(cat) {
+        const lang = window.painterI18n ? painterI18n.getLang() : 'en';
+        if (lang === 'ta') {
+            return cat.name_ta || cat.name || '';
+        }
+        return cat.name || '';
+    }
+
+    function contentTypeIcon(type) {
+        switch (type) {
+            case 'video': return '🎥';
+            case 'pdf': return '📎';
+            default: return '📄';
+        }
+    }
+
+    function contentTypeBadgeClass(type) {
+        switch (type) {
+            case 'video': return 'badge-video';
+            case 'pdf': return 'badge-pdf';
+            default: return 'badge-article';
+        }
+    }
+
+    function contentTypeLabel(type) {
+        switch (type) {
+            case 'video': return 'Video';
+            case 'pdf': return 'PDF';
+            default: return 'Article';
+        }
+    }
+
+    // Search with debounce
+    function onSearch(query) {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            searchQuery = query.trim().toLowerCase();
+            renderContent();
+        }, 300);
+    }
+
+    // Category filter
+    function filterCategory(catId, btn) {
+        currentCategory = catId;
+        document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        renderContent();
+    }
+
+    // Load all training content
+    async function loadTraining() {
+        try {
+            const res = await fetch(`${API}/me/training`, { headers: painterHeaders() });
+            if (res.status === 401) { logout(); return; }
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            allContent = data.content || [];
+            allCategories = data.categories || [];
+
+            renderCategoryTabs();
+            renderContent();
+
+            document.getElementById('loadingState').style.display = 'none';
+        } catch (err) {
+            console.error('Training load error:', err);
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'block';
+        }
+    }
+
+    // Render category tabs
+    function renderCategoryTabs() {
+        const container = document.getElementById('categoryTabs');
+        const lang = window.painterI18n ? painterI18n.getLang() : 'en';
+        const allLabel = lang === 'ta' ? 'அனைத்தும்' : 'All';
+
+        let html = `<button class="cat-tab active" data-cat="all" onclick="filterCategory('all', this)">${allLabel}</button>`;
+
+        allCategories.forEach(cat => {
+            const name = localizedCategoryName(cat);
+            html += `<button class="cat-tab" data-cat="${cat.id}" onclick="filterCategory('${cat.id}', this)">${cat.icon || '📄'} ${esc(name)}</button>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // Filter content based on current category and search
+    function getFilteredContent() {
+        let filtered = allContent;
+
+        if (currentCategory !== 'all') {
+            filtered = filtered.filter(c => String(c.category_id) === String(currentCategory));
+        }
+
+        if (searchQuery) {
+            filtered = filtered.filter(c => {
+                const title = (c.title || '').toLowerCase();
+                const titleTa = (c.title_ta || '').toLowerCase();
+                const summary = (c.summary || '').toLowerCase();
+                const summaryTa = (c.summary_ta || '').toLowerCase();
+                const catName = (c.category_name || '').toLowerCase();
+                return title.includes(searchQuery) || titleTa.includes(searchQuery) ||
+                       summary.includes(searchQuery) || summaryTa.includes(searchQuery) ||
+                       catName.includes(searchQuery);
+            });
+        }
+
+        return filtered;
+    }
+
+    // Main render
+    function renderContent() {
+        const filtered = getFilteredContent();
+        const featured = filtered.filter(c => c.is_featured);
+        const nonFeatured = filtered;
+
+        const featuredSection = document.getElementById('featuredSection');
+        const guidesSection = document.getElementById('guidesSection');
+        const emptyState = document.getElementById('emptyState');
+
+        if (filtered.length === 0) {
+            featuredSection.style.display = 'none';
+            guidesSection.style.display = 'none';
+            emptyState.style.display = 'block';
+            return;
+        }
+
+        emptyState.style.display = 'none';
+
+        // Featured section
+        if (featured.length > 0) {
+            featuredSection.style.display = 'block';
+            renderFeatured(featured);
+        } else {
+            featuredSection.style.display = 'none';
+        }
+
+        // All content list
+        if (nonFeatured.length > 0) {
+            guidesSection.style.display = 'block';
+            renderGuides(nonFeatured);
+        } else {
+            guidesSection.style.display = 'none';
+        }
+    }
+
+    // Render featured horizontal scroll
+    function renderFeatured(items) {
+        const container = document.getElementById('featuredList');
+        container.innerHTML = items.map(item => {
+            const title = esc(localizedTitle(item));
+            const catName = esc(item.category_name_ta && painterI18n.getLang() === 'ta' ? item.category_name_ta : (item.category_name || ''));
+            let thumbHtml = '';
+
+            if (item.content_type === 'video' && item.youtube_url) {
+                const thumbUrl = getYouTubeThumbnail(item.youtube_url);
+                thumbHtml = `
+                    <div class="relative">
+                        <img class="thumb" src="${thumbUrl || '/icons/icon-192x192.png'}" alt="${title}" onerror="this.src='/icons/icon-192x192.png'">
+                        <div class="play-overlay">
+                            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                    </div>`;
+            } else if (item.thumbnail_url) {
+                thumbHtml = `<img class="thumb" src="${esc(item.thumbnail_url)}" alt="${title}" onerror="this.src='/icons/icon-192x192.png'">`;
+            } else {
+                thumbHtml = `<div class="thumb flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100"><span class="text-3xl">${contentTypeIcon(item.content_type)}</span></div>`;
+            }
+
+            return `
+                <div class="featured-card" onclick="openDetail(${item.id})">
+                    ${thumbHtml}
+                    <div class="p-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="badge ${contentTypeBadgeClass(item.content_type)}">${contentTypeLabel(item.content_type)}</span>
+                            ${catName ? `<span class="text-xs text-gray-400">${catName}</span>` : ''}
+                        </div>
+                        <p class="text-sm font-semibold text-gray-800 line-clamp-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${title}</p>
+                        <div class="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                            <span>👁 ${item.view_count || 0}</span>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    // Render guides/articles list
+    function renderGuides(items) {
+        const container = document.getElementById('guidesList');
+        container.innerHTML = items.map(item => {
+            const title = esc(localizedTitle(item));
+            const summary = esc(localizedSummary(item));
+            const catName = esc(item.category_name_ta && painterI18n.getLang() === 'ta' ? item.category_name_ta : (item.category_name || ''));
+            let thumbHtml = '';
+
+            if (item.content_type === 'video' && item.youtube_url) {
+                const thumbUrl = getYouTubeThumbnail(item.youtube_url);
+                thumbHtml = `
+                    <div class="relative w-24 h-24 flex-shrink-0">
+                        <img class="w-full h-full object-cover rounded-lg" src="${thumbUrl || '/icons/icon-192x192.png'}" alt="${title}" onerror="this.src='/icons/icon-192x192.png'">
+                        <div class="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                    </div>`;
+            } else if (item.thumbnail_url) {
+                thumbHtml = `<img class="w-24 h-24 flex-shrink-0 object-cover rounded-lg" src="${esc(item.thumbnail_url)}" alt="${title}" onerror="this.src='/icons/icon-192x192.png'">`;
+            } else {
+                thumbHtml = `<div class="w-24 h-24 flex-shrink-0 rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center"><span class="text-2xl">${contentTypeIcon(item.content_type)}</span></div>`;
+            }
+
+            const typeLabel = item.content_type === 'pdf' ? '📎 PDF' : (item.content_type === 'video' ? '🎥 Video' : '📄 Article');
+
+            return `
+                <div class="content-card flex p-3 gap-3" onclick="openDetail(${item.id})">
+                    ${thumbHtml}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="badge ${contentTypeBadgeClass(item.content_type)}">${contentTypeLabel(item.content_type)}</span>
+                            ${catName ? `<span class="text-xs text-gray-400 truncate">${catName}</span>` : ''}
+                        </div>
+                        <p class="text-sm font-semibold text-gray-800 line-clamp-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${title}</p>
+                        ${summary ? `<p class="text-xs text-gray-500 mt-1 line-clamp-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${summary}</p>` : ''}
+                        <div class="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                            <span>${typeLabel}</span>
+                            <span>👁 ${item.view_count || 0}</span>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    // Open detail panel
+    async function openDetail(id) {
+        const overlay = document.getElementById('detailOverlay');
+        const panel = document.getElementById('detailPanel');
+        const contentEl = document.getElementById('detailContent');
+
+        // Show loading
+        contentEl.innerHTML = `
+            <div class="text-center py-12">
+                <div class="inline-block w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style="border-width:3px"></div>
+            </div>`;
+
+        overlay.classList.add('active');
+        panel.classList.add('active');
+
+        try {
+            const res = await fetch(`${API}/me/training/${id}`, { headers: painterHeaders() });
+            if (res.status === 401) { logout(); return; }
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            const item = data.content;
+            renderDetail(item);
+
+            // Update view count in local data
+            const localItem = allContent.find(c => c.id === id);
+            if (localItem) localItem.view_count = item.view_count;
+
+        } catch (err) {
+            console.error('Detail load error:', err);
+            contentEl.innerHTML = `<div class="text-center py-8 text-red-500 text-sm">Failed to load content</div>`;
+        }
+    }
+
+    // Render detail content
+    function renderDetail(item) {
+        const contentEl = document.getElementById('detailContent');
+        const title = esc(localizedTitle(item));
+        const catName = esc(item.category_name_ta && painterI18n.getLang() === 'ta' ? item.category_name_ta : (item.category_name || ''));
+        let bodyHtml = '';
+
+        if (item.content_type === 'video') {
+            bodyHtml = renderVideoDetail(item, title, catName);
+        } else if (item.content_type === 'pdf') {
+            bodyHtml = renderPdfDetail(item, title, catName);
+        } else {
+            bodyHtml = renderArticleDetail(item, title, catName);
+        }
+
+        contentEl.innerHTML = bodyHtml;
+    }
+
+    function renderVideoDetail(item, title, catName) {
+        const youtubeId = getYouTubeId(item.youtube_url);
+        const summary = localizedSummary(item);
+        const content = localizedContent(item);
+
+        let videoEmbed = '';
+        if (youtubeId) {
+            videoEmbed = `
+                <div class="video-wrapper mb-4">
+                    <iframe src="https://www.youtube.com/embed/${youtubeId}?rel=0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+                </div>`;
+        } else {
+            videoEmbed = `
+                <div class="bg-gray-100 rounded-xl p-8 text-center mb-4">
+                    <span class="text-4xl">🎥</span>
+                    <p class="text-gray-500 text-sm mt-2">Video unavailable</p>
+                </div>`;
+        }
+
+        return `
+            ${videoEmbed}
+            <div class="flex items-center gap-2 mb-2">
+                <span class="badge badge-video">Video</span>
+                ${catName ? `<span class="text-xs text-gray-400">${catName}</span>` : ''}
+                <span class="text-xs text-gray-400 ml-auto">👁 ${item.view_count || 0}</span>
+            </div>
+            <h2 class="text-lg font-bold text-gray-900 mb-2">${title}</h2>
+            ${summary ? `<p class="text-sm text-gray-600 mb-4">${esc(summary)}</p>` : ''}
+            ${content ? `<div class="prose prose-sm max-w-none text-gray-700 text-sm leading-relaxed">${content}</div>` : ''}
+        `;
+    }
+
+    function renderPdfDetail(item, title, catName) {
+        const summary = localizedSummary(item);
+        const lang = window.painterI18n ? painterI18n.getLang() : 'en';
+        const downloadLabel = lang === 'ta' ? 'PDF பதிவிறக்கம்' : 'Download PDF';
+
+        return `
+            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 text-center mb-4">
+                <span class="text-5xl">📎</span>
+                <h2 class="text-lg font-bold text-gray-900 mt-3 mb-1">${title}</h2>
+                <div class="flex items-center justify-center gap-2 mb-3">
+                    <span class="badge badge-pdf">PDF</span>
+                    ${catName ? `<span class="text-xs text-gray-400">${catName}</span>` : ''}
+                </div>
+                <span class="text-xs text-gray-400">👁 ${item.view_count || 0} views</span>
+            </div>
+            ${summary ? `<p class="text-sm text-gray-600 mb-4">${esc(summary)}</p>` : ''}
+            ${item.pdf_url ? `
+                <a href="${esc(item.pdf_url)}" target="_blank" rel="noopener noreferrer"
+                   class="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-white font-semibold text-sm"
+                   style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    ${downloadLabel}
+                </a>` : '<p class="text-gray-400 text-sm text-center">PDF not available</p>'}
+        `;
+    }
+
+    function renderArticleDetail(item, title, catName) {
+        const content = localizedContent(item);
+        const summary = localizedSummary(item);
+
+        let thumbHtml = '';
+        if (item.thumbnail_url) {
+            thumbHtml = `<img class="w-full rounded-xl mb-4" src="${esc(item.thumbnail_url)}" alt="${title}" onerror="this.style.display='none'">`;
+        }
+
+        return `
+            ${thumbHtml}
+            <div class="flex items-center gap-2 mb-2">
+                <span class="badge badge-article">Article</span>
+                ${catName ? `<span class="text-xs text-gray-400">${catName}</span>` : ''}
+                <span class="text-xs text-gray-400 ml-auto">👁 ${item.view_count || 0}</span>
+            </div>
+            <h2 class="text-lg font-bold text-gray-900 mb-3">${title}</h2>
+            ${content ? `<div class="text-sm text-gray-700 leading-relaxed">${content}</div>` :
+              (summary ? `<p class="text-sm text-gray-600">${esc(summary)}</p>` : '<p class="text-gray-400 text-sm">No content available</p>')}
+        `;
+    }
+
+    // Close detail panel
+    function closeDetail() {
+        document.getElementById('detailOverlay').classList.remove('active');
+        document.getElementById('detailPanel').classList.remove('active');
+    }
+
+    // Close on escape
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeDetail();
+    });
+
+    // Swipe down to close detail panel
+    let touchStartY = 0;
+    document.getElementById('detailPanel').addEventListener('touchstart', e => {
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.getElementById('detailPanel').addEventListener('touchmove', e => {
+        const deltaY = e.touches[0].clientY - touchStartY;
+        if (deltaY > 80 && document.getElementById('detailPanel').scrollTop <= 0) {
+            closeDetail();
+        }
+    }, { passive: true });
+
+    // Load notification count
+    async function loadNotifCount() {
+        try {
+            const res = await fetch(`${API}/me/notifications?limit=1`, { headers: painterHeaders() });
+            if (!res.ok) return;
+            const data = await res.json();
+            const unread = (data.notifications || []).filter(n => !n.is_read).length;
+            const badge = document.getElementById('notifBadge');
+            if (data.unread_count > 0) {
+                badge.textContent = data.unread_count > 9 ? '9+' : data.unread_count;
+                badge.style.display = 'flex';
+            }
+        } catch (e) {}
+    }
+
+    // Init
+    loadTraining();
+    loadNotifCount();
+    </script>
+</body>
+</html>
