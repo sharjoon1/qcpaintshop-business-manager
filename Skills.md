@@ -1,8 +1,8 @@
 # QC Paint Shop Business Manager - System Skills & Capabilities
 
 > **Platform**: act.qcpaintshop.com
-> **Version**: 3.3.0
-> **Last Updated**: 2026-02-17
+> **Version**: 3.3.3
+> **Last Updated**: 2026-02-28
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
@@ -580,15 +580,44 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 
 ### 2.13 Lead Management
 
-**Lead Pipeline**
+**Lead Pipeline (Admin)**
 - Full CRUD with search, filter, pagination
-- Fields: name, company, email, phone, source, status, value, notes
-- Status workflow: new -> contacted -> qualified -> proposal -> negotiation -> won -> lost
-- Staff assignment
-- Follow-up management with scheduled dates and notes
-- Lead conversion to customer
-- Lead statistics (by status, source, value)
-- Page: `admin-leads.html`
+- Fields: name, company, email, phone, source, status, priority, value, notes, project_type, property_type, budget, timeline
+- Status workflow: new → contacted → interested → quoted → negotiating → won/lost
+- Staff assignment with in-app + push + Socket.io notifications
+- Follow-up management with scheduled dates, types (call/visit/email/whatsapp/sms/meeting), and notes
+- Lead conversion to customer (transaction-based)
+- Lead statistics (by status, source, priority, followups today/overdue)
+- AI lead scoring (deterministic 0-100 + AI enhancement for top leads)
+- WhatsApp nurture campaigns (hot/warm/cold tiers)
+- Staff Performance leaderboard tab (conversion rates, followup counts, avg response time, monthly trends)
+- Page: `admin-leads.html` (2 tabs: Lead Management, Staff Performance)
+
+**Staff Lead Management (Per-Staff Isolation)**
+- Each staff member sees ONLY their own leads (`WHERE assigned_to = userId`)
+- Manager sees branch leads; Admin sees all leads
+- Staff can create leads (auto-assigned to self), update own leads, change status, log followups
+- Mobile-first page with stats cards (Total, New Today, Follow-ups Today, Overdue, Converted)
+- Filter tabs: All / Today's / Overdue / New / Hot (AI 80+)
+- Lead cards with priority color-coding, quick actions (Call, WhatsApp, View)
+- Pipeline/Kanban view toggle (New → Contacted → Interested → Quoted → Negotiating → Won)
+- Detail slide-out panel with followup history, status change, AI score
+- Socket.io real-time notifications on lead assignment
+- 60-second auto-refresh
+- Page: `staff-leads.html`
+- Permissions: `leads.own.view`, `leads.own.add`, `leads.own.edit` (assigned to staff/manager/admin roles)
+
+**Lead Followup Reminders**
+- Daily 8 AM IST cron (`services/lead-reminder-scheduler.js`)
+- Notifies staff with leads due today ("You have N follow-ups scheduled for today")
+- Notifies staff with overdue followups ("You have N overdue follow-ups")
+- Uses notification-service for in-app + push delivery
+
+**API Endpoints** (25 total in `routes/leads.js`):
+- Admin: `GET /`, `GET /stats`, `POST /`, `GET /:id`, `PUT /:id`, `DELETE /:id`, `PATCH /:id/status`, `PATCH /:id/assign`, `POST /:id/followup`, `GET /:id/followups`, `GET /:id/score`, `POST /:id/predict`, `POST /:id/convert`
+- Staff: `GET /my/stats`, `GET /my/today`, `GET /my/list`, `POST /my/create`, `PUT /my/:id`, `PATCH /my/:id/status`, `POST /my/:id/followup`, `GET /my/:id/followups`
+- AI Scoring: `GET /scoring/dashboard`, `POST /scoring/nurture`
+- Performance: `GET /performance/leaderboard`, `GET /performance/:userId`
 
 ---
 
@@ -1466,6 +1495,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | **AI Lead Manager** | `services/ai-lead-manager.js` | Lead scoring (deterministic + AI) and stale lead detection |
 | **AI Marketing** | `services/ai-marketing.js` | Marketing strategy and product trend analysis |
 | **AI Scheduler** | `services/ai-scheduler.js` | Cron orchestrator for all automated AI analysis jobs |
+| **Lead Reminder Scheduler** | `services/lead-reminder-scheduler.js` | Daily 8 AM IST reminders for due/overdue lead followups |
 
 ---
 
@@ -1505,6 +1535,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | Customer Requests | `customer-requests.html` | Design request handling |
 | Guides & Help | `staff/guides.html` | Browse/search guides, favorites, reading view |
 | Stock Check | `staff/stock-check.html` | Submit physical stock counts with photos |
+| My Leads | `staff-leads.html` | Per-staff lead management, followups, pipeline view, WhatsApp/Call actions |
 
 ### Admin Pages
 | Page | File | Purpose |
@@ -1524,7 +1555,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | Geofence Logs | `admin-geofence-logs.html` | Geo-fence violations |
 | Tasks | `admin-tasks.html` | Task assignment |
 | Daily Tasks | `admin-daily-tasks.html` | Daily task templates |
-| Leads | `admin-leads.html` | Lead pipeline |
+| Leads | `admin-leads.html` | Lead pipeline + Staff Performance leaderboard (2 tabs) |
 | Design Requests | `admin-design-requests.html` | AI visualization |
 | Estimate Requests | `admin-estimate-requests.html` | Request management |
 | Staff Registrations | `admin-staff-registrations.html` | Registration approvals |
@@ -1634,7 +1665,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | Salary | `/api/salary/*` | 25 | `routes/salary.js` |
 | Branches | `/api/branches/*` | 10 | `routes/branches.js` |
 | Roles | `/api/roles/*` | 10 | `routes/roles.js` |
-| Leads | `/api/leads/*` | 10 | `routes/leads.js` |
+| Leads | `/api/leads/*` | 25 | `routes/leads.js` |
 | Tasks | `/api/tasks/*` | 12 | `routes/tasks.js` |
 | Daily Tasks | `/api/daily-tasks/*` | 15 | `routes/daily-tasks.js` |
 | Activities | `/api/activities/*` | 9 | `routes/activities.js` |
@@ -1754,6 +1785,43 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-02-28 - Staff Lead Management System (Per-Staff Isolation)
+
+**Staff Lead Page** — `public/staff-leads.html` (1,412 lines): Mobile-first lead management for individual staff:
+- Stats cards (Total, New Today, Follow-ups Today, Overdue, Converted), filter tabs (All/Today/Overdue/New/Hot)
+- Lead cards with priority color-coding, status badges, AI score, quick actions (Call/WhatsApp/View)
+- Pipeline/Kanban toggle view (6 status columns: New → Contacted → Interested → Quoted → Negotiating → Won)
+- Add/Edit lead modal, Lead detail slide-out with followup history + status change + AI recommendation
+- Socket.io real-time `lead_assigned` notifications, 60s auto-refresh, debounced search
+
+**Data Isolation** — Role-based auto-filtering in `routes/leads.js`:
+- Staff: `WHERE assigned_to = userId` (own leads only)
+- Manager: `WHERE branch_id = userBranchId` (branch leads)
+- Admin: no filter (all leads)
+- Ownership verification via `checkLeadOwnership()` on all `/my/:id/*` endpoints (403 if not owner)
+
+**10 New API Endpoints** — Staff: `/my/stats`, `/my/today`, `/my/list`, `/my/create`, `/my/:id` (PUT), `/my/:id/status` (PATCH), `/my/:id/followup` (POST), `/my/:id/followups` (GET). Admin: `/performance/leaderboard`, `/performance/:userId`
+
+**Staff Performance Leaderboard** — New "Staff Performance" tab in `admin-leads.html`:
+- Ranked table: conversion rate, followup count, avg response time (hours), active/overdue lead counts
+- Date range + branch filters, click-to-expand detail (status/source breakdown, monthly trend, recent followups)
+
+**Assignment Notifications** — Enhanced `PATCH /:id/assign`:
+- In-app notification via `notification-service.send()` + Socket.io real-time `lead_assigned` event
+- Staff receives "New lead assigned: {name} ({lead_number})" with push notification
+
+**Daily Followup Reminders** — `services/lead-reminder-scheduler.js`:
+- Cron at 8 AM IST, sends notifications for today's followups and overdue followups per staff
+- Uses `notification-service.send()` (in-app + push)
+
+**Permissions** — `migrations/migrate-staff-leads-permissions.js`:
+- `leads.own.view`, `leads.own.add`, `leads.own.edit` — auto-assigned to staff, manager, admin roles
+- Existing `leads.view/edit/delete/convert` remain for admin-level access
+
+**Navigation** — "My Leads" entry added to staff sidebar (My Work section), `data-page="my-leads"`
+
+**Files**: `staff-leads.html` (new), `lead-reminder-scheduler.js` (new), `migrate-staff-leads-permissions.js` (new), `routes/leads.js` (+758 lines), `admin-leads.html` (+214 lines), `staff-sidebar.html` (+5 lines), `server.js` (+3 lines)
 
 ### 2026-02-26 - Server-Side Geo-Fence Enforcement
 - **Problem**: Client-side geo-fence monitoring reset on page refresh/app close — staff could exploit by refreshing
