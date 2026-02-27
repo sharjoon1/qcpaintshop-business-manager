@@ -12,6 +12,8 @@ const crypto = require('crypto');
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const pointsEngine = require('../services/painter-points-engine');
 const zohoAPI = require('../services/zoho-api');
+const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterAttendance } = require('../config/uploads');
+const painterNotificationService = require('../services/painter-notification-service');
 
 let pool;
 let io;
@@ -37,6 +39,17 @@ async function logEstimateStatusChange(estimateId, oldStatus, newStatus, changed
     } catch (err) {
         console.error('[Painters] Failed to log estimate status change:', err.message);
     }
+}
+
+// ─── Haversine Distance (meters) ─────────────────────────────
+function haversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // Earth radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 // ═══════════════════════════════════════════
@@ -684,8 +697,896 @@ router.delete('/me/estimates/:estimateId', requirePainterAuth, async (req, res) 
 });
 
 // ═══════════════════════════════════════════════════════════════
+// PAINTER CATALOG ENDPOINTS (/me/catalog/*)
+// ═══════════════════════════════════════════════════════════════
+
+// Browse product catalog with images, points, and active offers
+router.get('/me/catalog', requirePainterAuth, async (req, res) => {
+    try {
+        const { search, brand, category, page = 1, limit = 50 } = req.query;
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+        const offset = (pageNum - 1) * limitNum;
+
+        let where = "WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)";
+        const params = [];
+
+        if (search) {
+            where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_brand LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`);
+        }
+        if (brand) {
+            where += ' AND zim.zoho_brand = ?';
+            params.push(brand);
+        }
+        if (category) {
+            where += ' AND zim.zoho_category_name = ?';
+            params.push(category);
+        }
+
+        // Get total count
+        const [countResult] = await pool.query(`
+            SELECT COUNT(*) as total FROM zoho_items_map zim ${where}
+        `, params);
+        const total = countResult[0].total;
+
+        // Products with point rates
+        const [products] = await pool.query(`
+            SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
+                   zim.zoho_brand as brand, zim.zoho_category_name as category,
+                   zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
+                   zim.image_url,
+                   ppr.points_per_unit, ppr.points_type
+            FROM zoho_items_map zim
+            LEFT JOIN painter_product_point_rates ppr
+                ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+            ${where}
+            ORDER BY zim.zoho_brand, zim.zoho_item_name
+            LIMIT ? OFFSET ?
+        `, [...params, limitNum, offset]);
+
+        // Get active offers
+        const now = new Date();
+        const [offers] = await pool.query(`
+            SELECT * FROM painter_special_offers
+            WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
+            ORDER BY priority DESC, created_at DESC
+        `, [now, now]);
+
+        // Match offers to products
+        const productsWithOffers = products.map(p => {
+            const matchedOffers = offers.filter(o => {
+                if (o.applies_to === 'all') return true;
+                if (o.applies_to === 'brand' && o.applies_to_value === p.brand) return true;
+                if (o.applies_to === 'category' && o.applies_to_value === p.category) return true;
+                if (o.applies_to === 'product' && o.applies_to_value === p.item_id) return true;
+                return false;
+            });
+            return {
+                ...p,
+                rate: parseFloat(p.rate || 0),
+                stock: parseFloat(p.stock || 0),
+                points_per_unit: p.points_per_unit ? parseFloat(p.points_per_unit) : null,
+                offer: matchedOffers.length > 0 ? matchedOffers[0] : null
+            };
+        });
+
+        // Filter options
+        const [brands] = await pool.query(`
+            SELECT DISTINCT zoho_brand as brand FROM zoho_items_map
+            WHERE zoho_brand IS NOT NULL AND zoho_brand != ''
+            AND (zoho_status = 'active' OR zoho_status IS NULL)
+            ORDER BY zoho_brand
+        `);
+        const [categories] = await pool.query(`
+            SELECT DISTINCT zoho_category_name as category FROM zoho_items_map
+            WHERE zoho_category_name IS NOT NULL AND zoho_category_name != ''
+            AND (zoho_status = 'active' OR zoho_status IS NULL)
+            ORDER BY zoho_category_name
+        `);
+
+        res.json({
+            success: true,
+            products: productsWithOffers,
+            offers: offers.map(o => ({
+                ...o,
+                bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
+                bonus_multiplier: o.bonus_multiplier ? parseFloat(o.bonus_multiplier) : null
+            })),
+            brands: brands.map(b => b.brand),
+            categories: categories.map(c => c.category),
+            pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) }
+        });
+    } catch (error) {
+        console.error('Catalog browse error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load catalog' });
+    }
+});
+
+// Product detail with offers
+router.get('/me/catalog/:itemId', requirePainterAuth, async (req, res) => {
+    try {
+        const { itemId } = req.params;
+
+        const [products] = await pool.query(`
+            SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
+                   zim.zoho_brand as brand, zim.zoho_category_name as category,
+                   zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
+                   zim.image_url,
+                   ppr.points_per_unit, ppr.points_type
+            FROM zoho_items_map zim
+            LEFT JOIN painter_product_point_rates ppr
+                ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+            WHERE zim.zoho_item_id = ?
+        `, [itemId]);
+
+        if (!products.length) {
+            return res.status(404).json({ success: false, message: 'Product not found' });
+        }
+
+        const product = products[0];
+        product.rate = parseFloat(product.rate || 0);
+        product.stock = parseFloat(product.stock || 0);
+        product.points_per_unit = product.points_per_unit ? parseFloat(product.points_per_unit) : null;
+
+        // Find matching offers for this product
+        const now = new Date();
+        const [offers] = await pool.query(`
+            SELECT * FROM painter_special_offers
+            WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
+            AND (
+                applies_to = 'all'
+                OR (applies_to = 'product' AND applies_to_value = ?)
+                OR (applies_to = 'brand' AND applies_to_value = ?)
+                OR (applies_to = 'category' AND applies_to_value = ?)
+            )
+            ORDER BY priority DESC
+        `, [now, now, itemId, product.brand, product.category]);
+
+        res.json({
+            success: true,
+            product,
+            offers: offers.map(o => ({
+                ...o,
+                bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
+                bonus_multiplier: o.bonus_multiplier ? parseFloat(o.bonus_multiplier) : null
+            }))
+        });
+    } catch (error) {
+        console.error('Catalog product detail error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load product' });
+    }
+});
+
+// Active offers list
+router.get('/me/offers', requirePainterAuth, async (req, res) => {
+    try {
+        const now = new Date();
+        const [offers] = await pool.query(`
+            SELECT * FROM painter_special_offers
+            WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
+            ORDER BY priority DESC, created_at DESC
+        `, [now, now]);
+
+        res.json({
+            success: true,
+            offers: offers.map(o => ({
+                ...o,
+                bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
+                bonus_multiplier: o.bonus_multiplier ? parseFloat(o.bonus_multiplier) : null
+            }))
+        });
+    } catch (error) {
+        console.error('Get offers error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load offers' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PAINTER TRAINING ENDPOINTS (/me/training/*)
+// ═══════════════════════════════════════════════════════════════
+
+// List training content
+router.get('/me/training', requirePainterAuth, async (req, res) => {
+    try {
+        const { category, type, search } = req.query;
+
+        let where = "WHERE tc.status = 'published'";
+        const params = [];
+
+        if (category) {
+            where += ' AND tc.category_id = ?';
+            params.push(parseInt(category));
+        }
+        if (type) {
+            where += ' AND tc.content_type = ?';
+            params.push(type);
+        }
+        if (search) {
+            where += ' AND (tc.title LIKE ? OR tc.title_ta LIKE ? OR tc.description LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        const [content] = await pool.query(`
+            SELECT tc.*, cat.name as category_name, cat.name_ta as category_name_ta
+            FROM painter_training_content tc
+            LEFT JOIN painter_training_categories cat ON tc.category_id = cat.id
+            ${where}
+            ORDER BY tc.sort_order ASC, tc.created_at DESC
+        `, params);
+
+        const [categories] = await pool.query(`
+            SELECT * FROM painter_training_categories
+            WHERE is_active = 1
+            ORDER BY sort_order ASC, name ASC
+        `);
+
+        res.json({ success: true, content, categories });
+    } catch (error) {
+        console.error('Training list error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load training content' });
+    }
+});
+
+// Single training content detail (increments view count)
+router.get('/me/training/:id', requirePainterAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [content] = await pool.query(`
+            SELECT tc.*, cat.name as category_name, cat.name_ta as category_name_ta
+            FROM painter_training_content tc
+            LEFT JOIN painter_training_categories cat ON tc.category_id = cat.id
+            WHERE tc.id = ? AND tc.status = 'published'
+        `, [id]);
+
+        if (!content.length) {
+            return res.status(404).json({ success: false, message: 'Training content not found' });
+        }
+
+        // Increment view count
+        await pool.query('UPDATE painter_training_content SET view_count = view_count + 1 WHERE id = ?', [id]);
+        content[0].view_count += 1;
+
+        res.json({ success: true, content: content[0] });
+    } catch (error) {
+        console.error('Training detail error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load training content' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PAINTER ATTENDANCE ENDPOINTS (/me/attendance/*)
+// ═══════════════════════════════════════════════════════════════
+
+// Today's check-in status
+router.get('/me/attendance/today', requirePainterAuth, async (req, res) => {
+    try {
+        const [records] = await pool.query(
+            `SELECT * FROM painter_attendance
+             WHERE painter_id = ? AND DATE(check_in_at) = CURDATE()
+             ORDER BY check_in_at DESC LIMIT 1`,
+            [req.painter.id]
+        );
+
+        res.json({
+            success: true,
+            checkedIn: records.length > 0,
+            attendance: records[0] || null
+        });
+    } catch (error) {
+        console.error('Attendance today error:', error);
+        res.status(500).json({ success: false, message: 'Failed to check attendance status' });
+    }
+});
+
+// GPS geofence check-in
+router.post('/me/attendance/check-in', requirePainterAuth, uploadPainterAttendance.single('photo'), async (req, res) => {
+    try {
+        const { latitude, longitude } = req.body;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({ success: false, message: 'Location (latitude, longitude) is required' });
+        }
+
+        const lat = parseFloat(latitude);
+        const lng = parseFloat(longitude);
+
+        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            return res.status(400).json({ success: false, message: 'Invalid coordinates' });
+        }
+
+        // Check if already checked in today
+        const [existing] = await pool.query(
+            `SELECT id FROM painter_attendance
+             WHERE painter_id = ? AND DATE(check_in_at) = CURDATE()`,
+            [req.painter.id]
+        );
+        if (existing.length > 0) {
+            return res.status(400).json({ success: false, message: 'Already checked in today' });
+        }
+
+        // Get branches with GPS coordinates
+        const [branches] = await pool.query(`
+            SELECT id, name, latitude, longitude, geo_fence_radius
+            FROM branches
+            WHERE is_active = 1 AND latitude IS NOT NULL AND longitude IS NOT NULL
+        `);
+
+        if (!branches.length) {
+            return res.status(400).json({ success: false, message: 'No branches configured with GPS coordinates' });
+        }
+
+        // Get geofence radius from config (fallback)
+        const [geoConfig] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'painter_attendance_geofence_radius'"
+        );
+        const defaultRadius = geoConfig.length ? parseFloat(geoConfig[0].config_value) : 500; // 500m default
+
+        // Find nearest branch using haversine
+        let nearestBranch = null;
+        let minDistance = Infinity;
+
+        for (const branch of branches) {
+            const dist = haversineDistance(lat, lng, parseFloat(branch.latitude), parseFloat(branch.longitude));
+            if (dist < minDistance) {
+                minDistance = dist;
+                nearestBranch = branch;
+            }
+        }
+
+        const fenceRadius = nearestBranch.geo_fence_radius || defaultRadius;
+
+        if (minDistance > fenceRadius) {
+            return res.status(400).json({
+                success: false,
+                message: `Too far from nearest store (${nearestBranch.name}). Distance: ${Math.round(minDistance)}m, Required: within ${Math.round(fenceRadius)}m`,
+                distance: Math.round(minDistance),
+                required: Math.round(fenceRadius),
+                branch: nearestBranch.name
+            });
+        }
+
+        // Get daily attendance points from config
+        const [pointsConfig] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'painter_attendance_daily_points'"
+        );
+        const dailyPoints = pointsConfig.length ? parseInt(pointsConfig[0].config_value) : 5;
+
+        // Photo URL if uploaded
+        const photoUrl = req.file ? `/uploads/painter-attendance/${req.file.filename}` : null;
+
+        // Insert attendance record
+        const [result] = await pool.query(`
+            INSERT INTO painter_attendance
+            (painter_id, event_type, branch_id, check_in_at, photo_url, latitude, longitude, distance_meters, points_awarded)
+            VALUES (?, 'store_visit', ?, NOW(), ?, ?, ?, ?, ?)
+        `, [req.painter.id, nearestBranch.id, photoUrl, lat, lng, Math.round(minDistance), dailyPoints]);
+
+        // Award points via points engine
+        try {
+            await pointsEngine.awardAttendancePoints(req.painter.id, result.insertId);
+        } catch (pointsErr) {
+            console.error('[Painter Attendance] Points award error:', pointsErr.message);
+        }
+
+        res.json({
+            success: true,
+            message: `Checked in at ${nearestBranch.name}!`,
+            attendance: {
+                id: result.insertId,
+                branch: nearestBranch.name,
+                distance: Math.round(minDistance),
+                points: dailyPoints,
+                check_in_at: new Date()
+            }
+        });
+    } catch (error) {
+        console.error('Attendance check-in error:', error);
+        res.status(500).json({ success: false, message: 'Failed to check in' });
+    }
+});
+
+// Monthly attendance calendar data
+router.get('/me/attendance/monthly', requirePainterAuth, async (req, res) => {
+    try {
+        const now = new Date();
+        const month = parseInt(req.query.month) || (now.getMonth() + 1);
+        const year = parseInt(req.query.year) || now.getFullYear();
+
+        const [visits] = await pool.query(`
+            SELECT DATE(check_in_at) as visit_date, points_awarded, check_in_at,
+                   branch_id, distance_meters
+            FROM painter_attendance
+            WHERE painter_id = ? AND MONTH(check_in_at) = ? AND YEAR(check_in_at) = ?
+            ORDER BY check_in_at ASC
+        `, [req.painter.id, month, year]);
+
+        const totalVisits = visits.length;
+        const totalPoints = visits.reduce((sum, v) => sum + (v.points_awarded || 0), 0);
+
+        res.json({
+            success: true,
+            month,
+            year,
+            visits: visits.map(v => ({
+                date: v.visit_date,
+                points: v.points_awarded || 0,
+                check_in_time: v.check_in_at,
+                distance: v.distance_meters
+            })),
+            totalVisits,
+            totalPoints
+        });
+    } catch (error) {
+        console.error('Monthly attendance error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load attendance history' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PAINTER NOTIFICATION & FCM ENDPOINTS (/me/fcm/*, /me/notifications/*)
+// ═══════════════════════════════════════════════════════════════
+
+// Register FCM token
+router.post('/me/fcm/register', requirePainterAuth, async (req, res) => {
+    try {
+        const { fcm_token, device_info } = req.body;
+        if (!fcm_token) {
+            return res.status(400).json({ success: false, message: 'fcm_token is required' });
+        }
+
+        await pool.query(`
+            INSERT INTO painter_fcm_tokens (painter_id, fcm_token, device_info, is_active)
+            VALUES (?, ?, ?, 1)
+            ON DUPLICATE KEY UPDATE is_active = 1, device_info = VALUES(device_info), updated_at = NOW()
+        `, [req.painter.id, fcm_token, device_info ? JSON.stringify(device_info) : null]);
+
+        res.json({ success: true, message: 'FCM token registered' });
+    } catch (error) {
+        console.error('FCM register error:', error);
+        res.status(500).json({ success: false, message: 'Failed to register FCM token' });
+    }
+});
+
+// Deactivate FCM token
+router.delete('/me/fcm/unregister', requirePainterAuth, async (req, res) => {
+    try {
+        const { fcm_token } = req.body;
+        if (!fcm_token) {
+            return res.status(400).json({ success: false, message: 'fcm_token is required' });
+        }
+
+        await pool.query(
+            `UPDATE painter_fcm_tokens SET is_active = 0 WHERE painter_id = ? AND fcm_token = ?`,
+            [req.painter.id, fcm_token]
+        );
+
+        res.json({ success: true, message: 'FCM token deactivated' });
+    } catch (error) {
+        console.error('FCM unregister error:', error);
+        res.status(500).json({ success: false, message: 'Failed to deactivate FCM token' });
+    }
+});
+
+// List notifications (paginated)
+router.get('/me/notifications', requirePainterAuth, async (req, res) => {
+    try {
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+        const offset = Math.max(0, parseInt(req.query.offset) || 0);
+        const unreadOnly = req.query.unread === '1';
+
+        const result = await painterNotificationService.getNotifications(req.painter.id, {
+            limit,
+            offset,
+            unreadOnly
+        });
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Get notifications error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load notifications' });
+    }
+});
+
+// Mark notification as read
+router.put('/me/notifications/:id/read', requirePainterAuth, async (req, res) => {
+    try {
+        const notificationId = req.params.id === 'all' ? 'all' : parseInt(req.params.id);
+        const result = await painterNotificationService.markRead(req.painter.id, notificationId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Mark read error:', error);
+        res.status(500).json({ success: false, message: 'Failed to mark notification as read' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // ADMIN NAMED ROUTES (must come BEFORE /:id parameterized routes)
 // ═══════════════════════════════════════════════════════════════
+
+// --- OFFERS ADMIN ---
+
+// List all offers
+router.get('/offers', requireAuth, async (req, res) => {
+    try {
+        const [offers] = await pool.query(`
+            SELECT pso.*, u.full_name as created_by_name
+            FROM painter_special_offers pso
+            LEFT JOIN users u ON pso.created_by = u.id
+            ORDER BY pso.created_at DESC
+        `);
+
+        res.json({
+            success: true,
+            offers: offers.map(o => ({
+                ...o,
+                bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
+                bonus_multiplier: o.bonus_multiplier ? parseFloat(o.bonus_multiplier) : null
+            }))
+        });
+    } catch (error) {
+        console.error('List offers error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list offers' });
+    }
+});
+
+// Create offer
+router.post('/offers', requirePermission('painters', 'manage'), uploadOfferBanner.single('banner'), async (req, res) => {
+    try {
+        const {
+            title, title_ta, description, description_ta,
+            offer_type, bonus_points, bonus_multiplier,
+            applies_to, applies_to_value,
+            start_date, end_date, priority
+        } = req.body;
+
+        if (!title || !offer_type || !start_date || !end_date) {
+            return res.status(400).json({ success: false, message: 'title, offer_type, start_date, and end_date are required' });
+        }
+
+        const bannerUrl = req.file ? `/uploads/offers/${req.file.filename}` : null;
+
+        const [result] = await pool.query(`
+            INSERT INTO painter_special_offers
+            (title, title_ta, description, description_ta, offer_type,
+             bonus_points, bonus_multiplier, applies_to, applies_to_value,
+             banner_image_url, start_date, end_date, priority, is_active, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        `, [
+            title, title_ta || null, description || null, description_ta || null,
+            offer_type,
+            bonus_points ? parseFloat(bonus_points) : null,
+            bonus_multiplier ? parseFloat(bonus_multiplier) : null,
+            applies_to || 'all', applies_to_value || null,
+            bannerUrl, start_date, end_date,
+            parseInt(priority) || 0,
+            req.user.id
+        ]);
+
+        res.json({ success: true, message: 'Offer created', offerId: result.insertId });
+    } catch (error) {
+        console.error('Create offer error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create offer' });
+    }
+});
+
+// Update offer
+router.put('/offers/:id', requirePermission('painters', 'manage'), uploadOfferBanner.single('banner'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            title, title_ta, description, description_ta,
+            offer_type, bonus_points, bonus_multiplier,
+            applies_to, applies_to_value,
+            start_date, end_date, priority, is_active
+        } = req.body;
+
+        // Check offer exists
+        const [existing] = await pool.query('SELECT id FROM painter_special_offers WHERE id = ?', [id]);
+        if (!existing.length) {
+            return res.status(404).json({ success: false, message: 'Offer not found' });
+        }
+
+        const bannerUrl = req.file ? `/uploads/offers/${req.file.filename}` : undefined;
+
+        let updateQuery = `
+            UPDATE painter_special_offers SET
+                title = COALESCE(?, title),
+                title_ta = COALESCE(?, title_ta),
+                description = COALESCE(?, description),
+                description_ta = COALESCE(?, description_ta),
+                offer_type = COALESCE(?, offer_type),
+                bonus_points = COALESCE(?, bonus_points),
+                bonus_multiplier = COALESCE(?, bonus_multiplier),
+                applies_to = COALESCE(?, applies_to),
+                applies_to_value = COALESCE(?, applies_to_value),
+                start_date = COALESCE(?, start_date),
+                end_date = COALESCE(?, end_date),
+                priority = COALESCE(?, priority)`;
+        const updateParams = [
+            title || null, title_ta || null, description || null, description_ta || null,
+            offer_type || null,
+            bonus_points ? parseFloat(bonus_points) : null,
+            bonus_multiplier ? parseFloat(bonus_multiplier) : null,
+            applies_to || null, applies_to_value || null,
+            start_date || null, end_date || null,
+            priority != null ? parseInt(priority) : null
+        ];
+
+        if (bannerUrl !== undefined) {
+            updateQuery += ', banner_image_url = ?';
+            updateParams.push(bannerUrl);
+        }
+
+        if (is_active !== undefined) {
+            updateQuery += ', is_active = ?';
+            updateParams.push(is_active === 'true' || is_active === true || is_active === '1' ? 1 : 0);
+        }
+
+        updateQuery += ' WHERE id = ?';
+        updateParams.push(id);
+
+        await pool.query(updateQuery, updateParams);
+        res.json({ success: true, message: 'Offer updated' });
+    } catch (error) {
+        console.error('Update offer error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update offer' });
+    }
+});
+
+// Delete offer
+router.delete('/offers/:id', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const [existing] = await pool.query('SELECT id FROM painter_special_offers WHERE id = ?', [req.params.id]);
+        if (!existing.length) {
+            return res.status(404).json({ success: false, message: 'Offer not found' });
+        }
+
+        await pool.query('DELETE FROM painter_special_offers WHERE id = ?', [req.params.id]);
+        res.json({ success: true, message: 'Offer deleted' });
+    } catch (error) {
+        console.error('Delete offer error:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete offer' });
+    }
+});
+
+// --- TRAINING ADMIN ---
+
+// List all training content (admin view — includes drafts)
+router.get('/training', requireAuth, async (req, res) => {
+    try {
+        const { status, category, type, search } = req.query;
+
+        let where = 'WHERE 1=1';
+        const params = [];
+
+        if (status) {
+            where += ' AND tc.status = ?';
+            params.push(status);
+        }
+        if (category) {
+            where += ' AND tc.category_id = ?';
+            params.push(parseInt(category));
+        }
+        if (type) {
+            where += ' AND tc.content_type = ?';
+            params.push(type);
+        }
+        if (search) {
+            where += ' AND (tc.title LIKE ? OR tc.description LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`);
+        }
+
+        const [content] = await pool.query(`
+            SELECT tc.*, cat.name as category_name,
+                   u.full_name as created_by_name
+            FROM painter_training_content tc
+            LEFT JOIN painter_training_categories cat ON tc.category_id = cat.id
+            LEFT JOIN users u ON tc.created_by = u.id
+            ${where}
+            ORDER BY tc.sort_order ASC, tc.created_at DESC
+        `, params);
+
+        const [categories] = await pool.query(`
+            SELECT * FROM painter_training_categories ORDER BY sort_order ASC, name ASC
+        `);
+
+        res.json({ success: true, content, categories });
+    } catch (error) {
+        console.error('Admin training list error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list training content' });
+    }
+});
+
+// Create training content
+router.post('/training', requirePermission('painters', 'manage'), uploadTraining.single('file'), async (req, res) => {
+    try {
+        const {
+            title, title_ta, description, description_ta,
+            content_type, category_id, video_url, body_html, body_html_ta,
+            sort_order, status
+        } = req.body;
+
+        if (!title || !content_type) {
+            return res.status(400).json({ success: false, message: 'title and content_type are required' });
+        }
+
+        let thumbnailUrl = null;
+        let pdfUrl = null;
+
+        if (req.file) {
+            if (content_type === 'pdf') {
+                pdfUrl = `/uploads/training/${req.file.filename}`;
+            } else {
+                thumbnailUrl = `/uploads/training/${req.file.filename}`;
+            }
+        }
+
+        const [result] = await pool.query(`
+            INSERT INTO painter_training_content
+            (title, title_ta, description, description_ta, content_type,
+             category_id, video_url, body_html, body_html_ta,
+             thumbnail_url, pdf_url, sort_order, status, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            title, title_ta || null, description || null, description_ta || null,
+            content_type,
+            category_id ? parseInt(category_id) : null,
+            video_url || null, body_html || null, body_html_ta || null,
+            thumbnailUrl, pdfUrl,
+            parseInt(sort_order) || 0,
+            status || 'draft',
+            req.user.id
+        ]);
+
+        res.json({ success: true, message: 'Training content created', contentId: result.insertId });
+    } catch (error) {
+        console.error('Create training error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create training content' });
+    }
+});
+
+// Update training content
+router.put('/training/:id', requirePermission('painters', 'manage'), uploadTraining.single('file'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            title, title_ta, description, description_ta,
+            content_type, category_id, video_url, body_html, body_html_ta,
+            sort_order, status
+        } = req.body;
+
+        const [existing] = await pool.query('SELECT id, content_type FROM painter_training_content WHERE id = ?', [id]);
+        if (!existing.length) {
+            return res.status(404).json({ success: false, message: 'Training content not found' });
+        }
+
+        const effectiveType = content_type || existing[0].content_type;
+        let fileUpdate = '';
+        const fileParams = [];
+
+        if (req.file) {
+            if (effectiveType === 'pdf') {
+                fileUpdate = ', pdf_url = ?';
+                fileParams.push(`/uploads/training/${req.file.filename}`);
+            } else {
+                fileUpdate = ', thumbnail_url = ?';
+                fileParams.push(`/uploads/training/${req.file.filename}`);
+            }
+        }
+
+        await pool.query(`
+            UPDATE painter_training_content SET
+                title = COALESCE(?, title),
+                title_ta = COALESCE(?, title_ta),
+                description = COALESCE(?, description),
+                description_ta = COALESCE(?, description_ta),
+                content_type = COALESCE(?, content_type),
+                category_id = COALESCE(?, category_id),
+                video_url = COALESCE(?, video_url),
+                body_html = COALESCE(?, body_html),
+                body_html_ta = COALESCE(?, body_html_ta),
+                sort_order = COALESCE(?, sort_order),
+                status = COALESCE(?, status)
+                ${fileUpdate}
+            WHERE id = ?
+        `, [
+            title || null, title_ta || null, description || null, description_ta || null,
+            content_type || null,
+            category_id ? parseInt(category_id) : null,
+            video_url || null, body_html || null, body_html_ta || null,
+            sort_order != null ? parseInt(sort_order) : null,
+            status || null,
+            ...fileParams,
+            id
+        ]);
+
+        res.json({ success: true, message: 'Training content updated' });
+    } catch (error) {
+        console.error('Update training error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update training content' });
+    }
+});
+
+// Delete training content
+router.delete('/training/:id', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const [existing] = await pool.query('SELECT id FROM painter_training_content WHERE id = ?', [req.params.id]);
+        if (!existing.length) {
+            return res.status(404).json({ success: false, message: 'Training content not found' });
+        }
+
+        await pool.query('DELETE FROM painter_training_content WHERE id = ?', [req.params.id]);
+        res.json({ success: true, message: 'Training content deleted' });
+    } catch (error) {
+        console.error('Delete training error:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete training content' });
+    }
+});
+
+// --- PRODUCT IMAGES ---
+
+// Upload product image
+router.post('/products/:itemId/image', requirePermission('painters', 'manage'), uploadProductImage.single('image'), async (req, res) => {
+    try {
+        const { itemId } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'Image file is required' });
+        }
+
+        // Verify product exists
+        const [existing] = await pool.query('SELECT zoho_item_id FROM zoho_items_map WHERE zoho_item_id = ?', [itemId]);
+        if (!existing.length) {
+            return res.status(404).json({ success: false, message: 'Product not found' });
+        }
+
+        const imageUrl = `/uploads/products/${req.file.filename}`;
+        await pool.query('UPDATE zoho_items_map SET image_url = ? WHERE zoho_item_id = ?', [imageUrl, itemId]);
+
+        res.json({ success: true, message: 'Product image uploaded', image_url: imageUrl });
+    } catch (error) {
+        console.error('Upload product image error:', error);
+        res.status(500).json({ success: false, message: 'Failed to upload product image' });
+    }
+});
+
+// --- BULK NOTIFICATIONS ---
+
+// Send notification to all painters
+router.post('/notifications/send-all', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { type, title, title_ta, body, body_ta, data } = req.body;
+
+        if (!title || !body) {
+            return res.status(400).json({ success: false, message: 'title and body are required' });
+        }
+
+        const results = await painterNotificationService.sendToAll({
+            type: type || 'announcement',
+            title,
+            title_ta: title_ta || null,
+            body,
+            body_ta: body_ta || null,
+            data: data || null
+        });
+
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.filter(r => !r.success).length;
+
+        res.json({
+            success: true,
+            message: `Notification sent to ${successCount} painters${failCount > 0 ? ` (${failCount} failed)` : ''}`,
+            sent: successCount,
+            failed: failCount,
+            total: results.length
+        });
+    } catch (error) {
+        console.error('Bulk notification error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send notifications' });
+    }
+});
 
 // --- INVOICE LINKING ---
 
