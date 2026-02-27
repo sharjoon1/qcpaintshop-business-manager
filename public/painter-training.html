@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#1B5E3B">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <title>Training Hub - Quality Colours</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/painter-i18n.js"></script>
     <style>
         body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .header { background: linear-gradient(135deg, #1B5E3B, #D4A24E); color: #fff; }
         .cat-tab { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 9999px; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; cursor: pointer; border: 1px solid #e2e8f0; background: #fff; color: #475569; transition: all 0.2s; flex-shrink: 0; }
-        .cat-tab.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-color: transparent; }
+        .cat-tab.active { background: linear-gradient(135deg, #1B5E3B, #D4A24E); color: #fff; border-color: transparent; }
         .cat-tabs-scroll { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding: 0 1rem; }
         .cat-tabs-scroll::-webkit-scrollbar { display: none; }
         .featured-scroll { display: flex; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding: 0 1rem; }
@@ -38,8 +38,8 @@
         /* Bottom nav */
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e8ecf1; padding: 6px 0 calc(6px + env(safe-area-inset-bottom)); z-index: 50; }
         .bottom-nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.6875rem; color: #94a3b8; text-decoration: none; padding: 4px 0; }
-        .bottom-nav a.active { color: #667eea; font-weight: 600; }
-        .bottom-nav a.active svg { stroke: #667eea; }
+        .bottom-nav a.active { color: #1B5E3B; font-weight: 600; }
+        .bottom-nav a.active svg { stroke: #1B5E3B; }
 
         /* YouTube responsive embed */
         .video-wrapper { position: relative; width: 100%; padding-bottom: 56.25%; border-radius: 12px; overflow: hidden; background: #000; }
@@ -47,7 +47,7 @@
 
         /* Search bar */
         .search-bar { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; padding: 0 12px; gap: 8px; transition: border-color 0.2s; }
-        .search-bar:focus-within { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .search-bar:focus-within { border-color: #1B5E3B; box-shadow: 0 0 0 3px rgba(27,94,59,0.1); }
         .search-bar input { border: none; outline: none; flex: 1; font-size: 0.875rem; padding: 10px 0; background: transparent; }
 
         /* Play icon overlay on video thumbnails */
@@ -97,7 +97,7 @@
     <div class="max-w-lg mx-auto pb-24 mt-4" id="mainContent">
         <!-- Loading -->
         <div id="loadingState" class="text-center py-12">
-            <div class="inline-block w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style="border-width:3px"></div>
+            <div class="inline-block w-8 h-8 border-3 border-emerald-200 border-t-emerald-700 rounded-full animate-spin" style="border-width:3px"></div>
             <p class="text-gray-400 text-sm mt-3" data-i18n="common.loading">Loading...</p>
         </div>
 
@@ -410,7 +410,7 @@
             } else if (item.thumbnail_url) {
                 thumbHtml = `<img class="thumb" src="${esc(item.thumbnail_url)}" alt="${title}" onerror="this.src='/icons/icon-192x192.png'">`;
             } else {
-                thumbHtml = `<div class="thumb flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100"><span class="text-3xl">${contentTypeIcon(item.content_type)}</span></div>`;
+                thumbHtml = `<div class="thumb flex items-center justify-center bg-gradient-to-br from-emerald-100 to-amber-100"><span class="text-3xl">${contentTypeIcon(item.content_type)}</span></div>`;
             }
 
             return `
@@ -451,7 +451,7 @@
             } else if (item.thumbnail_url) {
                 thumbHtml = `<img class="w-24 h-24 flex-shrink-0 object-cover rounded-lg" src="${esc(item.thumbnail_url)}" alt="${title}" onerror="this.src='/icons/icon-192x192.png'">`;
             } else {
-                thumbHtml = `<div class="w-24 h-24 flex-shrink-0 rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center"><span class="text-2xl">${contentTypeIcon(item.content_type)}</span></div>`;
+                thumbHtml = `<div class="w-24 h-24 flex-shrink-0 rounded-lg bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center"><span class="text-2xl">${contentTypeIcon(item.content_type)}</span></div>`;
             }
 
             const typeLabel = item.content_type === 'pdf' ? '📎 PDF' : (item.content_type === 'video' ? '🎥 Video' : '📄 Article');
@@ -484,7 +484,7 @@
         // Show loading
         contentEl.innerHTML = `
             <div class="text-center py-12">
-                <div class="inline-block w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style="border-width:3px"></div>
+                <div class="inline-block w-8 h-8 border-3 border-emerald-200 border-t-emerald-700 rounded-full animate-spin" style="border-width:3px"></div>
             </div>`;
 
         overlay.classList.add('active');
@@ -578,7 +578,7 @@
             ${item.pdf_url ? `
                 <a href="${esc(item.pdf_url)}" target="_blank" rel="noopener noreferrer"
                    class="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-white font-semibold text-sm"
-                   style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                   style="background: linear-gradient(135deg, #1B5E3B, #D4A24E);">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     ${downloadLabel}
                 </a>` : '<p class="text-gray-400 text-sm text-center">PDF not available</p>'}

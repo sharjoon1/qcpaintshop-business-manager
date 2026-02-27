@@ -3,30 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#1B5E3B">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <title>Create Estimate - Quality Colours</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .header { background: linear-gradient(135deg, #1B5E3B, #D4A24E); color: #fff; }
         .step { display: none; }
         .step.active { display: block; }
         .type-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 16px; padding: 1.5rem; cursor: pointer; transition: all 0.2s; text-align: center; }
-        .type-card:hover { border-color: #667eea; box-shadow: 0 4px 12px rgba(102,126,234,0.15); }
-        .type-card.selected { border-color: #667eea; background: linear-gradient(135deg, #f0f4ff, #faf5ff); }
+        .type-card:hover { border-color: #1B5E3B; box-shadow: 0 4px 12px rgba(27,94,59,0.15); }
+        .type-card.selected { border-color: #1B5E3B; background: linear-gradient(135deg, #f0fdf4, #fefce8); }
         .product-card { background: #fff; border: 1px solid #e8ecf1; border-radius: 12px; padding: 0.75rem; display: flex; align-items: center; gap: 0.75rem; transition: all 0.15s; }
-        .product-card:hover { border-color: #667eea; }
+        .product-card:hover { border-color: #1B5E3B; }
         .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9; }
         .cart-item:last-child { border-bottom: none; }
-        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.9375rem; }
+        .btn-primary { background: linear-gradient(135deg, #1B5E3B, #D4A24E); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.9375rem; }
         .btn-primary:hover { opacity: 0.95; }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-outline { background: #fff; border: 1px solid #d1d5db; color: #374151; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 500; cursor: pointer; }
         .qty-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; font-size: 1.125rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .qty-btn:hover { background: #f3f4f6; }
         .search-input { width: 100%; padding: 0.625rem 0.75rem 0.625rem 2.5rem; border: 1px solid #d1d5db; border-radius: 10px; font-size: 0.875rem; }
-        .search-input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .search-input:focus { outline: none; border-color: #1B5E3B; box-shadow: 0 0 0 3px rgba(27,94,59,0.1); }
         .filter-select { padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.8125rem; background: #fff; }
         .badge { display: inline-flex; padding: 2px 8px; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; }
         .badge-stock { background: #d1fae5; color: #065f46; }
@@ -73,7 +73,7 @@
                     </div>
                     <h3 class="font-semibold text-gray-800">Self Billing</h3>
                     <p class="text-sm text-gray-500 mt-1">Buying paint for yourself</p>
-                    <p class="text-xs text-indigo-600 mt-2 font-medium">You'll see dealer prices</p>
+                    <p class="text-xs text-emerald-700 mt-2 font-medium">You'll see dealer prices</p>
                 </div>
                 <div class="type-card" onclick="selectBillingType('customer')">
                     <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#fef3c7,#fde68a);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;">
@@ -305,7 +305,7 @@
                         ${p.brand ? `<span class="text-xs text-gray-500">${esc(p.brand)}</span>` : ''}
                         <span class="badge ${stockBadge}">${stockLabel}</span>
                     </div>
-                    ${p.rate !== null ? `<div class="text-sm font-semibold text-indigo-600 mt-1">₹${p.rate.toLocaleString('en-IN')}</div>` : ''}
+                    ${p.rate !== null ? `<div class="text-sm font-semibold text-emerald-700 mt-1">₹${p.rate.toLocaleString('en-IN')}</div>` : ''}
                 </div>
                 <div class="flex-shrink-0">
                     ${inCart ? `
@@ -315,7 +315,7 @@
                             <button class="qty-btn" onclick="updateQty('${p.item_id}', 1)">+</button>
                         </div>
                     ` : `
-                        <button onclick="addToCart('${p.item_id}')" class="px-3 py-1.5 rounded-lg text-sm font-medium text-indigo-600 border border-indigo-200 hover:bg-indigo-50 transition-colors">
+                        <button onclick="addToCart('${p.item_id}')" class="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-700 border border-emerald-200 hover:bg-emerald-50 transition-colors">
                             + Add
                         </button>
                     `}

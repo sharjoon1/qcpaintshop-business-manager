@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#1B5E3B">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <title>Shop Attendance - Quality Colours</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,7 +11,7 @@
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding-bottom: 80px; }
-        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .header { background: linear-gradient(135deg, #1B5E3B, #D4A24E); color: #fff; }
         .section-card { background: #fff; border-radius: 16px; border: 1px solid #e8ecf1; overflow: hidden; }
         .section-header { padding: 1rem 1.25rem; font-weight: 600; font-size: 0.9375rem; }
 
@@ -45,7 +45,7 @@
         .cal-day.empty { visibility: hidden; }
         .cal-day.visited { background: #d1fae5; color: #065f46; font-weight: 700; }
         .cal-day.visited::after { content: ''; position: absolute; bottom: 3px; width: 4px; height: 4px; border-radius: 50%; background: #10b981; }
-        .cal-day.today { box-shadow: inset 0 0 0 2px #667eea; font-weight: 700; color: #667eea; }
+        .cal-day.today { box-shadow: inset 0 0 0 2px #1B5E3B; font-weight: 700; color: #1B5E3B; }
         .cal-day.today.visited { box-shadow: inset 0 0 0 2px #059669; color: #065f46; }
         .cal-day.future { color: #cbd5e1; }
         .cal-day.past { color: #64748b; }
@@ -93,7 +93,7 @@
             padding: 0.5rem 0; font-size: 0.625rem; color: #94a3b8; text-decoration: none;
             transition: color 0.2s;
         }
-        .bottom-nav a.active { color: #667eea; }
+        .bottom-nav a.active { color: #1B5E3B; }
         .bottom-nav a svg { width: 22px; height: 22px; margin-bottom: 2px; }
 
         /* Visit row */
@@ -105,7 +105,7 @@
 
         /* Stat mini cards */
         .stat-mini {
-            background: linear-gradient(135deg, #f0f4ff, #faf5ff);
+            background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
             border-radius: 12px; padding: 1rem; text-align: center; flex: 1;
         }
         .stat-mini-value { font-size: 1.5rem; font-weight: 800; }
@@ -117,7 +117,7 @@
             padding: 0.75rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
             cursor: pointer; transition: all 0.2s; color: #64748b; font-size: 0.875rem;
         }
-        .photo-btn:hover { border-color: #667eea; color: #667eea; }
+        .photo-btn:hover { border-color: #1B5E3B; color: #1B5E3B; }
         .photo-btn.has-photo { border-color: #10b981; background: #f0fdf4; color: #065f46; border-style: solid; }
 
         /* Pulse for check-in btn */
@@ -173,8 +173,8 @@
             <div class="p-5">
                 <!-- Date -->
                 <div class="flex items-center gap-2 mb-4">
-                    <div class="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>
+                    <div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B5E3B" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>
                     </div>
                     <div>
                         <p class="text-sm text-gray-500" data-i18n="attendance.today">Today</p>
@@ -229,7 +229,7 @@
         <div class="section-card">
             <div class="section-header flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B5E3B" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     <span data-i18n="attendance.this_month">This Month</span>
                 </div>
                 <!-- Month navigation -->
@@ -247,7 +247,7 @@
             <!-- Stats row -->
             <div class="flex gap-3 px-5 pt-4 pb-3">
                 <div class="stat-mini">
-                    <div class="stat-mini-value text-indigo-600" id="monthVisits">0</div>
+                    <div class="stat-mini-value text-emerald-700" id="monthVisits">0</div>
                     <div class="stat-mini-label" data-i18n="attendance.visits">Visits</div>
                 </div>
                 <div class="stat-mini">
@@ -266,7 +266,7 @@
         <!-- Recent Visits -->
         <div class="section-card">
             <div class="section-header flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B5E3B" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span data-i18n="attendance.recent_visits">Recent Visits</span>
             </div>
             <div class="px-5 pb-4" id="recentVisits">
@@ -312,7 +312,7 @@
                 <span class="text-2xl font-bold text-amber-500" id="successPoints">+5</span>
                 <span class="text-amber-500 text-lg">pts</span>
             </div>
-            <button onclick="dismissSuccess()" class="w-full py-2.5 rounded-xl font-semibold text-white" style="background: linear-gradient(135deg, #667eea, #764ba2);" data-i18n="common.close">Close</button>
+            <button onclick="dismissSuccess()" class="w-full py-2.5 rounded-xl font-semibold text-white" style="background: linear-gradient(135deg, #1B5E3B, #D4A24E);" data-i18n="common.close">Close</button>
         </div>
     </div>
 
@@ -599,7 +599,7 @@
     }
 
     function spawnConfetti() {
-        const colors = ['#667eea', '#764ba2', '#10b981', '#f59e0b', '#ef4444', '#3b82f6'];
+        const colors = ['#1B5E3B', '#D4A24E', '#10b981', '#f59e0b', '#ef4444', '#3b82f6'];
         for (let i = 0; i < 30; i++) {
             const piece = document.createElement('div');
             piece.className = 'confetti-piece';

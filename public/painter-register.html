@@ -3,29 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#1B5E3B">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <title>Painter Registration - Quality Colours</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background: linear-gradient(135deg, #1B5E3B 0%, #D4A24E 100%); min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .card { background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
         .step { display: none; }
         .step.active { display: block; }
         .step-indicator { display: flex; gap: 8px; justify-content: center; margin-bottom: 2rem; }
         .step-dot { width: 10px; height: 10px; border-radius: 50%; background: #e2e8f0; transition: all 0.3s; }
-        .step-dot.active { background: #667eea; transform: scale(1.2); }
+        .step-dot.active { background: #1B5E3B; transform: scale(1.2); }
         .step-dot.done { background: #10b981; }
         .input-field { width: 100%; padding: 0.75rem 1rem; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; transition: border-color 0.2s; }
-        .input-field:focus { outline: none; border-color: #667eea; }
-        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 0.75rem 2rem; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; width: 100%; transition: opacity 0.2s; }
+        .input-field:focus { outline: none; border-color: #1B5E3B; }
+        .btn-primary { background: linear-gradient(135deg, #1B5E3B, #D4A24E); color: #fff; padding: 0.75rem 2rem; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; width: 100%; transition: opacity 0.2s; }
         .btn-primary:hover { opacity: 0.9; }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-secondary { background: transparent; color: #667eea; border: 2px solid #667eea; padding: 0.75rem 2rem; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; width: 100%; }
+        .btn-secondary { background: transparent; color: #1B5E3B; border: 2px solid #1B5E3B; padding: 0.75rem 2rem; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; width: 100%; }
         .otp-input { width: 48px; height: 56px; text-align: center; font-size: 1.5rem; font-weight: 700; border: 2px solid #e2e8f0; border-radius: 10px; }
-        .otp-input:focus { outline: none; border-color: #667eea; }
+        .otp-input:focus { outline: none; border-color: #1B5E3B; }
         .spec-option { border: 2px solid #e2e8f0; border-radius: 10px; padding: 1rem; cursor: pointer; text-align: center; transition: all 0.2s; }
-        .spec-option.selected { border-color: #667eea; background: #f0f4ff; }
+        .spec-option.selected { border-color: #1B5E3B; background: #f0fdf4; }
         .error-msg { color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem; }
         .success-msg { color: #10b981; font-size: 0.875rem; margin-top: 0.25rem; }
     </style>
@@ -34,7 +34,7 @@
     <div class="card w-full max-w-md p-8">
         <!-- Logo -->
         <div class="text-center mb-6">
-            <div class="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-3" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+            <div class="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-3" style="background: linear-gradient(135deg, #1B5E3B, #D4A24E);">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
             </div>
             <h1 class="text-2xl font-bold text-gray-900">Painter Registration</h1>
@@ -62,16 +62,16 @@
             <div id="otpSection" style="display:none">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Enter OTP</label>
                 <div class="flex gap-2 justify-center mb-3">
-                    <input type="text" maxlength="1" class="otp-input" data-otp="1">
-                    <input type="text" maxlength="1" class="otp-input" data-otp="2">
-                    <input type="text" maxlength="1" class="otp-input" data-otp="3">
-                    <input type="text" maxlength="1" class="otp-input" data-otp="4">
-                    <input type="text" maxlength="1" class="otp-input" data-otp="5">
-                    <input type="text" maxlength="1" class="otp-input" data-otp="6">
+                    <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-input" data-otp="1">
+                    <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-input" data-otp="2">
+                    <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-input" data-otp="3">
+                    <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-input" data-otp="4">
+                    <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-input" data-otp="5">
+                    <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-input" data-otp="6">
                 </div>
                 <div id="otpError" class="error-msg text-center" style="display:none"></div>
                 <button onclick="verifyOtp()" class="btn-primary mt-3" id="verifyOtpBtn">Verify OTP</button>
-                <p class="text-center text-sm text-gray-400 mt-2">Didn't receive? <a href="#" onclick="sendOtp()" class="text-indigo-600">Resend</a></p>
+                <p class="text-center text-sm text-gray-400 mt-2">Didn't receive? <a href="#" onclick="sendOtp()" class="text-emerald-700">Resend</a></p>
             </div>
 
             <div id="sendOtpSection">
@@ -79,7 +79,7 @@
             </div>
 
             <div class="text-center mt-6">
-                <p class="text-sm text-gray-500">Already registered? <a href="/painter-login.html" class="text-indigo-600 font-medium">Login here</a></p>
+                <p class="text-sm text-gray-500">Already registered? <a href="/painter-login.html" class="text-emerald-700 font-medium">Login here</a></p>
             </div>
         </div>
 
@@ -146,7 +146,7 @@
                 </div>
                 <h2 class="text-xl font-bold text-gray-900 mb-2">Registration Submitted!</h2>
                 <p class="text-gray-500 mb-4">Your registration is being reviewed. You'll be notified once approved.</p>
-                <p class="text-sm text-gray-400 mb-6">Your referral code: <code class="font-mono font-bold text-indigo-600" id="myReferralCode"></code></p>
+                <p class="text-sm text-gray-400 mb-6">Your referral code: <code class="font-mono font-bold text-emerald-700" id="myReferralCode"></code></p>
                 <a href="/painter-login.html" class="btn-primary inline-block text-center" style="text-decoration:none">Go to Login</a>
             </div>
         </div>

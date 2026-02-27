@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#1B5E3B">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <title>Painter Dashboard - Quality Colours</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/painter-i18n.js"></script>
     <style>
         body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .header { background: linear-gradient(135deg, #1B5E3B, #D4A24E); color: #fff; }
         .stat-card { background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e8ecf1; transition: transform 0.2s; }
         .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .stat-value { font-size: 1.75rem; font-weight: 700; }
         .stat-label { font-size: 0.8125rem; color: #64748b; margin-top: 2px; }
         .action-btn { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: inherit; display: block; }
-        .action-btn:hover { border-color: #667eea; box-shadow: 0 2px 8px rgba(102,126,234,0.15); }
-        .action-btn svg { width: 28px; height: 28px; stroke: #667eea; fill: none; stroke-width: 1.75; margin: 0 auto 0.5rem; }
+        .action-btn:hover { border-color: #1B5E3B; box-shadow: 0 2px 8px rgba(27,94,59,0.15); }
+        .action-btn svg { width: 28px; height: 28px; stroke: #1B5E3B; fill: none; stroke-width: 1.75; margin: 0 auto 0.5rem; }
         .txn-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9; }
         .txn-row:last-child { border-bottom: none; }
         .badge { display: inline-flex; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
@@ -28,15 +28,15 @@
         .section-body { padding: 1rem 1.25rem; }
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
         .modal-content { background: #fff; border-radius: 16px; max-width: 400px; width: 90%; padding: 1.5rem; }
-        .referral-code { background: linear-gradient(135deg, #f0f4ff, #faf5ff); border: 2px dashed #667eea; border-radius: 12px; padding: 1.25rem; text-align: center; }
-        .referral-code code { font-size: 1.5rem; font-weight: 800; color: #667eea; letter-spacing: 2px; }
+        .referral-code { background: linear-gradient(135deg, #f0fdf4, #faf5ff); border: 2px dashed #1B5E3B; border-radius: 12px; padding: 1.25rem; text-align: center; }
+        .referral-code code { font-size: 1.5rem; font-weight: 800; color: #1B5E3B; letter-spacing: 2px; }
 
         /* Offers carousel */
         .offers-scroll { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
         .offers-scroll::-webkit-scrollbar { display: none; }
         .offer-card { flex: 0 0 280px; scroll-snap-align: start; border-radius: 12px; overflow: hidden; position: relative; cursor: pointer; transition: transform 0.2s; }
         .offer-card:hover { transform: translateY(-2px); }
-        .offer-card-bg { width: 100%; height: 140px; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: flex-end; padding: 12px; }
+        .offer-card-bg { width: 100%; height: 140px; background: linear-gradient(135deg, #1B5E3B, #D4A24E); display: flex; align-items: flex-end; padding: 12px; }
         .offer-card-bg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
         .offer-card-info { position: relative; z-index: 1; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
         .offer-card-info h4 { font-size: 0.9375rem; font-weight: 700; line-height: 1.2; }
@@ -48,7 +48,7 @@
         .bottom-nav a { display: flex; flex-direction: column; align-items: center; padding: 6px 0; text-decoration: none; transition: color 0.15s; min-width: 0; }
         .bottom-nav a svg { width: 24px; height: 24px; stroke-width: 1.5; fill: none; }
         .bottom-nav a span { font-size: 0.625rem; margin-top: 2px; font-weight: 500; white-space: nowrap; }
-        .bottom-nav a.active { color: #667eea; }
+        .bottom-nav a.active { color: #1B5E3B; }
         .bottom-nav a:not(.active) { color: #9ca3af; }
         .bottom-nav a:not(.active):hover { color: #6b7280; }
 
@@ -56,7 +56,7 @@
         .notif-badge { position: absolute; top: -4px; right: -6px; background: #ef4444; color: #fff; font-size: 0.625rem; font-weight: 700; min-width: 16px; height: 16px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0 4px; }
 
         /* Toast */
-        .toast { position: fixed; top: 20px; right: 20px; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 12px 16px; z-index: 2000; max-width: 320px; transform: translateX(120%); transition: transform 0.3s ease; border-left: 4px solid #667eea; }
+        .toast { position: fixed; top: 20px; right: 20px; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 12px 16px; z-index: 2000; max-width: 320px; transform: translateX(120%); transition: transform 0.3s ease; border-left: 4px solid #1B5E3B; }
         .toast.show { transform: translateX(0); }
     </style>
 </head>
@@ -96,7 +96,7 @@
         <!-- Balance Cards -->
         <div class="grid grid-cols-2 gap-3 mb-4">
             <div class="stat-card">
-                <div class="stat-value text-indigo-600" id="regularBalance">0</div>
+                <div class="stat-value text-emerald-700" id="regularBalance">0</div>
                 <div class="stat-label" data-i18n="dashboard.regular_points">Regular Points</div>
                 <div class="text-xs text-gray-400 mt-1" data-i18n="dashboard.withdraw_anytime">Withdraw anytime</div>
             </div>
@@ -122,7 +122,7 @@
         <div id="offersSection" class="mb-6" style="display:none">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-semibold text-gray-800" data-i18n="dashboard.active_offers">Active Offers</h3>
-                <a href="/painter-catalog.html" class="text-sm text-indigo-600 font-medium" data-i18n="dashboard.view_all">View All</a>
+                <a href="/painter-catalog.html" class="text-sm text-emerald-700 font-medium" data-i18n="dashboard.view_all">View All</a>
             </div>
             <div class="offers-scroll" id="offersCarousel"></div>
         </div>
@@ -151,7 +151,7 @@
         <div class="referral-code mb-6">
             <p class="text-sm text-gray-500 mb-2" data-i18n="dashboard.share_referral_code">Share your referral code</p>
             <code id="referralCode">---</code>
-            <button onclick="shareReferral()" class="mt-3 text-sm text-indigo-600 font-medium flex items-center gap-1 mx-auto">
+            <button onclick="shareReferral()" class="mt-3 text-sm text-emerald-700 font-medium flex items-center gap-1 mx-auto">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                 <span data-i18n="common.share">Share</span>
             </button>
@@ -161,7 +161,7 @@
         <div class="section-card mb-6">
             <div class="section-header flex justify-between items-center">
                 <span data-i18n="dashboard.my_estimates">My Estimates</span>
-                <a href="/painter-estimate-create.html" class="text-sm text-indigo-600 font-medium">+ <span data-i18n="common.new">New</span></a>
+                <a href="/painter-estimate-create.html" class="text-sm text-emerald-700 font-medium">+ <span data-i18n="common.new">New</span></a>
             </div>
             <div class="section-body" id="estimatesList">
                 <div class="text-center py-4 text-gray-400 text-sm" data-i18n="common.loading">Loading...</div>
@@ -172,7 +172,7 @@
         <div class="section-card mb-6">
             <div class="section-header flex justify-between items-center">
                 <span data-i18n="dashboard.recent_transactions">Recent Transactions</span>
-                <a href="#" onclick="showTransactions()" class="text-sm text-indigo-600 font-medium" data-i18n="dashboard.view_all">View All</a>
+                <a href="#" onclick="showTransactions()" class="text-sm text-emerald-700 font-medium" data-i18n="dashboard.view_all">View All</a>
             </div>
             <div class="section-body" id="recentTransactions">
                 <div class="text-center py-4 text-gray-400 text-sm" data-i18n="common.loading">Loading...</div>
@@ -190,7 +190,7 @@
             <div class="section-header flex justify-between items-center">
                 <span data-i18n="dashboard.all_transactions">All Transactions</span>
                 <div class="flex gap-2">
-                    <button onclick="loadFullTransactions('regular')" class="text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-700" id="txnFilterRegular" data-i18n="dashboard.regular">Regular</button>
+                    <button onclick="loadFullTransactions('regular')" class="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-800" id="txnFilterRegular" data-i18n="dashboard.regular">Regular</button>
                     <button onclick="loadFullTransactions('annual')" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600" id="txnFilterAnnual" data-i18n="dashboard.annual">Annual</button>
                 </div>
             </div>
@@ -268,7 +268,7 @@
     <div id="toastContainer" class="toast" style="display:none">
         <div class="flex items-start gap-3">
             <div class="flex-shrink-0">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B5E3B" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             </div>
             <div>
                 <div class="text-sm font-semibold text-gray-800" id="toastTitle"></div>
@@ -295,7 +295,7 @@
             </div>
             <div class="flex gap-2 mt-4">
                 <button onclick="document.getElementById('withdrawModal').style.display='none'" class="flex-1 py-2 border rounded-lg text-gray-600 font-medium" data-i18n="common.cancel">Cancel</button>
-                <button onclick="submitWithdrawal()" class="flex-1 py-2 rounded-lg text-white font-medium" style="background: linear-gradient(135deg, #667eea, #764ba2);" data-i18n="common.submit">Submit</button>
+                <button onclick="submitWithdrawal()" class="flex-1 py-2 rounded-lg text-white font-medium" style="background: linear-gradient(135deg, #1B5E3B, #D4A24E);" data-i18n="common.submit">Submit</button>
             </div>
         </div>
     </div>
@@ -386,8 +386,8 @@
     }
 
     async function loadFullTransactions(pool) {
-        document.getElementById('txnFilterRegular').className = pool === 'regular' ? 'text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-700' : 'text-xs px-2 py-1 rounded bg-gray-100 text-gray-600';
-        document.getElementById('txnFilterAnnual').className = pool === 'annual' ? 'text-xs px-2 py-1 rounded bg-purple-100 text-purple-700' : 'text-xs px-2 py-1 rounded bg-gray-100 text-gray-600';
+        document.getElementById('txnFilterRegular').className = pool === 'regular' ? 'text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-800' : 'text-xs px-2 py-1 rounded bg-gray-100 text-gray-600';
+        document.getElementById('txnFilterAnnual').className = pool === 'annual' ? 'text-xs px-2 py-1 rounded bg-amber-100 text-amber-700' : 'text-xs px-2 py-1 rounded bg-gray-100 text-gray-600';
 
         try {
             const res = await fetch(`${API}/me/points/${pool}?limit=100`, { headers: painterHeaders() });
@@ -548,8 +548,8 @@
                 if (data.notifications && data.notifications.length) {
                     list.innerHTML = data.notifications.map(n => `
                         <div class="flex items-start gap-3 py-3 border-b border-gray-100 last:border-0">
-                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B5E3B" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="text-sm font-medium text-gray-800">${esc(n.title)}</div>
@@ -615,7 +615,7 @@
             const container = document.getElementById('estimatesList');
 
             if (!data.success || !data.estimates || !data.estimates.length) {
-                container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm"><span data-i18n="dashboard.no_estimates">No estimates yet.</span> <a href="/painter-estimate-create.html" class="text-indigo-600" data-i18n="dashboard.create_one">Create one</a></div>';
+                container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm"><span data-i18n="dashboard.no_estimates">No estimates yet.</span> <a href="/painter-estimate-create.html" class="text-emerald-700" data-i18n="dashboard.create_one">Create one</a></div>';
                 if (window.painterI18n) painterI18n.applyTranslations();
                 return;
             }
