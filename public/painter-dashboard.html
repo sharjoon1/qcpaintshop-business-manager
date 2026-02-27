@@ -7,6 +7,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
     <title>Painter Dashboard - Quality Colours</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/js/painter-i18n.js"></script>
     <style>
         body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .header { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
@@ -29,6 +30,34 @@
         .modal-content { background: #fff; border-radius: 16px; max-width: 400px; width: 90%; padding: 1.5rem; }
         .referral-code { background: linear-gradient(135deg, #f0f4ff, #faf5ff); border: 2px dashed #667eea; border-radius: 12px; padding: 1.25rem; text-align: center; }
         .referral-code code { font-size: 1.5rem; font-weight: 800; color: #667eea; letter-spacing: 2px; }
+
+        /* Offers carousel */
+        .offers-scroll { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
+        .offers-scroll::-webkit-scrollbar { display: none; }
+        .offer-card { flex: 0 0 280px; scroll-snap-align: start; border-radius: 12px; overflow: hidden; position: relative; cursor: pointer; transition: transform 0.2s; }
+        .offer-card:hover { transform: translateY(-2px); }
+        .offer-card-bg { width: 100%; height: 140px; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: flex-end; padding: 12px; }
+        .offer-card-bg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .offer-card-info { position: relative; z-index: 1; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+        .offer-card-info h4 { font-size: 0.9375rem; font-weight: 700; line-height: 1.2; }
+        .offer-card-info p { font-size: 0.75rem; opacity: 0.9; margin-top: 2px; }
+        .offer-card-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%); }
+
+        /* Bottom nav */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e5e7eb; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 50; }
+        .bottom-nav a { display: flex; flex-direction: column; align-items: center; padding: 6px 0; text-decoration: none; transition: color 0.15s; min-width: 0; }
+        .bottom-nav a svg { width: 24px; height: 24px; stroke-width: 1.5; fill: none; }
+        .bottom-nav a span { font-size: 0.625rem; margin-top: 2px; font-weight: 500; white-space: nowrap; }
+        .bottom-nav a.active { color: #667eea; }
+        .bottom-nav a:not(.active) { color: #9ca3af; }
+        .bottom-nav a:not(.active):hover { color: #6b7280; }
+
+        /* Notification badge */
+        .notif-badge { position: absolute; top: -4px; right: -6px; background: #ef4444; color: #fff; font-size: 0.625rem; font-weight: 700; min-width: 16px; height: 16px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0 4px; }
+
+        /* Toast */
+        .toast { position: fixed; top: 20px; right: 20px; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 12px 16px; z-index: 2000; max-width: 320px; transform: translateX(120%); transition: transform 0.3s ease; border-left: 4px solid #667eea; }
+        .toast.show { transform: translateX(0); }
     </style>
 </head>
 <body>
@@ -37,108 +66,132 @@
         <div class="max-w-lg mx-auto px-4 py-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm opacity-80">Welcome back,</p>
+                    <p class="text-sm opacity-80" data-i18n="dashboard.welcome_back">Welcome back,</p>
                     <h1 class="text-xl font-bold" id="painterName">Painter</h1>
                 </div>
-                <button onclick="logout()" class="text-sm opacity-80 hover:opacity-100 flex items-center gap-1">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    Logout
-                </button>
+                <div class="flex items-center gap-3">
+                    <!-- Language Toggle -->
+                    <button id="langToggle" onclick="painterI18n.toggleLanguage()" class="text-sm font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-2.5 py-1 transition-colors backdrop-blur-sm">
+                        EN
+                    </button>
+                    <!-- Notification Bell -->
+                    <button onclick="showNotificationPanel()" class="relative p-1 hover:bg-white/20 rounded-lg transition-colors">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        <span id="notifBadge" class="notif-badge hidden">0</span>
+                    </button>
+                    <!-- Logout -->
+                    <button onclick="logout()" class="text-sm opacity-80 hover:opacity-100 flex items-center gap-1">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        <span data-i18n="common.logout">Logout</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="max-w-lg mx-auto px-4 -mt-2 pb-8">
+    <div class="max-w-lg mx-auto px-4 -mt-2 pb-20">
         <!-- Balance Cards -->
         <div class="grid grid-cols-2 gap-3 mb-4">
             <div class="stat-card">
                 <div class="stat-value text-indigo-600" id="regularBalance">0</div>
-                <div class="stat-label">Regular Points</div>
-                <div class="text-xs text-gray-400 mt-1">Withdraw anytime</div>
+                <div class="stat-label" data-i18n="dashboard.regular_points">Regular Points</div>
+                <div class="text-xs text-gray-400 mt-1" data-i18n="dashboard.withdraw_anytime">Withdraw anytime</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value text-purple-600" id="annualBalance">0</div>
-                <div class="stat-label">Annual Points</div>
-                <div class="text-xs text-gray-400 mt-1">Annual withdrawal</div>
+                <div class="stat-label" data-i18n="dashboard.annual_points">Annual Points</div>
+                <div class="text-xs text-gray-400 mt-1" data-i18n="dashboard.annual_withdrawal">Annual withdrawal</div>
             </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3 mb-6">
             <div class="stat-card">
                 <div class="stat-value text-lg text-green-600" id="totalEarned">0</div>
-                <div class="stat-label">Total Earned</div>
+                <div class="stat-label" data-i18n="dashboard.total_earned">Total Earned</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value text-lg text-blue-600" id="referralCount">0</div>
-                <div class="stat-label">Referrals</div>
+                <div class="stat-label" data-i18n="dashboard.referrals">Referrals</div>
             </div>
+        </div>
+
+        <!-- Active Offers Section -->
+        <div id="offersSection" class="mb-6" style="display:none">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-semibold text-gray-800" data-i18n="dashboard.active_offers">Active Offers</h3>
+                <a href="/painter-catalog.html" class="text-sm text-indigo-600 font-medium" data-i18n="dashboard.view_all">View All</a>
+            </div>
+            <div class="offers-scroll" id="offersCarousel"></div>
         </div>
 
         <!-- Quick Actions -->
         <div class="grid grid-cols-4 gap-3 mb-6">
             <a class="action-btn" href="/painter-estimate-create.html">
                 <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                <div class="text-xs font-medium">Estimate</div>
+                <div class="text-xs font-medium" data-i18n="common.estimate">Estimate</div>
             </a>
             <a class="action-btn" onclick="showWithdrawModal()">
                 <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                <div class="text-xs font-medium">Withdraw</div>
+                <div class="text-xs font-medium" data-i18n="dashboard.withdraw">Withdraw</div>
             </a>
             <a class="action-btn" onclick="showTransactions()">
                 <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                <div class="text-xs font-medium">Transactions</div>
+                <div class="text-xs font-medium" data-i18n="dashboard.transactions">Transactions</div>
             </a>
             <a class="action-btn" onclick="showReferrals()">
                 <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-                <div class="text-xs font-medium">Referrals</div>
+                <div class="text-xs font-medium" data-i18n="dashboard.referrals">Referrals</div>
             </a>
         </div>
 
         <!-- Referral Code -->
         <div class="referral-code mb-6">
-            <p class="text-sm text-gray-500 mb-2">Share your referral code</p>
+            <p class="text-sm text-gray-500 mb-2" data-i18n="dashboard.share_referral_code">Share your referral code</p>
             <code id="referralCode">---</code>
             <button onclick="shareReferral()" class="mt-3 text-sm text-indigo-600 font-medium flex items-center gap-1 mx-auto">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                Share
+                <span data-i18n="common.share">Share</span>
             </button>
         </div>
 
         <!-- My Estimates -->
         <div class="section-card mb-6">
             <div class="section-header flex justify-between items-center">
-                <span>My Estimates</span>
-                <a href="/painter-estimate-create.html" class="text-sm text-indigo-600 font-medium">+ New</a>
+                <span data-i18n="dashboard.my_estimates">My Estimates</span>
+                <a href="/painter-estimate-create.html" class="text-sm text-indigo-600 font-medium">+ <span data-i18n="common.new">New</span></a>
             </div>
             <div class="section-body" id="estimatesList">
-                <div class="text-center py-4 text-gray-400 text-sm">Loading...</div>
+                <div class="text-center py-4 text-gray-400 text-sm" data-i18n="common.loading">Loading...</div>
             </div>
         </div>
 
         <!-- Recent Transactions -->
         <div class="section-card mb-6">
             <div class="section-header flex justify-between items-center">
-                <span>Recent Transactions</span>
-                <a href="#" onclick="showTransactions()" class="text-sm text-indigo-600 font-medium">View All</a>
+                <span data-i18n="dashboard.recent_transactions">Recent Transactions</span>
+                <a href="#" onclick="showTransactions()" class="text-sm text-indigo-600 font-medium" data-i18n="dashboard.view_all">View All</a>
             </div>
             <div class="section-body" id="recentTransactions">
-                <div class="text-center py-4 text-gray-400 text-sm">Loading...</div>
+                <div class="text-center py-4 text-gray-400 text-sm" data-i18n="common.loading">Loading...</div>
             </div>
         </div>
 
         <!-- Withdrawal History -->
         <div class="section-card" id="withdrawalSection" style="display:none">
-            <div class="section-header">My Withdrawals</div>
+            <div class="section-header" data-i18n="dashboard.my_withdrawals">My Withdrawals</div>
             <div class="section-body" id="withdrawalList"></div>
         </div>
 
         <!-- Full Transaction List (hidden by default) -->
         <div class="section-card" id="fullTransactionSection" style="display:none">
             <div class="section-header flex justify-between items-center">
-                <span>All Transactions</span>
+                <span data-i18n="dashboard.all_transactions">All Transactions</span>
                 <div class="flex gap-2">
-                    <button onclick="loadFullTransactions('regular')" class="text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-700" id="txnFilterRegular">Regular</button>
-                    <button onclick="loadFullTransactions('annual')" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600" id="txnFilterAnnual">Annual</button>
+                    <button onclick="loadFullTransactions('regular')" class="text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-700" id="txnFilterRegular" data-i18n="dashboard.regular">Regular</button>
+                    <button onclick="loadFullTransactions('annual')" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600" id="txnFilterAnnual" data-i18n="dashboard.annual">Annual</button>
                 </div>
             </div>
             <div class="section-body" id="fullTransactionList"></div>
@@ -146,30 +199,103 @@
 
         <!-- Referral List (hidden by default) -->
         <div class="section-card" id="referralSection" style="display:none">
-            <div class="section-header">My Referrals</div>
+            <div class="section-header" data-i18n="dashboard.my_referrals">My Referrals</div>
             <div class="section-body" id="referralList"></div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav" id="bottomNav">
+        <div class="flex justify-around items-center h-16 max-w-lg mx-auto">
+            <a href="/painter-dashboard.html" class="active">
+                <!-- Heroicons: home -->
+                <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/>
+                </svg>
+                <span data-i18n="common.home">Home</span>
+            </a>
+            <a href="/painter-catalog.html">
+                <!-- Heroicons: squares-2x2 (catalog/grid) -->
+                <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+                </svg>
+                <span data-i18n="common.catalog">Catalog</span>
+            </a>
+            <a href="/painter-estimate-create.html">
+                <!-- Heroicons: document-text (estimate) -->
+                <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span data-i18n="common.estimate">Estimate</span>
+            </a>
+            <a href="/painter-training.html">
+                <!-- Heroicons: academic-cap (training) -->
+                <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 14l9-5-9-5-9 5 9 5z"/>
+                    <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+                    <path d="M12 14l9-5-9-5-9 5 9 5zm0 0v6"/>
+                </svg>
+                <span data-i18n="common.training">Training</span>
+            </a>
+            <a href="/painter-attendance.html">
+                <!-- Heroicons: map-pin (attendance/location) -->
+                <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span data-i18n="common.attendance">Attendance</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Notification Panel (slide-down) -->
+    <div id="notifPanel" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-black/30" onclick="hideNotificationPanel()"></div>
+        <div class="absolute top-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-b-2xl shadow-xl transform transition-transform duration-300 -translate-y-full" id="notifSlide">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="font-semibold text-gray-800" data-i18n="dashboard.notifications">Notifications</h3>
+                <button onclick="hideNotificationPanel()" class="p-1 text-gray-400 hover:text-gray-600">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div id="notifList" class="max-h-80 overflow-y-auto p-4">
+                <div class="text-center py-6 text-gray-400 text-sm" data-i18n="dashboard.no_notifications">No notifications</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="toast" style="display:none">
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <div>
+                <div class="text-sm font-semibold text-gray-800" id="toastTitle"></div>
+                <div class="text-xs text-gray-500 mt-0.5" id="toastBody"></div>
+            </div>
         </div>
     </div>
 
     <!-- Withdraw Modal -->
     <div id="withdrawModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
         <div class="modal-content">
-            <h3 class="text-lg font-bold mb-4">Request Withdrawal</h3>
+            <h3 class="text-lg font-bold mb-4" data-i18n="dashboard.request_withdrawal">Request Withdrawal</h3>
             <div class="mb-3">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Pool</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="dashboard.pool">Pool</label>
                 <select id="withdrawPool" class="w-full p-2 border rounded-lg">
-                    <option value="regular">Regular Points</option>
-                    <option value="annual">Annual Points</option>
+                    <option value="regular" data-i18n="dashboard.regular_points">Regular Points</option>
+                    <option value="annual" data-i18n="dashboard.annual_points">Annual Points</option>
                 </select>
             </div>
             <div class="mb-3">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                <input type="number" id="withdrawAmount" class="w-full p-2 border rounded-lg" step="0.01" min="1" placeholder="Enter points to withdraw">
-                <p class="text-xs text-gray-400 mt-1">Available: <span id="withdrawAvailable">0</span> points</p>
+                <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="dashboard.amount">Amount</label>
+                <input type="number" id="withdrawAmount" class="w-full p-2 border rounded-lg" step="0.01" min="1" placeholder="Enter points to withdraw" data-i18n-placeholder="dashboard.enter_points">
+                <p class="text-xs text-gray-400 mt-1"><span data-i18n="dashboard.available">Available</span>: <span id="withdrawAvailable">0</span> <span data-i18n="dashboard.points">points</span></p>
             </div>
             <div class="flex gap-2 mt-4">
-                <button onclick="document.getElementById('withdrawModal').style.display='none'" class="flex-1 py-2 border rounded-lg text-gray-600 font-medium">Cancel</button>
-                <button onclick="submitWithdrawal()" class="flex-1 py-2 rounded-lg text-white font-medium" style="background: linear-gradient(135deg, #667eea, #764ba2);">Submit</button>
+                <button onclick="document.getElementById('withdrawModal').style.display='none'" class="flex-1 py-2 border rounded-lg text-gray-600 font-medium" data-i18n="common.cancel">Cancel</button>
+                <button onclick="submitWithdrawal()" class="flex-1 py-2 rounded-lg text-white font-medium" style="background: linear-gradient(135deg, #667eea, #764ba2);" data-i18n="common.submit">Submit</button>
             </div>
         </div>
     </div>
@@ -184,6 +310,8 @@
             'X-Painter-Token': localStorage.getItem('painter_token') || ''
         };
     }
+    // Alias for consistency with task spec
+    function getHeaders() { return painterHeaders(); }
 
     function logout() {
         localStorage.removeItem('painter_token');
@@ -200,6 +328,7 @@
     try {
         const p = JSON.parse(localStorage.getItem('painter') || '{}');
         if (p.name) document.getElementById('painterName').textContent = p.name;
+        if (p.full_name) document.getElementById('painterName').textContent = p.full_name;
     } catch(e) {}
 
     async function loadDashboard() {
@@ -228,7 +357,8 @@
     function renderTransactions(txns, containerId) {
         const container = document.getElementById(containerId);
         if (!txns || !txns.length) {
-            container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">No transactions yet</div>';
+            container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm" data-i18n="dashboard.no_transactions">No transactions yet</div>';
+            if (window.painterI18n) painterI18n.applyTranslations();
             return;
         }
         container.innerHTML = txns.map(t => {
@@ -264,7 +394,7 @@
             const data = await res.json();
             renderTransactions(data.transactions, 'fullTransactionList');
         } catch (err) {
-            document.getElementById('fullTransactionList').innerHTML = '<div class="text-red-500 text-sm py-4">Error loading transactions</div>';
+            document.getElementById('fullTransactionList').innerHTML = '<div class="text-red-500 text-sm py-4" data-i18n="common.error_loading">Error loading transactions</div>';
         }
     }
 
@@ -278,7 +408,8 @@
             const container = document.getElementById('referralList');
 
             if (!data.referrals || !data.referrals.length) {
-                container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">No referrals yet. Share your code to earn bonus points!</div>';
+                container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm" data-i18n="dashboard.no_referrals">No referrals yet. Share your code to earn bonus points!</div>';
+                if (window.painterI18n) painterI18n.applyTranslations();
             } else {
                 container.innerHTML = data.referrals.map(r => `
                     <div class="flex justify-between items-center py-3 border-b border-gray-100 last:border-0">
@@ -295,7 +426,7 @@
             }
             document.getElementById('referralSection').scrollIntoView({ behavior: 'smooth' });
         } catch (err) {
-            document.getElementById('referralList').innerHTML = '<div class="text-red-500 text-sm py-4">Error loading referrals</div>';
+            document.getElementById('referralList').innerHTML = '<div class="text-red-500 text-sm py-4" data-i18n="common.error_loading">Error loading referrals</div>';
         }
     }
 
@@ -354,7 +485,129 @@
         return div.innerHTML;
     }
 
-    // Estimates
+    // ============ Active Offers ============
+    async function loadOffers() {
+        try {
+            const res = await fetch(`${API}/me/offers`, { headers: painterHeaders() });
+            const data = await res.json();
+            if (!data.success || !data.offers || !data.offers.length) return;
+
+            const section = document.getElementById('offersSection');
+            const carousel = document.getElementById('offersCarousel');
+            section.style.display = 'block';
+
+            carousel.innerHTML = data.offers.map(offer => {
+                const hasImage = offer.banner_image || offer.image_url;
+                const dateRange = formatOfferDates(offer.start_date, offer.end_date);
+                return `
+                    <div class="offer-card" onclick="window.location.href='/painter-catalog.html'">
+                        <div class="offer-card-bg">
+                            ${hasImage ? `<img src="${esc(hasImage)}" alt="${esc(offer.title)}" onerror="this.style.display='none'">` : ''}
+                            <div class="offer-card-overlay"></div>
+                            <div class="offer-card-info">
+                                <h4>${esc(offer.title)}</h4>
+                                <p>${esc(offer.description || '')}</p>
+                                ${dateRange ? `<p class="mt-1 opacity-75">${dateRange}</p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (err) {
+            console.error('Load offers error:', err);
+        }
+    }
+
+    function formatOfferDates(start, end) {
+        if (!start && !end) return '';
+        const opts = { month: 'short', day: 'numeric' };
+        const s = start ? new Date(start).toLocaleDateString('en-IN', opts) : '';
+        const e = end ? new Date(end).toLocaleDateString('en-IN', opts) : '';
+        if (s && e) return `${s} - ${e}`;
+        if (s) return `From ${s}`;
+        if (e) return `Until ${e}`;
+        return '';
+    }
+
+    // ============ Notifications ============
+    async function loadNotifications() {
+        try {
+            const res = await fetch(`${API}/me/notifications?unread=1&limit=5`, { headers: getHeaders() });
+            const data = await res.json();
+            if (data.success) {
+                const badge = document.getElementById('notifBadge');
+                if (data.unreadCount > 0) {
+                    badge.textContent = data.unreadCount > 9 ? '9+' : data.unreadCount;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+
+                // Render notification list
+                const list = document.getElementById('notifList');
+                if (data.notifications && data.notifications.length) {
+                    list.innerHTML = data.notifications.map(n => `
+                        <div class="flex items-start gap-3 py-3 border-b border-gray-100 last:border-0">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium text-gray-800">${esc(n.title)}</div>
+                                <div class="text-xs text-gray-500 mt-0.5">${esc(n.body || n.message || '')}</div>
+                                <div class="text-xs text-gray-400 mt-1">${timeAgo(n.created_at)}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<div class="text-center py-6 text-gray-400 text-sm" data-i18n="dashboard.no_notifications">No notifications</div>';
+                    if (window.painterI18n) painterI18n.applyTranslations();
+                }
+            }
+        } catch (err) {
+            console.error('Load notifications error:', err);
+        }
+    }
+
+    function timeAgo(dateStr) {
+        if (!dateStr) return '';
+        const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return `${Math.floor(diff / 86400)}d ago`;
+    }
+
+    function showNotificationPanel() {
+        const panel = document.getElementById('notifPanel');
+        const slide = document.getElementById('notifSlide');
+        panel.classList.remove('hidden');
+        requestAnimationFrame(() => {
+            slide.style.transform = 'translateY(0)';
+        });
+        loadNotifications();
+    }
+
+    function hideNotificationPanel() {
+        const panel = document.getElementById('notifPanel');
+        const slide = document.getElementById('notifSlide');
+        slide.style.transform = 'translateY(-100%)';
+        setTimeout(() => panel.classList.add('hidden'), 300);
+    }
+
+    // ============ Toast ============
+    function showToast(title, body) {
+        const toast = document.getElementById('toastContainer');
+        document.getElementById('toastTitle').textContent = title;
+        document.getElementById('toastBody').textContent = body || '';
+        toast.style.display = 'block';
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => { toast.style.display = 'none'; }, 300);
+        }, 4000);
+    }
+
+    // ============ Estimates ============
     async function loadEstimates() {
         try {
             const res = await fetch(`${API}/me/estimates?limit=10`, { headers: painterHeaders() });
@@ -362,7 +615,8 @@
             const container = document.getElementById('estimatesList');
 
             if (!data.success || !data.estimates || !data.estimates.length) {
-                container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">No estimates yet. <a href="/painter-estimate-create.html" class="text-indigo-600">Create one</a></div>';
+                container.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm"><span data-i18n="dashboard.no_estimates">No estimates yet.</span> <a href="/painter-estimate-create.html" class="text-indigo-600" data-i18n="dashboard.create_one">Create one</a></div>';
+                if (window.painterI18n) painterI18n.applyTranslations();
                 return;
             }
 
@@ -397,13 +651,58 @@
             }).join('');
         } catch (err) {
             console.error('Load estimates error:', err);
-            document.getElementById('estimatesList').innerHTML = '<div class="text-red-500 text-sm py-4">Error loading estimates</div>';
+            document.getElementById('estimatesList').innerHTML = '<div class="text-red-500 text-sm py-4" data-i18n="common.error_loading">Error loading estimates</div>';
         }
     }
 
-    // Init
+    // ============ Socket.io for real-time notifications ============
+    function initSocket() {
+        if (window.io) {
+            try {
+                const socket = io();
+                const painter = JSON.parse(localStorage.getItem('painter') || '{}');
+                if (painter.id) {
+                    socket.emit('join_painter_room', painter.id);
+                    socket.on('painter_notification', (notification) => {
+                        loadNotifications();
+                        showToast(notification.title || 'New Notification', notification.body || notification.message || '');
+                    });
+                }
+            } catch (err) {
+                console.error('Socket init error:', err);
+            }
+        }
+    }
+
+    // ============ FCM Token Registration ============
+    function registerFCMToken() {
+        if (window.QCApp && window.QCApp.getFCMToken) {
+            try {
+                const token = window.QCApp.getFCMToken();
+                if (token) {
+                    fetch(`${API}/me/fcm/register`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ fcm_token: token, device_info: navigator.userAgent })
+                    }).catch(err => console.error('FCM register error:', err));
+                }
+            } catch (err) {
+                console.error('FCM token error:', err);
+            }
+        }
+    }
+
+    // ============ Init ============
     loadDashboard();
     loadEstimates();
+    loadOffers();
+    loadNotifications();
+
+    // Defer socket and FCM after page load
+    window.addEventListener('load', () => {
+        initSocket();
+        registerFCMToken();
+    });
     </script>
 </body>
 </html>
