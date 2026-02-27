@@ -75,6 +75,7 @@ const anomalyRoutes = require('./routes/anomalies');
 const anomalyDetector = require('./services/anomaly-detector');
 const productionMonitor = require('./services/production-monitor');
 const responseTracker = require('./middleware/responseTracker');
+const painterNotificationService = require('./services/painter-notification-service');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)
@@ -3220,6 +3221,7 @@ creditLimitRoutes.setIO(io);
 leadsRoutes.setIO(io);
 productionMonitor.setIO(io);
 productionMonitor.setSessionManager(whatsappSessionManager);
+painterNotificationService.setDependencies(pool, io);
 
 // Connect anomaly detector alerts to notification system
 const _anomalyAlertThrottle = {};
@@ -3313,6 +3315,13 @@ io.on('connection', async (socket) => {
     socket.on('join_whatsapp_chat_admin', () => {
         if (socket.user.role === 'admin') {
             socket.join('whatsapp_chat_admin');
+        }
+    });
+
+    // Painter room for real-time notifications
+    socket.on('join_painter_room', (painterId) => {
+        if (painterId) {
+            socket.join(`painter_${painterId}`);
         }
     });
 
