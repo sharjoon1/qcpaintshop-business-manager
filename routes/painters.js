@@ -145,15 +145,39 @@ router.post('/send-otp', async (req, res) => {
             [painter.id, token, otp]
         );
 
-        // Send OTP via WhatsApp using General session (branch_id=0)
+        // Send OTP via SMS (primary) + WhatsApp (secondary)
         console.log(`[Painter OTP] Phone: ${phone}, OTP: ${otp}`);
-        if (sessionManager) {
-            try {
-                const otpMessage = `🎨 *Quality Colours Painter Program*\n\nYour OTP is: *${otp}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
-                await sessionManager.sendMessage(0, phone, otpMessage, { source: 'painter_otp' });
-                console.log(`[Painter OTP] WhatsApp sent to ${phone}`);
-            } catch (waErr) {
-                console.error(`[Painter OTP] WhatsApp send failed for ${phone}:`, waErr.message);
+
+        if (!isTestAccount) {
+            // 1. SMS — always send (reliable)
+            if (process.env.SMS_USER && process.env.SMS_PASSWORD) {
+                const http = require('http');
+                const querystring = require('querystring');
+                const smsText = `Your OTP for Quality Colours Painter App is ${otp}. Valid for 10 minutes. Do not share. - QUALITY COLOURS.`;
+                const smsParams = querystring.stringify({
+                    user: process.env.SMS_USER,
+                    password: process.env.SMS_PASSWORD,
+                    senderid: process.env.SMS_SENDER_ID || 'QUALTQ',
+                    channel: 'Trans', DCS: '0', flashsms: '0',
+                    number: phone.startsWith('91') ? phone : '91' + phone.replace(/\D/g, ''),
+                    text: smsText, route: '4'
+                });
+                http.get(`http://retailsms.nettyfish.com/api/mt/SendSMS?${smsParams}`, (smsRes) => {
+                    let data = '';
+                    smsRes.on('data', chunk => { data += chunk; });
+                    smsRes.on('end', () => console.log(`[Painter OTP] SMS response for ${phone}:`, data));
+                }).on('error', (err) => console.error(`[Painter OTP] SMS error for ${phone}:`, err.message));
+            }
+
+            // 2. WhatsApp — also try (if session available)
+            if (sessionManager) {
+                try {
+                    const otpMessage = `🎨 *Quality Colours Painter Program*\n\nYour OTP is: *${otp}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
+                    await sessionManager.sendMessage(0, phone, otpMessage, { source: 'painter_otp' });
+                    console.log(`[Painter OTP] WhatsApp sent to ${phone}`);
+                } catch (waErr) {
+                    console.error(`[Painter OTP] WhatsApp failed for ${phone}:`, waErr.message);
+                }
             }
         }
         res.json({ success: true, message: 'OTP sent', status: painter.status });
