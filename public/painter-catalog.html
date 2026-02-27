@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <title>Product Catalog - Quality Colours</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+
+        /* Search bar */
+        .search-input { width: 100%; padding: 0.625rem 0.75rem 0.625rem 2.5rem; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 0.875rem; background: #fff; transition: all 0.2s; }
+        .search-input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
+
+        /* Filter chips */
+        .chip-scroll { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .chip-scroll::-webkit-scrollbar { display: none; }
+        .chip { flex-shrink: 0; padding: 6px 14px; border-radius: 20px; font-size: 0.8125rem; font-weight: 500; border: 1px solid #e2e8f0; background: #fff; color: #475569; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .chip.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-color: transparent; }
+        .chip:hover:not(.active) { border-color: #667eea; color: #667eea; }
+
+        /* Offer banners */
+        .offer-scroll { display: flex; gap: 12px; overflow-x: auto; padding: 4px 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .offer-scroll::-webkit-scrollbar { display: none; }
+        .offer-card { flex-shrink: 0; width: 260px; border-radius: 14px; padding: 1rem 1.25rem; color: #fff; position: relative; overflow: hidden; cursor: pointer; }
+        .offer-card::before { content: ''; position: absolute; top: -30%; right: -20%; width: 120px; height: 120px; background: rgba(255,255,255,0.12); border-radius: 50%; }
+        .offer-card::after { content: ''; position: absolute; bottom: -20%; left: -10%; width: 80px; height: 80px; background: rgba(255,255,255,0.08); border-radius: 50%; }
+        .offer-grad-1 { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .offer-grad-2 { background: linear-gradient(135deg, #f97316, #ef4444); }
+        .offer-grad-3 { background: linear-gradient(135deg, #10b981, #059669); }
+        .offer-grad-4 { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
+
+        /* Product grid */
+        .product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .product-card { background: #fff; border-radius: 14px; border: 1px solid #e8ecf1; overflow: hidden; cursor: pointer; transition: all 0.2s; position: relative; }
+        .product-card:hover { border-color: #c7d2fe; box-shadow: 0 4px 16px rgba(102,126,234,0.1); transform: translateY(-2px); }
+        .product-card:active { transform: translateY(0); }
+        .product-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: #f1f5f9; }
+        .product-placeholder { width: 100%; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 700; }
+        .product-info { padding: 0.625rem 0.75rem 0.75rem; }
+
+        /* Badges */
+        .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; }
+        .badge-points { background: #eff6ff; color: #1d4ed8; }
+        .badge-offer { background: #fef3c7; color: #92400e; }
+        .badge-offer-fire { background: linear-gradient(135deg, #fef3c7, #fed7aa); color: #c2410c; }
+        .badge-stock-ok { background: #d1fae5; color: #065f46; }
+        .badge-stock-low { background: #fef3c7; color: #92400e; }
+        .badge-stock-out { background: #fee2e2; color: #991b1b; }
+        .badge-brand { background: #f1f5f9; color: #475569; font-size: 0.625rem; }
+
+        /* Offer corner ribbon */
+        .offer-ribbon { position: absolute; top: 8px; right: 8px; z-index: 5; }
+
+        /* Skeleton loading */
+        .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .skeleton-card { background: #fff; border-radius: 14px; border: 1px solid #e8ecf1; overflow: hidden; }
+        .skeleton-img { width: 100%; aspect-ratio: 1; }
+        .skeleton-text { height: 14px; margin: 8px 12px; width: 70%; }
+        .skeleton-text-sm { height: 10px; margin: 4px 12px 8px; width: 50%; }
+
+        /* Detail panel (slide-up) */
+        .detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .detail-overlay.open { opacity: 1; pointer-events: auto; }
+        .detail-panel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 90vh; background: #fff; border-radius: 20px 20px 0 0; z-index: 201; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1); overflow-y: auto; overscroll-behavior: contain; }
+        .detail-panel.open { transform: translateY(0); }
+        .detail-panel .drag-handle { width: 40px; height: 4px; background: #d1d5db; border-radius: 999px; margin: 10px auto 0; }
+
+        /* Bottom nav */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e8ecf1; z-index: 100; padding-bottom: env(safe-area-inset-bottom); }
+        .bottom-nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; font-size: 0.6875rem; color: #94a3b8; text-decoration: none; transition: color 0.15s; }
+        .bottom-nav a.active { color: #667eea; font-weight: 600; }
+        .bottom-nav a svg { width: 22px; height: 22px; }
+
+        /* Notification badge */
+        .notif-badge { position: absolute; top: -4px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: #fff; font-size: 0.625rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
+
+        /* Toast */
+        .toast { position: fixed; top: 16px; left: 16px; right: 16px; padding: 12px 16px; border-radius: 12px; color: #fff; font-size: 0.875rem; font-weight: 500; z-index: 300; transform: translateY(-120%); transition: transform 0.3s; max-width: 480px; margin: 0 auto; }
+        .toast.show { transform: translateY(0); }
+        .toast-error { background: #ef4444; }
+        .toast-success { background: #10b981; }
+
+        /* Empty state */
+        .empty-state svg { width: 96px; height: 96px; opacity: 0.4; }
+
+        /* Load more button */
+        .load-more-btn { width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid #e2e8f0; background: #fff; font-weight: 600; font-size: 0.875rem; color: #667eea; cursor: pointer; transition: all 0.2s; }
+        .load-more-btn:hover { background: #f0f4ff; border-color: #667eea; }
+        .load-more-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <!-- ───────── HEADER ───────── -->
+    <div class="header">
+        <div class="max-w-lg mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <a href="/painter-dashboard.html" class="opacity-80 hover:opacity-100">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    </a>
+                    <h1 class="text-lg font-bold" data-i18n="catalog.title">Product Catalog</h1>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- Notification bell -->
+                    <button onclick="window.location='/painter-dashboard.html#notifications'" class="relative opacity-80 hover:opacity-100">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                        <span class="notif-badge" id="notifCount" style="display:none">0</span>
+                    </button>
+                    <!-- Language toggle -->
+                    <button id="langToggle" onclick="window.painterI18n && window.painterI18n.toggleLanguage()" class="text-xs font-semibold opacity-80 hover:opacity-100 bg-white/20 px-2 py-1 rounded-lg">EN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ───────── MAIN CONTENT ───────── -->
+    <div class="max-w-lg mx-auto px-4 pt-3 pb-24">
+
+        <!-- Search bar -->
+        <div class="relative mb-3">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" class="search-input" data-i18n-placeholder="common.search" placeholder="Search products...">
+            <button id="searchClear" onclick="clearSearch()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" style="display:none">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+
+        <!-- Brand filter chips -->
+        <div class="mb-2">
+            <div class="chip-scroll" id="brandChips">
+                <button class="chip active" data-brand="" data-i18n="catalog.all_brands" onclick="filterBrand('')">All Brands</button>
+            </div>
+        </div>
+
+        <!-- Category filter chips -->
+        <div class="mb-4">
+            <div class="chip-scroll" id="categoryChips">
+                <button class="chip active" data-category="" data-i18n="catalog.all_categories" onclick="filterCategory('')">All Categories</button>
+            </div>
+        </div>
+
+        <!-- Offer banners section -->
+        <div id="offersSection" style="display:none" class="mb-4">
+            <h3 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                <span class="text-base">&#128293;</span>
+                <span data-i18n="catalog.special_offers">Special Offers</span>
+            </h3>
+            <div class="offer-scroll" id="offerBanners"></div>
+        </div>
+
+        <!-- Product grid -->
+        <div id="productGrid" class="product-grid"></div>
+
+        <!-- Skeleton loading -->
+        <div id="skeletonGrid" class="product-grid" style="display:none">
+            <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div></div>
+            <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div></div>
+            <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div></div>
+            <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div></div>
+            <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div></div>
+            <div class="skeleton-card"><div class="skeleton skeleton-img"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div></div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="emptyState" class="text-center py-12" style="display:none">
+            <svg class="mx-auto mb-4" viewBox="0 0 96 96" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                <rect x="12" y="24" width="72" height="56" rx="6"/>
+                <path d="M12 40h72"/>
+                <circle cx="48" cy="58" r="10"/>
+                <line x1="55" y1="65" x2="64" y2="74"/>
+                <path d="M32 32h8M56 32h8"/>
+            </svg>
+            <p class="text-gray-400 font-medium" data-i18n="catalog.no_products">No products found</p>
+            <p class="text-gray-300 text-sm mt-1">Try adjusting your filters</p>
+        </div>
+
+        <!-- Load more button -->
+        <div id="loadMoreWrap" class="mt-4" style="display:none">
+            <button id="loadMoreBtn" class="load-more-btn" onclick="loadMore()">
+                <span id="loadMoreText">Load More Products</span>
+                <span id="loadMoreSpinner" style="display:none">Loading...</span>
+            </button>
+            <p class="text-center text-xs text-gray-400 mt-2" id="productCount"></p>
+        </div>
+    </div>
+
+    <!-- ───────── PRODUCT DETAIL PANEL ───────── -->
+    <div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+    <div class="detail-panel" id="detailPanel">
+        <div class="drag-handle"></div>
+        <!-- Close button -->
+        <div class="flex justify-end px-4 pt-2">
+            <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600 p-1">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <!-- Detail content rendered by JS -->
+        <div id="detailContent" class="px-4 pb-8"></div>
+    </div>
+
+    <!-- ───────── TOAST ───────── -->
+    <div id="toast" class="toast"></div>
+
+    <!-- ───────── BOTTOM NAVIGATION ───────── -->
+    <nav class="bottom-nav">
+        <div class="flex justify-around items-center h-16 max-w-lg mx-auto">
+            <a href="/painter-dashboard.html" class="flex flex-col items-center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span data-i18n="common.home">Home</span>
+            </a>
+            <a href="/painter-catalog.html" class="active flex flex-col items-center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                <span data-i18n="common.catalog">Catalog</span>
+            </a>
+            <a href="/painter-estimate-create.html" class="flex flex-col items-center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                <span data-i18n="common.estimate">Estimate</span>
+            </a>
+            <a href="/painter-training.html" class="flex flex-col items-center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                <span data-i18n="common.training">Training</span>
+            </a>
+            <a href="/painter-attendance.html" class="flex flex-col items-center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
+                <span data-i18n="common.attendance">Attendance</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- ───────── i18n ───────── -->
+    <script src="/js/painter-i18n.js"></script>
+
+    <!-- ───────── APP LOGIC ───────── -->
+    <script>
+    (function() {
+        'use strict';
+
+        // ── Auth ──
+        const API = '/api/painters';
+        const token = localStorage.getItem('painter_token');
+        const painter = (() => { try { return JSON.parse(localStorage.getItem('painter')); } catch { return null; } })();
+        if (!token || !painter) { window.location = '/painter-login.html'; return; }
+
+        function painterHeaders() {
+            return { 'X-Painter-Token': token, 'Content-Type': 'application/json' };
+        }
+
+        // ── State ──
+        let allProducts = [];
+        let currentBrand = '';
+        let currentCategory = '';
+        let currentSearch = '';
+        let currentPage = 1;
+        let totalPages = 1;
+        let isLoading = false;
+        let filtersLoaded = false;
+
+        // ── Escape HTML ──
+        function esc(s) {
+            if (!s) return '';
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        // ── Toast ──
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast toast-' + (type || 'error') + ' show';
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // ── Format currency ──
+        function formatMoney(n) {
+            return '\u20B9' + parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        // ── Brand color map for placeholders ──
+        const brandColors = {
+            'asian paints': ['#FF6B35', '#FF8F5E'],
+            'berger': ['#1B4D89', '#3A7BD5'],
+            'nerolac': ['#E53935', '#EF5350'],
+            'dulux': ['#2979FF', '#64B5F6'],
+            'indigo': ['#3949AB', '#5C6BC0'],
+            'jsw': ['#00838F', '#26C6DA'],
+            'nippon': ['#F44336', '#FF7043'],
+            'shalimar': ['#6D4C41', '#8D6E63'],
+            'default': ['#667eea', '#764ba2']
+        };
+
+        function getBrandGradient(brand) {
+            const key = (brand || '').toLowerCase();
+            for (const [k, v] of Object.entries(brandColors)) {
+                if (key.includes(k)) return v;
+            }
+            return brandColors.default;
+        }
+
+        // ── Offer badge text ──
+        function getOfferBadgeHtml(offer) {
+            if (!offer) return '';
+            if (offer.offer_type === 'multiplier' && offer.bonus_multiplier) {
+                return `<span class="badge badge-offer-fire">&#128293; ${offer.bonus_multiplier}x</span>`;
+            }
+            if (offer.offer_type === 'bonus_points' && offer.bonus_points) {
+                return `<span class="badge badge-offer">+${offer.bonus_points}pts</span>`;
+            }
+            if (offer.offer_type === 'discount') {
+                return `<span class="badge badge-offer">% OFF</span>`;
+            }
+            if (offer.offer_type === 'free_product') {
+                return `<span class="badge badge-offer">FREE</span>`;
+            }
+            return '';
+        }
+
+        // ── Stock badge ──
+        function getStockBadge(stock) {
+            const s = parseFloat(stock || 0);
+            if (s <= 0) return `<span class="badge badge-stock-out" data-i18n="catalog.out_of_stock">Out of Stock</span>`;
+            if (s <= 10) return `<span class="badge badge-stock-low" data-i18n="catalog.low_stock">Low Stock</span>`;
+            return '';
+        }
+
+        // ── Product card HTML ──
+        function renderProductCard(p) {
+            const colors = getBrandGradient(p.brand);
+            const initial = (p.name || '?')[0].toUpperCase();
+            const offerBadge = getOfferBadgeHtml(p.offer);
+
+            const imgHtml = p.image_url
+                ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" class="product-img" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'product-placeholder\\' style=\\'background:linear-gradient(135deg,${colors[0]},${colors[1]})\\'><span style=\\'font-size:2rem;color:#fff\\'>${initial}</span><span style=\\'font-size:0.625rem;color:rgba(255,255,255,0.8);margin-top:4px\\'>${esc(p.brand || '')}</span></div>'">`
+                : `<div class="product-placeholder" style="background:linear-gradient(135deg,${colors[0]},${colors[1]})">
+                       <span style="font-size:2rem;color:#fff">${initial}</span>
+                       <span style="font-size:0.625rem;color:rgba(255,255,255,0.8);margin-top:4px">${esc(p.brand || '')}</span>
+                   </div>`;
+
+            const pointsBadge = p.points_per_unit
+                ? `<span class="badge badge-points"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> ${p.points_per_unit}pts</span>`
+                : '';
+
+            return `
+                <div class="product-card" onclick="openDetail('${esc(p.item_id)}')">
+                    ${offerBadge ? `<div class="offer-ribbon">${offerBadge}</div>` : ''}
+                    <div class="relative">${imgHtml}</div>
+                    <div class="product-info">
+                        <p class="text-xs font-semibold text-gray-800 leading-tight" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(p.name)}</p>
+                        <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            ${p.brand ? `<span class="badge badge-brand">${esc(p.brand)}</span>` : ''}
+                            ${pointsBadge}
+                        </div>
+                        <div class="flex items-center justify-between mt-1.5">
+                            <span class="text-sm font-bold text-gray-900">${formatMoney(p.rate)}</span>
+                            ${getStockBadge(p.stock)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ── Skeleton show/hide ──
+        function showSkeleton() {
+            document.getElementById('skeletonGrid').style.display = 'grid';
+            document.getElementById('emptyState').style.display = 'none';
+        }
+        function hideSkeleton() {
+            document.getElementById('skeletonGrid').style.display = 'none';
+        }
+
+        // ── Render product grid ──
+        function renderProducts(append) {
+            const grid = document.getElementById('productGrid');
+            if (!append) grid.innerHTML = '';
+
+            if (!allProducts.length && !append) {
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('loadMoreWrap').style.display = 'none';
+                return;
+            }
+            document.getElementById('emptyState').style.display = 'none';
+
+            const html = allProducts.slice(append ? grid.children.length : 0).map(renderProductCard).join('');
+            if (append) {
+                grid.insertAdjacentHTML('beforeend', html);
+            } else {
+                grid.innerHTML = html;
+            }
+
+            // Load more visibility
+            if (currentPage < totalPages) {
+                document.getElementById('loadMoreWrap').style.display = 'block';
+            } else {
+                document.getElementById('loadMoreWrap').style.display = allProducts.length ? 'block' : 'none';
+                document.getElementById('loadMoreBtn').style.display = currentPage >= totalPages ? 'none' : '';
+            }
+            document.getElementById('productCount').textContent = `Showing ${allProducts.length} products`;
+        }
+
+        // ── Fetch catalog ──
+        async function fetchCatalog(page, append) {
+            if (isLoading) return;
+            isLoading = true;
+
+            if (!append) showSkeleton();
+            document.getElementById('loadMoreBtn').disabled = true;
+            document.getElementById('loadMoreText').style.display = 'none';
+            document.getElementById('loadMoreSpinner').style.display = 'inline';
+
+            try {
+                const params = new URLSearchParams({
+                    page: page.toString(),
+                    limit: '50'
+                });
+                if (currentSearch) params.set('search', currentSearch);
+                if (currentBrand) params.set('brand', currentBrand);
+                if (currentCategory) params.set('category', currentCategory);
+
+                const res = await fetch(`${API}/me/catalog?${params}`, { headers: painterHeaders() });
+                const data = await res.json();
+
+                if (!data.success) throw new Error(data.message || 'Failed to load');
+
+                if (append) {
+                    allProducts = allProducts.concat(data.products);
+                } else {
+                    allProducts = data.products;
+                }
+
+                currentPage = data.pagination.page;
+                totalPages = data.pagination.pages;
+
+                // Render filters only once
+                if (!filtersLoaded) {
+                    renderBrandChips(data.brands);
+                    renderCategoryChips(data.categories);
+                    filtersLoaded = true;
+                }
+
+                // Render offers only on first page load (no filters)
+                if (!append && !currentSearch && !currentBrand && !currentCategory) {
+                    renderOfferBanners(data.offers);
+                }
+
+                hideSkeleton();
+                renderProducts(append);
+
+            } catch (err) {
+                hideSkeleton();
+                console.error('Catalog fetch error:', err);
+                if (!append && !allProducts.length) {
+                    document.getElementById('emptyState').style.display = 'block';
+                }
+                showToast('Failed to load products. Please try again.', 'error');
+            } finally {
+                isLoading = false;
+                document.getElementById('loadMoreBtn').disabled = false;
+                document.getElementById('loadMoreText').style.display = 'inline';
+                document.getElementById('loadMoreSpinner').style.display = 'none';
+            }
+        }
+
+        // ── Load more ──
+        window.loadMore = function() {
+            if (currentPage < totalPages) {
+                fetchCatalog(currentPage + 1, true);
+            }
+        };
+
+        // ── Brand chips ──
+        function renderBrandChips(brands) {
+            const container = document.getElementById('brandChips');
+            let html = `<button class="chip ${!currentBrand ? 'active' : ''}" data-brand="" onclick="filterBrand('')" data-i18n="catalog.all_brands">All Brands</button>`;
+            (brands || []).forEach(b => {
+                html += `<button class="chip ${currentBrand === b ? 'active' : ''}" data-brand="${esc(b)}" onclick="filterBrand('${esc(b)}')">${esc(b)}</button>`;
+            });
+            container.innerHTML = html;
+        }
+
+        // ── Category chips ──
+        function renderCategoryChips(categories) {
+            const container = document.getElementById('categoryChips');
+            let html = `<button class="chip ${!currentCategory ? 'active' : ''}" data-category="" onclick="filterCategory('')" data-i18n="catalog.all_categories">All Categories</button>`;
+            (categories || []).forEach(c => {
+                html += `<button class="chip ${currentCategory === c ? 'active' : ''}" data-category="${esc(c)}" onclick="filterCategory('${esc(c)}')">${esc(c)}</button>`;
+            });
+            container.innerHTML = html;
+        }
+
+        // ── Filter handlers ──
+        window.filterBrand = function(brand) {
+            currentBrand = brand;
+            currentPage = 1;
+            // Update chip active states
+            document.querySelectorAll('#brandChips .chip').forEach(c => {
+                c.classList.toggle('active', c.dataset.brand === brand);
+            });
+            fetchCatalog(1, false);
+        };
+
+        window.filterCategory = function(cat) {
+            currentCategory = cat;
+            currentPage = 1;
+            document.querySelectorAll('#categoryChips .chip').forEach(c => {
+                c.classList.toggle('active', c.dataset.category === cat);
+            });
+            fetchCatalog(1, false);
+        };
+
+        // ── Search (debounced 300ms) ──
+        let searchTimer = null;
+        const searchInput = document.getElementById('searchInput');
+        const searchClear = document.getElementById('searchClear');
+
+        searchInput.addEventListener('input', function() {
+            const val = this.value.trim();
+            searchClear.style.display = val ? 'block' : 'none';
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                currentSearch = val;
+                currentPage = 1;
+                fetchCatalog(1, false);
+            }, 300);
+        });
+
+        window.clearSearch = function() {
+            searchInput.value = '';
+            searchClear.style.display = 'none';
+            currentSearch = '';
+            currentPage = 1;
+            fetchCatalog(1, false);
+        };
+
+        // ── Offer banners ──
+        const offerGradients = ['offer-grad-1', 'offer-grad-2', 'offer-grad-3', 'offer-grad-4'];
+
+        function renderOfferBanners(offers) {
+            const section = document.getElementById('offersSection');
+            const container = document.getElementById('offerBanners');
+
+            if (!offers || !offers.length) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = 'block';
+
+            const lang = (window.painterI18n && window.painterI18n.getLang()) || 'en';
+
+            container.innerHTML = offers.map((o, i) => {
+                const gradClass = offerGradients[i % offerGradients.length];
+                const title = (lang === 'ta' && o.title_ta) ? o.title_ta : o.title;
+                const desc = (lang === 'ta' && o.description_ta) ? o.description_ta : o.description;
+                const endDate = o.end_date ? new Date(o.end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : '';
+
+                // Offer type label
+                let typeLabel = '';
+                if (o.offer_type === 'multiplier' && o.bonus_multiplier) typeLabel = `${o.bonus_multiplier}x Points`;
+                else if (o.offer_type === 'bonus_points' && o.bonus_points) typeLabel = `+${o.bonus_points} Bonus Pts`;
+                else if (o.offer_type === 'discount') typeLabel = 'Discount';
+                else if (o.offer_type === 'free_product') typeLabel = 'Free Product';
+
+                if (o.banner_image_url) {
+                    return `
+                        <div class="offer-card" style="padding:0;width:280px;border-radius:14px;overflow:hidden">
+                            <img src="${esc(o.banner_image_url)}" alt="${esc(title)}" style="width:100%;height:140px;object-fit:cover">
+                        </div>`;
+                }
+
+                return `
+                    <div class="offer-card ${gradClass}">
+                        <div class="relative" style="z-index:1">
+                            ${typeLabel ? `<div class="text-xs font-bold opacity-90 bg-white/20 inline-block px-2 py-0.5 rounded-full mb-1.5">${typeLabel}</div>` : ''}
+                            <h4 class="font-bold text-sm leading-tight">${esc(title)}</h4>
+                            ${desc ? `<p class="text-xs opacity-80 mt-1 leading-tight" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(desc)}</p>` : ''}
+                            ${endDate ? `<p class="text-xs opacity-70 mt-2">Ends ${endDate}</p>` : ''}
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        // ── Product Detail Panel ──
+        const detailOverlay = document.getElementById('detailOverlay');
+        const detailPanel = document.getElementById('detailPanel');
+        const detailContent = document.getElementById('detailContent');
+
+        window.openDetail = async function(itemId) {
+            // Show panel immediately with loading state
+            detailContent.innerHTML = `
+                <div class="py-12 text-center">
+                    <div class="skeleton mx-auto" style="width:60%;height:200px;border-radius:12px;margin-bottom:16px"></div>
+                    <div class="skeleton mx-auto" style="width:70%;height:18px;margin-bottom:8px"></div>
+                    <div class="skeleton mx-auto" style="width:50%;height:14px"></div>
+                </div>`;
+            detailOverlay.classList.add('open');
+            detailPanel.classList.add('open');
+            document.body.style.overflow = 'hidden';
+
+            try {
+                const res = await fetch(`${API}/me/catalog/${encodeURIComponent(itemId)}`, { headers: painterHeaders() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+
+                renderDetailPanel(data.product, data.offers);
+            } catch (err) {
+                console.error('Product detail error:', err);
+                detailContent.innerHTML = `
+                    <div class="text-center py-12">
+                        <p class="text-red-500 font-medium">Failed to load product details</p>
+                        <button onclick="closeDetail()" class="mt-4 text-indigo-600 font-medium text-sm">Close</button>
+                    </div>`;
+            }
+        };
+
+        function renderDetailPanel(product, offers) {
+            const p = product;
+            const colors = getBrandGradient(p.brand);
+            const initial = (p.name || '?')[0].toUpperCase();
+            const bestOffer = offers && offers.length ? offers[0] : null;
+            const lang = (window.painterI18n && window.painterI18n.getLang()) || 'en';
+
+            const imgHtml = p.image_url
+                ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" style="width:100%;max-height:280px;object-fit:contain;border-radius:12px;background:#f8fafc">`
+                : `<div style="width:100%;height:220px;border-radius:12px;background:linear-gradient(135deg,${colors[0]},${colors[1]});display:flex;flex-direction:column;align-items:center;justify-content:center">
+                       <span style="font-size:4rem;color:#fff;font-weight:700">${initial}</span>
+                       <span style="font-size:0.875rem;color:rgba(255,255,255,0.8);margin-top:4px">${esc(p.brand || '')}</span>
+                   </div>`;
+
+            // Stock status
+            const stock = parseFloat(p.stock || 0);
+            let stockHtml = '';
+            if (stock <= 0) {
+                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span><span class="text-sm font-medium text-red-600" data-i18n="catalog.out_of_stock">Out of Stock</span></div>`;
+            } else if (stock <= 10) {
+                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span><span class="text-sm font-medium text-amber-600" data-i18n="catalog.low_stock">Low Stock</span><span class="text-xs text-gray-400">(${stock} units)</span></div>`;
+            } else {
+                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span><span class="text-sm font-medium text-green-600" data-i18n="catalog.in_stock">In Stock</span><span class="text-xs text-gray-400">(${stock} units)</span></div>`;
+            }
+
+            // Incentives section
+            let incentivesHtml = '';
+            if (p.points_per_unit || bestOffer) {
+                incentivesHtml = `
+                    <div class="mt-4 p-3.5 rounded-xl" style="background:linear-gradient(135deg,#f0f4ff,#faf5ff);border:1px solid #e0e7ff">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                            <span>&#128176;</span>
+                            <span data-i18n="catalog.your_incentives">Your Incentives</span>
+                        </h4>
+                        <div class="space-y-2">`;
+
+                if (p.points_per_unit) {
+                    incentivesHtml += `
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600">Regular</span>
+                            <span class="font-semibold text-indigo-600">${p.points_per_unit} pts/unit</span>
+                        </div>`;
+                    if (p.points_type === 'both' || p.points_type === 'annual') {
+                        incentivesHtml += `
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-600" data-i18n="catalog.annual_eligible">Annual Eligible</span>
+                                <span class="font-semibold text-purple-600">Yes</span>
+                            </div>`;
+                    }
+                }
+
+                if (bestOffer) {
+                    const offerTitle = (lang === 'ta' && bestOffer.title_ta) ? bestOffer.title_ta : bestOffer.title;
+                    let offerDesc = '';
+                    if (bestOffer.offer_type === 'multiplier' && bestOffer.bonus_multiplier) {
+                        offerDesc = `${bestOffer.bonus_multiplier}x points`;
+                    } else if (bestOffer.offer_type === 'bonus_points' && bestOffer.bonus_points) {
+                        offerDesc = `+${bestOffer.bonus_points} bonus pts`;
+                    } else if (bestOffer.offer_type === 'discount') {
+                        offerDesc = 'Discount available';
+                    } else if (bestOffer.offer_type === 'free_product') {
+                        offerDesc = 'Free product included';
+                    }
+
+                    const endStr = bestOffer.end_date
+                        ? new Date(bestOffer.end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+                        : '';
+
+                    incentivesHtml += `
+                        <div class="mt-2 pt-2 border-t border-indigo-100">
+                            <div class="flex items-start gap-2">
+                                <span class="text-base mt-0.5">&#128293;</span>
+                                <div>
+                                    <p class="text-sm font-semibold text-orange-600">${esc(offerTitle)}</p>
+                                    <p class="text-xs text-gray-500">${offerDesc}${endStr ? ` &bull; Ends ${endStr}` : ''}</p>
+                                </div>
+                            </div>
+                        </div>`;
+                }
+
+                incentivesHtml += `</div></div>`;
+            }
+
+            detailContent.innerHTML = `
+                <div class="mb-4">${imgHtml}</div>
+                <h2 class="text-lg font-bold text-gray-900 leading-tight">${esc(p.name)}</h2>
+                <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                    ${p.brand ? `<span class="text-sm text-gray-500">Brand: <strong>${esc(p.brand)}</strong></span>` : ''}
+                    ${p.category ? `<span class="text-xs text-gray-400">&bull;</span><span class="text-sm text-gray-500">${esc(p.category)}</span>` : ''}
+                </div>
+                <div class="flex items-center justify-between mt-3">
+                    <div>
+                        <span class="text-xs text-gray-400" data-i18n="catalog.mrp">MRP</span>
+                        <p class="text-xl font-bold text-gray-900">${formatMoney(p.rate)}</p>
+                    </div>
+                    ${stockHtml}
+                </div>
+                ${incentivesHtml}
+                <div class="mt-5 mb-2">
+                    <button onclick="createEstimateWith('${esc(p.item_id)}')"
+                        class="w-full py-3 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2"
+                        style="background:linear-gradient(135deg,#667eea,#764ba2)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                        <span data-i18n="catalog.create_estimate">Create Estimate with this</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+            `;
+
+            // Re-apply translations after rendering
+            if (window.painterI18n) window.painterI18n.applyTranslations();
+        }
+
+        window.closeDetail = function() {
+            detailOverlay.classList.remove('open');
+            detailPanel.classList.remove('open');
+            document.body.style.overflow = '';
+        };
+
+        // Close on swipe down (basic)
+        let touchStartY = 0;
+        detailPanel.addEventListener('touchstart', function(e) {
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+        detailPanel.addEventListener('touchmove', function(e) {
+            const dy = e.touches[0].clientY - touchStartY;
+            if (dy > 80 && detailPanel.scrollTop <= 0) {
+                closeDetail();
+            }
+        }, { passive: true });
+
+        // ── Navigate to create estimate with pre-selected product ──
+        window.createEstimateWith = function(itemId) {
+            closeDetail();
+            window.location = `/painter-estimate-create.html?product=${encodeURIComponent(itemId)}`;
+        };
+
+        // ── Notification count ──
+        async function loadNotificationCount() {
+            try {
+                const res = await fetch(`${API}/me/notifications?limit=1`, { headers: painterHeaders() });
+                const data = await res.json();
+                const badge = document.getElementById('notifCount');
+                if (data.success && data.unread_count > 0) {
+                    badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            } catch (e) { /* silent */ }
+        }
+
+        // ── Init ──
+        fetchCatalog(1, false);
+        loadNotificationCount();
+
+    })();
+    </script>
+</body>
+</html>
