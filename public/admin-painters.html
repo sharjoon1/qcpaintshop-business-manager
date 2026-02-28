@@ -76,6 +76,7 @@
                 <button class="tab-btn" onclick="switchTab('offers')">🎁 Offers</button>
                 <button class="tab-btn" onclick="switchTab('training')">📚 Training</button>
                 <button class="tab-btn" onclick="switchTab('catalog')">Catalog</button>
+                <button class="tab-btn" onclick="switchTab('visualizations')">🎨 Visualizations</button>
             </div>
 
             <!-- Tab 1: Painters -->
@@ -562,6 +563,55 @@
                     <div id="catalogProductList" class="space-y-2 max-h-96 overflow-y-auto"></div>
                 </div>
             </div>
+
+            <div id="tab-visualizations" class="tab-content">
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">Visualization Requests</h3>
+                            <p class="text-sm text-gray-500 mt-1">Process painter visualization requests</p>
+                        </div>
+                        <select id="vizStatusFilter" onchange="loadVisualizations()" class="border rounded-lg px-3 py-1.5 text-sm">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="bg-amber-50 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-amber-600" id="vizStatPending">-</div>
+                            <div class="text-xs text-gray-500 mt-1">Pending</div>
+                        </div>
+                        <div class="bg-blue-50 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-blue-600" id="vizStatProgress">-</div>
+                            <div class="text-xs text-gray-500 mt-1">In Progress</div>
+                        </div>
+                        <div class="bg-emerald-50 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-emerald-600" id="vizStatCompleted">-</div>
+                            <div class="text-xs text-gray-500 mt-1">Completed</div>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table w-full">
+                            <thead>
+                                <tr>
+                                    <th>Painter</th>
+                                    <th>Photo</th>
+                                    <th>Color</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vizTableBody">
+                                <tr><td colspan="6" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -648,6 +698,7 @@
         if (tab === 'offers') loadOffers();
         if (tab === 'training') loadTrainingContent();
         if (tab === 'catalog') loadCatalogStats();
+        if (tab === 'visualizations') loadVisualizations();
     }
 
     // ═══════════════════════════════════════
@@ -1885,7 +1936,7 @@
         // Check URL tab param
         const urlParams = new URLSearchParams(window.location.search);
         const tab = urlParams.get('tab');
-        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports', 'estimates', 'offers', 'training', 'catalog'];
+        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports', 'estimates', 'offers', 'training', 'catalog', 'visualizations'];
         const activeTab = tab && tabNames.includes(tab) ? tab : 'painters';
 
         if (activeTab !== 'painters') {
@@ -1908,10 +1959,155 @@
         else if (activeTab === 'offers') loadOffers();
         else if (activeTab === 'training') loadTrainingContent();
         else if (activeTab === 'catalog') loadCatalogStats();
+        else if (activeTab === 'visualizations') loadVisualizations();
 
         // Initialize training fields visibility
         toggleTrainingFields();
     });
+    // ═══════════════════════════════════════
+    // VISUALIZATIONS TAB
+    // ═══════════════════════════════════════
+    async function loadVisualizations() {
+        try {
+            const status = document.getElementById('vizStatusFilter')?.value || '';
+            const params = status ? `?status=${status}` : '';
+            const res = await fetch(`${API}/admin/visualizations${params}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            const vizs = data.visualizations || [];
+
+            // Update stats
+            document.getElementById('vizStatPending').textContent = vizs.filter(v => v.status === 'pending').length;
+            document.getElementById('vizStatProgress').textContent = vizs.filter(v => v.status === 'in_progress').length;
+            document.getElementById('vizStatCompleted').textContent = vizs.filter(v => v.status === 'completed').length;
+
+            const tbody = document.getElementById('vizTableBody');
+            if (!vizs.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">No visualization requests</td></tr>';
+                return;
+            }
+
+            const statusColors = {
+                pending: 'background:#fef3c7;color:#92400e',
+                in_progress: 'background:#dbeafe;color:#1e40af',
+                completed: 'background:#d1fae5;color:#065f46',
+                rejected: 'background:#fee2e2;color:#991b1b'
+            };
+
+            tbody.innerHTML = vizs.map(v => `
+                <tr>
+                    <td>
+                        <div class="font-medium text-sm">${esc(v.painter_name)}</div>
+                        <div class="text-xs text-gray-400">${esc(v.painter_phone || '')} &bull; ${esc(v.painter_city || '')}</div>
+                    </td>
+                    <td>
+                        <img src="${esc(v.photo_path)}" style="width:60px;height:45px;object-fit:cover;border-radius:6px;cursor:pointer" onclick="window.open('${esc(v.photo_path)}','_blank')" alt="Photo">
+                    </td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            ${v.color_hex ? `<div style="width:20px;height:20px;border-radius:4px;background:${esc(v.color_hex)};border:1px solid #e5e7eb"></div>` : ''}
+                            <div>
+                                <div class="text-sm">${esc(v.color_name || '-')}</div>
+                                <div class="text-xs text-gray-400">${esc(v.brand || '')} ${v.color_code ? '(' + esc(v.color_code) + ')' : ''}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge" style="${statusColors[v.status] || ''}">${v.status.replace(/_/g, ' ')}</span></td>
+                    <td class="text-sm text-gray-500">${new Date(v.created_at).toLocaleDateString()}</td>
+                    <td>
+                        <div class="flex gap-1">
+                            ${v.status === 'pending' ? `
+                                <button onclick="updateVizStatus(${v.id}, 'in_progress')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" title="Start Processing">Start</button>
+                            ` : ''}
+                            ${v.status === 'pending' || v.status === 'in_progress' ? `
+                                <button onclick="showVizUploadModal(${v.id})" class="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200" title="Upload Result">Upload</button>
+                                <button onclick="rejectViz(${v.id})" class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200" title="Reject">Reject</button>
+                            ` : ''}
+                            ${v.status === 'completed' && v.visualization_path ? `
+                                <button onclick="window.open('${esc(v.visualization_path)}','_blank')" class="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">View Result</button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (err) {
+            console.error('Load visualizations error:', err);
+            document.getElementById('vizTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading visualizations</td></tr>';
+        }
+    }
+
+    async function updateVizStatus(id, status, notes) {
+        try {
+            const res = await fetch(`${API}/admin/visualizations/${id}`, {
+                method: 'PUT',
+                headers: authHeaders(),
+                body: JSON.stringify({ status, admin_notes: notes || null })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            showToast('Visualization updated');
+            loadVisualizations();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+
+    function rejectViz(id) {
+        const notes = prompt('Rejection reason:');
+        if (notes === null) return;
+        updateVizStatus(id, 'rejected', notes);
+    }
+
+    function showVizUploadModal(id) {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.display = 'flex';
+        modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3 class="text-lg font-semibold mb-4">Upload Visualization Result</h3>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Visualization Image</label>
+                    <input type="file" id="vizResultFile" accept="image/*" class="w-full text-sm border rounded-lg p-2">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="this.closest('.modal-overlay').remove()" class="flex-1 py-2 border rounded-lg text-gray-600 font-medium">Cancel</button>
+                    <button onclick="uploadVizResult(${id}, this)" class="flex-1 py-2 rounded-lg text-white font-medium bg-emerald-600 hover:bg-emerald-700">Upload & Complete</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+    }
+
+    async function uploadVizResult(id, btn) {
+        const file = document.getElementById('vizResultFile').files[0];
+        if (!file) { showToast('Select an image first', 'error'); return; }
+
+        btn.disabled = true;
+        btn.textContent = 'Uploading...';
+
+        const formData = new FormData();
+        formData.append('visualization', file);
+
+        try {
+            const token = localStorage.getItem('auth_token') || localStorage.getItem('token') || '';
+            const res = await fetch(`${API}/admin/visualizations/${id}/upload-result`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            showToast('Visualization uploaded and completed!');
+            btn.closest('.modal-overlay').remove();
+            loadVisualizations();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Upload & Complete';
+        }
+    }
     </script>
 </body>
 </html>
