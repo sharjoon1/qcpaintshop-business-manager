@@ -12,7 +12,7 @@ const crypto = require('crypto');
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const pointsEngine = require('../services/painter-points-engine');
 const zohoAPI = require('../services/zoho-api');
-const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterAttendance, uploadProfile } = require('../config/uploads');
+const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterAttendance, uploadProfile, uploadPainterVisualization } = require('../config/uploads');
 const sharp = require('sharp');
 const cardGenerator = require('../services/painter-card-generator');
 const painterNotificationService = require('../services/painter-notification-service');
@@ -378,6 +378,56 @@ router.get('/me/visiting-card', requirePainterAuth, async (req, res) => {
     } catch (error) {
         console.error('Visiting card error:', error);
         res.status(500).json({ success: false, message: 'Failed to generate visiting card' });
+    }
+});
+
+// ═══════════════════════════════════════════
+// PAINTER VISUALIZATION REQUESTS
+// ═══════════════════════════════════════════
+
+// Submit visualization request
+router.post('/me/visualizations', requirePainterAuth, uploadPainterVisualization.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'Photo is required' });
+
+        const { brand, color_name, color_code, color_hex, notes } = req.body;
+
+        // Save uploaded photo with sharp compression
+        const filename = `viz-req-${req.painter.id}-${Date.now()}.jpg`;
+        const outputPath = `public/uploads/painter-visualizations/${filename}`;
+        await sharp(req.file.buffer)
+            .resize(1200, 900, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 85 })
+            .toFile(outputPath);
+
+        const photoUrl = `/uploads/painter-visualizations/${filename}`;
+
+        const [result] = await pool.query(
+            `INSERT INTO painter_visualization_requests (painter_id, photo_path, brand, color_name, color_code, color_hex, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [req.painter.id, photoUrl, brand || null, color_name || null, color_code || null, color_hex || null, notes || null]
+        );
+
+        res.json({ success: true, id: result.insertId, message: 'Visualization request submitted' });
+    } catch (error) {
+        console.error('Visualization submit error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit request' });
+    }
+});
+
+// List my visualization requests
+router.get('/me/visualizations', requirePainterAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT id, photo_path, brand, color_name, color_hex, status, visualization_path, admin_notes, created_at, completed_at
+             FROM painter_visualization_requests
+             WHERE painter_id = ?
+             ORDER BY created_at DESC`,
+            [req.painter.id]
+        );
+        res.json({ success: true, visualizations: rows });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to load visualizations' });
     }
 });
 
@@ -2554,6 +2604,110 @@ router.post('/:id/attendance', requirePermission('painters', 'manage'), async (r
     } catch (error) {
         console.error('Record attendance error:', error);
         res.status(500).json({ success: false, message: 'Failed to record attendance' });
+    }
+});
+
+// ═══════════════════════════════════════════
+// ADMIN: VISUALIZATION REQUESTS
+// ═══════════════════════════════════════════
+
+// List all visualization requests
+router.get('/admin/visualizations', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const status = req.query.status || '';
+        let where = '';
+        const params = [];
+        if (status) {
+            where = 'WHERE vr.status = ?';
+            params.push(status);
+        }
+        const [rows] = await pool.query(
+            `SELECT vr.*, p.full_name as painter_name, p.phone as painter_phone, p.city as painter_city
+             FROM painter_visualization_requests vr
+             JOIN painters p ON p.id = vr.painter_id
+             ${where}
+             ORDER BY FIELD(vr.status, 'pending', 'in_progress', 'completed', 'rejected'), vr.created_at DESC`,
+            params
+        );
+        res.json({ success: true, visualizations: rows });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to load visualizations' });
+    }
+});
+
+// Process visualization (update status/notes)
+router.put('/admin/visualizations/:id', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { status, admin_notes } = req.body;
+        const updates = [];
+        const params = [];
+
+        if (status) { updates.push('status = ?'); params.push(status); }
+        if (admin_notes !== undefined) { updates.push('admin_notes = ?'); params.push(admin_notes); }
+        if (status === 'in_progress') { updates.push('processed_by = ?'); params.push(req.user.id); }
+        if (status === 'completed') { updates.push('completed_at = NOW()'); }
+
+        if (updates.length === 0) return res.status(400).json({ success: false, message: 'Nothing to update' });
+
+        params.push(req.params.id);
+        await pool.query(`UPDATE painter_visualization_requests SET ${updates.join(', ')} WHERE id = ?`, params);
+
+        // Send notification to painter if completed or rejected
+        if (status === 'completed' || status === 'rejected') {
+            const [req_rows] = await pool.query('SELECT painter_id FROM painter_visualization_requests WHERE id = ?', [req.params.id]);
+            if (req_rows.length) {
+                try {
+                    await painterNotificationService.send(pool, req_rows[0].painter_id, {
+                        title: status === 'completed' ? 'Visualization Ready!' : 'Visualization Update',
+                        body: status === 'completed'
+                            ? 'Your color visualization is ready. Open the app to view and share it.'
+                            : `Your visualization request was ${status}. ${admin_notes || ''}`,
+                        type: 'visualization_' + status
+                    });
+                } catch (e) { console.error('Notification error:', e.message); }
+            }
+        }
+
+        res.json({ success: true, message: 'Visualization request updated' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to update visualization' });
+    }
+});
+
+// Upload visualization result image
+router.post('/admin/visualizations/:id/upload-result', requirePermission('painters', 'manage'), uploadPainterVisualization.single('visualization'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'Visualization image required' });
+
+        const filename = `viz-result-${req.params.id}-${Date.now()}.jpg`;
+        const outputPath = `public/uploads/painter-visualizations/${filename}`;
+        await sharp(req.file.buffer)
+            .resize(1200, 900, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 90 })
+            .toFile(outputPath);
+
+        const vizUrl = `/uploads/painter-visualizations/${filename}`;
+        await pool.query(
+            'UPDATE painter_visualization_requests SET visualization_path = ?, status = ?, completed_at = NOW(), processed_by = ? WHERE id = ?',
+            [vizUrl, 'completed', req.user.id, req.params.id]
+        );
+
+        // Notify painter
+        const [req_rows] = await pool.query('SELECT painter_id FROM painter_visualization_requests WHERE id = ?', [req.params.id]);
+        if (req_rows.length) {
+            try {
+                await painterNotificationService.send(pool, req_rows[0].painter_id, {
+                    title: 'Visualization Ready!',
+                    body: 'Your color visualization is ready. Open the app to view and share it.',
+                    type: 'visualization_completed'
+                });
+            } catch (e) { console.error('Notification error:', e.message); }
+        }
+
+        res.json({ success: true, message: 'Visualization uploaded and completed', url: vizUrl });
+    } catch (error) {
+        console.error('Visualization upload error:', error);
+        res.status(500).json({ success: false, message: 'Failed to upload visualization' });
     }
 });
 
