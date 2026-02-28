@@ -67,9 +67,16 @@
     <div class="header">
         <div class="max-w-lg mx-auto px-4 py-4">
             <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm opacity-80" data-i18n="dashboard.welcome_back">Welcome back,</p>
-                    <h1 class="text-xl font-bold" id="painterName">Painter</h1>
+                <div class="flex items-center gap-3">
+                    <a href="/painter-profile.html" id="headerAvatarLink">
+                        <div id="headerAvatar" style="width:44px;height:44px;border-radius:50%;background:#D4A24E;border:2px solid white;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                            <span id="headerInitial" style="color:white;font-size:18px;font-weight:700">P</span>
+                        </div>
+                    </a>
+                    <div>
+                        <p class="text-sm opacity-80" data-i18n="dashboard.welcome_back">Welcome back,</p>
+                        <h1 class="text-xl font-bold" id="painterName">Painter</h1>
+                    </div>
                 </div>
                 <div class="flex items-center gap-3">
                     <!-- Language Toggle -->
@@ -129,23 +136,60 @@
             <div class="offers-scroll" id="offersCarousel"></div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="grid grid-cols-4 gap-3 mb-6">
-            <a class="action-btn" href="/painter-estimate-create.html">
+        <!-- My Visiting Card -->
+        <div class="section-card mb-6" id="visitingCardSection">
+            <div class="section-header flex justify-between items-center">
+                <span>My Visiting Card</span>
+                <button onclick="shareVisitingCard()" class="text-sm text-emerald-700 font-medium flex items-center gap-1">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    Share
+                </button>
+            </div>
+            <div class="section-body" id="visitingCardBody">
+                <div class="text-center py-4">
+                    <div id="cardPreview" style="border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+                        <div class="text-sm text-gray-400 py-8">Loading card...</div>
+                    </div>
+                    <div class="flex gap-2 mt-3 justify-center">
+                        <button onclick="downloadVisitingCard()" class="text-sm px-4 py-2 rounded-lg font-medium text-white" style="background:#1B5E3B">Download</button>
+                        <button onclick="shareVisitingCard()" class="text-sm px-4 py-2 rounded-lg font-medium text-white" style="background:#D4A24E">Share</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- My Visualizations -->
+        <div class="section-card mb-6" id="vizSection">
+            <div class="section-header flex justify-between items-center">
+                <span>My Visualizations</span>
+                <button onclick="showVizModal()" class="text-sm text-emerald-700 font-medium">+ Request</button>
+            </div>
+            <div class="section-body" id="vizGallery">
+                <div class="text-center py-4 text-gray-400 text-sm">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Quick Actions (horizontal scroll) -->
+        <div class="flex gap-3 overflow-x-auto mb-6 pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch">
+            <a class="action-btn flex-shrink-0" href="/painter-estimate-create.html" style="min-width:80px">
                 <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                 <div class="text-xs font-medium" data-i18n="common.estimate">Estimate</div>
             </a>
-            <a class="action-btn" onclick="showWithdrawModal()">
+            <a class="action-btn flex-shrink-0" onclick="showWithdrawModal()" style="min-width:80px">
                 <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                 <div class="text-xs font-medium" data-i18n="dashboard.withdraw">Withdraw</div>
             </a>
-            <a class="action-btn" onclick="showTransactions()">
-                <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                <div class="text-xs font-medium" data-i18n="dashboard.transactions">Transactions</div>
+            <a class="action-btn flex-shrink-0" onclick="loadVisitingCard()" style="min-width:80px">
+                <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                <div class="text-xs font-medium">Card</div>
             </a>
-            <a class="action-btn" onclick="showReferrals()">
-                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-                <div class="text-xs font-medium" data-i18n="dashboard.referrals">Referrals</div>
+            <a class="action-btn flex-shrink-0" onclick="shareReferral()" style="min-width:80px">
+                <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <div class="text-xs font-medium" data-i18n="dashboard.refer">Refer</div>
+            </a>
+            <a class="action-btn flex-shrink-0" onclick="showVizModal()" style="min-width:80px">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="currentColor" fill="none" stroke-width="1.75"/><path d="M2 12h20" stroke="currentColor" fill="none" stroke-width="1.75"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" stroke="currentColor" fill="none" stroke-width="1.75"/></svg>
+                <div class="text-xs font-medium">Visualize</div>
             </a>
         </div>
 
@@ -157,6 +201,7 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                 <span data-i18n="common.share">Share</span>
             </button>
+            <p class="text-xs text-gray-400 mt-1">Share with your visiting card attached</p>
         </div>
 
         <!-- My Estimates -->
@@ -341,6 +386,17 @@
             if (!data.success) throw new Error(data.message);
 
             dashboardData = data.dashboard;
+
+            // Update header avatar
+            if (data.dashboard.profilePhoto) {
+                document.getElementById('headerAvatar').innerHTML = `<img src="${data.dashboard.profilePhoto}" style="width:100%;height:100%;object-fit:cover">`;
+            } else if (data.dashboard.painterName) {
+                document.getElementById('headerInitial').textContent = data.dashboard.painterName.charAt(0).toUpperCase();
+            }
+            if (data.dashboard.painterName) {
+                document.getElementById('painterName').textContent = data.dashboard.painterName;
+            }
+
             const b = data.dashboard.balance;
 
             document.getElementById('regularBalance').textContent = b.regular.toFixed(2);
@@ -733,11 +789,207 @@
         }
     }
 
+    // ============ Visiting Card ============
+    let visitingCardUrl = null;
+
+    async function loadVisitingCard() {
+        try {
+            const res = await fetch(`${API}/me/visiting-card?format=url`, { headers: painterHeaders() });
+            const data = await res.json();
+            if (data.success && data.url) {
+                visitingCardUrl = data.url;
+                document.getElementById('cardPreview').innerHTML = `<img src="${data.url}" style="width:100%;display:block" alt="Visiting Card">`;
+            }
+        } catch (err) {
+            console.error('Load visiting card error:', err);
+            document.getElementById('cardPreview').innerHTML = '<div class="text-sm text-gray-400 py-8">Could not load card</div>';
+        }
+    }
+
+    async function downloadVisitingCard() {
+        if (!visitingCardUrl) await loadVisitingCard();
+        if (!visitingCardUrl) { showToast('Card not available', 'error'); return; }
+        const a = document.createElement('a');
+        a.href = visitingCardUrl;
+        a.download = 'visiting-card.png';
+        a.click();
+    }
+
+    async function shareVisitingCard() {
+        if (!visitingCardUrl) await loadVisitingCard();
+        if (!visitingCardUrl) { showToast('Card not available', 'error'); return; }
+
+        try {
+            const response = await fetch(visitingCardUrl);
+            const blob = await response.blob();
+            const file = new File([blob], 'QC-Painter-Card.png', { type: 'image/png' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: 'My QC Painter Visiting Card',
+                    text: `Quality Colours Painter\nRegister: ${window.location.origin}/painter-register.html?ref=${dashboardData?.referralCode || ''}`,
+                    files: [file]
+                });
+                showToast('Card shared!');
+                return;
+            }
+        } catch (e) { /* fallback below */ }
+
+        // Fallback: download + copy link
+        downloadVisitingCard();
+        showToast('Card downloaded! You can share it manually.');
+    }
+
+    // ============ Visualizations ============
+    async function loadVisualizations() {
+        try {
+            const res = await fetch(`${API}/me/visualizations`, { headers: painterHeaders() });
+            const data = await res.json();
+            const container = document.getElementById('vizGallery');
+
+            if (!data.success || !data.visualizations || !data.visualizations.length) {
+                container.innerHTML = '<div class="text-center py-6"><div class="text-gray-400 text-sm mb-2">No visualizations yet</div><button onclick="showVizModal()" class="text-sm px-4 py-2 rounded-lg font-medium text-white" style="background:#D4A24E">Request Visualization</button></div>';
+                return;
+            }
+
+            const completed = data.visualizations.filter(v => v.status === 'completed');
+            const pending = data.visualizations.filter(v => v.status !== 'completed' && v.status !== 'rejected');
+
+            let html = '';
+
+            if (completed.length) {
+                html += '<div class="grid grid-cols-2 gap-2 mb-3">';
+                completed.forEach(v => {
+                    html += `<div class="rounded-lg overflow-hidden border border-gray-100 cursor-pointer" onclick="viewViz('${esc(v.visualization_path)}')">
+                        <img src="${esc(v.visualization_path)}" style="width:100%;height:100px;object-fit:cover" alt="Visualization">
+                        <div class="px-2 py-1.5"><div class="text-xs font-medium truncate">${esc(v.color_name || v.brand || 'Visualization')}</div></div>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            if (pending.length) {
+                html += '<div class="space-y-2">';
+                pending.forEach(v => {
+                    const statusColors = { pending: 'background:#fef3c7;color:#92400e', in_progress: 'background:#dbeafe;color:#1e40af' };
+                    html += `<div class="flex items-center gap-3 py-2 border-b border-gray-100">
+                        <img src="${esc(v.photo_path)}" style="width:48px;height:48px;object-fit:cover;border-radius:8px">
+                        <div class="flex-1"><div class="text-sm font-medium">${esc(v.color_name || v.brand || 'Request')}</div><div class="text-xs text-gray-400">${new Date(v.created_at).toLocaleDateString()}</div></div>
+                        <span class="badge" style="${statusColors[v.status] || ''}">${v.status.replace(/_/g, ' ')}</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
+        } catch (err) {
+            console.error('Load visualizations error:', err);
+            document.getElementById('vizGallery').innerHTML = '<div class="text-sm text-red-500 py-4">Error loading visualizations</div>';
+        }
+    }
+
+    function viewViz(url) {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4';
+        modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+        modal.innerHTML = `<div class="max-w-lg w-full"><img src="${url}" style="width:100%;border-radius:12px" alt="Visualization"><div class="flex gap-2 mt-3 justify-center"><button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-white rounded-lg text-sm font-medium">Close</button></div></div>`;
+        document.body.appendChild(modal);
+    }
+
+    function showVizModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.display = 'flex';
+        modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3 class="text-lg font-bold mb-4">Request Visualization</h3>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Photo of wall/building *</label>
+                    <input type="file" id="vizPhoto" accept="image/*" class="w-full text-sm border rounded-lg p-2" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                    <input type="text" id="vizBrand" class="w-full p-2 border rounded-lg text-sm" placeholder="e.g., Asian Paints">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Color Name</label>
+                    <input type="text" id="vizColorName" class="w-full p-2 border rounded-lg text-sm" placeholder="e.g., Ivory White">
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Color Code</label>
+                        <input type="text" id="vizColorCode" class="w-full p-2 border rounded-lg text-sm" placeholder="e.g., 0906">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hex Color</label>
+                        <div class="flex gap-2">
+                            <input type="color" id="vizColorHex" value="#D4A24E" class="w-10 h-10 rounded border p-0.5">
+                            <input type="text" id="vizColorHexText" class="flex-1 p-2 border rounded-lg text-sm" value="#D4A24E">
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea id="vizNotes" class="w-full p-2 border rounded-lg text-sm" rows="2" placeholder="Any special instructions..."></textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="this.closest('.modal-overlay').remove()" class="flex-1 py-2 border rounded-lg text-gray-600 font-medium">Cancel</button>
+                    <button onclick="submitVisualization(this)" class="flex-1 py-2 rounded-lg text-white font-medium" style="background:linear-gradient(135deg, #1B5E3B, #D4A24E)">Submit</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+
+        // Sync color picker
+        modal.querySelector('#vizColorHex').addEventListener('input', function() {
+            modal.querySelector('#vizColorHexText').value = this.value;
+        });
+        modal.querySelector('#vizColorHexText').addEventListener('input', function() {
+            if (/^#[0-9a-f]{6}$/i.test(this.value)) modal.querySelector('#vizColorHex').value = this.value;
+        });
+    }
+
+    async function submitVisualization(btn) {
+        const photo = document.getElementById('vizPhoto').files[0];
+        if (!photo) { showToast('Please select a photo', 'error'); return; }
+
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+
+        const formData = new FormData();
+        formData.append('photo', photo);
+        formData.append('brand', document.getElementById('vizBrand').value);
+        formData.append('color_name', document.getElementById('vizColorName').value);
+        formData.append('color_code', document.getElementById('vizColorCode').value);
+        formData.append('color_hex', document.getElementById('vizColorHexText').value);
+        formData.append('notes', document.getElementById('vizNotes').value);
+
+        try {
+            const res = await fetch(`${API}/me/visualizations`, {
+                method: 'POST',
+                headers: { 'X-Painter-Token': localStorage.getItem('painter_token') || '' },
+                body: formData
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            showToast('Visualization request submitted!');
+            btn.closest('.modal-overlay').remove();
+            loadVisualizations();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Submit';
+        }
+    }
+
     // ============ Init ============
     loadDashboard();
     loadEstimates();
     loadOffers();
     loadNotifications();
+    loadVisitingCard();
+    loadVisualizations();
 
     // Defer socket and FCM after page load
     window.addEventListener('load', () => {
