@@ -68,7 +68,7 @@
                     </div>
                     <div class="flex items-center justify-between">
                         <span id="resultsCount" class="text-xs text-gray-500"></span>
-                        <button onclick="clearFilters()" class="text-xs text-purple-600 hover:text-purple-800 font-semibold">Clear Filters</button>
+                        <button onclick="clearFilters()" class="text-xs text-emerald-600 hover:text-emerald-800 font-semibold">Clear Filters</button>
                     </div>
                 </div>
             </div>
@@ -283,7 +283,6 @@
     </div>
 
     <script>
-        console.log('[AdminProducts] Script loaded at', new Date().toISOString());
         let products = [];
         let brands = [];
         let categories = [];
@@ -310,14 +309,11 @@
         async function searchZohoItems(query) {
             try {
                 const url = `/api/products/zoho-items-search?search=${encodeURIComponent(query || '')}`;
-                console.log('[ZohoSearch] Fetching:', url);
                 const res = await fetch(url, { headers: getAuthHeaders() });
-                console.log('[ZohoSearch] Status:', res.status);
                 const data = await res.json();
-                console.log('[ZohoSearch] Response:', data.success, 'items:', data.items ? data.items.length : 0);
                 return data.success ? data.items : [];
             } catch (e) {
-                console.error('[ZohoSearch] Error:', e);
+                console.error('Zoho search error:', e);
                 return [];
             }
         }
@@ -433,7 +429,7 @@
                 : `${products.length} products`;
 
             if (filtered.length === 0 && products.length > 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No products match your filters. <button onclick="clearFilters()" class="text-purple-600 hover:text-purple-800 font-semibold underline">Clear filters</button></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No products match your filters. <button onclick="clearFilters()" class="text-emerald-600 hover:text-emerald-800 font-semibold underline">Clear filters</button></td></tr>`;
                 return;
             }
 
@@ -535,7 +531,6 @@
         }
 
         function renderPackSizes() {
-            console.log('[RenderPackSizes] called, packSizes:', JSON.stringify(packSizes));
             const container = document.getElementById('packSizesList');
             if (packSizes.length === 0) {
                 container.innerHTML = '<p class="text-sm text-gray-500 italic">No pack sizes added yet</p>';
@@ -561,7 +556,6 @@
                             >
                             <div id="zohoDropdown_${idx}" class="bg-white border border-gray-300 rounded-b shadow-lg max-h-40 overflow-y-auto" style="display:none;position:fixed;z-index:9999;width:300px"></div>
                         </div>
-                        <button type="button" onclick="showZohoDropdown(${idx})" class="px-2 py-1 bg-purple-600 text-white rounded text-xs">Load</button>
                         ${ps.zoho_item_id ? `<span class="text-xs text-green-600 font-medium whitespace-nowrap">&#10003; Mapped</span>` : `<span class="text-xs text-orange-500 whitespace-nowrap">Not mapped</span>`}
                     </div>
                 </div>
@@ -570,8 +564,8 @@
             packSizes.forEach((ps, idx) => {
                 const input = document.getElementById('zohoSearch_' + idx);
                 if (input) {
-                    input.addEventListener('focus', () => { console.log('[EventListener] focus on idx', idx); debounceZohoSearch(idx); });
-                    input.addEventListener('input', () => { console.log('[EventListener] input on idx', idx); debounceZohoSearch(idx); });
+                    input.addEventListener('focus', () => { debounceZohoSearch(idx); });
+                    input.addEventListener('input', () => { debounceZohoSearch(idx); });
                 }
             });
         }
@@ -579,16 +573,13 @@
         let zohoSearchTimers = {};
 
         function debounceZohoSearch(idx) {
-            console.log('[ZohoDebounce] debounceZohoSearch called, idx:', idx);
             clearTimeout(zohoSearchTimers[idx]);
             zohoSearchTimers[idx] = setTimeout(() => showZohoDropdown(idx), 300);
         }
 
         async function showZohoDropdown(idx) {
-            console.log('[ZohoDropdown] showZohoDropdown called for idx:', idx);
             const input = document.getElementById('zohoSearch_' + idx);
             const dropdown = document.getElementById('zohoDropdown_' + idx);
-            console.log('[ZohoDropdown] input:', !!input, 'dropdown:', !!dropdown);
             if (!input || !dropdown) return;
 
             // Position dropdown below input using fixed positioning (escapes overflow:auto parent)
@@ -667,7 +658,6 @@
 
         // Edit product
         async function editProduct(id) {
-            console.log('[EditProduct] editProduct called, id:', id);
             const product = products.find(p => p.id === id);
             if (!product) return;
 
