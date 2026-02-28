@@ -561,10 +561,19 @@
                             >
                             <div id="zohoDropdown_${idx}" class="bg-white border border-gray-300 rounded-b shadow-lg max-h-40 overflow-y-auto" style="display:none;position:fixed;z-index:9999;width:300px"></div>
                         </div>
+                        <button type="button" onclick="showZohoDropdown(${idx})" class="px-2 py-1 bg-purple-600 text-white rounded text-xs">Load</button>
                         ${ps.zoho_item_id ? `<span class="text-xs text-green-600 font-medium whitespace-nowrap">&#10003; Mapped</span>` : `<span class="text-xs text-orange-500 whitespace-nowrap">Not mapped</span>`}
                     </div>
                 </div>
             `).join('');
+            // Also attach event listeners programmatically as backup
+            packSizes.forEach((ps, idx) => {
+                const input = document.getElementById('zohoSearch_' + idx);
+                if (input) {
+                    input.addEventListener('focus', () => { console.log('[EventListener] focus on idx', idx); debounceZohoSearch(idx); });
+                    input.addEventListener('input', () => { console.log('[EventListener] input on idx', idx); debounceZohoSearch(idx); });
+                }
+            });
         }
 
         let zohoSearchTimers = {};
