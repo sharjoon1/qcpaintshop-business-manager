@@ -553,7 +553,7 @@
                                 oninput="debounceZohoSearch(${idx})"
                                 onfocus="debounceZohoSearch(${idx})"
                             >
-                            <div id="zohoDropdown_${idx}" class="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-b shadow-lg max-h-40 overflow-y-auto" style="display:none"></div>
+                            <div id="zohoDropdown_${idx}" class="bg-white border border-gray-300 rounded-b shadow-lg max-h-40 overflow-y-auto" style="display:none;position:fixed;z-index:9999;width:300px"></div>
                         </div>
                         ${ps.zoho_item_id ? `<span class="text-xs text-green-600 font-medium whitespace-nowrap">&#10003; Mapped</span>` : `<span class="text-xs text-orange-500 whitespace-nowrap">Not mapped</span>`}
                     </div>
@@ -572,6 +572,12 @@
             const input = document.getElementById('zohoSearch_' + idx);
             const dropdown = document.getElementById('zohoDropdown_' + idx);
             if (!input || !dropdown) return;
+
+            // Position dropdown below input using fixed positioning (escapes overflow:auto parent)
+            const rect = input.getBoundingClientRect();
+            dropdown.style.top = (rect.bottom + 1) + 'px';
+            dropdown.style.left = rect.left + 'px';
+            dropdown.style.width = rect.width + 'px';
 
             const query = input.value.trim();
             const items = await searchZohoItems(query);
