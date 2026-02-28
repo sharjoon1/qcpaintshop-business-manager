@@ -308,11 +308,15 @@
 
         async function searchZohoItems(query) {
             try {
-                const res = await fetch(`/api/products/zoho-items-search?search=${encodeURIComponent(query || '')}`, { headers: getAuthHeaders() });
+                const url = `/api/products/zoho-items-search?search=${encodeURIComponent(query || '')}`;
+                console.log('[ZohoSearch] Fetching:', url);
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                console.log('[ZohoSearch] Status:', res.status);
                 const data = await res.json();
+                console.log('[ZohoSearch] Response:', data.success, 'items:', data.items ? data.items.length : 0);
                 return data.success ? data.items : [];
             } catch (e) {
-                console.error('Zoho search error:', e);
+                console.error('[ZohoSearch] Error:', e);
                 return [];
             }
         }
@@ -569,8 +573,10 @@
         }
 
         async function showZohoDropdown(idx) {
+            console.log('[ZohoDropdown] showZohoDropdown called for idx:', idx);
             const input = document.getElementById('zohoSearch_' + idx);
             const dropdown = document.getElementById('zohoDropdown_' + idx);
+            console.log('[ZohoDropdown] input:', !!input, 'dropdown:', !!dropdown);
             if (!input || !dropdown) return;
 
             // Position dropdown below input using fixed positioning (escapes overflow:auto parent)
