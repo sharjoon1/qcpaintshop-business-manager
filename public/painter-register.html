@@ -157,6 +157,18 @@
     let verifiedPhone = '';
     let referralTimer;
 
+    // Auto-fill referral code from URL (?ref=CODE)
+    (function autoFillReferral() {
+        const params = new URLSearchParams(window.location.search);
+        const refCode = params.get('ref') || params.get('referral');
+        if (refCode) {
+            const input = document.getElementById('regReferral');
+            input.value = refCode;
+            // Validate the referral code
+            setTimeout(() => validateReferral(), 300);
+        }
+    })();
+
     // OTP input auto-focus
     document.querySelectorAll('.otp-input').forEach((input, idx, inputs) => {
         input.addEventListener('input', (e) => {
