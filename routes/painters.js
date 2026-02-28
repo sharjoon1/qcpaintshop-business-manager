@@ -14,6 +14,7 @@ const pointsEngine = require('../services/painter-points-engine');
 const zohoAPI = require('../services/zoho-api');
 const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterAttendance, uploadProfile } = require('../config/uploads');
 const sharp = require('sharp');
+const cardGenerator = require('../services/painter-card-generator');
 const painterNotificationService = require('../services/painter-notification-service');
 
 let pool;
@@ -342,6 +343,41 @@ router.put('/me/profile-photo', requirePainterAuth, uploadProfile.single('photo'
     } catch (error) {
         console.error('Profile photo upload error:', error);
         res.status(500).json({ success: false, message: 'Failed to upload photo' });
+    }
+});
+
+// Get/generate visiting card PNG
+router.get('/me/visiting-card', requirePainterAuth, async (req, res) => {
+    try {
+        const [painters] = await pool.query(
+            'SELECT id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo, card_generated_at, updated_at FROM painters WHERE id = ?',
+            [req.painter.id]
+        );
+        if (!painters.length) return res.status(404).json({ success: false, message: 'Painter not found' });
+
+        const painter = painters[0];
+        const cardPath = require('path').join(__dirname, '..', 'public', 'uploads', 'painter-cards', `painter_${painter.id}.png`);
+        const fs = require('fs');
+
+        // Check if card needs regeneration
+        const needsRegen = !painter.card_generated_at
+            || !fs.existsSync(cardPath)
+            || (painter.updated_at && new Date(painter.updated_at) > new Date(painter.card_generated_at));
+
+        if (needsRegen) {
+            await cardGenerator.generateCard(painter);
+            await pool.query('UPDATE painters SET card_generated_at = NOW() WHERE id = ?', [painter.id]);
+        }
+
+        // Return as image or JSON with URL based on query param
+        if (req.query.format === 'url') {
+            res.json({ success: true, url: `/uploads/painter-cards/painter_${painter.id}.png?v=${Date.now()}` });
+        } else {
+            res.sendFile(cardPath);
+        }
+    } catch (error) {
+        console.error('Visiting card error:', error);
+        res.status(500).json({ success: false, message: 'Failed to generate visiting card' });
     }
 });
 
