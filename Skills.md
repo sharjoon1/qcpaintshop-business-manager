@@ -2379,6 +2379,16 @@ Based on AI App Analyzer report, fixed critical production errors:
   - Push button: "Push X Discrepancies to Zoho" (only submitted items); refreshes panel after push instead of closing
   - Waiting state: shows "Waiting for staff to submit more items" when no submitted items left
 
+### Feb 28, 2026 — Painter Premium Features
+- **Profile Photo Upload**: PUT /me/profile-photo endpoint with Sharp resize (400x400 JPEG). Card cache invalidation on profile changes.
+- **Visiting Card Generator**: `services/painter-card-generator.js` — Sharp composite PNG (1050x600) with gradient header, circular photo, QR code, branding. GET /me/visiting-card with caching.
+- **Color Visualization System**: `painter_visualization_requests` table. Painter submits photo+color → admin processes → painter notified. 5 new endpoints (2 painter + 3 admin).
+- **Dashboard Redesign**: Avatar header, visiting card section with download/share, visualization gallery, 5-item quick actions scroll.
+- **Profile Page**: New `painter-profile.html` with avatar upload, editable fields, dirty tracking.
+- **Admin Visualization Tab**: Tab 10 in admin-painters.html — queue table, status filter, upload result, reject with notes.
+- **Android Painter App v1.2.0**: Green/gold colors (no purple), referral auto-fill. APK + AAB built.
+- **Cleanup**: Removed debug logging from admin-products.html, fixed purple → emerald on filter buttons.
+
 ### Feb 23, 2026 — Zoho Product Import & Painter Rates Fix
 - **Fixed**: Painter Rates "Sync from Zoho" was querying non-existent `zoho_items_cache` table — changed to `zoho_items_map`
 - **Enhanced**: GET `/api/painters/config/product-rates` now JOINs `zoho_items_map` for brand/MRP/stock info, supports `?search`, `?brand`, `?category` filtering
@@ -2404,8 +2414,8 @@ Based on AI App Analyzer report, fixed critical production errors:
 ### Overview
 Loyalty program for painters who buy or recommend Quality Colours paint products. Painters earn points through billing, referrals, attendance, and volume slabs. Points split into **Regular** (withdraw anytime) and **Annual** (once per year) pools.
 
-### Database Tables (10)
-- `painters` — Core profile (name, phone, referral_code, credit, cached point balances)
+### Database Tables (11)
+- `painters` — Core profile (full_name, phone, referral_code, credit, cached point balances, profile_photo, card_generated_at)
 - `painter_sessions` — OTP-based authentication tokens
 - `painter_point_transactions` — Ledger (source of truth for all point movements)
 - `painter_referrals` — Referrer→referred pairs with tier tracking
@@ -2415,6 +2425,7 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 - `painter_attendance` — Store visits, training, events
 - `painter_invoices_processed` — Tracks which Zoho invoices are already processed
 - `painter_slab_evaluations` — Tracks monthly/quarterly slab evaluation results
+- `painter_visualization_requests` — Color visualization requests (painter submits photo → admin processes → painter receives result). Status: pending→in_progress→completed/rejected
 
 ### Points System
 - **Self-billing**: Only annual points (annual_pct% of line total for eligible items)
@@ -2426,18 +2437,23 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 
 ### Key Files
 - `migrations/migrate-painters.js` — 10 tables + settings seeds + permissions
+- `migrations/migrate-painter-premium.js` — painter_visualization_requests table + card_generated_at column
 - `services/painter-points-engine.js` — Core points logic (invoice processing, slabs, credit, withdrawals)
-- `routes/painters.js` — ~40 API endpoints (public + painter-auth + admin)
-- `public/admin-painters.html` — Admin 5-tab page (Painters, Points, Rates, Withdrawals, Reports)
-- `public/painter-register.html` — Multi-step self-registration (phone OTP → details → referral)
+- `services/painter-card-generator.js` — Sharp-based 1050x600 visiting card PNG (gradient header, circular photo, QR code, branding)
+- `routes/painters.js` — ~50 API endpoints (public + painter-auth + admin)
+- `public/admin-painters.html` — Admin 10-tab page (Painters, Points, Rates, Withdrawals, Reports, Estimates, Offers, Training, Catalog, Visualizations)
+- `public/painter-register.html` — Multi-step self-registration (phone OTP → details → referral). Auto-fills `?ref=` code from URL.
 - `public/painter-login.html` — OTP-based painter login
-- `public/painter-dashboard.html` — Painter self-service portal (balances, transactions, referrals)
+- `public/painter-dashboard.html` — Premium dashboard (avatar header, stats, offers, visiting card, visualization gallery, quick actions, referrals, estimates, transactions)
+- `public/painter-profile.html` — Profile editing page with avatar photo upload, editable fields, dirty tracking
 - `public/components/painters-subnav.html` — Module sub-navigation
+- `config/uploads.js` — uploadPainterVisualization (memory storage, 10MB, images only)
 
 ### API Endpoints
 - **Public**: POST register, send-otp, verify-otp | GET validate-referral/:code
-- **Painter-Auth** (X-Painter-Token header): GET/PUT /me, /me/points/:pool, /me/referrals, /me/withdrawals, /me/invoices, /me/attendance, /me/dashboard | POST /me/withdraw
+- **Painter-Auth** (X-Painter-Token header): GET/PUT /me, PUT /me/profile-photo, GET /me/visiting-card(?format=url), /me/points/:pool, /me/referrals, /me/withdrawals, /me/invoices, /me/attendance, /me/dashboard, POST/GET /me/visualizations | POST /me/withdraw
 - **Admin**: GET / (list), GET /:id, PUT /:id, PUT /:id/approve, PUT /:id/credit
+- **Admin Visualizations**: GET /admin/visualizations(?status=), PUT /admin/visualizations/:id, POST /admin/visualizations/:id/upload-result
 - **Points**: GET/POST /:id/points/adjust, POST /invoice/process, GET /invoice/search
 - **Config**: GET /config/product-rates (?search, ?brand, ?category + JOINs zoho_items_map for brand/mrp), PUT /config/product-rates, POST /config/product-rates/sync (reads from `zoho_items_map`), CRUD /config/slabs
 - **Withdrawals**: GET /withdrawals, PUT /withdrawals/:id
@@ -2511,6 +2527,47 @@ Painters create estimates for paint purchases; admin reviews, records payment, p
 - Permission: `painters.estimates`
 - Migration: `node migrations/migrate-painter-estimates.js`
 
+### Painter Premium Features (Feb 28, 2026)
+Profile avatar, server-generated visiting card, color visualization system, and premium dashboard redesign.
+
+#### Profile Photo
+- `PUT /me/profile-photo` — multer upload → sharp resize 400x400 → JPEG 80% → saves as `painter_{id}.jpg`
+- Updates `painters.profile_photo` column, sets `card_generated_at = NULL` (invalidates card cache)
+- `PUT /me` also sets `card_generated_at = NULL` when profile fields change
+
+#### Visiting Card Generator
+- `services/painter-card-generator.js` — Sharp composite: gradient header, circular photo (or initials fallback), QR code, painter details, branded footer
+- Card: 1050x600 PNG, saved to `public/uploads/painter-cards/painter_{id}.png`
+- QR code links to `{ORIGIN}/painter-register.html?ref={referral_code}`
+- `GET /me/visiting-card` returns PNG image (or `?format=url` for JSON URL)
+- Cache: regenerates when `card_generated_at` is NULL or stale vs `updated_at`
+
+#### Color Visualization System
+- **Table**: `painter_visualization_requests` (painter_id, photo_path, brand, color_name, color_code, color_hex, notes, status, visualization_path, admin_notes, processed_by, created_at, completed_at)
+- **Painter**: `POST /me/visualizations` (photo + color info), `GET /me/visualizations` (list)
+- **Admin**: `GET /admin/visualizations(?status=)`, `PUT /admin/visualizations/:id` (status/notes), `POST /admin/visualizations/:id/upload-result` (upload processed image)
+- Notifications sent to painter on completion/rejection via `painter-notification-service`
+
+#### Dashboard Redesign
+- Header: circular avatar linking to `/painter-profile.html`, initials fallback
+- Quick actions: 5-item horizontal scroll (Estimate, Withdraw, Card, Refer, Visualize)
+- Visiting Card section: card thumbnail, Download + Share buttons (Web Share API with file)
+- Visualization Gallery: completed grid (2-col) + pending list with status badges
+- Request Visualization modal: photo upload + brand/color/hex picker + notes
+
+#### Admin Tab
+- Tab 10 "Visualizations" in `admin-painters.html`: status filter, 3 stat cards, queue table
+- Actions: Start processing, Upload result, Reject with notes
+
+#### Android Painter App
+- Package: `com.qcpaintshop.painter`, v1.2.0 (versionCode 3)
+- Colors: green/gold (#1B5E3B/#D4A24E), NO purple
+- Publish script: `google-services/publish-painter.js`
+- Play Console registration still pending (first upload must be manual)
+
+#### Migration
+- `node migrations/migrate-painter-premium.js` — creates `painter_visualization_requests` table, adds `card_generated_at` column
+
 ---
 
 ## 10. KNOWN ISSUES & ROADMAP
@@ -2534,4 +2591,4 @@ Painters create estimates for paint purchases; admin reviews, records payment, p
 ---
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-02-16 | Version: 3.3.0 | Maintained by: Development Team*
+*Last Updated: 2026-03-01 | Version: 3.3.5 (Staff/Customer), 1.2.0 (Painter) | Maintained by: Development Team*
