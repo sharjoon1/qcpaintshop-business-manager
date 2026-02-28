@@ -283,6 +283,7 @@
     </div>
 
     <script>
+        console.log('[AdminProducts] Script loaded at', new Date().toISOString());
         let products = [];
         let brands = [];
         let categories = [];
@@ -534,6 +535,7 @@
         }
 
         function renderPackSizes() {
+            console.log('[RenderPackSizes] called, packSizes:', JSON.stringify(packSizes));
             const container = document.getElementById('packSizesList');
             if (packSizes.length === 0) {
                 container.innerHTML = '<p class="text-sm text-gray-500 italic">No pack sizes added yet</p>';
@@ -568,6 +570,7 @@
         let zohoSearchTimers = {};
 
         function debounceZohoSearch(idx) {
+            console.log('[ZohoDebounce] debounceZohoSearch called, idx:', idx);
             clearTimeout(zohoSearchTimers[idx]);
             zohoSearchTimers[idx] = setTimeout(() => showZohoDropdown(idx), 300);
         }
@@ -655,6 +658,7 @@
 
         // Edit product
         async function editProduct(id) {
+            console.log('[EditProduct] editProduct called, id:', id);
             const product = products.find(p => p.id === id);
             if (!product) return;
 
