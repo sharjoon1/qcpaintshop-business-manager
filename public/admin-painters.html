@@ -75,6 +75,7 @@
                 <button class="tab-btn" onclick="switchTab('estimates')">Estimates</button>
                 <button class="tab-btn" onclick="switchTab('offers')">🎁 Offers</button>
                 <button class="tab-btn" onclick="switchTab('training')">📚 Training</button>
+                <button class="tab-btn" onclick="switchTab('catalog')">Catalog</button>
             </div>
 
             <!-- Tab 1: Painters -->
@@ -529,6 +530,38 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Tab: Catalog -->
+            <div id="tab-catalog" class="tab-content">
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">Estimate Catalog</h3>
+                            <p class="text-sm text-gray-500 mt-1">Products available for painter estimates</p>
+                        </div>
+                        <a href="/admin-products.html" class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition">Manage Products</a>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gray-50 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-gray-800" id="catStatProducts">-</div>
+                            <div class="text-xs text-gray-500 mt-1">Products</div>
+                        </div>
+                        <div class="bg-emerald-50 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-emerald-600" id="catStatMapped">-</div>
+                            <div class="text-xs text-gray-500 mt-1">Mapped Variations</div>
+                        </div>
+                        <div class="bg-orange-50 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-orange-500" id="catStatUnmapped">-</div>
+                            <div class="text-xs text-gray-500 mt-1">Unmapped</div>
+                        </div>
+                        <div class="bg-blue-50 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-blue-600" id="catStatBrands">-</div>
+                            <div class="text-xs text-gray-500 mt-1">Brands</div>
+                        </div>
+                    </div>
+                    <div id="catalogProductList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -614,6 +647,7 @@
         if (tab === 'estimates') loadEstimates();
         if (tab === 'offers') loadOffers();
         if (tab === 'training') loadTrainingContent();
+        if (tab === 'catalog') loadCatalogStats();
     }
 
     // ═══════════════════════════════════════
@@ -1807,13 +1841,51 @@
     }
 
     // ═══════════════════════════════════════
+    // CATALOG TAB
+    // ═══════════════════════════════════════
+    async function loadCatalogStats() {
+        try {
+            // Get stats from a single endpoint
+            const statsRes = await fetch('/api/products/catalog-stats', { headers: authHeaders() });
+            const stats = await statsRes.json();
+            if (stats.success) {
+                document.getElementById('catStatProducts').textContent = stats.total_products;
+                document.getElementById('catStatMapped').textContent = stats.mapped;
+                document.getElementById('catStatUnmapped').textContent = stats.unmapped;
+                document.getElementById('catStatBrands').textContent = stats.brand_count;
+            }
+
+            // Get product list (lightweight, no pack_sizes fetch needed)
+            const res = await fetch('/api/products', { headers: authHeaders() });
+            const products = await res.json();
+
+            const container = document.getElementById('catalogProductList');
+            container.innerHTML = products.map(p => {
+                const typeBadge = p.product_type === 'area_wise'
+                    ? '<span style="background:#dbeafe;color:#1d4ed8;font-size:0.625rem;padding:1px 6px;border-radius:9999px;font-weight:600">Area</span>'
+                    : '<span style="background:#d1fae5;color:#065f46;font-size:0.625rem;padding:1px 6px;border-radius:9999px;font-weight:600">Unit</span>';
+                return '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">' +
+                    '<div class="flex items-center gap-2">' +
+                        '<span class="font-medium text-gray-800 text-sm">' + esc(p.name || '') + '</span>' +
+                        '<span class="text-xs text-gray-500">' + esc(p.brand_name || '') + '</span>' +
+                        typeBadge +
+                    '</div>' +
+                    '<a href="/admin-products.html" class="text-xs text-indigo-600 font-medium hover:underline">Edit</a>' +
+                '</div>';
+            }).join('');
+        } catch (err) {
+            console.error('Catalog stats error:', err);
+        }
+    }
+
+    // ═══════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════
     document.addEventListener('DOMContentLoaded', function() {
         // Check URL tab param
         const urlParams = new URLSearchParams(window.location.search);
         const tab = urlParams.get('tab');
-        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports', 'estimates', 'offers', 'training'];
+        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports', 'estimates', 'offers', 'training', 'catalog'];
         const activeTab = tab && tabNames.includes(tab) ? tab : 'painters';
 
         if (activeTab !== 'painters') {
@@ -1835,6 +1907,7 @@
         else if (activeTab === 'estimates') loadEstimates();
         else if (activeTab === 'offers') loadOffers();
         else if (activeTab === 'training') loadTrainingContent();
+        else if (activeTab === 'catalog') loadCatalogStats();
 
         // Initialize training fields visibility
         toggleTrainingFields();

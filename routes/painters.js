@@ -424,67 +424,95 @@ async function generateEstimateNumber() {
 // Product list for estimate builder
 router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
     try {
-        const { billing_type, search, brand, category } = req.query;
-        let where = "WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)";
+        const { billing_type, search, brand, category, product_type } = req.query;
+
+        let where = "WHERE p.status = 'active' AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL";
         const params = [];
 
         if (search) {
-            where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_brand LIKE ?)';
+            where += ' AND (p.name LIKE ? OR b.name LIKE ?)';
             params.push(`%${search}%`, `%${search}%`);
         }
         if (brand) {
-            where += ' AND zim.zoho_brand = ?';
+            where += ' AND b.id = ?';
             params.push(brand);
         }
         if (category) {
-            where += ' AND zim.zoho_category_name = ?';
+            where += ' AND c.id = ?';
             params.push(category);
         }
+        if (product_type) {
+            where += ' AND p.product_type = ?';
+            params.push(product_type);
+        }
 
-        const [items] = await pool.query(`
-            SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
-                   zim.zoho_brand as brand, zim.zoho_category_name as category,
-                   zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock
-            FROM zoho_items_map zim
+        const [rows] = await pool.query(`
+            SELECT p.id, p.name, p.product_type, p.area_coverage, p.gst_percentage,
+                   b.name as brand, b.id as brand_id,
+                   c.name as category, c.id as category_id,
+                   ps.id as pack_size_id, ps.size, ps.unit, ps.base_price, ps.zoho_item_id,
+                   zim.zoho_rate, zim.zoho_stock_on_hand as stock
+            FROM products p
+            LEFT JOIN brands b ON p.brand_id = b.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            INNER JOIN pack_sizes ps ON ps.product_id = p.id
+            LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
             ${where}
-            ORDER BY zim.zoho_brand, zim.zoho_item_name
-            LIMIT 500
+            ORDER BY b.name, p.name, ps.size
         `, params);
 
-        // Get filter options
+        // Group by product
+        const productMap = {};
+        for (const row of rows) {
+            if (!productMap[row.id]) {
+                productMap[row.id] = {
+                    id: row.id,
+                    name: row.name,
+                    brand: row.brand,
+                    brand_id: row.brand_id,
+                    category: row.category,
+                    category_id: row.category_id,
+                    product_type: row.product_type,
+                    area_coverage: row.area_coverage ? parseFloat(row.area_coverage) : null,
+                    gst_percentage: row.gst_percentage ? parseFloat(row.gst_percentage) : 18,
+                    pack_sizes: []
+                };
+            }
+            const showPrices = billing_type === 'self';
+            productMap[row.id].pack_sizes.push({
+                pack_size_id: row.pack_size_id,
+                size: parseFloat(row.size),
+                unit: row.unit,
+                rate: showPrices ? parseFloat(row.zoho_rate || row.base_price || 0) : null,
+                zoho_item_id: row.zoho_item_id,
+                stock: parseFloat(row.stock || 0)
+            });
+        }
+
+        const products = Object.values(productMap);
+
         const [brands] = await pool.query(`
-            SELECT DISTINCT zoho_brand as brand FROM zoho_items_map
-            WHERE zoho_brand IS NOT NULL AND zoho_brand != ''
-            AND (zoho_status = 'active' OR zoho_status IS NULL)
-            ORDER BY zoho_brand
+            SELECT DISTINCT b.id, b.name FROM brands b
+            INNER JOIN products p ON p.brand_id = b.id AND p.status = 'active'
+            INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL
+            ORDER BY b.name
         `);
         const [categories] = await pool.query(`
-            SELECT DISTINCT zoho_category_name as category FROM zoho_items_map
-            WHERE zoho_category_name IS NOT NULL AND zoho_category_name != ''
-            AND (zoho_status = 'active' OR zoho_status IS NULL)
-            ORDER BY zoho_category_name
+            SELECT DISTINCT c.id, c.name FROM categories c
+            INNER JOIN products p ON p.category_id = c.id AND p.status = 'active'
+            INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL
+            ORDER BY c.name
         `);
-
-        // Self-billing: show prices. Customer-billing: hide prices
-        const showPrices = billing_type === 'self';
-        const mapped = items.map(i => ({
-            item_id: i.item_id,
-            name: i.name,
-            brand: i.brand,
-            category: i.category,
-            rate: showPrices ? parseFloat(i.rate || 0) : null,
-            stock: parseFloat(i.stock || 0)
-        }));
 
         res.json({
             success: true,
-            products: mapped,
-            brands: brands.map(b => b.brand),
-            categories: categories.map(c => c.category)
+            products,
+            brands: brands.map(b => ({ id: b.id, name: b.name })),
+            categories: categories.map(c => ({ id: c.id, name: c.name }))
         });
     } catch (error) {
-        console.error('Estimate products error:', error);
-        res.status(500).json({ success: false, message: 'Failed to load products' });
+        console.error('Estimate catalog error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load catalog' });
     }
 });
 
@@ -522,36 +550,42 @@ router.post('/me/estimates', requirePainterAuth, async (req, res) => {
         const [gstConfig] = await pool.query("SELECT config_value FROM ai_config WHERE config_key = 'painter_estimate_gst_pct'");
         const gstPct = gstConfig.length ? parseFloat(gstConfig[0].config_value) : 18;
 
-        // Validate items and get server-side prices from zoho_items_map
-        const itemIds = items.map(i => i.item_id);
-        const [zohoItems] = await pool.query(
-            `SELECT zoho_item_id, zoho_item_name, zoho_brand, zoho_category_name, zoho_rate
-             FROM zoho_items_map WHERE zoho_item_id IN (?)`, [itemIds]
-        );
-        const zohoMap = {};
-        zohoItems.forEach(z => { zohoMap[z.zoho_item_id] = z; });
+        // Validate items — each has pack_size_id + quantity
+        const packSizeIds = items.map(i => i.pack_size_id || i.item_id);
+        const [packSizeRows] = await pool.query(`
+            SELECT ps.id as pack_size_id, ps.zoho_item_id, ps.size, ps.unit, ps.base_price, ps.product_id,
+                   p.name as product_name, p.product_type,
+                   zim.zoho_item_name, zim.zoho_brand, zim.zoho_category_name, zim.zoho_rate
+            FROM pack_sizes ps
+            INNER JOIN products p ON p.id = ps.product_id
+            LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+            WHERE ps.id IN (?) AND ps.is_active = 1
+        `, [packSizeIds]);
+
+        const packSizeMap = {};
+        packSizeRows.forEach(r => { packSizeMap[r.pack_size_id] = r; });
 
         const estimateNumber = await generateEstimateNumber();
         const status = submit ? 'pending_admin' : 'draft';
 
-        // Calculate totals from server-side prices
         let subtotal = 0;
         const lineItems = [];
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            const zohoItem = zohoMap[item.item_id];
-            if (!zohoItem) {
-                return res.status(400).json({ success: false, message: `Product not found: ${item.item_id}` });
+            const psId = item.pack_size_id || item.item_id;
+            const psRow = packSizeMap[psId];
+            if (!psRow || !psRow.zoho_item_id) {
+                return res.status(400).json({ success: false, message: `Product not found or not mapped: ${psId}` });
             }
             const qty = parseFloat(item.quantity) || 1;
-            const unitPrice = parseFloat(zohoItem.zoho_rate) || 0;
+            const unitPrice = parseFloat(psRow.zoho_rate || psRow.base_price || 0);
             const lineTotal = qty * unitPrice;
             subtotal += lineTotal;
             lineItems.push({
-                zoho_item_id: item.item_id,
-                item_name: zohoItem.zoho_item_name,
-                brand: zohoItem.zoho_brand,
-                category: zohoItem.zoho_category_name,
+                zoho_item_id: psRow.zoho_item_id,
+                item_name: `${psRow.product_name} ${psRow.size}${psRow.unit}`,
+                brand: psRow.zoho_brand,
+                category: psRow.zoho_category_name,
                 quantity: qty,
                 unit_price: unitPrice,
                 line_total: lineTotal,

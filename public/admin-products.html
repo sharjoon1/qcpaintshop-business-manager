@@ -288,6 +288,7 @@
         let categories = [];
         let editingProductId = null;
         let packSizes = []; // Array of {size, price} objects
+        let zohoItemsCache = [];
 
         // Helper function for authenticated API requests
         function getAuthHeaders() {
@@ -296,6 +297,24 @@
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             };
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        async function searchZohoItems(query) {
+            try {
+                const res = await fetch(`/api/products/zoho-items-search?search=${encodeURIComponent(query || '')}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                return data.success ? data.items : [];
+            } catch (e) {
+                console.error('Zoho search error:', e);
+                return [];
+            }
         }
 
         // Load all data
@@ -495,7 +514,7 @@
                 return;
             }
             
-            packSizes.push({size, unit, price, base_price: price});
+            packSizes.push({ size, unit, price, base_price: price, zoho_item_id: null, zoho_item_name: '' });
             packSizes.sort((a, b) => a.size - b.size); // Sort by size
             renderPackSizes();
             
@@ -516,16 +535,80 @@
                 container.innerHTML = '<p class="text-sm text-gray-500 italic">No pack sizes added yet</p>';
                 return;
             }
-            
             container.innerHTML = packSizes.map((ps, idx) => `
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <span class="font-semibold text-gray-700">${ps.size} ${ps.unit || 'L'}</span>
-                    <span class="text-gray-900">₹${ps.price.toFixed(2)}</span>
-                    <button type="button" onclick="removePackSize(${idx})" class="text-red-600 hover:text-red-800 font-semibold">
-                        Remove
-                    </button>
+                <div class="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold text-gray-700">${ps.size} ${ps.unit || 'L'}</span>
+                        <span class="text-gray-900">₹${parseFloat(ps.price).toFixed(2)}</span>
+                        <button type="button" onclick="removePackSize(${idx})" class="text-red-600 hover:text-red-800 font-semibold text-sm">Remove</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs text-gray-500 whitespace-nowrap">Zoho Item:</label>
+                        <div class="relative flex-1">
+                            <input type="text"
+                                id="zohoSearch_${idx}"
+                                class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:border-purple-500 focus:outline-none"
+                                placeholder="Search Zoho item to map..."
+                                value="${ps.zoho_item_name ? ps.zoho_item_name.replace(/"/g, '&quot;') : ''}"
+                                oninput="debounceZohoSearch(${idx})"
+                                onfocus="debounceZohoSearch(${idx})"
+                            >
+                            <div id="zohoDropdown_${idx}" class="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-b shadow-lg max-h-40 overflow-y-auto" style="display:none"></div>
+                        </div>
+                        ${ps.zoho_item_id ? `<span class="text-xs text-green-600 font-medium whitespace-nowrap">&#10003; Mapped</span>` : `<span class="text-xs text-orange-500 whitespace-nowrap">Not mapped</span>`}
+                    </div>
                 </div>
             `).join('');
+        }
+
+        let zohoSearchTimers = {};
+
+        function debounceZohoSearch(idx) {
+            clearTimeout(zohoSearchTimers[idx]);
+            zohoSearchTimers[idx] = setTimeout(() => showZohoDropdown(idx), 300);
+        }
+
+        async function showZohoDropdown(idx) {
+            const input = document.getElementById('zohoSearch_' + idx);
+            const dropdown = document.getElementById('zohoDropdown_' + idx);
+            if (!input || !dropdown) return;
+
+            const query = input.value.trim();
+            const items = await searchZohoItems(query);
+
+            if (!items.length) {
+                dropdown.innerHTML = '<div class="px-3 py-2 text-xs text-gray-400">No items found</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            dropdown.innerHTML = items.map(item => {
+                const safeName = (item.zoho_item_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                return `
+                    <div class="px-3 py-2 text-xs hover:bg-purple-50 cursor-pointer border-b border-gray-100"
+                         onclick="selectZohoItem(${idx}, '${item.zoho_item_id}', '${safeName}')">
+                        <div class="font-medium text-gray-800">${escHtml(item.zoho_item_name)}</div>
+                        <div class="text-gray-500">${escHtml(item.zoho_brand)} ${item.zoho_rate ? '• ₹' + item.zoho_rate : ''}</div>
+                    </div>
+                `;
+            }).join('');
+            dropdown.style.display = 'block';
+
+            setTimeout(() => {
+                const handler = function(e) {
+                    if (!dropdown.contains(e.target) && e.target !== input) {
+                        dropdown.style.display = 'none';
+                        document.removeEventListener('click', handler);
+                    }
+                };
+                document.addEventListener('click', handler);
+            }, 100);
+        }
+
+        function selectZohoItem(idx, zohoItemId, zohoItemName) {
+            packSizes[idx].zoho_item_id = zohoItemId;
+            packSizes[idx].zoho_item_name = zohoItemName;
+            renderPackSizes();
         }
 
         // Toggle Area Coverage field based on product type
@@ -559,7 +642,7 @@
         }
 
         // Edit product
-        function editProduct(id) {
+        async function editProduct(id) {
             const product = products.find(p => p.id === id);
             if (!product) return;
 
@@ -577,33 +660,47 @@
 
             toggleAreaCoverage(); // Show/hide area coverage field based on product type
             
-            // Load pack sizes
+            // Load pack sizes from server (includes zoho_item_id)
             packSizes = [];
-            if (product.available_sizes) {
-                try {
-                    packSizes = JSON.parse(product.available_sizes);
-                    if (!Array.isArray(packSizes)) packSizes = [];
-                    if (packSizes.length > 0 && typeof packSizes[0] === 'number') {
-                        // Old format: convert [1,4,10] to [{size:1,unit:'L',price:base_price}, ...]
-                        packSizes = packSizes.map(s => ({size: s, unit: 'L', price: parseFloat(product.base_price), base_price: parseFloat(product.base_price)}));
-                    } else {
-                        // Ensure each pack size has unit and base_price
-                        packSizes = packSizes.map(ps => ({
-                            size: ps.size,
+            try {
+                const psRes = await fetch('/api/products/' + id, { headers: getAuthHeaders() });
+                const psData = await psRes.json();
+                if (psData.pack_sizes && psData.pack_sizes.length > 0) {
+                    packSizes = psData.pack_sizes.map(ps => ({
+                        size: parseFloat(ps.size),
+                        unit: ps.unit || 'L',
+                        price: parseFloat(ps.base_price),
+                        base_price: parseFloat(ps.base_price),
+                        zoho_item_id: ps.zoho_item_id || null,
+                        zoho_item_name: ''
+                    }));
+                    // Fetch Zoho item names in parallel
+                    await Promise.all(packSizes.map(async (ps, i) => {
+                        if (ps.zoho_item_id) {
+                            const items = await searchZohoItems(ps.zoho_item_id);
+                            const match = items.find(it => String(it.zoho_item_id) === String(ps.zoho_item_id));
+                            if (match) packSizes[i].zoho_item_name = match.zoho_item_name;
+                        }
+                    }));
+                } else if (product.available_sizes) {
+                    try {
+                        let parsed = JSON.parse(product.available_sizes);
+                        if (!Array.isArray(parsed)) parsed = [];
+                        packSizes = parsed.map(ps => ({
+                            size: typeof ps === 'number' ? ps : ps.size,
                             unit: ps.unit || 'L',
                             price: ps.price || ps.base_price || parseFloat(product.base_price),
-                            base_price: ps.base_price || ps.price || parseFloat(product.base_price)
+                            base_price: ps.base_price || ps.price || parseFloat(product.base_price),
+                            zoho_item_id: null,
+                            zoho_item_name: ''
                         }));
-                    }
-                } catch (e) {
-                    console.log('Error parsing pack sizes:', e);
-                    packSizes = [];
+                    } catch (e) { packSizes = []; }
                 }
-            }
-            
-            // If no pack sizes, create one from base_price
-            if (packSizes.length === 0 && product.base_price) {
-                packSizes = [{size: 1, unit: 'L', price: parseFloat(product.base_price), base_price: parseFloat(product.base_price)}];
+                if (packSizes.length === 0 && product.base_price) {
+                    packSizes = [{ size: 1, unit: 'L', price: parseFloat(product.base_price), base_price: parseFloat(product.base_price), zoho_item_id: null, zoho_item_name: '' }];
+                }
+            } catch (e) {
+                console.error('Error loading pack sizes:', e);
             }
             
             renderPackSizes();

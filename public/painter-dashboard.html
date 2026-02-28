@@ -9,6 +9,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/painter-i18n.js"></script>
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { max-width: 100vw; overflow-x: hidden; }
         body { background: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .header { background: linear-gradient(135deg, #1B5E3B, #D4A24E); color: #fff; }
         .stat-card { background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e8ecf1; transition: transform 0.2s; }
@@ -467,15 +469,54 @@
 
     async function shareReferral() {
         const code = dashboardData?.referralCode || document.getElementById('referralCode').textContent;
-        const text = `Join Quality Colours Painter Loyalty Program! Use my referral code: ${code}\n\nRegister here: ${window.location.origin}/painter-register.html`;
+        if (!code || code === '---') { showToast('Referral code not loaded yet', 'error'); return; }
 
+        const text = `Join Quality Colours Painter Loyalty Program! Use my referral code: ${code}\n\nRegister here: ${window.location.origin}/painter-register.html?ref=${code}`;
+
+        // Try native share first
         if (navigator.share) {
             try {
                 await navigator.share({ title: 'Quality Colours Painter Program', text });
-            } catch (e) {}
-        } else {
-            navigator.clipboard.writeText(text).then(() => alert('Referral link copied to clipboard!'));
+                showToast('Shared successfully!');
+                return;
+            } catch (e) {
+                // User cancelled or share failed — fall through to clipboard
+            }
         }
+
+        // Try clipboard
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast('Referral code copied to clipboard!');
+            return;
+        } catch (e) {
+            // Clipboard failed — show WhatsApp + manual copy
+        }
+
+        // Fallback: WhatsApp deep link + show text in bottom sheet
+        const waUrl = 'https://wa.me/?text=' + encodeURIComponent(text);
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/50 flex items-end justify-center z-50';
+        modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+        modal.innerHTML = '<div class="bg-white rounded-t-2xl w-full max-w-lg p-5 pb-8">' +
+            '<h3 class="font-semibold text-gray-800 mb-3">Share Referral Code</h3>' +
+            '<div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 mb-4 select-all" style="word-break:break-word">' + text.replace(/\n/g, '<br>') + '</div>' +
+            '<div class="flex gap-3">' +
+                '<a href="' + waUrl + '" target="_blank" class="flex-1 py-2.5 bg-green-600 text-white text-center rounded-lg font-medium text-sm">Share via WhatsApp</a>' +
+                '<button onclick="this.closest(\'.fixed\').remove()" class="flex-1 py-2.5 border border-gray-300 rounded-lg font-medium text-sm text-gray-600">Close</button>' +
+            '</div>' +
+        '</div>';
+        document.body.appendChild(modal);
+    }
+
+    function showToast(msg, type) {
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-sm font-medium z-50 ' + (type === 'error' ? 'bg-red-600' : 'bg-emerald-600') + ' text-white shadow-lg';
+        toast.style.transform = 'translateX(-50%)';
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
+        setTimeout(function() { toast.remove(); }, 2500);
     }
 
     function esc(s) {
@@ -595,7 +636,7 @@
     }
 
     // ============ Toast ============
-    function showToast(title, body) {
+    function showNotifToast(title, body) {
         const toast = document.getElementById('toastContainer');
         document.getElementById('toastTitle').textContent = title;
         document.getElementById('toastBody').textContent = body || '';
@@ -665,7 +706,7 @@
                     socket.emit('join_painter_room', painter.id);
                     socket.on('painter_notification', (notification) => {
                         loadNotifications();
-                        showToast(notification.title || 'New Notification', notification.body || notification.message || '');
+                        showNotifToast(notification.title || 'New Notification', notification.body || notification.message || '');
                     });
                 }
             } catch (err) {

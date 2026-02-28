@@ -2396,6 +2396,49 @@ app.delete('/api/customer-types/:id', requirePermission('customers', 'delete'), 
 // PRODUCTS
 // ========================================
 
+// Search Zoho items for pack size mapping dropdown
+app.get('/api/products/zoho-items-search', requireAuth, async (req, res) => {
+    try {
+        const { search } = req.query;
+        let where = "WHERE (zoho_status = 'active' OR zoho_status IS NULL)";
+        const params = [];
+        if (search) {
+            where += ' AND (zoho_item_name LIKE ? OR zoho_brand LIKE ? OR zoho_sku LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+        const [items] = await pool.query(`
+            SELECT zoho_item_id, zoho_item_name, zoho_brand, zoho_rate, zoho_sku
+            FROM zoho_items_map ${where}
+            ORDER BY zoho_brand, zoho_item_name
+            LIMIT 50
+        `, params);
+        res.json({ success: true, items });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Catalog stats for estimate catalog tab
+app.get('/api/products/catalog-stats', requireAuth, async (req, res) => {
+    try {
+        const [[{ total_products }]] = await pool.query(
+            "SELECT COUNT(*) as total_products FROM products WHERE status = 'active'"
+        );
+        const [[{ mapped }]] = await pool.query(
+            "SELECT COUNT(*) as mapped FROM pack_sizes ps INNER JOIN products p ON p.id = ps.product_id WHERE p.status = 'active' AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL"
+        );
+        const [[{ unmapped }]] = await pool.query(
+            "SELECT COUNT(*) as unmapped FROM pack_sizes ps INNER JOIN products p ON p.id = ps.product_id WHERE p.status = 'active' AND ps.is_active = 1 AND (ps.zoho_item_id IS NULL OR ps.zoho_item_id = '')"
+        );
+        const [[{ brand_count }]] = await pool.query(
+            "SELECT COUNT(DISTINCT b.id) as brand_count FROM brands b INNER JOIN products p ON p.brand_id = b.id WHERE p.status = 'active'"
+        );
+        res.json({ success: true, total_products, mapped, unmapped, brand_count });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 app.get('/api/products', requireAuth, async (req, res) => {
     try {
         const [rows] = await pool.query(`
@@ -2454,8 +2497,8 @@ app.post('/api/products', requirePermission('products', 'add'), async (req, res)
                 const packSizes = JSON.parse(available_sizes);
                 for (const pack of packSizes) {
                     await pool.query(
-                        'INSERT INTO pack_sizes (product_id, size, unit, base_price, is_active) VALUES (?, ?, ?, ?, 1)',
-                        [productId, pack.size, pack.unit || 'L', pack.base_price || pack.price]
+                        'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
+                        [productId, pack.size, pack.unit || 'L', pack.base_price || pack.price, pack.zoho_item_id || null]
                     );
                 }
             } catch (e) {
@@ -2486,8 +2529,8 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
                 const packSizes = JSON.parse(available_sizes);
                 for (const pack of packSizes) {
                     await pool.query(
-                        'INSERT INTO pack_sizes (product_id, size, unit, base_price, is_active) VALUES (?, ?, ?, ?, 1)',
-                        [req.params.id, pack.size, pack.unit || 'L', pack.base_price || pack.price]
+                        'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
+                        [req.params.id, pack.size, pack.unit || 'L', pack.base_price || pack.price, pack.zoho_item_id || null]
                     );
                 }
             } catch (e) {
