@@ -26,7 +26,9 @@ const uploadDirs = [
     'public/uploads/products',
     'public/uploads/offers',
     'public/uploads/training',
-    'public/uploads/painter-attendance'
+    'public/uploads/painter-attendance',
+    'public/uploads/painter-cards',
+    'public/uploads/painter-visualizations'
 ];
 
 function ensureUploadDirs() {
@@ -125,6 +127,13 @@ const uploadPainterAttendance = multer({
     fileFilter: imageFilter
 });
 
+// Painter visualization photo upload (10MB, memory storage for sharp compression)
+const uploadPainterVisualization = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: imageFilter
+});
+
 module.exports = {
     ensureUploadDirs,
     uploadLogo,
@@ -134,5 +143,6 @@ module.exports = {
     uploadProductImage,
     uploadOfferBanner,
     uploadTraining,
-    uploadPainterAttendance
+    uploadPainterAttendance,
+    uploadPainterVisualization
 };
