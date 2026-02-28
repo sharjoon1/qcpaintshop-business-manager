@@ -12,7 +12,8 @@ const crypto = require('crypto');
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const pointsEngine = require('../services/painter-points-engine');
 const zohoAPI = require('../services/zoho-api');
-const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterAttendance } = require('../config/uploads');
+const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterAttendance, uploadProfile } = require('../config/uploads');
+const sharp = require('sharp');
 const painterNotificationService = require('../services/painter-notification-service');
 
 let pool;
@@ -302,12 +303,45 @@ router.put('/me', requirePainterAuth, async (req, res) => {
         await pool.query(
             `UPDATE painters SET email = COALESCE(?, email), address = COALESCE(?, address), city = COALESCE(?, city),
              district = COALESCE(?, district), pincode = COALESCE(?, pincode), experience_years = COALESCE(?, experience_years),
-             specialization = COALESCE(?, specialization) WHERE id = ?`,
+             specialization = COALESCE(?, specialization), card_generated_at = NULL WHERE id = ?`,
             [email, address, city, district, pincode, experience_years, specialization, req.painter.id]
         );
         res.json({ success: true, message: 'Profile updated' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to update profile' });
+    }
+});
+
+// Upload/update profile photo
+router.put('/me/profile-photo', requirePainterAuth, uploadProfile.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'No photo uploaded' });
+
+        const filename = `painter_${req.painter.id}.jpg`;
+        const outputPath = require('path').join(__dirname, '..', 'public', 'uploads', 'profiles', filename);
+
+        // Resize + compress with sharp
+        await sharp(req.file.path)
+            .resize(400, 400, { fit: 'cover' })
+            .jpeg({ quality: 80 })
+            .toFile(outputPath + '.tmp');
+
+        // Replace original with processed version
+        const fs = require('fs');
+        if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+        fs.renameSync(outputPath + '.tmp', outputPath);
+        // Remove multer's original upload
+        if (req.file.path !== outputPath) {
+            try { fs.unlinkSync(req.file.path); } catch(e) {}
+        }
+
+        const photoUrl = `/uploads/profiles/${filename}?v=${Date.now()}`;
+        await pool.query('UPDATE painters SET profile_photo = ?, card_generated_at = NULL WHERE id = ?', [photoUrl, req.painter.id]);
+
+        res.json({ success: true, photo_url: photoUrl });
+    } catch (error) {
+        console.error('Profile photo upload error:', error);
+        res.status(500).json({ success: false, message: 'Failed to upload photo' });
     }
 });
 
@@ -381,13 +415,15 @@ router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
         const [referralCount] = await pool.query('SELECT COUNT(*) as count FROM painter_referrals WHERE referrer_id = ?', [req.painter.id]);
         const [recentTxns] = await pool.query('SELECT * FROM painter_point_transactions WHERE painter_id = ? ORDER BY created_at DESC LIMIT 10', [req.painter.id]);
         const [pendingWithdrawals] = await pool.query('SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM painter_withdrawals WHERE painter_id = ? AND status = "pending"', [req.painter.id]);
-        const [painter] = await pool.query('SELECT referral_code FROM painters WHERE id = ?', [req.painter.id]);
+        const [painter] = await pool.query('SELECT referral_code, profile_photo, full_name FROM painters WHERE id = ?', [req.painter.id]);
 
         res.json({
             success: true,
             dashboard: {
                 balance,
                 referralCode: painter[0]?.referral_code,
+                profilePhoto: painter[0]?.profile_photo,
+                painterName: painter[0]?.full_name,
                 referralCount: referralCount[0].count,
                 recentTransactions: recentTxns,
                 pendingWithdrawals: { count: pendingWithdrawals[0].count, total: parseFloat(pendingWithdrawals[0].total) }
