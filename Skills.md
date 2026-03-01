@@ -1,8 +1,8 @@
 # QC Paint Shop Business Manager - System Skills & Capabilities
 
 > **Platform**: act.qcpaintshop.com
-> **Version**: 3.3.3
-> **Last Updated**: 2026-02-28
+> **Version**: 3.3.6
+> **Last Updated**: 2026-03-01
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
@@ -487,7 +487,17 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - DB columns: `approved_by`, `approved_at`, `rejection_reason`, `review_notes`
 - Notification sent to staff on approval/rejection (via `user_id` + `request_type`)
 - **Re-clock-in request**: After clock-out, staff can request overtime. Admin approves → `allow_reclockin = 1` → staff clocks in again creating new attendance record
+- **Leave balance display**: When staff selects "leave" type, shows current month leave balance (Sunday/Weekday paid leaves used/remaining) with salary deduction warning if exceeding free quota
 - Page: `staff/permission-request.html`
+
+**Leave Policy & Balance**
+- **Policy**: 1 paid Sunday leave + 1 paid weekday leave per month (same for all staff)
+- Leaves beyond free quota are deducted from salary even if admin-approved
+- Deduction formula: `excess_leaves × hourly_rate × standard_daily_hours` (same as absence deduction)
+- Leave count source: `attendance_permissions` table (type='leave', status='approved'), split by `DAYOFWEEK(request_date)`
+- **Endpoint**: `GET /api/attendance/leave-balance` — returns Sunday/weekday used/pending/remaining counts, `total_excess`, `will_be_deducted` flag
+- **Staff dashboard card**: Leave Balance card showing Sunday/Weekday indicators (green=remaining, red=used), excess leave warning
+- **Staff salary page**: Leave Balance card synced to selected month, leave deduction row in monthly summary
 
 **Admin Features**
 - Today's attendance summary (present, absent, late, on-break)
@@ -511,42 +521,56 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 ### 2.11 Salary Management
 
 **Salary Configuration**
-- Per-user salary config: base_salary, HRA, DA, TA, other allowances
-- Deductions: PF, ESI, professional_tax
-- Per-day rate calculation
-- Overtime rate configuration
+- Per-user salary config: monthly_salary, hourly_rate (generated: monthly_salary/260), overtime_multiplier (default 1.5x)
+- Work hours: standard_daily_hours (10h), sunday_hours (5h)
+- Deductions: enable_late_deduction, late_deduction_per_hour, enable_absence_deduction
+- Allowances: transport_allowance, food_allowance, other_allowance
+- Effective date range (effective_from, effective_until), is_active flag
+- 11 staff configured (Rs 12,000 - Rs 30,000)
 - Page: `admin-salary-config.html`
 
 **Monthly Salary Calculation**
-- Auto-calculation based on attendance data
-- Present days, absent days, late days, overtime hours
-- Gross salary = base + allowances
-- Net salary = gross - deductions - advances
-- Adjustments (bonus, penalty, custom)
-- Individual and bulk calculation
-- Status: calculated -> approved -> paid
+- `calculateSalaryForUser(userId, month, calculatedBy)` function in `routes/salary.js`
+- Attendance data from `staff_attendance`: present/absent/half_day/on_leave days, standard/sunday/overtime hours
+- **Leave deduction**: queries `attendance_permissions` (type='leave', status='approved'), splits Sunday vs weekday leaves
+- **Leave policy**: 1 paid Sunday leave + 1 paid weekday leave per month; excess deducted at `hourly_rate × standard_daily_hours`
+- Pay components: standard_hours_pay, sunday_hours_pay, overtime_pay (approved OT only)
+- Deductions: late_deduction, absence_deduction, **leave_deduction**, other_deduction
+- `gross_salary` and `net_salary` are GENERATED ALWAYS AS (STORED) columns
+- Individual (`POST /calculate`) and bulk (`POST /calculate-all`) calculation with per-staff error reporting
+- Status: draft → calculated → approved → paid
 - Notification sent to staff on salary approval
+- DB columns: `paid_sunday_leaves`, `paid_weekday_leaves`, `excess_leaves`, `leave_deduction`
+- Detail modal shows attendance summary (including paid leaves, excess leaves) and deduction breakdown (including leave deduction)
 - Page: `admin-salary-monthly.html`
+- Migration: `migrations/migrate-salary-leave-deduction.js`
 
 **Salary Payments**
 - Record payments with method (cash, bank_transfer, UPI, cheque)
 - Transaction reference tracking
-- Payment status management
+- Partial payment support (multiple payment records per salary)
+- Payment status: unpaid → partial → paid
 - Notification sent to staff on payment recording
 - Page: `admin-salary-payments.html`
 
 **Salary Advances**
-- Staff can request advances (with reason and repayment plan)
+- Staff can request advances (with reason)
 - Admin approval/rejection workflow
 - Notification sent to staff on advance approval/rejection
-- Payment recording
-- Advance deduction in monthly salary
-- Summary statistics
-- Pages: `admin-salary-advances.html`, `staff/advance-request.html`, `staff/salary.html`
+- Payment recording with recovery month (YYYY-MM)
+- Summary statistics (pending amount, approved, rejected, paid)
+- Pages: `admin-salary-advances.html`, `staff/salary.html`
+
+**Staff Salary View**
+- Staff self-service salary page: config view, monthly summary with month navigation, salary history, payment history
+- **Leave balance card**: shows Sunday/Weekday leave usage for selected month, excess leave warning
+- **Leave deduction row**: conditional display when leave_deduction > 0, shows excess day count
+- Endpoints: `GET /my-config`, `GET /my-monthly`, `GET /my-payments`, `GET /my-advances`, `POST /my-advance-request`
+- Page: `staff/salary.html`
 
 **Reports**
-- Monthly summary: total payroll, average salary, department breakdown
-- Individual salary history
+- Monthly summary: total payroll, branch breakdown
+- Overtime analysis, allowances summary, deductions analysis
 - Page: `admin-salary-reports.html`
 
 ---
