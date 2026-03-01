@@ -488,9 +488,12 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
     const paidWeekdayLeaves = Math.min(weekdayLeaves, FREE_WEEKDAY_LEAVES);
     const excessLeaves = Math.max(0, sundayLeaves - FREE_SUNDAY_LEAVES) + Math.max(0, weekdayLeaves - FREE_WEEKDAY_LEAVES);
 
-    // Calculate pay components
+    // Calculate pay components (Sunday: 5 hrs = 1 day, Weekday: 10 hrs = 1 day)
+    const WEEKDAY_HOURS_PER_DAY = 10;
+    const SUNDAY_HOURS_PER_DAY = 5;
+    const dailyRate = hourlyRate * WEEKDAY_HOURS_PER_DAY; // daily rate based on 10-hr day
     const standardHoursPay = parseFloat(att.standard_hours) * hourlyRate;
-    const sundayHoursPay = parseFloat(att.sunday_hours) * hourlyRate;
+    const sundayHoursPay = (parseFloat(att.sunday_hours) / SUNDAY_HOURS_PER_DAY) * dailyRate;
     // Use approved OT hours for pay (falls back to 0 if no approved OT)
     const overtimePay = parseFloat(att.approved_overtime_hours) * hourlyRate * overtimeMultiplier;
 

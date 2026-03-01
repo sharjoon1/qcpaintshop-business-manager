@@ -26,7 +26,7 @@ function generateSalarySlipPDF(options, stream) {
     const hourlyRate = parseFloat(s.base_salary || 0) / 260;
     const dailyRate = hourlyRate * 10;
     const stdDays = (parseFloat(s.total_standard_hours || 0) / 10);
-    const sunDays = (parseFloat(s.total_sunday_hours || 0) / 10);
+    const sunDays = (parseFloat(s.total_sunday_hours || 0) / 5); // Sunday: 5 hrs = 1 day
     const otDays = (parseFloat(s.total_overtime_hours || 0) / 10);
     const totalDays = stdDays + sunDays + otDays;
 
@@ -118,7 +118,7 @@ function generateSalarySlipPDF(options, stream) {
     y += 5;
     doc.moveTo(40, y).lineTo(555, y).strokeColor('#ddd').lineWidth(0.5).stroke();
     y += 12;
-    doc.fontSize(11).fillColor(purple).font('Helvetica-Bold').text('WORKING DAYS (10 hrs = 1 day)', 40, y);
+    doc.fontSize(11).fillColor(purple).font('Helvetica-Bold').text('WORKING DAYS (Sun: 5h=1d, Others: 10h=1d)', 40, y);
     y += 18;
 
     const dayRows = [

@@ -709,7 +709,7 @@
             tbody.innerHTML = salaries.map(s => {
                 const netSalary = parseFloat(s.net_salary || 0);
                 const stdDays = (parseFloat(s.total_standard_hours || 0) / 10).toFixed(1);
-                const sunDays = (parseFloat(s.total_sunday_hours || 0) / 10).toFixed(1);
+                const sunDays = (parseFloat(s.total_sunday_hours || 0) / 5).toFixed(1); // Sunday: 5 hrs = 1 day
                 const otDays = (parseFloat(s.total_overtime_hours || 0) / 10).toFixed(1);
 
                 return `
@@ -795,7 +795,7 @@
             const dailyRate = hourlyRate * 10;
             const fmtINR = n => parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2});
             const stdDays = (parseFloat(s.total_standard_hours || 0) / 10);
-            const sunDays = (parseFloat(s.total_sunday_hours || 0) / 10);
+            const sunDays = (parseFloat(s.total_sunday_hours || 0) / 5); // Sunday: 5 hrs = 1 day
             const otDays = (parseFloat(s.total_overtime_hours || 0) / 10);
             const totalDays = stdDays + sunDays + otDays;
 
@@ -830,7 +830,7 @@
                     </div>
 
                     <div class="detail-section">
-                        <h3><i class="fas fa-clock"></i> Working Days (10 hrs = 1 day)</h3>
+                        <h3><i class="fas fa-clock"></i> Working Days (Sun: 5h=1d, Others: 10h=1d)</h3>
                         <div class="detail-row">
                             <span>Standard Days:</span>
                             <strong>${stdDays.toFixed(1)} days <small style="color:#888">(${parseFloat(s.total_standard_hours||0).toFixed(1)} hrs)</small></strong>
