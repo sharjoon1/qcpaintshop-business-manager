@@ -838,6 +838,30 @@
         </div>
     </div>
 
+    <!-- Leave Balance Card -->
+    <div class="status-card" id="leaveBalanceCard" style="display: none;">
+        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1f2937;">
+            <span style="margin-right: 8px;">📅</span>Leave Balance This Month
+        </h3>
+        <div id="leaveBalanceContent">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                <div style="background: #f0f9ff; border-radius: 12px; padding: 16px; text-align: center;">
+                    <div style="font-size: 12px; color: #0369a1; font-weight: 600; margin-bottom: 4px;">Sunday Paid Leave</div>
+                    <div id="sundayLeaveStatus" style="font-size: 24px; font-weight: 700; color: #0c4a6e;">-</div>
+                    <div id="sundayLeaveLabel" style="font-size: 11px; color: #6b7280; margin-top: 4px;">Loading...</div>
+                </div>
+                <div style="background: #fefce8; border-radius: 12px; padding: 16px; text-align: center;">
+                    <div style="font-size: 12px; color: #a16207; font-weight: 600; margin-bottom: 4px;">Weekday Paid Leave</div>
+                    <div id="weekdayLeaveStatus" style="font-size: 24px; font-weight: 700; color: #713f12;">-</div>
+                    <div id="weekdayLeaveLabel" style="font-size: 11px; color: #6b7280; margin-top: 4px;">Loading...</div>
+                </div>
+            </div>
+            <div id="leaveWarning" style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; text-align: center;">
+                <span style="color: #dc2626; font-size: 13px; font-weight: 500;" id="leaveWarningText">Extra leaves will be deducted from salary</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Bank Details Section -->
     <div class="status-card" id="bankDetailsCard">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -2937,8 +2961,43 @@
             renderYourWork();
         }
 
+        async function loadLeaveBalance() {
+            try {
+                const res = await fetch('/api/attendance/leave-balance', { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) {
+                    const card = document.getElementById('leaveBalanceCard');
+                    card.style.display = 'block';
+                    const lb = data.data;
+
+                    const sunEl = document.getElementById('sundayLeaveStatus');
+                    const sunLabel = document.getElementById('sundayLeaveLabel');
+                    sunEl.textContent = `${lb.sunday.used}/${lb.sunday.free}`;
+                    sunEl.style.color = lb.sunday.remaining > 0 ? '#10b981' : '#ef4444';
+                    sunLabel.textContent = lb.sunday.remaining > 0 ? `${lb.sunday.remaining} remaining` : 'Used';
+                    if (lb.sunday.pending > 0) sunLabel.textContent += ` (${lb.sunday.pending} pending)`;
+
+                    const wkEl = document.getElementById('weekdayLeaveStatus');
+                    const wkLabel = document.getElementById('weekdayLeaveLabel');
+                    wkEl.textContent = `${lb.weekday.used}/${lb.weekday.free}`;
+                    wkEl.style.color = lb.weekday.remaining > 0 ? '#10b981' : '#ef4444';
+                    wkLabel.textContent = lb.weekday.remaining > 0 ? `${lb.weekday.remaining} remaining` : 'Used';
+                    if (lb.weekday.pending > 0) wkLabel.textContent += ` (${lb.weekday.pending} pending)`;
+
+                    if (lb.will_be_deducted) {
+                        document.getElementById('leaveWarning').style.display = 'block';
+                        document.getElementById('leaveWarningText').textContent =
+                            `⚠️ ${lb.total_excess} extra leave(s) will be deducted from your salary`;
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading leave balance:', e);
+            }
+        }
+
         // Load on page init
         loadYourWork();
+        loadLeaveBalance();
         // Auto-refresh every 60 seconds
         yourWorkInterval = setInterval(() => loadYourWork(), 60000);
 

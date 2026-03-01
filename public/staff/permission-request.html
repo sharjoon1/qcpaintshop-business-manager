@@ -200,6 +200,18 @@
                     </select>
                 </div>
 
+                <!-- Leave Balance Info (shown when 'leave' type selected) -->
+                <div id="leaveBalanceInfo" style="display: none; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                    <div style="font-size: 13px; font-weight: 600; color: #0369a1; margin-bottom: 8px;">Leave Balance This Month</div>
+                    <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+                        <div><span style="color: #6b7280;">Sunday:</span> <strong id="lbSunday">-</strong></div>
+                        <div><span style="color: #6b7280;">Weekday:</span> <strong id="lbWeekday">-</strong></div>
+                    </div>
+                    <div id="lbWarning" style="display: none; font-size: 12px; color: #dc2626; font-weight: 500; background: #fef2f2; padding: 8px; border-radius: 8px;">
+                        ⚠️ This leave will be deducted from your salary
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">Date *</label>
                     <input type="date" class="form-input" id="requestDate" required>
@@ -265,6 +277,77 @@
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('requestDate').value = today;
         }
+
+        // Leave balance tracking
+        let leaveBalance = null;
+
+        async function loadLeaveBalance() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/attendance/leave-balance', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    leaveBalance = data.data;
+                    updateLeaveBalanceDisplay();
+                }
+            } catch (e) {
+                console.error('Error loading leave balance:', e);
+            }
+        }
+
+        function updateLeaveBalanceDisplay() {
+            if (!leaveBalance) return;
+            const lb = leaveBalance;
+            document.getElementById('lbSunday').textContent = `${lb.sunday.used}/${lb.sunday.free} used`;
+            document.getElementById('lbSunday').style.color = lb.sunday.remaining > 0 ? '#10b981' : '#ef4444';
+            document.getElementById('lbWeekday').textContent = `${lb.weekday.used}/${lb.weekday.free} used`;
+            document.getElementById('lbWeekday').style.color = lb.weekday.remaining > 0 ? '#10b981' : '#ef4444';
+            checkLeaveWarning();
+        }
+
+        function checkLeaveWarning() {
+            if (!leaveBalance) return;
+            const requestDate = document.getElementById('requestDate').value;
+            if (!requestDate) return;
+
+            const dayOfWeek = new Date(requestDate).getDay(); // 0 = Sunday
+            const isSunday = dayOfWeek === 0;
+            const warning = document.getElementById('lbWarning');
+
+            if (isSunday && leaveBalance.sunday.remaining <= 0) {
+                warning.style.display = 'block';
+                warning.textContent = '⚠️ Sunday paid leave used. This leave will be deducted from your salary.';
+            } else if (!isSunday && leaveBalance.weekday.remaining <= 0) {
+                warning.style.display = 'block';
+                warning.textContent = '⚠️ Weekday paid leave used. This leave will be deducted from your salary.';
+            } else {
+                warning.style.display = 'none';
+            }
+        }
+
+        // Show/hide leave balance when request type changes
+        document.getElementById('requestType').addEventListener('change', function() {
+            const leaveInfo = document.getElementById('leaveBalanceInfo');
+            if (this.value === 'leave') {
+                leaveInfo.style.display = 'block';
+                if (!leaveBalance) loadLeaveBalance();
+                else updateLeaveBalanceDisplay();
+            } else {
+                leaveInfo.style.display = 'none';
+            }
+        });
+
+        // Re-check warning when date changes
+        document.getElementById('requestDate').addEventListener('change', function() {
+            if (document.getElementById('requestType').value === 'leave') {
+                checkLeaveWarning();
+            }
+        });
+
+        // Prefetch leave balance
+        loadLeaveBalance();
 
         // Switch tabs
         function switchTab(tab) {

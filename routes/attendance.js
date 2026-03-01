@@ -3635,6 +3635,85 @@ router.get('/report/staff-list', requirePermission('attendance.view'), async (re
     }
 });
 
+// ========================================
+// LEAVE BALANCE
+// ========================================
+
+/**
+ * GET /api/attendance/leave-balance
+ * Returns current month leave usage for the authenticated user
+ */
+router.get('/leave-balance', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { month } = req.query;
+
+        // Default to current month
+        const now = new Date();
+        const targetMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const fromDate = `${targetMonth}-01`;
+        const toDate = new Date(parseInt(targetMonth.split('-')[0]), parseInt(targetMonth.split('-')[1]), 0)
+            .toISOString().split('T')[0];
+
+        // Count approved leaves from attendance_permissions
+        const [leaveRows] = await pool.query(
+            `SELECT
+                COALESCE(SUM(CASE WHEN DAYOFWEEK(request_date) = 1 THEN 1 ELSE 0 END), 0) as sunday_leaves,
+                COALESCE(SUM(CASE WHEN DAYOFWEEK(request_date) != 1 THEN 1 ELSE 0 END), 0) as weekday_leaves
+             FROM attendance_permissions
+             WHERE user_id = ? AND request_type = 'leave' AND status = 'approved'
+               AND request_date BETWEEN ? AND ?`,
+            [userId, fromDate, toDate]
+        );
+
+        // Count pending leave requests too
+        const [pendingRows] = await pool.query(
+            `SELECT
+                COALESCE(SUM(CASE WHEN DAYOFWEEK(request_date) = 1 THEN 1 ELSE 0 END), 0) as sunday_pending,
+                COALESCE(SUM(CASE WHEN DAYOFWEEK(request_date) != 1 THEN 1 ELSE 0 END), 0) as weekday_pending
+             FROM attendance_permissions
+             WHERE user_id = ? AND request_type = 'leave' AND status = 'pending'
+               AND request_date BETWEEN ? AND ?`,
+            [userId, fromDate, toDate]
+        );
+
+        const data = leaveRows[0];
+        const pending = pendingRows[0];
+        const sundayUsed = parseInt(data.sunday_leaves) || 0;
+        const weekdayUsed = parseInt(data.weekday_leaves) || 0;
+        const sundayPending = parseInt(pending.sunday_pending) || 0;
+        const weekdayPending = parseInt(pending.weekday_pending) || 0;
+
+        const FREE_SUNDAY = 1;
+        const FREE_WEEKDAY = 1;
+
+        res.json({
+            success: true,
+            data: {
+                month: targetMonth,
+                sunday: {
+                    free: FREE_SUNDAY,
+                    used: sundayUsed,
+                    pending: sundayPending,
+                    remaining: Math.max(0, FREE_SUNDAY - sundayUsed)
+                },
+                weekday: {
+                    free: FREE_WEEKDAY,
+                    used: weekdayUsed,
+                    pending: weekdayPending,
+                    remaining: Math.max(0, FREE_WEEKDAY - weekdayUsed)
+                },
+                total_excess: Math.max(0, sundayUsed - FREE_SUNDAY) + Math.max(0, weekdayUsed - FREE_WEEKDAY),
+                will_be_deducted: (Math.max(0, sundayUsed - FREE_SUNDAY) + Math.max(0, weekdayUsed - FREE_WEEKDAY)) > 0
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching leave balance:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch leave balance' });
+    }
+});
+
 module.exports = {
     router,
     setPool,

@@ -457,6 +457,28 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
 
     const att = attendanceRows[0];
 
+    // Get approved leave count from attendance_permissions
+    const [leaveRows] = await pool.query(
+        `SELECT
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(request_date) = 1 THEN 1 ELSE 0 END), 0) as sunday_leaves,
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(request_date) != 1 THEN 1 ELSE 0 END), 0) as weekday_leaves
+         FROM attendance_permissions
+         WHERE user_id = ? AND request_type = 'leave' AND status = 'approved'
+           AND request_date BETWEEN ? AND ?`,
+        [userId, fromDate, toDate]
+    );
+
+    const leaveData = leaveRows[0];
+    const sundayLeaves = parseInt(leaveData.sunday_leaves) || 0;
+    const weekdayLeaves = parseInt(leaveData.weekday_leaves) || 0;
+
+    // Leave policy: 1 paid Sunday leave + 1 paid weekday leave per month
+    const FREE_SUNDAY_LEAVES = 1;
+    const FREE_WEEKDAY_LEAVES = 1;
+    const paidSundayLeaves = Math.min(sundayLeaves, FREE_SUNDAY_LEAVES);
+    const paidWeekdayLeaves = Math.min(weekdayLeaves, FREE_WEEKDAY_LEAVES);
+    const excessLeaves = Math.max(0, sundayLeaves - FREE_SUNDAY_LEAVES) + Math.max(0, weekdayLeaves - FREE_WEEKDAY_LEAVES);
+
     // Calculate pay components
     const standardHoursPay = parseFloat(att.standard_hours) * hourlyRate;
     const sundayHoursPay = parseFloat(att.sunday_hours) * hourlyRate;
@@ -480,7 +502,10 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
         absenceDeduction = parseInt(att.absent_days) * hourlyRate * parseFloat(config.standard_daily_hours);
     }
 
-    const totalDeductions = lateDeduction + absenceDeduction;
+    // Leave deduction: excess leaves beyond free quota
+    const leaveDeduction = excessLeaves * hourlyRate * parseFloat(config.standard_daily_hours);
+
+    const totalDeductions = lateDeduction + absenceDeduction + leaveDeduction;
 
     // Check if salary record exists
     const [existing] = await pool.query(
@@ -496,23 +521,27 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
                 branch_id = ?, from_date = ?, to_date = ?, base_salary = ?,
                 total_working_days = ?, total_present_days = ?, total_absent_days = ?,
                 total_half_days = ?, total_sundays_worked = ?, total_leaves = ?,
+                paid_sunday_leaves = ?, paid_weekday_leaves = ?, excess_leaves = ?,
                 total_standard_hours = ?, total_sunday_hours = ?, total_overtime_hours = ?,
                 total_worked_hours = ?,
                 standard_hours_pay = ?, sunday_hours_pay = ?, overtime_pay = ?,
                 transport_allowance = ?, food_allowance = ?, other_allowance = ?,
                 total_allowances = ?,
-                late_deduction = ?, absence_deduction = ?, total_deductions = ?,
+                late_deduction = ?, absence_deduction = ?, leave_deduction = ?,
+                total_deductions = ?,
                 status = 'calculated', calculation_date = NOW(), calculated_by = ?
              WHERE id = ?`,
             [
                 config.branch_id, fromDate, toDate, config.monthly_salary,
                 parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
                 parseInt(att.half_days), parseInt(att.sundays_worked), parseInt(att.leaves),
+                paidSundayLeaves, paidWeekdayLeaves, excessLeaves,
                 parseFloat(att.standard_hours), parseFloat(att.sunday_hours), parseFloat(att.overtime_hours),
                 parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours),
                 standardHoursPay, sundayHoursPay, overtimePay,
                 transportAllowance, foodAllowance, otherAllowance, totalAllowances,
-                lateDeduction, absenceDeduction, totalDeductions,
+                lateDeduction, absenceDeduction, leaveDeduction,
+                totalDeductions,
                 calculatedBy, salaryId
             ]
         );
@@ -522,21 +551,23 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
                 user_id, branch_id, salary_month, from_date, to_date, base_salary,
                 total_working_days, total_present_days, total_absent_days,
                 total_half_days, total_sundays_worked, total_leaves,
+                paid_sunday_leaves, paid_weekday_leaves, excess_leaves,
                 total_standard_hours, total_sunday_hours, total_overtime_hours, total_worked_hours,
                 standard_hours_pay, sunday_hours_pay, overtime_pay,
                 transport_allowance, food_allowance, other_allowance, total_allowances,
-                late_deduction, absence_deduction, total_deductions,
+                late_deduction, absence_deduction, leave_deduction, total_deductions,
                 status, calculation_date, calculated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)`,
             [
                 userId, config.branch_id, month, fromDate, toDate, config.monthly_salary,
                 parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
                 parseInt(att.half_days), parseInt(att.sundays_worked), parseInt(att.leaves),
+                paidSundayLeaves, paidWeekdayLeaves, excessLeaves,
                 parseFloat(att.standard_hours), parseFloat(att.sunday_hours), parseFloat(att.overtime_hours),
                 parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours),
                 standardHoursPay, sundayHoursPay, overtimePay,
                 transportAllowance, foodAllowance, otherAllowance, totalAllowances,
-                lateDeduction, absenceDeduction, totalDeductions,
+                lateDeduction, absenceDeduction, leaveDeduction, totalDeductions,
                 calculatedBy
             ]
         );
@@ -631,6 +662,7 @@ router.post('/calculate-all', requireAuth, requirePermission('salary', 'manage')
                     data: result
                 });
             } catch (err) {
+                console.error(`Salary calc failed for user ${s.user_id}:`, err.message);
                 results.push({
                     user_id: s.user_id,
                     success: false,

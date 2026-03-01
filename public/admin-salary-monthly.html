@@ -660,19 +660,26 @@
             if (status) url += `&status=${status}`;
             if (paymentStatus) url += `&payment_status=${paymentStatus}`;
             
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            const result = await response.json();
-            
-            document.getElementById('loading').style.display = 'none';
-            
-            if (result.success && result.data.length > 0) {
-                renderSalaries(result.data);
-                updateSummary(result.data);
-                document.getElementById('tableContent').style.display = 'block';
-            } else {
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const result = await response.json();
+
+                document.getElementById('loading').style.display = 'none';
+
+                if (result.success && result.data.length > 0) {
+                    renderSalaries(result.data);
+                    updateSummary(result.data);
+                    document.getElementById('tableContent').style.display = 'block';
+                } else {
+                    document.getElementById('emptyState').style.display = 'block';
+                    updateSummary([]);
+                }
+            } catch (err) {
+                console.error('Error loading salaries:', err);
+                document.getElementById('loading').style.display = 'none';
                 document.getElementById('emptyState').style.display = 'block';
                 updateSummary([]);
             }
@@ -799,6 +806,14 @@
                             <span>Sundays Worked:</span>
                             <strong>${s.total_sundays_worked || 0}</strong>
                         </div>
+                        <div class="detail-row">
+                            <span>Paid Leaves (Sun/Wkday):</span>
+                            <strong>${s.paid_sunday_leaves || 0} / ${s.paid_weekday_leaves || 0}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Excess Leaves (deducted):</span>
+                            <strong style="color: ${(s.excess_leaves || 0) > 0 ? '#dc3545' : '#28a745'};">${s.excess_leaves || 0}</strong>
+                        </div>
                     </div>
                     
                     <div class="detail-section">
@@ -860,6 +875,10 @@
                             <strong class="money negative">₹${parseFloat(s.absence_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
                         </div>
                         <div class="detail-row">
+                            <span>Leave Deduction (${s.excess_leaves || 0} excess):</span>
+                            <strong class="money negative">₹${parseFloat(s.leave_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        </div>
+                        <div class="detail-row">
                             <span>Other Deduction:</span>
                             <strong class="money negative">₹${parseFloat(s.other_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
                         </div>
@@ -910,35 +929,46 @@
             const token = localStorage.getItem('auth_token');
             const month = document.getElementById('calculateMonth').value;
             const branchId = document.getElementById('calculateBranch').value;
-            
+
             if (!month) {
                 alert('Please select a month');
                 return;
             }
-            
+
             if (!confirm('Calculate salaries for ' + month + '?')) return;
-            
+
             const data = { month };
-            if (branchId) data.branch_id = branchId;
-            
-            const response = await fetch(`${API_BASE}/api/salary/calculate-all`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                alert(result.message);
-                closeCalculateModal();
-                document.getElementById('filterMonth').value = month;
-                loadSalaries();
-            } else {
-                alert('Error: ' + result.message);
+            if (branchId) data.branch_id = parseInt(branchId);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/salary/calculate-all`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const successCount = result.data.filter(r => r.success).length;
+                    const failCount = result.data.filter(r => !r.success).length;
+                    let msg = `Calculated salaries: ${successCount} success`;
+                    if (failCount > 0) {
+                        const errors = result.data.filter(r => !r.success).map(r => r.error).join('\n');
+                        msg += `, ${failCount} failed:\n${errors}`;
+                    }
+                    alert(msg);
+                    closeCalculateModal();
+                    document.getElementById('filterMonth').value = month;
+                    loadSalaries();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (err) {
+                alert('Network error: ' + err.message);
             }
         }
 

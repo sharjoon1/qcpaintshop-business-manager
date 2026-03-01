@@ -144,6 +144,23 @@
         </div>
     </div>
 
+    <!-- Leave Balance Card -->
+    <div id="leaveBalanceCard" class="card" style="display: none;">
+        <div class="section-title">Leave Balance</div>
+        <div id="leaveBalanceContent">
+            <div class="info-row">
+                <span style="color:#6b7280;">Sunday Paid Leave</span>
+                <span id="salSundayLeave" style="font-weight:600;">-</span>
+            </div>
+            <div class="info-row">
+                <span style="color:#6b7280;">Weekday Paid Leave</span>
+                <span id="salWeekdayLeave" style="font-weight:600;">-</span>
+            </div>
+            <div id="salLeaveWarning" style="display: none; margin-top: 8px; background: #fef2f2; border-radius: 8px; padding: 10px; text-align: center;">
+                <span style="color: #dc2626; font-size: 13px; font-weight: 500;" id="salLeaveWarningText"></span>
+            </div>
+        </div>
+    </div>
 
     <script src="/components/logo-loader.js"></script>
     <script>
@@ -164,6 +181,7 @@
             currentMonth = d.toISOString().slice(0, 7);
             document.getElementById('monthLabel').textContent = formatMonth(currentMonth);
             loadMonthly();
+            loadLeaveBalance();
         }
 
         function statusBadge(status) {
@@ -177,9 +195,39 @@
             return `<span class="badge ${map[status] || 'badge-info'}">${status}</span>`;
         }
 
+        async function loadLeaveBalance() {
+            try {
+                const res = await fetch(`/api/attendance/leave-balance?month=${currentMonth}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) {
+                    const card = document.getElementById('leaveBalanceCard');
+                    card.style.display = 'block';
+                    const lb = data.data;
+
+                    const sunEl = document.getElementById('salSundayLeave');
+                    sunEl.textContent = `${lb.sunday.used}/${lb.sunday.free} used`;
+                    sunEl.style.color = lb.sunday.remaining > 0 ? '#10b981' : '#ef4444';
+
+                    const wkEl = document.getElementById('salWeekdayLeave');
+                    wkEl.textContent = `${lb.weekday.used}/${lb.weekday.free} used`;
+                    wkEl.style.color = lb.weekday.remaining > 0 ? '#10b981' : '#ef4444';
+
+                    if (lb.will_be_deducted) {
+                        document.getElementById('salLeaveWarning').style.display = 'block';
+                        document.getElementById('salLeaveWarningText').textContent =
+                            `⚠️ ${lb.total_excess} excess leave(s) will be deducted from salary`;
+                    } else {
+                        document.getElementById('salLeaveWarning').style.display = 'none';
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading leave balance:', e);
+            }
+        }
+
         async function loadAll() {
             document.getElementById('monthLabel').textContent = formatMonth(currentMonth);
-            await Promise.all([loadConfig(), loadMonthly(), loadHistory(), loadPayments()]);
+            await Promise.all([loadConfig(), loadMonthly(), loadHistory(), loadPayments(), loadLeaveBalance()]);
             document.getElementById('loadingState').style.display = 'none';
         }
 
@@ -237,7 +285,8 @@
                         <div class="info-row"><span style="color:#6b7280;">Sunday Pay</span><span style="font-weight:600;">${formatCurrency(s.sunday_hours_pay)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Overtime Pay</span><span style="font-weight:600;">${formatCurrency(s.overtime_pay)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Allowances</span><span style="font-weight:600;color:#10b981;">+${formatCurrency(s.total_allowances)}</span></div>
-                        <div class="info-row"><span style="color:#6b7280;">Deductions</span><span style="font-weight:600;color:#ef4444;">-${formatCurrency(s.total_deductions)}</span></div>
+                        ${parseFloat(s.leave_deduction || 0) > 0 ? `<div class="info-row"><span style="color:#6b7280;">Leave Deduction (${s.excess_leaves || 0} days)</span><span style="font-weight:600;color:#ef4444;">-${formatCurrency(s.leave_deduction)}</span></div>` : ''}
+                        <div class="info-row"><span style="color:#6b7280;">Total Deductions</span><span style="font-weight:600;color:#ef4444;">-${formatCurrency(s.total_deductions)}</span></div>
                         <div class="info-row"><span style="color:#6b7280;">Paid Amount</span><span style="font-weight:600;">${formatCurrency(s.paid_amount)}</span></div>
                     `;
                     document.getElementById('noMonthly').style.display = 'none';
