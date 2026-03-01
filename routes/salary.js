@@ -443,6 +443,8 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
     const overtimeMultiplier = parseFloat(config.overtime_multiplier);
 
     // Get attendance data for the month
+    // NOTE: status IN ('present','half_day') ensures half-day worked hours are counted for salary
+    // Sunday: 1 actual hr = 2 equivalent hrs, 5 actual hrs (300 min) = 1 day, then OT rule
     const [attendanceRows] = await pool.query(
         `SELECT
             COUNT(*) as total_days,
@@ -450,14 +452,16 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
             SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_days,
             SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_days,
             SUM(CASE WHEN status = 'on_leave' THEN 1 ELSE 0 END) as leaves,
-            SUM(CASE WHEN DAYOFWEEK(date) = 1 AND status = 'present' THEN 1 ELSE 0 END) as sundays_worked,
-            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status = 'present'
+            SUM(CASE WHEN DAYOFWEEK(date) = 1 AND status IN ('present','half_day') THEN 1 ELSE 0 END) as sundays_worked,
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status IN ('present','half_day')
                 THEN LEAST(total_working_minutes, 600) ELSE 0 END) / 60, 0) as standard_hours,
-            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) = 1 AND status = 'present'
-                THEN total_working_minutes ELSE 0 END) / 60, 0) as sunday_hours,
-            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status = 'present' AND total_working_minutes > 600
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) = 1 AND status IN ('present','half_day')
+                THEN LEAST(total_working_minutes, 300) ELSE 0 END) / 60, 0) as sunday_hours,
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status IN ('present','half_day') AND total_working_minutes > 600
                 THEN (total_working_minutes - 600) ELSE 0 END) / 60, 0) as overtime_hours,
-            COALESCE(SUM(CASE WHEN status = 'present' THEN ot_approved_minutes ELSE 0 END) / 60, 0) as approved_overtime_hours,
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) = 1 AND status IN ('present','half_day') AND total_working_minutes > 300
+                THEN (total_working_minutes - 300) * 2 ELSE 0 END) / 60, 0) as sunday_overtime_hours,
+            COALESCE(SUM(CASE WHEN status IN ('present','half_day') THEN ot_approved_minutes ELSE 0 END) / 60, 0) as approved_overtime_hours,
             COALESCE(SUM(CASE WHEN is_late = 1 THEN 1 ELSE 0 END), 0) as late_days
          FROM staff_attendance
          WHERE user_id = ? AND date BETWEEN ? AND ?`,
@@ -488,14 +492,16 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
     const paidWeekdayLeaves = Math.min(weekdayLeaves, FREE_WEEKDAY_LEAVES);
     const excessLeaves = Math.max(0, sundayLeaves - FREE_SUNDAY_LEAVES) + Math.max(0, weekdayLeaves - FREE_WEEKDAY_LEAVES);
 
-    // Calculate pay components (Sunday: 5 hrs = 1 day, Weekday: 10 hrs = 1 day)
+    // Calculate pay components (Sunday: 1hr=2hrs equiv, 5 actual hrs=1 day, Weekday: 10 hrs=1 day)
     const WEEKDAY_HOURS_PER_DAY = 10;
     const SUNDAY_HOURS_PER_DAY = 5;
     const dailyRate = hourlyRate * WEEKDAY_HOURS_PER_DAY; // daily rate based on 10-hr day
     const standardHoursPay = parseFloat(att.standard_hours) * hourlyRate;
     const sundayHoursPay = (parseFloat(att.sunday_hours) / SUNDAY_HOURS_PER_DAY) * dailyRate;
-    // Use approved OT hours for pay (falls back to 0 if no approved OT)
-    const overtimePay = parseFloat(att.approved_overtime_hours) * hourlyRate * overtimeMultiplier;
+    // Weekday approved OT + Sunday OT (auto-paid, already in equivalent hours)
+    const weekdayOvertimePay = parseFloat(att.approved_overtime_hours) * hourlyRate * overtimeMultiplier;
+    const sundayOvertimePay = parseFloat(att.sunday_overtime_hours) * hourlyRate * overtimeMultiplier;
+    const overtimePay = weekdayOvertimePay + sundayOvertimePay;
 
     // Allowances from config
     const transportAllowance = parseFloat(config.transport_allowance) || 0;
@@ -548,8 +554,9 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
                 parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
                 parseInt(att.half_days), parseInt(att.sundays_worked), parseInt(att.leaves),
                 paidSundayLeaves, paidWeekdayLeaves, excessLeaves,
-                parseFloat(att.standard_hours), parseFloat(att.sunday_hours), parseFloat(att.overtime_hours),
-                parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours),
+                parseFloat(att.standard_hours), parseFloat(att.sunday_hours),
+                parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
+                parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
                 standardHoursPay, sundayHoursPay, overtimePay,
                 transportAllowance, foodAllowance, otherAllowance, totalAllowances,
                 lateDeduction, absenceDeduction, leaveDeduction,
@@ -575,8 +582,9 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
                 parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
                 parseInt(att.half_days), parseInt(att.sundays_worked), parseInt(att.leaves),
                 paidSundayLeaves, paidWeekdayLeaves, excessLeaves,
-                parseFloat(att.standard_hours), parseFloat(att.sunday_hours), parseFloat(att.overtime_hours),
-                parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours),
+                parseFloat(att.standard_hours), parseFloat(att.sunday_hours),
+                parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
+                parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
                 standardHoursPay, sundayHoursPay, overtimePay,
                 transportAllowance, foodAllowance, otherAllowance, totalAllowances,
                 lateDeduction, absenceDeduction, leaveDeduction, totalDeductions,
