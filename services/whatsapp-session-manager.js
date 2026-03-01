@@ -77,6 +77,13 @@ async function connectBranch(branchId, userId) {
     sessions.set(branchId, sessionEntry);
 
     try {
+        // Clean stale Chromium lock files (left behind after PM2 restart / SIGKILL)
+        const sessionDir = path.join(process.cwd(), 'whatsapp-sessions', `session-branch_${branchId}`);
+        for (const lockFile of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+            const lockPath = path.join(sessionDir, lockFile);
+            try { fs.unlinkSync(lockPath); } catch {}
+        }
+
         const client = new Client({
             authStrategy: new LocalAuth({
                 clientId: `branch_${branchId}`,
