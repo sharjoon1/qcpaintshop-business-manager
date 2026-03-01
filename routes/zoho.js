@@ -37,6 +37,7 @@ const zohoAPI = require('../services/zoho-api');
 const syncScheduler = require('../services/sync-scheduler');
 const whatsappProcessor = require('../services/whatsapp-processor');
 const purchaseSuggestion = require('../services/purchase-suggestion');
+const aiEngine = require('../services/ai-engine');
 
 let pool;
 
@@ -1767,6 +1768,132 @@ router.post('/sync/items', requirePermission('zoho', 'sync'), async (req, res) =
         res.json({ success: true, data: result });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * POST /api/zoho/items/ai-edit - AI-powered item editing via KAI
+ * Sends items + natural language command to AI, returns JSON edits
+ */
+router.post('/items/ai-edit', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const { command, items } = req.body;
+        if (!command || !command.trim()) {
+            return res.status(400).json({ success: false, message: 'command is required' });
+        }
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: 'items array is required' });
+        }
+
+        // Limit items to prevent massive payloads
+        const maxItems = 2000;
+        const itemsToSend = items.slice(0, maxItems);
+
+        // Build compact item data (only fields AI needs)
+        const compactItems = itemsToSend.map(it => ({
+            id: it.zoho_item_id || it.item_id,
+            name: it.name || it.item_name,
+            sku: it.sku || '',
+            rate: parseFloat(it.rate) || 0,
+            purchase_rate: parseFloat(it.purchase_rate) || 0,
+            cf_dpl: parseFloat(it.cf_dpl) || 0,
+            unit: it.unit || '',
+            brand: it.brand || '',
+            category: it.category_name || '',
+            manufacturer: it.manufacturer || '',
+            hsn_or_sac: it.hsn_or_sac || '',
+            tax_pct: parseFloat(it.tax_percentage) || 0,
+            reorder_level: parseInt(it.reorder_level) || 0,
+            stock: parseFloat(it.stock_on_hand) || 0,
+            description: it.description || '',
+            cf_product_name: it.cf_product_name || ''
+        }));
+
+        const systemPrompt = `You are KAI, an AI Items Editor for a paint retail business (Quality Colours). You receive a list of Zoho inventory items and a user command. You MUST return ONLY valid JSON — no markdown, no explanation outside JSON.
+
+EDITABLE FIELDS: rate, purchase_rate, cf_dpl, unit, hsn_or_sac, tax_pct, brand, category, manufacturer, reorder_level, description, cf_product_name, sku
+READ-ONLY (context only): id, name, stock
+
+RULES:
+- Return ONLY a JSON object: { "edits": [...], "summary": "..." }
+- Each edit: { "id": "<zoho_item_id>", "changes": { "<field>": <newValue> } }
+- Only include items that actually change. If nothing changes, return empty edits array.
+- Round numeric values to 2 decimal places.
+- NEVER change "id" or "name" fields.
+- "cf_dpl" is the Dealer Price List (DPL). "rate" is the selling rate. "purchase_rate" is the cost price.
+- If the command is unclear, return { "edits": [], "summary": "I didn't understand. Try: 'Set DPL to 80% of rate' or 'Increase rates by 5% for Asian Paints'" }
+- For percentage operations: "increase by 5%" means multiply by 1.05. "Set DPL to 80% of rate" means cf_dpl = rate * 0.8.
+- The "summary" should be a short sentence describing what was done and how many items were affected.
+- If you find anomalies or issues, describe them in the summary.
+
+IMPORTANT: Return ONLY the JSON object. No markdown code fences, no extra text.`;
+
+        const userMessage = `COMMAND: ${command.trim()}
+
+ITEMS (${compactItems.length} total):
+${JSON.stringify(compactItems)}`;
+
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+        ];
+
+        const result = await aiEngine.generateWithFailover(messages, {
+            max_tokens: 16000,
+            temperature: 0.1
+        });
+
+        if (!result || !result.text) {
+            return res.status(500).json({ success: false, message: 'AI returned empty response' });
+        }
+
+        // Parse AI response — handle markdown fences
+        let responseText = result.text.trim();
+        if (responseText.startsWith('```')) {
+            responseText = responseText.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+        }
+
+        let parsed;
+        try {
+            parsed = JSON.parse(responseText);
+        } catch (parseErr) {
+            // Try to extract JSON from response
+            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                parsed = JSON.parse(jsonMatch[0]);
+            } else {
+                return res.status(422).json({
+                    success: false,
+                    message: 'AI returned invalid response format',
+                    raw: responseText.substring(0, 500)
+                });
+            }
+        }
+
+        const edits = Array.isArray(parsed.edits) ? parsed.edits : [];
+        const summary = parsed.summary || `Processed ${edits.length} items`;
+
+        // Map back field names for frontend (category → category_name, tax_pct → tax_percentage)
+        const fieldMap = { category: 'category_name', tax_pct: 'tax_percentage' };
+        const mappedEdits = edits.map(e => {
+            const changes = {};
+            for (const [k, v] of Object.entries(e.changes || {})) {
+                changes[fieldMap[k] || k] = v;
+            }
+            return { zoho_item_id: e.id, changes };
+        });
+
+        res.json({
+            success: true,
+            edits: mappedEdits,
+            summary,
+            model: result.model || 'unknown',
+            itemsProcessed: compactItems.length
+        });
+
+    } catch (error) {
+        console.error('AI items edit error:', error);
+        res.status(500).json({ success: false, message: 'AI processing failed: ' + error.message });
     }
 });
 
