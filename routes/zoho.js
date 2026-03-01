@@ -1785,57 +1785,55 @@ router.post('/items/ai-edit', requirePermission('zoho', 'manage'), async (req, r
             return res.status(400).json({ success: false, message: 'items array is required' });
         }
 
-        // Limit items to prevent massive payloads
-        const maxItems = 2000;
+        // Build compact item data — minimal fields to stay within WebSocket limits
+        // For large sets (>200), use ultra-compact format (no description/manufacturer/etc)
+        const maxItems = 500;
         const itemsToSend = items.slice(0, maxItems);
+        const isLargeSet = itemsToSend.length > 200;
 
-        // Build compact item data (only fields AI needs)
-        const compactItems = itemsToSend.map(it => ({
-            id: it.zoho_item_id || it.item_id,
-            name: it.name || it.item_name,
-            sku: it.sku || '',
-            rate: parseFloat(it.rate) || 0,
-            purchase_rate: parseFloat(it.purchase_rate) || 0,
-            cf_dpl: parseFloat(it.cf_dpl) || 0,
-            unit: it.unit || '',
-            brand: it.brand || '',
-            category: it.category_name || '',
-            manufacturer: it.manufacturer || '',
-            hsn_or_sac: it.hsn_or_sac || '',
-            tax_pct: parseFloat(it.tax_percentage) || 0,
-            reorder_level: parseInt(it.reorder_level) || 0,
-            stock: parseFloat(it.stock_on_hand) || 0,
-            description: it.description || '',
-            cf_product_name: it.cf_product_name || ''
-        }));
+        const compactItems = itemsToSend.map(it => {
+            const base = {
+                id: it.zoho_item_id || it.item_id,
+                name: it.name || it.item_name,
+                sku: it.sku || '',
+                rate: parseFloat(it.rate) || 0,
+                pr: parseFloat(it.purchase_rate) || 0,
+                dpl: parseFloat(it.cf_dpl) || 0,
+                brand: it.brand || ''
+            };
+            if (!isLargeSet) {
+                base.unit = it.unit || '';
+                base.cat = it.category_name || '';
+                base.hsn = it.hsn_or_sac || '';
+                base.tax = parseFloat(it.tax_percentage) || 0;
+                base.stock = parseFloat(it.stock_on_hand) || 0;
+            }
+            return base;
+        });
+        const truncated = items.length > maxItems;
 
-        const systemPrompt = `You are KAI, an AI Items Editor for a paint retail business (Quality Colours). You receive a list of Zoho inventory items and a user command. You MUST return ONLY valid JSON — no markdown, no explanation outside JSON.
+        const systemPrompt = `You are KAI, an AI Items Editor for a paint retail business (Quality Colours). You receive inventory items and a user command. Return ONLY valid JSON.
 
-EDITABLE FIELDS: rate, purchase_rate, cf_dpl, unit, hsn_or_sac, tax_pct, brand, category, manufacturer, reorder_level, description, cf_product_name, sku
-READ-ONLY (context only): id, name, stock
+FIELD NAMES IN DATA (shortened): id, name, sku, rate (selling price), pr (purchase_rate), dpl (cf_dpl = Dealer Price List), brand, unit, cat (category), hsn (hsn_or_sac), tax (tax_percentage), stock
+EDITABLE FIELDS in edits: rate, pr, dpl, unit, hsn, tax, brand, cat, sku (use these SHORT names in your edits)
+READ-ONLY: id, name, stock
 
 RULES:
-- Return ONLY a JSON object: { "edits": [...], "summary": "...", "reply": "..." }
-- Each edit: { "id": "<zoho_item_id>", "changes": { "<field>": <newValue> } }
-- Only include items that actually change. If nothing changes, return empty edits array.
-- Round numeric values to 2 decimal places.
-- NEVER change "id" or "name" fields.
-- "cf_dpl" is the Dealer Price List (DPL). "rate" is the selling rate. "purchase_rate" is the cost price.
-- If the command is unclear, return { "edits": [], "summary": "I didn't understand.", "reply": "I didn't understand your request. Try commands like:\n- Set DPL to 80% of rate\n- Increase rates by 5% for Asian Paints\n- Find items where DPL > rate" }
-- For percentage operations: "increase by 5%" means multiply by 1.05. "Set DPL to 80% of rate" means cf_dpl = rate * 0.8.
-- "reply" is a conversational message shown in the chat panel. Use it to explain what you did, answer questions, or describe findings. Can use markdown formatting.
-- If the user provides REFERENCE DATA (e.g. pasted Excel table), use it to match items by name/SKU and apply the values. Parse tab-separated or comma-separated data intelligently.
-- The "summary" should be a short sentence describing what was done and how many items were affected.
-- If you find anomalies or issues, describe them in the summary.
-
-IMPORTANT: Return ONLY the JSON object. No markdown code fences, no extra text.`;
+- Return ONLY JSON: { "edits": [...], "summary": "...", "reply": "..." }
+- Each edit: { "id": "<item_id>", "changes": { "<field>": <value> } }. Use SHORT field names (pr, dpl, cat, hsn, tax).
+- Only include changed items. Round numbers to 2 decimals. NEVER change id/name.
+- "reply" = conversational message for chat (markdown OK). "summary" = one-line description.
+- For % ops: "increase by 5%" = multiply by 1.05. "Set DPL to 80% of rate" = dpl = rate * 0.8.
+- If REFERENCE DATA provided (Excel table), match items by name/SKU and apply values.
+- If unclear: return empty edits with helpful reply.
+- IMPORTANT: Return ONLY the JSON object. No markdown fences, no extra text.`;
 
         // Build context section if reference data provided (e.g. pasted Excel tables)
-        const contextSection = context ? `\nREFERENCE DATA (provided by user, e.g. Excel table):\n${context.substring(0, 20000)}\n` : '';
+        const contextSection = context ? `\nREFERENCE DATA (Excel/table):\n${context.substring(0, 10000)}\n` : '';
+        const truncNote = truncated ? `\nNOTE: Showing first ${maxItems} of ${items.length} total items.` : '';
 
-        const userMessage = `COMMAND: ${command.trim()}
-${contextSection}
-ITEMS (${compactItems.length} total):
+        const userMessage = `COMMAND: ${command.trim()}${contextSection}${truncNote}
+ITEMS (${compactItems.length}):
 ${JSON.stringify(compactItems)}`;
 
         // Build messages array with optional chat history
@@ -1892,8 +1890,14 @@ ${JSON.stringify(compactItems)}`;
         const summary = parsed.summary || `Processed ${edits.length} items`;
         const reply = parsed.reply || summary;
 
-        // Map back field names for frontend (category → category_name, tax_pct → tax_percentage)
-        const fieldMap = { category: 'category_name', tax_pct: 'tax_percentage' };
+        // Map short field names back to full names for frontend
+        const fieldMap = {
+            pr: 'purchase_rate', dpl: 'cf_dpl', cat: 'category_name',
+            hsn: 'hsn_or_sac', tax: 'tax_percentage',
+            // Also handle if AI uses full names
+            category: 'category_name', tax_pct: 'tax_percentage',
+            purchase_rate: 'purchase_rate', cf_dpl: 'cf_dpl'
+        };
         const mappedEdits = edits.map(e => {
             const changes = {};
             for (const [k, v] of Object.entries(e.changes || {})) {

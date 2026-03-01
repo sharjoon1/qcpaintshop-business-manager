@@ -828,6 +828,25 @@
         }
     }
 
+    // Build compact items for AI (reduce payload)
+    function compactItemsForAI(srcItems) {
+        return srcItems.map(function(it) {
+            return {
+                zoho_item_id: it.item_id || it.zoho_item_id,
+                name: it.name || it.item_name,
+                sku: it.sku || '',
+                rate: parseFloat(it.rate) || 0,
+                purchase_rate: parseFloat(it.purchase_rate) || 0,
+                cf_dpl: parseFloat(it.cf_dpl) || 0,
+                brand: it.brand || '',
+                unit: it.unit || '',
+                category_name: it.category_name || '',
+                hsn_or_sac: it.hsn_or_sac || '',
+                tax_percentage: parseFloat(it.tax_percentage) || 0
+            };
+        });
+    }
+
     async function runAiCommand() {
         var command = document.getElementById('aiCommandInput').value.trim();
         if (!command) { showToast('Type a command for KAI', 'info'); return; }
@@ -842,9 +861,9 @@
         document.getElementById('aiResultBanner').classList.add('hidden');
 
         // Determine scope
-        var itemsToProcess = items;
+        var srcItems = items;
         if (selectedItemIds.size > 0) {
-            itemsToProcess = items.filter(function(it) {
+            srcItems = items.filter(function(it) {
                 return selectedItemIds.has(String(it.item_id || it.zoho_item_id));
             });
         }
@@ -858,7 +877,7 @@
             var resp = await fetch('/api/zoho/items/ai-edit', {
                 method: 'POST',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ command: command, items: itemsToProcess })
+                body: JSON.stringify({ command: command, items: compactItemsForAI(srcItems) })
             });
 
             var data = await resp.json();
@@ -1115,9 +1134,9 @@
         showChatTyping();
 
         // Determine scope
-        var itemsToProcess = items;
+        var srcItems = items;
         if (selectedItemIds.size > 0) {
-            itemsToProcess = items.filter(function(it) {
+            srcItems = items.filter(function(it) {
                 return selectedItemIds.has(String(it.item_id || it.zoho_item_id));
             });
         }
@@ -1128,7 +1147,7 @@
                 headers: getAuthHeaders(),
                 body: JSON.stringify({
                     command: message || 'Process the attached reference data',
-                    items: itemsToProcess,
+                    items: compactItemsForAI(srcItems),
                     context: chatAttachmentData || null,
                     history: chatHistory.slice(-6)
                 })
