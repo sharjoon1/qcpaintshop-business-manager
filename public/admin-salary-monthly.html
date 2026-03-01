@@ -366,7 +366,10 @@
                     <h1><i class="fas fa-calendar-alt"></i> Monthly Salaries</h1>
                     <p style="color: #666; margin-top: 5px;">Calculate and manage monthly staff salaries</p>
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-success" id="bulkWhatsAppBtn" onclick="bulkSendWhatsApp()" style="background:#25D366; display:none;">
+                        <i class="fab fa-whatsapp"></i> <span id="bulkWaLabel">Send All WhatsApp</span>
+                    </button>
                     <button class="btn btn-warning" onclick="showCalculateModal()">
                         <i class="fas fa-calculator"></i> Calculate Salaries
                     </button>
@@ -449,6 +452,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th style="width:40px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
                             <th>Staff</th>
                             <th>Branch</th>
                             <th>Present</th>
@@ -585,6 +589,7 @@
         const API_BASE = '';
         let currentUser = null;
         let currentSalaryDetails = null;
+        let allSalaries = [];
 
         // Check authentication
         async function checkAuth() {
@@ -675,11 +680,16 @@
                 document.getElementById('loading').style.display = 'none';
 
                 if (result.success && result.data.length > 0) {
+                    allSalaries = result.data;
                     renderSalaries(result.data);
                     updateSummary(result.data);
                     document.getElementById('tableContent').style.display = 'block';
+                    document.getElementById('bulkWhatsAppBtn').style.display = '';
+                    updateBulkBtn();
                 } else {
+                    allSalaries = [];
                     document.getElementById('emptyState').style.display = 'block';
+                    document.getElementById('bulkWhatsAppBtn').style.display = 'none';
                     updateSummary([]);
                 }
             } catch (err) {
@@ -714,6 +724,7 @@
 
                 return `
                     <tr>
+                        <td><input type="checkbox" class="salary-check" value="${s.id}" data-name="${s.staff_name}" onchange="updateBulkBtn()"></td>
                         <td>${s.staff_name}</td>
                         <td>${s.branch_name}</td>
                         <td>${s.total_present_days || 0}</td>
@@ -1126,6 +1137,76 @@
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fab fa-whatsapp"></i> WhatsApp';
+            }
+        }
+
+        // ========== Bulk WhatsApp Functions ==========
+
+        function toggleSelectAll(el) {
+            document.querySelectorAll('.salary-check').forEach(cb => cb.checked = el.checked);
+            updateBulkBtn();
+        }
+
+        function updateBulkBtn() {
+            const checked = document.querySelectorAll('.salary-check:checked').length;
+            const total = allSalaries.length;
+            const label = document.getElementById('bulkWaLabel');
+            if (checked > 0) {
+                label.textContent = `Send Selected (${checked}) WhatsApp`;
+            } else {
+                label.textContent = `Send All (${total}) WhatsApp`;
+            }
+        }
+
+        async function bulkSendWhatsApp() {
+            const checked = [...document.querySelectorAll('.salary-check:checked')];
+            let ids, count;
+
+            if (checked.length > 0) {
+                ids = checked.map(cb => parseInt(cb.value));
+                count = ids.length;
+            } else {
+                ids = allSalaries.map(s => s.id);
+                count = ids.length;
+            }
+
+            if (count === 0) return;
+
+            if (!confirm(`Send salary slip PDF via WhatsApp to ${count} staff member(s)?`)) return;
+
+            const btn = document.getElementById('bulkWhatsAppBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending 0/' + count + '...';
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/salary/bulk/send-whatsapp`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ salary_ids: ids })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    const d = result.data;
+                    let msg = `Sent: ${d.sent}/${d.total}`;
+                    if (d.failed > 0) {
+                        const failNames = d.details.filter(r => !r.success).map(r => `${r.name || 'ID:'+r.id} (${r.reason})`).join('\n');
+                        msg += `\nFailed: ${d.failed}\n\n${failNames}`;
+                    }
+                    alert(msg);
+                } else {
+                    alert('Failed: ' + result.message);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fab fa-whatsapp"></i> <span id="bulkWaLabel">Send All WhatsApp</span>';
+                updateBulkBtn();
             }
         }
 

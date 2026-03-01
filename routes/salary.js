@@ -962,6 +962,76 @@ router.post('/monthly/:id/send-whatsapp', requireAuth, requirePermission('salary
 });
 
 /**
+ * POST /bulk/send-whatsapp - Send salary slips to multiple staff via WhatsApp
+ */
+router.post('/bulk/send-whatsapp', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        if (!sessionManager) {
+            return res.status(400).json({ success: false, message: 'WhatsApp not available' });
+        }
+
+        const { salary_ids } = req.body;
+        if (!Array.isArray(salary_ids) || salary_ids.length === 0) {
+            return res.status(400).json({ success: false, message: 'No salary records selected' });
+        }
+
+        const branding = await getBranding();
+        const results = [];
+
+        for (const salaryId of salary_ids) {
+            try {
+                const salary = await getSalaryForPdf(salaryId);
+                if (!salary) {
+                    results.push({ id: salaryId, success: false, reason: 'Not found' });
+                    continue;
+                }
+                if (!salary.staff_phone) {
+                    results.push({ id: salaryId, name: salary.staff_name, success: false, reason: 'No phone number' });
+                    continue;
+                }
+
+                // Generate PDF to temp file
+                const tmpFile = path.join(os.tmpdir(), `salary-${salary.id}-${Date.now()}.pdf`);
+                const writeStream = fs.createWriteStream(tmpFile);
+                await new Promise((resolve, reject) => {
+                    writeStream.on('finish', resolve);
+                    writeStream.on('error', reject);
+                    generateSalarySlipPDF({ salary, branding }, writeStream);
+                });
+
+                const filename = `Salary-${salary.staff_name}-${salary.salary_month}.pdf`;
+                const caption = `Salary Slip - ${salary.salary_month}\nName: ${salary.staff_name}\nNet Salary: ₹${parseFloat(salary.net_salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+                const sent = await sessionManager.sendMedia(
+                    salary.branch_id || 0,
+                    salary.staff_phone,
+                    { type: 'document', mediaPath: tmpFile, filename, caption },
+                    { source: 'salary_slip_bulk', sent_by: req.user.id }
+                );
+
+                fs.unlink(tmpFile, () => {});
+
+                results.push({ id: salaryId, name: salary.staff_name, success: !!sent, reason: sent ? null : 'WhatsApp session not connected' });
+            } catch (err) {
+                results.push({ id: salaryId, success: false, reason: err.message });
+            }
+        }
+
+        const sent = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+
+        res.json({
+            success: true,
+            message: `Sent ${sent}/${salary_ids.length} salary slips`,
+            data: { sent, failed, total: salary_ids.length, details: results }
+        });
+    } catch (error) {
+        console.error('Bulk WhatsApp salary send error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send bulk WhatsApp' });
+    }
+});
+
+/**
  * PUT approve monthly salary
  */
 router.put('/monthly/:id/approve', requireAuth, requirePermission('salary', 'approve'), async (req, res) => {
