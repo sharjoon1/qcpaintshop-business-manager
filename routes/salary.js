@@ -419,9 +419,9 @@ router.put('/config/:id', requireAuth, requirePermission('salary', 'manage'), as
  */
 async function calculateSalaryForUser(userId, month, calculatedBy) {
     const fromDate = `${month}-01`;
-    // Get last day of month
-    const toDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
-        .toISOString().split('T')[0];
+    // Get last day of month (use local getters, NOT toISOString which converts to UTC and loses a day in IST)
+    const lastDay = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0);
+    const toDate = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
 
     // Get active salary config (config effective_from must be <= month end, effective_until must be >= month start or NULL)
     const [configs] = await pool.query(
