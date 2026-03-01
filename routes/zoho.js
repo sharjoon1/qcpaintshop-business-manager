@@ -1830,52 +1830,55 @@ RULES:
             batches.push(allCompact.slice(i, i + BATCH_SIZE));
         }
 
-        const allEdits = [];
-        const batchSummaries = [];
-        let lastReply = '';
-        let lastModel = 'unknown';
-        let totalProcessed = 0;
-
-        for (let bIdx = 0; bIdx < batches.length; bIdx++) {
-            const batch = batches[bIdx];
+        // Process all batches in parallel
+        const batchPromises = batches.map((batch, bIdx) => {
+            let itemOffset = 0;
+            for (let i = 0; i < bIdx; i++) itemOffset += batches[i].length;
             const batchLabel = batches.length > 1
-                ? `\nBATCH ${bIdx + 1}/${batches.length} (items ${totalProcessed + 1}-${totalProcessed + batch.length} of ${allCompact.length})`
+                ? `\nBATCH ${bIdx + 1}/${batches.length} (items ${itemOffset + 1}-${itemOffset + batch.length} of ${allCompact.length})`
                 : '';
 
             const userMessage = `COMMAND: ${command.trim()}${contextSection}${batchLabel}
 ITEMS (${batch.length}):
 ${JSON.stringify(batch)}`;
 
-            // Build messages array with optional chat history
             const messages = [{ role: 'system', content: systemPrompt }];
-
             if (Array.isArray(history) && history.length > 0) {
-                const recentHistory = history.slice(-6);
-                recentHistory.forEach(msg => {
+                history.slice(-6).forEach(msg => {
                     if (msg.role === 'user' || msg.role === 'assistant') {
                         messages.push({ role: msg.role, content: msg.content });
                     }
                 });
             }
-
             messages.push({ role: 'user', content: userMessage });
 
-            const result = await aiEngine.generateWithFailover(messages, {
-                max_tokens: 16000,
-                temperature: 0.1
-            });
+            return aiEngine.generateWithFailover(messages, { max_tokens: 16000, temperature: 0.1 })
+                .then(result => ({ bIdx, result }))
+                .catch(err => ({ bIdx, error: err.message }));
+        });
 
-            if (!result || !result.text) {
-                // If a batch fails, continue with next batch instead of aborting entirely
-                batchSummaries.push(`Batch ${bIdx + 1}: AI returned empty response`);
-                totalProcessed += batch.length;
+        const batchResults = await Promise.all(batchPromises);
+
+        // Collect results in order
+        const allEdits = [];
+        const batchSummaries = [];
+        let lastReply = '';
+        let lastModel = 'unknown';
+
+        for (const br of batchResults) {
+            const batchNum = br.bIdx + 1;
+            if (br.error) {
+                batchSummaries.push(`Batch ${batchNum}: ${br.error}`);
+                continue;
+            }
+            if (!br.result || !br.result.text) {
+                batchSummaries.push(`Batch ${batchNum}: empty response`);
                 continue;
             }
 
-            lastModel = result.model || 'unknown';
+            lastModel = br.result.model || 'unknown';
 
-            // Parse AI response — handle markdown fences
-            let responseText = result.text.trim();
+            let responseText = br.result.text.trim();
             if (responseText.startsWith('```')) {
                 responseText = responseText.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
             }
@@ -1891,7 +1894,6 @@ ${JSON.stringify(batch)}`;
             }
 
             if (parsed && Array.isArray(parsed.edits)) {
-                // Map short field names back to full names
                 const mappedBatchEdits = parsed.edits.map(e => {
                     const changes = {};
                     for (const [k, v] of Object.entries(e.changes || {})) {
@@ -1900,13 +1902,11 @@ ${JSON.stringify(batch)}`;
                     return { zoho_item_id: e.id, changes };
                 });
                 allEdits.push(...mappedBatchEdits);
-                batchSummaries.push(parsed.summary || `Batch ${bIdx + 1}: ${mappedBatchEdits.length} edits`);
+                batchSummaries.push(parsed.summary || `Batch ${batchNum}: ${mappedBatchEdits.length} edits`);
                 lastReply = parsed.reply || parsed.summary || '';
             } else {
-                batchSummaries.push(`Batch ${bIdx + 1}: failed to parse response`);
+                batchSummaries.push(`Batch ${batchNum}: failed to parse response`);
             }
-
-            totalProcessed += batch.length;
         }
 
         // Build combined response
