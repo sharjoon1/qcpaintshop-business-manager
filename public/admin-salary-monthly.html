@@ -451,14 +451,13 @@
                         <tr>
                             <th>Staff</th>
                             <th>Branch</th>
-                            <th>Days</th>
-                            <th>Hours</th>
-                            <th>OT Hours</th>
-                            <th>Base</th>
+                            <th>Present</th>
+                            <th>Std Days</th>
+                            <th>Sun Days</th>
+                            <th>OT Days</th>
                             <th>Gross</th>
                             <th>Deductions</th>
                             <th>Net Salary</th>
-                            <th>Paid</th>
                             <th>Status</th>
                             <th>Payment</th>
                             <th>Actions</th>
@@ -512,6 +511,12 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeDetailModal()">Close</button>
+                <button class="btn btn-info" id="downloadPdfBtn" onclick="downloadSalaryPdf()">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </button>
+                <button class="btn btn-success" id="whatsappBtn" onclick="sendSalaryWhatsApp()" style="background:#25D366;">
+                    <i class="fab fa-whatsapp"></i> WhatsApp
+                </button>
                 <button class="btn btn-warning" id="approveBtn" onclick="approveSalary()" style="display: none;">
                     <i class="fas fa-check"></i> Approve
                 </button>
@@ -703,21 +708,21 @@
             const tbody = document.getElementById('salaryTableBody');
             tbody.innerHTML = salaries.map(s => {
                 const netSalary = parseFloat(s.net_salary || 0);
-                const paidAmount = parseFloat(s.paid_amount || 0);
-                const pending = netSalary - paidAmount;
-                
+                const stdDays = (parseFloat(s.total_standard_hours || 0) / 10).toFixed(1);
+                const sunDays = (parseFloat(s.total_sunday_hours || 0) / 10).toFixed(1);
+                const otDays = (parseFloat(s.total_overtime_hours || 0) / 10).toFixed(1);
+
                 return `
                     <tr>
                         <td>${s.staff_name}</td>
                         <td>${s.branch_name}</td>
                         <td>${s.total_present_days || 0}</td>
-                        <td>${parseFloat(s.total_standard_hours || 0).toFixed(1)}</td>
-                        <td>${parseFloat(s.total_overtime_hours || 0).toFixed(1)}</td>
-                        <td class="money">₹${parseFloat(s.base_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                        <td>${stdDays}</td>
+                        <td>${sunDays}</td>
+                        <td>${otDays}</td>
                         <td class="money">₹${parseFloat(s.gross_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                         <td class="money negative">₹${parseFloat(s.total_deductions || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                         <td class="money">₹${netSalary.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-                        <td class="money">${paidAmount > 0 ? '₹' + paidAmount.toLocaleString('en-IN', {minimumFractionDigits: 2}) : '-'}</td>
                         <td>
                             <span class="badge badge-${getStatusColor(s.status)}">
                                 ${s.status}
@@ -786,6 +791,14 @@
             const paidAmount = parseFloat(s.paid_amount || 0);
             const pending = netSalary - paidAmount;
             
+            const hourlyRate = parseFloat(s.base_salary || 0) / 260;
+            const dailyRate = hourlyRate * 10;
+            const fmtINR = n => parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2});
+            const stdDays = (parseFloat(s.total_standard_hours || 0) / 10);
+            const sunDays = (parseFloat(s.total_sunday_hours || 0) / 10);
+            const otDays = (parseFloat(s.total_overtime_hours || 0) / 10);
+            const totalDays = stdDays + sunDays + otDays;
+
             document.getElementById('detailContent').innerHTML = `
                 <div class="detail-grid">
                     <div class="detail-section">
@@ -815,96 +828,96 @@
                             <strong style="color: ${(s.excess_leaves || 0) > 0 ? '#dc3545' : '#28a745'};">${s.excess_leaves || 0}</strong>
                         </div>
                     </div>
-                    
+
                     <div class="detail-section">
-                        <h3><i class="fas fa-clock"></i> Hours Summary</h3>
+                        <h3><i class="fas fa-clock"></i> Working Days (10 hrs = 1 day)</h3>
                         <div class="detail-row">
-                            <span>Standard Hours:</span>
-                            <strong>${parseFloat(s.total_standard_hours || 0).toFixed(2)} hrs</strong>
+                            <span>Standard Days:</span>
+                            <strong>${stdDays.toFixed(1)} days <small style="color:#888">(${parseFloat(s.total_standard_hours||0).toFixed(1)} hrs)</small></strong>
                         </div>
                         <div class="detail-row">
-                            <span>Sunday Hours:</span>
-                            <strong>${parseFloat(s.total_sunday_hours || 0).toFixed(2)} hrs</strong>
+                            <span>Sunday Days:</span>
+                            <strong>${sunDays.toFixed(1)} days <small style="color:#888">(${parseFloat(s.total_sunday_hours||0).toFixed(1)} hrs)</small></strong>
                         </div>
                         <div class="detail-row">
-                            <span>Overtime Hours:</span>
-                            <strong>${parseFloat(s.total_overtime_hours || 0).toFixed(2)} hrs</strong>
+                            <span>Overtime Days:</span>
+                            <strong>${otDays.toFixed(1)} days <small style="color:#888">(${parseFloat(s.total_overtime_hours||0).toFixed(1)} hrs)</small></strong>
                         </div>
                         <div class="detail-row total">
-                            <span>Total Hours:</span>
-                            <strong>${parseFloat(s.total_worked_hours || 0).toFixed(2)} hrs</strong>
+                            <span>Total Days:</span>
+                            <strong>${totalDays.toFixed(1)} days</strong>
                         </div>
                     </div>
-                    
+
                     <div class="detail-section">
-                        <h3><i class="fas fa-calculator"></i> Earnings</h3>
+                        <h3><i class="fas fa-calculator"></i> Earnings (₹${fmtINR(dailyRate)}/day)</h3>
                         <div class="detail-row">
-                            <span>Base Salary:</span>
-                            <strong class="money">₹${parseFloat(s.base_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                            <span>Base Salary (monthly):</span>
+                            <strong class="money">₹${fmtINR(s.base_salary)}</strong>
                         </div>
                         <div class="detail-row">
-                            <span>Standard Hours Pay:</span>
-                            <strong class="money">₹${parseFloat(s.standard_hours_pay || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                            <span>Standard: ${stdDays.toFixed(1)} days × ₹${fmtINR(dailyRate)}</span>
+                            <strong class="money">₹${fmtINR(s.standard_hours_pay)}</strong>
                         </div>
                         <div class="detail-row">
-                            <span>Sunday Hours Pay:</span>
-                            <strong class="money">₹${parseFloat(s.sunday_hours_pay || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                            <span>Sunday: ${sunDays.toFixed(1)} days × ₹${fmtINR(dailyRate)}</span>
+                            <strong class="money">₹${fmtINR(s.sunday_hours_pay)}</strong>
                         </div>
                         <div class="detail-row">
-                            <span>Overtime Pay:</span>
-                            <strong class="money">₹${parseFloat(s.overtime_pay || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                            <span>Overtime: ${otDays.toFixed(1)} days × ₹${fmtINR(dailyRate)} × ${s.overtime_multiplier || 1}x</span>
+                            <strong class="money">₹${fmtINR(s.overtime_pay)}</strong>
                         </div>
-                        <div class="detail-row">
+                        ${parseFloat(s.total_allowances || 0) > 0 ? `<div class="detail-row">
                             <span>Allowances:</span>
-                            <strong class="money">₹${parseFloat(s.total_allowances || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
-                        </div>
+                            <strong class="money">₹${fmtINR(s.total_allowances)}</strong>
+                        </div>` : ''}
                         <div class="detail-row total">
                             <span>Gross Salary:</span>
-                            <strong class="money">₹${parseFloat(s.gross_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                            <strong class="money">₹${fmtINR(s.gross_salary)}</strong>
                         </div>
                     </div>
-                    
+
                     <div class="detail-section">
                         <h3><i class="fas fa-minus-circle"></i> Deductions</h3>
-                        <div class="detail-row">
+                        ${parseFloat(s.late_deduction || 0) > 0 ? `<div class="detail-row">
                             <span>Late Deduction:</span>
-                            <strong class="money negative">₹${parseFloat(s.late_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
-                        </div>
-                        <div class="detail-row">
-                            <span>Absence Deduction:</span>
-                            <strong class="money negative">₹${parseFloat(s.absence_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
-                        </div>
-                        <div class="detail-row">
-                            <span>Leave Deduction (${s.excess_leaves || 0} excess):</span>
-                            <strong class="money negative">₹${parseFloat(s.leave_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
-                        </div>
-                        <div class="detail-row">
+                            <strong class="money negative">₹${fmtINR(s.late_deduction)}</strong>
+                        </div>` : ''}
+                        ${parseFloat(s.absence_deduction || 0) > 0 ? `<div class="detail-row">
+                            <span>Absence: ${s.total_absent_days || 0} days × ₹${fmtINR(dailyRate)}</span>
+                            <strong class="money negative">₹${fmtINR(s.absence_deduction)}</strong>
+                        </div>` : ''}
+                        ${parseFloat(s.leave_deduction || 0) > 0 ? `<div class="detail-row">
+                            <span>Leave: ${s.excess_leaves || 0} excess × ₹${fmtINR(dailyRate)}</span>
+                            <strong class="money negative">₹${fmtINR(s.leave_deduction)}</strong>
+                        </div>` : ''}
+                        ${parseFloat(s.other_deduction || 0) > 0 ? `<div class="detail-row">
                             <span>Other Deduction:</span>
-                            <strong class="money negative">₹${parseFloat(s.other_deduction || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
-                        </div>
+                            <strong class="money negative">₹${fmtINR(s.other_deduction)}</strong>
+                        </div>` : ''}
                         <div class="detail-row total">
                             <span>Total Deductions:</span>
-                            <strong class="money negative">₹${parseFloat(s.total_deductions || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                            <strong class="money negative">₹${fmtINR(s.total_deductions)}</strong>
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="detail-section" style="margin-top: 20px; background: #fff3cd;">
                     <h3 style="margin-bottom: 15px;"><i class="fas fa-money-bill-wave"></i> Payment Summary</h3>
                     <div class="detail-row" style="font-size: 18px;">
                         <span>Net Salary:</span>
-                        <strong class="money" style="font-size: 20px;">₹${netSalary.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        <strong class="money" style="font-size: 20px;">₹${fmtINR(netSalary)}</strong>
                     </div>
                     <div class="detail-row">
                         <span>Paid Amount:</span>
-                        <strong class="money">₹${paidAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        <strong class="money">₹${fmtINR(paidAmount)}</strong>
                     </div>
                     <div class="detail-row total" style="color: ${pending > 0 ? '#dc3545' : '#28a745'};">
                         <span>Pending Payment:</span>
-                        <strong>₹${pending.toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                        <strong>₹${fmtINR(pending)}</strong>
                     </div>
                 </div>
-                
+
                 ${s.notes ? `<div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
                     <strong>Notes:</strong> ${s.notes}
                 </div>` : ''}
@@ -1066,6 +1079,54 @@
         function closeDetailModal() {
             document.getElementById('detailModal').classList.remove('active');
             currentSalaryDetails = null;
+        }
+
+        // Download salary slip PDF
+        function downloadSalaryPdf() {
+            if (!currentSalaryDetails) return;
+            const token = localStorage.getItem('auth_token');
+            const id = currentSalaryDetails.salary.id;
+            window.open(`${API_BASE}/api/salary/monthly/${id}/pdf?token=${token}`, '_blank');
+        }
+
+        // Send salary slip via WhatsApp
+        async function sendSalaryWhatsApp() {
+            if (!currentSalaryDetails) return;
+            const s = currentSalaryDetails.salary;
+
+            if (!s.staff_phone) {
+                alert('No phone number found for this staff member');
+                return;
+            }
+
+            if (!confirm(`Send salary slip to ${s.staff_name} (${s.staff_phone}) via WhatsApp?`)) return;
+
+            const btn = document.getElementById('whatsappBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}/api/salary/monthly/${s.id}/send-whatsapp`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Salary slip sent via WhatsApp!');
+                } else {
+                    alert('Failed: ' + result.message);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fab fa-whatsapp"></i> WhatsApp';
+            }
         }
 
         // Initialize

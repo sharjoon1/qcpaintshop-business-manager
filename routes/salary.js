@@ -5,8 +5,16 @@
 
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const { requirePermission, requireAuth, requireRole } = require('../middleware/permissionMiddleware');
 const notificationService = require('../services/notification-service');
+const { generateSalarySlipPDF } = require('./salary-pdf-generator');
+
+// WhatsApp session manager (optional - loaded dynamically)
+let sessionManager;
+try { sessionManager = require('../services/whatsapp-session-manager'); } catch {}
 
 // Database connection (imported from main app)
 let pool;
@@ -820,12 +828,135 @@ router.get('/monthly/:id', requireRole('admin', 'manager', 'accountant'), requir
 });
 
 /**
+ * Helper: get branding settings
+ */
+async function getBranding() {
+    try {
+        const [settings] = await pool.query(
+            "SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('business_name','business_logo','business_phone','business_email','business_address','business_gst')"
+        );
+        const obj = {};
+        settings.forEach(s => { obj[s.setting_key] = s.setting_value; });
+        return obj;
+    } catch { return {}; }
+}
+
+/**
+ * Helper: auth from token header OR query param (for PDF download links)
+ */
+async function authenticateRequest(req) {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+    if (!token) return null;
+    const [sessions] = await pool.query(
+        `SELECT s.*, u.id as user_id, u.username, u.role, u.full_name
+         FROM user_sessions s JOIN users u ON s.user_id = u.id
+         WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'`,
+        [token]
+    );
+    return sessions.length > 0 ? sessions[0] : null;
+}
+
+/**
+ * Helper: get salary data for PDF generation
+ */
+async function getSalaryForPdf(salaryId) {
+    const [salaries] = await pool.query(`
+        SELECT ms.*, u.full_name as staff_name, u.email as staff_email, u.phone as staff_phone,
+               b.name as branch_name, sc.overtime_multiplier
+        FROM monthly_salaries ms
+        JOIN users u ON ms.user_id = u.id
+        JOIN branches b ON ms.branch_id = b.id
+        LEFT JOIN staff_salary_config sc ON ms.user_id = sc.user_id AND sc.is_active = 1
+        WHERE ms.id = ?
+    `, [salaryId]);
+    return salaries.length > 0 ? salaries[0] : null;
+}
+
+/**
+ * GET /monthly/:id/pdf - Download salary slip as PDF
+ */
+router.get('/monthly/:id/pdf', async (req, res) => {
+    try {
+        const user = await authenticateRequest(req);
+        if (!user) return res.status(401).json({ success: false, message: 'Authentication required' });
+
+        const salary = await getSalaryForPdf(req.params.id);
+        if (!salary) return res.status(404).json({ success: false, message: 'Salary record not found' });
+
+        const branding = await getBranding();
+        const filename = `Salary-${salary.staff_name}-${salary.salary_month}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        generateSalarySlipPDF({ salary, branding }, res);
+    } catch (error) {
+        console.error('Salary PDF error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'Failed to generate PDF' });
+        }
+    }
+});
+
+/**
+ * POST /monthly/:id/send-whatsapp - Send salary slip PDF via WhatsApp
+ */
+router.post('/monthly/:id/send-whatsapp', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        if (!sessionManager) {
+            return res.status(400).json({ success: false, message: 'WhatsApp not available' });
+        }
+
+        const salary = await getSalaryForPdf(req.params.id);
+        if (!salary) return res.status(404).json({ success: false, message: 'Salary record not found' });
+
+        if (!salary.staff_phone) {
+            return res.status(400).json({ success: false, message: 'Staff has no phone number' });
+        }
+
+        const branding = await getBranding();
+
+        // Generate PDF to temp file
+        const tmpFile = path.join(os.tmpdir(), `salary-${salary.id}-${Date.now()}.pdf`);
+        const writeStream = fs.createWriteStream(tmpFile);
+
+        await new Promise((resolve, reject) => {
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+            generateSalarySlipPDF({ salary, branding }, writeStream);
+        });
+
+        // Send via WhatsApp
+        const filename = `Salary-${salary.staff_name}-${salary.salary_month}.pdf`;
+        const caption = `Salary Slip - ${salary.salary_month}\nName: ${salary.staff_name}\nNet Salary: ₹${parseFloat(salary.net_salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+        const result = await sessionManager.sendMedia(
+            salary.branch_id || 0,
+            salary.staff_phone,
+            { type: 'document', mediaPath: tmpFile, filename, caption },
+            { source: 'salary_slip', sent_by: req.user.id }
+        );
+
+        // Clean up temp file
+        fs.unlink(tmpFile, () => {});
+
+        if (result) {
+            res.json({ success: true, message: 'Salary slip sent via WhatsApp' });
+        } else {
+            res.status(400).json({ success: false, message: 'WhatsApp session not connected' });
+        }
+    } catch (error) {
+        console.error('WhatsApp salary send error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send via WhatsApp' });
+    }
+});
+
+/**
  * PUT approve monthly salary
  */
 router.put('/monthly/:id/approve', requireAuth, requirePermission('salary', 'approve'), async (req, res) => {
     try {
         const { notes } = req.body;
-        
+
         // Get salary record before update to know which user
         const [salaryRec] = await pool.query('SELECT user_id FROM monthly_salaries WHERE id = ?', [req.params.id]);
 
