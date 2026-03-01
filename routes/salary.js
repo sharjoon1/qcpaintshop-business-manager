@@ -415,14 +415,15 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
     const toDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
         .toISOString().split('T')[0];
 
-    // Get active salary config
+    // Get active salary config (config effective_from must be <= month end, effective_until must be >= month start or NULL)
     const [configs] = await pool.query(
         `SELECT * FROM staff_salary_config
          WHERE user_id = ? AND is_active = 1
-           AND ? >= effective_from
-           AND (effective_until IS NULL OR ? <= effective_until)
+           AND effective_from <= ?
+           AND (effective_until IS NULL OR effective_until >= ?)
+         ORDER BY effective_from DESC
          LIMIT 1`,
-        [userId, fromDate, toDate]
+        [userId, toDate, fromDate]
     );
 
     if (configs.length === 0) {
