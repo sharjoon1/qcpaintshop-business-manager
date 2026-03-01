@@ -85,8 +85,8 @@ function generateSalarySlipPDF(options, stream) {
     doc.fontSize(9).fillColor(medGray).font('Helvetica-Bold').text('PERIOD', 350, y, { width: 205, align: 'right' });
     doc.fontSize(9).fillColor(darkGray).font('Helvetica')
         .text(`${formatDate(s.from_date)} - ${formatDate(s.to_date)}`, 350, y + 14, { width: 205, align: 'right' })
-        .text(`Base Salary: ₹${fmtINR(s.base_salary)}/month`, 350, y + 28, { width: 205, align: 'right' })
-        .text(`Daily Rate: ₹${fmtINR(dailyRate)}/day (10 hrs)`, 350, y + 42, { width: 205, align: 'right' });
+        .text(`Base Salary: Rs.${fmtINR(s.base_salary)}/month`, 350, y + 28, { width: 205, align: 'right' })
+        .text(`Daily Rate: Rs.${fmtINR(dailyRate)}/day (10 hrs)`, 350, y + 42, { width: 205, align: 'right' });
 
     // Light divider
     y += 60;
@@ -160,14 +160,14 @@ function generateSalarySlipPDF(options, stream) {
 
     const earningRows = [];
     if (stdDays > 0) {
-        earningRows.push(['Standard Work', `${stdDays.toFixed(1)} days × ₹${fmtINR(dailyRate)}`, s.standard_hours_pay]);
+        earningRows.push(['Standard Work', `${stdDays.toFixed(1)} days × Rs.${fmtINR(dailyRate)}`, s.standard_hours_pay]);
     }
     if (sunDays > 0) {
-        earningRows.push(['Sunday Work', `${sunDays.toFixed(1)} days × ₹${fmtINR(dailyRate)}`, s.sunday_hours_pay]);
+        earningRows.push(['Sunday Work', `${sunDays.toFixed(1)} days × Rs.${fmtINR(dailyRate)}`, s.sunday_hours_pay]);
     }
     if (otDays > 0) {
         const otMult = s.overtime_multiplier || 1;
-        earningRows.push(['Overtime', `${otDays.toFixed(1)} days × ₹${fmtINR(dailyRate)} × ${otMult}x`, s.overtime_pay]);
+        earningRows.push(['Overtime', `${otDays.toFixed(1)} days × Rs.${fmtINR(dailyRate)} × ${otMult}x`, s.overtime_pay]);
     }
     if (parseFloat(s.total_allowances || 0) > 0) {
         earningRows.push(['Allowances', '', s.total_allowances]);
@@ -179,7 +179,7 @@ function generateSalarySlipPDF(options, stream) {
         doc.fontSize(8).fillColor(darkGray).font('Helvetica')
             .text(row[0], 50, y, { width: 250 });
         doc.text(row[1], 300, y, { width: 140 });
-        doc.font('Helvetica-Bold').text('₹' + fmtINR(row[2]), 450, y, { width: 100, align: 'right' });
+        doc.font('Helvetica-Bold').text('Rs.' + fmtINR(row[2]), 450, y, { width: 100, align: 'right' });
         y += 16;
     }
 
@@ -187,7 +187,7 @@ function generateSalarySlipPDF(options, stream) {
     doc.rect(40, y, 515, 18).fill('#eef2ff');
     doc.fontSize(9).fillColor(purple).font('Helvetica-Bold')
         .text('GROSS SALARY', 50, y + 4, { width: 350 });
-    doc.text('₹' + fmtINR(s.gross_salary), 450, y + 4, { width: 100, align: 'right' });
+    doc.text('Rs.' + fmtINR(s.gross_salary), 450, y + 4, { width: 100, align: 'right' });
     y += 24;
 
     // ===== DEDUCTIONS TABLE =====
@@ -211,10 +211,10 @@ function generateSalarySlipPDF(options, stream) {
             dedRows.push(['Late Deduction', '', s.late_deduction]);
         }
         if (parseFloat(s.absence_deduction || 0) > 0) {
-            dedRows.push(['Absence', `${s.total_absent_days || 0} days × ₹${fmtINR(dailyRate)}`, s.absence_deduction]);
+            dedRows.push(['Absence', `${s.total_absent_days || 0} days × Rs.${fmtINR(dailyRate)}`, s.absence_deduction]);
         }
         if (parseFloat(s.leave_deduction || 0) > 0) {
-            dedRows.push(['Excess Leave', `${s.excess_leaves || 0} days × ₹${fmtINR(dailyRate)}`, s.leave_deduction]);
+            dedRows.push(['Excess Leave', `${s.excess_leaves || 0} days × Rs.${fmtINR(dailyRate)}`, s.leave_deduction]);
         }
         if (parseFloat(s.other_deduction || 0) > 0) {
             dedRows.push(['Other Deduction', '', s.other_deduction]);
@@ -226,7 +226,7 @@ function generateSalarySlipPDF(options, stream) {
             doc.fontSize(8).fillColor(darkGray).font('Helvetica')
                 .text(row[0], 50, y, { width: 250 });
             doc.text(row[1], 300, y, { width: 140 });
-            doc.font('Helvetica-Bold').fillColor('#dc3545').text('-₹' + fmtINR(row[2]), 450, y, { width: 100, align: 'right' });
+            doc.font('Helvetica-Bold').fillColor('#dc3545').text('-Rs.' + fmtINR(row[2]), 450, y, { width: 100, align: 'right' });
             y += 16;
         }
 
@@ -234,7 +234,7 @@ function generateSalarySlipPDF(options, stream) {
         doc.rect(40, y, 515, 18).fill('#fff5f5');
         doc.fontSize(9).fillColor('#dc3545').font('Helvetica-Bold')
             .text('TOTAL DEDUCTIONS', 50, y + 4, { width: 350 });
-        doc.text('-₹' + fmtINR(s.total_deductions), 450, y + 4, { width: 100, align: 'right' });
+        doc.text('-Rs.' + fmtINR(s.total_deductions), 450, y + 4, { width: 100, align: 'right' });
         y += 24;
     }
 
@@ -243,7 +243,7 @@ function generateSalarySlipPDF(options, stream) {
     doc.rect(40, y, 515, 40).fill(purple);
     doc.fontSize(14).fillColor('#ffffff').font('Helvetica-Bold')
         .text('NET SALARY', 60, y + 12, { width: 300 });
-    doc.fontSize(16).text('₹' + fmtINR(s.net_salary), 350, y + 11, { width: 195, align: 'right' });
+    doc.fontSize(16).text('Rs.' + fmtINR(s.net_salary), 350, y + 11, { width: 195, align: 'right' });
 
     // ===== FOOTER =====
     y += 60;
