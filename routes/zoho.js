@@ -1777,7 +1777,7 @@ router.post('/sync/items', requirePermission('zoho', 'sync'), async (req, res) =
  */
 router.post('/items/ai-edit', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
-        const { command, items } = req.body;
+        const { command, items, context, history } = req.body;
         if (!command || !command.trim()) {
             return res.status(400).json({ success: false, message: 'command is required' });
         }
@@ -1815,28 +1815,46 @@ EDITABLE FIELDS: rate, purchase_rate, cf_dpl, unit, hsn_or_sac, tax_pct, brand, 
 READ-ONLY (context only): id, name, stock
 
 RULES:
-- Return ONLY a JSON object: { "edits": [...], "summary": "..." }
+- Return ONLY a JSON object: { "edits": [...], "summary": "...", "reply": "..." }
 - Each edit: { "id": "<zoho_item_id>", "changes": { "<field>": <newValue> } }
 - Only include items that actually change. If nothing changes, return empty edits array.
 - Round numeric values to 2 decimal places.
 - NEVER change "id" or "name" fields.
 - "cf_dpl" is the Dealer Price List (DPL). "rate" is the selling rate. "purchase_rate" is the cost price.
-- If the command is unclear, return { "edits": [], "summary": "I didn't understand. Try: 'Set DPL to 80% of rate' or 'Increase rates by 5% for Asian Paints'" }
+- If the command is unclear, return { "edits": [], "summary": "I didn't understand.", "reply": "I didn't understand your request. Try commands like:\n- Set DPL to 80% of rate\n- Increase rates by 5% for Asian Paints\n- Find items where DPL > rate" }
 - For percentage operations: "increase by 5%" means multiply by 1.05. "Set DPL to 80% of rate" means cf_dpl = rate * 0.8.
+- "reply" is a conversational message shown in the chat panel. Use it to explain what you did, answer questions, or describe findings. Can use markdown formatting.
+- If the user provides REFERENCE DATA (e.g. pasted Excel table), use it to match items by name/SKU and apply the values. Parse tab-separated or comma-separated data intelligently.
 - The "summary" should be a short sentence describing what was done and how many items were affected.
 - If you find anomalies or issues, describe them in the summary.
 
 IMPORTANT: Return ONLY the JSON object. No markdown code fences, no extra text.`;
 
-        const userMessage = `COMMAND: ${command.trim()}
+        // Build context section if reference data provided (e.g. pasted Excel tables)
+        const contextSection = context ? `\nREFERENCE DATA (provided by user, e.g. Excel table):\n${context.substring(0, 20000)}\n` : '';
 
+        const userMessage = `COMMAND: ${command.trim()}
+${contextSection}
 ITEMS (${compactItems.length} total):
 ${JSON.stringify(compactItems)}`;
 
+        // Build messages array with optional chat history
         const messages = [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userMessage }
+            { role: 'system', content: systemPrompt }
         ];
+
+        // Add chat history for multi-turn conversations
+        if (Array.isArray(history) && history.length > 0) {
+            // Only keep last 6 messages to avoid token overflow
+            const recentHistory = history.slice(-6);
+            recentHistory.forEach(msg => {
+                if (msg.role === 'user' || msg.role === 'assistant') {
+                    messages.push({ role: msg.role, content: msg.content });
+                }
+            });
+        }
+
+        messages.push({ role: 'user', content: userMessage });
 
         const result = await aiEngine.generateWithFailover(messages, {
             max_tokens: 16000,
@@ -1872,6 +1890,7 @@ ${JSON.stringify(compactItems)}`;
 
         const edits = Array.isArray(parsed.edits) ? parsed.edits : [];
         const summary = parsed.summary || `Processed ${edits.length} items`;
+        const reply = parsed.reply || summary;
 
         // Map back field names for frontend (category → category_name, tax_pct → tax_percentage)
         const fieldMap = { category: 'category_name', tax_pct: 'tax_percentage' };
@@ -1887,6 +1906,7 @@ ${JSON.stringify(compactItems)}`;
             success: true,
             edits: mappedEdits,
             summary,
+            reply,
             model: result.model || 'unknown',
             itemsProcessed: compactItems.length
         });

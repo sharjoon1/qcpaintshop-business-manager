@@ -90,6 +90,32 @@
         .slide-form-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
         .slide-form { background: white; border-radius: 16px 16px 0 0; width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto; padding: 1rem; animation: slideUp 0.25s ease; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        /* AI Chat Sidebar */
+        .ai-chat-toggle { position: fixed; right: 16px; bottom: 80px; z-index: 45; width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; box-shadow: 0 4px 16px rgba(102,126,234,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+        .ai-chat-toggle:hover { transform: scale(1.1); box-shadow: 0 6px 24px rgba(102,126,234,0.5); }
+        .ai-chat-toggle.has-badge::after { content: ''; position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; background: #10b981; border-radius: 50%; border: 2px solid white; }
+        .ai-chat-sidebar { position: fixed; top: 0; right: -420px; width: 400px; max-width: 90vw; height: 100vh; height: 100dvh; background: white; border-left: 1px solid #e2e8f0; box-shadow: -4px 0 24px rgba(0,0,0,0.1); z-index: 1050; display: flex; flex-direction: column; transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+        .ai-chat-sidebar.open { right: 0; }
+        .ai-chat-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 1049; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .ai-chat-overlay.visible { opacity: 1; pointer-events: auto; }
+        .ai-chat-header { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .ai-chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+        .ai-chat-msg { max-width: 90%; padding: 10px 14px; border-radius: 12px; font-size: 0.8125rem; line-height: 1.5; word-break: break-word; }
+        .ai-chat-msg.user { align-self: flex-end; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-bottom-right-radius: 4px; }
+        .ai-chat-msg.assistant { align-self: flex-start; background: #f1f5f9; color: #1e293b; border-bottom-left-radius: 4px; }
+        .ai-chat-msg.assistant .edit-count { display: inline-block; margin-top: 6px; padding: 2px 8px; background: #dbeafe; color: #1e40af; border-radius: 8px; font-size: 0.7rem; font-weight: 600; }
+        .ai-chat-msg pre { background: #1e293b; color: #e2e8f0; padding: 8px 10px; border-radius: 6px; overflow-x: auto; font-size: 0.75rem; margin: 6px 0; }
+        .ai-chat-msg code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 0.75rem; }
+        .ai-chat-input-area { padding: 10px 12px; border-top: 1px solid #e2e8f0; flex-shrink: 0; background: #fafbfc; }
+        .ai-chat-attachment { margin-bottom: 8px; }
+        .ai-chat-attachment-preview { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 0.7rem; color: #475569; max-height: 80px; overflow: hidden; position: relative; font-family: monospace; white-space: pre; }
+        .ai-chat-attachment-preview .remove-att { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .ai-typing { display: flex; gap: 4px; padding: 8px 14px; align-self: flex-start; }
+        .ai-typing span { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; animation: typingBounce 1.4s infinite ease-in-out; }
+        .ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+        .ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typingBounce { 0%,80%,100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body data-page="zoho-items-edit" class="bg-gray-50">
@@ -264,6 +290,70 @@
                 <svg class="w-3.5 h-3.5" id="pushIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
                 <span id="pushBtnText">Push Changes to Zoho</span>
             </button>
+        </div>
+    </div>
+
+    <!-- AI Chat Toggle Button -->
+    <button id="aiChatToggle" class="ai-chat-toggle" onclick="toggleAiChat()" title="Chat with KAI">
+        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+    </button>
+
+    <!-- AI Chat Overlay -->
+    <div id="aiChatOverlay" class="ai-chat-overlay" onclick="toggleAiChat()"></div>
+
+    <!-- AI Chat Sidebar -->
+    <div id="aiChatSidebar" class="ai-chat-sidebar">
+        <div class="ai-chat-header">
+            <div class="flex items-center gap-2">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                <div>
+                    <div class="font-bold text-sm">KAI Items Assistant</div>
+                    <div class="text-xs opacity-75">Paste Excel tables, ask questions, edit items</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="clearAiChat()" class="p-1 hover:bg-white/20 rounded transition" title="Clear chat">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+                <button onclick="toggleAiChat()" class="p-1 hover:bg-white/20 rounded transition" title="Close">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="aiChatMessages" class="ai-chat-messages">
+            <div class="ai-chat-msg assistant">
+                <strong>Hi! I'm KAI, your Items Editor.</strong><br><br>
+                You can:
+                <ul style="margin: 6px 0 0 16px; list-style: disc;">
+                    <li>Paste Excel tables as reference data</li>
+                    <li>Ask me to update rates, DPL, brands, etc.</li>
+                    <li>Ask questions about your items</li>
+                </ul>
+                <br>
+                <em style="font-size: 0.75rem; opacity: 0.7;">Tip: Copy cells from Excel and paste directly into the text box below!</em>
+            </div>
+        </div>
+
+        <div class="ai-chat-input-area">
+            <!-- Attachment preview -->
+            <div id="chatAttachment" class="ai-chat-attachment" style="display: none;">
+                <div class="ai-chat-attachment-preview">
+                    <button class="remove-att" onclick="removeChatAttachment()" title="Remove">&times;</button>
+                    <div id="chatAttachmentText"></div>
+                </div>
+                <div class="text-xs text-gray-400 mt-1" id="chatAttachmentInfo"></div>
+            </div>
+            <!-- Input -->
+            <div class="flex gap-2">
+                <div class="flex-1 relative">
+                    <textarea id="aiChatInput" rows="1" placeholder="Type a message or paste Excel data..." class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none transition" style="max-height: 120px;" onkeydown="handleChatKeydown(event)" onpaste="handleChatPaste(event)" oninput="autoResizeChatInput()"></textarea>
+                </div>
+                <button onclick="sendChatMessage()" id="chatSendBtn" class="px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg transition flex items-center justify-center" title="Send">
+                    <svg id="chatSendIcon" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                    <svg id="chatSendSpinner" class="hidden animate-spin" width="18" height="18" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -866,6 +956,250 @@
         updateChangesUI();
         document.getElementById('aiResultBanner').classList.add('hidden');
         showToast('AI changes undone', 'success');
+    }
+
+    // ============ AI CHAT SIDEBAR ============
+    var chatHistory = []; // [{ role: 'user'|'assistant', content: '...' }]
+    var chatAttachmentData = null; // pasted Excel/table text
+    var isChatSending = false;
+
+    function toggleAiChat() {
+        var sidebar = document.getElementById('aiChatSidebar');
+        var overlay = document.getElementById('aiChatOverlay');
+        var isOpen = sidebar.classList.contains('open');
+        if (isOpen) {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('visible');
+        } else {
+            sidebar.classList.add('open');
+            overlay.classList.add('visible');
+            document.getElementById('aiChatInput').focus();
+            scrollChatToBottom();
+        }
+    }
+
+    function clearAiChat() {
+        chatHistory = [];
+        chatAttachmentData = null;
+        document.getElementById('chatAttachment').style.display = 'none';
+        document.getElementById('aiChatMessages').innerHTML = '<div class="ai-chat-msg assistant"><strong>Chat cleared.</strong> Paste Excel data or type a command.</div>';
+    }
+
+    function scrollChatToBottom() {
+        var el = document.getElementById('aiChatMessages');
+        setTimeout(function() { el.scrollTop = el.scrollHeight; }, 50);
+    }
+
+    function autoResizeChatInput() {
+        var ta = document.getElementById('aiChatInput');
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    }
+
+    function handleChatKeydown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    }
+
+    function handleChatPaste(e) {
+        // Check for pasted table/spreadsheet data
+        var clipData = e.clipboardData || window.clipboardData;
+        if (!clipData) return;
+
+        var plainText = clipData.getData('text/plain') || '';
+
+        // Detect if it looks like tabular data (has tabs = Excel/Sheets paste)
+        if (plainText.includes('\t') && plainText.includes('\n')) {
+            e.preventDefault(); // Don't paste into textarea
+
+            chatAttachmentData = plainText;
+
+            // Show preview
+            var lines = plainText.split('\n').filter(function(l) { return l.trim(); });
+            var rowCount = lines.length;
+            var colCount = lines[0] ? lines[0].split('\t').length : 0;
+
+            document.getElementById('chatAttachmentText').textContent = plainText.substring(0, 500) + (plainText.length > 500 ? '...' : '');
+            document.getElementById('chatAttachmentInfo').textContent = rowCount + ' rows × ' + colCount + ' columns detected (Excel/table data)';
+            document.getElementById('chatAttachment').style.display = 'block';
+
+            // Auto-fill a helpful prompt
+            var input = document.getElementById('aiChatInput');
+            if (!input.value.trim()) {
+                input.value = 'Update items using this reference table data';
+            }
+            input.focus();
+
+            showToast('Excel table pasted! Add your command and press Enter.', 'success');
+        }
+        // If it's just regular text, let it paste normally
+    }
+
+    function removeChatAttachment() {
+        chatAttachmentData = null;
+        document.getElementById('chatAttachment').style.display = 'none';
+    }
+
+    function addChatMessage(role, content, editCount) {
+        var container = document.getElementById('aiChatMessages');
+        var div = document.createElement('div');
+        div.className = 'ai-chat-msg ' + role;
+
+        if (role === 'assistant') {
+            // Simple markdown rendering
+            var html = content
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/\n- /g, '\n• ')
+                .replace(/\n/g, '<br>');
+            div.innerHTML = html;
+            if (editCount > 0) {
+                div.innerHTML += '<div class="edit-count">' + editCount + ' items edited in table</div>';
+            }
+        } else {
+            // User message
+            var text = content.length > 200 ? content.substring(0, 200) + '...' : content;
+            div.textContent = text;
+            if (chatAttachmentData) {
+                var attBadge = document.createElement('div');
+                attBadge.style.cssText = 'margin-top: 6px; padding: 2px 8px; background: rgba(255,255,255,0.2); border-radius: 6px; font-size: 0.7rem;';
+                attBadge.textContent = '📎 Excel data attached';
+                div.appendChild(attBadge);
+            }
+        }
+
+        container.appendChild(div);
+        scrollChatToBottom();
+    }
+
+    function showChatTyping() {
+        var container = document.getElementById('aiChatMessages');
+        var div = document.createElement('div');
+        div.id = 'chatTypingIndicator';
+        div.className = 'ai-typing';
+        div.innerHTML = '<span></span><span></span><span></span>';
+        container.appendChild(div);
+        scrollChatToBottom();
+    }
+
+    function hideChatTyping() {
+        var el = document.getElementById('chatTypingIndicator');
+        if (el) el.remove();
+    }
+
+    async function sendChatMessage() {
+        var input = document.getElementById('aiChatInput');
+        var message = input.value.trim();
+        if (!message && !chatAttachmentData) return;
+        if (isChatSending) return;
+        if (items.length === 0) { showToast('No items loaded yet', 'info'); return; }
+
+        isChatSending = true;
+        var sendBtn = document.getElementById('chatSendBtn');
+        document.getElementById('chatSendIcon').classList.add('hidden');
+        document.getElementById('chatSendSpinner').classList.remove('hidden');
+        sendBtn.disabled = true;
+
+        // Display user message
+        addChatMessage('user', message || '(Excel data attached)');
+
+        // Clear input
+        input.value = '';
+        input.style.height = 'auto';
+
+        showChatTyping();
+
+        // Determine scope
+        var itemsToProcess = items;
+        if (selectedItemIds.size > 0) {
+            itemsToProcess = items.filter(function(it) {
+                return selectedItemIds.has(String(it.item_id || it.zoho_item_id));
+            });
+        }
+
+        try {
+            var resp = await fetch('/api/zoho/items/ai-edit', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    command: message || 'Process the attached reference data',
+                    items: itemsToProcess,
+                    context: chatAttachmentData || null,
+                    history: chatHistory.slice(-6)
+                })
+            });
+
+            var data = await resp.json();
+            hideChatTyping();
+
+            if (!resp.ok || !data.success) {
+                throw new Error(data.message || 'AI request failed');
+            }
+
+            // Store in chat history
+            chatHistory.push({ role: 'user', content: message + (chatAttachmentData ? '\n[Excel data attached]' : '') });
+
+            var replyText = data.reply || data.summary || 'Done.';
+            var edits = data.edits || [];
+
+            // Apply edits if any
+            if (edits.length > 0) {
+                // Save undo snapshot
+                var dirtyBefore = new Map();
+                dirtyItems.forEach(function(v, k) { dirtyBefore.set(k, Object.assign({}, v)); });
+                aiUndoSnapshot = { dirtyBefore: dirtyBefore, affectedIds: [] };
+
+                edits.forEach(function(edit) {
+                    var itemId = String(edit.zoho_item_id);
+                    var item = items.find(function(it) { return String(it.item_id || it.zoho_item_id) === itemId; });
+                    if (!item) return;
+
+                    if (!originalValues.has(itemId)) {
+                        var orig = {};
+                        allColumns.forEach(function(col) { orig[col.key] = item[col.key] !== undefined ? item[col.key] : null; });
+                        originalValues.set(itemId, orig);
+                    }
+
+                    var existing = dirtyItems.get(itemId) || { _itemName: item.name || item.item_name || '' };
+                    var changes = edit.changes || {};
+                    for (var field in changes) {
+                        if (changes.hasOwnProperty(field)) {
+                            existing[field] = changes[field];
+                            item[field] = changes[field];
+                        }
+                    }
+                    dirtyItems.set(itemId, existing);
+                    aiUndoSnapshot.affectedIds.push(itemId);
+                });
+
+                renderTable(); renderCards(); updateChangesUI(); updateAiScope();
+
+                // Show result banner too
+                document.getElementById('aiResultText').textContent = data.summary + (data.model ? ' (via ' + data.model + ')' : '');
+                document.getElementById('aiResultBanner').classList.remove('hidden');
+            }
+
+            chatHistory.push({ role: 'assistant', content: replyText });
+            addChatMessage('assistant', replyText, edits.length);
+
+            // Clear attachment after successful send
+            chatAttachmentData = null;
+            document.getElementById('chatAttachment').style.display = 'none';
+
+        } catch (err) {
+            hideChatTyping();
+            addChatMessage('assistant', 'Error: ' + err.message, 0);
+        } finally {
+            isChatSending = false;
+            document.getElementById('chatSendIcon').classList.remove('hidden');
+            document.getElementById('chatSendSpinner').classList.add('hidden');
+            sendBtn.disabled = false;
+        }
     }
 
     // ============ INIT ============
