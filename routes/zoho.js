@@ -1786,37 +1786,22 @@ router.post('/items/ai-edit', requirePermission('zoho', 'manage'), async (req, r
         }
 
         // Build compact item data — minimal fields to stay within WebSocket limits
-        // For large sets (>200), use ultra-compact format (no description/manufacturer/etc)
-        const maxItems = 500;
-        const itemsToSend = items.slice(0, maxItems);
-        const isLargeSet = itemsToSend.length > 200;
-
-        const compactItems = itemsToSend.map(it => {
-            const base = {
-                id: it.zoho_item_id || it.item_id,
-                name: it.name || it.item_name,
-                sku: it.sku || '',
-                rate: parseFloat(it.rate) || 0,
-                pr: parseFloat(it.purchase_rate) || 0,
-                dpl: parseFloat(it.cf_dpl) || 0,
-                brand: it.brand || ''
-            };
-            if (!isLargeSet) {
-                base.unit = it.unit || '';
-                base.cat = it.category_name || '';
-                base.hsn = it.hsn_or_sac || '';
-                base.tax = parseFloat(it.tax_percentage) || 0;
-                base.stock = parseFloat(it.stock_on_hand) || 0;
-            }
-            return base;
-        });
-        const truncated = items.length > maxItems;
+        const BATCH_SIZE = 300; // Items per AI call (keeps payload under WS frame limit)
+        const allCompact = items.map(it => ({
+            id: it.zoho_item_id || it.item_id,
+            name: it.name || it.item_name,
+            sku: it.sku || '',
+            rate: parseFloat(it.rate) || 0,
+            pr: parseFloat(it.purchase_rate) || 0,
+            dpl: parseFloat(it.cf_dpl) || 0,
+            brand: it.brand || ''
+        }));
 
         const systemPrompt = `You are KAI, an AI Items Editor for a paint retail business (Quality Colours). You receive inventory items and a user command. Return ONLY valid JSON.
 
-FIELD NAMES IN DATA (shortened): id, name, sku, rate (selling price), pr (purchase_rate), dpl (cf_dpl = Dealer Price List), brand, unit, cat (category), hsn (hsn_or_sac), tax (tax_percentage), stock
-EDITABLE FIELDS in edits: rate, pr, dpl, unit, hsn, tax, brand, cat, sku (use these SHORT names in your edits)
-READ-ONLY: id, name, stock
+FIELD NAMES IN DATA (shortened): id, name, sku, rate (selling price), pr (purchase_rate), dpl (cf_dpl = Dealer Price List), brand
+EDITABLE FIELDS in edits: rate, pr, dpl, brand, sku, unit, hsn, tax, cat (use these SHORT names in your edits)
+READ-ONLY: id, name
 
 RULES:
 - Return ONLY JSON: { "edits": [...], "summary": "...", "reply": "..." }
@@ -1824,95 +1809,123 @@ RULES:
 - Only include changed items. Round numbers to 2 decimals. NEVER change id/name.
 - "reply" = conversational message for chat (markdown OK). "summary" = one-line description.
 - For % ops: "increase by 5%" = multiply by 1.05. "Set DPL to 80% of rate" = dpl = rate * 0.8.
-- If REFERENCE DATA provided (Excel table), match items by name/SKU and apply values.
+- If REFERENCE DATA provided (Excel table), match items by name/SKU and apply values from reference.
 - If unclear: return empty edits with helpful reply.
 - IMPORTANT: Return ONLY the JSON object. No markdown fences, no extra text.`;
 
         // Build context section if reference data provided (e.g. pasted Excel tables)
         const contextSection = context ? `\nREFERENCE DATA (Excel/table):\n${context.substring(0, 10000)}\n` : '';
-        const truncNote = truncated ? `\nNOTE: Showing first ${maxItems} of ${items.length} total items.` : '';
 
-        const userMessage = `COMMAND: ${command.trim()}${contextSection}${truncNote}
-ITEMS (${compactItems.length}):
-${JSON.stringify(compactItems)}`;
-
-        // Build messages array with optional chat history
-        const messages = [
-            { role: 'system', content: systemPrompt }
-        ];
-
-        // Add chat history for multi-turn conversations
-        if (Array.isArray(history) && history.length > 0) {
-            // Only keep last 6 messages to avoid token overflow
-            const recentHistory = history.slice(-6);
-            recentHistory.forEach(msg => {
-                if (msg.role === 'user' || msg.role === 'assistant') {
-                    messages.push({ role: msg.role, content: msg.content });
-                }
-            });
-        }
-
-        messages.push({ role: 'user', content: userMessage });
-
-        const result = await aiEngine.generateWithFailover(messages, {
-            max_tokens: 16000,
-            temperature: 0.1
-        });
-
-        if (!result || !result.text) {
-            return res.status(500).json({ success: false, message: 'AI returned empty response' });
-        }
-
-        // Parse AI response — handle markdown fences
-        let responseText = result.text.trim();
-        if (responseText.startsWith('```')) {
-            responseText = responseText.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
-        }
-
-        let parsed;
-        try {
-            parsed = JSON.parse(responseText);
-        } catch (parseErr) {
-            // Try to extract JSON from response
-            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                parsed = JSON.parse(jsonMatch[0]);
-            } else {
-                return res.status(422).json({
-                    success: false,
-                    message: 'AI returned invalid response format',
-                    raw: responseText.substring(0, 500)
-                });
-            }
-        }
-
-        const edits = Array.isArray(parsed.edits) ? parsed.edits : [];
-        const summary = parsed.summary || `Processed ${edits.length} items`;
-        const reply = parsed.reply || summary;
-
-        // Map short field names back to full names for frontend
+        // Field name mapping (short → full)
         const fieldMap = {
             pr: 'purchase_rate', dpl: 'cf_dpl', cat: 'category_name',
             hsn: 'hsn_or_sac', tax: 'tax_percentage',
-            // Also handle if AI uses full names
             category: 'category_name', tax_pct: 'tax_percentage',
             purchase_rate: 'purchase_rate', cf_dpl: 'cf_dpl'
         };
-        const mappedEdits = edits.map(e => {
-            const changes = {};
-            for (const [k, v] of Object.entries(e.changes || {})) {
-                changes[fieldMap[k] || k] = v;
+
+        // Split into batches and process sequentially
+        const batches = [];
+        for (let i = 0; i < allCompact.length; i += BATCH_SIZE) {
+            batches.push(allCompact.slice(i, i + BATCH_SIZE));
+        }
+
+        const allEdits = [];
+        const batchSummaries = [];
+        let lastReply = '';
+        let lastModel = 'unknown';
+        let totalProcessed = 0;
+
+        for (let bIdx = 0; bIdx < batches.length; bIdx++) {
+            const batch = batches[bIdx];
+            const batchLabel = batches.length > 1
+                ? `\nBATCH ${bIdx + 1}/${batches.length} (items ${totalProcessed + 1}-${totalProcessed + batch.length} of ${allCompact.length})`
+                : '';
+
+            const userMessage = `COMMAND: ${command.trim()}${contextSection}${batchLabel}
+ITEMS (${batch.length}):
+${JSON.stringify(batch)}`;
+
+            // Build messages array with optional chat history
+            const messages = [{ role: 'system', content: systemPrompt }];
+
+            if (Array.isArray(history) && history.length > 0) {
+                const recentHistory = history.slice(-6);
+                recentHistory.forEach(msg => {
+                    if (msg.role === 'user' || msg.role === 'assistant') {
+                        messages.push({ role: msg.role, content: msg.content });
+                    }
+                });
             }
-            return { zoho_item_id: e.id, changes };
-        });
+
+            messages.push({ role: 'user', content: userMessage });
+
+            const result = await aiEngine.generateWithFailover(messages, {
+                max_tokens: 16000,
+                temperature: 0.1
+            });
+
+            if (!result || !result.text) {
+                // If a batch fails, continue with next batch instead of aborting entirely
+                batchSummaries.push(`Batch ${bIdx + 1}: AI returned empty response`);
+                totalProcessed += batch.length;
+                continue;
+            }
+
+            lastModel = result.model || 'unknown';
+
+            // Parse AI response — handle markdown fences
+            let responseText = result.text.trim();
+            if (responseText.startsWith('```')) {
+                responseText = responseText.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+            }
+
+            let parsed;
+            try {
+                parsed = JSON.parse(responseText);
+            } catch (parseErr) {
+                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    try { parsed = JSON.parse(jsonMatch[0]); } catch { parsed = null; }
+                }
+            }
+
+            if (parsed && Array.isArray(parsed.edits)) {
+                // Map short field names back to full names
+                const mappedBatchEdits = parsed.edits.map(e => {
+                    const changes = {};
+                    for (const [k, v] of Object.entries(e.changes || {})) {
+                        changes[fieldMap[k] || k] = v;
+                    }
+                    return { zoho_item_id: e.id, changes };
+                });
+                allEdits.push(...mappedBatchEdits);
+                batchSummaries.push(parsed.summary || `Batch ${bIdx + 1}: ${mappedBatchEdits.length} edits`);
+                lastReply = parsed.reply || parsed.summary || '';
+            } else {
+                batchSummaries.push(`Batch ${bIdx + 1}: failed to parse response`);
+            }
+
+            totalProcessed += batch.length;
+        }
+
+        // Build combined response
+        const summary = batches.length > 1
+            ? `Updated ${allEdits.length} items across ${batches.length} batches (${allCompact.length} total processed)`
+            : (batchSummaries[0] || `Processed ${allEdits.length} items`);
+        const reply = batches.length > 1
+            ? `${lastReply}\n\n**Batch processing complete**: ${allEdits.length} items updated across ${batches.length} batches (${allCompact.length} items scanned).`
+            : (lastReply || summary);
 
         res.json({
             success: true,
-            edits: mappedEdits,
+            edits: allEdits,
             summary,
             reply,
-            model: result.model || 'unknown',
-            itemsProcessed: compactItems.length
+            model: lastModel,
+            itemsProcessed: allCompact.length,
+            batchCount: batches.length,
+            batchSummaries: batches.length > 1 ? batchSummaries : undefined
         });
 
     } catch (error) {

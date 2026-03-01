@@ -859,6 +859,13 @@
         var icon = document.getElementById('aiIcon');
         btn.disabled = true; spinner.classList.remove('hidden'); icon.classList.add('hidden');
         document.getElementById('aiResultBanner').classList.add('hidden');
+        // Show batch hint for large item sets
+        var scopeCount = selectedItemIds.size > 0 ? selectedItemIds.size : items.length;
+        if (scopeCount > 300) {
+            document.getElementById('aiResultText').textContent = 'Processing ' + scopeCount + ' items in batches... This may take a minute.';
+            document.getElementById('aiResultBanner').classList.remove('hidden');
+            document.getElementById('aiResultBanner').style.background = 'linear-gradient(135deg, #667eea22, #764ba222)';
+        }
 
         // Determine scope
         var srcItems = items;
@@ -874,11 +881,16 @@
         aiUndoSnapshot = { dirtyBefore: dirtyBefore, affectedIds: [] };
 
         try {
+            // Longer timeout for batch processing (5 min)
+            var controller = new AbortController();
+            var timeout = setTimeout(function() { controller.abort(); }, 300000);
             var resp = await fetch('/api/zoho/items/ai-edit', {
                 method: 'POST',
                 headers: getAuthHeaders(),
+                signal: controller.signal,
                 body: JSON.stringify({ command: command, items: compactItemsForAI(srcItems) })
             });
+            clearTimeout(timeout);
 
             var data = await resp.json();
             if (!resp.ok || !data.success) {
@@ -928,7 +940,9 @@
 
             // Show result banner
             var banner = document.getElementById('aiResultBanner');
-            document.getElementById('aiResultText').textContent = data.summary + (data.model ? ' (via ' + data.model + ')' : '');
+            banner.style.background = '';
+            var batchInfo = data.batchCount > 1 ? ' [' + data.batchCount + ' batches]' : '';
+            document.getElementById('aiResultText').textContent = data.summary + batchInfo + (data.model ? ' (via ' + data.model + ')' : '');
             banner.classList.remove('hidden');
 
             showToast('KAI applied ' + appliedCount + ' edits', 'success');
@@ -1142,9 +1156,13 @@
         }
 
         try {
+            // Longer timeout for batch processing (5 min)
+            var controller = new AbortController();
+            var timeout = setTimeout(function() { controller.abort(); }, 300000);
             var resp = await fetch('/api/zoho/items/ai-edit', {
                 method: 'POST',
                 headers: getAuthHeaders(),
+                signal: controller.signal,
                 body: JSON.stringify({
                     command: message || 'Process the attached reference data',
                     items: compactItemsForAI(srcItems),
@@ -1152,6 +1170,7 @@
                     history: chatHistory.slice(-6)
                 })
             });
+            clearTimeout(timeout);
 
             var data = await resp.json();
             hideChatTyping();
@@ -1199,7 +1218,8 @@
                 renderTable(); renderCards(); updateChangesUI(); updateAiScope();
 
                 // Show result banner too
-                document.getElementById('aiResultText').textContent = data.summary + (data.model ? ' (via ' + data.model + ')' : '');
+                var batchInfo = data.batchCount > 1 ? ' [' + data.batchCount + ' batches]' : '';
+                document.getElementById('aiResultText').textContent = data.summary + batchInfo + (data.model ? ' (via ' + data.model + ')' : '');
                 document.getElementById('aiResultBanner').classList.remove('hidden');
             }
 
