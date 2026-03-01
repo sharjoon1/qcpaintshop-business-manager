@@ -17,9 +17,9 @@
     <link rel="stylesheet" href="/css/design-system.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
             min-height: 100vh;
         }
         .container {
@@ -208,9 +208,18 @@
         let currentDate = new Date();
         let attendanceData = [];
 
-        // Initialize
+        // Initialize - try current month, if empty and it's early in the month, show previous month
         async function init() {
+            updateMonthDisplay();
             await loadAttendance();
+            // If no records and we're in the first 5 days of the month, auto-show previous month
+            if (attendanceData.length === 0 && new Date().getDate() <= 5) {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                document.getElementById('loadingState').style.display = 'block';
+                document.getElementById('emptyState').style.display = 'none';
+                document.getElementById('attendanceList').innerHTML = '';
+                await loadAttendance();
+            }
         }
 
         // Load attendance for current month
@@ -231,7 +240,16 @@
                     }
                 });
 
+                if (response.status === 401) {
+                    localStorage.removeItem('auth_token');
+                    window.location.href = '/login.html';
+                    return;
+                }
+
                 const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to load');
+                }
                 attendanceData = data.data || [];
 
                 // Update UI
