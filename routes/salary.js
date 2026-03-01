@@ -451,8 +451,8 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
             SUM(CASE WHEN status = 'half_day' THEN 1 ELSE 0 END) as half_days,
             SUM(CASE WHEN status = 'on_leave' THEN 1 ELSE 0 END) as leaves,
             SUM(CASE WHEN DAYOFWEEK(date) = 1 AND status = 'present' THEN 1 ELSE 0 END) as sundays_worked,
-            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status = 'present' AND total_working_minutes <= 600
-                THEN total_working_minutes ELSE 0 END) / 60, 0) as standard_hours,
+            COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status = 'present'
+                THEN LEAST(total_working_minutes, 600) ELSE 0 END) / 60, 0) as standard_hours,
             COALESCE(SUM(CASE WHEN DAYOFWEEK(date) = 1 AND status = 'present'
                 THEN total_working_minutes ELSE 0 END) / 60, 0) as sunday_hours,
             COALESCE(SUM(CASE WHEN DAYOFWEEK(date) != 1 AND status = 'present' AND total_working_minutes > 600
