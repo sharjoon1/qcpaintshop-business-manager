@@ -10,7 +10,7 @@
  */
 
 const webPush = require('web-push');
-const https = require('https');
+const fcmAdmin = require('./fcm-admin');
 
 let pool;
 let io;
@@ -90,10 +90,18 @@ async function sendPushNotifications(userId, { type, title, body, data }) {
             if (sub.type === 'web' && sub.endpoint) {
                 await sendWebPush(sub, { type, title, body, data });
             } else if (sub.type === 'fcm' && sub.fcm_token) {
-                await sendFCM(sub.fcm_token, { type, title, body, data });
+                const result = await fcmAdmin.sendToDevice(sub.fcm_token, {
+                    title,
+                    body,
+                    data: { type: type || 'notification', ...(data || {}) }
+                });
+                if (result.invalidToken) {
+                    await pool.query('DELETE FROM push_subscriptions WHERE id = ?', [sub.id]);
+                    console.log(`Removed stale FCM subscription ${sub.id} for user ${userId}`);
+                }
             }
         } catch (err) {
-            // Remove invalid subscriptions
+            // Remove invalid web push subscriptions
             if (err.statusCode === 410 || err.statusCode === 404) {
                 await pool.query('DELETE FROM push_subscriptions WHERE id = ?', [sub.id]);
                 console.log(`Removed stale push subscription ${sub.id}`);
@@ -125,47 +133,6 @@ async function sendWebPush(subscription, { title, body, data }) {
     });
 
     await webPush.sendNotification(pushSubscription, payload, { TTL: 86400 });
-}
-
-/**
- * Send FCM notification via HTTP v1 API
- */
-async function sendFCM(fcmToken, { title, body, data }) {
-    const serverKey = process.env.FIREBASE_SERVER_KEY;
-    if (!serverKey) return;
-
-    const payload = JSON.stringify({
-        to: fcmToken,
-        data: { title, body, ...(data || {}), type: data?.type || 'notification' }
-    });
-
-    return new Promise((resolve, reject) => {
-        const req = https.request({
-            hostname: 'fcm.googleapis.com',
-            path: '/fcm/send',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `key=${serverKey}`,
-                'Content-Length': Buffer.byteLength(payload)
-            }
-        }, (res) => {
-            let body = '';
-            res.on('data', chunk => body += chunk);
-            res.on('end', () => {
-                if (res.statusCode >= 200 && res.statusCode < 300) {
-                    resolve(JSON.parse(body));
-                } else {
-                    const err = new Error(`FCM error: ${res.statusCode}`);
-                    err.statusCode = res.statusCode;
-                    reject(err);
-                }
-            });
-        });
-        req.on('error', reject);
-        req.write(payload);
-        req.end();
-    });
 }
 
 module.exports = { setPool, setIO, send, sendToMany };

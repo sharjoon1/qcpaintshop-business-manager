@@ -14,7 +14,7 @@
  *   await painterNotificationService.sendToPainter(painterId, { type, title, title_ta, body, body_ta, data });
  */
 
-const https = require('https');
+const fcmAdmin = require('./fcm-admin');
 
 let pool, io;
 
@@ -123,8 +123,8 @@ async function sendToAll({ type, title, title_ta, body, body_ta, data }) {
 /**
  * Send FCM push notification to a painter's registered devices
  * - Fetches active FCM tokens for the painter
- * - Sends to each token via Firebase legacy HTTP API
- * - Deactivates tokens that are no longer valid (NotRegistered / InvalidRegistration)
+ * - Sends to each token via Firebase Admin SDK (v1 API)
+ * - Deactivates tokens that are no longer valid
  *
  * @param {number} painterId
  * @param {Object} opts
@@ -135,9 +135,6 @@ async function sendToAll({ type, title, title_ta, body, body_ta, data }) {
  * @private
  */
 async function sendFCM(painterId, { title, body, type, data }) {
-    const serverKey = process.env.FIREBASE_SERVER_KEY;
-    if (!serverKey) return;
-
     const [tokens] = await pool.query(
         `SELECT id, fcm_token FROM painter_fcm_tokens WHERE painter_id = ? AND is_active = 1`,
         [painterId]
@@ -147,85 +144,23 @@ async function sendFCM(painterId, { title, body, type, data }) {
 
     for (const tokenRow of tokens) {
         try {
-            const result = await sendFCMRequest(serverKey, tokenRow.fcm_token, {
+            const result = await fcmAdmin.sendToDevice(tokenRow.fcm_token, {
                 title,
                 body,
-                type,
-                data
+                data: { type: type || 'notification', ...(data || {}) }
             });
 
-            // Check for invalid tokens and deactivate them
-            if (result && result.failure > 0 && result.results) {
-                for (const r of result.results) {
-                    if (r.error === 'NotRegistered' || r.error === 'InvalidRegistration') {
-                        await pool.query(
-                            `UPDATE painter_fcm_tokens SET is_active = 0 WHERE id = ?`,
-                            [tokenRow.id]
-                        );
-                        console.log(`[PainterNotification] Deactivated stale FCM token ${tokenRow.id} for painter ${painterId}`);
-                    }
-                }
+            if (result.invalidToken) {
+                await pool.query(
+                    `UPDATE painter_fcm_tokens SET is_active = 0 WHERE id = ?`,
+                    [tokenRow.id]
+                );
+                console.log(`[PainterNotification] Deactivated stale FCM token ${tokenRow.id} for painter ${painterId}`);
             }
         } catch (err) {
             console.error(`[PainterNotification] FCM send error for token ${tokenRow.id}:`, err.message);
         }
     }
-}
-
-/**
- * Make the actual FCM HTTP request
- *
- * @param {string} serverKey - Firebase server key
- * @param {string} fcmToken - Device FCM token
- * @param {Object} opts - { title, body, type, data }
- * @returns {Promise<Object>} FCM response
- * @private
- */
-function sendFCMRequest(serverKey, fcmToken, { title, body, type, data }) {
-    const payload = JSON.stringify({
-        to: fcmToken,
-        notification: {
-            title,
-            body
-        },
-        data: {
-            type: type || 'notification',
-            ...(data || {})
-        }
-    });
-
-    return new Promise((resolve, reject) => {
-        const req = https.request({
-            hostname: 'fcm.googleapis.com',
-            path: '/fcm/send',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `key=${serverKey}`,
-                'Content-Length': Buffer.byteLength(payload)
-            }
-        }, (res) => {
-            let responseBody = '';
-            res.on('data', chunk => responseBody += chunk);
-            res.on('end', () => {
-                try {
-                    if (res.statusCode >= 200 && res.statusCode < 300) {
-                        resolve(JSON.parse(responseBody));
-                    } else {
-                        const err = new Error(`FCM error: ${res.statusCode} - ${responseBody}`);
-                        err.statusCode = res.statusCode;
-                        reject(err);
-                    }
-                } catch (parseErr) {
-                    reject(new Error(`FCM response parse error: ${parseErr.message}`));
-                }
-            });
-        });
-
-        req.on('error', reject);
-        req.write(payload);
-        req.end();
-    });
 }
 
 /**

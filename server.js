@@ -77,6 +77,7 @@ const anomalyDetector = require('./services/anomaly-detector');
 const productionMonitor = require('./services/production-monitor');
 const responseTracker = require('./middleware/responseTracker');
 const painterNotificationService = require('./services/painter-notification-service');
+const fcmAdmin = require('./services/fcm-admin');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)

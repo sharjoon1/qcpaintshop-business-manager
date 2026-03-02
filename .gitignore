@@ -31,3 +31,6 @@ whatsapp-sessions/
 cookie.txt
 nul
 .claude/settings.local.json
+
+# Firebase service account key (contains private key)
+google-services/firebase-service-account.json
