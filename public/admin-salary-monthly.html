@@ -882,6 +882,10 @@
                             <span>Allowances:</span>
                             <strong class="money">₹${fmtINR(s.total_allowances)}</strong>
                         </div>` : ''}
+                        ${parseFloat(s.incentive_amount || 0) > 0 ? `<div class="detail-row">
+                            <span><i class="fas fa-trophy" style="color:#FFD700;"></i> Incentive (Lead Conversion):</span>
+                            <strong class="money">₹${fmtINR(s.incentive_amount)}</strong>
+                        </div>` : ''}
                         <div class="detail-row total">
                             <span>Gross Salary:</span>
                             <strong class="money">₹${fmtINR(s.gross_salary)}</strong>

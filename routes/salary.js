@@ -525,6 +525,15 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
 
     const totalDeductions = lateDeduction + absenceDeduction + leaveDeduction;
 
+    // Incentive: sum of approved incentives for this staff+month
+    const [incentiveRows] = await pool.query(
+        `SELECT COALESCE(SUM(amount), 0) as total_incentive
+         FROM staff_incentives
+         WHERE user_id = ? AND incentive_month = ? AND status = 'approved'`,
+        [userId, month]
+    );
+    const incentiveAmount = parseFloat(incentiveRows[0].total_incentive) || 0;
+
     // Check if salary record exists
     const [existing] = await pool.query(
         'SELECT id FROM monthly_salaries WHERE user_id = ? AND salary_month = ?',
@@ -544,7 +553,7 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
                 total_worked_hours = ?,
                 standard_hours_pay = ?, sunday_hours_pay = ?, overtime_pay = ?,
                 transport_allowance = ?, food_allowance = ?, other_allowance = ?,
-                total_allowances = ?,
+                total_allowances = ?, incentive_amount = ?,
                 late_deduction = ?, absence_deduction = ?, leave_deduction = ?,
                 total_deductions = ?,
                 status = 'calculated', calculation_date = NOW(), calculated_by = ?
@@ -558,7 +567,7 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
                 parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
                 parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
                 standardHoursPay, sundayHoursPay, overtimePay,
-                transportAllowance, foodAllowance, otherAllowance, totalAllowances,
+                transportAllowance, foodAllowance, otherAllowance, totalAllowances, incentiveAmount,
                 lateDeduction, absenceDeduction, leaveDeduction,
                 totalDeductions,
                 calculatedBy, salaryId
@@ -574,9 +583,10 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
                 total_standard_hours, total_sunday_hours, total_overtime_hours, total_worked_hours,
                 standard_hours_pay, sunday_hours_pay, overtime_pay,
                 transport_allowance, food_allowance, other_allowance, total_allowances,
+                incentive_amount,
                 late_deduction, absence_deduction, leave_deduction, total_deductions,
                 status, calculation_date, calculated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated', NOW(), ?)`,
             [
                 userId, config.branch_id, month, fromDate, toDate, config.monthly_salary,
                 parseInt(att.total_days), parseInt(att.present_days), parseInt(att.absent_days),
@@ -587,6 +597,7 @@ async function calculateSalaryForUser(userId, month, calculatedBy) {
                 parseFloat(att.standard_hours) + parseFloat(att.sunday_hours) + parseFloat(att.overtime_hours) + parseFloat(att.sunday_overtime_hours),
                 standardHoursPay, sundayHoursPay, overtimePay,
                 transportAllowance, foodAllowance, otherAllowance, totalAllowances,
+                incentiveAmount,
                 lateDeduction, absenceDeduction, leaveDeduction, totalDeductions,
                 calculatedBy
             ]
@@ -1109,7 +1120,7 @@ router.put('/monthly/:id/adjustments', requireAuth, requirePermission('salary', 
         
         // Recalculate totals
         updates.push('total_allowances = transport_allowance + food_allowance + other_allowance');
-        updates.push('total_deductions = late_deduction + absence_deduction + other_deduction');
+        updates.push('total_deductions = late_deduction + absence_deduction + leave_deduction + other_deduction');
         
         values.push(req.params.id);
         
@@ -1654,6 +1665,238 @@ router.put('/advances/:id/pay', requireAuth, requirePermission('salary', 'manage
     } catch (error) {
         console.error('Error recording payment:', error);
         res.status(500).json({ success: false, message: 'Failed to record payment' });
+    }
+});
+
+// ========================================
+// STAFF INCENTIVE ROUTES
+// ========================================
+
+/**
+ * GET /incentives - List incentives (admin: all, staff: own)
+ */
+router.get('/incentives', requireAuth, async (req, res) => {
+    try {
+        const { month, user_id, status: filterStatus } = req.query;
+        const isAdmin = ['admin', 'super_admin', 'manager'].includes(req.user.role);
+
+        let query = `
+            SELECT si.*, u.full_name as staff_name, l.name as lead_name, l.phone as lead_phone,
+                   ab.full_name as approved_by_name
+            FROM staff_incentives si
+            JOIN users u ON si.user_id = u.id
+            LEFT JOIN leads l ON si.lead_id = l.id
+            LEFT JOIN users ab ON si.approved_by = ab.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (!isAdmin) {
+            query += ' AND si.user_id = ?';
+            params.push(req.user.id);
+        } else if (user_id) {
+            query += ' AND si.user_id = ?';
+            params.push(user_id);
+        }
+
+        if (month) {
+            query += ' AND si.incentive_month = ?';
+            params.push(month);
+        }
+
+        if (filterStatus) {
+            query += ' AND si.status = ?';
+            params.push(filterStatus);
+        }
+
+        query += ' ORDER BY si.created_at DESC';
+
+        const [incentives] = await pool.query(query, params);
+
+        // Summary
+        const approved = incentives.filter(i => i.status === 'approved');
+        const pending = incentives.filter(i => i.status === 'pending');
+
+        res.json({
+            success: true,
+            data: incentives,
+            summary: {
+                total: incentives.length,
+                pending_count: pending.length,
+                pending_amount: pending.reduce((s, i) => s + parseFloat(i.amount), 0),
+                approved_count: approved.length,
+                approved_amount: approved.reduce((s, i) => s + parseFloat(i.amount), 0)
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching incentives:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch incentives' });
+    }
+});
+
+/**
+ * GET /incentives/summary - Monthly incentive summary per staff
+ */
+router.get('/incentives/summary', requireRole('admin', 'manager'), requirePermission('salary', 'view'), async (req, res) => {
+    try {
+        const { month } = req.query;
+        if (!month) return res.status(400).json({ success: false, message: 'month parameter required (YYYY-MM)' });
+
+        const [summary] = await pool.query(`
+            SELECT si.user_id, u.full_name as staff_name,
+                   COUNT(*) as total_conversions,
+                   SUM(CASE WHEN si.status = 'approved' THEN si.amount ELSE 0 END) as approved_amount,
+                   SUM(CASE WHEN si.status = 'pending' THEN si.amount ELSE 0 END) as pending_amount,
+                   SUM(CASE WHEN si.lead_type = 'customer' THEN 1 ELSE 0 END) as customer_count,
+                   SUM(CASE WHEN si.lead_type = 'painter' THEN 1 ELSE 0 END) as painter_count,
+                   SUM(CASE WHEN si.lead_type = 'engineer' THEN 1 ELSE 0 END) as engineer_count
+            FROM staff_incentives si
+            JOIN users u ON si.user_id = u.id
+            WHERE si.incentive_month = ?
+            GROUP BY si.user_id
+            ORDER BY approved_amount DESC
+        `, [month]);
+
+        res.json({ success: true, data: summary });
+    } catch (error) {
+        console.error('Error fetching incentive summary:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch incentive summary' });
+    }
+});
+
+/**
+ * POST /incentives - Create incentive (auto-created on lead conversion or manual)
+ */
+router.post('/incentives', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const { user_id, lead_id, lead_type, amount, notes, incentive_month } = req.body;
+
+        if (!user_id || !lead_type || !amount) {
+            return res.status(400).json({ success: false, message: 'user_id, lead_type, and amount are required' });
+        }
+
+        // Determine month (default: current month)
+        const now = new Date();
+        const month = incentive_month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+        // Check for duplicate (same user + lead)
+        if (lead_id) {
+            const [existing] = await pool.query(
+                'SELECT id FROM staff_incentives WHERE user_id = ? AND lead_id = ?',
+                [user_id, lead_id]
+            );
+            if (existing.length > 0) {
+                return res.status(400).json({ success: false, message: 'Incentive already exists for this lead conversion' });
+            }
+        }
+
+        const [result] = await pool.query(
+            `INSERT INTO staff_incentives (user_id, lead_id, customer_id, lead_type, incentive_month, amount, notes, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [user_id, lead_id || null, null, lead_type, month, amount, notes || null]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Incentive created',
+            data: { id: result.insertId }
+        });
+    } catch (error) {
+        console.error('Error creating incentive:', error);
+        res.status(500).json({ success: false, message: 'Failed to create incentive' });
+    }
+});
+
+/**
+ * PUT /incentives/:id/approve - Approve an incentive
+ */
+router.put('/incentives/:id/approve', requireRole('admin', 'manager'), requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const [incentive] = await pool.query('SELECT * FROM staff_incentives WHERE id = ?', [req.params.id]);
+        if (incentive.length === 0) {
+            return res.status(404).json({ success: false, message: 'Incentive not found' });
+        }
+        if (incentive[0].status !== 'pending') {
+            return res.status(400).json({ success: false, message: 'Only pending incentives can be approved' });
+        }
+
+        await pool.query(
+            'UPDATE staff_incentives SET status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?',
+            ['approved', req.user.id, req.params.id]
+        );
+
+        res.json({ success: true, message: 'Incentive approved' });
+    } catch (error) {
+        console.error('Error approving incentive:', error);
+        res.status(500).json({ success: false, message: 'Failed to approve incentive' });
+    }
+});
+
+/**
+ * PUT /incentives/:id/reject - Reject an incentive
+ */
+router.put('/incentives/:id/reject', requireRole('admin', 'manager'), requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const { notes } = req.body;
+        const [incentive] = await pool.query('SELECT * FROM staff_incentives WHERE id = ?', [req.params.id]);
+        if (incentive.length === 0) {
+            return res.status(404).json({ success: false, message: 'Incentive not found' });
+        }
+        if (incentive[0].status !== 'pending') {
+            return res.status(400).json({ success: false, message: 'Only pending incentives can be rejected' });
+        }
+
+        await pool.query(
+            'UPDATE staff_incentives SET status = ?, notes = CONCAT(COALESCE(notes, ""), ?), approved_by = ?, approved_at = NOW() WHERE id = ?',
+            ['rejected', notes ? `\nRejected: ${notes}` : '', req.user.id, req.params.id]
+        );
+
+        res.json({ success: true, message: 'Incentive rejected' });
+    } catch (error) {
+        console.error('Error rejecting incentive:', error);
+        res.status(500).json({ success: false, message: 'Failed to reject incentive' });
+    }
+});
+
+/**
+ * PUT /incentives/bulk-approve - Approve all pending incentives for a month
+ */
+router.put('/incentives/bulk-approve', requireRole('admin', 'manager'), requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const { month } = req.body;
+        if (!month) return res.status(400).json({ success: false, message: 'month is required' });
+
+        const [result] = await pool.query(
+            `UPDATE staff_incentives SET status = 'approved', approved_by = ?, approved_at = NOW()
+             WHERE incentive_month = ? AND status = 'pending'`,
+            [req.user.id, month]
+        );
+
+        res.json({ success: true, message: `${result.affectedRows} incentives approved`, count: result.affectedRows });
+    } catch (error) {
+        console.error('Error bulk approving incentives:', error);
+        res.status(500).json({ success: false, message: 'Failed to bulk approve' });
+    }
+});
+
+/**
+ * DELETE /incentives/:id - Delete incentive (admin only, pending only)
+ */
+router.delete('/incentives/:id', requireRole('admin'), requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const [incentive] = await pool.query('SELECT * FROM staff_incentives WHERE id = ?', [req.params.id]);
+        if (incentive.length === 0) {
+            return res.status(404).json({ success: false, message: 'Incentive not found' });
+        }
+        if (incentive[0].status !== 'pending') {
+            return res.status(400).json({ success: false, message: 'Only pending incentives can be deleted' });
+        }
+
+        await pool.query('DELETE FROM staff_incentives WHERE id = ?', [req.params.id]);
+        res.json({ success: true, message: 'Incentive deleted' });
+    } catch (error) {
+        console.error('Error deleting incentive:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete incentive' });
     }
 });
 

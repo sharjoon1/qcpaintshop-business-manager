@@ -1279,7 +1279,7 @@
     async function convertLead(leadType) {
         if (!currentLeadData) return;
         const typeLabel = leadType.charAt(0).toUpperCase() + leadType.slice(1);
-        if (!confirm(`Convert "${currentLeadData.name}" to ${typeLabel}?\n\nThis will create a Zoho customer contact and mark the lead as Won.`)) return;
+        if (!confirm(`Convert "${currentLeadData.name}" to ${typeLabel}?\n\nThis will mark the lead as Won and create an incentive entry.`)) return;
 
         try {
             const res = await fetch(`${API_BASE}/my/${currentLeadData.id}/convert`, {

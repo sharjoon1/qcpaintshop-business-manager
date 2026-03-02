@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>Staff Incentives - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        .header { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .header h1 { color: #333; font-size: 24px; }
+
+        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .summary-card { padding: 20px; border-radius: 8px; color: white; }
+        .summary-card h3 { font-size: 14px; opacity: 0.9; }
+        .summary-card .value { font-size: 28px; font-weight: 700; margin-top: 5px; }
+        .card-purple { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-green { background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); }
+        .card-orange { background: linear-gradient(135deg, #FF6B35 0%, #ff5722 100%); }
+        .card-gold { background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #333; }
+
+        .filters { background: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .filter-row { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group label { font-size: 12px; font-weight: 600; color: #666; }
+        .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn:hover { opacity: 0.9; }
+
+        .table-container { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #666; border-bottom: 2px solid #eee; white-space: nowrap; }
+        td { padding: 12px 15px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        tr:hover { background: #f8f9fa; }
+
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+        .badge-info { background: #d1ecf1; color: #0c5460; }
+        .badge-customer { background: #e3f2fd; color: #1565c0; }
+        .badge-painter { background: #e8f5e9; color: #2e7d32; }
+        .badge-engineer { background: #fff3e0; color: #ef6c00; }
+
+        .money { font-weight: 600; color: #28a745; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .empty-state i { font-size: 64px; margin-bottom: 20px; opacity: 0.3; }
+        .action-buttons { display: flex; gap: 5px; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; border-top: 2px solid #eee; padding-top: 15px; margin-top: 20px; }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .header h1 { font-size: 18px; }
+            .summary-card .value { font-size: 22px; }
+            td, th { padding: 8px 10px; font-size: 12px; }
+            .table-container { overflow-x: auto; }
+        }
+    </style>
+    <script src="/universal-nav-loader.js"></script>
+</head>
+<body data-page="salary-incentives">
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div>
+                    <h1><i class="fas fa-trophy" style="color:#FFD700;"></i> Staff Incentives</h1>
+                    <p style="color: #666; margin-top: 5px;">Track and manage lead conversion incentives</p>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-success" id="bulkApproveBtn" onclick="bulkApprove()" style="display:none;">
+                        <i class="fas fa-check-double"></i> Approve All Pending
+                    </button>
+                    <button class="btn btn-primary" onclick="showAddModal()">
+                        <i class="fas fa-plus"></i> Add Incentive
+                    </button>
+                </div>
+            </div>
+
+            <div class="summary-cards" id="summaryCards">
+                <div class="summary-card card-purple">
+                    <h3>Total Incentives</h3>
+                    <div class="value" id="totalCount">0</div>
+                </div>
+                <div class="summary-card card-orange">
+                    <h3>Pending Approval</h3>
+                    <div class="value" id="pendingCount">0</div>
+                </div>
+                <div class="summary-card card-green">
+                    <h3>Approved Amount</h3>
+                    <div class="value" id="approvedAmount">&#8377;0</div>
+                </div>
+                <div class="summary-card card-gold">
+                    <h3>Pending Amount</h3>
+                    <div class="value" id="pendingAmount">&#8377;0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="filters">
+            <div class="filter-row">
+                <div class="form-group">
+                    <label>Month</label>
+                    <input type="month" id="filterMonth" onchange="loadIncentives()">
+                </div>
+                <div class="form-group">
+                    <label>Staff</label>
+                    <select id="filterStaff" onchange="loadIncentives()">
+                        <option value="">All Staff</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="filterStatus" onchange="loadIncentives()">
+                        <option value="">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-secondary" onclick="loadIncentives()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div id="loading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> Loading incentives...
+            </div>
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="fas fa-trophy"></i>
+                <h3>No incentives found</h3>
+                <p>Incentives are auto-created when staff convert leads</p>
+            </div>
+            <div id="tableContent" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Staff</th>
+                            <th>Lead</th>
+                            <th>Type</th>
+                            <th>Month</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="incentiveTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Incentive Modal -->
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-plus"></i> Add Manual Incentive</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label>Staff *</label>
+                    <select id="addStaff" required>
+                        <option value="">Select Staff</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label>Type *</label>
+                    <select id="addType" required>
+                        <option value="customer">Customer</option>
+                        <option value="painter">Painter</option>
+                        <option value="engineer">Engineer</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label>Amount (&#8377;) *</label>
+                    <input type="number" id="addAmount" step="0.01" min="0" required>
+                </div>
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label>Month</label>
+                    <input type="month" id="addMonth">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="addNotes" rows="3" style="width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:14px;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
+                <button class="btn btn-success" onclick="createIncentive()">
+                    <i class="fas fa-save"></i> Create
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        const fmtINR = n => parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+        function setDefaultMonth() {
+            const now = new Date();
+            const monthStr = now.toISOString().substring(0, 7);
+            document.getElementById('filterMonth').value = monthStr;
+            document.getElementById('addMonth').value = monthStr;
+        }
+
+        async function loadStaff() {
+            const token = localStorage.getItem('auth_token');
+            try {
+                const res = await fetch(`${API_BASE}/api/users?role=staff&status=active`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+                const users = Array.isArray(result) ? result : (result.data || []);
+
+                ['filterStaff', 'addStaff'].forEach(id => {
+                    const sel = document.getElementById(id);
+                    const firstOpt = sel.options[0].outerHTML;
+                    sel.innerHTML = firstOpt;
+                    users.forEach(u => {
+                        sel.innerHTML += `<option value="${u.id}">${u.full_name}</option>`;
+                    });
+                });
+            } catch (err) {
+                console.error('Error loading staff:', err);
+            }
+        }
+
+        async function loadIncentives() {
+            const token = localStorage.getItem('auth_token');
+            const month = document.getElementById('filterMonth').value;
+            const userId = document.getElementById('filterStaff').value;
+            const status = document.getElementById('filterStatus').value;
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('tableContent').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'none';
+
+            let url = `${API_BASE}/api/salary/incentives?`;
+            if (month) url += `month=${month}&`;
+            if (userId) url += `user_id=${userId}&`;
+            if (status) url += `status=${status}&`;
+
+            try {
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+
+                document.getElementById('loading').style.display = 'none';
+
+                if (result.success && result.data.length > 0) {
+                    renderIncentives(result.data);
+                    updateSummary(result.summary);
+                    document.getElementById('tableContent').style.display = 'block';
+                    document.getElementById('bulkApproveBtn').style.display = result.summary.pending_count > 0 ? '' : 'none';
+                } else {
+                    document.getElementById('emptyState').style.display = 'block';
+                    document.getElementById('bulkApproveBtn').style.display = 'none';
+                    updateSummary({ total: 0, pending_count: 0, approved_count: 0, approved_amount: 0, pending_amount: 0 });
+                }
+            } catch (err) {
+                console.error('Error loading incentives:', err);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        }
+
+        function updateSummary(s) {
+            document.getElementById('totalCount').textContent = s.total || 0;
+            document.getElementById('pendingCount').textContent = s.pending_count || 0;
+            document.getElementById('approvedAmount').textContent = '\u20B9' + fmtINR(s.approved_amount);
+            document.getElementById('pendingAmount').textContent = '\u20B9' + fmtINR(s.pending_amount);
+        }
+
+        function renderIncentives(data) {
+            const tbody = document.getElementById('incentiveTableBody');
+            tbody.innerHTML = data.map(i => {
+                const statusColors = { pending: 'warning', approved: 'success', rejected: 'danger' };
+                const typeColors = { customer: 'customer', painter: 'painter', engineer: 'engineer' };
+                const created = new Date(i.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+                return `<tr>
+                    <td><strong>${i.staff_name}</strong></td>
+                    <td>${i.lead_name || '-'} ${i.lead_phone ? `<br><small style="color:#888">${i.lead_phone}</small>` : ''}</td>
+                    <td><span class="badge badge-${typeColors[i.lead_type]}">${i.lead_type}</span></td>
+                    <td>${i.incentive_month}</td>
+                    <td class="money">\u20B9${fmtINR(i.amount)}</td>
+                    <td><span class="badge badge-${statusColors[i.status]}">${i.status}</span></td>
+                    <td>${created}${i.approved_by_name ? `<br><small style="color:#888">by ${i.approved_by_name}</small>` : ''}</td>
+                    <td>
+                        <div class="action-buttons">
+                            ${i.status === 'pending' ? `
+                                <button class="btn btn-success btn-sm" onclick="approveIncentive(${i.id})" title="Approve">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="rejectIncentive(${i.id})" title="Reject">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            ` : ''}
+                            ${i.status === 'pending' ? `
+                                <button class="btn btn-secondary btn-sm" onclick="deleteIncentive(${i.id})" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function approveIncentive(id) {
+            if (!confirm('Approve this incentive?')) return;
+            const token = localStorage.getItem('auth_token');
+            try {
+                const res = await fetch(`${API_BASE}/api/salary/incentives/${id}/approve`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert('Incentive approved!');
+                    loadIncentives();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (err) { alert('Network error'); }
+        }
+
+        async function rejectIncentive(id) {
+            const notes = prompt('Rejection reason (optional):');
+            if (notes === null) return;
+            const token = localStorage.getItem('auth_token');
+            try {
+                const res = await fetch(`${API_BASE}/api/salary/incentives/${id}/reject`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert('Incentive rejected');
+                    loadIncentives();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (err) { alert('Network error'); }
+        }
+
+        async function deleteIncentive(id) {
+            if (!confirm('Delete this incentive?')) return;
+            const token = localStorage.getItem('auth_token');
+            try {
+                const res = await fetch(`${API_BASE}/api/salary/incentives/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+                if (result.success) {
+                    loadIncentives();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (err) { alert('Network error'); }
+        }
+
+        async function bulkApprove() {
+            const month = document.getElementById('filterMonth').value;
+            if (!month) { alert('Select a month first'); return; }
+            if (!confirm(`Approve ALL pending incentives for ${month}?`)) return;
+
+            const token = localStorage.getItem('auth_token');
+            try {
+                const res = await fetch(`${API_BASE}/api/salary/incentives/bulk-approve`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ month })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert(`${result.count} incentives approved!`);
+                    loadIncentives();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (err) { alert('Network error'); }
+        }
+
+        function showAddModal() {
+            document.getElementById('addModal').classList.add('active');
+        }
+
+        function closeAddModal() {
+            document.getElementById('addModal').classList.remove('active');
+        }
+
+        async function createIncentive() {
+            const token = localStorage.getItem('auth_token');
+            const userId = document.getElementById('addStaff').value;
+            const leadType = document.getElementById('addType').value;
+            const amount = document.getElementById('addAmount').value;
+            const month = document.getElementById('addMonth').value;
+            const notes = document.getElementById('addNotes').value;
+
+            if (!userId || !amount) { alert('Staff and amount are required'); return; }
+
+            try {
+                const res = await fetch(`${API_BASE}/api/salary/incentives`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: parseInt(userId),
+                        lead_type: leadType,
+                        amount: parseFloat(amount),
+                        incentive_month: month,
+                        notes: notes || null
+                    })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert('Incentive created!');
+                    closeAddModal();
+                    loadIncentives();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (err) { alert('Network error: ' + err.message); }
+        }
+
+        // Init
+        (async function() {
+            setDefaultMonth();
+            await loadStaff();
+            loadIncentives();
+        })();
+    </script>
+</body>
+</html>

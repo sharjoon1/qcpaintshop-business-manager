@@ -172,6 +172,9 @@ function generateSalarySlipPDF(options, stream) {
     if (parseFloat(s.total_allowances || 0) > 0) {
         earningRows.push(['Allowances', '', s.total_allowances]);
     }
+    if (parseFloat(s.incentive_amount || 0) > 0) {
+        earningRows.push(['Incentive (Lead Conversion)', '', s.incentive_amount]);
+    }
 
     for (let i = 0; i < earningRows.length; i++) {
         const row = earningRows[i];

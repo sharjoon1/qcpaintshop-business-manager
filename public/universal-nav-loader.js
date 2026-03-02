@@ -57,6 +57,7 @@
         'salary-monthly': CONFIG.SALARY_SUBNAV_PATH,
         'salary-payments': CONFIG.SALARY_SUBNAV_PATH,
         'salary-advances': CONFIG.SALARY_SUBNAV_PATH,
+        'salary-incentives': CONFIG.SALARY_SUBNAV_PATH,
         'salary-reports': CONFIG.SALARY_SUBNAV_PATH,
         // Sales & Estimates
         'estimates': CONFIG.SALES_SUBNAV_PATH,
