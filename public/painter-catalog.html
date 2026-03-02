@@ -325,8 +325,7 @@
         function getStockBadge(stock) {
             const s = parseFloat(stock || 0);
             if (s <= 0) return `<span class="badge badge-stock-out" data-i18n="catalog.out_of_stock">Out of Stock</span>`;
-            if (s <= 10) return `<span class="badge badge-stock-low" data-i18n="catalog.low_stock">Low Stock</span>`;
-            return '';
+            return `<span class="badge badge-stock-ok" data-i18n="catalog.in_stock">In Stock</span>`;
         }
 
         // ── Product card HTML (grouped product) ──
@@ -343,7 +342,7 @@
                    </div>`;
 
             const pointsBadge = p.points_per_unit
-                ? `<span class="badge badge-points"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> ${p.points_per_unit}pts</span>`
+                ? `<span class="badge badge-points"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> earns pts</span>`
                 : '';
 
             // Price: show range if min != max
@@ -642,15 +641,13 @@
                        <span style="font-size:0.875rem;color:rgba(255,255,255,0.8);margin-top:4px">${esc(p.brand || '')}</span>
                    </div>`;
 
-            // Total stock status
+            // Total stock status (no numeric count shown to painters)
             const stock = parseFloat(p.total_stock || 0);
             let stockHtml = '';
             if (stock <= 0) {
                 stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span><span class="text-sm font-medium text-red-600" data-i18n="catalog.out_of_stock">Out of Stock</span></div>`;
-            } else if (stock <= 10) {
-                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span><span class="text-sm font-medium text-amber-600" data-i18n="catalog.low_stock">Low Stock</span><span class="text-xs text-gray-400">(${stock})</span></div>`;
             } else {
-                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span><span class="text-sm font-medium text-green-600" data-i18n="catalog.in_stock">In Stock</span><span class="text-xs text-gray-400">(${stock})</span></div>`;
+                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span><span class="text-sm font-medium text-green-600" data-i18n="catalog.in_stock">In Stock</span></div>`;
             }
 
             // Price range
@@ -681,6 +678,47 @@
                     </div>`;
             }
 
+            // Earnings breakdown section
+            let earningsHtml = '';
+            if (p.variants && p.variants.length) {
+                const variantsWithRates = p.variants.filter(v => v.points_per_unit || v.annual_eligible);
+                if (variantsWithRates.length === 0) {
+                    earningsHtml = `
+                        <div class="mt-4 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                            <p class="text-xs text-gray-400 text-center">Points not configured for this product</p>
+                        </div>`;
+                } else {
+                    earningsHtml = `
+                        <div class="mt-4">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-2">Your Earnings</h4>
+                            <div class="space-y-2">
+                                ${variantsWithRates.map(v => {
+                                    const regularPts = v.points_per_unit ? parseFloat(v.points_per_unit) : 0;
+                                    const annualPct = v.annual_pct ? parseFloat(v.annual_pct) : 0;
+                                    const rate = parseFloat(v.rate || 0);
+                                    const annualPts = v.annual_eligible ? Math.round(rate * annualPct / 100 * 100) / 100 : 0;
+                                    return `
+                                        <div class="p-2.5 rounded-lg border border-gray-100 bg-gray-50">
+                                            <p class="text-xs font-medium text-gray-700 mb-1.5 truncate">${esc(v.name)}</p>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div class="p-2 rounded-md" style="background:#f0fdf4;border:1px solid #bbf7d0">
+                                                    <p class="text-[0.6rem] font-semibold text-emerald-700 mb-1">Customer Billing</p>
+                                                    <p class="text-xs text-gray-700">Regular: <strong>${regularPts}</strong> pts</p>
+                                                    <p class="text-xs text-gray-700">Annual: <strong>${annualPts}</strong> pts${v.annual_eligible ? ` <span class="text-gray-400">(${annualPct}%)</span>` : ''}</p>
+                                                </div>
+                                                <div class="p-2 rounded-md" style="background:#eff6ff;border:1px solid #bfdbfe">
+                                                    <p class="text-[0.6rem] font-semibold text-blue-700 mb-1">Self Billing</p>
+                                                    <p class="text-xs text-gray-700">Regular: <strong>0</strong> pts</p>
+                                                    <p class="text-xs text-gray-700">Annual: <strong>${annualPts}</strong> pts${v.annual_eligible ? ` <span class="text-gray-400">(${annualPct}%)</span>` : ''}</p>
+                                                </div>
+                                            </div>
+                                        </div>`;
+                                }).join('')}
+                            </div>
+                        </div>`;
+                }
+            }
+
             // Variants list
             let variantsHtml = '';
             if (p.variants && p.variants.length) {
@@ -690,13 +728,13 @@
                         <div class="space-y-2">
                             ${p.variants.map(v => {
                                 const vStock = parseFloat(v.stock || 0);
-                                let vStockDot = '';
-                                if (vStock <= 0) vStockDot = '<span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>';
-                                else if (vStock <= 10) vStockDot = '<span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>';
-                                else vStockDot = '<span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>';
+                                const vStockDot = vStock <= 0
+                                    ? '<span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>'
+                                    : '<span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>';
+                                const vStockLabel = vStock <= 0 ? 'Out of Stock' : 'In Stock';
 
                                 const ptsBadge = v.points_per_unit
-                                    ? `<span class="text-xs text-emerald-700 font-medium">${v.points_per_unit}pts</span>`
+                                    ? `<span class="text-xs text-emerald-700 font-medium">★ earns pts</span>`
                                     : '';
 
                                 return `
@@ -705,7 +743,7 @@
                                             <p class="text-xs font-medium text-gray-800 truncate">${esc(v.name)}</p>
                                             <div class="flex items-center gap-2 mt-0.5">
                                                 ${vStockDot}
-                                                <span class="text-xs text-gray-500">${vStock > 0 ? vStock + ' in stock' : 'Out of stock'}</span>
+                                                <span class="text-xs text-gray-500">${vStockLabel}</span>
                                                 ${ptsBadge}
                                             </div>
                                         </div>
@@ -735,6 +773,7 @@
                     ${stockHtml}
                 </div>
                 ${incentivesHtml}
+                ${earningsHtml}
                 ${variantsHtml}
             `;
 
