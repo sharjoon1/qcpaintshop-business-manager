@@ -1028,7 +1028,7 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
             SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
                    zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
-                   zim.image_url, ps.size_label,
+                   zim.image_url,
                    ppr.regular_points_per_unit as points_per_unit, ppr.annual_eligible, ppr.annual_pct
             FROM pack_sizes ps
             INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
