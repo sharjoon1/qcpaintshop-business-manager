@@ -1,0 +1,208 @@
+<!-- Staff Work Sub-Navigation Component -->
+<style>
+    .staff-work-subnav {
+        background: #ffffff;
+        border-bottom: 1px solid #e8ecf1;
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        padding: 0;
+    }
+
+    .staff-work-subnav-inner {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 1rem;
+        position: relative;
+    }
+
+    /* Desktop: Horizontal scrollable tabs */
+    .staff-work-subnav-tabs {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: 0.5rem 0;
+    }
+    .staff-work-subnav-tabs::-webkit-scrollbar { display: none; }
+
+    .staff-work-subnav-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: #64748b;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        flex-shrink: 0;
+    }
+    .staff-work-subnav-tab:hover {
+        background: #f1f5f9;
+        color: #334155;
+    }
+    .staff-work-subnav-tab svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+    }
+    .staff-work-subnav-tab.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #ffffff;
+        border-color: transparent;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    .staff-work-subnav-tab.active:hover {
+        background: linear-gradient(135deg, #5a6fd6, #6a4192);
+        color: #ffffff;
+    }
+
+    /* Mobile hamburger toggle */
+    .staff-work-subnav-toggle {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.625rem 0;
+        width: 100%;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #475569;
+    }
+    .staff-work-subnav-toggle svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        transition: transform 0.2s ease;
+    }
+    .staff-work-subnav-toggle.open svg.chevron-icon {
+        transform: rotate(180deg);
+    }
+
+    .staff-work-subnav-toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .staff-work-subnav-toggle-label svg {
+        width: 16px;
+        height: 16px;
+        stroke: #667eea;
+    }
+
+    /* Mobile dropdown */
+    .staff-work-subnav-dropdown {
+        display: none;
+        flex-direction: column;
+        gap: 2px;
+        padding-bottom: 0.5rem;
+    }
+    .staff-work-subnav-dropdown.show {
+        display: flex;
+    }
+    .staff-work-subnav-dropdown .staff-work-subnav-tab {
+        width: 100%;
+        padding: 8px 12px;
+        border-radius: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .staff-work-subnav-tabs {
+            display: none;
+        }
+        .staff-work-subnav-toggle {
+            display: flex;
+        }
+    }
+</style>
+
+<nav class="staff-work-subnav" id="staffWorkSubnav">
+    <div class="staff-work-subnav-inner">
+        <!-- Mobile toggle -->
+        <button class="staff-work-subnav-toggle" id="staffWorkSubnavToggle" onclick="toggleStaffWorkSubnav()">
+            <span class="staff-work-subnav-toggle-label">
+                <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+                <span id="staffWorkSubnavCurrentPage">My Work</span>
+            </span>
+            <svg class="chevron-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <!-- Mobile dropdown -->
+        <div class="staff-work-subnav-dropdown" id="staffWorkSubnavDropdown"></div>
+
+        <!-- Desktop horizontal tabs -->
+        <div class="staff-work-subnav-tabs" id="staffWorkSubnavTabs"></div>
+    </div>
+</nav>
+
+<script>
+(function() {
+    var staffWorkPages = [
+        { page: 'my-leads', label: 'My Leads', href: '/staff-leads.html', icon: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>' },
+        { page: 'my-estimates', label: 'My Estimates', href: '/staff-estimates.html', icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
+        { page: 'my-incentives', label: 'My Incentives', href: '/staff-incentives.html', icon: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>' }
+    ];
+
+    var currentPage = document.body.getAttribute('data-page') || document.documentElement.getAttribute('data-page') || '';
+    var currentPageObj = staffWorkPages.find(function(p) { return p.page === currentPage; });
+
+    var tabsContainer = document.getElementById('staffWorkSubnavTabs');
+    var dropdownContainer = document.getElementById('staffWorkSubnavDropdown');
+
+    staffWorkPages.forEach(function(p) {
+        var isActive = p.page === currentPage;
+        var tabHtml = '<a href="' + p.href + '" class="staff-work-subnav-tab' + (isActive ? ' active' : '') + '" data-staff-work-page="' + p.page + '">' +
+            '<svg viewBox="0 0 24 24">' + p.icon + '</svg>' +
+            '<span>' + p.label + '</span>' +
+        '</a>';
+
+        tabsContainer.insertAdjacentHTML('beforeend', tabHtml);
+        dropdownContainer.insertAdjacentHTML('beforeend', tabHtml);
+    });
+
+    if (currentPageObj) {
+        document.getElementById('staffWorkSubnavCurrentPage').textContent = currentPageObj.label;
+    }
+
+    setTimeout(function() {
+        var activeTab = tabsContainer.querySelector('.staff-work-subnav-tab.active');
+        if (activeTab) {
+            activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+    }, 100);
+})();
+
+function toggleStaffWorkSubnav() {
+    var toggle = document.getElementById('staffWorkSubnavToggle');
+    var dropdown = document.getElementById('staffWorkSubnavDropdown');
+    toggle.classList.toggle('open');
+    dropdown.classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+    var subnav = document.getElementById('staffWorkSubnav');
+    if (subnav && !subnav.contains(e.target)) {
+        var toggle = document.getElementById('staffWorkSubnavToggle');
+        var dropdown = document.getElementById('staffWorkSubnavDropdown');
+        if (toggle) toggle.classList.remove('open');
+        if (dropdown) dropdown.classList.remove('show');
+    }
+});
+</script>

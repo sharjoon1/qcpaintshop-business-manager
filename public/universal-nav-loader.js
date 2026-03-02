@@ -29,6 +29,7 @@
         SYSTEM_SUBNAV_PATH: '/components/system-subnav.html',
         MARKETING_SUBNAV_PATH: '/components/marketing-subnav.html',
         PAINTERS_SUBNAV_PATH: '/components/painters-subnav.html',
+        STAFF_WORK_SUBNAV_PATH: '/components/staff-work-subnav.html',
         RETRY_ATTEMPTS: 3,
         RETRY_DELAY: 1000
     };
@@ -85,6 +86,10 @@
         'painter-rates': CONFIG.PAINTERS_SUBNAV_PATH,
         'painter-withdrawals': CONFIG.PAINTERS_SUBNAV_PATH,
         'painter-reports': CONFIG.PAINTERS_SUBNAV_PATH,
+        // Staff Work (staff-only pages)
+        'my-leads': CONFIG.STAFF_WORK_SUBNAV_PATH,
+        'my-estimates': CONFIG.STAFF_WORK_SUBNAV_PATH,
+        'my-incentives': CONFIG.STAFF_WORK_SUBNAV_PATH,
     };
     
     // Skip navigation on login pages and public share pages

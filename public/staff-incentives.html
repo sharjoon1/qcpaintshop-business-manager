@@ -12,6 +12,7 @@
     <title>My Incentives - QC Paint Shop</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
     <script src="/js/auth-helper.js"></script>
     <script>checkAuthOrRedirect();</script>
     <style>
@@ -29,29 +30,22 @@
 </head>
 <body data-page="my-incentives" class="min-h-screen">
 
-    <!-- Top Bar -->
-    <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div class="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
-            <div class="flex items-center gap-3">
-                <button onclick="window.qcSidebar && window.qcSidebar.open()" class="p-1.5 -ml-1.5 rounded-lg hover:bg-gray-100 transition lg:hidden">
-                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                </button>
-                <div>
-                    <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-                        <span class="text-xl">&#127942;</span> My Incentives
-                    </h1>
-                    <p class="text-xs text-gray-500">Lead conversion rewards</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <select id="filterMonth" onchange="loadIncentives()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
-                </select>
-            </div>
+    <!-- Page Header -->
+    <div class="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
+        <div>
+            <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <span class="text-xl">&#127942;</span> My Incentives
+            </h1>
+            <p class="text-xs text-gray-500">Lead conversion rewards</p>
         </div>
-    </header>
+        <div class="flex items-center gap-2">
+            <select id="filterMonth" onchange="loadIncentives()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+            </select>
+        </div>
+    </div>
 
     <!-- Summary Cards -->
-    <div class="max-w-lg mx-auto px-4 pt-4 pb-2">
+    <div class="max-w-lg mx-auto px-4 pb-2">
         <div class="grid grid-cols-3 gap-3">
             <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-3 text-white">
                 <div class="text-xs opacity-80">Conversions</div>
@@ -100,22 +94,6 @@
 
     <!-- Bottom spacing for mobile nav -->
     <div class="h-20"></div>
-
-    <!-- Staff Sidebar -->
-    <script>
-        (function() {
-            var link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css';
-            document.head.appendChild(link);
-            fetch('/components/staff-sidebar.html?_v=' + Date.now(), { cache: 'no-store' })
-                .then(r => r.text()).then(html => {
-                    var d = document.createElement('div');
-                    d.innerHTML = html;
-                    document.body.appendChild(d);
-                });
-        })();
-    </script>
 
     <script>
         const API_BASE = '';
