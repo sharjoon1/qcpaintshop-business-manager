@@ -922,11 +922,16 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         const total = countResult[0].total;
 
         // Grouped products: one row per product with aggregated info
+        // Stock from zoho_location_stock (sum across all branches)
         const [products] = await pool.query(`
             SELECT p.id as product_id, p.name as name, p.product_type,
                    MIN(CAST(zim.zoho_rate AS DECIMAL(10,2))) as min_rate,
                    MAX(CAST(zim.zoho_rate AS DECIMAL(10,2))) as max_rate,
-                   SUM(CAST(zim.zoho_stock_on_hand AS DECIMAL(10,2))) as total_stock,
+                   (SELECT COALESCE(SUM(zls.stock_on_hand), 0) FROM zoho_location_stock zls
+                    WHERE zls.zoho_item_id IN (
+                        SELECT ps3.zoho_item_id FROM pack_sizes ps3
+                        WHERE ps3.product_id = p.id AND ps3.is_active = 1
+                    )) as total_stock,
                    COUNT(DISTINCT ps.id) as variant_count,
                    MAX(zim.zoho_brand) as brand,
                    MAX(zim.zoho_category_name) as category,
@@ -1024,10 +1029,13 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
         const prod = prodRows[0];
 
         // Get all variants (pack sizes) for this product
+        // Stock from zoho_location_stock (sum across all branches)
         const [variants] = await pool.query(`
             SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
-                   zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
+                   zim.zoho_rate as rate,
+                   COALESCE((SELECT SUM(zls.stock_on_hand) FROM zoho_location_stock zls
+                    WHERE zls.zoho_item_id = zim.zoho_item_id), 0) as stock,
                    zim.image_url,
                    ppr.regular_points_per_unit as points_per_unit, ppr.annual_eligible, ppr.annual_pct
             FROM pack_sizes ps
