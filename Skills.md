@@ -2452,6 +2452,17 @@ Based on AI App Analyzer report, fixed critical production errors:
 - **Fixed**: Zoho search dropdown in variant editor — replaced position:fixed dropdown (clipped by modal overflow) with inline results rendered in document flow using event delegation
 - **Fixed**: Orphaned pack_sizes cleanup (5 rows with active pack_sizes on inactive products)
 
+### Mar 3, 2026 — Painter Dashboard Redesign (Logo, Offers, Cards, ID Card, Share)
+- **Header Logo**: Dashboard header now shows business logo from settings table (fallback to app icon)
+- **Offer Products Box**: Replaced flat offer carousel with brand-tabbed product box. New `GET /me/offer-products` endpoint returns products grouped by brand with images/points. Brand pill tabs + horizontal product card scroll.
+- **Visiting Card Redesign**: `painter-card-generator.js` rewritten — photo 180px (was 120), name 34px (was 28), company logo from settings, photo on right side, referral code in footer. Both `generateCard(painter, pool)` and helpers (`loadCompanyLogo`, `loadProfilePhoto`) are shared.
+- **New ID Card**: Portrait badge-style card (600x900) via `generateIdCard(painter, pool)`. Green header, circular photo, referral code box, QR code. Output: `painter_id_{id}.png`. New `GET /me/id-card` endpoint with same caching pattern as visiting card.
+- **Share Fix**: `shareCardFile()` helper uses `navigator.share({ files })` → WhatsApp deep link fallback. Never triggers download. Both visiting card and ID card share buttons use this.
+- **Section Reorder**: Balance → Offers → Cards → Quick Actions → Referral → Estimates → Transactions → Visualizations (viz moved down)
+- **Dashboard API**: `GET /me/dashboard` now returns `businessLogo` and parallelizes all 6 queries with `Promise.all`
+- **Cache Invalidation**: Profile update and photo upload now also reset `id_card_generated_at = NULL`
+- **Migration**: `migrations/migrate-painter-id-card.js` adds `id_card_generated_at TIMESTAMP NULL` to painters table
+
 ### Feb 28, 2026 — Painter Premium Features
 - **Profile Photo Upload**: PUT /me/profile-photo endpoint with Sharp resize (400x400 JPEG). Card cache invalidation on profile changes.
 - **Visiting Card Generator**: `services/painter-card-generator.js` — Sharp composite PNG (1050x600) with gradient header, circular photo, QR code, branding. GET /me/visiting-card with caching.
@@ -2512,12 +2523,12 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 - `migrations/migrate-painters.js` — 10 tables + settings seeds + permissions
 - `migrations/migrate-painter-premium.js` — painter_visualization_requests table + card_generated_at column
 - `services/painter-points-engine.js` — Core points logic (invoice processing, slabs, credit, withdrawals)
-- `services/painter-card-generator.js` — Sharp-based 1050x600 visiting card PNG (gradient header, circular photo, QR code, branding)
+- `services/painter-card-generator.js` — Sharp-based card generator: visiting card (1050x600 landscape) + ID card (600x900 portrait). Shared helpers: loadCompanyLogo, loadProfilePhoto, escapeSvg
 - `routes/painters.js` — ~50 API endpoints (public + painter-auth + admin)
 - `public/admin-painters.html` — Admin 10-tab page (Painters, Points, Rates, Withdrawals, Reports, Estimates, Offers, Training, Catalog, Visualizations)
 - `public/painter-register.html` — Multi-step self-registration (phone OTP → details → referral). Auto-fills `?ref=` code from URL.
 - `public/painter-login.html` — OTP-based painter login
-- `public/painter-dashboard.html` — Premium dashboard (avatar header, stats, offers, visiting card, visualization gallery, quick actions, referrals, estimates, transactions)
+- `public/painter-dashboard.html` — Premium dashboard (logo+avatar header, stats, brand-tabbed offer products, dual card section (visiting+ID), quick actions, referrals, estimates, transactions, visualizations)
 - `public/painter-profile.html` — Profile editing page with avatar photo upload, editable fields, dirty tracking
 - `public/painter-catalog.html` — Product catalog for painters. Stock shown as "In Stock"/"Out of Stock" only (no numeric counts). Detail panel shows "Your Earnings" breakdown (Customer Billing vs Self Billing points per variant). Rates from `painter_product_point_rates` table (admin-configurable in Tab 3).
 - `public/components/painters-subnav.html` — Module sub-navigation
@@ -2525,7 +2536,7 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 
 ### API Endpoints
 - **Public**: POST register, send-otp, verify-otp | GET validate-referral/:code
-- **Painter-Auth** (X-Painter-Token header): GET/PUT /me, PUT /me/profile-photo, GET /me/visiting-card(?format=url), /me/points/:pool, /me/referrals, /me/withdrawals, /me/invoices, /me/attendance, /me/dashboard, POST/GET /me/visualizations | POST /me/withdraw | GET /me/catalog(?search, ?brand, ?category, ?page), GET /me/catalog/:productId (variants with points_per_unit, annual_eligible, annual_pct)
+- **Painter-Auth** (X-Painter-Token header): GET/PUT /me, PUT /me/profile-photo, GET /me/visiting-card(?format=url), GET /me/id-card(?format=url), /me/points/:pool, /me/referrals, /me/withdrawals, /me/invoices, /me/attendance, /me/dashboard (incl. businessLogo), GET /me/offer-products (brand-grouped), POST/GET /me/visualizations | POST /me/withdraw | GET /me/catalog(?search, ?brand, ?category, ?page), GET /me/catalog/:productId (variants with points_per_unit, annual_eligible, annual_pct)
 - **Admin**: GET / (list), GET /:id, PUT /:id, PUT /:id/approve, PUT /:id/credit
 - **Admin Visualizations**: GET /admin/visualizations(?status=), PUT /admin/visualizations/:id, POST /admin/visualizations/:id/upload-result
 - **Points**: GET/POST /:id/points/adjust, POST /invoice/process, GET /invoice/search
@@ -2610,10 +2621,11 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 - `PUT /me` also sets `card_generated_at = NULL` when profile fields change
 
 #### Visiting Card Generator
-- `services/painter-card-generator.js` — Sharp composite: gradient header, circular photo (or initials fallback), QR code, painter details, branded footer
-- Card: 1050x600 PNG, saved to `public/uploads/painter-cards/painter_{id}.png`
+- `services/painter-card-generator.js` — Sharp composite: visiting card (1050x600) + ID card (600x900). Company logo from settings, circular photo (180px, or initials fallback), QR code, gradient header/footer
+- Visiting card: `painter_{id}.png`, ID card: `painter_id_{id}.png`, both in `public/uploads/painter-cards/`
 - QR code links to `{ORIGIN}/painter-register.html?ref={referral_code}`
 - `GET /me/visiting-card` returns PNG image (or `?format=url` for JSON URL)
+- `GET /me/id-card` returns ID card PNG (or `?format=url` for JSON URL)
 - Cache: regenerates when `card_generated_at` is NULL or stale vs `updated_at`
 
 #### Color Visualization System

@@ -304,7 +304,7 @@ router.put('/me', requirePainterAuth, async (req, res) => {
         await pool.query(
             `UPDATE painters SET email = COALESCE(?, email), address = COALESCE(?, address), city = COALESCE(?, city),
              district = COALESCE(?, district), pincode = COALESCE(?, pincode), experience_years = COALESCE(?, experience_years),
-             specialization = COALESCE(?, specialization), card_generated_at = NULL WHERE id = ?`,
+             specialization = COALESCE(?, specialization), card_generated_at = NULL, id_card_generated_at = NULL WHERE id = ?`,
             [email, address, city, district, pincode, experience_years, specialization, req.painter.id]
         );
         res.json({ success: true, message: 'Profile updated' });
@@ -337,7 +337,7 @@ router.put('/me/profile-photo', requirePainterAuth, uploadProfile.single('photo'
         }
 
         const photoUrl = `/uploads/profiles/${filename}?v=${Date.now()}`;
-        await pool.query('UPDATE painters SET profile_photo = ?, card_generated_at = NULL WHERE id = ?', [photoUrl, req.painter.id]);
+        await pool.query('UPDATE painters SET profile_photo = ?, card_generated_at = NULL, id_card_generated_at = NULL WHERE id = ?', [photoUrl, req.painter.id]);
 
         res.json({ success: true, photo_url: photoUrl });
     } catch (error) {
@@ -365,7 +365,7 @@ router.get('/me/visiting-card', requirePainterAuth, async (req, res) => {
             || (painter.updated_at && new Date(painter.updated_at) > new Date(painter.card_generated_at));
 
         if (needsRegen) {
-            await cardGenerator.generateCard(painter);
+            await cardGenerator.generateCard(painter, pool);
             await pool.query('UPDATE painters SET card_generated_at = NOW() WHERE id = ?', [painter.id]);
         }
 
@@ -378,6 +378,39 @@ router.get('/me/visiting-card', requirePainterAuth, async (req, res) => {
     } catch (error) {
         console.error('Visiting card error:', error);
         res.status(500).json({ success: false, message: 'Failed to generate visiting card' });
+    }
+});
+
+// Generate/get painter ID card (portrait badge)
+router.get('/me/id-card', requirePainterAuth, async (req, res) => {
+    try {
+        const [painters] = await pool.query(
+            'SELECT id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo, id_card_generated_at, updated_at FROM painters WHERE id = ?',
+            [req.painter.id]
+        );
+        if (!painters.length) return res.status(404).json({ success: false, message: 'Painter not found' });
+
+        const painter = painters[0];
+        const cardPath = require('path').join(__dirname, '..', 'public', 'uploads', 'painter-cards', `painter_id_${painter.id}.png`);
+        const fs = require('fs');
+
+        const needsRegen = !painter.id_card_generated_at
+            || !fs.existsSync(cardPath)
+            || (painter.updated_at && new Date(painter.updated_at) > new Date(painter.id_card_generated_at));
+
+        if (needsRegen) {
+            await cardGenerator.generateIdCard(painter, pool);
+            await pool.query('UPDATE painters SET id_card_generated_at = NOW() WHERE id = ?', [painter.id]);
+        }
+
+        if (req.query.format === 'url') {
+            res.json({ success: true, url: `/uploads/painter-cards/painter_id_${painter.id}.png?v=${Date.now()}` });
+        } else {
+            res.sendFile(cardPath);
+        }
+    } catch (error) {
+        console.error('ID card error:', error);
+        res.status(500).json({ success: false, message: 'Failed to generate ID card' });
     }
 });
 
@@ -497,11 +530,19 @@ router.get('/me/attendance', requirePainterAuth, async (req, res) => {
 
 router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
     try {
-        const balance = await pointsEngine.getBalance(req.painter.id);
-        const [referralCount] = await pool.query('SELECT COUNT(*) as count FROM painter_referrals WHERE referrer_id = ?', [req.painter.id]);
-        const [recentTxns] = await pool.query('SELECT * FROM painter_point_transactions WHERE painter_id = ? ORDER BY created_at DESC LIMIT 10', [req.painter.id]);
-        const [pendingWithdrawals] = await pool.query('SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM painter_withdrawals WHERE painter_id = ? AND status = "pending"', [req.painter.id]);
-        const [painter] = await pool.query('SELECT referral_code, profile_photo, full_name FROM painters WHERE id = ?', [req.painter.id]);
+        const [balance, [referralCount], [recentTxns], [pendingWithdrawals], [painter], [logoSetting]] = await Promise.all([
+            pointsEngine.getBalance(req.painter.id),
+            pool.query('SELECT COUNT(*) as count FROM painter_referrals WHERE referrer_id = ?', [req.painter.id]),
+            pool.query('SELECT * FROM painter_point_transactions WHERE painter_id = ? ORDER BY created_at DESC LIMIT 10', [req.painter.id]),
+            pool.query('SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM painter_withdrawals WHERE painter_id = ? AND status = "pending"', [req.painter.id]),
+            pool.query('SELECT referral_code, profile_photo, full_name FROM painters WHERE id = ?', [req.painter.id]),
+            pool.query("SELECT setting_value FROM settings WHERE setting_key = 'business_logo' LIMIT 1")
+        ]);
+
+        const logoVal = logoSetting[0]?.setting_value || null;
+        const businessLogo = logoVal
+            ? (logoVal.startsWith('/') ? logoVal : `/uploads/logos/${logoVal}`)
+            : null;
 
         res.json({
             success: true,
@@ -512,7 +553,8 @@ router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
                 painterName: painter[0]?.full_name,
                 referralCount: referralCount[0].count,
                 recentTransactions: recentTxns,
-                pendingWithdrawals: { count: pendingWithdrawals[0].count, total: parseFloat(pendingWithdrawals[0].total) }
+                pendingWithdrawals: { count: pendingWithdrawals[0].count, total: parseFloat(pendingWithdrawals[0].total) },
+                businessLogo
             }
         });
     } catch (error) {
@@ -1123,6 +1165,93 @@ router.get('/me/offers', requirePainterAuth, async (req, res) => {
     } catch (error) {
         console.error('Get offers error:', error);
         res.status(500).json({ success: false, message: 'Failed to load offers' });
+    }
+});
+
+// Offer products grouped by brand (for dashboard offer box)
+router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
+    try {
+        const now = new Date();
+        const [offers] = await pool.query(`
+            SELECT * FROM painter_special_offers
+            WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
+            ORDER BY created_at DESC
+        `, [now, now]);
+
+        if (!offers.length) {
+            return res.json({ success: true, brands: [], products: [], offers: [] });
+        }
+
+        // Build product filter based on offer targets
+        let extraWhere = '';
+        const extraParams = [];
+        const brandOffers = offers.filter(o => o.applies_to === 'brand' && o.target_id);
+        const categoryOffers = offers.filter(o => o.applies_to === 'category' && o.target_id);
+
+        if (brandOffers.length && !offers.some(o => o.applies_to === 'all')) {
+            const brandIds = brandOffers.map(o => o.target_id);
+            const catIds = categoryOffers.map(o => o.target_id);
+            const conditions = [];
+            if (brandIds.length) {
+                conditions.push(`zim.zoho_brand IN (${brandIds.map(() => '?').join(',')})`);
+                extraParams.push(...brandIds);
+            }
+            if (catIds.length) {
+                conditions.push(`zim.zoho_category_name IN (${catIds.map(() => '?').join(',')})`);
+                extraParams.push(...catIds);
+            }
+            if (conditions.length) extraWhere = ` AND (${conditions.join(' OR ')})`;
+        }
+
+        const [products] = await pool.query(`
+            SELECT p.id as product_id, p.name, p.product_type,
+                   MIN(CAST(zim.zoho_rate AS DECIMAL(10,2))) as min_rate,
+                   MAX(CAST(zim.zoho_rate AS DECIMAL(10,2))) as max_rate,
+                   COUNT(DISTINCT ps.id) as variant_count,
+                   MAX(zim.zoho_brand) as brand,
+                   MAX(zim.zoho_category_name) as category,
+                   (SELECT z2.image_url FROM pack_sizes ps2
+                    INNER JOIN zoho_items_map z2 ON z2.zoho_item_id = ps2.zoho_item_id
+                    WHERE ps2.product_id = p.id AND ps2.is_active = 1 AND z2.image_url IS NOT NULL
+                    LIMIT 1) as image_url,
+                   MAX(ppr.regular_points_per_unit) as points_per_unit
+            FROM products p
+            INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+            INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+                AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
+            LEFT JOIN painter_product_point_rates ppr
+                ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+            WHERE p.status = 'active'${extraWhere}
+            GROUP BY p.id, p.name, p.product_type
+            ORDER BY p.name
+            LIMIT 100
+        `, extraParams);
+
+        // Unique brands
+        const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
+
+        res.json({
+            success: true,
+            brands,
+            products: products.map(p => ({
+                ...p,
+                min_rate: p.min_rate ? parseFloat(p.min_rate) : null,
+                max_rate: p.max_rate ? parseFloat(p.max_rate) : null,
+                points_per_unit: p.points_per_unit ? parseFloat(p.points_per_unit) : null
+            })),
+            offers: offers.map(o => ({
+                id: o.id,
+                title: o.title,
+                offer_type: o.offer_type,
+                bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
+                multiplier_value: o.multiplier_value ? parseFloat(o.multiplier_value) : null,
+                applies_to: o.applies_to,
+                target_id: o.target_id
+            }))
+        });
+    } catch (error) {
+        console.error('Offer products error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load offer products' });
     }
 });
 

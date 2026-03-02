@@ -33,17 +33,25 @@
         .referral-code { background: linear-gradient(135deg, #f0fdf4, #fefce8); border: 2px dashed #1B5E3B; border-radius: 12px; padding: 1.25rem; text-align: center; }
         .referral-code code { font-size: 1.5rem; font-weight: 800; color: #1B5E3B; letter-spacing: 2px; }
 
-        /* Offers carousel */
-        .offers-scroll { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
-        .offers-scroll::-webkit-scrollbar { display: none; }
-        .offer-card { flex: 0 0 280px; scroll-snap-align: start; border-radius: 12px; overflow: hidden; position: relative; cursor: pointer; transition: transform 0.2s; }
-        .offer-card:hover { transform: translateY(-2px); }
-        .offer-card-bg { width: 100%; height: 140px; background: linear-gradient(135deg, #1B5E3B, #D4A24E); display: flex; align-items: flex-end; padding: 12px; }
-        .offer-card-bg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-        .offer-card-info { position: relative; z-index: 1; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
-        .offer-card-info h4 { font-size: 0.9375rem; font-weight: 700; line-height: 1.2; }
-        .offer-card-info p { font-size: 0.75rem; opacity: 0.9; margin-top: 2px; }
-        .offer-card-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%); }
+        /* Offer brand tabs & products */
+        .offer-brand-tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+        .offer-brand-tabs::-webkit-scrollbar { display: none; }
+        .offer-brand-tab { flex: 0 0 auto; padding: 6px 14px; border-radius: 20px; font-size: 0.8125rem; font-weight: 600; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+        .offer-brand-tab.active { background: #1B5E3B; color: #fff; border-color: #1B5E3B; }
+        .offer-products-grid { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+        .offer-products-grid::-webkit-scrollbar { display: none; }
+        .offer-product-card { flex: 0 0 140px; background: #fff; border: 1px solid #e8ecf1; border-radius: 10px; overflow: hidden; transition: transform 0.2s; cursor: pointer; }
+        .offer-product-card:hover { transform: translateY(-2px); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .offer-product-card img { width: 100%; height: 100px; object-fit: cover; background: #f8fafc; }
+        .offer-product-card .no-img { width: 100%; height: 100px; background: linear-gradient(135deg, #f0fdf4, #fefce8); display: flex; align-items: center; justify-content: center; }
+        .offer-product-card .card-body { padding: 8px; }
+        .offer-product-card .card-body h4 { font-size: 0.75rem; font-weight: 600; color: #1a1a2e; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .offer-product-card .card-body .pts { font-size: 0.6875rem; color: #1B5E3B; font-weight: 600; margin-top: 2px; }
+
+        /* Cards section */
+        .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .card-preview-wrap { border-radius: 10px; overflow: hidden; border: 1px solid #e8ecf1; background: #f8fafc; }
+        .card-preview-wrap img { width: 100%; display: block; }
 
         /* Bottom nav */
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e5e7eb; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 50; }
@@ -68,6 +76,7 @@
         <div class="max-w-lg mx-auto px-4 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
+                    <img id="headerLogo" src="/icons/icon-72x72.png" style="width:36px;height:36px;border-radius:8px;object-fit:contain" alt="QC">
                     <a href="/painter-profile.html" id="headerAvatarLink">
                         <div id="headerAvatar" style="width:44px;height:44px;border-radius:50%;background:#D4A24E;border:2px solid white;display:flex;align-items:center;justify-content:center;overflow:hidden">
                             <span id="headerInitial" style="color:white;font-size:18px;font-weight:700">P</span>
@@ -127,49 +136,48 @@
             </div>
         </div>
 
-        <!-- Active Offers Section -->
-        <div id="offersSection" class="mb-6" style="display:none">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="font-semibold text-gray-800" data-i18n="dashboard.active_offers">Active Offers</h3>
+        <!-- 1. Offer Products Section (brand-tabbed box) -->
+        <div id="offerProductsSection" class="section-card mb-6" style="display:none">
+            <div class="section-header flex justify-between items-center">
+                <span data-i18n="dashboard.active_offers">Active Offers</span>
                 <a href="/painter-catalog.html" class="text-sm text-emerald-700 font-medium" data-i18n="dashboard.view_all">View All</a>
             </div>
-            <div class="offers-scroll" id="offersCarousel"></div>
+            <div class="section-body">
+                <div id="offerBrandTabs" class="offer-brand-tabs mb-3"></div>
+                <div id="offerProductsGrid" class="offer-products-grid"></div>
+            </div>
         </div>
 
-        <!-- My Visiting Card -->
-        <div class="section-card mb-6" id="visitingCardSection">
-            <div class="section-header flex justify-between items-center">
-                <span>My Visiting Card</span>
-                <button onclick="shareVisitingCard()" class="text-sm text-emerald-700 font-medium flex items-center gap-1">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                    Share
-                </button>
-            </div>
-            <div class="section-body" id="visitingCardBody">
-                <div class="text-center py-4">
-                    <div id="cardPreview" style="border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
-                        <div class="text-sm text-gray-400 py-8">Loading card...</div>
+        <!-- 2. My Cards (Visiting + ID) -->
+        <div class="section-card mb-6" id="myCardsSection">
+            <div class="section-header">My Cards</div>
+            <div class="section-body">
+                <div class="cards-grid">
+                    <!-- Visiting Card -->
+                    <div>
+                        <div class="card-preview-wrap mb-2" id="visitingCardPreview">
+                            <div class="text-center py-6 text-sm text-gray-400">Loading...</div>
+                        </div>
+                        <button onclick="shareVisitingCard()" class="w-full text-sm py-2 rounded-lg font-medium text-white flex items-center justify-center gap-1.5" style="background:#1B5E3B">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                            Share with Customers
+                        </button>
                     </div>
-                    <div class="flex gap-2 mt-3 justify-center">
-                        <button onclick="downloadVisitingCard()" class="text-sm px-4 py-2 rounded-lg font-medium text-white" style="background:#1B5E3B">Download</button>
-                        <button onclick="shareVisitingCard()" class="text-sm px-4 py-2 rounded-lg font-medium text-white" style="background:#D4A24E">Share</button>
+                    <!-- ID Card -->
+                    <div>
+                        <div class="card-preview-wrap mb-2" id="idCardPreview" style="max-width:240px;margin:0 auto">
+                            <div class="text-center py-6 text-sm text-gray-400">Loading...</div>
+                        </div>
+                        <button onclick="shareIdCard()" class="w-full text-sm py-2 rounded-lg font-medium text-white flex items-center justify-center gap-1.5" style="background:#D4A24E">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                            Share with Painters
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- My Visualizations -->
-        <div class="section-card mb-6" id="vizSection">
-            <div class="section-header flex justify-between items-center">
-                <span>My Visualizations</span>
-                <button onclick="showVizModal()" class="text-sm text-emerald-700 font-medium">+ Request</button>
-            </div>
-            <div class="section-body" id="vizGallery">
-                <div class="text-center py-4 text-gray-400 text-sm">Loading...</div>
-            </div>
-        </div>
-
-        <!-- Quick Actions (horizontal scroll) -->
+        <!-- 3. Quick Actions (horizontal scroll) -->
         <div class="flex gap-3 overflow-x-auto mb-6 pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch">
             <a class="action-btn flex-shrink-0" href="/painter-estimate-create.html" style="min-width:80px">
                 <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
@@ -179,7 +187,7 @@
                 <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                 <div class="text-xs font-medium" data-i18n="dashboard.withdraw">Withdraw</div>
             </a>
-            <a class="action-btn flex-shrink-0" onclick="loadVisitingCard()" style="min-width:80px">
+            <a class="action-btn flex-shrink-0" onclick="shareVisitingCard()" style="min-width:80px">
                 <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                 <div class="text-xs font-medium">Card</div>
             </a>
@@ -193,7 +201,7 @@
             </a>
         </div>
 
-        <!-- Referral Code -->
+        <!-- 4. Referral Code -->
         <div class="referral-code mb-6">
             <p class="text-sm text-gray-500 mb-2" data-i18n="dashboard.share_referral_code">Share your referral code</p>
             <code id="referralCode">---</code>
@@ -204,7 +212,7 @@
             <p class="text-xs text-gray-400 mt-1">Share with your visiting card attached</p>
         </div>
 
-        <!-- My Estimates -->
+        <!-- 5. My Estimates -->
         <div class="section-card mb-6">
             <div class="section-header flex justify-between items-center">
                 <span data-i18n="dashboard.my_estimates">My Estimates</span>
@@ -215,7 +223,7 @@
             </div>
         </div>
 
-        <!-- Recent Transactions -->
+        <!-- 6. Recent Transactions -->
         <div class="section-card mb-6">
             <div class="section-header flex justify-between items-center">
                 <span data-i18n="dashboard.recent_transactions">Recent Transactions</span>
@@ -223,6 +231,17 @@
             </div>
             <div class="section-body" id="recentTransactions">
                 <div class="text-center py-4 text-gray-400 text-sm" data-i18n="common.loading">Loading...</div>
+            </div>
+        </div>
+
+        <!-- 7. My Visualizations (moved down) -->
+        <div class="section-card mb-6" id="vizSection">
+            <div class="section-header flex justify-between items-center">
+                <span>My Visualizations</span>
+                <button onclick="showVizModal()" class="text-sm text-emerald-700 font-medium">+ Request</button>
+            </div>
+            <div class="section-body" id="vizGallery">
+                <div class="text-center py-4 text-gray-400 text-sm">Loading...</div>
             </div>
         </div>
 
@@ -255,28 +274,24 @@
     <nav class="bottom-nav" id="bottomNav">
         <div class="flex justify-around items-center h-16 max-w-lg mx-auto">
             <a href="/painter-dashboard.html" class="active">
-                <!-- Heroicons: home -->
                 <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/>
                 </svg>
                 <span data-i18n="common.home">Home</span>
             </a>
             <a href="/painter-catalog.html">
-                <!-- Heroicons: squares-2x2 (catalog/grid) -->
                 <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
                 </svg>
                 <span data-i18n="common.catalog">Catalog</span>
             </a>
             <a href="/painter-estimate-create.html">
-                <!-- Heroicons: document-text (estimate) -->
                 <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
                 <span data-i18n="common.estimate">Estimate</span>
             </a>
             <a href="/painter-training.html">
-                <!-- Heroicons: academic-cap (training) -->
                 <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 14l9-5-9-5-9 5 9 5z"/>
                     <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
@@ -285,7 +300,6 @@
                 <span data-i18n="common.training">Training</span>
             </a>
             <a href="/painter-attendance.html">
-                <!-- Heroicons: map-pin (attendance/location) -->
                 <svg viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                     <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -357,7 +371,6 @@
             'X-Painter-Token': localStorage.getItem('painter_token') || ''
         };
     }
-    // Alias for consistency with task spec
     function getHeaders() { return painterHeaders(); }
 
     function logout() {
@@ -386,6 +399,11 @@
             if (!data.success) throw new Error(data.message);
 
             dashboardData = data.dashboard;
+
+            // Update header logo
+            if (data.dashboard.businessLogo) {
+                document.getElementById('headerLogo').src = data.dashboard.businessLogo;
+            }
 
             // Update header avatar
             if (data.dashboard.profilePhoto) {
@@ -529,27 +547,20 @@
 
         const text = `Join Quality Colours Painter Loyalty Program! Use my referral code: ${code}\n\nRegister here: ${window.location.origin}/painter-register.html?ref=${code}`;
 
-        // Try native share first
         if (navigator.share) {
             try {
                 await navigator.share({ title: 'Quality Colours Painter Program', text });
                 showToast('Shared successfully!');
                 return;
-            } catch (e) {
-                // User cancelled or share failed — fall through to clipboard
-            }
+            } catch (e) { /* fall through */ }
         }
 
-        // Try clipboard
         try {
             await navigator.clipboard.writeText(text);
             showToast('Referral code copied to clipboard!');
             return;
-        } catch (e) {
-            // Clipboard failed — show WhatsApp + manual copy
-        }
+        } catch (e) { /* fall through */ }
 
-        // Fallback: WhatsApp deep link + show text in bottom sheet
         const waUrl = 'https://wa.me/?text=' + encodeURIComponent(text);
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 bg-black/50 flex items-end justify-center z-50';
@@ -582,48 +593,64 @@
         return div.innerHTML;
     }
 
-    // ============ Active Offers ============
-    async function loadOffers() {
+    // ============ Offer Products (brand-tabbed box) ============
+    let offerProductsData = null;
+    let selectedOfferBrand = 'all';
+
+    async function loadOfferProducts() {
         try {
-            const res = await fetch(`${API}/me/offers`, { headers: painterHeaders() });
+            const res = await fetch(`${API}/me/offer-products`, { headers: painterHeaders() });
             const data = await res.json();
-            if (!data.success || !data.offers || !data.offers.length) return;
+            if (!data.success || !data.products || !data.products.length) return;
 
-            const section = document.getElementById('offersSection');
-            const carousel = document.getElementById('offersCarousel');
-            section.style.display = 'block';
+            offerProductsData = data;
+            document.getElementById('offerProductsSection').style.display = 'block';
 
-            carousel.innerHTML = data.offers.map(offer => {
-                const hasImage = offer.banner_image || offer.image_url;
-                const dateRange = formatOfferDates(offer.start_date, offer.end_date);
-                return `
-                    <div class="offer-card" onclick="window.location.href='/painter-catalog.html'">
-                        <div class="offer-card-bg">
-                            ${hasImage ? `<img src="${esc(hasImage)}" alt="${esc(offer.title)}" onerror="this.style.display='none'">` : ''}
-                            <div class="offer-card-overlay"></div>
-                            <div class="offer-card-info">
-                                <h4>${esc(offer.title)}</h4>
-                                <p>${esc(offer.description || '')}</p>
-                                ${dateRange ? `<p class="mt-1 opacity-75">${dateRange}</p>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            // Build brand tabs
+            const tabsHtml = '<button class="offer-brand-tab active" onclick="filterOfferProducts(this, \'all\')">All</button>' +
+                data.brands.map(b => `<button class="offer-brand-tab" onclick="filterOfferProducts(this, '${esc(b)}')">${esc(b)}</button>`).join('');
+            document.getElementById('offerBrandTabs').innerHTML = tabsHtml;
+
+            renderOfferProducts('all');
         } catch (err) {
-            console.error('Load offers error:', err);
+            console.error('Load offer products error:', err);
         }
     }
 
-    function formatOfferDates(start, end) {
-        if (!start && !end) return '';
-        const opts = { month: 'short', day: 'numeric' };
-        const s = start ? new Date(start).toLocaleDateString('en-IN', opts) : '';
-        const e = end ? new Date(end).toLocaleDateString('en-IN', opts) : '';
-        if (s && e) return `${s} - ${e}`;
-        if (s) return `From ${s}`;
-        if (e) return `Until ${e}`;
-        return '';
+    function filterOfferProducts(btn, brand) {
+        selectedOfferBrand = brand;
+        document.querySelectorAll('.offer-brand-tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        renderOfferProducts(brand);
+    }
+
+    function renderOfferProducts(brand) {
+        if (!offerProductsData) return;
+        const products = brand === 'all'
+            ? offerProductsData.products
+            : offerProductsData.products.filter(p => p.brand === brand);
+
+        const grid = document.getElementById('offerProductsGrid');
+        if (!products.length) {
+            grid.innerHTML = '<div class="text-sm text-gray-400 py-4 text-center w-full">No products for this brand</div>';
+            return;
+        }
+
+        grid.innerHTML = products.map(p => {
+            const imgHtml = p.image_url
+                ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" onerror="this.parentElement.innerHTML='<div class=\\'no-img\\'><svg width=\\'32\\' height=\\'32\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'#94a3b8\\' stroke-width=\\'1.5\\'><rect x=\\'3\\' y=\\'3\\' width=\\'18\\' height=\\'18\\' rx=\\'2\\'/><circle cx=\\'8.5\\' cy=\\'8.5\\' r=\\'1.5\\'/><path d=\\'M21 15l-5-5L5 21\\'/></svg></div>'">`
+                : '<div class="no-img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>';
+            const ptsText = p.points_per_unit ? `${p.points_per_unit} pts` : '';
+            return `
+                <div class="offer-product-card" onclick="window.location.href='/painter-catalog.html'">
+                    ${imgHtml}
+                    <div class="card-body">
+                        <h4>${esc(p.name)}</h4>
+                        ${ptsText ? `<div class="pts">${ptsText}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     // ============ Notifications ============
@@ -640,7 +667,6 @@
                     badge.classList.add('hidden');
                 }
 
-                // Render notification list
                 const list = document.getElementById('notifList');
                 if (data.notifications && data.notifications.length) {
                     list.innerHTML = data.notifications.map(n => `
@@ -789,8 +815,9 @@
         }
     }
 
-    // ============ Visiting Card ============
+    // ============ Cards (Visiting + ID) ============
     let visitingCardUrl = null;
+    let idCardUrl = null;
 
     async function loadVisitingCard() {
         try {
@@ -798,46 +825,68 @@
             const data = await res.json();
             if (data.success && data.url) {
                 visitingCardUrl = data.url;
-                document.getElementById('cardPreview').innerHTML = `<img src="${data.url}" style="width:100%;display:block" alt="Visiting Card">`;
+                document.getElementById('visitingCardPreview').innerHTML = `<img src="${data.url}" alt="Visiting Card">`;
             }
         } catch (err) {
             console.error('Load visiting card error:', err);
-            document.getElementById('cardPreview').innerHTML = '<div class="text-sm text-gray-400 py-8">Could not load card</div>';
+            document.getElementById('visitingCardPreview').innerHTML = '<div class="text-sm text-gray-400 py-6 text-center">Could not load card</div>';
         }
     }
 
-    async function downloadVisitingCard() {
-        if (!visitingCardUrl) await loadVisitingCard();
-        if (!visitingCardUrl) { showToast('Card not available', 'error'); return; }
-        const a = document.createElement('a');
-        a.href = visitingCardUrl;
-        a.download = 'visiting-card.png';
-        a.click();
+    async function loadIdCard() {
+        try {
+            const res = await fetch(`${API}/me/id-card?format=url`, { headers: painterHeaders() });
+            const data = await res.json();
+            if (data.success && data.url) {
+                idCardUrl = data.url;
+                document.getElementById('idCardPreview').innerHTML = `<img src="${data.url}" alt="ID Card">`;
+            }
+        } catch (err) {
+            console.error('Load ID card error:', err);
+            document.getElementById('idCardPreview').innerHTML = '<div class="text-sm text-gray-400 py-6 text-center">Could not load card</div>';
+        }
+    }
+
+    /**
+     * Shared card share helper — uses native share with file, falls back to WhatsApp deep link.
+     * Never downloads.
+     */
+    async function shareCardFile(cardUrl, fileName, title, text) {
+        if (!cardUrl) { showToast('Card not available yet', 'error'); return; }
+
+        try {
+            const response = await fetch(cardUrl);
+            const blob = await response.blob();
+            const file = new File([blob], fileName, { type: 'image/png' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ title, text, files: [file] });
+                showToast('Card shared!');
+                return;
+            }
+        } catch (e) {
+            // User cancelled or share not supported — fall through
+            if (e.name === 'AbortError') return; // user cancelled, don't fallback
+        }
+
+        // Fallback: WhatsApp deep link with text (no file, but at least opens WhatsApp)
+        const waUrl = 'https://wa.me/?text=' + encodeURIComponent(text);
+        window.open(waUrl, '_blank');
+        showToast('Opening WhatsApp...');
     }
 
     async function shareVisitingCard() {
         if (!visitingCardUrl) await loadVisitingCard();
-        if (!visitingCardUrl) { showToast('Card not available', 'error'); return; }
+        const code = dashboardData?.referralCode || '';
+        const text = `I am a Quality Colours registered painter. For all your painting needs, contact me!\nVisit: ${window.location.origin}/painter-register.html?ref=${code}`;
+        await shareCardFile(visitingCardUrl, 'QC-Painter-Card.png', 'My QC Painter Visiting Card', text);
+    }
 
-        try {
-            const response = await fetch(visitingCardUrl);
-            const blob = await response.blob();
-            const file = new File([blob], 'QC-Painter-Card.png', { type: 'image/png' });
-
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    title: 'My QC Painter Visiting Card',
-                    text: `Quality Colours Painter\nRegister: ${window.location.origin}/painter-register.html?ref=${dashboardData?.referralCode || ''}`,
-                    files: [file]
-                });
-                showToast('Card shared!');
-                return;
-            }
-        } catch (e) { /* fallback below */ }
-
-        // Fallback: download + copy link
-        downloadVisitingCard();
-        showToast('Card downloaded! You can share it manually.');
+    async function shareIdCard() {
+        if (!idCardUrl) await loadIdCard();
+        const code = dashboardData?.referralCode || '';
+        const text = `Join Quality Colours Painter Loyalty Program! Use my referral code: ${code}\nEarn points on every paint purchase. Register now:\n${window.location.origin}/painter-register.html?ref=${code}`;
+        await shareCardFile(idCardUrl, 'QC-Painter-ID.png', 'QC Painter ID Card', text);
     }
 
     // ============ Visualizations ============
@@ -986,9 +1035,10 @@
     // ============ Init ============
     loadDashboard();
     loadEstimates();
-    loadOffers();
+    loadOfferProducts();
     loadNotifications();
     loadVisitingCard();
+    loadIdCard();
     loadVisualizations();
 
     // Defer socket and FCM after page load
