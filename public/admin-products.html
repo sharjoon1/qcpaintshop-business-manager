@@ -671,6 +671,7 @@
                                 value="${ps.zoho_item_name ? ps.zoho_item_name.replace(/"/g, '&quot;') : ''}"
                                 oninput="debounceZohoSearch(${idx})"
                                 onfocus="debounceZohoSearch(${idx})"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault();debounceZohoSearch(${idx})}"
                             >
                             <div id="zohoDropdown_${idx}" class="bg-white border border-gray-300 rounded-b shadow-lg max-h-40 overflow-y-auto" style="display:none;position:fixed;z-index:9999;width:300px"></div>
                         </div>

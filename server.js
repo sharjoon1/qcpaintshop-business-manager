@@ -2503,7 +2503,9 @@ app.post('/api/products/bulk-map', requirePermission('products', 'edit'), async 
 app.get('/api/products/mapped-zoho-ids', requireAuth, async (req, res) => {
     try {
         const [rows] = await pool.query(
-            "SELECT DISTINCT zoho_item_id FROM pack_sizes WHERE zoho_item_id IS NOT NULL AND zoho_item_id != '' AND is_active = 1"
+            `SELECT DISTINCT ps.zoho_item_id FROM pack_sizes ps
+             INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
+             WHERE ps.zoho_item_id IS NOT NULL AND ps.zoho_item_id != '' AND ps.is_active = 1`
         );
         res.json({ success: true, ids: rows.map(r => r.zoho_item_id) });
     } catch (err) {
@@ -2783,6 +2785,8 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
 app.delete('/api/products/:id', requirePermission('products', 'delete'), async (req, res) => {
     try {
         await pool.query('UPDATE products SET status = ? WHERE id = ?', ['inactive', req.params.id]);
+        // Also deactivate pack_sizes so their Zoho mappings are freed
+        await pool.query('UPDATE pack_sizes SET is_active = 0 WHERE product_id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
