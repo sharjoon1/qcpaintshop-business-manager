@@ -974,42 +974,13 @@ router.post('/my/:id/convert', requirePermission('leads', 'own.edit'), async (re
             [leadId]
         );
 
-        // Auto-create incentive record for this conversion
-        const incentiveMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        try {
-            const [incentiveConfig] = await connection.query(
-                "SELECT config_value FROM ai_config WHERE config_key = 'incentive_per_conversion'"
-            );
-            const incentiveAmount = incentiveConfig.length > 0 ? parseFloat(incentiveConfig[0].config_value) || 500 : 500;
-
-            const [incentiveEnabled] = await connection.query(
-                "SELECT config_value FROM ai_config WHERE config_key = 'incentive_enabled'"
-            );
-            const isEnabled = incentiveEnabled.length > 0 ? incentiveEnabled[0].config_value === 'true' : true;
-
-            if (isEnabled) {
-                const [autoApprove] = await connection.query(
-                    "SELECT config_value FROM ai_config WHERE config_key = 'incentive_auto_approve'"
-                );
-                const autoApproveVal = autoApprove.length > 0 && autoApprove[0].config_value === 'true';
-
-                await connection.query(
-                    `INSERT INTO staff_incentives (user_id, lead_id, customer_id, lead_type, incentive_month, amount, status, notes)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [req.user.id, leadId, customerId, lead_type, incentiveMonth, incentiveAmount,
-                     autoApproveVal ? 'approved' : 'pending',
-                     `Auto-created: Lead "${lead.name}" converted to ${typeLabel}`]
-                );
-            }
-        } catch (incErr) {
-            console.error('Auto-incentive creation error (non-fatal):', incErr);
-        }
-
         await connection.commit();
         connection.release();
 
         // NOTE: Zoho contact is NOT created here. It will be created later
         // when estimate is confirmed and payment is received.
+        // NOTE: Incentive is NOT created here. It will be created when
+        // payment is received for the estimate (in push-zoho endpoint).
 
         res.status(201).json({
             success: true,
@@ -2001,44 +1972,13 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
             [leadId]
         );
 
-        // Auto-create incentive for the assigned staff (if lead has assigned_to)
-        if (lead.assigned_to) {
-            const incentiveMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            try {
-                const [incentiveConfig] = await connection.query(
-                    "SELECT config_value FROM ai_config WHERE config_key = 'incentive_per_conversion'"
-                );
-                const incentiveAmount = incentiveConfig.length > 0 ? parseFloat(incentiveConfig[0].config_value) || 500 : 500;
-
-                const [incentiveEnabled] = await connection.query(
-                    "SELECT config_value FROM ai_config WHERE config_key = 'incentive_enabled'"
-                );
-                const isEnabled = incentiveEnabled.length > 0 ? incentiveEnabled[0].config_value === 'true' : true;
-
-                if (isEnabled) {
-                    const [autoApprove] = await connection.query(
-                        "SELECT config_value FROM ai_config WHERE config_key = 'incentive_auto_approve'"
-                    );
-                    const autoApproveVal = autoApprove.length > 0 && autoApprove[0].config_value === 'true';
-
-                    await connection.query(
-                        `INSERT INTO staff_incentives (user_id, lead_id, customer_id, lead_type, incentive_month, amount, status, notes)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                        [lead.assigned_to, leadId, customerId, lead_type, incentiveMonth, incentiveAmount,
-                         autoApproveVal ? 'approved' : 'pending',
-                         `Auto-created: Lead "${lead.name}" converted to ${typeLabel} by admin`]
-                    );
-                }
-            } catch (incErr) {
-                console.error('Auto-incentive creation error (non-fatal):', incErr);
-            }
-        }
-
         await connection.commit();
         connection.release();
 
         // NOTE: Zoho contact is NOT created here. It will be created later
         // when estimate is confirmed and payment is received.
+        // NOTE: Incentive is NOT created here. It will be created when
+        // payment is received for the estimate (in push-zoho endpoint).
 
         const [newCustomer] = await pool.query('SELECT * FROM customers WHERE id = ?', [customerId]);
 

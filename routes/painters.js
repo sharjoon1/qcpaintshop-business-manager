@@ -2435,6 +2435,78 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
         );
         await logEstimateStatusChange(estimate.id, 'payment_recorded', 'pushed_to_zoho', req.user.id, `Zoho invoice: ${invoiceNumber}`);
 
+        // 5. Auto-create staff incentive if this estimate's customer came from a converted lead
+        try {
+            // Match customer to a converted lead by name+phone
+            const customerName = estimate.customer_name || estimate.painter_name;
+            const customerPhone = estimate.customer_phone || estimate.painter_phone;
+
+            let leadMatch = null;
+            if (customerPhone) {
+                const [leads] = await pool.query(
+                    `SELECT l.id, l.assigned_to, l.name, l.lead_type, l.customer_id
+                     FROM leads l
+                     WHERE l.status = 'won' AND l.lead_type IS NOT NULL AND l.customer_id IS NOT NULL
+                       AND l.phone = ?
+                     ORDER BY l.converted_at DESC LIMIT 1`,
+                    [customerPhone]
+                );
+                if (leads.length > 0) leadMatch = leads[0];
+            }
+            if (!leadMatch && customerName) {
+                const [leads] = await pool.query(
+                    `SELECT l.id, l.assigned_to, l.name, l.lead_type, l.customer_id
+                     FROM leads l
+                     WHERE l.status = 'won' AND l.lead_type IS NOT NULL AND l.customer_id IS NOT NULL
+                       AND l.name = ?
+                     ORDER BY l.converted_at DESC LIMIT 1`,
+                    [customerName]
+                );
+                if (leads.length > 0) leadMatch = leads[0];
+            }
+
+            if (leadMatch && leadMatch.assigned_to) {
+                // Check if incentive already exists for this lead
+                const [existingIncentive] = await pool.query(
+                    'SELECT id FROM staff_incentives WHERE lead_id = ?', [leadMatch.id]
+                );
+
+                if (existingIncentive.length === 0) {
+                    const [incentiveEnabled] = await pool.query(
+                        "SELECT config_value FROM ai_config WHERE config_key = 'incentive_enabled'"
+                    );
+                    const isEnabled = !incentiveEnabled.length || incentiveEnabled[0].config_value === 'true';
+
+                    if (isEnabled) {
+                        const [incentiveConfig] = await pool.query(
+                            "SELECT config_value FROM ai_config WHERE config_key = 'incentive_per_conversion'"
+                        );
+                        const incentiveAmount = incentiveConfig.length > 0 ? parseFloat(incentiveConfig[0].config_value) || 500 : 500;
+
+                        const [autoApprove] = await pool.query(
+                            "SELECT config_value FROM ai_config WHERE config_key = 'incentive_auto_approve'"
+                        );
+                        const autoApproveVal = autoApprove.length > 0 && autoApprove[0].config_value === 'true';
+
+                        const now = new Date();
+                        const incentiveMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+                        await pool.query(
+                            `INSERT INTO staff_incentives (user_id, lead_id, customer_id, lead_type, incentive_month, amount, status, notes)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [leadMatch.assigned_to, leadMatch.id, leadMatch.customer_id, leadMatch.lead_type,
+                             incentiveMonth, incentiveAmount,
+                             autoApproveVal ? 'approved' : 'pending',
+                             `Payment received: Estimate #${estimate.estimate_number}, Zoho Invoice: ${invoiceNumber}`]
+                        );
+                        console.log(`[Incentive] Created for staff ${leadMatch.assigned_to}, lead ${leadMatch.id}, amount ${incentiveAmount}`);
+                    }
+                }
+            }
+        } catch (incErr) {
+            console.error('Auto-incentive on payment error (non-fatal):', incErr);
+        }
+
         res.json({
             success: true,
             message: 'Invoice pushed to Zoho and points awarded',
