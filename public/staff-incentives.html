@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>My Incentives - QC Paint Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        body { background: #f8fafc; }
+
+        .incentive-card {
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        @media (hover: hover) {
+            .incentive-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px -4px rgba(0,0,0,0.1); }
+        }
+    </style>
+</head>
+<body data-page="my-incentives" class="min-h-screen">
+
+    <!-- Top Bar -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
+            <div class="flex items-center gap-3">
+                <button onclick="window.qcSidebar && window.qcSidebar.open()" class="p-1.5 -ml-1.5 rounded-lg hover:bg-gray-100 transition lg:hidden">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <div>
+                    <h1 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <span class="text-xl">&#127942;</span> My Incentives
+                    </h1>
+                    <p class="text-xs text-gray-500">Lead conversion rewards</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <select id="filterMonth" onchange="loadIncentives()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <!-- Summary Cards -->
+    <div class="max-w-lg mx-auto px-4 pt-4 pb-2">
+        <div class="grid grid-cols-3 gap-3">
+            <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-3 text-white">
+                <div class="text-xs opacity-80">Conversions</div>
+                <div class="text-2xl font-bold mt-1" id="totalConversions">0</div>
+            </div>
+            <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-3 text-white">
+                <div class="text-xs opacity-80">Approved</div>
+                <div class="text-xl font-bold mt-1" id="approvedAmt">&#8377;0</div>
+            </div>
+            <div class="bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl p-3 text-white">
+                <div class="text-xs opacity-80">Pending</div>
+                <div class="text-xl font-bold mt-1" id="pendingAmt">&#8377;0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Type Breakdown -->
+    <div class="max-w-lg mx-auto px-4 py-2">
+        <div class="flex gap-2 overflow-x-auto scroll-hide pb-1" id="typeBreakdown">
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="max-w-lg mx-auto px-4 py-2">
+        <div class="flex gap-2 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
+            <button onclick="filterByStatus('')" class="filter-tab flex-1 py-2 text-xs font-semibold rounded-lg transition bg-indigo-50 text-indigo-700" data-status="">All</button>
+            <button onclick="filterByStatus('approved')" class="filter-tab flex-1 py-2 text-xs font-semibold rounded-lg transition text-gray-500" data-status="approved">Approved</button>
+            <button onclick="filterByStatus('pending')" class="filter-tab flex-1 py-2 text-xs font-semibold rounded-lg transition text-gray-500" data-status="pending">Pending</button>
+            <button onclick="filterByStatus('rejected')" class="filter-tab flex-1 py-2 text-xs font-semibold rounded-lg transition text-gray-500" data-status="rejected">Rejected</button>
+        </div>
+    </div>
+
+    <!-- Incentive List -->
+    <div class="max-w-lg mx-auto px-4 py-3">
+        <div id="loading" class="text-center py-12 text-gray-400">
+            <svg class="w-8 h-8 mx-auto animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            <p class="mt-2 text-sm">Loading incentives...</p>
+        </div>
+        <div id="emptyState" class="text-center py-16 hidden">
+            <div class="text-5xl mb-3 opacity-30">&#127942;</div>
+            <h3 class="text-gray-500 font-semibold">No incentives yet</h3>
+            <p class="text-gray-400 text-sm mt-1">Convert leads and close sales to earn incentives!</p>
+        </div>
+        <div id="incentiveList" class="space-y-3 hidden"></div>
+    </div>
+
+    <!-- Bottom spacing for mobile nav -->
+    <div class="h-20"></div>
+
+    <!-- Staff Sidebar -->
+    <script>
+        (function() {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css';
+            document.head.appendChild(link);
+            fetch('/components/staff-sidebar.html?_v=' + Date.now(), { cache: 'no-store' })
+                .then(r => r.text()).then(html => {
+                    var d = document.createElement('div');
+                    d.innerHTML = html;
+                    document.body.appendChild(d);
+                });
+        })();
+    </script>
+
+    <script>
+        const API_BASE = '';
+        let allIncentives = [];
+        let currentStatusFilter = '';
+
+        function getHeaders() {
+            return {
+                'Authorization': 'Bearer ' + localStorage.getItem('auth_token'),
+                'Content-Type': 'application/json'
+            };
+        }
+
+        function fmtINR(n) {
+            return parseFloat(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        }
+
+        // Populate month filter (last 6 months)
+        function initMonthFilter() {
+            const sel = document.getElementById('filterMonth');
+            const now = new Date();
+            for (let i = 0; i < 6; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                const label = d.toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+                sel.innerHTML += `<option value="${val}" ${i === 0 ? 'selected' : ''}>${label}</option>`;
+            }
+        }
+
+        async function loadIncentives() {
+            const month = document.getElementById('filterMonth').value;
+
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('incentiveList').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+
+            try {
+                const res = await fetch(`${API_BASE}/api/salary/incentives?month=${month}`, {
+                    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('auth_token') }
+                });
+                const result = await res.json();
+
+                document.getElementById('loading').classList.add('hidden');
+
+                if (result.success && result.data.length > 0) {
+                    allIncentives = result.data;
+                    updateSummary(result.summary);
+                    updateTypeBreakdown(result.data);
+                    renderIncentives(result.data);
+                    document.getElementById('incentiveList').classList.remove('hidden');
+                } else {
+                    allIncentives = [];
+                    updateSummary({ total: 0, pending_count: 0, approved_count: 0, approved_amount: 0, pending_amount: 0 });
+                    updateTypeBreakdown([]);
+                    document.getElementById('emptyState').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+            }
+        }
+
+        function updateSummary(s) {
+            document.getElementById('totalConversions').textContent = s.total || 0;
+            document.getElementById('approvedAmt').textContent = '\u20B9' + fmtINR(s.approved_amount);
+            document.getElementById('pendingAmt').textContent = '\u20B9' + fmtINR(s.pending_amount);
+        }
+
+        function updateTypeBreakdown(data) {
+            const container = document.getElementById('typeBreakdown');
+            const counts = { customer: 0, painter: 0, engineer: 0 };
+            data.forEach(i => { if (counts[i.lead_type] !== undefined) counts[i.lead_type]++; });
+
+            const colors = {
+                customer: { bg: 'bg-blue-50', text: 'text-blue-700', icon: '&#128100;' },
+                painter: { bg: 'bg-green-50', text: 'text-green-700', icon: '&#127912;' },
+                engineer: { bg: 'bg-amber-50', text: 'text-amber-700', icon: '&#128736;' }
+            };
+
+            container.innerHTML = Object.entries(counts).map(([type, count]) => {
+                const c = colors[type];
+                return `<div class="${c.bg} ${c.text} rounded-xl px-4 py-2 flex items-center gap-2 flex-shrink-0">
+                    <span class="text-lg">${c.icon}</span>
+                    <span class="font-semibold text-sm">${count}</span>
+                    <span class="text-xs opacity-70">${type}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function filterByStatus(status) {
+            currentStatusFilter = status;
+            document.querySelectorAll('.filter-tab').forEach(t => {
+                const isActive = t.dataset.status === status;
+                t.className = `filter-tab flex-1 py-2 text-xs font-semibold rounded-lg transition ${isActive ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500'}`;
+            });
+
+            const filtered = status ? allIncentives.filter(i => i.status === status) : allIncentives;
+
+            if (filtered.length > 0) {
+                renderIncentives(filtered);
+                document.getElementById('incentiveList').classList.remove('hidden');
+                document.getElementById('emptyState').classList.add('hidden');
+            } else {
+                document.getElementById('incentiveList').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+            }
+        }
+
+        function renderIncentives(data) {
+            const container = document.getElementById('incentiveList');
+
+            const statusConfig = {
+                approved: { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-700', icon: '&#10003;', label: 'Approved' },
+                pending: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', icon: '&#9202;', label: 'Pending' },
+                rejected: { bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-700', icon: '&#10007;', label: 'Rejected' }
+            };
+
+            const typeColors = {
+                customer: 'bg-blue-100 text-blue-700',
+                painter: 'bg-green-100 text-green-700',
+                engineer: 'bg-amber-100 text-amber-700'
+            };
+
+            container.innerHTML = data.map(i => {
+                const s = statusConfig[i.status] || statusConfig.pending;
+                const created = new Date(i.created_at);
+                const dateStr = created.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
+                return `<div class="incentive-card ${s.bg} border ${s.border} rounded-xl p-4">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="text-sm font-bold text-gray-900">${i.lead_name || 'Manual'}</span>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${typeColors[i.lead_type] || ''}">${i.lead_type}</span>
+                            </div>
+                            ${i.lead_phone ? `<p class="text-xs text-gray-500 mb-1">${i.lead_phone}</p>` : ''}
+                            ${i.notes ? `<p class="text-xs text-gray-500 truncate">${i.notes}</p>` : ''}
+                        </div>
+                        <div class="text-right flex-shrink-0 ml-3">
+                            <div class="text-lg font-bold text-gray-900">\u20B9${fmtINR(i.amount)}</div>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${s.badge}">
+                                ${s.label}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-200/50">
+                        <span class="text-[11px] text-gray-400">${dateStr}</span>
+                        ${i.approved_by_name ? `<span class="text-[11px] text-gray-400">by ${i.approved_by_name}</span>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Init
+        initMonthFilter();
+        loadIncentives();
+    </script>
+</body>
+</html>
