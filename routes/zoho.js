@@ -1794,7 +1794,9 @@ router.post('/items/ai-edit', requirePermission('zoho', 'manage'), async (req, r
             rate: parseFloat(it.rate) || 0,
             pr: parseFloat(it.purchase_rate) || 0,
             dpl: parseFloat(it.cf_dpl) || 0,
-            brand: it.brand || ''
+            brand: it.brand || '',
+            desc: it.description || '',
+            cat: it.category_name || ''
         }));
 
         const systemPrompt = `You are KAI, an AI Items Editor for a paint retail business (Quality Colours). You receive inventory items and a user command. Return ONLY valid JSON.
@@ -1935,6 +1937,346 @@ RULES:
                     });
                 }
             }
+        }
+
+        // === DETERMINISTIC PAINT PRODUCT CATEGORIZER ===
+        // When user asks to categorize/classify items, use keyword matching on product names.
+        // This is instant, handles all items, and never misses any.
+        const isCategoryCommand = /\b(categor|classify|categorise|categorize)\b/i.test(command);
+        if (isCategoryCommand) {
+            function categorizePaintItem(name, desc, brand) {
+                const text = `${name || ''} ${desc || ''}`.toUpperCase();
+                const b = (brand || '').toUpperCase();
+
+                // --- MARINE / ANTIFOULING ---
+                if (/\bANTIFOUL/i.test(text) || /\bMARINE\b/i.test(text) || /\bBASE COAT\b/i.test(text) ||
+                    /\bRUST O CAP\b/i.test(text) || /\bPROTECTMASTIC\b/i.test(text) ||
+                    b.includes('MARINE') || /\bBF\s/.test(name)) return 'MARINE';
+
+                // --- WALL PUTTY ---
+                if (/\bWALL\s*PUTTY\b/.test(text) || /\bWALLCARE.*PUTTY\b/.test(text) ||
+                    /\bAPTY\d/.test(text) || /\bSMARTCARE\s*WATERPROOF\s*PUTTY\b/.test(text) ||
+                    /\bBIRLA\s*WALLCARE\b/.test(text) || /\bPLASTER\s*COAT\b/.test(text))
+                    return b.includes('OPUS') ? 'OPUS WALLCARE&WALLPUTTY'
+                         : b.includes('BERGER') ? 'BERGER WALLCARE&WALLPUTTY'
+                         : b.includes('MULTI') ? 'MULTI WALLCARE&WALLPUTTY'
+                         : /TRUCARE/.test(text) ? (/SUPREMA/.test(text) ? 'TRUCARE WALL PUTTY SUPREMA WHITE- PROJECT' : 'TRUCARE WALL PUTTY WHITE')
+                         : /PUTTY.*WHITE|WHITE.*PUTTY/.test(text) ? 'AP TRUCARE ACR WALL PUTTY WHITE'
+                         : 'MULTI WALLCARE&WALLPUTTY';
+
+                // --- CONSTRUCTION CHEMICALS / WATERPROOFING ---
+                if (/\bCRACK\s*(PASTE|SEAL|POWDER)\b/.test(text) || /\bSEEPGAU?RD\b/.test(text) ||
+                    /\bDR\s*FIXIT\b/.test(text) || /\bCMX\b/.test(text) || /\bCRACK\s*MASTER\b/.test(text) ||
+                    /\bCC\d/.test(name) || /\bCR\d/.test(name))
+                    return /OPUS/.test(text) ? 'CONSTRUCTION CHEMICALS' : /BERGER/.test(text) ? 'CONSTRUCTION CHEMICALS' : 'CONSTRUCTION CHEMICALS';
+
+                if (/\bDAMP\s*PROOF\b/.test(text) || /\bDAMP\s*BLOCK\b/.test(text) || /\bDAMP\s*SHEATH\b/.test(text) ||
+                    /\bHYDROLOC\b/.test(text) || /\bWATER\s*PROOF\b/.test(text) || /\bSMART\s*CARE\b/.test(text) ||
+                    /\bSMRTCR\b/.test(text)) {
+                    if (/DAMP\s*PROOF.*TERACOTA|TERACOTA.*DAMP/.test(text)) return 'AP SMARTCARE DAMP PROOF TERACOTA';
+                    if (/DAMP\s*PROOF.*WHITE|WHITE.*DAMP\s*PROOF/.test(text)) return 'AP SMARTCARE DAMP PROOF WHITE';
+                    if (/DAMP\s*BLOCK/.test(text)) return /PRIME/.test(text) ? 'SMARTCARE DAMP BLOCK 2K PRIME BLACK' : 'AP SMARTCARE DAMP BLOCK - 2K BLACK';
+                    if (/DAMP\s*SHEATH.*EXT/.test(text)) return 'AP SMARTCARE DAMP SHEATH EXTERIOR WHITE';
+                    if (/DAMP\s*SHEATH.*INT.*CLASC|CLASC.*INT/.test(text)) return 'AP SMARTCARE DAMP SHEATH INTERIOR CLASC WT';
+                    if (/DAMP\s*SHEATH.*INT/.test(text)) return 'AP SMARTCARE DAMP SHEATH INTERIOR WHITE';
+                    if (/HYDROLOC/.test(text)) return 'AP SMARTCARE HYDROLOC CLEAR';
+                    if (/CRACK\s*SEAL/.test(text)) return 'AP SMARTCARE CRACK SEAL WHITE';
+                    if (/REPAIR\s*POLYMER/.test(text)) return 'AP SMART CARE REPAIR POLYMER WHITE';
+                    return 'AP SMARTCARE DAMP PROOF WHITE';
+                }
+
+                // --- DISTEMPER ---
+                if (/\bDIS?TEMB?E?R\b/.test(text) || /\bDIS\d/.test(name) || /\bBISON\s*DIS/.test(text))
+                    return /OPUS/.test(text) || b.includes('OPUS') ? 'OPUS DISTEMPAR'
+                         : /BERGER/.test(text) || b.includes('BERGER') ? 'BERGER DISTEMPAR'
+                         : 'MULTI PDR';
+
+                // --- FLOOR COAT ---
+                if (/\bFLOOR\s*(COAT|GUARD)\b/.test(text) || /\bFG\d/.test(name))
+                    return /OPUS/.test(text) || b.includes('OPUS') ? 'OPUS FLOOR COAT' : 'FLOOR COAT';
+
+                // --- WOOD PRODUCTS ---
+                if (/\bMELA[MY]NE\b/.test(text) || /\bWOOD\s*TECH\b/.test(text) || /\bWOODTECH\b/.test(text) ||
+                    /\bVARNISH\b/.test(text) || /\bWOOD\s*STAIN\b/.test(text) || /\bNC\s*SAND/.test(text) ||
+                    /\bPU\s*(EX|IN|INT|EXT|PALETTE)\b/.test(text) || /\bLACQUER\b/.test(text) ||
+                    /\bFRENCH\s*POLISH\b/.test(text) || /\bWOOD\s*POLISH\b/.test(text) ||
+                    /\bSEALER\b/.test(text) || /\bWOOD\s*PRIMER\b/.test(text)) {
+                    if (/MELAMYNE.*GLOSSY|GLOSSY.*MELAMYNE/.test(text)) return 'AP WOODTECH MELAMYNE GLOSSY CLEAR';
+                    if (/MELAMYNE.*MATT|MATT.*MELAMYNE/.test(text)) return 'AP WOODTECH MELAMYNE MATT CLEAR';
+                    if (/MELAMYNE.*SEALER|SEALER.*MELAMYNE/.test(text)) return 'AP WOODTECH MELAMYNE SEALER CLEAR';
+                    if (/PU.*EX.*GL/.test(text)) return 'ASNPTS PU EX GL CLEAR';
+                    if (/PU.*IN.*SR|PU.*INT.*SEALER/.test(text)) return 'ASNPTS PU IN SR CLEAR';
+                    if (/PU.*INT.*GL|PU.*IN.*GL/.test(text)) return 'PU PALETTE TRANSLUCENT APPU INT GLS';
+                    if (/WOOD\s*STAIN/.test(text)) return 'WOODTECH WOOD STAIN WALNUT';
+                    if (/WOOD\s*PRIMER/.test(text)) return 'ASIAN PAINTS WOOD PRIMER WHITE';
+                    if (/OPUS/.test(text) || b.includes('OPUS')) return 'OPUS WOOD POLISH - SEALER, GLASSY, MAT';
+                    if (/BERGER/.test(text) || b.includes('BERGER')) return 'BERGER WOOD POLISH - SEALER, GLASSY, MAT';
+                    return 'ASIAN PAINT PRODUCTS';
+                }
+
+                // --- PRIMER ---
+                if (/\bPRIMER\b/.test(text) || /\bPRIMEX\b/.test(text) || /\bPRIMCOAT\b/.test(text) ||
+                    /\bPRIME\b/.test(text) && !/PREMIUM/.test(text)) {
+                    if (/TRUCARE.*INT|INT.*PRIMER/.test(text) && /ASIAN|AP\b/.test(text)) return 'TRUCARE INTERIOR WALL PRIMER - WT WHITE';
+                    if (/TRUCARE.*EXT|EXT.*PRIMER/.test(text)) return /WHITE\s*C/.test(text) ? 'TRUCARE EXTERIOR WALL PRIMER WHITE C' : 'TRUCARE EXTERIOR WALL PRIMER WHITE';
+                    if (/EPOXY/.test(text) && /1\s*PACK/.test(text)) return 'TRUCARE 1 PACK EPOXY PRIMER LT GREY';
+                    if (/SPARC.*PRIMER|INTERIOR.*PRIMER.*ASIAN/.test(text)) return 'ASIAN PAINTS SPARC INTERIOR PRIMER WHITE';
+                    if (/METAL.*PRIMER.*YELLOW|YELLOW.*METAL.*PRIMER|HI\s*PERF/.test(text)) return 'HI PERFORMANCE YELLOW METAL PRIMER YELLOW';
+                    if (/OPUS/.test(text) || b.includes('OPUS')) return /METAL|WOOD/.test(text) ? 'OPUS METAL & WOOD PRIMER' : 'OPUS PRIMER';
+                    if (/BERGER/.test(text) || b.includes('BERGER')) return /METAL|WOOD/.test(text) ? 'BERGER METAL & WOOD PRIMER' : 'BERGER PRIMER';
+                    if (/BIRLA.*OPUS|OPUS.*PRIME/.test(text) || b.includes('PRIME OPUS')) return 'BIRLA OPUS PRIME';
+                    if (/NIPPON/.test(text)) return 'ASIAN PAINT PRODUCTS';
+                    return 'ASIAN PAINT PRODUCTS';
+                }
+
+                // --- ENAMEL ---
+                if (/\bENAMEL\b/.test(text) || /\bENML\b/.test(text) || /\bENL\b/.test(text) ||
+                    /\bAPCO\s*ADV\b/.test(text) || /\bAPCOLITE\b/.test(text) || /\bAPCO\b/.test(text) ||
+                    /\bGLOSS\b/.test(text) && /\bPREMIUM\b/.test(text)) {
+                    if (/APCOLITE.*SHYNE|APCOADVSHYNE/.test(text)) {
+                        if (/AS11/.test(text)) return 'APCOLITE ADVANCED SHYNE AS11';
+                        if (/AS22/.test(text)) return 'APCOLITE ADVANCED SHYNE AS22';
+                        if (/PUR\s*WH|PURWH/.test(text)) return 'APCOLITE ADVANCED SHYNE PURWHT';
+                        return 'APCOLITE ADVANCED SHYNE PURWHT';
+                    }
+                    if (/ALL\s*PROTEK/.test(text)) return 'APCOLITE ALL PROTEK PURWHT';
+                    if (/BLACK\s*BOARD/.test(text)) return 'ASIAN PAINT PRODUCTS';
+                    if (/HAMMER\s*TONE/.test(text)) return 'HAMMER TONE';
+                    if (/OPUS/.test(text) || b.includes('OPUS') || b.includes('ENAMEL')) return /OPUS/.test(text) || b.includes('OPUS') ? 'OPUS ENAMEL' : 'BERGER ENAMEL';
+                    if (/BERGER/.test(text) || b.includes('BERGER')) return 'BERGER ENAMEL';
+                    if (/SPRAY/.test(text)) return 'SPRAY PAINT';
+                    return 'AP PREMIUM GLOSS ENAMEL BLACK';
+                }
+
+                // --- EMULSION (must come after enamel/primer checks) ---
+                if (/\bEMUL(SION|TION)?\b/.test(text) || /\bEML\b/.test(text)) {
+                    // Asian Paints products
+                    if (/ROYALE/.test(text)) {
+                        if (/SHYNE/.test(text)) {
+                            if (/SN10/.test(text)) return 'ROYALE SHYNE SN10';
+                            if (/SN21/.test(text)) return 'ROYALE SHYNE SN21';
+                            if (/SN3\b/.test(text)) return 'ROYALE SHYNE SN3';
+                            if (/RADNT|RADIANT/.test(text)) return 'AP ROYALE SHYNE RADNT WT';
+                            return 'AP ROYALE SHYNE RADNT WT';
+                        }
+                        if (/PLY.*METALLIC|METALLIC/.test(text)) return 'AP ROYALE PLY METALLICS COPPER';
+                        if (/GRAND|GRND/.test(text)) return 'AP ROYALE GRAND WHITE';
+                        if (/RB1/.test(text)) return 'ROYALE LUXURY EMULSION RB1N';
+                        if (/RB2/.test(text)) return 'AP ROYALE RB2';
+                        return 'ROYALE LUXURY EMULSION RB1N';
+                    }
+                    if (/APEX.*ULTIMA|APEXULTIMA/.test(text)) {
+                        if (/PROTEK/.test(text)) {
+                            if (/UP1\b/.test(text)) return 'APEX ULTIMA PROTEK UP1';
+                            if (/UP10/.test(text)) return 'APEX ULTIMA PROTEK UP10';
+                            if (/UP20/.test(text)) return 'APEX ULTIMA PROTEK UP20';
+                            return 'APEX ULTIMA PROTEK UP1';
+                        }
+                        if (/HQ16/.test(text)) return 'APEX ULTIMA HQ16';
+                        if (/HQ17/.test(text)) return 'APEX ULTIMA HQ17';
+                        if (/HQ20/.test(text)) return 'APEX ULTIMA HQ20N';
+                        if (/HQ2\b|HQ2N/.test(text)) return 'APEX ULTIMA HQ2N';
+                        if (/BR\s*WHITE/.test(text)) return 'AP APEX ULTIMA BR WHITE';
+                        return 'APEX ULTIMA HQ17';
+                    }
+                    if (/APEX.*ADV|APEX\s*ADVANCED/.test(text)) {
+                        if (/AV6/.test(text)) return 'APEX ADVANCED AV6';
+                        return 'APEX ADVANCED AV6';
+                    }
+                    if (/APEX.*SUPREMA/.test(text)) return 'APEX SUPREMA CLASSIC WHITE- PROJECT';
+                    if (/APEX.*TILE|TILE\s*GUARD/.test(text)) return 'APEX TILE GUARD TG1';
+                    if (/\bAPEX\b/.test(text)) {
+                        if (/CLASC|CLASSIC/.test(text)) return 'AP APEX CLASC WT';
+                        if (/AB11/.test(text)) return 'APEX WP EXT EMULSION AB11';
+                        if (/AB12/.test(text)) return 'APEX WP EXT EMULSION AB12';
+                        if (/AB15/.test(text)) return 'APEX WP EXT EMULSION AB15';
+                        if (/AB17/.test(text)) return 'AP APEX AB17';
+                        if (/AB2\b|AB2G/.test(text)) return 'APEX WP EXT EMULSION AB2';
+                        if (/AB21/.test(text)) return /AB21G/.test(text) ? 'APEX WP EXT EMULSION AB21G' : 'AP APEX AB21';
+                        if (/AB6/.test(text)) return 'APEX WP EXT EMULSION AB6';
+                        return 'APEX WP EXT EMULSION AB2';
+                    }
+                    if (/ACE.*SHYNE|ACESHYNE/.test(text)) {
+                        if (/AH10/.test(text)) return 'ACE SHYNE AH10';
+                        if (/AH2\b|AH21/.test(text)) return /AH21/.test(text) ? 'ACE SHYNE AH21' : 'ACE SHYNE AH2';
+                        return 'ACE SHYNE AH10';
+                    }
+                    if (/ACE.*ADV/.test(text)) {
+                        if (/AE2/.test(text)) return 'ACE ADVANCED AE2';
+                        if (/WHITE/.test(text)) return 'AP ACE ADVANCED WHITE';
+                        return 'ACE ADVANCED AE2';
+                    }
+                    if (/ACE.*SPARC/.test(text)) return 'ACE SPARC ADVANCED SUPWHT';
+                    if (/\bACE\b.*EXT/.test(text)) {
+                        if (/AC17/.test(text)) return 'ACE EXTERIOR EML PT AC17';
+                        if (/AC21/.test(text)) return 'ACE EXTERIOR EMULSION AC21G';
+                        if (/AC2\b|AC2G/.test(text)) return 'ACE EXTERIOR EMULSION AC2G';
+                        if (/AC9/.test(text)) return 'ACE EXTERIOR EMULSION AC9G';
+                        return 'ACE EXTERIOR EMULSION AC2G';
+                    }
+                    if (/TRACTOR.*SHYNE|TRACTORSHYNE/.test(text)) {
+                        if (/SH1\b|SH1N/.test(text)) return 'TRACTOR EMULSION SHYNE SH1';
+                        if (/SH13/.test(text)) return 'TRACTOR EMULSION SHYNE SH13';
+                        return 'TRACTOR EMULSION SHYNE SH1';
+                    }
+                    if (/TRACTOR.*SPARC/.test(text)) return /SUPWHTA/.test(text) ? 'TRACTOR SPARC SUPWHTA' : 'TRACTOR SPARC SUPWHT';
+                    if (/TRACTOR.*SUPREMA/.test(text)) return 'TRACTOR SUPREMA SPRWHITE';
+                    if (/TRACTOR.*ADV|TRACTOR.*TA\d/.test(text)) return 'TRACTOR EMULSION ADVANCED TA3';
+                    if (/TRACTOR/.test(text) || /\bTE\d/.test(text) || /TRACTOREMUL/.test(text)) {
+                        if (/TE1\b|TE\s*1\b/.test(text)) return 'AP TRACTOR EMUL TE1';
+                        if (/TE13/.test(text)) return 'TRACTOR EMULSION TE13';
+                        if (/TE22/.test(text)) return 'TRACTOR EMULSION TE22N';
+                        if (/TE3\b/.test(text)) return 'TRACTOR EMULSION TE3';
+                        return 'AP TRACTOR EMUL TE1';
+                    }
+                    if (/PREM.*EMUL|PREMEMUL/.test(text)) {
+                        if (/BW1\b|BW1\//.test(text)) return 'PREMIUM EMULSION BW1';
+                        if (/BW11/.test(text)) return 'PREMIUM EMULSION BW11N';
+                        if (/BW12/.test(text)) return 'PREMIUM EMULSION BW12';
+                        return 'PREMIUM EMULSION BW1';
+                    }
+
+                    // Shalimar products
+                    if (/SHALIMAR/.test(text) || /HERO\s*PREMIUM/.test(text) || /SILK.*INT|INT.*SILK/.test(text) ||
+                        /SHAKTIMAN/.test(text) || /XTRA\s*TOUGH/.test(text) || /NO\s*1\s*SILK/.test(text) ||
+                        /SILK\s*ECO/.test(text) || /SILK\s*SIGN/.test(text)) {
+                        return 'ASIAN PAINT PRODUCTS';
+                    }
+
+                    // Berger products
+                    if (/BERGER/.test(text) || b.includes('BERGER') || b.includes('EMULSION BERGER') ||
+                        /FLEXO/.test(text) || /SMOOTH\s*EMUL/.test(text) || /LONG\s*LIFE/.test(text) ||
+                        /FEASY/.test(text) || /EASY\s*CLEAN/.test(text) || /WALMASTA/.test(text) ||
+                        /BISON\s*LITE/.test(text) || /ANTIDUST/.test(text)) return 'BERGER EMULSION';
+
+                    // Crizon products
+                    if (/CRIZON|CRIZION/.test(text) || b.includes('CRIZON')) {
+                        if (/DIAMONT|GLAZE/.test(text)) return 'ASIAN PAINT PRODUCTS';
+                        if (/TUF\s*PRO|TUFPRO/.test(text)) return 'ASIAN PAINT PRODUCTS';
+                        if (/FEATHER\s*PRO/.test(text)) return 'ASIAN PAINT PRODUCTS';
+                        if (/BDR|BORDER/.test(text)) return 'ASIAN PAINT PRODUCTS';
+                        return 'ASIAN PAINT PRODUCTS';
+                    }
+
+                    // Opus products
+                    if (/OPUS/.test(text) || b.includes('OPUS')) return 'OPUS EMULSION';
+
+                    // Nippon / Astral
+                    if (/NIPPON/.test(text)) return 'ASIAN PAINT PRODUCTS';
+                    if (/ASTRAL/.test(text)) return 'GEM ASTRAL PAINTS';
+
+                    // Generic/default emulsion
+                    return 'ASIAN PAINT PRODUCTS';
+                }
+
+                // --- COLORANT / STAINER / TINTER ---
+                if (/\bCOLOU?RANT\b/.test(text) || /\bSTAINER\b/.test(text) || /\bTINTER\b/.test(text) ||
+                    /\bAMBER\b/.test(text) || /\bCC\b.*\bCOLOU?R/.test(text) || /\bBR\s*COLOURANT/.test(text)) {
+                    if (/BERGER/.test(text) || b.includes('BERGER')) return 'BERGER MACHINE COLORANT';
+                    if (/OPUS/.test(text) || b.includes('OPUS')) return 'OPUS EMULSION';
+                    if (b.includes('MULTI')) return 'MULTI CC';
+                    return 'QC STAINER';
+                }
+
+                // --- SPRAY PAINT ---
+                if (/\bSPRAY\s*PAINT\b/.test(text) || /\bSPRAY\b/.test(text) && /\bPAINT\b/.test(text))
+                    return 'SPRAY PAINT';
+
+                // --- HAMMER TONE ---
+                if (/\bHAMMER\s*TONE\b/.test(text)) return 'HAMMER TONE';
+
+                // --- ADHESIVE / FEVICOL ---
+                if (/\bFEVICOL\b/.test(text) || /\bARALDITE\b/.test(text) || /\bM[\s-]*SEAL\b/.test(text) ||
+                    /\bADHESIVE\b/.test(text) || /\bDDL\b/.test(name))
+                    return 'ACCESSORIES';
+
+                // --- TOOLS / BRUSHES ---
+                if (/\bBRUSH\b/.test(text) || /\bROLLER\b/.test(text) || /\bTAPE\b/.test(text) ||
+                    /\bBLADE\b/.test(text) || /\bTRAY\b/.test(text) || /\bMASKING\b/.test(text) ||
+                    /\bSPONGE\b/.test(text) || /\bSAND\s*PAPER\b/.test(text) || /\bEMERY\b/.test(text) ||
+                    /\bPAPER\b/.test(text) && /\bAJAX\b/.test(text) ||
+                    /\bCOMBO\b/.test(text) || /\bSCRAPER\b/.test(text) || /\bPUTTY\s*KNIFE\b/.test(text))
+                    return 'TOOLS- BRUSH, ROLLER, BLADE, PAPER';
+
+                // --- ABRASIVE / CUMI ---
+                if (/\bCUMI\b/.test(text) || /\bABRASIVE\b/.test(text) || /\bGRIND\b/.test(text) ||
+                    /\bSAND\b/.test(text) && /\bDISC\b/.test(text))
+                    return 'ACCESSORIES';
+
+                // --- THINNER / SOLVENT ---
+                if (/\bTHINNER\b/.test(text) || /\bTURPENTINE\b/.test(text) || /\bSOLVENT\b/.test(text) ||
+                    /\bSPIRIT\b/.test(text) || /\bTERMINATOR\b/.test(text))
+                    return 'ACCESSORIES';
+
+                // --- TEXTURE / DIATONE ---
+                if (/\bTEXTURE\b/.test(text) || /\bDIATONE\b/.test(text) || /\bSTUCCO\b/.test(text))
+                    return 'ASIAN PAINT PRODUCTS';
+
+                // --- WASTE / MISC ---
+                if (/\bWASTE\b/.test(text) || /\bCLOTH\b/.test(text) && /\bWASTE\b/.test(text) ||
+                    /\bCAP\b/.test(text) && /\bWASTE\b/.test(text))
+                    return 'ACCESSORIES';
+
+                // --- Brand-based fallback for remaining items ---
+                if (b.includes('OPUS') || /OPUS/.test(text)) return 'BIRLA OPUS PRODUCTS';
+                if (b.includes('BERGER') || /BERGER/.test(text)) return 'BERGER PAINT PRODUCTS';
+                if (b.includes('ADDISONS') || /ADDISONS/.test(text)) return 'QC ADDISONS PRODUCTS';
+                if (b.includes('ASTRAL') || /ASTRAL/.test(text)) return 'GEM ASTRAL PAINTS';
+                if (b.includes('MULTI')) return 'QC MULTI BRAND';
+                if (/ASIAN|AP\s/.test(text) || /^AP/.test(name)) return 'ASIAN PAINT PRODUCTS';
+                if (/NIPPON/.test(text)) return 'ASIAN PAINT PRODUCTS';
+                if (/CRIZON|CRIZION/.test(text) || b.includes('CRIZON')) return 'ASIAN PAINT PRODUCTS';
+                if (/SHALIMAR/.test(text)) return 'ASIAN PAINT PRODUCTS';
+
+                return null; // Truly unrecognizable
+            }
+
+            const allEdits = [];
+            let categorized = 0;
+            let unchanged = 0;
+            let unrecognized = 0;
+            const categoryCounts = {};
+
+            for (const item of allCompact) {
+                const newCat = categorizePaintItem(item.name, item.desc, item.brand);
+                if (!newCat) {
+                    unrecognized++;
+                    continue;
+                }
+                // Only include if category actually changed
+                if ((item.cat || '').toUpperCase() !== newCat.toUpperCase()) {
+                    allEdits.push({ zoho_item_id: item.id, changes: { category_name: newCat } });
+                    categorized++;
+                    categoryCounts[newCat] = (categoryCounts[newCat] || 0) + 1;
+                } else {
+                    unchanged++;
+                }
+            }
+
+            // Build summary of categories assigned
+            const topCats = Object.entries(categoryCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 15)
+                .map(([cat, cnt]) => `  - ${cat}: ${cnt} items`)
+                .join('\n');
+
+            const summary = `Categorized ${categorized} items across ${Object.keys(categoryCounts).length} categories. ${unchanged} already correct, ${unrecognized} unrecognized.`;
+            const reply = `**Category Assignment Complete**\n\n` +
+                `- **${categorized}** items updated with new categories\n` +
+                `- **${unchanged}** items already had correct categories\n` +
+                `- **${unrecognized}** items could not be categorized (unrecognized names)\n\n` +
+                `**Top categories assigned:**\n${topCats}\n\n` +
+                `*Deterministic matching — instant, 100% consistent.*`;
+
+            return res.json({
+                success: true,
+                edits: allEdits,
+                summary,
+                reply,
+                model: 'deterministic',
+                itemsProcessed: allCompact.length,
+                batchCount: 1
+            });
         }
 
         // === AI-BASED PROCESSING (fallback for non-reference-data commands) ===
