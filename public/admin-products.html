@@ -663,135 +663,86 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <label class="text-xs text-gray-500 whitespace-nowrap">Zoho Item:</label>
-                        <div class="relative flex-1">
+                        <div class="flex-1">
                             <input type="text"
                                 id="zohoSearch_${idx}"
                                 autocomplete="off"
                                 class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:border-purple-500 focus:outline-none"
                                 placeholder="Search Zoho item to map..."
                                 value="${ps.zoho_item_name ? ps.zoho_item_name.replace(/"/g, '&quot;') : ''}"
-                                oninput="debounceZohoSearch(${idx})"
-                                onfocus="debounceZohoSearch(${idx})"
-                                onkeydown="if(event.key==='Enter'){event.preventDefault();debounceZohoSearch(${idx})}"
                             >
                         </div>
                         ${ps.zoho_item_id ? `<span class="text-xs text-green-600 font-medium whitespace-nowrap">&#10003; Mapped</span>` : `<span class="text-xs text-orange-500 whitespace-nowrap">Not mapped</span>`}
                     </div>
+                    <!-- Inline search results (renders inside card, no z-index/overflow issues) -->
+                    <div id="zohoResults_${idx}" class="hidden"></div>
                 </div>
             `).join('');
         }
 
+        // Zoho search for pack size mapping — uses inline results (no dropdown/z-index issues)
         let zohoSearchTimers = {};
+        let activeZohoSearchIdx = null;
 
-        function debounceZohoSearch(idx) {
-            clearTimeout(zohoSearchTimers[idx]);
-            zohoSearchTimers[idx] = setTimeout(() => showZohoDropdown(idx), 300);
-        }
-
-        // Event delegation for Zoho search inputs (reliable even after innerHTML re-render)
+        // Event delegation — captures all input/focus/keydown on zohoSearch_ fields
         document.addEventListener('input', function(e) {
             if (e.target.id && e.target.id.startsWith('zohoSearch_')) {
-                const idx = parseInt(e.target.id.split('_')[1]);
-                if (!isNaN(idx)) debounceZohoSearch(idx);
+                var idx = parseInt(e.target.id.split('_')[1]);
+                if (!isNaN(idx)) { clearTimeout(zohoSearchTimers[idx]); zohoSearchTimers[idx] = setTimeout(function() { doZohoSearch(idx); }, 300); }
             }
         });
         document.addEventListener('focusin', function(e) {
             if (e.target.id && e.target.id.startsWith('zohoSearch_')) {
-                const idx = parseInt(e.target.id.split('_')[1]);
-                if (!isNaN(idx)) debounceZohoSearch(idx);
+                var idx = parseInt(e.target.id.split('_')[1]);
+                if (!isNaN(idx)) { clearTimeout(zohoSearchTimers[idx]); zohoSearchTimers[idx] = setTimeout(function() { doZohoSearch(idx); }, 300); }
             }
         });
         document.addEventListener('keydown', function(e) {
-            if (e.target.id && e.target.id.startsWith('zohoSearch_') && e.key === 'Enter') {
-                e.preventDefault();
-            }
+            if (e.target.id && e.target.id.startsWith('zohoSearch_') && e.key === 'Enter') { e.preventDefault(); }
         });
 
-        // Global dropdown element (appended to body so it's never clipped by modal overflow)
-        let globalZohoDropdown = null;
-        let globalZohoDropdownHandler = null;
-        let globalZohoDropdownIdx = null;
+        function doZohoSearch(idx) {
+            var input = document.getElementById('zohoSearch_' + idx);
+            var resultsDiv = document.getElementById('zohoResults_' + idx);
+            if (!input || !resultsDiv) return;
 
-        function getGlobalZohoDropdown() {
-            if (!globalZohoDropdown) {
-                globalZohoDropdown = document.createElement('div');
-                globalZohoDropdown.id = 'globalZohoDropdown';
-                globalZohoDropdown.className = 'bg-white border border-gray-300 rounded-b shadow-lg max-h-48 overflow-y-auto';
-                globalZohoDropdown.style.cssText = 'display:none;position:fixed;z-index:99999;min-width:300px;';
-                document.body.appendChild(globalZohoDropdown);
-            }
-            return globalZohoDropdown;
+            activeZohoSearchIdx = idx;
+            resultsDiv.className = '';
+            resultsDiv.innerHTML = '<div class="px-2 py-1 text-xs text-gray-400 mt-1">Searching...</div>';
+
+            var query = input.value.trim();
+            searchZohoItems(query).then(function(items) {
+                if (activeZohoSearchIdx !== idx) return;
+                if (!items || !items.length) {
+                    resultsDiv.innerHTML = '<div class="px-2 py-1 text-xs text-gray-400 mt-1">No items found</div>';
+                    return;
+                }
+                resultsDiv.innerHTML = '<div class="mt-1 border border-gray-200 rounded bg-white max-h-36 overflow-y-auto">' +
+                    items.map(function(item) {
+                        var safeName = (item.zoho_item_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                        return '<div class="px-2 py-1.5 text-xs hover:bg-purple-50 cursor-pointer border-b border-gray-100" ' +
+                            'onclick="selectZohoItem(' + idx + ', \'' + item.zoho_item_id + '\', \'' + safeName + '\')">' +
+                            '<span class="font-medium text-gray-800">' + escHtml(item.zoho_item_name) + '</span> ' +
+                            '<span class="text-gray-400">' + escHtml(item.zoho_brand || '') + (item.zoho_rate ? ' ₹' + item.zoho_rate : '') + '</span>' +
+                        '</div>';
+                    }).join('') + '</div>';
+            }).catch(function(err) {
+                resultsDiv.innerHTML = '<div class="px-2 py-1 text-xs text-red-500 mt-1">Search failed</div>';
+            });
         }
 
-        function hideGlobalZohoDropdown() {
-            const dd = getGlobalZohoDropdown();
-            dd.style.display = 'none';
-            dd.innerHTML = '';
-            if (globalZohoDropdownHandler) {
-                document.removeEventListener('mousedown', globalZohoDropdownHandler);
-                globalZohoDropdownHandler = null;
+        function hideZohoResults() {
+            if (activeZohoSearchIdx !== null) {
+                var el = document.getElementById('zohoResults_' + activeZohoSearchIdx);
+                if (el) { el.innerHTML = ''; el.className = 'hidden'; }
+                activeZohoSearchIdx = null;
             }
-            globalZohoDropdownIdx = null;
-        }
-
-        async function showZohoDropdown(idx) {
-            console.log('[ZohoSearch] showZohoDropdown called, idx:', idx);
-            const input = document.getElementById('zohoSearch_' + idx);
-            if (!input) { console.warn('[ZohoSearch] input not found for idx', idx); return; }
-
-            const dropdown = getGlobalZohoDropdown();
-            globalZohoDropdownIdx = idx;
-
-            // Position below the input
-            const rect = input.getBoundingClientRect();
-            console.log('[ZohoSearch] input rect:', JSON.stringify({top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width}));
-            dropdown.style.top = (rect.bottom + 2) + 'px';
-            dropdown.style.left = rect.left + 'px';
-            dropdown.style.width = Math.max(rect.width, 300) + 'px';
-            dropdown.innerHTML = '<div class="px-3 py-2 text-xs text-gray-400">Searching...</div>';
-            dropdown.style.display = 'block';
-            console.log('[ZohoSearch] dropdown visible, fetching...');
-
-            try {
-                const query = input.value.trim();
-                const items = await searchZohoItems(query);
-                console.log('[ZohoSearch] got', items.length, 'results for:', query);
-
-                // Check if user switched to a different input while we were fetching
-                if (globalZohoDropdownIdx !== idx) return;
-
-                if (!items.length) {
-                    dropdown.innerHTML = '<div class="px-3 py-2 text-xs text-gray-400">No items found</div>';
-                } else {
-                    dropdown.innerHTML = items.map(item => {
-                        const safeName = (item.zoho_item_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                        return `
-                            <div class="px-3 py-2 text-xs hover:bg-purple-50 cursor-pointer border-b border-gray-100"
-                                 onclick="selectZohoItem(${idx}, '${item.zoho_item_id}', '${safeName}'); hideGlobalZohoDropdown();">
-                                <div class="font-medium text-gray-800">${escHtml(item.zoho_item_name)}</div>
-                                <div class="text-gray-500">${escHtml(item.zoho_brand)} ${item.zoho_rate ? '• ₹' + item.zoho_rate : ''}</div>
-                            </div>
-                        `;
-                    }).join('');
-                }
-            } catch (err) {
-                console.error('[ZohoSearch] error:', err);
-                dropdown.innerHTML = '<div class="px-3 py-2 text-xs text-red-500">Search failed: ' + escHtml(err.message) + '</div>';
-            }
-
-            // Close on click outside (use mousedown to fire before blur)
-            if (globalZohoDropdownHandler) document.removeEventListener('mousedown', globalZohoDropdownHandler);
-            globalZohoDropdownHandler = function(e) {
-                if (!dropdown.contains(e.target) && e.target !== input) {
-                    hideGlobalZohoDropdown();
-                }
-            };
-            setTimeout(() => document.addEventListener('mousedown', globalZohoDropdownHandler), 100);
         }
 
         function selectZohoItem(idx, zohoItemId, zohoItemName) {
             packSizes[idx].zoho_item_id = zohoItemId;
             packSizes[idx].zoho_item_name = zohoItemName;
+            activeZohoSearchIdx = null;
             renderPackSizes();
         }
 
