@@ -1208,31 +1208,47 @@
         let reviewGroups = []; // { key, name, brand, category, items: [...zohoItems], image_url }
         let reviewImageTarget = null; // group index for image upload
 
-        function parseDisplaySize(itemName) {
-            const m = (itemName || '').match(/(\d+(?:\.\d+)?)\s*(ltr?|litres?|liters?|kg|kgs?|ml|gm?|grams?|pc|pcs?|pieces?|m|meters?)\b/i);
-            if (m) return m[1] + ' ' + m[2];
-            return '';
+        // Smart product info extraction (mirrors backend logic)
+        const UNIT_PATTERN = 'ltr?|litres?|liters?|kg|kgs?|ml|gm?|grams?|pc|pcs?|pieces?|m|meters?';
+        function extractProductInfoJS(itemName, cfProductName) {
+            const n = (itemName || '').trim();
+            // 1. cf_product_name overrides
+            if (cfProductName && cfProductName.trim()) {
+                const m = n.match(new RegExp('(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_PATTERN + ')\\b', 'i'));
+                return { productName: cfProductName.trim(), sizeLabel: m ? m[1] + ' ' + m[2] : n };
+            }
+            // 2. Suffix: "Product Name 4 Ltr"
+            const sfx = n.match(new RegExp('^(.+?)\\s+(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_PATTERN + ')\\s*$', 'i'));
+            if (sfx) return { productName: sfx[1].trim(), sizeLabel: sfx[2] + ' ' + sfx[3] };
+            // 3. Prefix with unit: "4 Ltr Product Name"
+            const pfxU = n.match(new RegExp('^(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_PATTERN + ')\\s+(.+)$', 'i'));
+            if (pfxU) return { productName: pfxU[3].trim(), sizeLabel: pfxU[1] + ' ' + pfxU[2] };
+            // 4. Prefix number: "100 AJAX PAPER"
+            const pfxN = n.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+            if (pfxN) return { productName: pfxN[2].trim(), sizeLabel: pfxN[1] };
+            // 5. Fallback
+            return { productName: n, sizeLabel: '' };
         }
 
         function showImportReview() {
-            // Build groups from selected items in zohoCurrentItems
+            // Build groups from selected items using smart extraction
             const selectedItems = zohoCurrentItems.filter(i => zohoSelectedIds.has(i.zoho_item_id || i.item_id));
             const groupMap = {};
             for (const item of selectedItems) {
-                const name = (item.cf_product_name || item.name || item.item_name || '').trim();
+                const info = extractProductInfoJS(item.name || item.item_name, item.cf_product_name);
                 const brand = (item.brand || '').trim();
                 const cat = (item.category_name || '').trim();
-                const key = `${name}|||${brand}|||${cat}`;
+                const key = `${info.productName}|||${brand}|||${cat}`;
                 if (!groupMap[key]) {
                     groupMap[key] = {
-                        key, name, brand, category: cat,
+                        key, name: info.productName, brand, category: cat,
                         image_url: item.image_url || '',
                         product_type: 'unit_wise',
                         area_coverage: '',
                         items: []
                     };
                 }
-                groupMap[key].items.push(item);
+                groupMap[key].items.push({ ...item, _sizeLabel: info.sizeLabel });
             }
             reviewGroups = Object.values(groupMap);
             renderImportReview();
@@ -1251,7 +1267,6 @@
             document.getElementById('reviewFooterInfo').textContent = `${reviewGroups.length} products will be created`;
 
             body.innerHTML = reviewGroups.map((g, idx) => {
-                const sizes = g.items.map(i => parseDisplaySize(i.name || i.item_name) || (i.name || i.item_name)).filter(Boolean);
                 const firstItemId = g.items[0]?.zoho_item_id || g.items[0]?.item_id || '';
                 return `
                 <div class="border border-gray-200 rounded-xl p-4 hover:border-purple-200 transition">
@@ -1277,9 +1292,9 @@
                             <!-- Size chips -->
                             <div class="flex flex-wrap gap-1.5 mt-2">
                                 ${g.items.map(item => {
-                                    const sz = parseDisplaySize(item.name || item.item_name);
+                                    const sz = item._sizeLabel || (item.name || item.item_name);
                                     const rate = item.rate ? '₹' + parseFloat(item.rate).toFixed(0) : '';
-                                    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">${sz || escH(item.name || item.item_name)}${rate ? ' · ' + rate : ''}</span>`;
+                                    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">${escH(sz)}${rate ? ' · ' + rate : ''}</span>`;
                                 }).join('')}
                             </div>
                             <!-- Type & Coverage -->

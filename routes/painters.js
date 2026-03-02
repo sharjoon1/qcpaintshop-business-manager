@@ -893,12 +893,18 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const offset = (pageNum - 1) * limitNum;
 
+        // Only show items that have been imported to Products table (via pack_sizes mapping)
+        const joins = `
+            FROM zoho_items_map zim
+            INNER JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
+            INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
+        `;
         let where = "WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)";
         const params = [];
 
         if (search) {
-            where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_brand LIKE ?)';
-            params.push(`%${search}%`, `%${search}%`);
+            where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_brand LIKE ? OR p.name LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
         }
         if (brand) {
             where += ' AND zim.zoho_brand = ?';
@@ -910,19 +916,20 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         }
 
         // Get total count
-        const [countResult] = await pool.query(`
-            SELECT COUNT(*) as total FROM zoho_items_map zim ${where}
-        `, params);
+        const [countResult] = await pool.query(
+            `SELECT COUNT(*) as total ${joins} ${where}`, params
+        );
         const total = countResult[0].total;
 
-        // Products with point rates
+        // Products with point rates (only admin-imported items)
         const [products] = await pool.query(`
             SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
                    zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
                    zim.image_url,
+                   p.name as product_name, p.id as product_id,
                    ppr.regular_points_per_unit as points_per_unit, ppr.annual_eligible, ppr.annual_pct
-            FROM zoho_items_map zim
+            ${joins}
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
             ${where}
@@ -956,18 +963,22 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
             };
         });
 
-        // Filter options
+        // Filter options — only from admin-imported products
         const [brands] = await pool.query(`
-            SELECT DISTINCT zoho_brand as brand FROM zoho_items_map
-            WHERE zoho_brand IS NOT NULL AND zoho_brand != ''
-            AND (zoho_status = 'active' OR zoho_status IS NULL)
-            ORDER BY zoho_brand
+            SELECT DISTINCT zim.zoho_brand as brand
+            FROM zoho_items_map zim
+            INNER JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
+            INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
+            WHERE zim.zoho_brand IS NOT NULL AND zim.zoho_brand != ''
+            ORDER BY zim.zoho_brand
         `);
         const [categories] = await pool.query(`
-            SELECT DISTINCT zoho_category_name as category FROM zoho_items_map
-            WHERE zoho_category_name IS NOT NULL AND zoho_category_name != ''
-            AND (zoho_status = 'active' OR zoho_status IS NULL)
-            ORDER BY zoho_category_name
+            SELECT DISTINCT zim.zoho_category_name as category
+            FROM zoho_items_map zim
+            INNER JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
+            INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
+            WHERE zim.zoho_category_name IS NOT NULL AND zim.zoho_category_name != ''
+            ORDER BY zim.zoho_category_name
         `);
 
         res.json({
@@ -997,9 +1008,11 @@ router.get('/me/catalog/:itemId', requirePainterAuth, async (req, res) => {
             SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
                    zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
-                   zim.image_url,
+                   zim.image_url, p.name as product_name, p.id as product_id,
                    ppr.regular_points_per_unit as points_per_unit, ppr.annual_eligible, ppr.annual_pct
             FROM zoho_items_map zim
+            INNER JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
+            INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
             WHERE zim.zoho_item_id = ?

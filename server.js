@@ -2525,21 +2525,56 @@ app.post('/api/products/import-from-zoho', requirePermission('products', 'add'),
             return res.status(400).json({ success: false, error: 'Maximum 200 items per import' });
         }
 
-        // Helper: parse size & unit from Zoho item name
-        function parsePackSizeFromName(itemName, zohoUnit) {
-            const m = (itemName || '').match(/(\d+(?:\.\d+)?)\s*(ltr?|litres?|liters?|kg|kgs?|ml|gm?|grams?|pc|pcs?|pieces?|m|meters?)\b/i);
-            if (m) {
-                let size = parseFloat(m[1]);
-                const u = m[2].toLowerCase();
-                if (/^(ltr?|litres?|liters?)$/.test(u)) return { size, unit: 'L' };
-                if (/^(kg|kgs?)$/.test(u)) return { size, unit: 'KG' };
-                if (/^ml$/.test(u)) return { size: +(size / 1000).toFixed(4), unit: 'L' };
-                if (/^(gm?|grams?)$/.test(u)) return { size: +(size / 1000).toFixed(4), unit: 'KG' };
-                if (/^(pc|pcs?|pieces?)$/.test(u)) return { size, unit: 'PC' };
-                if (/^(m|meters?)$/.test(u)) return { size, unit: 'M' };
+        // Helper: map raw unit text to standard code
+        function mapUnitCode(u) {
+            if (!u) return 'L';
+            u = u.toLowerCase();
+            if (/^(ltr?|litres?|liters?)$/.test(u)) return 'L';
+            if (/^(kg|kgs?)$/.test(u)) return 'KG';
+            if (/^ml$/.test(u)) return 'L';
+            if (/^(gm?|grams?)$/.test(u)) return 'KG';
+            if (/^(pc|pcs?|pieces?|nos|qty)$/.test(u)) return 'PC';
+            if (/^(m|meters?)$/.test(u)) return 'M';
+            return 'L';
+        }
+
+        // Smart extractor: returns { productName, size, unit } from Zoho item name
+        // Handles: "Product 4 Ltr", "4 Ltr Product", "100 AJAX PAPER", cf_product_name override
+        const UNIT_RE = 'ltr?|litres?|liters?|kg|kgs?|ml|gm?|grams?|pc|pcs?|pieces?|m|meters?';
+        function extractProductInfo(itemName, cfProductName, zohoUnit) {
+            const n = (itemName || '').trim();
+            // 1. If cf_product_name exists, use it as product name and parse size from item name
+            if (cfProductName && cfProductName.trim()) {
+                const m = n.match(new RegExp('(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_RE + ')\\b', 'i'));
+                let size = m ? parseFloat(m[1]) : 1;
+                let unit = m ? mapUnitCode(m[2]) : mapUnitCode(zohoUnit);
+                if (m && /^ml$/i.test(m[2])) { size = +(size / 1000).toFixed(4); }
+                if (m && /^(gm?|grams?)$/i.test(m[2])) { size = +(size / 1000).toFixed(4); }
+                return { productName: cfProductName.trim(), size, unit };
             }
-            const unitMap = { ltr: 'L', l: 'L', kg: 'KG', pcs: 'PC', nos: 'PC', qty: 'PC' };
-            return { size: 1, unit: unitMap[(zohoUnit || '').toLowerCase()] || 'L' };
+            // 2. Suffix pattern: "Product Name 4 Ltr"
+            const sfx = n.match(new RegExp('^(.+?)\\s+(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_RE + ')\\s*$', 'i'));
+            if (sfx) {
+                let size = parseFloat(sfx[2]), unit = mapUnitCode(sfx[3]);
+                if (/^ml$/i.test(sfx[3])) { size = +(size / 1000).toFixed(4); }
+                if (/^(gm?|grams?)$/i.test(sfx[3])) { size = +(size / 1000).toFixed(4); }
+                return { productName: sfx[1].trim(), size, unit };
+            }
+            // 3. Prefix with unit: "4 Ltr Product Name"
+            const pfxU = n.match(new RegExp('^(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_RE + ')\\s+(.+)$', 'i'));
+            if (pfxU) {
+                let size = parseFloat(pfxU[1]), unit = mapUnitCode(pfxU[2]);
+                if (/^ml$/i.test(pfxU[2])) { size = +(size / 1000).toFixed(4); }
+                if (/^(gm?|grams?)$/i.test(pfxU[2])) { size = +(size / 1000).toFixed(4); }
+                return { productName: pfxU[3].trim(), size, unit };
+            }
+            // 4. Prefix number only: "100 AJAX PAPER" → grit/gsm/variation number
+            const pfxN = n.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+            if (pfxN) {
+                return { productName: pfxN[2].trim(), size: parseFloat(pfxN[1]), unit: 'PC' };
+            }
+            // 5. Fallback
+            return { productName: n, size: 1, unit: mapUnitCode(zohoUnit) };
         }
 
         const conn = await pool.getConnection();
@@ -2555,15 +2590,15 @@ app.post('/api/products/import-from-zoho', requirePermission('products', 'add'),
             const mappedSet = new Set(alreadyMapped.map(r => r.zoho_item_id));
             const toImport = zohoItems.filter(i => !mappedSet.has(i.zoho_item_id));
 
-            // Group by product name + brand + category
+            // Group by extracted product name + brand + category
             const groups = {};
             for (const item of toImport) {
-                const productName = (item.zoho_cf_product_name || item.zoho_item_name || '').trim();
+                const info = extractProductInfo(item.zoho_item_name, item.zoho_cf_product_name, item.zoho_unit);
                 const brand = (item.zoho_brand || '').trim();
                 const cat = (item.zoho_category_name || '').trim();
-                const key = `${productName}|||${brand}|||${cat}`;
-                if (!groups[key]) groups[key] = { name: productName, brand, category: cat, items: [] };
-                groups[key].items.push(item);
+                const key = `${info.productName}|||${brand}|||${cat}`;
+                if (!groups[key]) groups[key] = { name: info.productName, brand, category: cat, items: [] };
+                groups[key].items.push({ ...item, _extracted: info });
             }
 
             let productsCreated = 0, packSizesCreated = 0;
@@ -2607,7 +2642,7 @@ app.post('/api/products/import-from-zoho', requirePermission('products', 'add'),
                 }
                 // Create pack sizes
                 for (const item of group.items) {
-                    const { size, unit } = parsePackSizeFromName(item.zoho_item_name, item.zoho_unit);
+                    const { size, unit } = item._extracted || extractProductInfo(item.zoho_item_name, item.zoho_cf_product_name, item.zoho_unit);
                     await conn.query(
                         'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
                         [productId, size, unit, item.zoho_rate || 0, item.zoho_item_id]
