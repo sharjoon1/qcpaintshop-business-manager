@@ -1814,7 +1814,8 @@ RULES:
 - IMPORTANT: Return ONLY the JSON object. No markdown fences, no extra text.`;
 
         // Build context section if reference data provided (e.g. pasted Excel tables)
-        const contextSection = context ? `\nREFERENCE DATA (Excel/table):\n${context.substring(0, 10000)}\n` : '';
+        // WS frame limit 512KB; each batch ~35KB items + ~1KB prompt = ~200KB budget for context
+        const contextSection = context ? `\nREFERENCE DATA (Excel/table):\n${context.substring(0, 200000)}\n` : '';
 
         // Field name mapping (short → full)
         const fieldMap = {
