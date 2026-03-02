@@ -80,11 +80,14 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <div class="max-w-lg mx-auto px-4 py-4">
+        <div class="max-w-lg mx-auto px-4 pt-3 pb-4">
+            <!-- Centered Logo -->
+            <div id="headerLogoWrap" class="text-center mb-2" style="display:none">
+                <img id="headerLogo" style="width:48px;height:48px;border-radius:10px;object-fit:contain" alt="QC">
+            </div>
             <div class="flex items-center justify-between">
-                <!-- Left: Logo + Name -->
-                <div class="flex items-center gap-3">
-                    <img id="headerLogo" style="width:40px;height:40px;border-radius:8px;object-fit:contain;display:none" alt="QC">
+                <!-- Left: Name -->
+                <div class="flex items-center gap-2">
                     <div>
                         <p class="text-sm opacity-80" data-i18n="dashboard.welcome_back">Welcome back,</p>
                         <h1 class="text-xl font-bold" id="painterName">Painter</h1>
@@ -427,11 +430,10 @@
 
             dashboardData = data.dashboard;
 
-            // Show business logo directly (no fallback icon)
+            // Show business logo centered (no fallback)
             if (data.dashboard.businessLogo) {
-                const logoEl = document.getElementById('headerLogo');
-                logoEl.src = data.dashboard.businessLogo;
-                logoEl.style.display = 'block';
+                document.getElementById('headerLogo').src = data.dashboard.businessLogo;
+                document.getElementById('headerLogoWrap').style.display = 'block';
             }
 
             // Update profile avatar (top-right button)
@@ -879,7 +881,8 @@
 
     /**
      * Shared card share helper — shares the actual card PNG image + Tamil text.
-     * Uses Web Share API (files), then falls back to blob URL + WhatsApp.
+     * 1. Web Share API with files (Chrome Android, Safari iOS 15+)
+     * 2. Fallback: download PNG to device + open WhatsApp with text
      */
     async function shareCardFile(cardUrl, fileName, title, text) {
         if (!cardUrl) { showToast('Card not available yet', 'error'); return; }
@@ -896,32 +899,34 @@
 
         const file = new File([blob], fileName, { type: 'image/png' });
 
-        // Try native Web Share API with file
+        // Try native Web Share API with file (works on Chrome Android & Safari iOS 15+)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
                 await navigator.share({ title, text, files: [file] });
                 showToast('Card shared!');
                 return;
             } catch (e) {
-                if (e.name === 'AbortError') return; // user cancelled
-            }
-        }
-
-        // Fallback: try share without files (text + title only)
-        if (navigator.share) {
-            try {
-                await navigator.share({ title, text });
-                showToast('Text shared! Attach the card image manually.');
-                return;
-            } catch (e) {
                 if (e.name === 'AbortError') return;
             }
         }
 
-        // Final fallback: WhatsApp with text
-        const waUrl = 'https://wa.me/?text=' + encodeURIComponent(text);
-        window.open(waUrl, '_blank');
-        showToast('Opening WhatsApp...');
+        // Fallback: download the card PNG to device, then open WhatsApp
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        showToast('Card saved! Attach it in WhatsApp', 'success');
+
+        // Open WhatsApp after brief delay so download starts first
+        setTimeout(() => {
+            window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+            URL.revokeObjectURL(blobUrl);
+        }, 1500);
     }
 
     async function shareVisitingCard() {
