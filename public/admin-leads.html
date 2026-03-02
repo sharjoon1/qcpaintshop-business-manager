@@ -374,6 +374,32 @@
         </div>
     </div>
 
+    <!-- Convert Modal -->
+    <div id="convertModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Convert Lead</h3>
+                <button onclick="document.getElementById('convertModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <p class="text-gray-600 mb-4">Convert <strong id="convertLeadName"></strong> to:</p>
+            <div class="space-y-3">
+                <button onclick="adminConvertLead('customer')" class="w-full py-3 bg-blue-50 text-blue-700 rounded-xl text-sm font-semibold hover:bg-blue-100 transition flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    Customer
+                </button>
+                <button onclick="adminConvertLead('painter')" class="w-full py-3 bg-green-50 text-green-700 rounded-xl text-sm font-semibold hover:bg-green-100 transition flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343"/></svg>
+                    Painter
+                </button>
+                <button onclick="adminConvertLead('engineer')" class="w-full py-3 bg-amber-50 text-amber-700 rounded-xl text-sm font-semibold hover:bg-amber-100 transition flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                    Engineer
+                </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-4 text-center">A Zoho Books contact will be created automatically</p>
+        </div>
+    </div>
+
     <script>
         const API_BASE = '/api';
         let leads = [];
@@ -563,6 +589,7 @@
                         <span class="px-3 py-1 text-xs font-semibold rounded-full ${statusClass}">
                             ${formatStatus(lead.status)}
                         </span>
+                        ${lead.lead_type ? `<span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full ${lead.lead_type === 'painter' ? 'bg-green-100 text-green-700' : lead.lead_type === 'engineer' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${lead.lead_type.charAt(0).toUpperCase() + lead.lead_type.slice(1)}</span>` : ''}
                     </td>
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 text-xs font-semibold ${getPriorityBadge(lead.priority)}">
@@ -578,6 +605,9 @@
                         <button onclick="editLead(${lead.id})" class="text-green-600 hover:text-green-800 font-semibold text-sm mr-2">
                             Edit
                         </button>
+                        ${!lead.customer_id && lead.status !== 'inactive' ? `<button onclick="showConvertModal(${lead.id}, '${lead.name.replace(/'/g, "\\'")}')" class="text-purple-600 hover:text-purple-800 font-semibold text-sm mr-2">
+                            Convert
+                        </button>` : ''}
                         <button onclick="deleteLead(${lead.id})" class="text-red-600 hover:text-red-800 font-semibold text-sm">
                             Delete
                         </button>
@@ -606,6 +636,7 @@
                                     <p><span class="font-semibold">Source:</span> ${formatSource(lead.source)}</p>
                                     <p><span class="font-semibold">Status:</span> <span class="px-3 py-1 text-xs font-semibold rounded-full status-${lead.status}">${formatStatus(lead.status)}</span></p>
                                     <p><span class="font-semibold">Priority:</span> <span class="${getPriorityBadge(lead.priority)}">${formatPriority(lead.priority)}</span></p>
+                                    ${lead.lead_type ? `<p><span class="font-semibold">Converted To:</span> <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${lead.lead_type === 'painter' ? 'bg-green-100 text-green-700' : lead.lead_type === 'engineer' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${lead.lead_type.charAt(0).toUpperCase() + lead.lead_type.slice(1)}</span></p>` : ''}
                                 </div>
                             </div>
                             <div>
@@ -756,6 +787,39 @@
         }
 
         // Delete lead
+        let convertLeadId = null;
+        let convertLeadName = '';
+
+        function showConvertModal(id, name) {
+            convertLeadId = id;
+            convertLeadName = name;
+            document.getElementById('convertLeadName').textContent = name;
+            document.getElementById('convertModal').classList.remove('hidden');
+        }
+
+        async function adminConvertLead(leadType) {
+            if (!convertLeadId) return;
+            const typeLabel = leadType.charAt(0).toUpperCase() + leadType.slice(1);
+
+            try {
+                const response = await fetch(`${API_BASE}/leads/${convertLeadId}/convert`, {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lead_type: leadType })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert(`Lead "${convertLeadName}" converted to ${typeLabel} successfully!${result.data.zoho_contact_id ? '\nZoho contact created.' : '\nNote: Zoho contact creation may have failed.'}`);
+                    document.getElementById('convertModal').classList.add('hidden');
+                    loadLeads();
+                } else {
+                    alert('Failed: ' + result.message);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
         async function deleteLead(id) {
             const lead = leads.find(l => l.id === id);
             if (!lead) return;

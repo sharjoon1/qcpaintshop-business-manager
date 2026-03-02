@@ -8,6 +8,7 @@ const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const leadManager = require('../services/ai-lead-manager');
 const notificationService = require('../services/notification-service');
+const zohoAPI = require('../services/zoho-api');
 
 let io;
 
@@ -900,6 +901,123 @@ router.get('/my/:id/followups', requirePermission('leads', 'own.view'), async (r
     } catch (error) {
         console.error('Staff get followups error:', error);
         res.status(500).json({ success: false, message: 'Failed to retrieve followups' });
+    }
+});
+
+/**
+ * POST /api/leads/my/:id/convert
+ * Staff converts own lead to customer/painter/engineer
+ * Creates Zoho Books contact + local customers record
+ */
+router.post('/my/:id/convert', requirePermission('leads', 'own.edit'), async (req, res) => {
+    const connection = await pool.getConnection();
+
+    try {
+        const leadId = req.params.id;
+        const { lead_type } = req.body;
+
+        if (!['customer', 'painter', 'engineer'].includes(lead_type)) {
+            connection.release();
+            return res.status(400).json({ success: false, message: 'Invalid lead_type. Must be customer, painter, or engineer' });
+        }
+
+        const ownership = await checkLeadOwnership(leadId, req.user.id);
+        if (!ownership.exists) {
+            connection.release();
+            return res.status(404).json({ success: false, message: 'Lead not found' });
+        }
+        if (!ownership.isOwner) {
+            connection.release();
+            return res.status(403).json({ success: false, message: 'You can only convert leads assigned to you' });
+        }
+
+        await connection.beginTransaction();
+
+        const [leads] = await connection.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const lead = leads[0];
+
+        if (lead.customer_id) {
+            await connection.rollback();
+            connection.release();
+            return res.status(400).json({ success: false, message: 'Lead has already been converted' });
+        }
+        if (lead.status === 'inactive') {
+            await connection.rollback();
+            connection.release();
+            return res.status(400).json({ success: false, message: 'Cannot convert an inactive lead' });
+        }
+
+        // Create local customer record
+        const [customerResult] = await connection.query(
+            `INSERT INTO customers (name, phone, email, address, city, status)
+             VALUES (?, ?, ?, ?, ?, 'approved')`,
+            [lead.name, lead.phone || null, lead.email || null, lead.address || null, lead.city || null]
+        );
+        const customerId = customerResult.insertId;
+        const now = new Date();
+
+        // Update lead
+        await connection.query(
+            `UPDATE leads SET customer_id = ?, lead_type = ?, converted_at = ?, status = 'won' WHERE id = ?`,
+            [customerId, lead_type, now, leadId]
+        );
+
+        // Add conversion followup
+        const typeLabel = lead_type.charAt(0).toUpperCase() + lead_type.slice(1);
+        await connection.query(
+            `INSERT INTO lead_followups (lead_id, user_id, followup_type, notes, outcome)
+             VALUES (?, ?, 'other', ?, 'converted')`,
+            [leadId, req.user.id, `Lead converted to ${typeLabel}`]
+        );
+
+        await connection.query(
+            `UPDATE leads SET total_followups = total_followups + 1, last_contact_date = CURDATE() WHERE id = ?`,
+            [leadId]
+        );
+
+        await connection.commit();
+        connection.release();
+
+        // Try creating Zoho contact (non-blocking — don't fail conversion if Zoho fails)
+        let zohoContactId = null;
+        try {
+            const zohoResult = await zohoAPI.createContact({
+                contact_name: lead.name,
+                contact_type: 'customer',
+                phone: lead.phone || undefined,
+                email: lead.email || undefined,
+                billing_address: lead.address ? {
+                    address: lead.address,
+                    city: lead.city || '',
+                    state: lead.state || '',
+                    zip: lead.pincode || ''
+                } : undefined,
+                notes: `Converted from lead ${lead.lead_number} as ${typeLabel}. Source: ${lead.source || 'walk_in'}`
+            });
+            if (zohoResult && zohoResult.contact) {
+                zohoContactId = zohoResult.contact.contact_id;
+            }
+        } catch (zohoErr) {
+            console.error('Zoho contact creation failed (non-blocking):', zohoErr.message);
+        }
+
+        res.status(201).json({
+            success: true,
+            message: `Lead converted to ${typeLabel} successfully`,
+            data: {
+                lead_id: parseInt(leadId),
+                lead_type,
+                customer_id: customerId,
+                zoho_contact_id: zohoContactId,
+                converted_at: now
+            }
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        connection.release();
+        console.error('Staff convert lead error:', error);
+        res.status(500).json({ success: false, message: 'Failed to convert lead' });
     }
 });
 
@@ -1814,22 +1932,21 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
 
     try {
         const leadId = req.params.id;
+        const lead_type = req.body.lead_type || 'customer';
+
+        if (!['customer', 'painter', 'engineer'].includes(lead_type)) {
+            connection.release();
+            return res.status(400).json({ success: false, message: 'Invalid lead_type' });
+        }
 
         await connection.beginTransaction();
 
-        // Get the lead
-        const [leads] = await connection.query(
-            'SELECT * FROM leads WHERE id = ?',
-            [leadId]
-        );
+        const [leads] = await connection.query('SELECT * FROM leads WHERE id = ?', [leadId]);
 
         if (leads.length === 0) {
             await connection.rollback();
             connection.release();
-            return res.status(404).json({
-                success: false,
-                message: 'Lead not found'
-            });
+            return res.status(404).json({ success: false, message: 'Lead not found' });
         }
 
         const lead = leads[0];
@@ -1837,52 +1954,39 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
         if (lead.customer_id) {
             await connection.rollback();
             connection.release();
-            return res.status(400).json({
-                success: false,
-                message: 'Lead has already been converted to a customer',
-                data: { customer_id: lead.customer_id }
-            });
+            return res.status(400).json({ success: false, message: 'Lead has already been converted', data: { customer_id: lead.customer_id } });
         }
 
         if (lead.status === 'inactive') {
             await connection.rollback();
             connection.release();
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot convert an inactive lead'
-            });
+            return res.status(400).json({ success: false, message: 'Cannot convert an inactive lead' });
         }
 
         // Create customer from lead data
         const [customerResult] = await connection.query(
             `INSERT INTO customers (name, phone, email, address, city, status)
              VALUES (?, ?, ?, ?, ?, 'approved')`,
-            [
-                lead.name,
-                lead.phone || null,
-                lead.email || null,
-                lead.address || null,
-                lead.city || null
-            ]
+            [lead.name, lead.phone || null, lead.email || null, lead.address || null, lead.city || null]
         );
 
         const customerId = customerResult.insertId;
         const now = new Date();
+        const typeLabel = lead_type.charAt(0).toUpperCase() + lead_type.slice(1);
 
-        // Update lead with customer reference and won status
+        // Update lead with customer reference, type, and won status
         await connection.query(
-            `UPDATE leads SET customer_id = ?, converted_at = ?, status = 'won' WHERE id = ?`,
-            [customerId, now, leadId]
+            `UPDATE leads SET customer_id = ?, lead_type = ?, converted_at = ?, status = 'won' WHERE id = ?`,
+            [customerId, lead_type, now, leadId]
         );
 
         // Add a conversion followup entry
         await connection.query(
             `INSERT INTO lead_followups (lead_id, user_id, followup_type, notes, outcome)
-             VALUES (?, ?, 'other', 'Lead converted to customer', 'converted')`,
-            [leadId, req.user.id]
+             VALUES (?, ?, 'other', ?, 'converted')`,
+            [leadId, req.user.id, `Lead converted to ${typeLabel}`]
         );
 
-        // Update followup count
         await connection.query(
             `UPDATE leads SET total_followups = total_followups + 1, last_contact_date = CURDATE() WHERE id = ?`,
             [leadId]
@@ -1891,19 +1995,40 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
         await connection.commit();
         connection.release();
 
-        // Fetch the created customer
-        const [newCustomer] = await pool.query(
-            'SELECT * FROM customers WHERE id = ?',
-            [customerId]
-        );
+        // Try creating Zoho contact (non-blocking)
+        let zohoContactId = null;
+        try {
+            const zohoResult = await zohoAPI.createContact({
+                contact_name: lead.name,
+                contact_type: 'customer',
+                phone: lead.phone || undefined,
+                email: lead.email || undefined,
+                billing_address: lead.address ? {
+                    address: lead.address,
+                    city: lead.city || '',
+                    state: lead.state || '',
+                    zip: lead.pincode || ''
+                } : undefined,
+                notes: `Converted from lead ${lead.lead_number} as ${typeLabel}. Source: ${lead.source || 'walk_in'}`
+            });
+            if (zohoResult && zohoResult.contact) {
+                zohoContactId = zohoResult.contact.contact_id;
+            }
+        } catch (zohoErr) {
+            console.error('Zoho contact creation failed (non-blocking):', zohoErr.message);
+        }
+
+        const [newCustomer] = await pool.query('SELECT * FROM customers WHERE id = ?', [customerId]);
 
         res.status(201).json({
             success: true,
-            message: 'Lead successfully converted to customer',
+            message: `Lead successfully converted to ${typeLabel}`,
             data: {
                 lead_id: parseInt(leadId),
+                lead_type,
                 customer_id: customerId,
                 customer: newCustomer[0],
+                zoho_contact_id: zohoContactId,
                 converted_at: now
             }
         });
@@ -1912,10 +2037,7 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
         await connection.rollback();
         connection.release();
         console.error('Convert lead error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to convert lead to customer'
-        });
+        res.status(500).json({ success: false, message: 'Failed to convert lead' });
     }
 });
 
