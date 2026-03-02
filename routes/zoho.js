@@ -1942,7 +1942,7 @@ RULES:
         // === DETERMINISTIC PAINT PRODUCT CATEGORIZER ===
         // When user asks to categorize/classify items, use keyword matching on product names.
         // This is instant, handles all items, and never misses any.
-        const isCategoryCommand = /\b(categor|classify|categorise|categorize)\b/i.test(command);
+        const isCategoryCommand = /\b(categor(y|ize|ise|ies)?|classify|classification)\b/i.test(command);
         if (isCategoryCommand) {
             function categorizePaintItem(name, desc, brand) {
                 const text = `${name || ''} ${desc || ''}`.toUpperCase();
