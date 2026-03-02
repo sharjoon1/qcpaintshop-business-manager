@@ -8,7 +8,6 @@ const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const leadManager = require('../services/ai-lead-manager');
 const notificationService = require('../services/notification-service');
-const zohoAPI = require('../services/zoho-api');
 
 let io;
 
@@ -978,28 +977,8 @@ router.post('/my/:id/convert', requirePermission('leads', 'own.edit'), async (re
         await connection.commit();
         connection.release();
 
-        // Try creating Zoho contact (non-blocking — don't fail conversion if Zoho fails)
-        let zohoContactId = null;
-        try {
-            const zohoResult = await zohoAPI.createContact({
-                contact_name: lead.name,
-                contact_type: 'customer',
-                phone: lead.phone || undefined,
-                email: lead.email || undefined,
-                billing_address: lead.address ? {
-                    address: lead.address,
-                    city: lead.city || '',
-                    state: lead.state || '',
-                    zip: lead.pincode || ''
-                } : undefined,
-                notes: `Converted from lead ${lead.lead_number} as ${typeLabel}. Source: ${lead.source || 'walk_in'}`
-            });
-            if (zohoResult && zohoResult.contact) {
-                zohoContactId = zohoResult.contact.contact_id;
-            }
-        } catch (zohoErr) {
-            console.error('Zoho contact creation failed (non-blocking):', zohoErr.message);
-        }
+        // NOTE: Zoho contact is NOT created here. It will be created later
+        // when estimate is confirmed and payment is received.
 
         res.status(201).json({
             success: true,
@@ -1008,7 +987,6 @@ router.post('/my/:id/convert', requirePermission('leads', 'own.edit'), async (re
                 lead_id: parseInt(leadId),
                 lead_type,
                 customer_id: customerId,
-                zoho_contact_id: zohoContactId,
                 converted_at: now
             }
         });
@@ -1995,28 +1973,8 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
         await connection.commit();
         connection.release();
 
-        // Try creating Zoho contact (non-blocking)
-        let zohoContactId = null;
-        try {
-            const zohoResult = await zohoAPI.createContact({
-                contact_name: lead.name,
-                contact_type: 'customer',
-                phone: lead.phone || undefined,
-                email: lead.email || undefined,
-                billing_address: lead.address ? {
-                    address: lead.address,
-                    city: lead.city || '',
-                    state: lead.state || '',
-                    zip: lead.pincode || ''
-                } : undefined,
-                notes: `Converted from lead ${lead.lead_number} as ${typeLabel}. Source: ${lead.source || 'walk_in'}`
-            });
-            if (zohoResult && zohoResult.contact) {
-                zohoContactId = zohoResult.contact.contact_id;
-            }
-        } catch (zohoErr) {
-            console.error('Zoho contact creation failed (non-blocking):', zohoErr.message);
-        }
+        // NOTE: Zoho contact is NOT created here. It will be created later
+        // when estimate is confirmed and payment is received.
 
         const [newCustomer] = await pool.query('SELECT * FROM customers WHERE id = ?', [customerId]);
 
@@ -2028,7 +1986,6 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
                 lead_type,
                 customer_id: customerId,
                 customer: newCustomer[0],
-                zoho_contact_id: zohoContactId,
                 converted_at: now
             }
         });
