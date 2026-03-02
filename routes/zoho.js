@@ -1813,10 +1813,6 @@ RULES:
 - If unclear: return empty edits with helpful reply.
 - IMPORTANT: Return ONLY the JSON object. No markdown fences, no extra text.`;
 
-        // Build context section if reference data provided (e.g. pasted Excel tables)
-        // WS frame limit 512KB; each batch ~35KB items + ~1KB prompt = ~200KB budget for context
-        const contextSection = context ? `\nREFERENCE DATA (Excel/table):\n${context.substring(0, 200000)}\n` : '';
-
         // Field name mapping (short → full)
         const fieldMap = {
             pr: 'purchase_rate', dpl: 'cf_dpl', cat: 'category_name',
@@ -1825,13 +1821,132 @@ RULES:
             purchase_rate: 'purchase_rate', cf_dpl: 'cf_dpl'
         };
 
-        // Split into batches and process sequentially
+        // === DETERMINISTIC REFERENCE DATA MATCHING ===
+        // If context contains a tab-separated table (pasted from Excel), parse it and do
+        // exact name matching instead of sending to AI. This is instant, accurate, and handles
+        // thousands of items without batching or timeouts.
+        if (context && context.includes('\t')) {
+            const lines = context.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            if (lines.length >= 2) {
+                // Parse header row to detect columns
+                const headerLine = lines[0];
+                const headers = headerLine.split('\t').map(h => h.trim().toLowerCase());
+
+                // Map header names to our field names
+                const headerFieldMap = {
+                    'brand': 'brand', 'brand name': 'brand',
+                    'rate': 'rate', 'selling price': 'rate', 'price': 'rate', 'mrp': 'rate',
+                    'purchase rate': 'purchase_rate', 'purchase_rate': 'purchase_rate', 'cost': 'purchase_rate', 'cost price': 'purchase_rate',
+                    'dpl': 'cf_dpl', 'cf_dpl': 'cf_dpl', 'dealer price': 'cf_dpl',
+                    'sku': 'sku',
+                    'unit': 'unit',
+                    'hsn': 'hsn_or_sac', 'hsn code': 'hsn_or_sac', 'hsn_or_sac': 'hsn_or_sac', 'sac': 'hsn_or_sac',
+                    'tax': 'tax_percentage', 'tax %': 'tax_percentage', 'tax_percentage': 'tax_percentage', 'gst': 'tax_percentage',
+                    'category': 'category_name', 'category name': 'category_name', 'category_name': 'category_name',
+                    'description': 'description'
+                };
+
+                // Find which column is the item name (first column or explicit header)
+                const nameColIdx = headers.findIndex(h =>
+                    h === 'item name' || h === 'name' || h === 'item_name' || h === 'product name' || h === 'product'
+                );
+                const nameIdx = nameColIdx >= 0 ? nameColIdx : 0; // Default to first column
+
+                // Find value columns (everything except the name column)
+                const valueColumns = [];
+                for (let i = 0; i < headers.length; i++) {
+                    if (i === nameIdx) continue;
+                    const fieldName = headerFieldMap[headers[i]];
+                    if (fieldName) {
+                        valueColumns.push({ colIdx: i, fieldName });
+                    }
+                }
+
+                // Only use deterministic matching if we found at least one value column
+                if (valueColumns.length > 0) {
+                    // Build lookup map: normalized item name → { field: value, ... }
+                    const lookupMap = new Map();
+                    for (let i = 1; i < lines.length; i++) {
+                        const cols = lines[i].split('\t');
+                        const itemName = (cols[nameIdx] || '').trim();
+                        if (!itemName) continue;
+
+                        const values = {};
+                        for (const vc of valueColumns) {
+                            const val = (cols[vc.colIdx] || '').trim();
+                            if (val) {
+                                // Keep numeric fields as numbers
+                                if (['rate', 'purchase_rate', 'cf_dpl', 'tax_percentage'].includes(vc.fieldName)) {
+                                    const num = parseFloat(val);
+                                    if (!isNaN(num)) values[vc.fieldName] = num;
+                                } else {
+                                    values[vc.fieldName] = val;
+                                }
+                            }
+                        }
+                        if (Object.keys(values).length > 0) {
+                            lookupMap.set(itemName.toUpperCase(), values);
+                        }
+                    }
+
+                    // Match items by exact name
+                    const allEdits = [];
+                    let matchCount = 0;
+                    let missCount = 0;
+                    for (const item of allCompact) {
+                        const itemName = (item.name || '').trim().toUpperCase();
+                        const match = lookupMap.get(itemName);
+                        if (match) {
+                            // Only include fields that actually changed
+                            const changes = {};
+                            for (const [field, newVal] of Object.entries(match)) {
+                                const shortField = Object.entries(fieldMap).find(([, v]) => v === field);
+                                const currentVal = shortField ? item[shortField[0]] : item[field];
+                                if (String(currentVal || '').toUpperCase() !== String(newVal).toUpperCase()) {
+                                    changes[field] = newVal;
+                                }
+                            }
+                            if (Object.keys(changes).length > 0) {
+                                allEdits.push({ zoho_item_id: item.id, changes });
+                                matchCount++;
+                            }
+                        } else {
+                            missCount++;
+                        }
+                    }
+
+                    const fieldNames = valueColumns.map(vc => vc.fieldName).join(', ');
+                    const summary = `Direct match: Updated ${matchCount} items (${fieldNames}). ${missCount} items had no match in reference data. ${lookupMap.size} reference entries used.`;
+                    const reply = `**Direct Data Match Complete**\n\n` +
+                        `Applied **${fieldNames}** from your reference table (${lookupMap.size} entries) to ${allCompact.length} items.\n\n` +
+                        `- **${matchCount}** items updated (exact name match)\n` +
+                        `- **${allCompact.length - matchCount - missCount}** items already had correct values\n` +
+                        `- **${missCount}** items not found in reference data\n\n` +
+                        `*Used deterministic matching — every value applied exactly as provided.*`;
+
+                    return res.json({
+                        success: true,
+                        edits: allEdits,
+                        summary,
+                        reply,
+                        model: 'deterministic',
+                        itemsProcessed: allCompact.length,
+                        batchCount: 1
+                    });
+                }
+            }
+        }
+
+        // === AI-BASED PROCESSING (fallback for non-reference-data commands) ===
+        // Build context section if reference data provided but not tab-separated
+        const contextSection = context ? `\nREFERENCE DATA (Excel/table):\n${context.substring(0, 200000)}\n` : '';
+
+        // Split into batches and process in parallel
         const batches = [];
         for (let i = 0; i < allCompact.length; i += BATCH_SIZE) {
             batches.push(allCompact.slice(i, i + BATCH_SIZE));
         }
 
-        // Process all batches in parallel
         const batchPromises = batches.map((batch, bIdx) => {
             let itemOffset = 0;
             for (let i = 0; i < bIdx; i++) itemOffset += batches[i].length;
