@@ -2514,7 +2514,10 @@ app.get('/api/products/mapped-zoho-ids', requireAuth, async (req, res) => {
 // Import Zoho items as local Products + pack_sizes
 app.post('/api/products/import-from-zoho', requirePermission('products', 'add'), async (req, res) => {
     try {
-        const { zoho_item_ids } = req.body;
+        const { zoho_item_ids, product_configs } = req.body;
+        // product_configs: optional { "groupKey": { product_type, area_coverage } }
+        const configs = product_configs || {};
+
         if (!Array.isArray(zoho_item_ids) || !zoho_item_ids.length) {
             return res.status(400).json({ success: false, error: 'No items selected' });
         }
@@ -2566,7 +2569,11 @@ app.post('/api/products/import-from-zoho', requirePermission('products', 'add'),
             let productsCreated = 0, packSizesCreated = 0;
             const skipped = mappedSet.size;
 
-            for (const group of Object.values(groups)) {
+            for (const [key, group] of Object.entries(groups)) {
+                const cfg = configs[key] || {};
+                const productType = cfg.product_type || 'unit_wise';
+                const areaCoverage = productType === 'area_wise' ? (parseFloat(cfg.area_coverage) || null) : null;
+
                 // Find or create brand
                 let brandId = null;
                 if (group.brand) {
@@ -2592,8 +2599,8 @@ app.post('/api/products/import-from-zoho', requirePermission('products', 'add'),
                 } else {
                     const rate = group.items[0]?.zoho_rate || 0;
                     const [r] = await conn.query(
-                        "INSERT INTO products (name, brand_id, category_id, product_type, base_price, status) VALUES (?, ?, ?, 'unit_wise', ?, 'active')",
-                        [group.name, brandId, categoryId, rate]
+                        "INSERT INTO products (name, brand_id, category_id, product_type, base_price, area_coverage, status) VALUES (?, ?, ?, ?, ?, ?, 'active')",
+                        [group.name, brandId, categoryId, productType, rate, areaCoverage]
                     );
                     productId = r.insertId;
                     productsCreated++;

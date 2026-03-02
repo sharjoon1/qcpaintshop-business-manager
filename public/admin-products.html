@@ -263,8 +263,37 @@
         </div>
     </div>
 
-    <!-- Hidden file input for product image upload -->
+    <!-- Hidden file inputs for image uploads -->
     <input type="file" id="productImageInput" accept="image/*" style="display:none" onchange="uploadProductImage(event)">
+    <input type="file" id="reviewImageInput" accept="image/*" style="display:none" onchange="uploadReviewImage(event)">
+
+    <!-- Import Review Modal -->
+    <div id="importReviewModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl">
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">Import to Products</h3>
+                    <p class="text-sm text-gray-500" id="reviewSubtitle">Review and configure before importing</p>
+                </div>
+                <button onclick="closeImportReview()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <!-- Body (scrollable) -->
+            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4" id="reviewBody" style="min-height:0">
+                <!-- Product cards rendered here -->
+            </div>
+            <!-- Footer -->
+            <div class="flex items-center justify-between px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
+                <span class="text-sm text-gray-500" id="reviewFooterInfo"></span>
+                <div class="flex gap-3">
+                    <button onclick="closeImportReview()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button>
+                    <button onclick="confirmImport()" id="confirmImportBtn" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Import All</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Add/Edit Modal -->
     <div id="productModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1167,17 +1196,173 @@
             else bar.classList.add('hidden');
         }
 
-        async function importZohoToProducts() {
+        // Open review modal instead of importing directly
+        function importZohoToProducts() {
             if (zohoSelectedIds.size === 0) return;
-            const btn = document.getElementById('zohoImportBtn');
+            showImportReview();
+        }
+
+        // ═══════════════════════════════════════
+        // IMPORT REVIEW MODAL
+        // ═══════════════════════════════════════
+        let reviewGroups = []; // { key, name, brand, category, items: [...zohoItems], image_url }
+        let reviewImageTarget = null; // group index for image upload
+
+        function parseDisplaySize(itemName) {
+            const m = (itemName || '').match(/(\d+(?:\.\d+)?)\s*(ltr?|litres?|liters?|kg|kgs?|ml|gm?|grams?|pc|pcs?|pieces?|m|meters?)\b/i);
+            if (m) return m[1] + ' ' + m[2];
+            return '';
+        }
+
+        function showImportReview() {
+            // Build groups from selected items in zohoCurrentItems
+            const selectedItems = zohoCurrentItems.filter(i => zohoSelectedIds.has(i.zoho_item_id || i.item_id));
+            const groupMap = {};
+            for (const item of selectedItems) {
+                const name = (item.cf_product_name || item.name || item.item_name || '').trim();
+                const brand = (item.brand || '').trim();
+                const cat = (item.category_name || '').trim();
+                const key = `${name}|||${brand}|||${cat}`;
+                if (!groupMap[key]) {
+                    groupMap[key] = {
+                        key, name, brand, category: cat,
+                        image_url: item.image_url || '',
+                        product_type: 'unit_wise',
+                        area_coverage: '',
+                        items: []
+                    };
+                }
+                groupMap[key].items.push(item);
+            }
+            reviewGroups = Object.values(groupMap);
+            renderImportReview();
+            document.getElementById('importReviewModal').classList.remove('hidden');
+        }
+
+        function closeImportReview() {
+            document.getElementById('importReviewModal').classList.add('hidden');
+            reviewGroups = [];
+        }
+
+        function renderImportReview() {
+            const body = document.getElementById('reviewBody');
+            const totalItems = reviewGroups.reduce((s, g) => s + g.items.length, 0);
+            document.getElementById('reviewSubtitle').textContent = `${reviewGroups.length} product${reviewGroups.length > 1 ? 's' : ''}, ${totalItems} item${totalItems > 1 ? 's' : ''} selected`;
+            document.getElementById('reviewFooterInfo').textContent = `${reviewGroups.length} products will be created`;
+
+            body.innerHTML = reviewGroups.map((g, idx) => {
+                const sizes = g.items.map(i => parseDisplaySize(i.name || i.item_name) || (i.name || i.item_name)).filter(Boolean);
+                const firstItemId = g.items[0]?.zoho_item_id || g.items[0]?.item_id || '';
+                return `
+                <div class="border border-gray-200 rounded-xl p-4 hover:border-purple-200 transition">
+                    <div class="flex gap-4">
+                        <!-- Image -->
+                        <div class="flex-shrink-0">
+                            ${g.image_url
+                                ? `<img src="${escH(g.image_url)}" class="w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:border-purple-400 transition" onclick="triggerReviewImage(${idx}, '${firstItemId}')" title="Click to change">`
+                                : `<div class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition" onclick="triggerReviewImage(${idx}, '${firstItemId}')" title="Upload image">
+                                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <span class="text-[10px] text-gray-400 mt-1">Upload</span>
+                                   </div>`
+                            }
+                        </div>
+                        <!-- Details -->
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-semibold text-gray-900 text-sm truncate">${escH(g.name)}</h4>
+                            <div class="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
+                                ${g.brand ? `<span>Brand: <strong>${escH(g.brand)}</strong></span>` : ''}
+                                ${g.category ? `<span>Category: <strong>${escH(g.category)}</strong></span>` : ''}
+                                <span>${g.items.length} size${g.items.length > 1 ? 's' : ''}</span>
+                            </div>
+                            <!-- Size chips -->
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                ${g.items.map(item => {
+                                    const sz = parseDisplaySize(item.name || item.item_name);
+                                    const rate = item.rate ? '₹' + parseFloat(item.rate).toFixed(0) : '';
+                                    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">${sz || escH(item.name || item.item_name)}${rate ? ' · ' + rate : ''}</span>`;
+                                }).join('')}
+                            </div>
+                            <!-- Type & Coverage -->
+                            <div class="flex flex-wrap items-center gap-3 mt-3">
+                                <div class="flex items-center gap-2">
+                                    <label class="text-xs font-medium text-gray-600">Type:</label>
+                                    <select onchange="setReviewType(${idx}, this.value)" class="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:border-purple-500 focus:outline-none">
+                                        <option value="unit_wise" ${g.product_type === 'unit_wise' ? 'selected' : ''}>Unit Wise</option>
+                                        <option value="area_wise" ${g.product_type === 'area_wise' ? 'selected' : ''}>Area Wise</option>
+                                    </select>
+                                </div>
+                                <div id="reviewCoverage_${idx}" class="flex items-center gap-2" style="${g.product_type === 'area_wise' ? '' : 'display:none'}">
+                                    <label class="text-xs font-medium text-gray-600">Coverage:</label>
+                                    <input type="number" step="0.01" placeholder="sq ft/L" value="${g.area_coverage || ''}"
+                                        onchange="reviewGroups[${idx}].area_coverage = this.value"
+                                        class="w-24 px-2 py-1 border border-gray-300 rounded-lg text-xs focus:border-purple-500 focus:outline-none">
+                                    <span class="text-[10px] text-gray-400">sq ft per L/KG</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function setReviewType(idx, value) {
+            reviewGroups[idx].product_type = value;
+            const coverageEl = document.getElementById('reviewCoverage_' + idx);
+            if (coverageEl) coverageEl.style.display = value === 'area_wise' ? '' : 'none';
+        }
+
+        function triggerReviewImage(groupIdx, itemId) {
+            reviewImageTarget = { groupIdx, itemId };
+            const input = document.getElementById('reviewImageInput');
+            input.value = '';
+            input.click();
+        }
+
+        async function uploadReviewImage(event) {
+            const file = event.target.files[0];
+            if (!file || !reviewImageTarget) return;
+            const { groupIdx, itemId } = reviewImageTarget;
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch(`/api/products/${itemId}/image`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message || data.error);
+                reviewGroups[groupIdx].image_url = data.image_url;
+                renderImportReview();
+            } catch (err) {
+                alert('Image upload failed: ' + err.message);
+            } finally {
+                reviewImageTarget = null;
+            }
+        }
+
+        async function confirmImport() {
+            const btn = document.getElementById('confirmImportBtn');
             btn.disabled = true;
             btn.textContent = 'Importing...';
+
+            // Build configs keyed by group key
+            const product_configs = {};
+            for (const g of reviewGroups) {
+                product_configs[g.key] = { product_type: g.product_type };
+                if (g.product_type === 'area_wise' && g.area_coverage) {
+                    product_configs[g.key].area_coverage = g.area_coverage;
+                }
+            }
 
             try {
                 const res = await fetch('/api/products/import-from-zoho', {
                     method: 'POST',
                     headers: getAuthHeaders(),
-                    body: JSON.stringify({ zoho_item_ids: [...zohoSelectedIds] })
+                    body: JSON.stringify({ zoho_item_ids: [...zohoSelectedIds], product_configs })
                 });
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
@@ -1187,9 +1372,11 @@
                 if (data.skipped > 0) msg += `. ${data.skipped} already mapped — skipped.`;
                 alert(msg);
 
+                closeImportReview();
                 zohoSelectedIds.clear();
                 await loadZohoMappedIds();
                 await loadZohoItems();
+                await loadData();
                 updateZohoSelectionUI();
                 const allCb = document.getElementById('zohoSelectAll');
                 if (allCb) allCb.checked = false;
@@ -1197,7 +1384,7 @@
                 alert('Import failed: ' + err.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg> Import to Products';
+                btn.textContent = 'Import All';
             }
         }
 
