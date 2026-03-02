@@ -2301,6 +2301,98 @@ RULES:
             });
         }
 
+        // === DETERMINISTIC DESCRIPTION UPDATER ===
+        // Detect commands about updating descriptions for known product types.
+        // Handles product-specific description generation based on item name patterns.
+        const isDescCommand = /\bdescription\b/i.test(command);
+        if (isDescCommand) {
+            const allEdits = [];
+            const productTypes = [];
+
+            // --- Sanding Paper / Abrasive Paper ---
+            if (/\bsand(ing)?\s*paper\b/i.test(command) || /\bajax\b/i.test(command) || /\bemery\b/i.test(command) || /\babrasive\b/i.test(command)) {
+                productTypes.push('Sanding Paper');
+                for (const item of allCompact) {
+                    const name = (item.name || '').toUpperCase();
+                    // Match: "100 AJAX PAPER", "80 ROLL PAPER AJAX 01 METER", "100 ROLL EMERY PAPER 1 MT"
+                    if (/AJAX\s*PAPER/.test(name) || /ROLL\s*PAPER\s*AJAX/.test(name) || /EMERY\s*PAPER/.test(name) || /ROLL\s*EMERY/.test(name)) {
+                        const gritMatch = name.match(/^(\d+)\s/);
+                        const grit = gritMatch ? gritMatch[1] : '';
+                        let newDesc;
+                        if (/ROLL/.test(name)) {
+                            const meterMatch = name.match(/(\d+)\s*M(T|ETER)?/i);
+                            const meter = meterMatch ? meterMatch[1] + ' Meter' : '';
+                            newDesc = `Sanding Paper ${grit} Grit Roll${meter ? ' ' + meter : ''}`;
+                        } else {
+                            newDesc = `Sanding Paper ${grit} Grit Sheet`;
+                        }
+                        if (newDesc && newDesc !== (item.desc || '')) {
+                            allEdits.push({ zoho_item_id: item.id, changes: { description: newDesc } });
+                        }
+                    }
+                }
+            }
+
+            // --- Stainer / Colorant ---
+            if (/\bstainer\b/i.test(command) || /\bcolourant\b/i.test(command) || /\bcolorant\b/i.test(command)) {
+                productTypes.push('Stainer/Colorant');
+                for (const item of allCompact) {
+                    const name = (item.name || '').toUpperCase();
+                    if (/STAINER/.test(name)) {
+                        const colorMatch = name.match(/^(BLACK|BLUE|RED|GREEN|YELLOW|BROWN|WHITE|ORANGE|VIOLET|MAROON)\s+STAINER/i);
+                        const sizeMatch = name.match(/(\d+)\s*ML/i);
+                        if (colorMatch) {
+                            const color = colorMatch[1].charAt(0) + colorMatch[1].slice(1).toLowerCase();
+                            const size = sizeMatch ? sizeMatch[1] + 'ml' : '';
+                            const newDesc = `${color} Liquid Stainer${size ? ' ' + size : ''}`;
+                            if (newDesc !== (item.desc || '')) {
+                                allEdits.push({ zoho_item_id: item.id, changes: { description: newDesc } });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Amber / Powder Pigment ---
+            if (/\bamber\b/i.test(command) || /\bpigment\b/i.test(command) || /\boxide\b/i.test(command)) {
+                productTypes.push('Powder Pigment');
+                for (const item of allCompact) {
+                    const name = (item.name || '').toUpperCase();
+                    if (/^AMBER\s/.test(name)) {
+                        const colorMatch = name.match(/AMBER\s+(BLACK|BROWN|RED|YELLOW|GREEN|BLUE|WHITE|ORANGE)/i);
+                        const sizeMatch = name.match(/(\d+)\s*G/i);
+                        if (colorMatch) {
+                            const color = colorMatch[1].charAt(0) + colorMatch[1].slice(1).toLowerCase();
+                            const size = sizeMatch ? sizeMatch[1] + 'g' : '';
+                            const newDesc = `Amber ${color} Powder Pigment${size ? ' ' + size : ''}`;
+                            if (newDesc !== (item.desc || '')) {
+                                allEdits.push({ zoho_item_id: item.id, changes: { description: newDesc } });
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (allEdits.length > 0 || productTypes.length > 0) {
+                const summary = `Updated descriptions for ${allEdits.length} ${productTypes.join(', ')} items`;
+                const reply = `**Description Update Complete**\n\n` +
+                    `Updated **${allEdits.length}** item descriptions for: ${productTypes.join(', ')}\n\n` +
+                    allEdits.slice(0, 20).map(e => `- ${e.changes.description}`).join('\n') +
+                    (allEdits.length > 20 ? `\n- ...and ${allEdits.length - 20} more` : '') +
+                    `\n\n*Deterministic — instant, exact values from item names.*`;
+
+                return res.json({
+                    success: true,
+                    edits: allEdits,
+                    summary,
+                    reply,
+                    model: 'deterministic',
+                    itemsProcessed: allCompact.length,
+                    batchCount: 1
+                });
+            }
+        }
+
         // === AI-BASED PROCESSING (fallback for non-reference-data commands) ===
         // Build context section if reference data provided but not tab-separated
         const contextSection = context ? `\nREFERENCE DATA (Excel/table):\n${context.substring(0, 200000)}\n` : '';
