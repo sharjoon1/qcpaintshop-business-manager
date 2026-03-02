@@ -688,6 +688,25 @@
             zohoSearchTimers[idx] = setTimeout(() => showZohoDropdown(idx), 300);
         }
 
+        // Event delegation for Zoho search inputs (reliable even after innerHTML re-render)
+        document.addEventListener('input', function(e) {
+            if (e.target.id && e.target.id.startsWith('zohoSearch_')) {
+                const idx = parseInt(e.target.id.split('_')[1]);
+                if (!isNaN(idx)) debounceZohoSearch(idx);
+            }
+        });
+        document.addEventListener('focusin', function(e) {
+            if (e.target.id && e.target.id.startsWith('zohoSearch_')) {
+                const idx = parseInt(e.target.id.split('_')[1]);
+                if (!isNaN(idx)) debounceZohoSearch(idx);
+            }
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.target.id && e.target.id.startsWith('zohoSearch_') && e.key === 'Enter') {
+                e.preventDefault();
+            }
+        });
+
         // Global dropdown element (appended to body so it's never clipped by modal overflow)
         let globalZohoDropdown = null;
         let globalZohoDropdownHandler = null;
@@ -716,23 +735,27 @@
         }
 
         async function showZohoDropdown(idx) {
+            console.log('[ZohoSearch] showZohoDropdown called, idx:', idx);
             const input = document.getElementById('zohoSearch_' + idx);
-            if (!input) return;
+            if (!input) { console.warn('[ZohoSearch] input not found for idx', idx); return; }
 
             const dropdown = getGlobalZohoDropdown();
             globalZohoDropdownIdx = idx;
 
             // Position below the input
             const rect = input.getBoundingClientRect();
+            console.log('[ZohoSearch] input rect:', JSON.stringify({top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width}));
             dropdown.style.top = (rect.bottom + 2) + 'px';
             dropdown.style.left = rect.left + 'px';
             dropdown.style.width = Math.max(rect.width, 300) + 'px';
             dropdown.innerHTML = '<div class="px-3 py-2 text-xs text-gray-400">Searching...</div>';
             dropdown.style.display = 'block';
+            console.log('[ZohoSearch] dropdown visible, fetching...');
 
             try {
                 const query = input.value.trim();
                 const items = await searchZohoItems(query);
+                console.log('[ZohoSearch] got', items.length, 'results for:', query);
 
                 // Check if user switched to a different input while we were fetching
                 if (globalZohoDropdownIdx !== idx) return;
@@ -752,8 +775,8 @@
                     }).join('');
                 }
             } catch (err) {
-                console.error('Zoho search error:', err);
-                dropdown.innerHTML = '<div class="px-3 py-2 text-xs text-red-500">Search failed</div>';
+                console.error('[ZohoSearch] error:', err);
+                dropdown.innerHTML = '<div class="px-3 py-2 text-xs text-red-500">Search failed: ' + escHtml(err.message) + '</div>';
             }
 
             // Close on click outside (use mousedown to fire before blur)
