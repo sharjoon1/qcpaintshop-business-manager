@@ -329,7 +329,7 @@
             return '';
         }
 
-        // ── Product card HTML ──
+        // ── Product card HTML (grouped product) ──
         function renderProductCard(p) {
             const colors = getBrandGradient(p.brand);
             const initial = (p.name || '?')[0].toUpperCase();
@@ -346,19 +346,30 @@
                 ? `<span class="badge badge-points"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> ${p.points_per_unit}pts</span>`
                 : '';
 
+            // Price: show range if min != max
+            const priceHtml = (p.min_rate !== undefined && p.min_rate !== p.max_rate)
+                ? `<span class="text-sm font-bold text-gray-900">${formatMoney(p.min_rate)} - ${formatMoney(p.max_rate)}</span>`
+                : `<span class="text-sm font-bold text-gray-900">${formatMoney(p.min_rate !== undefined ? p.min_rate : p.rate)}</span>`;
+
+            // Variant count badge
+            const variantBadge = (p.variant_count && p.variant_count > 1)
+                ? `<span class="badge" style="background:#f0f4ff;color:#4f46e5;font-size:0.6rem;padding:1px 6px">${p.variant_count} sizes</span>`
+                : '';
+
             return `
-                <div class="product-card" onclick="openDetail('${esc(p.item_id)}')">
+                <div class="product-card" onclick="openDetail(${p.product_id})">
                     ${offerBadge ? `<div class="offer-ribbon">${offerBadge}</div>` : ''}
                     <div class="relative">${imgHtml}</div>
                     <div class="product-info">
                         <p class="text-xs font-semibold text-gray-800 leading-tight" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(p.name)}</p>
                         <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
                             ${p.brand ? `<span class="badge badge-brand">${esc(p.brand)}</span>` : ''}
+                            ${variantBadge}
                             ${pointsBadge}
                         </div>
                         <div class="flex items-center justify-between mt-1.5">
-                            <span class="text-sm font-bold text-gray-900">${formatMoney(p.rate)}</span>
-                            ${getStockBadge(p.stock)}
+                            ${priceHtml}
+                            ${getStockBadge(p.total_stock !== undefined ? p.total_stock : p.stock)}
                         </div>
                     </div>
                 </div>
@@ -589,7 +600,7 @@
         const detailPanel = document.getElementById('detailPanel');
         const detailContent = document.getElementById('detailContent');
 
-        window.openDetail = async function(itemId) {
+        window.openDetail = async function(productId) {
             // Show panel immediately with loading state
             detailContent.innerHTML = `
                 <div class="py-12 text-center">
@@ -602,7 +613,7 @@
             document.body.style.overflow = 'hidden';
 
             try {
-                const res = await fetch(`${API}/me/catalog/${encodeURIComponent(itemId)}`, { headers: painterHeaders() });
+                const res = await fetch(`${API}/me/catalog/${encodeURIComponent(productId)}`, { headers: painterHeaders() });
                 const data = await res.json();
                 if (!data.success) throw new Error(data.message);
 
@@ -631,73 +642,81 @@
                        <span style="font-size:0.875rem;color:rgba(255,255,255,0.8);margin-top:4px">${esc(p.brand || '')}</span>
                    </div>`;
 
-            // Stock status
-            const stock = parseFloat(p.stock || 0);
+            // Total stock status
+            const stock = parseFloat(p.total_stock || 0);
             let stockHtml = '';
             if (stock <= 0) {
                 stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span><span class="text-sm font-medium text-red-600" data-i18n="catalog.out_of_stock">Out of Stock</span></div>`;
             } else if (stock <= 10) {
-                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span><span class="text-sm font-medium text-amber-600" data-i18n="catalog.low_stock">Low Stock</span><span class="text-xs text-gray-400">(${stock} units)</span></div>`;
+                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span><span class="text-sm font-medium text-amber-600" data-i18n="catalog.low_stock">Low Stock</span><span class="text-xs text-gray-400">(${stock})</span></div>`;
             } else {
-                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span><span class="text-sm font-medium text-green-600" data-i18n="catalog.in_stock">In Stock</span><span class="text-xs text-gray-400">(${stock} units)</span></div>`;
+                stockHtml = `<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span><span class="text-sm font-medium text-green-600" data-i18n="catalog.in_stock">In Stock</span><span class="text-xs text-gray-400">(${stock})</span></div>`;
             }
+
+            // Price range
+            const priceHtml = (p.min_rate !== p.max_rate)
+                ? `<p class="text-xl font-bold text-gray-900">${formatMoney(p.min_rate)} - ${formatMoney(p.max_rate)}</p>`
+                : `<p class="text-xl font-bold text-gray-900">${formatMoney(p.min_rate)}</p>`;
 
             // Incentives section
             let incentivesHtml = '';
-            if (p.points_per_unit || bestOffer) {
+            if (bestOffer) {
+                const offerTitle = (lang === 'ta' && bestOffer.title_ta) ? bestOffer.title_ta : bestOffer.title;
+                let offerDesc = '';
+                if (bestOffer.offer_type === 'multiplier' && bestOffer.bonus_multiplier) offerDesc = `${bestOffer.bonus_multiplier}x points`;
+                else if (bestOffer.offer_type === 'bonus_points' && bestOffer.bonus_points) offerDesc = `+${bestOffer.bonus_points} bonus pts`;
+                else if (bestOffer.offer_type === 'discount') offerDesc = 'Discount available';
+                else if (bestOffer.offer_type === 'free_product') offerDesc = 'Free product included';
+                const endStr = bestOffer.end_date ? new Date(bestOffer.end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : '';
+
                 incentivesHtml = `
-                    <div class="mt-4 p-3.5 rounded-xl" style="background:linear-gradient(135deg,#f0fdf4,#fffbeb);border:1px solid #bbf7d0">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-                            <span>&#128176;</span>
-                            <span data-i18n="catalog.your_incentives">Your Incentives</span>
-                        </h4>
-                        <div class="space-y-2">`;
-
-                if (p.points_per_unit) {
-                    incentivesHtml += `
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600">Regular</span>
-                            <span class="font-semibold text-emerald-700">${p.points_per_unit} pts/unit</span>
-                        </div>`;
-                    if (p.points_type === 'both' || p.points_type === 'annual') {
-                        incentivesHtml += `
-                            <div class="flex items-center justify-between text-sm">
-                                <span class="text-gray-600" data-i18n="catalog.annual_eligible">Annual Eligible</span>
-                                <span class="font-semibold text-amber-600">Yes</span>
-                            </div>`;
-                    }
-                }
-
-                if (bestOffer) {
-                    const offerTitle = (lang === 'ta' && bestOffer.title_ta) ? bestOffer.title_ta : bestOffer.title;
-                    let offerDesc = '';
-                    if (bestOffer.offer_type === 'multiplier' && bestOffer.bonus_multiplier) {
-                        offerDesc = `${bestOffer.bonus_multiplier}x points`;
-                    } else if (bestOffer.offer_type === 'bonus_points' && bestOffer.bonus_points) {
-                        offerDesc = `+${bestOffer.bonus_points} bonus pts`;
-                    } else if (bestOffer.offer_type === 'discount') {
-                        offerDesc = 'Discount available';
-                    } else if (bestOffer.offer_type === 'free_product') {
-                        offerDesc = 'Free product included';
-                    }
-
-                    const endStr = bestOffer.end_date
-                        ? new Date(bestOffer.end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
-                        : '';
-
-                    incentivesHtml += `
-                        <div class="mt-2 pt-2 border-t border-emerald-100">
-                            <div class="flex items-start gap-2">
-                                <span class="text-base mt-0.5">&#128293;</span>
-                                <div>
-                                    <p class="text-sm font-semibold text-orange-600">${esc(offerTitle)}</p>
-                                    <p class="text-xs text-gray-500">${offerDesc}${endStr ? ` &bull; Ends ${endStr}` : ''}</p>
-                                </div>
+                    <div class="mt-4 p-3 rounded-xl" style="background:linear-gradient(135deg,#f0fdf4,#fffbeb);border:1px solid #bbf7d0">
+                        <div class="flex items-start gap-2">
+                            <span class="text-base mt-0.5">&#128293;</span>
+                            <div>
+                                <p class="text-sm font-semibold text-orange-600">${esc(offerTitle)}</p>
+                                <p class="text-xs text-gray-500">${offerDesc}${endStr ? ` &bull; Ends ${endStr}` : ''}</p>
                             </div>
-                        </div>`;
-                }
+                        </div>
+                    </div>`;
+            }
 
-                incentivesHtml += `</div></div>`;
+            // Variants list
+            let variantsHtml = '';
+            if (p.variants && p.variants.length) {
+                variantsHtml = `
+                    <div class="mt-4">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">${p.variants.length > 1 ? 'Available Sizes (' + p.variants.length + ')' : 'Product Details'}</h4>
+                        <div class="space-y-2">
+                            ${p.variants.map(v => {
+                                const vStock = parseFloat(v.stock || 0);
+                                let vStockDot = '';
+                                if (vStock <= 0) vStockDot = '<span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>';
+                                else if (vStock <= 10) vStockDot = '<span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>';
+                                else vStockDot = '<span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>';
+
+                                const ptsBadge = v.points_per_unit
+                                    ? `<span class="text-xs text-emerald-700 font-medium">${v.points_per_unit}pts</span>`
+                                    : '';
+
+                                return `
+                                    <div class="flex items-center justify-between p-2.5 rounded-lg border border-gray-100 bg-gray-50 hover:bg-gray-100 cursor-pointer" onclick="createEstimateWith('${esc(v.item_id)}')">
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-xs font-medium text-gray-800 truncate">${esc(v.name)}</p>
+                                            <div class="flex items-center gap-2 mt-0.5">
+                                                ${vStockDot}
+                                                <span class="text-xs text-gray-500">${vStock > 0 ? vStock + ' in stock' : 'Out of stock'}</span>
+                                                ${ptsBadge}
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-2 flex-shrink-0 ml-2">
+                                            <span class="text-sm font-bold text-gray-900">${formatMoney(v.rate)}</span>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                                        </div>
+                                    </div>`;
+                            }).join('')}
+                        </div>
+                    </div>`;
             }
 
             detailContent.innerHTML = `
@@ -706,24 +725,17 @@
                 <div class="flex items-center gap-2 mt-1.5 flex-wrap">
                     ${p.brand ? `<span class="text-sm text-gray-500">Brand: <strong>${esc(p.brand)}</strong></span>` : ''}
                     ${p.category ? `<span class="text-xs text-gray-400">&bull;</span><span class="text-sm text-gray-500">${esc(p.category)}</span>` : ''}
+                    ${p.variant_count > 1 ? `<span class="text-xs text-gray-400">&bull;</span><span class="text-xs font-medium text-indigo-600">${p.variant_count} sizes</span>` : ''}
                 </div>
                 <div class="flex items-center justify-between mt-3">
                     <div>
                         <span class="text-xs text-gray-400" data-i18n="catalog.mrp">MRP</span>
-                        <p class="text-xl font-bold text-gray-900">${formatMoney(p.rate)}</p>
+                        ${priceHtml}
                     </div>
                     ${stockHtml}
                 </div>
                 ${incentivesHtml}
-                <div class="mt-5 mb-2">
-                    <button onclick="createEstimateWith('${esc(p.item_id)}')"
-                        class="w-full py-3 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2"
-                        style="background:linear-gradient(135deg,#1B5E3B,#D4A24E)">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                        <span data-i18n="catalog.create_estimate">Create Estimate with this</span>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                </div>
+                ${variantsHtml}
             `;
 
             // Re-apply translations after rendering

@@ -885,7 +885,7 @@ router.delete('/me/estimates/:estimateId', requirePainterAuth, async (req, res) 
 // PAINTER CATALOG ENDPOINTS (/me/catalog/*)
 // ═══════════════════════════════════════════════════════════════
 
-// Browse product catalog with images, points, and active offers
+// Browse product catalog — grouped by product (not individual pack sizes)
 router.get('/me/catalog', requirePainterAuth, async (req, res) => {
     try {
         const { search, brand, category, page = 1, limit = 50 } = req.query;
@@ -893,17 +893,17 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const offset = (pageNum - 1) * limitNum;
 
-        // Only show items that have been imported to Products table (via pack_sizes mapping)
         const joins = `
-            FROM zoho_items_map zim
-            INNER JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
-            INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
+            FROM products p
+            INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+            INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+                AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
         `;
-        let where = "WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)";
+        let where = "WHERE p.status = 'active'";
         const params = [];
 
         if (search) {
-            where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_brand LIKE ? OR p.name LIKE ?)';
+            where += ' AND (p.name LIKE ? OR zim.zoho_item_name LIKE ? OR zim.zoho_brand LIKE ?)';
             params.push(`%${search}%`, `%${search}%`, `%${search}%`);
         }
         if (brand) {
@@ -915,29 +915,38 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
             params.push(category);
         }
 
-        // Get total count
+        // Count grouped products
         const [countResult] = await pool.query(
-            `SELECT COUNT(*) as total ${joins} ${where}`, params
+            `SELECT COUNT(DISTINCT p.id) as total ${joins} ${where}`, params
         );
         const total = countResult[0].total;
 
-        // Products with point rates (only admin-imported items)
+        // Grouped products: one row per product with aggregated info
         const [products] = await pool.query(`
-            SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
-                   zim.zoho_brand as brand, zim.zoho_category_name as category,
-                   zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
-                   zim.image_url,
-                   p.name as product_name, p.id as product_id,
-                   ppr.regular_points_per_unit as points_per_unit, ppr.annual_eligible, ppr.annual_pct
+            SELECT p.id as product_id, p.name as name, p.product_type,
+                   MIN(CAST(zim.zoho_rate AS DECIMAL(10,2))) as min_rate,
+                   MAX(CAST(zim.zoho_rate AS DECIMAL(10,2))) as max_rate,
+                   SUM(CAST(zim.zoho_stock_on_hand AS DECIMAL(10,2))) as total_stock,
+                   COUNT(DISTINCT ps.id) as variant_count,
+                   MAX(zim.zoho_brand) as brand,
+                   MAX(zim.zoho_category_name) as category,
+                   (SELECT z2.image_url FROM pack_sizes ps2
+                    INNER JOIN zoho_items_map z2 ON z2.zoho_item_id = ps2.zoho_item_id
+                    WHERE ps2.product_id = p.id AND ps2.is_active = 1 AND z2.image_url IS NOT NULL
+                    LIMIT 1) as image_url,
+                   MAX(ppr.regular_points_per_unit) as points_per_unit,
+                   MAX(ppr.annual_eligible) as annual_eligible,
+                   MAX(ppr.annual_pct) as annual_pct
             ${joins}
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
             ${where}
-            ORDER BY zim.zoho_brand, zim.zoho_item_name
+            GROUP BY p.id, p.name, p.product_type
+            ORDER BY p.name
             LIMIT ? OFFSET ?
         `, [...params, limitNum, offset]);
 
-        // Get active offers
+        // Active offers
         const now = new Date();
         const [offers] = await pool.query(`
             SELECT * FROM painter_special_offers
@@ -945,25 +954,25 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
             ORDER BY created_at DESC
         `, [now, now]);
 
-        // Match offers to products
+        // Match offers to grouped products
         const productsWithOffers = products.map(p => {
             const matchedOffers = offers.filter(o => {
                 if (o.applies_to === 'all') return true;
                 if (o.applies_to === 'brand' && o.target_id === p.brand) return true;
                 if (o.applies_to === 'category' && o.target_id === p.category) return true;
-                if (o.applies_to === 'product' && o.target_id === p.item_id) return true;
                 return false;
             });
             return {
                 ...p,
-                rate: parseFloat(p.rate || 0),
-                stock: parseFloat(p.stock || 0),
+                min_rate: parseFloat(p.min_rate || 0),
+                max_rate: parseFloat(p.max_rate || 0),
+                total_stock: parseFloat(p.total_stock || 0),
                 points_per_unit: p.points_per_unit ? parseFloat(p.points_per_unit) : null,
                 offer: matchedOffers.length > 0 ? matchedOffers[0] : null
             };
         });
 
-        // Filter options — only from admin-imported products
+        // Filter options
         const [brands] = await pool.query(`
             SELECT DISTINCT zim.zoho_brand as brand
             FROM zoho_items_map zim
@@ -999,47 +1008,76 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
     }
 });
 
-// Product detail with offers
-router.get('/me/catalog/:itemId', requirePainterAuth, async (req, res) => {
+// Product detail — returns product with all its variants (pack sizes)
+router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
     try {
-        const { itemId } = req.params;
+        const { productId } = req.params;
 
-        const [products] = await pool.query(`
+        // Get the product
+        const [prodRows] = await pool.query(
+            "SELECT id, name, product_type FROM products WHERE id = ? AND status = 'active'",
+            [productId]
+        );
+        if (!prodRows.length) {
+            return res.status(404).json({ success: false, message: 'Product not found' });
+        }
+        const prod = prodRows[0];
+
+        // Get all variants (pack sizes) for this product
+        const [variants] = await pool.query(`
             SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
                    zim.zoho_rate as rate, zim.zoho_stock_on_hand as stock,
-                   zim.image_url, p.name as product_name, p.id as product_id,
+                   zim.image_url, ps.size_label,
                    ppr.regular_points_per_unit as points_per_unit, ppr.annual_eligible, ppr.annual_pct
-            FROM zoho_items_map zim
-            INNER JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
-            INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
+            FROM pack_sizes ps
+            INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+                AND (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
-            WHERE zim.zoho_item_id = ?
-        `, [itemId]);
+            WHERE ps.product_id = ? AND ps.is_active = 1
+            ORDER BY CAST(zim.zoho_rate AS DECIMAL(10,2)) ASC
+        `, [productId]);
 
-        if (!products.length) {
-            return res.status(404).json({ success: false, message: 'Product not found' });
+        if (!variants.length) {
+            return res.status(404).json({ success: false, message: 'No variants found' });
         }
 
-        const product = products[0];
-        product.rate = parseFloat(product.rate || 0);
-        product.stock = parseFloat(product.stock || 0);
-        product.points_per_unit = product.points_per_unit ? parseFloat(product.points_per_unit) : null;
+        const brand = variants[0].brand;
+        const category = variants[0].category;
+        const image_url = variants.find(v => v.image_url)?.image_url || null;
 
-        // Find matching offers for this product
+        const product = {
+            product_id: prod.id,
+            name: prod.name,
+            product_type: prod.product_type,
+            brand,
+            category,
+            image_url,
+            variant_count: variants.length,
+            min_rate: Math.min(...variants.map(v => parseFloat(v.rate || 0))),
+            max_rate: Math.max(...variants.map(v => parseFloat(v.rate || 0))),
+            total_stock: variants.reduce((s, v) => s + parseFloat(v.stock || 0), 0),
+            variants: variants.map(v => ({
+                ...v,
+                rate: parseFloat(v.rate || 0),
+                stock: parseFloat(v.stock || 0),
+                points_per_unit: v.points_per_unit ? parseFloat(v.points_per_unit) : null
+            }))
+        };
+
+        // Matching offers
         const now = new Date();
         const [offers] = await pool.query(`
             SELECT * FROM painter_special_offers
             WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
             AND (
                 applies_to = 'all'
-                OR (applies_to = 'product' AND target_id = ?)
                 OR (applies_to = 'brand' AND target_id = ?)
                 OR (applies_to = 'category' AND target_id = ?)
             )
             ORDER BY created_at DESC
-        `, [now, now, itemId, product.brand, product.category]);
+        `, [now, now, brand, category]);
 
         res.json({
             success: true,
