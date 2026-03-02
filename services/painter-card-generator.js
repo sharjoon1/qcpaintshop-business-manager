@@ -1,16 +1,17 @@
 /**
  * Painter Card Generator
- * Generates visiting card (landscape 1050x600) and ID card (portrait 600x900) using Sharp
+ * Generates visiting card (landscape 1200x700) and ID card (portrait 700x1050) using Sharp
+ * Designed for WhatsApp sharing — large, bold, readable on mobile
  */
 const sharp = require('sharp');
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 
-const CARD_WIDTH = 1050;
-const CARD_HEIGHT = 600;
-const ID_WIDTH = 600;
-const ID_HEIGHT = 900;
+const CARD_WIDTH = 1200;
+const CARD_HEIGHT = 700;
+const ID_WIDTH = 700;
+const ID_HEIGHT = 1050;
 const PRIMARY = '#1B5E3B';
 const SECONDARY = '#D4A24E';
 const ORIGIN = process.env.APP_ORIGIN || 'https://act.qcpaintshop.com';
@@ -28,9 +29,6 @@ function getSpecLabel(specialization) {
         + ' Specialist';
 }
 
-/**
- * Load company logo from settings table, returns resized PNG buffer or null
- */
 async function loadCompanyLogo(pool, size = 80) {
     try {
         const [rows] = await pool.query(
@@ -39,7 +37,6 @@ async function loadCompanyLogo(pool, size = 80) {
         if (!rows.length || !rows[0].setting_value) return null;
 
         const logoFile = rows[0].setting_value;
-        // Logo could be a full path like /uploads/logos/xxx.png or just the filename
         const logoPath = logoFile.startsWith('/')
             ? path.join(__dirname, '..', 'public', logoFile.split('?')[0])
             : path.join(__dirname, '..', 'public', 'uploads', 'logos', logoFile);
@@ -55,13 +52,9 @@ async function loadCompanyLogo(pool, size = 80) {
     }
 }
 
-/**
- * Load profile photo as circular image with white border ring, or create initials avatar
- * Returns { photo: Buffer, ring: Buffer }
- */
-async function loadProfilePhoto(profile_photo, full_name, size = 180) {
+async function loadProfilePhoto(profile_photo, full_name, size = 220) {
     const half = size / 2;
-    const ringSize = size + 10;
+    const ringSize = size + 12;
     const ringHalf = ringSize / 2;
 
     let photoBuffer;
@@ -79,7 +72,7 @@ async function loadProfilePhoto(profile_photo, full_name, size = 180) {
 
     if (!photoBuffer) {
         const initial = (full_name || 'P').charAt(0).toUpperCase();
-        const initialSvg = `<svg width="${size}" height="${size}"><circle cx="${half}" cy="${half}" r="${half}" fill="${SECONDARY}"/><text x="${half}" y="${half}" text-anchor="middle" dominant-baseline="central" font-family="Arial,sans-serif" font-size="${Math.round(size * 0.43)}" font-weight="bold" fill="white">${initial}</text></svg>`;
+        const initialSvg = `<svg width="${size}" height="${size}"><circle cx="${half}" cy="${half}" r="${half}" fill="${SECONDARY}"/><text x="${half}" y="${half}" text-anchor="middle" dominant-baseline="central" font-family="Arial,sans-serif" font-size="${Math.round(size * 0.45)}" font-weight="bold" fill="white">${initial}</text></svg>`;
         photoBuffer = await sharp(Buffer.from(initialSvg)).png().toBuffer();
     }
 
@@ -93,14 +86,14 @@ async function loadProfilePhoto(profile_photo, full_name, size = 180) {
         .toBuffer();
 
     // White border ring
-    const photoRing = Buffer.from(`<svg width="${ringSize}" height="${ringSize}"><circle cx="${ringHalf}" cy="${ringHalf}" r="${ringHalf - 1}" fill="none" stroke="white" stroke-width="3"/></svg>`);
+    const photoRing = Buffer.from(`<svg width="${ringSize}" height="${ringSize}"><circle cx="${ringHalf}" cy="${ringHalf}" r="${ringHalf - 1}" fill="none" stroke="white" stroke-width="4"/></svg>`);
     const photoRingBuf = await sharp(photoRing).png().toBuffer();
 
-    return { photo: circularPhoto, ring: photoRingBuf };
+    return { photo: circularPhoto, ring: photoRingBuf, size, ringSize };
 }
 
 // ═══════════════════════════════════════════════════════
-// VISITING CARD — 1050x600 Landscape
+// VISITING CARD — 1200x700 Landscape
 // ═══════════════════════════════════════════════════════
 
 async function generateCard(painter, pool) {
@@ -109,25 +102,22 @@ async function generateCard(painter, pool) {
         experience_years, referral_code, profile_photo
     } = painter;
 
-    // Generate QR code
     const registerUrl = `${ORIGIN}/painter-register.html?ref=${referral_code}`;
     const qrBuffer = await QRCode.toBuffer(registerUrl, {
-        width: 130, margin: 1,
+        width: 150, margin: 1,
         color: { dark: PRIMARY, light: '#FFFFFF' }
     });
 
-    // Load assets in parallel
-    const [{ photo: circularPhoto, ring: photoRingBuf }, logoBuf] = await Promise.all([
-        loadProfilePhoto(profile_photo, full_name, 180),
-        pool ? loadCompanyLogo(pool, 60) : Promise.resolve(null)
+    const photoSize = 220;
+    const [{ photo: circularPhoto, ring: photoRingBuf, ringSize }, logoBuf] = await Promise.all([
+        loadProfilePhoto(profile_photo, full_name, photoSize),
+        pool ? loadCompanyLogo(pool, 70) : Promise.resolve(null)
     ]);
 
     const specLabel = getSpecLabel(specialization);
     const expText = experience_years ? `${experience_years} years experience` : '';
     const e = escapeSvg;
-
-    // Logo header positioning
-    const logoOffset = logoBuf ? 80 : 0; // shift text right if logo present
+    const logoShift = logoBuf ? 90 : 0;
 
     const cardSvg = `
     <svg width="${CARD_WIDTH}" height="${CARD_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
@@ -142,66 +132,60 @@ async function generateCard(painter, pool) {
             </linearGradient>
         </defs>
 
-        <!-- White background with subtle border -->
-        <rect width="${CARD_WIDTH}" height="${CARD_HEIGHT}" rx="20" fill="white"/>
-        <rect width="${CARD_WIDTH}" height="${CARD_HEIGHT}" rx="20" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+        <!-- Background -->
+        <rect width="${CARD_WIDTH}" height="${CARD_HEIGHT}" rx="24" fill="white"/>
 
-        <!-- Header gradient bar -->
-        <rect width="${CARD_WIDTH}" height="90" rx="20" fill="url(#headerGrad)"/>
-        <rect y="20" width="${CARD_WIDTH}" height="70" fill="url(#headerGrad)"/>
+        <!-- Header -->
+        <rect width="${CARD_WIDTH}" height="100" rx="24" fill="url(#headerGrad)"/>
+        <rect y="24" width="${CARD_WIDTH}" height="76" fill="url(#headerGrad)"/>
 
-        <!-- Header text (shifted right if logo present) -->
-        <text x="${40 + logoOffset}" y="40" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="white">QUALITY COLOURS</text>
-        <text x="${40 + logoOffset}" y="62" font-family="Arial,sans-serif" font-size="12" fill="white" opacity="0.85">Your Trusted Paint Shop</text>
+        <!-- Header text -->
+        <text x="${50 + logoShift}" y="48" font-family="Arial,sans-serif" font-size="28" font-weight="bold" fill="white">QUALITY COLOURS</text>
+        <text x="${50 + logoShift}" y="75" font-family="Arial,sans-serif" font-size="16" fill="white" opacity="0.85">Your Trusted Paint Shop</text>
 
         <!-- Gold accent line -->
-        <rect y="88" width="${CARD_WIDTH}" height="3" fill="${SECONDARY}"/>
+        <rect y="98" width="${CARD_WIDTH}" height="4" fill="${SECONDARY}"/>
 
-        <!-- LEFT SIDE: Name + Contact -->
-        <text x="50" y="145" font-family="Arial,sans-serif" font-size="34" font-weight="bold" fill="#1a1a2e">${e(full_name)}</text>
-        <text x="50" y="175" font-family="Arial,sans-serif" font-size="18" fill="#64748b">${e(specLabel)}</text>
-        ${expText ? `<text x="50" y="200" font-family="Arial,sans-serif" font-size="14" fill="#94a3b8">${e(expText)}</text>` : ''}
+        <!-- LEFT: Name + Contact -->
+        <text x="60" y="165" font-family="Arial,sans-serif" font-size="42" font-weight="bold" fill="#1a1a2e">${e(full_name)}</text>
+        <text x="60" y="200" font-family="Arial,sans-serif" font-size="22" fill="#64748b">${e(specLabel)}</text>
+        ${expText ? `<text x="60" y="232" font-family="Arial,sans-serif" font-size="18" fill="#94a3b8">${e(expText)}</text>` : ''}
 
         <!-- Divider -->
-        <line x1="50" y1="${expText ? 220 : 200}" x2="580" y2="${expText ? 220 : 200}" stroke="#e2e8f0" stroke-width="1"/>
+        <line x1="60" y1="${expText ? 250 : 220}" x2="640" y2="${expText ? 250 : 220}" stroke="#e2e8f0" stroke-width="1.5"/>
 
         <!-- Phone -->
-        <text x="50" y="${expText ? 255 : 235}" font-family="Arial,sans-serif" font-size="18" fill="#334155">&#x1F4DE;  ${e(phone)}</text>
+        <text x="60" y="${expText ? 290 : 260}" font-family="Arial,sans-serif" font-size="24" fill="#334155">&#x1F4DE;  ${e(phone)}</text>
 
         <!-- City -->
-        ${city ? `<text x="50" y="${expText ? 285 : 265}" font-family="Arial,sans-serif" font-size="18" fill="#334155">&#x1F4CD;  ${e(city)}</text>` : ''}
+        ${city ? `<text x="60" y="${expText ? 328 : 298}" font-family="Arial,sans-serif" font-size="24" fill="#334155">&#x1F4CD;  ${e(city)}</text>` : ''}
 
-        <!-- RIGHT SIDE: Photo placeholder area (composited later) -->
-
-        <!-- QR label (bottom-right area) -->
-        <text x="${CARD_WIDTH - 105}" y="${CARD_HEIGHT - 100}" font-family="Arial,sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Scan to join</text>
+        <!-- QR label -->
+        <text x="${CARD_WIDTH - 115}" y="${CARD_HEIGHT - 110}" font-family="Arial,sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle">Scan to join</text>
 
         <!-- Footer -->
-        <rect y="${CARD_HEIGHT - 55}" width="${CARD_WIDTH}" height="55" rx="0" fill="url(#footerGrad)"/>
-        <rect y="${CARD_HEIGHT - 55}" width="${CARD_WIDTH}" height="35" fill="url(#footerGrad)"/>
-        <rect x="0" y="${CARD_HEIGHT - 20}" width="${CARD_WIDTH}" height="20" rx="20" fill="url(#footerGrad)"/>
+        <rect y="${CARD_HEIGHT - 65}" width="${CARD_WIDTH}" height="65" rx="0" fill="url(#footerGrad)"/>
+        <rect y="${CARD_HEIGHT - 65}" width="${CARD_WIDTH}" height="41" fill="url(#footerGrad)"/>
+        <rect x="0" y="${CARD_HEIGHT - 24}" width="${CARD_WIDTH}" height="24" rx="24" fill="url(#footerGrad)"/>
 
-        <!-- Footer content -->
-        <text x="40" y="${CARD_HEIGHT - 22}" font-family="Arial,sans-serif" font-size="12" fill="white" opacity="0.9">QC PAINTERS PROGRAM</text>
-        <text x="${CARD_WIDTH / 2}" y="${CARD_HEIGHT - 22}" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="2">Ref: ${e(referral_code)}</text>
-        <text x="${CARD_WIDTH - 40}" y="${CARD_HEIGHT - 22}" font-family="Arial,sans-serif" font-size="12" fill="white" text-anchor="end" opacity="0.9">Your Paint Partner</text>
+        <text x="50" y="${CARD_HEIGHT - 26}" font-family="Arial,sans-serif" font-size="16" fill="white" opacity="0.9">QC PAINTERS PROGRAM</text>
+        <text x="${CARD_WIDTH / 2}" y="${CARD_HEIGHT - 26}" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="3">Ref: ${e(referral_code)}</text>
+        <text x="${CARD_WIDTH - 50}" y="${CARD_HEIGHT - 26}" font-family="Arial,sans-serif" font-size="16" fill="white" text-anchor="end" opacity="0.9">Your Paint Partner</text>
     </svg>`;
 
     const cardBase = await sharp(Buffer.from(cardSvg)).png().toBuffer();
 
-    // Photo positioned on the right side, vertically centered in content area
-    const photoTop = 120;
-    const photoLeft = CARD_WIDTH - 240;
+    const photoTop = 130;
+    const photoLeft = CARD_WIDTH - photoSize - 70;
 
     const composites = [
-        { input: photoRingBuf, top: photoTop - 5, left: photoLeft - 5 },
+        { input: photoRingBuf, top: photoTop - 6, left: photoLeft - 6 },
         { input: circularPhoto, top: photoTop, left: photoLeft },
-        { input: qrBuffer, top: CARD_HEIGHT - 245, left: CARD_WIDTH - 170 },
+        { input: qrBuffer, top: CARD_HEIGHT - 270, left: CARD_WIDTH - 190 },
     ];
 
-    // Add logo to header if available
     if (logoBuf) {
-        composites.push({ input: logoBuf, top: 15, left: 30 });
+        composites.push({ input: logoBuf, top: 15, left: 40 });
     }
 
     const outputDir = path.join(__dirname, '..', 'public', 'uploads', 'painter-cards');
@@ -219,7 +203,7 @@ async function generateCard(painter, pool) {
 }
 
 // ═══════════════════════════════════════════════════════
-// ID CARD — 600x900 Portrait (badge-style)
+// ID CARD — 700x1050 Portrait (badge-style)
 // ═══════════════════════════════════════════════════════
 
 async function generateIdCard(painter, pool) {
@@ -228,24 +212,21 @@ async function generateIdCard(painter, pool) {
         experience_years, referral_code, profile_photo
     } = painter;
 
-    // Generate QR code
     const registerUrl = `${ORIGIN}/painter-register.html?ref=${referral_code}`;
     const qrBuffer = await QRCode.toBuffer(registerUrl, {
-        width: 140, margin: 1,
+        width: 160, margin: 1,
         color: { dark: PRIMARY, light: '#FFFFFF' }
     });
 
-    // Load assets in parallel
+    const photoSize = 220;
     const [{ photo: circularPhoto, ring: photoRingBuf }, logoBuf] = await Promise.all([
-        loadProfilePhoto(profile_photo, full_name, 180),
-        pool ? loadCompanyLogo(pool, 50) : Promise.resolve(null)
+        loadProfilePhoto(profile_photo, full_name, photoSize),
+        pool ? loadCompanyLogo(pool, 55) : Promise.resolve(null)
     ]);
 
     const specLabel = getSpecLabel(specialization);
-    const infoLine = [city, experience_years ? `${experience_years} yrs` : ''].filter(Boolean).join(' | ');
+    const infoLine = [city, experience_years ? `${experience_years} yrs` : ''].filter(Boolean).join('  |  ');
     const e = escapeSvg;
-
-    const logoOffset = logoBuf ? 60 : 0;
 
     const idSvg = `
     <svg width="${ID_WIDTH}" height="${ID_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
@@ -261,65 +242,60 @@ async function generateIdCard(painter, pool) {
         </defs>
 
         <!-- Background -->
-        <rect width="${ID_WIDTH}" height="${ID_HEIGHT}" rx="24" fill="white"/>
-        <rect width="${ID_WIDTH}" height="${ID_HEIGHT}" rx="24" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+        <rect width="${ID_WIDTH}" height="${ID_HEIGHT}" rx="28" fill="white"/>
 
-        <!-- Green header block -->
-        <rect width="${ID_WIDTH}" height="130" rx="24" fill="url(#hGrad)"/>
-        <rect y="24" width="${ID_WIDTH}" height="106" fill="url(#hGrad)"/>
+        <!-- Green header -->
+        <rect width="${ID_WIDTH}" height="150" rx="28" fill="url(#hGrad)"/>
+        <rect y="28" width="${ID_WIDTH}" height="122" fill="url(#hGrad)"/>
 
         <!-- Header text -->
-        <text x="${ID_WIDTH / 2}" y="55" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="white" text-anchor="middle">QUALITY COLOURS</text>
-        <text x="${ID_WIDTH / 2}" y="80" font-family="Arial,sans-serif" font-size="13" fill="white" text-anchor="middle" opacity="0.85">QC Painters Program</text>
-        <text x="${ID_WIDTH / 2}" y="110" font-family="Arial,sans-serif" font-size="11" fill="white" text-anchor="middle" opacity="0.7">Painter Identity Card</text>
-
-        <!-- Photo placeholder (composited later, centered) -->
+        <text x="${ID_WIDTH / 2}" y="60" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="white" text-anchor="middle">QUALITY COLOURS</text>
+        <text x="${ID_WIDTH / 2}" y="90" font-family="Arial,sans-serif" font-size="16" fill="white" text-anchor="middle" opacity="0.9">QC Painters Program</text>
+        <text x="${ID_WIDTH / 2}" y="120" font-family="Arial,sans-serif" font-size="14" fill="white" text-anchor="middle" opacity="0.75">Painter Identity Card</text>
 
         <!-- Name & Details -->
-        <text x="${ID_WIDTH / 2}" y="370" font-family="Arial,sans-serif" font-size="28" font-weight="bold" fill="#1a1a2e" text-anchor="middle">${e(full_name)}</text>
-        <text x="${ID_WIDTH / 2}" y="398" font-family="Arial,sans-serif" font-size="16" fill="#64748b" text-anchor="middle">${e(specLabel)}</text>
-        ${infoLine ? `<text x="${ID_WIDTH / 2}" y="422" font-family="Arial,sans-serif" font-size="14" fill="#94a3b8" text-anchor="middle">${e(infoLine)}</text>` : ''}
+        <text x="${ID_WIDTH / 2}" y="425" font-family="Arial,sans-serif" font-size="36" font-weight="bold" fill="#1a1a2e" text-anchor="middle">${e(full_name)}</text>
+        <text x="${ID_WIDTH / 2}" y="460" font-family="Arial,sans-serif" font-size="20" fill="#64748b" text-anchor="middle">${e(specLabel)}</text>
+        ${infoLine ? `<text x="${ID_WIDTH / 2}" y="490" font-family="Arial,sans-serif" font-size="18" fill="#94a3b8" text-anchor="middle">${e(infoLine)}</text>` : ''}
 
         <!-- Phone -->
-        <text x="${ID_WIDTH / 2}" y="452" font-family="Arial,sans-serif" font-size="15" fill="#334155" text-anchor="middle">&#x1F4DE; ${e(phone)}</text>
+        <text x="${ID_WIDTH / 2}" y="525" font-family="Arial,sans-serif" font-size="22" fill="#334155" text-anchor="middle">&#x1F4DE; ${e(phone)}</text>
 
         <!-- Gold divider -->
-        <rect x="60" y="470" width="${ID_WIDTH - 120}" height="2" fill="${SECONDARY}" rx="1"/>
+        <rect x="70" y="548" width="${ID_WIDTH - 140}" height="3" fill="${SECONDARY}" rx="1.5"/>
 
         <!-- Referral Code label -->
-        <text x="${ID_WIDTH / 2}" y="502" font-family="Arial,sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle" letter-spacing="1">REFERRAL CODE</text>
+        <text x="${ID_WIDTH / 2}" y="585" font-family="Arial,sans-serif" font-size="15" fill="#94a3b8" text-anchor="middle" letter-spacing="2">REFERRAL CODE</text>
 
         <!-- Referral code box -->
-        <rect x="150" y="510" width="${ID_WIDTH - 300}" height="44" rx="10" fill="#f0fdf4" stroke="${PRIMARY}" stroke-width="1.5"/>
-        <text x="${ID_WIDTH / 2}" y="538" font-family="Arial,sans-serif" font-size="24" font-weight="bold" fill="${PRIMARY}" text-anchor="middle" letter-spacing="3">${e(referral_code)}</text>
+        <rect x="160" y="596" width="${ID_WIDTH - 320}" height="52" rx="12" fill="#f0fdf4" stroke="${PRIMARY}" stroke-width="2"/>
+        <text x="${ID_WIDTH / 2}" y="630" font-family="Arial,sans-serif" font-size="30" font-weight="bold" fill="${PRIMARY}" text-anchor="middle" letter-spacing="4">${e(referral_code)}</text>
 
         <!-- QR label -->
-        <text x="${ID_WIDTH / 2}" y="${ID_HEIGHT - 115}" font-family="Arial,sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">Scan to join!</text>
+        <text x="${ID_WIDTH / 2}" y="${ID_HEIGHT - 125}" font-family="Arial,sans-serif" font-size="14" fill="#94a3b8" text-anchor="middle">Scan to join!</text>
 
         <!-- Footer -->
-        <rect y="${ID_HEIGHT - 60}" width="${ID_WIDTH}" height="60" rx="0" fill="url(#fGrad)"/>
-        <rect y="${ID_HEIGHT - 60}" width="${ID_WIDTH}" height="36" fill="url(#fGrad)"/>
-        <rect x="0" y="${ID_HEIGHT - 24}" width="${ID_WIDTH}" height="24" rx="24" fill="url(#fGrad)"/>
+        <rect y="${ID_HEIGHT - 70}" width="${ID_WIDTH}" height="70" rx="0" fill="url(#fGrad)"/>
+        <rect y="${ID_HEIGHT - 70}" width="${ID_WIDTH}" height="42" fill="url(#fGrad)"/>
+        <rect x="0" y="${ID_HEIGHT - 28}" width="${ID_WIDTH}" height="28" rx="28" fill="url(#fGrad)"/>
 
-        <text x="${ID_WIDTH / 2}" y="${ID_HEIGHT - 30}" font-family="Arial,sans-serif" font-size="12" fill="white" text-anchor="middle" opacity="0.95">Join us &amp; earn loyalty points on every purchase!</text>
-        <text x="${ID_WIDTH / 2}" y="${ID_HEIGHT - 12}" font-family="Arial,sans-serif" font-size="10" fill="white" text-anchor="middle" opacity="0.7">Quality Colours — Your Trusted Paint Partner</text>
+        <text x="${ID_WIDTH / 2}" y="${ID_HEIGHT - 36}" font-family="Arial,sans-serif" font-size="15" fill="white" text-anchor="middle" opacity="0.95">Join us &amp; earn loyalty points on every purchase!</text>
+        <text x="${ID_WIDTH / 2}" y="${ID_HEIGHT - 14}" font-family="Arial,sans-serif" font-size="12" fill="white" text-anchor="middle" opacity="0.7">Quality Colours — Your Trusted Paint Partner</text>
     </svg>`;
 
     const idBase = await sharp(Buffer.from(idSvg)).png().toBuffer();
 
-    // Center the photo below header
-    const photoLeft = (ID_WIDTH - 180) / 2;
-    const photoTop = 150;
+    const photoLeft = (ID_WIDTH - photoSize) / 2;
+    const photoTop = 170;
 
     const composites = [
-        { input: photoRingBuf, top: photoTop - 5, left: photoLeft - 5 },
+        { input: photoRingBuf, top: photoTop - 6, left: photoLeft - 6 },
         { input: circularPhoto, top: photoTop, left: photoLeft },
-        { input: qrBuffer, top: ID_HEIGHT - 260, left: (ID_WIDTH - 140) / 2 },
+        { input: qrBuffer, top: ID_HEIGHT - 290, left: (ID_WIDTH - 160) / 2 },
     ];
 
-    // Add logo in header top-left corner (avoid overlapping centered text)
     if (logoBuf) {
-        composites.push({ input: logoBuf, top: 12, left: 20 });
+        composites.push({ input: logoBuf, top: 14, left: 24 });
     }
 
     const outputDir = path.join(__dirname, '..', 'public', 'uploads', 'painter-cards');

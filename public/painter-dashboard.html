@@ -68,6 +68,13 @@
         /* Toast */
         .toast { position: fixed; top: 20px; right: 20px; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 12px 16px; z-index: 2000; max-width: 320px; transform: translateX(120%); transition: transform 0.3s ease; border-left: 4px solid #1B5E3B; }
         .toast.show { transform: translateX(0); }
+
+        /* Profile dropdown */
+        .profile-dropdown { position: absolute; top: 56px; right: 0; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); min-width: 180px; z-index: 60; overflow: hidden; opacity: 0; transform: translateY(-8px); pointer-events: none; transition: all 0.2s ease; }
+        .profile-dropdown.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        .profile-dropdown a, .profile-dropdown button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 16px; font-size: 0.875rem; color: #334155; text-decoration: none; border: none; background: none; cursor: pointer; text-align: left; }
+        .profile-dropdown a:hover, .profile-dropdown button:hover { background: #f1f5f9; }
+        .profile-dropdown .divider { height: 1px; background: #e2e8f0; margin: 0; }
     </style>
 </head>
 <body>
@@ -75,24 +82,19 @@
     <div class="header">
         <div class="max-w-lg mx-auto px-4 py-4">
             <div class="flex items-center justify-between">
+                <!-- Left: Logo + Name -->
                 <div class="flex items-center gap-3">
-                    <img id="headerLogo" src="/icons/icon-72x72.png" style="width:36px;height:36px;border-radius:8px;object-fit:contain" alt="QC">
-                    <a href="/painter-profile.html" id="headerAvatarLink">
-                        <div id="headerAvatar" style="width:44px;height:44px;border-radius:50%;background:#D4A24E;border:2px solid white;display:flex;align-items:center;justify-content:center;overflow:hidden">
-                            <span id="headerInitial" style="color:white;font-size:18px;font-weight:700">P</span>
-                        </div>
-                    </a>
+                    <img id="headerLogo" style="width:40px;height:40px;border-radius:8px;object-fit:contain;display:none" alt="QC">
                     <div>
                         <p class="text-sm opacity-80" data-i18n="dashboard.welcome_back">Welcome back,</p>
                         <h1 class="text-xl font-bold" id="painterName">Painter</h1>
                     </div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <!-- Language Toggle -->
+                <!-- Right: Lang + Bell + Profile -->
+                <div class="flex items-center gap-2">
                     <button id="langToggle" onclick="painterI18n.toggleLanguage()" class="text-sm font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-2.5 py-1 transition-colors backdrop-blur-sm">
                         EN
                     </button>
-                    <!-- Notification Bell -->
                     <button onclick="showNotificationPanel()" class="relative p-1 hover:bg-white/20 rounded-lg transition-colors">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -100,11 +102,23 @@
                         </svg>
                         <span id="notifBadge" class="notif-badge hidden">0</span>
                     </button>
-                    <!-- Logout -->
-                    <button onclick="logout()" class="text-sm opacity-80 hover:opacity-100 flex items-center gap-1">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                        <span data-i18n="common.logout">Logout</span>
-                    </button>
+                    <!-- Profile Avatar (tap to open dropdown) -->
+                    <div class="relative">
+                        <button onclick="toggleProfileDropdown()" id="headerAvatarBtn" style="width:42px;height:42px;border-radius:50%;background:#D4A24E;border:2px solid white;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer">
+                            <span id="headerInitial" style="color:white;font-size:17px;font-weight:700">P</span>
+                        </button>
+                        <div id="profileDropdown" class="profile-dropdown">
+                            <a href="/painter-profile.html">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                My Profile
+                            </a>
+                            <div class="divider"></div>
+                            <button onclick="logout()">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                                <span style="color:#ef4444">Logout</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -391,6 +405,19 @@
         if (p.full_name) document.getElementById('painterName').textContent = p.full_name;
     } catch(e) {}
 
+    function toggleProfileDropdown() {
+        const dd = document.getElementById('profileDropdown');
+        dd.classList.toggle('show');
+    }
+    // Close dropdown on outside click
+    document.addEventListener('click', function(e) {
+        const dd = document.getElementById('profileDropdown');
+        const btn = document.getElementById('headerAvatarBtn');
+        if (dd && dd.classList.contains('show') && !btn.contains(e.target) && !dd.contains(e.target)) {
+            dd.classList.remove('show');
+        }
+    });
+
     async function loadDashboard() {
         try {
             const res = await fetch(`${API}/me/dashboard`, { headers: painterHeaders() });
@@ -400,14 +427,17 @@
 
             dashboardData = data.dashboard;
 
-            // Update header logo
+            // Show business logo directly (no fallback icon)
             if (data.dashboard.businessLogo) {
-                document.getElementById('headerLogo').src = data.dashboard.businessLogo;
+                const logoEl = document.getElementById('headerLogo');
+                logoEl.src = data.dashboard.businessLogo;
+                logoEl.style.display = 'block';
             }
 
-            // Update header avatar
+            // Update profile avatar (top-right button)
+            const avatarBtn = document.getElementById('headerAvatarBtn');
             if (data.dashboard.profilePhoto) {
-                document.getElementById('headerAvatar').innerHTML = `<img src="${data.dashboard.profilePhoto}" style="width:100%;height:100%;object-fit:cover">`;
+                avatarBtn.innerHTML = `<img src="${data.dashboard.profilePhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
             } else if (data.dashboard.painterName) {
                 document.getElementById('headerInitial').textContent = data.dashboard.painterName.charAt(0).toUpperCase();
             }
@@ -848,28 +878,47 @@
     }
 
     /**
-     * Shared card share helper — uses native share with file, falls back to WhatsApp deep link.
-     * Never downloads.
+     * Shared card share helper — shares the actual card PNG image + Tamil text.
+     * Uses Web Share API (files), then falls back to blob URL + WhatsApp.
      */
     async function shareCardFile(cardUrl, fileName, title, text) {
         if (!cardUrl) { showToast('Card not available yet', 'error'); return; }
 
+        // Fetch the card image as blob
+        let blob;
         try {
             const response = await fetch(cardUrl);
-            const blob = await response.blob();
-            const file = new File([blob], fileName, { type: 'image/png' });
+            blob = await response.blob();
+        } catch (e) {
+            showToast('Could not load card image', 'error');
+            return;
+        }
 
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        const file = new File([blob], fileName, { type: 'image/png' });
+
+        // Try native Web Share API with file
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
                 await navigator.share({ title, text, files: [file] });
                 showToast('Card shared!');
                 return;
+            } catch (e) {
+                if (e.name === 'AbortError') return; // user cancelled
             }
-        } catch (e) {
-            // User cancelled or share not supported — fall through
-            if (e.name === 'AbortError') return; // user cancelled, don't fallback
         }
 
-        // Fallback: WhatsApp deep link with text (no file, but at least opens WhatsApp)
+        // Fallback: try share without files (text + title only)
+        if (navigator.share) {
+            try {
+                await navigator.share({ title, text });
+                showToast('Text shared! Attach the card image manually.');
+                return;
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+            }
+        }
+
+        // Final fallback: WhatsApp with text
         const waUrl = 'https://wa.me/?text=' + encodeURIComponent(text);
         window.open(waUrl, '_blank');
         showToast('Opening WhatsApp...');
@@ -878,15 +927,26 @@
     async function shareVisitingCard() {
         if (!visitingCardUrl) await loadVisitingCard();
         const code = dashboardData?.referralCode || '';
-        const text = `I am a Quality Colours registered painter. For all your painting needs, contact me!\nVisit: ${window.location.origin}/painter-register.html?ref=${code}`;
-        await shareCardFile(visitingCardUrl, 'QC-Painter-Card.png', 'My QC Painter Visiting Card', text);
+        const name = dashboardData?.painterName || '';
+        const text = `நான் Quality Colours பதிவு செய்யப்பட்ட பெயிண்டர்.\n` +
+            `உங்கள் அனைத்து பெயிண்டிங் தேவைகளுக்கும் என்னை தொடர்பு கொள்ளுங்கள்!\n\n` +
+            `I am a Quality Colours registered painter. Contact me for all your painting needs!\n\n` +
+            `${window.location.origin}/painter-register.html?ref=${code}`;
+        await shareCardFile(visitingCardUrl, 'QC-Painter-Card.png', name || 'QC Painter', text);
     }
 
     async function shareIdCard() {
         if (!idCardUrl) await loadIdCard();
         const code = dashboardData?.referralCode || '';
-        const text = `Join Quality Colours Painter Loyalty Program! Use my referral code: ${code}\nEarn points on every paint purchase. Register now:\n${window.location.origin}/painter-register.html?ref=${code}`;
-        await shareCardFile(idCardUrl, 'QC-Painter-ID.png', 'QC Painter ID Card', text);
+        const text = `Quality Colours பெயிண்டர் லாயல்டி புரோகிராமில் இணையுங்கள்!\n` +
+            `என் ரெபரல் கோட்: ${code}\n\n` +
+            `ஒவ்வொரு வண்ணப்பூச்சு வாங்குதலிலும் புள்ளிகள் பெறுங்கள்.\n` +
+            `இப்போதே பதிவு செய்யுங்கள்:\n\n` +
+            `Join Quality Colours Painter Loyalty Program!\n` +
+            `My referral code: ${code}\n` +
+            `Earn points on every paint purchase. Register now:\n` +
+            `${window.location.origin}/painter-register.html?ref=${code}`;
+        await shareCardFile(idCardUrl, 'QC-Painter-ID.png', 'QC Painters Program', text);
     }
 
     // ============ Visualizations ============
