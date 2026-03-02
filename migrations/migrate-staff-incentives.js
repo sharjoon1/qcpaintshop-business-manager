@@ -95,7 +95,7 @@ async function migrate() {
 
         for (const [key, value] of configKeys) {
             const [existing] = await pool.query(
-                'SELECT id FROM ai_config WHERE config_key = ?', [key]
+                'SELECT config_key FROM ai_config WHERE config_key = ?', [key]
             );
             if (existing.length === 0) {
                 await pool.query(
