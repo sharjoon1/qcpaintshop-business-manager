@@ -2421,6 +2421,12 @@ Based on AI App Analyzer report, fixed critical production errors:
   - Push button: "Push X Discrepancies to Zoho" (only submitted items); refreshes panel after push instead of closing
   - Waiting state: shows "Waiting for staff to submit more items" when no submitted items left
 
+### Mar 3, 2026 — Painter Catalog: Points Breakdown & Hide Stock Count
+- **Changed**: Stock display in `painter-catalog.html` — removed numeric counts and "Low Stock" state from all 3 locations (card badge, detail panel, variant rows). Only shows "In Stock" (green) / "Out of Stock" (red).
+- **Added**: "Your Earnings" section in product detail panel — 2-column breakdown per variant: Customer Billing (Regular pts + Annual pts) vs Self Billing (0 + Annual pts). Shows annual % of MRP. Variants without rates show "Points not configured".
+- **Changed**: Points badges simplified — card badge shows "earns pts" instead of specific number, variant rows show "★ earns pts". Full breakdown available in detail panel.
+- **No backend changes** — all data (`points_per_unit`, `annual_eligible`, `annual_pct`) already returned by `GET /me/catalog/:productId`.
+
 ### Mar 2, 2026 — Product Import Pipeline & Estimate Product Management
 - **Added**: Zoho → Estimate Product import flow: select items → smart grouping (`extractProductInfo()`) → Import Review modal → create products + pack_sizes
 - **Added**: Import Review modal with editable product names, unit_wise/area_wise toggle per group
@@ -2505,12 +2511,13 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 - `public/painter-login.html` — OTP-based painter login
 - `public/painter-dashboard.html` — Premium dashboard (avatar header, stats, offers, visiting card, visualization gallery, quick actions, referrals, estimates, transactions)
 - `public/painter-profile.html` — Profile editing page with avatar photo upload, editable fields, dirty tracking
+- `public/painter-catalog.html` — Product catalog for painters. Stock shown as "In Stock"/"Out of Stock" only (no numeric counts). Detail panel shows "Your Earnings" breakdown (Customer Billing vs Self Billing points per variant). Rates from `painter_product_point_rates` table (admin-configurable in Tab 3).
 - `public/components/painters-subnav.html` — Module sub-navigation
 - `config/uploads.js` — uploadPainterVisualization (memory storage, 10MB, images only)
 
 ### API Endpoints
 - **Public**: POST register, send-otp, verify-otp | GET validate-referral/:code
-- **Painter-Auth** (X-Painter-Token header): GET/PUT /me, PUT /me/profile-photo, GET /me/visiting-card(?format=url), /me/points/:pool, /me/referrals, /me/withdrawals, /me/invoices, /me/attendance, /me/dashboard, POST/GET /me/visualizations | POST /me/withdraw
+- **Painter-Auth** (X-Painter-Token header): GET/PUT /me, PUT /me/profile-photo, GET /me/visiting-card(?format=url), /me/points/:pool, /me/referrals, /me/withdrawals, /me/invoices, /me/attendance, /me/dashboard, POST/GET /me/visualizations | POST /me/withdraw | GET /me/catalog(?search, ?brand, ?category, ?page), GET /me/catalog/:productId (variants with points_per_unit, annual_eligible, annual_pct)
 - **Admin**: GET / (list), GET /:id, PUT /:id, PUT /:id/approve, PUT /:id/credit
 - **Admin Visualizations**: GET /admin/visualizations(?status=), PUT /admin/visualizations/:id, POST /admin/visualizations/:id/upload-result
 - **Points**: GET/POST /:id/points/adjust, POST /invoice/process, GET /invoice/search
