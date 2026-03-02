@@ -1266,7 +1266,18 @@
             document.getElementById('reviewSubtitle').textContent = `${reviewGroups.length} product${reviewGroups.length > 1 ? 's' : ''}, ${totalItems} item${totalItems > 1 ? 's' : ''} selected`;
             document.getElementById('reviewFooterInfo').textContent = `${reviewGroups.length} products will be created`;
 
-            body.innerHTML = reviewGroups.map((g, idx) => {
+            // Check for already-mapped items
+            const mappedCount = reviewGroups.reduce((s, g) => s + g.items.filter(i => zohoMappedIds.has(i.zoho_item_id || i.item_id)).length, 0);
+            let warningHtml = '';
+            if (mappedCount > 0) {
+                warningHtml = `<div class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3">
+                    <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    <div class="text-sm"><strong class="text-amber-800">${mappedCount} item${mappedCount > 1 ? 's' : ''} already imported.</strong>
+                    <span class="text-amber-700">They will be replaced with the new grouping.</span></div>
+                </div>`;
+            }
+
+            body.innerHTML = warningHtml + reviewGroups.map((g, idx) => {
                 const firstItemId = g.items[0]?.zoho_item_id || g.items[0]?.item_id || '';
                 return `
                 <div class="border border-gray-200 rounded-xl p-4 hover:border-purple-200 transition">
@@ -1283,7 +1294,11 @@
                         </div>
                         <!-- Details -->
                         <div class="flex-1 min-w-0">
-                            <h4 class="font-semibold text-gray-900 text-sm truncate">${escH(g.name)}</h4>
+                            <input type="text" value="${escH(g.name)}"
+                                onchange="updateReviewGroupName(${idx}, this.value)"
+                                class="font-semibold text-gray-900 text-sm w-full border-b border-transparent hover:border-gray-300 focus:border-purple-500 focus:outline-none bg-transparent px-0 py-0.5"
+                                placeholder="Product name"
+                                title="Edit product name">
                             <div class="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
                                 ${g.brand ? `<span>Brand: <strong>${escH(g.brand)}</strong></span>` : ''}
                                 ${g.category ? `<span>Category: <strong>${escH(g.category)}</strong></span>` : ''}
@@ -1294,7 +1309,9 @@
                                 ${g.items.map(item => {
                                     const sz = item._sizeLabel || (item.name || item.item_name);
                                     const rate = item.rate ? '₹' + parseFloat(item.rate).toFixed(0) : '';
-                                    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">${escH(sz)}${rate ? ' · ' + rate : ''}</span>`;
+                                    const isMapped = zohoMappedIds.has(item.zoho_item_id || item.item_id);
+                                    const chipClass = isMapped ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-700';
+                                    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${chipClass}" ${isMapped ? 'title="Will be re-imported"' : ''}>${isMapped ? '↻ ' : ''}${escH(sz)}${rate ? ' · ' + rate : ''}</span>`;
                                 }).join('')}
                             </div>
                             <!-- Type & Coverage -->
@@ -1318,6 +1335,11 @@
                     </div>
                 </div>`;
             }).join('');
+        }
+
+        function updateReviewGroupName(idx, newName) {
+            reviewGroups[idx].name = newName.trim();
+            reviewGroups[idx].key = `${newName.trim()}|||${reviewGroups[idx].brand}|||${reviewGroups[idx].category}`;
         }
 
         function setReviewType(idx, value) {
@@ -1364,27 +1386,35 @@
             btn.disabled = true;
             btn.textContent = 'Importing...';
 
-            // Build configs keyed by group key
-            const product_configs = {};
-            for (const g of reviewGroups) {
-                product_configs[g.key] = { product_type: g.product_type };
-                if (g.product_type === 'area_wise' && g.area_coverage) {
-                    product_configs[g.key].area_coverage = g.area_coverage;
-                }
-            }
+            // Build explicit groups with user-edited names
+            const groups = reviewGroups.map(g => ({
+                name: g.name,
+                brand: g.brand,
+                category: g.category,
+                product_type: g.product_type,
+                area_coverage: g.area_coverage || null,
+                items: g.items.map(item => ({
+                    zoho_item_id: item.zoho_item_id || item.item_id,
+                    size_label: item._sizeLabel || ''
+                }))
+            }));
+
+            // Check if any items are already mapped — if so, force replace
+            const hasAlreadyMapped = groups.some(g => g.items.some(i => zohoMappedIds.has(i.zoho_item_id)));
 
             try {
                 const res = await fetch('/api/products/import-from-zoho', {
                     method: 'POST',
                     headers: getAuthHeaders(),
-                    body: JSON.stringify({ zoho_item_ids: [...zohoSelectedIds], product_configs })
+                    body: JSON.stringify({ groups, force: hasAlreadyMapped })
                 });
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
 
                 let msg = `Imported ${data.pack_sizes_created} items as pack sizes`;
                 if (data.products_created > 0) msg += ` (${data.products_created} new products created)`;
-                if (data.skipped > 0) msg += `. ${data.skipped} already mapped — skipped.`;
+                if (data.replaced > 0) msg += `. ${data.replaced} previously mapped items replaced.`;
+                if (data.skipped > 0) msg += `. ${data.skipped} skipped.`;
                 alert(msg);
 
                 closeImportReview();

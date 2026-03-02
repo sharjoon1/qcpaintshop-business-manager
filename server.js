@@ -2514,14 +2514,24 @@ app.get('/api/products/mapped-zoho-ids', requireAuth, async (req, res) => {
 // Import Zoho items as local Products + pack_sizes
 app.post('/api/products/import-from-zoho', requirePermission('products', 'add'), async (req, res) => {
     try {
-        const { zoho_item_ids, product_configs } = req.body;
-        // product_configs: optional { "groupKey": { product_type, area_coverage } }
-        const configs = product_configs || {};
+        const { groups, force } = req.body;
 
-        if (!Array.isArray(zoho_item_ids) || !zoho_item_ids.length) {
-            return res.status(400).json({ success: false, error: 'No items selected' });
+        if (!Array.isArray(groups) || !groups.length) {
+            return res.status(400).json({ success: false, error: 'No groups provided' });
         }
-        if (zoho_item_ids.length > 200) {
+
+        // Collect all zoho_item_ids from groups
+        const allItemIds = [];
+        for (const g of groups) {
+            if (!g.name || !Array.isArray(g.items) || !g.items.length) continue;
+            for (const item of g.items) {
+                if (item.zoho_item_id) allItemIds.push(item.zoho_item_id);
+            }
+        }
+        if (!allItemIds.length) {
+            return res.status(400).json({ success: false, error: 'No items in groups' });
+        }
+        if (allItemIds.length > 200) {
             return res.status(400).json({ success: false, error: 'Maximum 200 items per import' });
         }
 
@@ -2538,121 +2548,103 @@ app.post('/api/products/import-from-zoho', requirePermission('products', 'add'),
             return 'L';
         }
 
-        // Smart extractor: returns { productName, size, unit } from Zoho item name
-        // Handles: "Product 4 Ltr", "4 Ltr Product", "100 AJAX PAPER", cf_product_name override
-        const UNIT_RE = 'ltr?|litres?|liters?|kg|kgs?|ml|gm?|grams?|pc|pcs?|pieces?|m|meters?';
-        function extractProductInfo(itemName, cfProductName, zohoUnit) {
-            const n = (itemName || '').trim();
-            // 1. If cf_product_name exists, use it as product name and parse size from item name
-            if (cfProductName && cfProductName.trim()) {
-                const m = n.match(new RegExp('(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_RE + ')\\b', 'i'));
-                let size = m ? parseFloat(m[1]) : 1;
-                let unit = m ? mapUnitCode(m[2]) : mapUnitCode(zohoUnit);
-                if (m && /^ml$/i.test(m[2])) { size = +(size / 1000).toFixed(4); }
-                if (m && /^(gm?|grams?)$/i.test(m[2])) { size = +(size / 1000).toFixed(4); }
-                return { productName: cfProductName.trim(), size, unit };
-            }
-            // 2. Suffix pattern: "Product Name 4 Ltr"
-            const sfx = n.match(new RegExp('^(.+?)\\s+(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_RE + ')\\s*$', 'i'));
-            if (sfx) {
-                let size = parseFloat(sfx[2]), unit = mapUnitCode(sfx[3]);
-                if (/^ml$/i.test(sfx[3])) { size = +(size / 1000).toFixed(4); }
-                if (/^(gm?|grams?)$/i.test(sfx[3])) { size = +(size / 1000).toFixed(4); }
-                return { productName: sfx[1].trim(), size, unit };
-            }
-            // 3. Prefix with unit: "4 Ltr Product Name"
-            const pfxU = n.match(new RegExp('^(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_RE + ')\\s+(.+)$', 'i'));
-            if (pfxU) {
-                let size = parseFloat(pfxU[1]), unit = mapUnitCode(pfxU[2]);
-                if (/^ml$/i.test(pfxU[2])) { size = +(size / 1000).toFixed(4); }
-                if (/^(gm?|grams?)$/i.test(pfxU[2])) { size = +(size / 1000).toFixed(4); }
-                return { productName: pfxU[3].trim(), size, unit };
-            }
-            // 4. Prefix number only: "100 AJAX PAPER" → grit/gsm/variation number
-            const pfxN = n.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
-            if (pfxN) {
-                return { productName: pfxN[2].trim(), size: parseFloat(pfxN[1]), unit: 'PC' };
-            }
-            // 5. Fallback
-            return { productName: n, size: 1, unit: mapUnitCode(zohoUnit) };
-        }
-
         const conn = await pool.getConnection();
         await conn.beginTransaction();
         try {
-            const ph = zoho_item_ids.map(() => '?').join(',');
-            const [zohoItems] = await conn.query(`SELECT * FROM zoho_items_map WHERE zoho_item_id IN (${ph})`, zoho_item_ids);
+            const ph = allItemIds.map(() => '?').join(',');
 
-            // Skip already-mapped
+            // Fetch Zoho item details for rate/unit info
+            const [zohoItems] = await conn.query(`SELECT * FROM zoho_items_map WHERE zoho_item_id IN (${ph})`, allItemIds);
+            const zohoMap = {};
+            for (const z of zohoItems) zohoMap[z.zoho_item_id] = z;
+
+            // Check already-mapped items
             const [alreadyMapped] = await conn.query(
-                `SELECT DISTINCT zoho_item_id FROM pack_sizes WHERE zoho_item_id IN (${ph}) AND is_active = 1`, zoho_item_ids
+                `SELECT DISTINCT zoho_item_id FROM pack_sizes WHERE zoho_item_id IN (${ph}) AND is_active = 1`, allItemIds
             );
             const mappedSet = new Set(alreadyMapped.map(r => r.zoho_item_id));
-            const toImport = zohoItems.filter(i => !mappedSet.has(i.zoho_item_id));
 
-            // Group by extracted product name + brand + category
-            const groups = {};
-            for (const item of toImport) {
-                const info = extractProductInfo(item.zoho_item_name, item.zoho_cf_product_name, item.zoho_unit);
-                const brand = (item.zoho_brand || '').trim();
-                const cat = (item.zoho_category_name || '').trim();
-                const key = `${info.productName}|||${brand}|||${cat}`;
-                if (!groups[key]) groups[key] = { name: info.productName, brand, category: cat, items: [] };
-                groups[key].items.push({ ...item, _extracted: info });
+            // If force=true, remove old pack_size mappings so they can be re-imported
+            let replaced = 0;
+            if (force && mappedSet.size > 0) {
+                const mappedIds = [...mappedSet];
+                const mph = mappedIds.map(() => '?').join(',');
+                await conn.query(`DELETE FROM pack_sizes WHERE zoho_item_id IN (${mph}) AND is_active = 1`, mappedIds);
+                replaced = mappedSet.size;
+                mappedSet.clear();
             }
 
-            let productsCreated = 0, packSizesCreated = 0;
-            const skipped = mappedSet.size;
+            let productsCreated = 0, packSizesCreated = 0, skipped = 0;
 
-            for (const [key, group] of Object.entries(groups)) {
-                const cfg = configs[key] || {};
-                const productType = cfg.product_type || 'unit_wise';
-                const areaCoverage = productType === 'area_wise' ? (parseFloat(cfg.area_coverage) || null) : null;
+            for (const group of groups) {
+                if (!group.name || !Array.isArray(group.items) || !group.items.length) continue;
+
+                const productName = group.name.trim();
+                const brand = (group.brand || '').trim();
+                const category = (group.category || '').trim();
+                const productType = group.product_type || 'unit_wise';
+                const areaCoverage = productType === 'area_wise' ? (parseFloat(group.area_coverage) || null) : null;
+
+                // Filter out any remaining already-mapped items (if force was false)
+                const itemsToImport = group.items.filter(i => !mappedSet.has(i.zoho_item_id));
+                skipped += group.items.length - itemsToImport.length;
+                if (!itemsToImport.length) continue;
 
                 // Find or create brand
                 let brandId = null;
-                if (group.brand) {
-                    const [eb] = await conn.query('SELECT id FROM brands WHERE name = ?', [group.brand]);
+                if (brand) {
+                    const [eb] = await conn.query('SELECT id FROM brands WHERE name = ?', [brand]);
                     if (eb.length) { brandId = eb[0].id; }
-                    else { const [r] = await conn.query('INSERT INTO brands (name) VALUES (?)', [group.brand]); brandId = r.insertId; }
+                    else { const [r] = await conn.query('INSERT INTO brands (name) VALUES (?)', [brand]); brandId = r.insertId; }
                 }
                 // Find or create category
                 let categoryId = null;
-                if (group.category) {
-                    const [ec] = await conn.query('SELECT id FROM categories WHERE name = ?', [group.category]);
+                if (category) {
+                    const [ec] = await conn.query('SELECT id FROM categories WHERE name = ?', [category]);
                     if (ec.length) { categoryId = ec[0].id; }
-                    else { const [r] = await conn.query('INSERT INTO categories (name) VALUES (?)', [group.category]); categoryId = r.insertId; }
+                    else { const [r] = await conn.query('INSERT INTO categories (name) VALUES (?)', [category]); categoryId = r.insertId; }
                 }
-                // Find or create product
+                // Find or create product (uses the user-edited name from frontend)
                 let productId;
                 const [ep] = await conn.query(
                     'SELECT id FROM products WHERE name = ? AND brand_id <=> ? AND category_id <=> ? AND status = ?',
-                    [group.name, brandId, categoryId, 'active']
+                    [productName, brandId, categoryId, 'active']
                 );
                 if (ep.length) {
                     productId = ep[0].id;
                 } else {
-                    const rate = group.items[0]?.zoho_rate || 0;
+                    const rate = zohoMap[itemsToImport[0].zoho_item_id]?.zoho_rate || 0;
                     const [r] = await conn.query(
                         "INSERT INTO products (name, brand_id, category_id, product_type, base_price, area_coverage, status) VALUES (?, ?, ?, ?, ?, ?, 'active')",
-                        [group.name, brandId, categoryId, productType, rate, areaCoverage]
+                        [productName, brandId, categoryId, productType, rate, areaCoverage]
                     );
                     productId = r.insertId;
                     productsCreated++;
                 }
-                // Create pack sizes
-                for (const item of group.items) {
-                    const { size, unit } = item._extracted || extractProductInfo(item.zoho_item_name, item.zoho_cf_product_name, item.zoho_unit);
+                // Create pack sizes — parse size from frontend's size_label or fallback to zoho item name
+                for (const item of itemsToImport) {
+                    const zohoItem = zohoMap[item.zoho_item_id];
+                    if (!zohoItem) continue;
+
+                    let size = 1, unit = mapUnitCode(zohoItem.zoho_unit);
+                    if (item.size_label) {
+                        const m = item.size_label.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
+                        if (m) {
+                            size = parseFloat(m[1]);
+                            if (m[2]) unit = mapUnitCode(m[2]);
+                        }
+                    }
+
                     await conn.query(
                         'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
-                        [productId, size, unit, item.zoho_rate || 0, item.zoho_item_id]
+                        [productId, size, unit, zohoItem.zoho_rate || 0, item.zoho_item_id]
                     );
                     packSizesCreated++;
                 }
             }
 
             await conn.commit();
-            res.json({ success: true, products_created: productsCreated, pack_sizes_created: packSizesCreated, skipped });
+            res.json({ success: true, products_created: productsCreated, pack_sizes_created: packSizesCreated, skipped, replaced });
         } catch (txErr) {
             await conn.rollback();
             throw txErr;
