@@ -1801,13 +1801,28 @@ router.post('/items/ai-edit', requirePermission('zoho', 'manage'), async (req, r
 
         const systemPrompt = `You are KAI, an AI Items Editor for a paint retail business (Quality Colours). You receive inventory items and a user command. Return ONLY valid JSON.
 
-FIELD NAMES IN DATA (shortened): id, name, sku, rate (selling price), pr (purchase_rate), dpl (cf_dpl = Dealer Price List), brand
-EDITABLE FIELDS in edits: rate, pr, dpl, brand, sku, unit, hsn, tax, cat (use these SHORT names in your edits)
+FIELD NAMES IN DATA (shortened): id, name, sku, rate (selling price), pr (purchase_rate), dpl (cf_dpl = Dealer Price List), brand, desc (description), cat (category)
+EDITABLE FIELDS in edits: rate, pr, dpl, brand, sku, unit, hsn, tax, cat, desc (use these SHORT names in your edits)
 READ-ONLY: id, name
+
+PAINT INDUSTRY PRODUCT KNOWLEDGE (use this to identify products by their abbreviated names):
+- "AJAX PAPER" / "ROLL PAPER AJAX" / "ROLL EMERY PAPER" = Sanding Paper / Abrasive Paper (number prefix = grit, e.g. "100 AJAX PAPER" = Sanding Paper 100 Grit)
+- "AMBER" colors (Amber Black/Brown/Red/Yellow) = Powder Pigment / Oxide Color
+- "STAINER" (Black/Blue/Red/Green/Yellow Stainer) = Liquid Colorant/Tinter
+- "DDL FEVICOL" = Wood Adhesive, "ARALDITE" = Epoxy Adhesive, "M-SEAL" = Epoxy Compound
+- "BDR" / "BORDER" = Border paint/emulsion for decorative borders
+- "BS" prefix (BS01/BS04/BS10/BS20) = Bucket Size (01L/04L/10L/20L) of emulsions
+- "AP" prefix = Asian Paints, "APCO" = Apcolite (enamel line), "APEX" = exterior emulsion line
+- "DIS" prefix = Distemper, "APTY" = Wall Putty, "CC" prefix = Construction Chemical
+- "AF" prefix = Antifouling (marine paint), "BC" prefix = Base Coat (marine/industrial)
+- "CST" prefix = Custom shade/color enamel, "CR" prefix = Crack repair product
+- "FG" prefix = Floor Guard, "BF" prefix = Marine bottom finish paint
+- "CAP WASTE" / "CLOTH WASTE" / "COLOUR WASTE" = Cleaning supplies
 
 RULES:
 - Return ONLY JSON: { "edits": [...], "summary": "...", "reply": "..." }
-- Each edit: { "id": "<item_id>", "changes": { "<field>": <value> } }. Use SHORT field names (pr, dpl, cat, hsn, tax).
+- Each edit: { "id": "<item_id>", "changes": { "<field>": <value> } }. Use SHORT field names (pr, dpl, cat, hsn, tax, desc).
+- CRITICAL: Process EVERY matching item. Do NOT skip items. Scan ALL items in the batch.
 - Only include changed items. Round numbers to 2 decimals. NEVER change id/name.
 - "reply" = conversational message for chat (markdown OK). "summary" = one-line description.
 - For % ops: "increase by 5%" = multiply by 1.05. "Set DPL to 80% of rate" = dpl = rate * 0.8.
@@ -1818,9 +1833,9 @@ RULES:
         // Field name mapping (short → full)
         const fieldMap = {
             pr: 'purchase_rate', dpl: 'cf_dpl', cat: 'category_name',
-            hsn: 'hsn_or_sac', tax: 'tax_percentage',
+            hsn: 'hsn_or_sac', tax: 'tax_percentage', desc: 'description',
             category: 'category_name', tax_pct: 'tax_percentage',
-            purchase_rate: 'purchase_rate', cf_dpl: 'cf_dpl'
+            purchase_rate: 'purchase_rate', cf_dpl: 'cf_dpl', description: 'description'
         };
 
         // === DETERMINISTIC REFERENCE DATA MATCHING ===
