@@ -8,6 +8,7 @@ const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const leadManager = require('../services/ai-lead-manager');
 const notificationService = require('../services/notification-service');
+const aiEngine = require('../services/ai-engine');
 
 let io;
 
@@ -1175,6 +1176,242 @@ router.get('/performance/:userId', requirePermission('leads', 'view'), async (re
 });
 
 // ========================================
+// BULK IMPORT ENDPOINTS
+// ========================================
+
+/**
+ * Generate multiple unique lead numbers in one call
+ */
+async function generateLeadNumbers(count) {
+    const today = new Date();
+    const dateStr = today.getFullYear().toString() +
+        String(today.getMonth() + 1).padStart(2, '0') +
+        String(today.getDate()).padStart(2, '0');
+    const prefix = `LEAD-${dateStr}-`;
+
+    const [rows] = await pool.query(
+        `SELECT lead_number FROM leads
+         WHERE lead_number LIKE ?
+         ORDER BY lead_number DESC LIMIT 1`,
+        [`${prefix}%`]
+    );
+
+    let nextSeq = 1;
+    if (rows.length > 0) {
+        const lastSeq = parseInt(rows[0].lead_number.split('-').pop(), 10);
+        if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+    }
+
+    const numbers = [];
+    for (let i = 0; i < count; i++) {
+        numbers.push(`${prefix}${String(nextSeq + i).padStart(4, '0')}`);
+    }
+    return numbers;
+}
+
+/**
+ * POST /api/leads/bulk/parse
+ * Parse raw text (Excel paste) into structured leads using AI
+ */
+router.post('/bulk/parse', requirePermission('leads', 'add'), async (req, res) => {
+    try {
+        const { rawText } = req.body;
+
+        if (!rawText || typeof rawText !== 'string') {
+            return res.status(400).json({ success: false, message: 'rawText is required' });
+        }
+
+        if (rawText.length > 50000) {
+            return res.status(400).json({ success: false, message: 'Text too long (max 50,000 characters)' });
+        }
+
+        const systemPrompt = `You are a data parser for a paint shop CRM. Parse the provided tabular data (tab/comma/pipe/space-separated, possibly from an Excel paste) into structured lead objects.
+
+For each row, extract these fields (use null for missing values):
+- name (string, REQUIRED — skip row if missing)
+- phone (string, 10-digit Indian mobile preferred)
+- email (string or null)
+- company (string or null)
+- city (string or null)
+- estimated_budget (number or null)
+- source (one of: walk_in, phone, whatsapp, website, referral, social_media, other — default to "other" if unclear)
+- priority (one of: low, medium, high — default to "medium")
+- notes (string or null — put any extra unstructured data here)
+
+Rules:
+1. Auto-detect the column layout from header row or data patterns
+2. Skip completely empty rows
+3. If a row has a name but nothing else, still include it
+4. Clean phone numbers: remove spaces, dashes, +91 prefix
+5. Return ONLY valid JSON, no markdown fences
+
+Return JSON in this exact format:
+{
+  "leads": [{ "name": "...", "phone": "...", ... }],
+  "skipped_count": 0,
+  "skipped_reasons": []
+}`;
+
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: rawText }
+        ];
+
+        const result = await aiEngine.generateWithFailover(messages, {
+            temperature: 0.1,
+            maxTokens: 8192
+        });
+
+        // Parse JSON from AI response
+        let parsed;
+        try {
+            // Strip markdown fences if present
+            let text = result.text.trim();
+            if (text.startsWith('```')) {
+                text = text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+            }
+            parsed = JSON.parse(text);
+        } catch (parseErr) {
+            return res.status(422).json({
+                success: false,
+                message: 'AI returned unparseable response. Try reformatting your data.',
+                raw: result.text.substring(0, 500)
+            });
+        }
+
+        if (!parsed.leads || !Array.isArray(parsed.leads)) {
+            return res.status(422).json({
+                success: false,
+                message: 'AI response missing leads array'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                leads: parsed.leads,
+                skipped_count: parsed.skipped_count || 0,
+                skipped_reasons: parsed.skipped_reasons || []
+            }
+        });
+
+    } catch (error) {
+        console.error('Bulk parse error:', error);
+        res.status(500).json({ success: false, message: 'Failed to parse leads: ' + error.message });
+    }
+});
+
+/**
+ * POST /api/leads/bulk/create
+ * Create multiple leads in a single transaction
+ */
+router.post('/bulk/create', requirePermission('leads', 'add'), async (req, res) => {
+    try {
+        const { leads: leadsToCreate, branch_id, assigned_to, priority } = req.body;
+
+        if (!leadsToCreate || !Array.isArray(leadsToCreate) || leadsToCreate.length === 0) {
+            return res.status(400).json({ success: false, message: 'leads array is required' });
+        }
+
+        if (leadsToCreate.length > 200) {
+            return res.status(400).json({ success: false, message: 'Maximum 200 leads per batch' });
+        }
+
+        // Validate each lead has a name
+        const validLeads = leadsToCreate.filter(l => l.name && l.name.trim());
+        if (validLeads.length === 0) {
+            return res.status(400).json({ success: false, message: 'No valid leads (name is required)' });
+        }
+
+        const leadNumbers = await generateLeadNumbers(validLeads.length);
+        const createdBy = req.user.id;
+        const defaultBranch = branch_id || req.user.branch_id;
+        const defaultPriority = priority || 'medium';
+
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        let createdCount = 0;
+        let failedCount = 0;
+
+        try {
+            for (let i = 0; i < validLeads.length; i++) {
+                const lead = validLeads[i];
+                try {
+                    await connection.query(
+                        `INSERT INTO leads
+                         (lead_number, name, phone, email, company, city,
+                          estimated_budget, source, notes, status, priority,
+                          assigned_to, branch_id, created_by)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?)`,
+                        [
+                            leadNumbers[i],
+                            lead.name.trim(),
+                            lead.phone || null,
+                            lead.email || null,
+                            lead.company || null,
+                            lead.city || null,
+                            lead.estimated_budget || null,
+                            lead.source || 'other',
+                            lead.notes || null,
+                            lead.priority || defaultPriority,
+                            assigned_to || null,
+                            lead.branch_id || defaultBranch || null,
+                            createdBy
+                        ]
+                    );
+                    createdCount++;
+                } catch (insertErr) {
+                    console.error(`Bulk create: failed to insert lead "${lead.name}":`, insertErr.message);
+                    failedCount++;
+                }
+            }
+
+            await connection.commit();
+            connection.release();
+
+            // Send consolidated notification if assigned_to set
+            if (assigned_to && createdCount > 0) {
+                try {
+                    await notificationService.send(parseInt(assigned_to), {
+                        type: 'lead_assigned',
+                        title: `${createdCount} New Leads Bulk-Assigned`,
+                        body: `${createdCount} leads imported and assigned to you`,
+                        data: { bulk_import: true, count: createdCount }
+                    });
+                } catch (notifErr) {
+                    console.error('Bulk import notification error:', notifErr.message);
+                }
+
+                if (io) {
+                    io.to(`user_${assigned_to}`).emit('leads_bulk_assigned', {
+                        count: createdCount,
+                        message: `${createdCount} leads imported and assigned to you`
+                    });
+                }
+            }
+
+            res.json({
+                success: true,
+                data: {
+                    created_count: createdCount,
+                    failed_count: failedCount
+                }
+            });
+
+        } catch (txErr) {
+            await connection.rollback();
+            connection.release();
+            throw txErr;
+        }
+
+    } catch (error) {
+        console.error('Bulk create error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create leads: ' + error.message });
+    }
+});
+
+// ========================================
 // SINGLE LEAD ENDPOINTS
 // ========================================
 
@@ -1290,6 +1527,29 @@ router.post('/', requirePermission('leads', 'add'), async (req, res) => {
             message: 'Lead created successfully',
             data: newLead[0]
         });
+
+        // Send notification to assigned staff (fire-and-forget)
+        if (assigned_to) {
+            try {
+                await notificationService.send(parseInt(assigned_to), {
+                    type: 'lead_assigned',
+                    title: 'New Lead Assigned',
+                    body: `Lead "${name}" (${leadNumber}) has been assigned to you`,
+                    data: { lead_id: result.insertId, lead_number: leadNumber }
+                });
+            } catch (notifErr) {
+                console.error('Lead creation assignment notification error:', notifErr.message);
+            }
+
+            if (io) {
+                io.to(`user_${assigned_to}`).emit('lead_assigned', {
+                    lead_id: result.insertId,
+                    lead_name: name,
+                    lead_number: leadNumber,
+                    assigned_by: req.user.full_name
+                });
+            }
+        }
 
     } catch (error) {
         console.error('Create lead error:', error);

@@ -53,9 +53,14 @@
                 <h2 class="text-3xl font-bold text-gray-800">Lead Management</h2>
                 <p class="text-gray-600 mt-1">Track and manage sales leads</p>
             </div>
-            <button onclick="openAddModal()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold shadow-lg">
-                + Add Lead
-            </button>
+            <div class="flex gap-3">
+                <button onclick="openBulkImportModal()" class="bg-indigo-600 text-white px-5 py-3 rounded-lg hover:bg-indigo-700 font-semibold shadow-lg text-sm">
+                    Bulk Import
+                </button>
+                <button onclick="openAddModal()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold shadow-lg">
+                    + Add Lead
+                </button>
+            </div>
         </div>
 
         <!-- Stats Cards -->
@@ -397,6 +402,91 @@
                 </button>
             </div>
             <p class="text-xs text-gray-400 mt-4 text-center">A Zoho Books contact will be created automatically</p>
+        </div>
+    </div>
+
+    <!-- Bulk Import Modal -->
+    <div id="bulkImportModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 my-8">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold text-gray-800">Bulk Import Leads</h3>
+                <button onclick="closeBulkImportModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+
+            <!-- Step 1: Paste Data -->
+            <div id="bulkStep1">
+                <p class="text-gray-600 mb-3">Paste data from Excel, Google Sheets, or any tabular format. The AI will auto-detect columns.</p>
+                <textarea id="bulkRawText" rows="10" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none font-mono text-sm" placeholder="Name&#9;Phone&#9;Email&#9;City&#9;Source&#10;John Doe&#9;9876543210&#9;john@email.com&#9;Mumbai&#9;referral&#10;Jane Smith&#9;8765432109&#9;&#9;Delhi&#9;website"></textarea>
+                <div class="flex items-center gap-4 mt-4">
+                    <button onclick="parseBulkLeads()" id="btnParseBulk" class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-700 font-semibold">
+                        Parse with AI
+                    </button>
+                    <span id="bulkParseStatus" class="text-sm text-gray-500"></span>
+                </div>
+            </div>
+
+            <!-- Step 2: Preview & Import -->
+            <div id="bulkStep2" class="hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <span class="text-sm font-semibold text-green-700 bg-green-50 px-3 py-1 rounded-full" id="bulkParsedCount">0 leads parsed</span>
+                        <span class="text-sm text-gray-500 ml-2" id="bulkSkippedCount"></span>
+                    </div>
+                    <button onclick="showBulkStep1()" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+                        &larr; Back to paste
+                    </button>
+                </div>
+
+                <!-- Defaults row -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 bg-gray-50 p-4 rounded-lg">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Branch (all leads)</label>
+                        <select id="bulkBranch" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm">
+                            <option value="">-- Select Branch --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Assign To (all leads)</label>
+                        <select id="bulkAssignTo" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm">
+                            <option value="">-- Unassigned --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Priority (default)</label>
+                        <select id="bulkPriority" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Preview Table -->
+                <div class="overflow-x-auto border rounded-lg max-h-64 overflow-y-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 sticky top-0">
+                            <tr>
+                                <th class="px-3 py-2 text-left">#</th>
+                                <th class="px-3 py-2 text-left">Name</th>
+                                <th class="px-3 py-2 text-left">Phone</th>
+                                <th class="px-3 py-2 text-left">Email</th>
+                                <th class="px-3 py-2 text-left">City</th>
+                                <th class="px-3 py-2 text-left">Source</th>
+                                <th class="px-3 py-2 text-left">Notes</th>
+                                <th class="px-3 py-2 text-center">Remove</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bulkPreviewBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="flex items-center gap-4 mt-4">
+                    <button onclick="importBulkLeads()" id="btnImportBulk" class="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 font-semibold">
+                        Import All
+                    </button>
+                    <span id="bulkImportStatus" class="text-sm text-gray-500"></span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -988,6 +1078,174 @@
             if (!dateStr) return '-';
             const date = new Date(dateStr);
             return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        // ========================================
+        // BULK IMPORT FUNCTIONS
+        // ========================================
+
+        let parsedBulkLeads = [];
+
+        function openBulkImportModal() {
+            parsedBulkLeads = [];
+            document.getElementById('bulkRawText').value = '';
+            document.getElementById('bulkStep1').classList.remove('hidden');
+            document.getElementById('bulkStep2').classList.add('hidden');
+            document.getElementById('bulkParseStatus').textContent = '';
+            document.getElementById('bulkImportStatus').textContent = '';
+
+            // Populate dropdowns
+            const branchSelect = document.getElementById('bulkBranch');
+            branchSelect.innerHTML = '<option value="">-- Select Branch --</option>' +
+                branches.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+
+            const staffSelect = document.getElementById('bulkAssignTo');
+            staffSelect.innerHTML = '<option value="">-- Unassigned --</option>' +
+                users.map(u => `<option value="${u.id}">${escapeHtml(u.full_name)}</option>`).join('');
+
+            document.getElementById('bulkImportModal').classList.remove('hidden');
+        }
+
+        function closeBulkImportModal() {
+            document.getElementById('bulkImportModal').classList.add('hidden');
+        }
+
+        function showBulkStep1() {
+            document.getElementById('bulkStep1').classList.remove('hidden');
+            document.getElementById('bulkStep2').classList.add('hidden');
+        }
+
+        async function parseBulkLeads() {
+            const rawText = document.getElementById('bulkRawText').value.trim();
+            if (!rawText) {
+                alert('Please paste some data first');
+                return;
+            }
+
+            const btn = document.getElementById('btnParseBulk');
+            const status = document.getElementById('bulkParseStatus');
+            btn.disabled = true;
+            btn.textContent = 'Parsing...';
+            status.textContent = 'AI is analyzing your data...';
+
+            try {
+                const response = await fetch(`${API_BASE}/leads/bulk/parse`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ rawText })
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    alert('Parse failed: ' + (result.message || 'Unknown error'));
+                    status.textContent = 'Parse failed';
+                    return;
+                }
+
+                parsedBulkLeads = result.data.leads || [];
+
+                if (parsedBulkLeads.length === 0) {
+                    alert('No leads could be parsed from the data');
+                    status.textContent = 'No leads found';
+                    return;
+                }
+
+                // Show step 2
+                document.getElementById('bulkParsedCount').textContent = `${parsedBulkLeads.length} leads parsed`;
+                const skipped = result.data.skipped_count || 0;
+                document.getElementById('bulkSkippedCount').textContent = skipped > 0 ? `(${skipped} rows skipped)` : '';
+
+                renderBulkPreview();
+                document.getElementById('bulkStep1').classList.add('hidden');
+                document.getElementById('bulkStep2').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Parse error:', error);
+                alert('Failed to parse: ' + error.message);
+                status.textContent = 'Error';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Parse with AI';
+            }
+        }
+
+        function renderBulkPreview() {
+            const tbody = document.getElementById('bulkPreviewBody');
+            tbody.innerHTML = parsedBulkLeads.map((lead, i) => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="px-3 py-2 text-gray-500">${i + 1}</td>
+                    <td class="px-3 py-2 font-medium">${escapeHtml(lead.name || '')}</td>
+                    <td class="px-3 py-2">${escapeHtml(lead.phone || '-')}</td>
+                    <td class="px-3 py-2">${escapeHtml(lead.email || '-')}</td>
+                    <td class="px-3 py-2">${escapeHtml(lead.city || '-')}</td>
+                    <td class="px-3 py-2">${escapeHtml(lead.source || 'other')}</td>
+                    <td class="px-3 py-2 max-w-[150px] truncate" title="${escapeHtml(lead.notes || '')}">${escapeHtml(lead.notes || '-')}</td>
+                    <td class="px-3 py-2 text-center">
+                        <button onclick="removeBulkLead(${i})" class="text-red-500 hover:text-red-700 font-bold">&times;</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('bulkParsedCount').textContent = `${parsedBulkLeads.length} leads parsed`;
+        }
+
+        function removeBulkLead(index) {
+            parsedBulkLeads.splice(index, 1);
+            renderBulkPreview();
+            if (parsedBulkLeads.length === 0) {
+                showBulkStep1();
+            }
+        }
+
+        async function importBulkLeads() {
+            if (parsedBulkLeads.length === 0) {
+                alert('No leads to import');
+                return;
+            }
+
+            const branch_id = document.getElementById('bulkBranch').value || null;
+            const assigned_to = document.getElementById('bulkAssignTo').value || null;
+            const priority = document.getElementById('bulkPriority').value || 'medium';
+
+            const btn = document.getElementById('btnImportBulk');
+            const status = document.getElementById('bulkImportStatus');
+            btn.disabled = true;
+            btn.textContent = 'Importing...';
+            status.textContent = `Creating ${parsedBulkLeads.length} leads...`;
+
+            try {
+                const response = await fetch(`${API_BASE}/leads/bulk/create`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        leads: parsedBulkLeads,
+                        branch_id,
+                        assigned_to,
+                        priority
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const { created_count, failed_count } = result.data;
+                    alert(`Import complete!\n${created_count} leads created${failed_count > 0 ? `\n${failed_count} failed` : ''}`);
+                    closeBulkImportModal();
+                    loadLeads();
+                    loadStats();
+                } else {
+                    alert('Import failed: ' + (result.message || 'Unknown error'));
+                    status.textContent = 'Import failed';
+                }
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Failed to import: ' + error.message);
+                status.textContent = 'Error';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Import All';
+            }
         }
 
         // Populate performance branch filter after branches load

@@ -61,6 +61,7 @@ const aiScheduler = require('./services/ai-scheduler');
 const paintersRoutes = require('./routes/painters');
 const painterScheduler = require('./services/painter-scheduler');
 const leadReminderScheduler = require('./services/lead-reminder-scheduler');
+const leadAutoAssignScheduler = require('./services/lead-auto-assign-scheduler');
 const appMetadataCollector = require('./services/app-metadata-collector');
 const systemRoutes = require('./routes/system');
 const creditLimitRoutes = require('./routes/credit-limits');
@@ -203,6 +204,7 @@ aiScheduler.setPool(pool);
 paintersRoutes.setPool(pool);
 paintersRoutes.setSessionManager(whatsappSessionManager);
 painterScheduler.setPool(pool);
+leadAutoAssignScheduler.setPool(pool);
 leadReminderScheduler.init(pool, notificationService);
 aiScheduler.setSessionManager(whatsappSessionManager);
 systemRoutes.setPool(pool);
@@ -3262,6 +3264,7 @@ aiScheduler.setIO(io);
 paintersRoutes.setIO(io);
 creditLimitRoutes.setIO(io);
 leadsRoutes.setIO(io);
+leadAutoAssignScheduler.setIO(io);
 productionMonitor.setIO(io);
 productionMonitor.setSessionManager(whatsappSessionManager);
 painterNotificationService.setDependencies(pool, io);
@@ -3442,6 +3445,7 @@ server.listen(PORT, () => {
     syncScheduler.setAutomationRegistry(automationRegistry);
     aiScheduler.setAutomationRegistry(automationRegistry);
     painterScheduler.setAutomationRegistry(automationRegistry);
+    leadAutoAssignScheduler.setAutomationRegistry(automationRegistry);
     autoClockout.setAutomationRegistry(automationRegistry);
     attendanceReport.setAutomationRegistry(automationRegistry);
     whatsappProcessor.setAutomationRegistry(automationRegistry);
@@ -3459,6 +3463,7 @@ server.listen(PORT, () => {
         waCampaignEngine.start();
         aiScheduler.start();
         painterScheduler.start();
+        leadAutoAssignScheduler.start();
         console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler, painter-scheduler');
         systemHealthService.startAutoHealthChecks(300000); // every 5 min
         productionMonitor.start(); // Production health monitoring + self-healing
