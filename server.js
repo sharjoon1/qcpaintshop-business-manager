@@ -2680,7 +2680,11 @@ app.post('/api/products/:itemId/image', requirePermission('products', 'edit'), u
 app.get('/api/products', requireAuth, async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT p.*, b.name as brand_name, c.name as category_name
+            SELECT p.*, b.name as brand_name, c.name as category_name,
+                (SELECT zim.image_url FROM pack_sizes ps2
+                 INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps2.zoho_item_id
+                 WHERE ps2.product_id = p.id AND ps2.is_active = 1 AND zim.image_url IS NOT NULL
+                 LIMIT 1) as image_url
             FROM products p
             LEFT JOIN brands b ON p.brand_id = b.id
             LEFT JOIN categories c ON p.category_id = c.id
