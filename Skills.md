@@ -2,7 +2,7 @@
 
 > **Platform**: act.qcpaintshop.com
 > **Version**: 3.3.6
-> **Last Updated**: 2026-03-01
+> **Last Updated**: 2026-03-03
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
@@ -2421,6 +2421,14 @@ Based on AI App Analyzer report, fixed critical production errors:
   - Push button: "Push X Discrepancies to Zoho" (only submitted items); refreshes panel after push instead of closing
   - Waiting state: shows "Waiting for staff to submit more items" when no submitted items left
 
+### Mar 3, 2026 — Grouped Product Rates in Painter Admin Tab 3
+- **Replaced**: Tab 3 "Rates & Slabs" now shows products grouped by `products` table (matching painter catalog view) instead of 1822 individual Zoho items. Shows variant count, price range, and aggregate rates per product.
+- **Added**: Expand/collapse per product — lazy-loads individual variants with per-variant rate overrides. "Mixed" badge when variants have differing rates.
+- **Added**: Unmapped items section — collapsible list of items in `painter_product_point_rates` not linked to any active product, with link to Zoho Import page.
+- **Added**: 3 new endpoints: `GET /config/product-rates/grouped` (products + unmapped + filters + summary), `GET /config/product-rates/grouped/:productId` (variants), `PUT /config/product-rates/grouped` (fans out product-level rates to all variants, respects per-variant overrides).
+- **Save behavior**: Product-level save fans out to all variants via INSERT ON DUPLICATE KEY UPDATE. Per-variant overrides (when expanded and changed) saved independently. Unmapped items saved separately.
+- **No DB schema changes** — grouping is purely UI + backend fan-out. `painter_product_point_rates` table stays per-item. Legacy endpoints preserved.
+
 ### Mar 3, 2026 — Painter Catalog: Points Breakdown & Hide Stock Count
 - **Changed**: Stock display in `painter-catalog.html` — removed numeric counts and "Low Stock" state from all 3 locations (card badge, detail panel, variant rows). Only shows "In Stock" (green) / "Out of Stock" (red).
 - **Added**: "Your Earnings" section in product detail panel — 2-column breakdown per variant: Customer Billing (Regular pts + Annual pts) vs Self Billing (0 + Annual pts). Shows annual % of MRP. Variants without rates show "Points not configured".
@@ -2521,7 +2529,7 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 - **Admin**: GET / (list), GET /:id, PUT /:id, PUT /:id/approve, PUT /:id/credit
 - **Admin Visualizations**: GET /admin/visualizations(?status=), PUT /admin/visualizations/:id, POST /admin/visualizations/:id/upload-result
 - **Points**: GET/POST /:id/points/adjust, POST /invoice/process, GET /invoice/search
-- **Config**: GET /config/product-rates (?search, ?brand, ?category + JOINs zoho_items_map for brand/mrp), PUT /config/product-rates, POST /config/product-rates/sync (reads from `zoho_items_map`), CRUD /config/slabs
+- **Config**: GET /config/product-rates/grouped (products grouped with variant counts, price ranges, mixed-rate flags, unmapped items, filter dropdowns), GET /config/product-rates/grouped/:productId (lazy-load variants), PUT /config/product-rates/grouped (fan-out product rates to variants + per-variant overrides + unmapped), POST /config/product-rates/sync (reads from `zoho_items_map`), CRUD /config/slabs | Legacy: GET/PUT /config/product-rates
 - **Withdrawals**: GET /withdrawals, PUT /withdrawals/:id
 - **Reports**: GET /reports/summary, GET /reports/top-earners, GET /referrals, GET /attendance
 
