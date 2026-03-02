@@ -312,11 +312,13 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 **Products**
 - Full CRUD with brand/category association
 - Product types: area_wise, unit_wise
-- Pack sizes with per-size pricing
+- Pack sizes with per-size pricing and Zoho item mapping
 - GST percentage configuration
 - Area coverage specification
 - Guest visibility toggle
 - Searchable dropdowns for brand/category
+- Image column: thumbnail from Zoho items via `pack_sizes → zoho_items_map` subquery
+- Inline Zoho search when adding/editing pack size variants (event delegation, results rendered in-flow)
 - Pages: `admin-products.html`, `admin-brands.html`, `admin-categories.html`
 
 **Zoho Product Import** (`admin-products.html?tab=zoho-import`)
@@ -324,7 +326,23 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Sync items from Zoho Books API (`POST /api/zoho/sync/items`)
 - Filter by brand, category; search by name/SKU
 - Paginated item list with summary cards (total items, brands, last sync time)
-- Subnav: 4th tab "Zoho Import" in `products-subnav.html`
+- **Push to Estimate Products**: Select items → smart grouping by `extractProductInfo()` → Import Review modal
+- **Import Review Modal**: Editable product names, unit_wise/area_wise toggle, force re-import for already-mapped items (amber warning)
+- Green tick on already-mapped items (JOINs with products to check active status)
+- Subnav: 5th tab "Zoho Import" in `products-subnav.html`
+
+**Bulk Map** (`admin-products.html?tab=bulk-map`)
+- Dedicated tab for mapping unmapped pack sizes to Zoho items in bulk
+- Summary cards: Total Unmapped | Selected | Ready to Save
+- Filter bar: search, brand & category dropdowns
+- Each row has inline Zoho item search dropdown
+- Sticky "Save All Mappings" action bar
+- Endpoints: `GET /api/products/unmapped-pack-sizes`, `POST /api/products/bulk-map`
+
+**Product Image Upload** (Zoho Import tab)
+- Image column on Zoho Import table (48x48 clickable thumbnail or "+" placeholder)
+- Upload endpoint: `POST /api/products/:itemId/image`
+- Stores to `zoho_items_map.image_url`
 
 **Estimate Calculator**
 - Area-based paint calculation (auto-mix optimization)
@@ -1570,7 +1588,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | Branches | `admin-branches.html` | Branch management |
 | Customers | `admin-customers.html` | Customer CRUD |
 | Customer Types | `admin-customer-types.html` | Customer classification |
-| Products | `admin-products.html` | Product catalog + Zoho Import tab (?tab=zoho-import) |
+| Products | `admin-products.html` | Product catalog + Bulk Map (?tab=bulk-map) + Zoho Import (?tab=zoho-import) |
 | Brands | `admin-brands.html` | Brand management |
 | Categories | `admin-categories.html` | Category management |
 | Roles | `admin-roles.html` | Role management |
@@ -1648,7 +1666,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | Branches Subnav | `components/branches-subnav.html` | Branches & Staff section nav |
 | Salary Subnav | `components/salary-subnav.html` | Salary & Payroll section nav |
 | Sales Subnav | `components/sales-subnav.html` | Sales & Estimates section nav |
-| Products Subnav | `components/products-subnav.html` | Products & Inventory section nav (Products, Categories, Brands, Zoho Import) |
+| Products Subnav | `components/products-subnav.html` | Products & Inventory section nav (Products, Categories, Brands, Bulk Map, Zoho Import) |
 | System Subnav | `components/system-subnav.html` | System (Reports, Settings, Profile, Website, Guides) section nav |
 
 ### JavaScript Files
@@ -1675,7 +1693,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | Settings | `/api/settings/*` | 5 | `server.js` |
 | Brands | `/api/brands` | 4 | `server.js` |
 | Categories | `/api/categories` | 4 | `server.js` |
-| Products | `/api/products` | 5 | `server.js` |
+| Products | `/api/products` | 9 | `server.js` |
 | Customers | `/api/customers` | 5 | `server.js` |
 | Customer Types | `/api/customer-types` | 4 | `server.js` |
 | Estimates | `/api/estimates` | 8 | `server.js` |
@@ -2402,6 +2420,23 @@ Based on AI App Analyzer report, fixed critical production errors:
   - Review panel: 6 stat cards (Total/Submitted/Adjusted/Match/Discrepancy/Pending), filter toggle (Submitted/Adjusted vs All Items), item_status badge per row
   - Push button: "Push X Discrepancies to Zoho" (only submitted items); refreshes panel after push instead of closing
   - Waiting state: shows "Waiting for staff to submit more items" when no submitted items left
+
+### Mar 2, 2026 — Product Import Pipeline & Estimate Product Management
+- **Added**: Zoho → Estimate Product import flow: select items → smart grouping (`extractProductInfo()`) → Import Review modal → create products + pack_sizes
+- **Added**: Import Review modal with editable product names, unit_wise/area_wise toggle per group
+- **Added**: Force re-import for already-mapped items (amber warning, deletes old pack_size mappings)
+- **Added**: Bulk Map tab (`?tab=bulk-map`) — map unmapped pack sizes to Zoho items in bulk
+- **Added**: "Bulk Map" 5th tab in `products-subnav.html`
+- **Added**: Image column on Products tab (thumbnail from `pack_sizes → zoho_items_map.image_url` subquery)
+- **Added**: Product image upload on Zoho Import tab (clickable thumbnail / "+" placeholder)
+- **Added**: `POST /api/products/import-from-zoho` — accepts `{ groups, force }` format with explicit group names
+- **Added**: `GET /api/products/unmapped-pack-sizes`, `POST /api/products/bulk-map` endpoints
+- **Added**: `POST /api/products/:itemId/image` endpoint for admin image upload
+- **Fixed**: Green tick persisting after product deletion — `mapped-zoho-ids` now JOINs with products to check `status = 'active'`
+- **Fixed**: Product delete now also deactivates pack_sizes (`is_active = 0`)
+- **Fixed**: Race condition in Zoho Import tab — `loadZohoMappedIds().then(() => loadZohoItems())` instead of parallel
+- **Fixed**: Zoho search dropdown in variant editor — replaced position:fixed dropdown (clipped by modal overflow) with inline results rendered in document flow using event delegation
+- **Fixed**: Orphaned pack_sizes cleanup (5 rows with active pack_sizes on inactive products)
 
 ### Feb 28, 2026 — Painter Premium Features
 - **Profile Photo Upload**: PUT /me/profile-photo endpoint with Sharp resize (400x400 JPEG). Card cache invalidation on profile changes.
