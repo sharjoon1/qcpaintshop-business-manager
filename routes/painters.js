@@ -1857,7 +1857,218 @@ router.get('/invoice/search', requireAuth, async (req, res) => {
     }
 });
 
-// --- PRODUCT RATES CONFIG ---
+// --- PRODUCT RATES CONFIG (GROUPED) ---
+
+router.get('/config/product-rates/grouped', requireAuth, async (req, res) => {
+    try {
+        // Get products with their variants and point rates
+        const [rows] = await pool.query(`
+            SELECT p.id as product_id, p.name as product_name,
+                   b.name as brand, c.name as category,
+                   ps.zoho_item_id as item_id, zim.zoho_item_name as item_name,
+                   zim.zoho_rate as mrp,
+                   ppr.regular_points_per_unit, ppr.annual_eligible, ppr.annual_pct
+            FROM products p
+            LEFT JOIN brands b ON p.brand_id = b.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL
+            LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+            LEFT JOIN painter_product_point_rates ppr ON ppr.item_id = ps.zoho_item_id
+            WHERE p.status = 'active'
+            ORDER BY b.name, p.name, zim.zoho_rate
+        `);
+
+        // Group by product
+        const productMap = {};
+        for (const row of rows) {
+            if (!productMap[row.product_id]) {
+                productMap[row.product_id] = {
+                    product_id: row.product_id,
+                    product_name: row.product_name,
+                    brand: row.brand,
+                    category: row.category,
+                    variants: []
+                };
+            }
+            productMap[row.product_id].variants.push({
+                item_id: row.item_id,
+                item_name: row.item_name,
+                mrp: row.mrp ? parseFloat(row.mrp) : null,
+                regular_points_per_unit: row.regular_points_per_unit ? parseFloat(row.regular_points_per_unit) : 0,
+                annual_eligible: row.annual_eligible ? 1 : 0,
+                annual_pct: row.annual_pct ? parseFloat(row.annual_pct) : 1.0
+            });
+        }
+
+        // Build product summaries
+        const products = Object.values(productMap).map(p => {
+            const v = p.variants;
+            const rates = v.map(x => x.regular_points_per_unit);
+            const annuals = v.map(x => x.annual_eligible);
+            const pcts = v.map(x => x.annual_pct);
+            const mrps = v.filter(x => x.mrp).map(x => x.mrp);
+
+            const allSameRate = rates.every(r => r === rates[0]);
+            const allSameAnnual = annuals.every(a => a === annuals[0]);
+            const allSamePct = pcts.every(p => p === pcts[0]);
+
+            return {
+                product_id: p.product_id,
+                product_name: p.product_name,
+                brand: p.brand,
+                category: p.category,
+                variant_count: v.length,
+                min_mrp: mrps.length ? Math.min(...mrps) : null,
+                max_mrp: mrps.length ? Math.max(...mrps) : null,
+                regular_points_per_unit: allSameRate ? rates[0] : Math.max(...rates),
+                annual_eligible: allSameAnnual ? annuals[0] : 1,
+                annual_pct: allSamePct ? pcts[0] : Math.max(...pcts),
+                has_mixed_rates: !(allSameRate && allSameAnnual && allSamePct)
+            };
+        });
+
+        // Get unmapped items: items in painter_product_point_rates NOT linked to any active product
+        const [unmapped] = await pool.query(`
+            SELECT ppr.item_id, ppr.item_name, ppr.regular_points_per_unit, ppr.annual_eligible, ppr.annual_pct, ppr.category,
+                   zim.zoho_brand as brand, zim.zoho_rate as mrp
+            FROM painter_product_point_rates ppr
+            LEFT JOIN zoho_items_map zim ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+            WHERE ppr.item_id NOT IN (
+                SELECT ps.zoho_item_id FROM pack_sizes ps
+                INNER JOIN products p ON ps.product_id = p.id AND p.status = 'active'
+                WHERE ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL
+            )
+            ORDER BY ppr.item_name
+        `);
+
+        // Get unique brands/categories for filters
+        const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
+        const categories = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
+
+        const totalVariants = products.reduce((sum, p) => sum + p.variant_count, 0);
+
+        res.json({
+            success: true,
+            products,
+            unmapped: unmapped.map(u => ({
+                ...u,
+                mrp: u.mrp ? parseFloat(u.mrp) : null,
+                regular_points_per_unit: parseFloat(u.regular_points_per_unit || 0),
+                annual_pct: parseFloat(u.annual_pct || 1.0)
+            })),
+            brands,
+            categories,
+            summary: { product_count: products.length, variant_count: totalVariants, unmapped_count: unmapped.length }
+        });
+    } catch (error) {
+        console.error('Get grouped rates error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get grouped rates' });
+    }
+});
+
+router.get('/config/product-rates/grouped/:productId', requireAuth, async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const [variants] = await pool.query(`
+            SELECT ps.zoho_item_id as item_id, zim.zoho_item_name as item_name,
+                   ps.size, ps.unit, zim.zoho_rate as mrp,
+                   ppr.regular_points_per_unit, ppr.annual_eligible, ppr.annual_pct
+            FROM pack_sizes ps
+            LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+            LEFT JOIN painter_product_point_rates ppr ON ppr.item_id = ps.zoho_item_id
+            WHERE ps.product_id = ? AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL
+            ORDER BY zim.zoho_rate
+        `, [productId]);
+
+        res.json({
+            success: true,
+            variants: variants.map(v => ({
+                item_id: v.item_id,
+                item_name: v.item_name,
+                size: v.size,
+                unit: v.unit,
+                mrp: v.mrp ? parseFloat(v.mrp) : null,
+                regular_points_per_unit: parseFloat(v.regular_points_per_unit || 0),
+                annual_eligible: v.annual_eligible ? 1 : 0,
+                annual_pct: parseFloat(v.annual_pct || 1.0)
+            }))
+        });
+    } catch (error) {
+        console.error('Get product variants error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get variants' });
+    }
+});
+
+router.put('/config/product-rates/grouped', requirePermission('painters', 'points'), async (req, res) => {
+    try {
+        const { products, overrides, unmapped } = req.body;
+        let updated = 0;
+
+        // Process product-level rates — fan out to all variants
+        if (Array.isArray(products)) {
+            for (const prod of products) {
+                // Get all zoho_item_ids for this product
+                const [packSizes] = await pool.query(
+                    `SELECT ps.zoho_item_id FROM pack_sizes ps WHERE ps.product_id = ? AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL`,
+                    [prod.product_id]
+                );
+
+                // Build set of overridden item_ids to skip
+                const overriddenIds = new Set((overrides || []).map(o => o.item_id));
+
+                for (const ps of packSizes) {
+                    if (overriddenIds.has(ps.zoho_item_id)) continue; // skip — will be handled by overrides
+                    await pool.query(
+                        `INSERT INTO painter_product_point_rates (item_id, regular_points_per_unit, annual_eligible, annual_pct)
+                         VALUES (?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE regular_points_per_unit = VALUES(regular_points_per_unit),
+                         annual_eligible = VALUES(annual_eligible), annual_pct = VALUES(annual_pct)`,
+                        [ps.zoho_item_id, prod.regular_points_per_unit || 0,
+                         prod.annual_eligible ? 1 : 0, prod.annual_pct || 1.0]
+                    );
+                    updated++;
+                }
+            }
+        }
+
+        // Process per-variant overrides
+        if (Array.isArray(overrides)) {
+            for (const ov of overrides) {
+                await pool.query(
+                    `INSERT INTO painter_product_point_rates (item_id, regular_points_per_unit, annual_eligible, annual_pct)
+                     VALUES (?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE regular_points_per_unit = VALUES(regular_points_per_unit),
+                     annual_eligible = VALUES(annual_eligible), annual_pct = VALUES(annual_pct)`,
+                    [ov.item_id, ov.regular_points_per_unit || 0,
+                     ov.annual_eligible ? 1 : 0, ov.annual_pct || 1.0]
+                );
+                updated++;
+            }
+        }
+
+        // Process unmapped items
+        if (Array.isArray(unmapped)) {
+            for (const u of unmapped) {
+                await pool.query(
+                    `INSERT INTO painter_product_point_rates (item_id, regular_points_per_unit, annual_eligible, annual_pct)
+                     VALUES (?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE regular_points_per_unit = VALUES(regular_points_per_unit),
+                     annual_eligible = VALUES(annual_eligible), annual_pct = VALUES(annual_pct)`,
+                    [u.item_id, u.regular_points_per_unit || 0,
+                     u.annual_eligible ? 1 : 0, u.annual_pct || 1.0]
+                );
+                updated++;
+            }
+        }
+
+        res.json({ success: true, message: `${updated} item rates updated` });
+    } catch (error) {
+        console.error('Update grouped rates error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update rates' });
+    }
+});
+
+// --- PRODUCT RATES CONFIG (LEGACY) ---
 
 router.get('/config/product-rates', requireAuth, async (req, res) => {
     try {

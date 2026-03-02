@@ -44,6 +44,19 @@
         .btn-danger:hover { background: #dc2626; }
         .btn-outline { background: transparent; border: 1px solid #d1d5db; color: #374151; }
         .btn-outline:hover { background: #f9fafb; }
+        /* Grouped rates styles */
+        .product-row { cursor: pointer; }
+        .product-row:hover { background: #f0f4ff !important; }
+        .expand-icon { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; transition: transform 0.2s; font-size: 0.75rem; color: #64748b; }
+        .expand-icon.expanded { transform: rotate(90deg); }
+        .variant-container { display: none; }
+        .variant-container.open { display: table-row; }
+        .variant-row td { background: #f8fafc; padding: 0.5rem 0.75rem; font-size: 0.8125rem; border-bottom: 1px solid #f1f5f9; }
+        .variant-row td:first-child { padding-left: 2.5rem; }
+        .mixed-badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 4px; font-size: 0.6875rem; font-weight: 600; background: #fef3c7; color: #92400e; margin-left: 4px; }
+        .unmapped-section { border: 1px dashed #d1d5db; border-radius: 0.75rem; padding: 1rem 1.25rem; margin-top: 1rem; }
+        .unmapped-toggle { cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.875rem; color: #64748b; }
+        .unmapped-toggle:hover { color: #374151; }
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
         .modal-content { background: #fff; border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; padding: 1.5rem; }
         .form-group { margin-bottom: 1rem; }
@@ -223,17 +236,43 @@
                         <table class="data-table" id="ratesTable">
                             <thead>
                                 <tr>
-                                    <th>Item Name</th>
+                                    <th style="width:30px"></th>
+                                    <th>Product Name</th>
                                     <th>Brand</th>
                                     <th>Category</th>
-                                    <th>MRP</th>
+                                    <th>Variants</th>
+                                    <th>Price Range</th>
                                     <th>Regular Pts/Unit</th>
                                     <th>Annual Eligible</th>
                                     <th>Annual %</th>
                                 </tr>
                             </thead>
-                            <tbody id="ratesTableBody"><tr><td colspan="7" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
+                            <tbody id="ratesTableBody"><tr><td colspan="9" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
                         </table>
+                    </div>
+                    <!-- Unmapped Items Section -->
+                    <div id="unmappedSection" class="unmapped-section hidden">
+                        <div class="unmapped-toggle" onclick="toggleUnmappedSection()">
+                            <span class="expand-icon" id="unmappedChevron">&#9654;</span>
+                            <span>Unmapped Zoho Items</span>
+                            <span id="unmappedCount" class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full"></span>
+                        </div>
+                        <div id="unmappedBody" class="hidden mt-3">
+                            <p class="text-xs text-gray-500 mb-2">These items exist in the rates table but aren't linked to any product. <a href="/admin-products.html?tab=zoho-import" class="text-indigo-600 hover:underline">Import them &rarr;</a></p>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Item Name</th>
+                                        <th>Brand</th>
+                                        <th>MRP</th>
+                                        <th>Regular Pts/Unit</th>
+                                        <th>Annual Eligible</th>
+                                        <th>Annual %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="unmappedTableBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -943,9 +982,11 @@
     }
 
     // ═══════════════════════════════════════
-    // RATES & SLABS TAB
+    // RATES & SLABS TAB (GROUPED VIEW)
     // ═══════════════════════════════════════
-    let allRates = [];
+    let allGroupedProducts = [];
+    let allUnmappedItems = [];
+    let expandedProducts = {}; // cache: productId → variants[]
 
     async function loadRatesTab() {
         await loadProductRates();
@@ -954,8 +995,9 @@
 
     async function loadProductRates() {
         try {
-            const res = await fetch(`${API}/config/product-rates`, { headers: authHeaders() });
+            const res = await fetch(`${API}/config/product-rates/grouped`, { headers: authHeaders() });
             const data = await res.json();
+            if (!data.success) throw new Error(data.message || 'Failed to load');
 
             // Populate filter dropdowns
             const brandFilter = document.getElementById('ratesBrandFilter');
@@ -965,11 +1007,16 @@
             catFilter.innerHTML = '<option value="">All Categories</option>' +
                 (data.categories || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 
-            allRates = data.rates || [];
-            document.getElementById('ratesItemCount').textContent = `${allRates.length} items`;
-            renderRatesTable(allRates);
+            allGroupedProducts = data.products || [];
+            allUnmappedItems = data.unmapped || [];
+            const s = data.summary || {};
+            document.getElementById('ratesItemCount').textContent = `${s.product_count || 0} products, ${s.variant_count || 0} variants`;
+
+            expandedProducts = {};
+            renderGroupedRatesTable(allGroupedProducts);
+            renderUnmappedSection(allUnmappedItems);
         } catch (err) {
-            document.getElementById('ratesTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+            document.getElementById('ratesTableBody').innerHTML = `<tr><td colspan="9" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
         }
     }
 
@@ -978,48 +1025,213 @@
         const brand = document.getElementById('ratesBrandFilter').value;
         const category = document.getElementById('ratesCategoryFilter').value;
 
-        const filtered = allRates.filter(r => {
-            if (search && !(r.item_name || '').toLowerCase().includes(search) && !(r.brand || '').toLowerCase().includes(search)) return false;
-            if (brand && r.brand !== brand) return false;
-            if (category && r.category !== category) return false;
+        const filtered = allGroupedProducts.filter(p => {
+            if (search && !(p.product_name || '').toLowerCase().includes(search) && !(p.brand || '').toLowerCase().includes(search)) return false;
+            if (brand && p.brand !== brand) return false;
+            if (category && p.category !== category) return false;
             return true;
         });
-        renderRatesTable(filtered);
+        renderGroupedRatesTable(filtered);
     }
 
-    function renderRatesTable(rates) {
-        if (!rates.length) {
-            document.getElementById('ratesTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-400">No product rates configured. Click "Sync from Zoho" to import items.</td></tr>';
+    function formatPriceRange(min, max) {
+        if (!min && !max) return '-';
+        if (min === max) return '₹' + min.toFixed(0);
+        return '₹' + (min || 0).toFixed(0) + ' – ₹' + (max || 0).toFixed(0);
+    }
+
+    function renderGroupedRatesTable(products) {
+        if (!products.length) {
+            document.getElementById('ratesTableBody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-gray-400">No products found. Click "Sync from Zoho" to import items, then map them in Products tab.</td></tr>';
             return;
         }
-        document.getElementById('ratesTableBody').innerHTML = rates.map(r => `
-            <tr data-item-id="${esc(r.item_id)}">
-                <td class="font-medium">${esc(r.item_name || r.item_id)}</td>
-                <td class="text-xs text-gray-500">${esc(r.brand || '-')}</td>
-                <td class="text-xs text-gray-500">${esc(r.category || '-')}</td>
-                <td class="text-xs">${r.mrp ? '₹' + parseFloat(r.mrp).toFixed(2) : '-'}</td>
-                <td><input type="number" value="${r.regular_points_per_unit}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="regular_points_per_unit"></td>
-                <td><input type="checkbox" ${r.annual_eligible ? 'checked' : ''} class="rate-checkbox" data-field="annual_eligible"></td>
-                <td><input type="number" value="${r.annual_pct}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="annual_pct"></td>
+        let html = '';
+        for (const p of products) {
+            const pid = p.product_id;
+            const isExpanded = expandedProducts[pid] && document.querySelector(`.variant-container[data-product-id="${pid}"]`)?.classList.contains('open');
+            html += `<tr class="product-row" data-product-id="${pid}" onclick="toggleProductVariants(${pid}, event)">
+                <td><span class="expand-icon ${isExpanded ? 'expanded' : ''}" id="chevron-${pid}">&#9654;</span></td>
+                <td class="font-medium">${esc(p.product_name)}${p.has_mixed_rates ? '<span class="mixed-badge">Mixed</span>' : ''}</td>
+                <td class="text-xs text-gray-500">${esc(p.brand || '-')}</td>
+                <td class="text-xs text-gray-500">${esc(p.category || '-')}</td>
+                <td class="text-xs">${p.variant_count}</td>
+                <td class="text-xs">${formatPriceRange(p.min_mrp, p.max_mrp)}</td>
+                <td><input type="number" value="${p.regular_points_per_unit}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="regular_points_per_unit" onclick="event.stopPropagation()" onchange="onProductRateChange(${pid}, this)"></td>
+                <td class="text-center"><input type="checkbox" ${p.annual_eligible ? 'checked' : ''} class="rate-checkbox" data-field="annual_eligible" onclick="event.stopPropagation()" onchange="onProductRateChange(${pid}, this)"></td>
+                <td><input type="number" value="${p.annual_pct}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="annual_pct" onclick="event.stopPropagation()" onchange="onProductRateChange(${pid}, this)"></td>
+            </tr>`;
+            // Variant container row (always present, hidden by default)
+            html += `<tr class="variant-container ${isExpanded ? 'open' : ''}" data-product-id="${pid}">
+                <td colspan="9" style="padding:0">
+                    <div id="variants-${pid}" class="px-4 py-2"></div>
+                </td>
+            </tr>`;
+        }
+        document.getElementById('ratesTableBody').innerHTML = html;
+    }
+
+    async function toggleProductVariants(productId, event) {
+        // Don't toggle when clicking inputs
+        if (event.target.tagName === 'INPUT') return;
+
+        const container = document.querySelector(`.variant-container[data-product-id="${productId}"]`);
+        const chevron = document.getElementById(`chevron-${productId}`);
+        const isOpen = container.classList.contains('open');
+
+        if (isOpen) {
+            container.classList.remove('open');
+            chevron.classList.remove('expanded');
+            return;
+        }
+
+        // Open
+        container.classList.add('open');
+        chevron.classList.add('expanded');
+
+        // Lazy load variants
+        if (!expandedProducts[productId]) {
+            const variantsDiv = document.getElementById(`variants-${productId}`);
+            variantsDiv.innerHTML = '<p class="text-xs text-gray-400 py-2">Loading variants...</p>';
+            try {
+                const res = await fetch(`${API}/config/product-rates/grouped/${productId}`, { headers: authHeaders() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+                expandedProducts[productId] = data.variants;
+            } catch (err) {
+                variantsDiv.innerHTML = `<p class="text-xs text-red-500 py-2">${err.message}</p>`;
+                return;
+            }
+        }
+
+        renderVariants(productId);
+    }
+
+    function renderVariants(productId) {
+        const variants = expandedProducts[productId];
+        if (!variants || !variants.length) {
+            document.getElementById(`variants-${productId}`).innerHTML = '<p class="text-xs text-gray-400 py-2">No variants found</p>';
+            return;
+        }
+        let html = '<table class="data-table" style="margin:0"><tbody>';
+        for (const v of variants) {
+            html += `<tr class="variant-row" data-item-id="${esc(v.item_id)}" data-product-id="${productId}">
+                <td style="width:30px"></td>
+                <td class="text-xs">${esc(v.item_name || v.item_id)}${v.size ? ' <span class="text-gray-400">(' + v.size + ' ' + (v.unit || '') + ')</span>' : ''}</td>
+                <td class="text-xs" colspan="2"></td>
+                <td class="text-xs"></td>
+                <td class="text-xs">${v.mrp ? '₹' + v.mrp.toFixed(0) : '-'}</td>
+                <td><input type="number" value="${v.regular_points_per_unit}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-xs" data-field="regular_points_per_unit" data-variant="1"></td>
+                <td class="text-center"><input type="checkbox" ${v.annual_eligible ? 'checked' : ''} class="rate-checkbox" data-field="annual_eligible" data-variant="1"></td>
+                <td><input type="number" value="${v.annual_pct}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-xs" data-field="annual_pct" data-variant="1"></td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        document.getElementById(`variants-${productId}`).innerHTML = html;
+    }
+
+    function onProductRateChange(productId, input) {
+        // When product-level rate changes, cascade to all expanded variants (unless individually overridden)
+        if (!expandedProducts[productId]) return;
+
+        const productRow = document.querySelector(`.product-row[data-product-id="${productId}"]`);
+        const field = input.dataset.field;
+        const newVal = field === 'annual_eligible' ? input.checked : input.value;
+
+        // Update all variant inputs for this field
+        const variantRows = document.querySelectorAll(`.variant-row[data-product-id="${productId}"]`);
+        variantRows.forEach(row => {
+            const vInput = row.querySelector(`[data-field="${field}"]`);
+            if (vInput) {
+                if (field === 'annual_eligible') vInput.checked = newVal;
+                else vInput.value = newVal;
+            }
+        });
+    }
+
+    async function saveProductRates() {
+        const products = [];
+        const overrides = [];
+        const unmapped = [];
+
+        // Collect product-level rates
+        document.querySelectorAll('.product-row[data-product-id]').forEach(row => {
+            const pid = parseInt(row.dataset.productId);
+            products.push({
+                product_id: pid,
+                regular_points_per_unit: parseFloat(row.querySelector('[data-field="regular_points_per_unit"]').value) || 0,
+                annual_eligible: row.querySelector('[data-field="annual_eligible"]').checked,
+                annual_pct: parseFloat(row.querySelector('[data-field="annual_pct"]').value) || 1.0
+            });
+
+            // Check expanded variants for overrides
+            const productRate = products[products.length - 1];
+            document.querySelectorAll(`.variant-row[data-product-id="${pid}"]`).forEach(vRow => {
+                const vRate = {
+                    item_id: vRow.dataset.itemId,
+                    regular_points_per_unit: parseFloat(vRow.querySelector('[data-field="regular_points_per_unit"]').value) || 0,
+                    annual_eligible: vRow.querySelector('[data-field="annual_eligible"]').checked,
+                    annual_pct: parseFloat(vRow.querySelector('[data-field="annual_pct"]').value) || 1.0
+                };
+                // Only override if different from product level
+                if (vRate.regular_points_per_unit !== productRate.regular_points_per_unit ||
+                    vRate.annual_eligible !== productRate.annual_eligible ||
+                    vRate.annual_pct !== productRate.annual_pct) {
+                    overrides.push(vRate);
+                }
+            });
+        });
+
+        // Collect unmapped item rates
+        document.querySelectorAll('#unmappedTableBody tr[data-item-id]').forEach(row => {
+            unmapped.push({
+                item_id: row.dataset.itemId,
+                regular_points_per_unit: parseFloat(row.querySelector('[data-field="regular_points_per_unit"]').value) || 0,
+                annual_eligible: row.querySelector('[data-field="annual_eligible"]').checked,
+                annual_pct: parseFloat(row.querySelector('[data-field="annual_pct"]').value) || 1.0
+            });
+        });
+
+        if (!products.length && !unmapped.length) return alert('No rates to save');
+
+        try {
+            const res = await fetch(`${API}/config/product-rates/grouped`, {
+                method: 'PUT', headers: authHeaders(),
+                body: JSON.stringify({ products, overrides, unmapped })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(data.message);
+            expandedProducts = {};
+            await loadProductRates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    function renderUnmappedSection(items) {
+        const section = document.getElementById('unmappedSection');
+        if (!items.length) {
+            section.classList.add('hidden');
+            return;
+        }
+        section.classList.remove('hidden');
+        document.getElementById('unmappedCount').textContent = `${items.length} items`;
+        document.getElementById('unmappedTableBody').innerHTML = items.map(u => `
+            <tr data-item-id="${esc(u.item_id)}">
+                <td class="text-xs">${esc(u.item_name || u.item_id)}</td>
+                <td class="text-xs text-gray-500">${esc(u.brand || '-')}</td>
+                <td class="text-xs">${u.mrp ? '₹' + u.mrp.toFixed(0) : '-'}</td>
+                <td><input type="number" value="${u.regular_points_per_unit}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="regular_points_per_unit"></td>
+                <td class="text-center"><input type="checkbox" ${u.annual_eligible ? 'checked' : ''} class="rate-checkbox" data-field="annual_eligible"></td>
+                <td><input type="number" value="${u.annual_pct}" step="0.01" min="0" class="rate-input w-20 px-2 py-1 border rounded text-sm" data-field="annual_pct"></td>
             </tr>
         `).join('');
     }
 
-    async function saveProductRates() {
-        const rows = document.querySelectorAll('#ratesTableBody tr[data-item-id]');
-        if (!rows.length) return alert('No rates to save');
-        const rates = Array.from(rows).map(row => ({
-            item_id: row.dataset.itemId,
-            regular_points_per_unit: parseFloat(row.querySelector('[data-field="regular_points_per_unit"]').value) || 0,
-            annual_eligible: row.querySelector('[data-field="annual_eligible"]').checked,
-            annual_pct: parseFloat(row.querySelector('[data-field="annual_pct"]').value) || 1.0
-        }));
-
-        try {
-            const res = await fetch(`${API}/config/product-rates`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ rates }) });
-            const data = await res.json();
-            alert(data.message);
-        } catch (err) { alert('Error: ' + err.message); }
+    function toggleUnmappedSection() {
+        const body = document.getElementById('unmappedBody');
+        const chevron = document.getElementById('unmappedChevron');
+        const isOpen = !body.classList.contains('hidden');
+        body.classList.toggle('hidden');
+        chevron.classList.toggle('expanded', !isOpen);
     }
 
     async function syncZohoThenRates() {
