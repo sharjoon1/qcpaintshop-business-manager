@@ -2049,7 +2049,14 @@ RULES:
                 }
 
                 // --- EMULSION (must come after enamel/primer checks) ---
-                if (/\bEMUL(SION|TION)?\b/.test(text) || /\bEML\b/.test(text)) {
+                // Also match known product lines that ARE emulsions even without "EMULSION" keyword
+                const isKnownEmulsionProduct = /\bAPEX\b/.test(text) || /\bROYALE\b/.test(text) ||
+                    (/\bTRACTOR\b/.test(text) && !/DISTEMPER/.test(text)) ||
+                    (/\bACE\b/.test(text) && !/ENAMEL/.test(text)) ||
+                    /\bPREM.*BW\d/.test(text) || /TRACTOREMUL/.test(text) ||
+                    /APEXULTIMA/.test(text) || /APACESHYNE/.test(text) ||
+                    /APTRACTOREMUL/.test(text);
+                if (/\bEMUL(SION|TION)?\b/.test(text) || /\bEML\b/.test(text) || isKnownEmulsionProduct) {
                     // Asian Paints products
                     if (/ROYALE/.test(text)) {
                         if (/SHYNE/.test(text)) {
