@@ -227,6 +227,7 @@
                     <table class="table w-full">
                         <thead>
                             <tr class="bg-gray-50">
+                                <th class="px-3 py-3 text-center w-10"><input type="checkbox" id="zohoSelectAll" onchange="toggleZohoSelectAll(this.checked)" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"></th>
                                 <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-16">Image</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Item Name</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SKU</th>
@@ -238,12 +239,26 @@
                             </tr>
                         </thead>
                         <tbody id="zohoItemsBody">
-                            <tr><td colspan="8" class="text-center py-8 text-gray-400">Loading Zoho items...</td></tr>
+                            <tr><td colspan="9" class="text-center py-8 text-gray-400">Loading Zoho items...</td></tr>
                         </tbody>
                     </table>
                 </div>
                 <!-- Pagination -->
                 <div id="zohoItemsPagination" class="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-500"></div>
+            </div>
+
+            <!-- Zoho Import Action Bar -->
+            <div id="zohoImportActionBar" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-50">
+                <div class="max-w-7xl mx-auto flex items-center justify-between">
+                    <span class="text-sm text-gray-600"><strong id="zohoImportCount">0</strong> items selected for import</span>
+                    <div class="flex gap-3">
+                        <button onclick="clearZohoSelection()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50">Clear Selection</button>
+                        <button onclick="importZohoToProducts()" id="zohoImportBtn" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                            Import to Products
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -899,9 +914,11 @@
             const tabEl = document.getElementById('tab-' + tab);
             if (tabEl) tabEl.style.display = 'block';
 
-            // Hide bulk action bar when switching tabs
+            // Hide action bars when switching tabs
             const bulkBar = document.getElementById('bulkActionBar');
             if (bulkBar) bulkBar.classList.add('hidden');
+            const zohoBar = document.getElementById('zohoImportActionBar');
+            if (zohoBar) zohoBar.classList.add('hidden');
 
             // Update header
             if (tab === 'zoho-import') {
@@ -933,14 +950,26 @@
         // ═══════════════════════════════════════
         let zohoSearchTimer;
         let zohoCurrentPage = 1;
+        let zohoSelectedIds = new Set();
+        let zohoMappedIds = new Set();
+        let zohoCurrentItems = [];
 
         function debounceZohoSearch() {
             clearTimeout(zohoSearchTimer);
             zohoSearchTimer = setTimeout(() => { zohoCurrentPage = 1; loadZohoItems(); }, 400);
         }
 
+        async function loadZohoMappedIds() {
+            try {
+                const res = await fetch('/api/products/mapped-zoho-ids', { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) zohoMappedIds = new Set(data.ids || []);
+            } catch (e) { console.error('Failed to load mapped IDs:', e); }
+        }
+
         async function loadZohoFilters() {
             try {
+                await loadZohoMappedIds();
                 // Load brands/categories from the existing zoho endpoint
                 const res = await fetch('/api/zoho/items?limit=1', { headers: getAuthHeaders() });
                 const data = await res.json();
@@ -992,14 +1021,25 @@
 
                 // Render table
                 if (!items.length) {
-                    document.getElementById('zohoItemsBody').innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-400">No items found. Click "Sync from Zoho Books" to import.</td></tr>';
+                    document.getElementById('zohoItemsBody').innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No items found. Click "Sync from Zoho Books" to import.</td></tr>';
                 } else {
-                    document.getElementById('zohoItemsBody').innerHTML = items.map(item => `
-                        <tr class="hover:bg-gray-50 border-b border-gray-100">
+                    zohoCurrentItems = items;
+                    document.getElementById('zohoItemsBody').innerHTML = items.map(item => {
+                        const itemId = item.zoho_item_id || item.item_id;
+                        const isMapped = zohoMappedIds.has(itemId);
+                        const isSelected = zohoSelectedIds.has(itemId);
+                        return `
+                        <tr class="hover:bg-gray-50 border-b border-gray-100 ${isSelected ? 'bg-purple-50' : ''}">
+                            <td class="px-3 py-2 text-center">
+                                ${isMapped
+                                    ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700" title="Already imported">&#10003;</span>`
+                                    : `<input type="checkbox" value="${itemId}" ${isSelected ? 'checked' : ''} onchange="toggleZohoItemSelect('${itemId}', this.checked)" class="zoho-item-cb w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">`
+                                }
+                            </td>
                             <td class="px-4 py-2 text-center">
                                 ${item.image_url
-                                    ? `<img src="${escH(item.image_url)}" class="w-12 h-12 object-cover rounded cursor-pointer border border-gray-200 hover:border-purple-400 transition" onclick="triggerImageUpload('${item.zoho_item_id || item.item_id}')" title="Click to change image">`
-                                    : `<div class="w-12 h-12 border-2 border-dashed border-gray-300 rounded flex items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition" onclick="triggerImageUpload('${item.zoho_item_id || item.item_id}')" title="Upload image">
+                                    ? `<img src="${escH(item.image_url)}" class="w-12 h-12 object-cover rounded cursor-pointer border border-gray-200 hover:border-purple-400 transition" onclick="triggerImageUpload('${itemId}')" title="Click to change image">`
+                                    : `<div class="w-12 h-12 border-2 border-dashed border-gray-300 rounded flex items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition" onclick="triggerImageUpload('${itemId}')" title="Upload image">
                                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                                        </div>`
                                 }
@@ -1011,8 +1051,12 @@
                             <td class="px-4 py-3 text-sm text-right font-semibold">${item.rate ? '₹' + parseFloat(item.rate).toFixed(2) : '-'}</td>
                             <td class="px-4 py-3 text-sm text-right">${item.stock_on_hand != null ? parseFloat(item.stock_on_hand).toFixed(0) : '-'}</td>
                             <td class="px-4 py-3 text-xs text-gray-500">${escH(item.hsn_or_sac || '-')}</td>
-                        </tr>
-                    `).join('');
+                        </tr>`;
+                    }).join('');
+                    // Sync select-all checkbox state
+                    const allCb = document.getElementById('zohoSelectAll');
+                    const selectableItems = items.filter(i => !zohoMappedIds.has(i.zoho_item_id || i.item_id));
+                    if (allCb) allCb.checked = selectableItems.length > 0 && selectableItems.every(i => zohoSelectedIds.has(i.zoho_item_id || i.item_id));
                 }
 
                 // Pagination
@@ -1029,7 +1073,7 @@
                     document.getElementById('zohoItemsPagination').innerHTML = items.length ? `<span>${items.length} items</span>` : '';
                 }
             } catch (err) {
-                document.getElementById('zohoItemsBody').innerHTML = `<tr><td colspan="8" class="text-center py-8 text-red-500">${escH(err.message)}</td></tr>`;
+                document.getElementById('zohoItemsBody').innerHTML = `<tr><td colspan="9" class="text-center py-8 text-red-500">${escH(err.message)}</td></tr>`;
             }
         }
 
@@ -1075,6 +1119,86 @@
             const d = document.createElement('div');
             d.textContent = s;
             return d.innerHTML;
+        }
+
+        // ═══════════════════════════════════════
+        // ZOHO IMPORT SELECTION & IMPORT
+        // ═══════════════════════════════════════
+        function toggleZohoItemSelect(itemId, checked) {
+            if (checked) zohoSelectedIds.add(itemId);
+            else zohoSelectedIds.delete(itemId);
+            updateZohoSelectionUI();
+        }
+
+        function toggleZohoSelectAll(checked) {
+            const selectableItems = zohoCurrentItems.filter(i => !zohoMappedIds.has(i.zoho_item_id || i.item_id));
+            selectableItems.forEach(item => {
+                const id = item.zoho_item_id || item.item_id;
+                if (checked) zohoSelectedIds.add(id);
+                else zohoSelectedIds.delete(id);
+            });
+            // Update checkboxes visually
+            document.querySelectorAll('.zoho-item-cb').forEach(cb => { cb.checked = checked; });
+            // Update row highlights
+            document.querySelectorAll('#zohoItemsBody tr').forEach(tr => {
+                const cb = tr.querySelector('.zoho-item-cb');
+                if (cb) {
+                    if (checked) tr.classList.add('bg-purple-50');
+                    else tr.classList.remove('bg-purple-50');
+                }
+            });
+            updateZohoSelectionUI();
+        }
+
+        function clearZohoSelection() {
+            zohoSelectedIds.clear();
+            document.querySelectorAll('.zoho-item-cb').forEach(cb => { cb.checked = false; });
+            document.querySelectorAll('#zohoItemsBody tr').forEach(tr => tr.classList.remove('bg-purple-50'));
+            const allCb = document.getElementById('zohoSelectAll');
+            if (allCb) allCb.checked = false;
+            updateZohoSelectionUI();
+        }
+
+        function updateZohoSelectionUI() {
+            const count = zohoSelectedIds.size;
+            document.getElementById('zohoImportCount').textContent = count;
+            const bar = document.getElementById('zohoImportActionBar');
+            if (count > 0) bar.classList.remove('hidden');
+            else bar.classList.add('hidden');
+        }
+
+        async function importZohoToProducts() {
+            if (zohoSelectedIds.size === 0) return;
+            const btn = document.getElementById('zohoImportBtn');
+            btn.disabled = true;
+            btn.textContent = 'Importing...';
+
+            try {
+                const res = await fetch('/api/products/import-from-zoho', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ zoho_item_ids: [...zohoSelectedIds] })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                let msg = `Imported ${data.pack_sizes_created} items as pack sizes`;
+                if (data.products_created > 0) msg += ` (${data.products_created} new products created)`;
+                if (data.skipped > 0) msg += `. ${data.skipped} already mapped — skipped.`;
+                alert(msg);
+
+                zohoSelectedIds.clear();
+                await loadZohoMappedIds();
+                await loadZohoItems();
+                updateZohoSelectionUI();
+                const allCb = document.getElementById('zohoSelectAll');
+                if (allCb) allCb.checked = false;
+            } catch (err) {
+                alert('Import failed: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg> Import to Products';
+            }
         }
 
         // ═══════════════════════════════════════

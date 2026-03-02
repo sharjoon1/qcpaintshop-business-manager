@@ -2499,6 +2499,129 @@ app.post('/api/products/bulk-map', requirePermission('products', 'edit'), async 
     }
 });
 
+// Get zoho_item_ids already mapped to pack_sizes
+app.get('/api/products/mapped-zoho-ids', requireAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            "SELECT DISTINCT zoho_item_id FROM pack_sizes WHERE zoho_item_id IS NOT NULL AND zoho_item_id != '' AND is_active = 1"
+        );
+        res.json({ success: true, ids: rows.map(r => r.zoho_item_id) });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Import Zoho items as local Products + pack_sizes
+app.post('/api/products/import-from-zoho', requirePermission('products', 'add'), async (req, res) => {
+    try {
+        const { zoho_item_ids } = req.body;
+        if (!Array.isArray(zoho_item_ids) || !zoho_item_ids.length) {
+            return res.status(400).json({ success: false, error: 'No items selected' });
+        }
+        if (zoho_item_ids.length > 200) {
+            return res.status(400).json({ success: false, error: 'Maximum 200 items per import' });
+        }
+
+        // Helper: parse size & unit from Zoho item name
+        function parsePackSizeFromName(itemName, zohoUnit) {
+            const m = (itemName || '').match(/(\d+(?:\.\d+)?)\s*(ltr?|litres?|liters?|kg|kgs?|ml|gm?|grams?|pc|pcs?|pieces?|m|meters?)\b/i);
+            if (m) {
+                let size = parseFloat(m[1]);
+                const u = m[2].toLowerCase();
+                if (/^(ltr?|litres?|liters?)$/.test(u)) return { size, unit: 'L' };
+                if (/^(kg|kgs?)$/.test(u)) return { size, unit: 'KG' };
+                if (/^ml$/.test(u)) return { size: +(size / 1000).toFixed(4), unit: 'L' };
+                if (/^(gm?|grams?)$/.test(u)) return { size: +(size / 1000).toFixed(4), unit: 'KG' };
+                if (/^(pc|pcs?|pieces?)$/.test(u)) return { size, unit: 'PC' };
+                if (/^(m|meters?)$/.test(u)) return { size, unit: 'M' };
+            }
+            const unitMap = { ltr: 'L', l: 'L', kg: 'KG', pcs: 'PC', nos: 'PC', qty: 'PC' };
+            return { size: 1, unit: unitMap[(zohoUnit || '').toLowerCase()] || 'L' };
+        }
+
+        const conn = await pool.getConnection();
+        await conn.beginTransaction();
+        try {
+            const ph = zoho_item_ids.map(() => '?').join(',');
+            const [zohoItems] = await conn.query(`SELECT * FROM zoho_items_map WHERE zoho_item_id IN (${ph})`, zoho_item_ids);
+
+            // Skip already-mapped
+            const [alreadyMapped] = await conn.query(
+                `SELECT DISTINCT zoho_item_id FROM pack_sizes WHERE zoho_item_id IN (${ph}) AND is_active = 1`, zoho_item_ids
+            );
+            const mappedSet = new Set(alreadyMapped.map(r => r.zoho_item_id));
+            const toImport = zohoItems.filter(i => !mappedSet.has(i.zoho_item_id));
+
+            // Group by product name + brand + category
+            const groups = {};
+            for (const item of toImport) {
+                const productName = (item.zoho_cf_product_name || item.zoho_item_name || '').trim();
+                const brand = (item.zoho_brand || '').trim();
+                const cat = (item.zoho_category_name || '').trim();
+                const key = `${productName}|||${brand}|||${cat}`;
+                if (!groups[key]) groups[key] = { name: productName, brand, category: cat, items: [] };
+                groups[key].items.push(item);
+            }
+
+            let productsCreated = 0, packSizesCreated = 0;
+            const skipped = mappedSet.size;
+
+            for (const group of Object.values(groups)) {
+                // Find or create brand
+                let brandId = null;
+                if (group.brand) {
+                    const [eb] = await conn.query('SELECT id FROM brands WHERE name = ?', [group.brand]);
+                    if (eb.length) { brandId = eb[0].id; }
+                    else { const [r] = await conn.query('INSERT INTO brands (name) VALUES (?)', [group.brand]); brandId = r.insertId; }
+                }
+                // Find or create category
+                let categoryId = null;
+                if (group.category) {
+                    const [ec] = await conn.query('SELECT id FROM categories WHERE name = ?', [group.category]);
+                    if (ec.length) { categoryId = ec[0].id; }
+                    else { const [r] = await conn.query('INSERT INTO categories (name) VALUES (?)', [group.category]); categoryId = r.insertId; }
+                }
+                // Find or create product
+                let productId;
+                const [ep] = await conn.query(
+                    'SELECT id FROM products WHERE name = ? AND brand_id <=> ? AND category_id <=> ? AND status = ?',
+                    [group.name, brandId, categoryId, 'active']
+                );
+                if (ep.length) {
+                    productId = ep[0].id;
+                } else {
+                    const rate = group.items[0]?.zoho_rate || 0;
+                    const [r] = await conn.query(
+                        "INSERT INTO products (name, brand_id, category_id, product_type, base_price, status) VALUES (?, ?, ?, 'unit_wise', ?, 'active')",
+                        [group.name, brandId, categoryId, rate]
+                    );
+                    productId = r.insertId;
+                    productsCreated++;
+                }
+                // Create pack sizes
+                for (const item of group.items) {
+                    const { size, unit } = parsePackSizeFromName(item.zoho_item_name, item.zoho_unit);
+                    await conn.query(
+                        'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
+                        [productId, size, unit, item.zoho_rate || 0, item.zoho_item_id]
+                    );
+                    packSizesCreated++;
+                }
+            }
+
+            await conn.commit();
+            res.json({ success: true, products_created: productsCreated, pack_sizes_created: packSizesCreated, skipped });
+        } catch (txErr) {
+            await conn.rollback();
+            throw txErr;
+        } finally {
+            conn.release();
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // Upload product image (for Zoho items)
 app.post('/api/products/:itemId/image', requirePermission('products', 'edit'), uploadProductImage.single('image'), async (req, res) => {
     try {
