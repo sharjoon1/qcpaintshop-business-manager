@@ -226,7 +226,7 @@ productionMonitor.setResponseTracker(responseTracker);
 // FILE UPLOAD CONFIG
 // ========================================
 
-const { ensureUploadDirs, uploadLogo, uploadProfile, uploadAadhar, designRequestUpload } = require('./config/uploads');
+const { ensureUploadDirs, uploadLogo, uploadProfile, uploadAadhar, designRequestUpload, uploadProductImage } = require('./config/uploads');
 ensureUploadDirs();
 
 // ========================================
@@ -2437,6 +2437,82 @@ app.get('/api/products/catalog-stats', requireAuth, async (req, res) => {
             "SELECT COUNT(DISTINCT b.id) as brand_count FROM brands b INNER JOIN products p ON p.brand_id = b.id WHERE p.status = 'active'"
         );
         res.json({ success: true, total_products, mapped, unmapped, brand_count });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get all unmapped pack sizes (for bulk mapping)
+app.get('/api/products/unmapped-pack-sizes', requireAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT ps.id as pack_size_id, ps.size, ps.unit, ps.base_price,
+                   p.id as product_id, p.name as product_name,
+                   b.name as brand_name, c.name as category_name
+            FROM pack_sizes ps
+            INNER JOIN products p ON p.id = ps.product_id
+            LEFT JOIN brands b ON p.brand_id = b.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE p.status = 'active' AND ps.is_active = 1
+              AND (ps.zoho_item_id IS NULL OR ps.zoho_item_id = '')
+            ORDER BY b.name, p.name, ps.size
+        `);
+        res.json({ success: true, items: rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Bulk map pack sizes to Zoho items
+app.post('/api/products/bulk-map', requirePermission('products', 'edit'), async (req, res) => {
+    try {
+        const { mappings } = req.body;
+        if (!Array.isArray(mappings) || mappings.length === 0) {
+            return res.status(400).json({ success: false, error: 'No mappings provided' });
+        }
+        if (mappings.length > 100) {
+            return res.status(400).json({ success: false, error: 'Maximum 100 mappings per call' });
+        }
+
+        const conn = await pool.getConnection();
+        await conn.beginTransaction();
+        let mapped = 0, failed = 0;
+        try {
+            for (const m of mappings) {
+                if (!m.pack_size_id || !m.zoho_item_id) { failed++; continue; }
+                const [result] = await conn.query(
+                    'UPDATE pack_sizes SET zoho_item_id = ? WHERE id = ? AND is_active = 1',
+                    [m.zoho_item_id, m.pack_size_id]
+                );
+                if (result.affectedRows > 0) mapped++; else failed++;
+            }
+            await conn.commit();
+            res.json({ success: true, mapped, failed });
+        } catch (txErr) {
+            await conn.rollback();
+            throw txErr;
+        } finally {
+            conn.release();
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Upload product image (for Zoho items)
+app.post('/api/products/:itemId/image', requirePermission('products', 'edit'), uploadProductImage.single('image'), async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'Image file is required' });
+        }
+        const [existing] = await pool.query('SELECT zoho_item_id FROM zoho_items_map WHERE zoho_item_id = ?', [itemId]);
+        if (!existing.length) {
+            return res.status(404).json({ success: false, message: 'Product not found in Zoho items' });
+        }
+        const imageUrl = `/uploads/products/${req.file.filename}`;
+        await pool.query('UPDATE zoho_items_map SET image_url = ? WHERE zoho_item_id = ?', [imageUrl, itemId]);
+        res.json({ success: true, message: 'Product image uploaded', image_url: imageUrl });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
