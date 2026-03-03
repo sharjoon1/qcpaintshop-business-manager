@@ -16,6 +16,7 @@ const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterAtte
 const sharp = require('sharp');
 const cardGenerator = require('../services/painter-card-generator');
 const painterNotificationService = require('../services/painter-notification-service');
+const { generatePainterEstimatePDF } = require('./painter-estimate-pdf-generator');
 
 let pool;
 let io;
@@ -974,6 +975,37 @@ router.delete('/me/estimates/:estimateId', requirePainterAuth, async (req, res) 
         res.json({ success: true, message: 'Estimate cancelled' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to cancel estimate' });
+    }
+});
+
+// Download estimate PDF (painter)
+router.get('/me/estimates/:estimateId/pdf', requirePainterAuth, async (req, res) => {
+    try {
+        const [estimates] = await pool.query(
+            `SELECT pe.*, p.full_name as painter_name, p.phone as painter_phone
+             FROM painter_estimates pe JOIN painters p ON pe.painter_id = p.id
+             WHERE pe.id = ? AND pe.painter_id = ?`,
+            [req.params.estimateId, req.painter.id]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        if (estimates[0].status === 'draft') return res.status(400).json({ success: false, message: 'Cannot download draft estimate' });
+
+        const [items] = await pool.query(
+            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? ORDER BY display_order, id',
+            [estimates[0].id]
+        );
+
+        // Load branding from settings
+        const [settings] = await pool.query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('business_name','business_logo','business_address','business_phone','business_email','business_gst')");
+        const branding = {};
+        settings.forEach(s => { branding[s.setting_key] = s.setting_value; });
+
+        // Customer billing: show markup prices to painter; Self billing: show cost prices
+        const showMarkup = estimates[0].billing_type === 'customer';
+        generatePainterEstimatePDF(res, estimates[0], items, branding, { showMarkup });
+    } catch (error) {
+        console.error('Painter estimate PDF error:', error);
+        if (!res.headersSent) res.status(500).json({ success: false, message: 'Failed to generate PDF' });
     }
 });
 
@@ -2576,6 +2608,30 @@ router.get('/estimates', requireAuth, async (req, res) => {
     }
 });
 
+// Search products for estimate editing (admin) — MUST be before /:estimateId
+router.get('/estimates/products', requireAuth, async (req, res) => {
+    try {
+        const { search } = req.query;
+        if (!search || search.trim().length < 2) return res.json({ success: true, products: [] });
+
+        const [products] = await pool.query(
+            `SELECT zim.zoho_item_id, zim.zoho_item_name, zim.zoho_description, zim.zoho_rate,
+                    zim.brand, zim.category, zim.image_url
+             FROM zoho_items_map zim
+             WHERE (zim.zoho_item_name LIKE ? OR zim.zoho_description LIKE ? OR zim.brand LIKE ?)
+             AND zim.zoho_rate > 0
+             ORDER BY zim.zoho_item_name
+             LIMIT 20`,
+            [`%${search}%`, `%${search}%`, `%${search}%`]
+        );
+
+        res.json({ success: true, products });
+    } catch (error) {
+        console.error('Search estimate products error:', error);
+        res.status(500).json({ success: false, message: 'Failed to search products' });
+    }
+});
+
 // Get single estimate detail (admin)
 router.get('/estimates/:estimateId', requireAuth, async (req, res) => {
     try {
@@ -2600,6 +2656,120 @@ router.get('/estimates/:estimateId', requireAuth, async (req, res) => {
         res.json({ success: true, estimate: estimates[0], items });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to load estimate' });
+    }
+});
+
+// Admin edit estimate items — replace items + recalculate totals
+router.put('/estimates/:estimateId/items', requirePermission('painters', 'estimates'), async (req, res) => {
+    try {
+        const { items } = req.body; // [{ item_id (zoho_item_id), quantity }]
+        if (!items || !Array.isArray(items) || !items.length) {
+            return res.status(400).json({ success: false, message: 'Items array is required' });
+        }
+
+        const editableStatuses = ['admin_review', 'approved', 'sent_to_customer', 'final_approved'];
+        const [estimates] = await pool.query(
+            'SELECT * FROM painter_estimates WHERE id = ? AND status IN (?)',
+            [req.params.estimateId, editableStatuses]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found or not editable' });
+
+        const estimate = estimates[0];
+        const isCustomer = estimate.billing_type === 'customer';
+
+        // Fetch prices from zoho_items_map for all requested items
+        const itemIds = items.map(i => i.item_id);
+        const [zohoItems] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name, zoho_description, zoho_rate, brand, category
+             FROM zoho_items_map WHERE zoho_item_id IN (?)`,
+            [itemIds]
+        );
+        const zohoMap = {};
+        zohoItems.forEach(z => { zohoMap[z.zoho_item_id] = z; });
+
+        // Delete old items
+        await pool.query('DELETE FROM painter_estimate_items WHERE estimate_id = ?', [estimate.id]);
+
+        // Insert new items with server-side prices
+        let subtotal = 0;
+        for (let i = 0; i < items.length; i++) {
+            const reqItem = items[i];
+            const zoho = zohoMap[reqItem.item_id];
+            if (!zoho) continue;
+
+            const qty = parseFloat(reqItem.quantity) || 1;
+            const unitPrice = parseFloat(zoho.zoho_rate) || 0;
+            const lineTotal = Math.round(unitPrice * qty * 100) / 100;
+            subtotal += lineTotal;
+
+            await pool.query(
+                `INSERT INTO painter_estimate_items (estimate_id, zoho_item_id, item_name, brand, category, quantity, unit_price, line_total, display_order)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [estimate.id, reqItem.item_id, zoho.zoho_item_name, zoho.brand, zoho.category, qty, unitPrice, lineTotal, i + 1]
+            );
+        }
+
+        const grandTotal = subtotal; // Prices include GST
+
+        // Update estimate totals
+        const updateFields = {
+            subtotal, gst_amount: 0, grand_total: grandTotal
+        };
+
+        // Customer billing: clear markup/discount, reset status to admin_review
+        if (isCustomer) {
+            updateFields.markup_subtotal = null;
+            updateFields.markup_gst_amount = null;
+            updateFields.markup_grand_total = null;
+            updateFields.discount_percentage = null;
+            updateFields.discount_amount = null;
+            updateFields.final_grand_total = null;
+
+            const oldStatus = estimate.status;
+            if (oldStatus !== 'admin_review') {
+                updateFields.status = 'admin_review';
+                await logEstimateStatusChange(estimate.id, oldStatus, 'admin_review', req.user.id, 'Items edited by admin — markup cleared');
+            }
+        }
+
+        const setClauses = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
+        const setValues = Object.values(updateFields);
+        await pool.query(`UPDATE painter_estimates SET ${setClauses} WHERE id = ?`, [...setValues, estimate.id]);
+
+        res.json({ success: true, message: `Items updated${isCustomer ? ' — markup cleared, set new markup' : ''}`, subtotal, grandTotal });
+    } catch (error) {
+        console.error('Edit estimate items error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update items' });
+    }
+});
+
+// Download estimate PDF (admin)
+router.get('/estimates/:estimateId/pdf', requireAuth, async (req, res) => {
+    try {
+        const [estimates] = await pool.query(
+            `SELECT pe.*, p.full_name as painter_name, p.phone as painter_phone
+             FROM painter_estimates pe JOIN painters p ON pe.painter_id = p.id
+             WHERE pe.id = ?`,
+            [req.params.estimateId]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        if (estimates[0].status === 'draft') return res.status(400).json({ success: false, message: 'Cannot download draft estimate' });
+
+        const [items] = await pool.query(
+            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? ORDER BY display_order, id',
+            [estimates[0].id]
+        );
+
+        const [settings] = await pool.query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('business_name','business_logo','business_address','business_phone','business_email','business_gst')");
+        const branding = {};
+        settings.forEach(s => { branding[s.setting_key] = s.setting_value; });
+
+        // Admin PDF: always show markup prices for customer billing
+        const showMarkup = estimates[0].billing_type === 'customer';
+        generatePainterEstimatePDF(res, estimates[0], items, branding, { showMarkup });
+    } catch (error) {
+        console.error('Admin estimate PDF error:', error);
+        if (!res.headersSent) res.status(500).json({ success: false, message: 'Failed to generate PDF' });
     }
 });
 

@@ -1692,6 +1692,10 @@
             }
         }).join('');
 
+        const editableStatuses = ['admin_review', 'approved', 'sent_to_customer', 'final_approved'];
+        const canEdit = editableStatuses.includes(est.status);
+        const canPdf = est.status !== 'draft';
+
         const content = document.getElementById('estimateDetailContent');
         content.innerHTML = `
             <div class="flex justify-between items-start mb-4">
@@ -1699,9 +1703,19 @@
                     <h3 class="text-lg font-bold">${esc(est.estimate_number)}</h3>
                     <span class="badge ${statusBadge[est.status] || ''}">${est.status.replace(/_/g, ' ')}</span>
                 </div>
-                <button onclick="closeEstimateDetail()" class="text-gray-400 hover:text-gray-600">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
+                <div class="flex items-center gap-2">
+                    ${canPdf ? `<button onclick="downloadEstimatePdf(${est.id},'${esc(est.estimate_number)}')" class="btn-sm btn-outline" title="Download PDF" style="display:flex;align-items:center;gap:4px;padding:4px 10px">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        PDF
+                    </button>` : ''}
+                    ${canEdit ? `<button onclick="toggleEditItems(${est.id})" id="editItemsBtn" class="btn-sm btn-outline" style="display:flex;align-items:center;gap:4px;padding:4px 10px">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Edit Items
+                    </button>` : ''}
+                    <button onclick="closeEstimateDetail()" class="text-gray-400 hover:text-gray-600">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4 text-sm mb-4">
@@ -1960,6 +1974,160 @@
             event.target.disabled = false;
             event.target.textContent = 'Push to Zoho';
         }
+    }
+
+    // ═══════════════════════════════════════
+    // ESTIMATE EDIT ITEMS + PDF
+    // ═══════════════════════════════════════
+    let editItemsEstimateId = null;
+    let editItemsList = [];
+
+    async function downloadEstimatePdf(id, estNumber) {
+        try {
+            const res = await fetch(`${API}/estimates/${id}/pdf`, {
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') }
+            });
+            if (!res.ok) throw new Error('Failed to download PDF');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${estNumber || 'Estimate'}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function toggleEditItems(estId) {
+        const tableContainer = document.querySelector('#estimateDetailContent .overflow-x-auto');
+        if (!tableContainer) return;
+
+        // If already in edit mode, cancel
+        if (editItemsEstimateId === estId) {
+            editItemsEstimateId = null;
+            viewEstimate(estId); // reload view mode
+            return;
+        }
+
+        editItemsEstimateId = estId;
+
+        // Fetch current items
+        const res = await fetch(`${API}/estimates/${estId}`, { headers: authHeaders() });
+        const data = await res.json();
+        if (!data.success) { alert(data.message); return; }
+
+        editItemsList = data.items.map(item => ({
+            item_id: item.zoho_item_id,
+            item_name: item.zoho_description || item.zoho_display_name || item.item_name,
+            brand: item.brand || '',
+            quantity: parseFloat(item.quantity),
+            unit_price: parseFloat(item.unit_price),
+        }));
+
+        renderEditItemsTable(tableContainer);
+
+        // Change edit button text
+        const btn = document.getElementById('editItemsBtn');
+        if (btn) { btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel Edit`; }
+    }
+
+    function renderEditItemsTable(container) {
+        let rowsHtml = editItemsList.map((item, idx) => `
+            <tr>
+                <td class="text-sm">${esc(item.item_name)}${item.brand ? `<div class="text-xs text-gray-400">${esc(item.brand)}</div>` : ''}</td>
+                <td class="text-center"><input type="number" min="1" step="1" value="${item.quantity}" class="w-16 px-2 py-1 border rounded text-sm text-center" onchange="editItemQty(${idx}, this.value)"></td>
+                <td class="text-right text-sm">₹${item.unit_price.toLocaleString('en-IN')}</td>
+                <td class="text-right text-sm">₹${(item.unit_price * item.quantity).toLocaleString('en-IN')}</td>
+                <td class="text-center"><button onclick="removeEditItem(${idx})" class="text-red-500 hover:text-red-700" title="Remove"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></td>
+            </tr>`).join('');
+
+        const totalCost = editItemsList.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+
+        container.innerHTML = `
+            <table class="data-table">
+                <thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>Total</th><th style="width:40px"></th></tr></thead>
+                <tbody>${rowsHtml}</tbody>
+                <tfoot><tr><td colspan="3" class="text-right font-bold">Total:</td><td class="text-right font-bold">₹${totalCost.toLocaleString('en-IN')}</td><td></td></tr></tfoot>
+            </table>
+
+            <!-- Add Item Search -->
+            <div class="mt-3 relative">
+                <input type="text" id="addItemSearch" placeholder="Search product to add..." class="w-full px-3 py-2 border rounded-lg text-sm" oninput="searchEstimateProducts(this.value)">
+                <div id="addItemResults" class="mt-1" style="max-height:200px;overflow-y:auto"></div>
+            </div>
+
+            <div class="flex gap-2 mt-3">
+                <button onclick="saveEditItems()" class="btn-sm btn-success">Save Changes</button>
+                <button onclick="editItemsEstimateId=null;viewEstimate(${editItemsEstimateId})" class="btn-sm btn-outline">Cancel</button>
+            </div>`;
+    }
+
+    function editItemQty(idx, val) {
+        editItemsList[idx].quantity = Math.max(1, parseFloat(val) || 1);
+        const container = document.querySelector('#estimateDetailContent .overflow-x-auto');
+        if (container) renderEditItemsTable(container);
+    }
+
+    function removeEditItem(idx) {
+        editItemsList.splice(idx, 1);
+        const container = document.querySelector('#estimateDetailContent .overflow-x-auto');
+        if (container) renderEditItemsTable(container);
+    }
+
+    let searchTimer = null;
+    function searchEstimateProducts(query) {
+        clearTimeout(searchTimer);
+        if (query.length < 2) { document.getElementById('addItemResults').innerHTML = ''; return; }
+        searchTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(`${API}/estimates/products?search=${encodeURIComponent(query)}`, { headers: authHeaders() });
+                const data = await res.json();
+                if (!data.success) return;
+                const resultsDiv = document.getElementById('addItemResults');
+                if (!data.products.length) { resultsDiv.innerHTML = '<div class="text-sm text-gray-400 p-2">No products found</div>'; return; }
+                resultsDiv.innerHTML = data.products.map(p => {
+                    const already = editItemsList.some(i => i.item_id === p.zoho_item_id);
+                    return `<div class="flex justify-between items-center p-2 hover:bg-gray-50 rounded cursor-pointer border-b text-sm ${already ? 'opacity-50' : ''}"
+                        onclick="${already ? '' : `addEstimateProduct('${p.zoho_item_id}','${esc(p.zoho_item_name).replace(/'/g,"\\'")}','${esc(p.brand||'').replace(/'/g,"\\'")}',${parseFloat(p.zoho_rate)||0})`}">
+                        <div>
+                            <div class="font-medium">${esc(p.zoho_item_name)}</div>
+                            ${p.brand ? `<div class="text-xs text-gray-400">${esc(p.brand)}</div>` : ''}
+                        </div>
+                        <div class="text-right">
+                            <div class="font-medium">₹${parseFloat(p.zoho_rate).toLocaleString('en-IN')}</div>
+                            ${already ? '<div class="text-xs text-green-600">Added</div>' : '<div class="text-xs text-blue-600">+ Add</div>'}
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (err) { console.error('Search error:', err); }
+        }, 300);
+    }
+
+    function addEstimateProduct(itemId, name, brand, price) {
+        if (editItemsList.some(i => i.item_id === itemId)) return;
+        editItemsList.push({ item_id: itemId, item_name: name, brand, quantity: 1, unit_price: price });
+        document.getElementById('addItemSearch').value = '';
+        document.getElementById('addItemResults').innerHTML = '';
+        const container = document.querySelector('#estimateDetailContent .overflow-x-auto');
+        if (container) renderEditItemsTable(container);
+    }
+
+    async function saveEditItems() {
+        if (!editItemsList.length) { alert('Add at least one item'); return; }
+        if (!confirm('Save item changes? For customer billing estimates, markup will be cleared.')) return;
+        const estId = editItemsEstimateId;
+        try {
+            const res = await fetch(`${API}/estimates/${estId}/items`, {
+                method: 'PUT', headers: authHeaders(),
+                body: JSON.stringify({ items: editItemsList.map(i => ({ item_id: i.item_id, quantity: i.quantity })) })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(data.message);
+            editItemsEstimateId = null;
+            viewEstimate(estId);
+            loadEstimates();
+        } catch (err) { alert('Error: ' + err.message); }
     }
 
     // ═══════════════════════════════════════
