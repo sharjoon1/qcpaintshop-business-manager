@@ -2588,18 +2588,32 @@ Painters create estimates for paint purchases; admin reviews, records payment, p
 - `GET /me/estimates/:id` — view single
 - `PUT /me/estimates/:id` — update draft
 - `POST /me/estimates/:id/submit` — submit draft
+- `POST /me/estimates/:id/request-discount` — request discount (customer billing)
+- `POST /me/estimates/:id/payment` — record payment
+- `GET /me/estimates/:id/pdf` — download estimate PDF (non-draft)
 - `DELETE /me/estimates/:id` — cancel draft
 
 **Admin** (`/estimates/*`):
 - `GET /estimates` — list all (filter: status, billing_type, painter)
+- `GET /estimates/products?search=` — search products for edit items (BEFORE /:id)
 - `GET /estimates/:id` — detail with painter info
+- `PUT /estimates/:id/items` — edit items (admin_review/approved/sent_to_customer/final_approved); customer billing: clears markup, resets to admin_review
+- `GET /estimates/:id/pdf` — download estimate PDF (non-draft)
 - `PUT /estimates/:id/review` — approve/reject
 - `POST /estimates/:id/markup` — set markup prices (customer-billing)
 - `POST /estimates/:id/share` — generate share token + WhatsApp link
+- `POST /estimates/:id/discount` — apply discount to customer estimate
+- `POST /estimates/:id/approve-final` — approve without discount
 - `POST /estimates/:id/payment` — record payment
 - `POST /estimates/:id/push-zoho` — create Zoho invoice + award points
 
 **Public**: `GET /estimates/share/:token` — shared estimate data (no auth)
+
+#### PDF Generator
+- `routes/painter-estimate-pdf-generator.js` — PDFKit-based, painter brand colors (green `#1B5E3B` + gold `#D4A24E`)
+- Columns: #, Product, Brand, Qty, Rate, Amount
+- Customer billing: shows markup prices; Self billing: shows cost prices
+- Discount line shown when discount applied; footer: "Quality Colours — Your Trusted Paint Partner"
 
 #### Pages
 - `painter-estimate-create.html` — 3-step builder (billing type → customer details → product picker + cart)
