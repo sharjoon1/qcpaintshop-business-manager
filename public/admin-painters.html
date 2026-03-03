@@ -1845,12 +1845,15 @@
     async function handleOfferSubmit(e) {
         e.preventDefault();
         const formData = new FormData();
-        formData.append('title_en', document.getElementById('offerTitle').value.trim());
+        const offerType = document.getElementById('offerType').value;
+        const offerVal = document.getElementById('offerValue').value;
+        formData.append('title', document.getElementById('offerTitle').value.trim());
         formData.append('title_ta', document.getElementById('offerTitleTa').value.trim());
-        formData.append('description_en', document.getElementById('offerDesc').value.trim());
+        formData.append('description', document.getElementById('offerDesc').value.trim());
         formData.append('description_ta', document.getElementById('offerDescTa').value.trim());
-        formData.append('offer_type', document.getElementById('offerType').value);
-        formData.append('offer_value', document.getElementById('offerValue').value);
+        formData.append('offer_type', offerType);
+        if (offerType === 'multiplier') formData.append('multiplier_value', offerVal);
+        else formData.append('bonus_points', offerVal);
         formData.append('applies_to', document.getElementById('offerAppliesTo').value);
         formData.append('target_id', document.getElementById('offerTarget').value.trim());
         formData.append('start_date', document.getElementById('offerStart').value);
