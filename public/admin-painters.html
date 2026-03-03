@@ -1827,9 +1827,9 @@
             const statusClass = !o.is_active ? 'badge-suspended' : isExpired ? 'badge-rejected' : isActive ? 'badge-approved' : 'badge-pending';
             const typeLabels = { multiplier: 'Multiplier', bonus_points: 'Bonus Points', discount: 'Discount', free_product: 'Free Product' };
             return `<tr>
-                <td class="font-medium">${esc(o.title_en)}${o.title_ta ? '<br><span class="text-xs text-gray-400">' + esc(o.title_ta) + '</span>' : ''}</td>
+                <td class="font-medium">${esc(o.title || o.title_en)}${o.title_ta ? '<br><span class="text-xs text-gray-400">' + esc(o.title_ta) + '</span>' : ''}</td>
                 <td class="capitalize">${typeLabels[o.offer_type] || o.offer_type}</td>
-                <td>${parseFloat(o.offer_value).toFixed(2)}</td>
+                <td>${parseFloat(o.multiplier_value || o.bonus_points || 0).toFixed(2)}</td>
                 <td class="capitalize">${o.applies_to === 'all' ? 'All Products' : esc(o.applies_to) + ': ' + esc(o.target_id || '-')}</td>
                 <td class="text-xs">${start.toLocaleDateString()} — ${end.toLocaleDateString()}</td>
                 <td><span class="badge ${statusClass}">${statusLabel}</span></td>
@@ -1885,12 +1885,12 @@
         const offer = allOffers.find(o => o.id === id);
         if (!offer) return;
         document.getElementById('offerEditId').value = offer.id;
-        document.getElementById('offerTitle').value = offer.title_en || '';
+        document.getElementById('offerTitle').value = offer.title || '';
         document.getElementById('offerTitleTa').value = offer.title_ta || '';
-        document.getElementById('offerDesc').value = offer.description_en || '';
+        document.getElementById('offerDesc').value = offer.description || '';
         document.getElementById('offerDescTa').value = offer.description_ta || '';
         document.getElementById('offerType').value = offer.offer_type || 'multiplier';
-        document.getElementById('offerValue').value = offer.offer_value || 2;
+        document.getElementById('offerValue').value = offer.multiplier_value || offer.bonus_points || 2;
         document.getElementById('offerAppliesTo').value = offer.applies_to || 'all';
         document.getElementById('offerTarget').value = offer.target_id || '';
         document.getElementById('offerStart').value = offer.start_date ? offer.start_date.substring(0, 10) : '';

@@ -1607,8 +1607,11 @@ router.get('/offers', requireAuth, async (req, res) => {
 // Create offer
 router.post('/offers', requirePermission('painters', 'manage'), uploadOfferBanner.single('banner'), async (req, res) => {
     try {
+        // Accept both 'title' and 'title_en' for backwards compatibility (browser cache)
+        const title = req.body.title || req.body.title_en;
+        const description = req.body.description || req.body.description_en;
         const {
-            title, title_ta, description, description_ta,
+            title_ta, description_ta,
             offer_type, bonus_points, multiplier_value,
             applies_to, target_id,
             start_date, end_date
@@ -1647,8 +1650,11 @@ router.post('/offers', requirePermission('painters', 'manage'), uploadOfferBanne
 router.put('/offers/:id', requirePermission('painters', 'manage'), uploadOfferBanner.single('banner'), async (req, res) => {
     try {
         const { id } = req.params;
+        // Accept both 'title' and 'title_en' for backwards compatibility (browser cache)
+        const title = req.body.title || req.body.title_en;
+        const description = req.body.description || req.body.description_en;
         const {
-            title, title_ta, description, description_ta,
+            title_ta, description_ta,
             offer_type, bonus_points, multiplier_value,
             applies_to, target_id,
             start_date, end_date, is_active
