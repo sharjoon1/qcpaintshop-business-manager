@@ -2572,13 +2572,16 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 Painters create estimates for paint purchases; admin reviews, records payment, pushes to Zoho as invoice, and awards points.
 
 #### Two Billing Flows
-1. **Self-Billing** — painter sees dealer prices (zoho_rate), submits → admin approves → records payment → push to Zoho → annual points only
-2. **Customer-Billing** — painter does NOT see prices, submits → admin sets markup prices → shares with customer (WhatsApp link) → records payment → push to Zoho → regular + annual points
+1. **Self-Billing** — painter sees dealer prices (zoho_rate), submits → admin approves → painter submits payment → admin confirms → push to Zoho → annual points only
+2. **Customer-Billing** — painter does NOT see prices, submits → admin sets markup prices → shares with customer (WhatsApp link) → painter submits payment → admin confirms → push to Zoho → regular + annual points
 
 #### Database Tables
 - `painter_estimates` — estimate_number (PE+YYYYMMDD+4seq), painter_id, billing_type (self/customer), customer fields, cost totals, markup totals, status workflow, payment fields, Zoho fields, points, share_token
 - `painter_estimate_items` — line items with zoho_item_id, unit_price (server-side from zoho_rate), markup prices (admin-set)
-- Status flow: `draft` → `pending_admin` → `approved` / `admin_review` → `sent_to_customer` → `approved` → `payment_recorded` → `pushed_to_zoho` | `rejected` | `cancelled`
+- Status flow: `draft` → `pending_admin` → `approved` / `admin_review` → `sent_to_customer` → `discount_requested` → `final_approved` → `payment_submitted` → `payment_recorded` → `pushed_to_zoho` | `rejected` | `cancelled`
+- **Payment flow**: Painter submits → `payment_submitted` (pending confirmation). Admin confirms → `payment_recorded` (shows "Paid" on painter panel). Admin can also record payment directly → `payment_recorded`.
+- **Balance due**: When total > payment_amount, balance shown in admin + painter views. Push-to-Zoho blocked. Painter can submit additional payment from `payment_recorded` status.
+- **All prices GST-inclusive** — no separate GST line in UI or PDF
 
 #### Endpoints
 **Painter-Auth** (`/me/estimates/*`):
@@ -2589,7 +2592,7 @@ Painters create estimates for paint purchases; admin reviews, records payment, p
 - `PUT /me/estimates/:id` — update draft
 - `POST /me/estimates/:id/submit` — submit draft
 - `POST /me/estimates/:id/request-discount` — request discount (customer billing)
-- `POST /me/estimates/:id/payment` — record payment
+- `POST /me/estimates/:id/payment` — submit payment (→ `payment_submitted`, pending admin confirmation; also works from `payment_recorded` for balance payments)
 - `GET /me/estimates/:id/pdf` — download estimate PDF (non-draft)
 - `DELETE /me/estimates/:id` — cancel draft
 
@@ -2597,15 +2600,16 @@ Painters create estimates for paint purchases; admin reviews, records payment, p
 - `GET /estimates` — list all (filter: status, billing_type, painter)
 - `GET /estimates/products?search=` — search products for edit items (BEFORE /:id)
 - `GET /estimates/:id` — detail with painter info
-- `PUT /estimates/:id/items` — edit items (admin_review/approved/sent_to_customer/final_approved); customer billing: clears markup, resets to admin_review
+- `PUT /estimates/:id/items` — edit items (admin_review/approved/sent_to_customer/final_approved/payment_submitted/payment_recorded); customer billing: clears markup, resets to admin_review; self billing: keeps status; payment fields always preserved
 - `GET /estimates/:id/pdf` — download estimate PDF (non-draft)
 - `PUT /estimates/:id/review` — approve/reject
 - `POST /estimates/:id/markup` — set markup prices (customer-billing)
 - `POST /estimates/:id/share` — generate share token + WhatsApp link
 - `POST /estimates/:id/discount` — apply discount to customer estimate
 - `POST /estimates/:id/approve-final` — approve without discount
-- `POST /estimates/:id/payment` — record payment
-- `POST /estimates/:id/push-zoho` — create Zoho invoice + award points
+- `POST /estimates/:id/confirm-payment` — confirm painter-submitted payment (`payment_submitted` → `payment_recorded`)
+- `POST /estimates/:id/payment` — record payment directly (admin, goes straight to `payment_recorded`; also accepts `payment_submitted` status)
+- `POST /estimates/:id/push-zoho` — create Zoho invoice + award points (blocked when balance > 0)
 
 **Public**: `GET /estimates/share/:token` — shared estimate data (no auth)
 
@@ -2618,14 +2622,17 @@ Painters create estimates for paint purchases; admin reviews, records payment, p
 #### Pages
 - `painter-estimate-create.html` — 3-step builder (billing type → customer details → product picker + cart)
 - `painter-dashboard.html` — "Create Estimate" button + "My Estimates" section
-- `admin-painters.html` — Tab 6 "Estimates" with filter bar, table, detail modal with status-dependent actions
+- `admin-painters.html` — Tab 6 "Estimates" with filter bar (incl. Payment Submitted/Confirmed filters), table, detail modal with: Edit Items button (all statuses), PDF download, Confirm Payment for payment_submitted, balance due display, status-dependent actions
 - `share/painter-estimate.html` — public customer view with print button
 
 #### Key Implementation Details
 - `unit_price` always set SERVER-SIDE from `zoho_items_map.zoho_rate` (never trusts client)
+- All prices GST-inclusive — no separate GST calculation, `gst_amount = 0`, `markup_gst_amount = 0`
 - Push-to-Zoho resolves contact (painter's zoho_contact_id or creates new), creates invoice, calls `pointsEngine.processInvoice()`
 - Share tokens expire after 7 days
-- GST percentage configurable via `painter_estimate_gst_pct` setting (default 18%)
+- Balance due = `effectiveTotal - payment_amount`, calculated dynamically (no extra column)
+- `effectiveTotal` = `final_grand_total || markup_grand_total || grand_total`
+- Painter payment adds to existing `payment_amount` (for balance payments)
 - Permission: `painters.estimates`
 - Migration: `node migrations/migrate-painter-estimates.js`
 
