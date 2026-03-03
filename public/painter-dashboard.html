@@ -433,7 +433,7 @@
             // Show business logo centered (no fallback)
             if (data.dashboard.businessLogo) {
                 document.getElementById('headerLogo').src = data.dashboard.businessLogo;
-                document.getElementById('headerLogoWrap').style.display = 'block';
+                document.getElementById('headerLogoWrap').style.display = 'flex';
             }
 
             // Update profile avatar (top-right button)
@@ -897,9 +897,26 @@
             return;
         }
 
+        // 1. Android native bridge — shares PNG + text directly via share sheet
+        if (window.QCApp && typeof window.QCApp.shareImage === 'function') {
+            try {
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+                window.QCApp.shareImage(base64, text, fileName);
+                return;
+            } catch (e) {
+                console.error('Native share failed:', e);
+                // Fall through to web share
+            }
+        }
+
         const file = new File([blob], fileName, { type: 'image/png' });
 
-        // 1. Try native Web Share API with PNG file (Chrome Android, Safari iOS 15+)
+        // 2. Web Share API with PNG file (Chrome Android browser, Safari iOS 15+)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
                 await navigator.share({ title, text, files: [file] });
@@ -907,22 +924,10 @@
                 return;
             } catch (e) {
                 if (e.name === 'AbortError') return;
-                // Share with files failed, try fallbacks below
             }
         }
 
-        // 2. Fallback: try share without files (text only — works in most WebViews)
-        if (navigator.share) {
-            try {
-                await navigator.share({ title, text, url: window.location.origin + cardUrl });
-                showToast('Link shared! Card image: long-press the card above to save');
-                return;
-            } catch (e) {
-                if (e.name === 'AbortError') return;
-            }
-        }
-
-        // 3. Last fallback: download PNG + open WhatsApp separately
+        // 3. Fallback: download PNG + open WhatsApp separately
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = blobUrl;
