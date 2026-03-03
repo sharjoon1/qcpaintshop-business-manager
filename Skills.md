@@ -2452,16 +2452,19 @@ Based on AI App Analyzer report, fixed critical production errors:
 - **Fixed**: Zoho search dropdown in variant editor — replaced position:fixed dropdown (clipped by modal overflow) with inline results rendered in document flow using event delegation
 - **Fixed**: Orphaned pack_sizes cleanup (5 rows with active pack_sizes on inactive products)
 
-### Mar 3, 2026 — Painter Dashboard Redesign (Logo, Offers, Cards, ID Card, Share)
-- **Header Logo**: Dashboard header now shows business logo from settings table (fallback to app icon)
-- **Offer Products Box**: Replaced flat offer carousel with brand-tabbed product box. New `GET /me/offer-products` endpoint returns products grouped by brand with images/points. Brand pill tabs + horizontal product card scroll.
-- **Visiting Card Redesign**: `painter-card-generator.js` rewritten — photo 180px (was 120), name 34px (was 28), company logo from settings, photo on right side, referral code in footer. Both `generateCard(painter, pool)` and helpers (`loadCompanyLogo`, `loadProfilePhoto`) are shared.
-- **New ID Card**: Portrait badge-style card (600x900) via `generateIdCard(painter, pool)`. Green header, circular photo, referral code box, QR code. Output: `painter_id_{id}.png`. New `GET /me/id-card` endpoint with same caching pattern as visiting card.
-- **Share Fix**: `shareCardFile()` helper uses `navigator.share({ files })` → WhatsApp deep link fallback. Never triggers download. Both visiting card and ID card share buttons use this.
-- **Section Reorder**: Balance → Offers → Cards → Quick Actions → Referral → Estimates → Transactions → Visualizations (viz moved down)
-- **Dashboard API**: `GET /me/dashboard` now returns `businessLogo` and parallelizes all 6 queries with `Promise.all`
-- **Cache Invalidation**: Profile update and photo upload now also reset `id_card_generated_at = NULL`
-- **Migration**: `migrations/migrate-painter-id-card.js` adds `id_card_generated_at TIMESTAMP NULL` to painters table
+### Mar 3, 2026 — Card v6, Estimate Discount Workflow, Professional Estimate View
+- **Card v6**: Bigger logo (250px visiting, 180px ID) with white semi-transparent circle backdrop for visibility. Text shadow on painter name, wider gold underline, bigger phone pill (460px), letter-spacing improvements on all text. ID card header text repositioned for larger logo, referral box gold border.
+- **Share Loading Spinner**: Full-screen overlay with gold spinner appears when share buttons clicked, auto-removes on completion/error/10s timeout.
+- **Professional Estimate View**: Billing-software-style modal on painter dashboard with QC branding header, bordered items table, discount/total summary. Status-based action buttons: Request Discount, Record Payment, Share via WhatsApp.
+- **Discount Request Workflow**: New statuses `discount_requested` and `final_approved`. Painter requests discount on approved customer estimate → admin applies % discount → final_approved → painter records payment → admin pushes to Zoho.
+- **Admin % Markup**: Items table shows `zoho_description` (from zoho_items_map JOIN). Per-item % markup with bidirectional calculation (% ↔ price). Bulk % markup input applies to all items. Both absolute price and percentage markup supported.
+- **Admin Discount Management**: For `discount_requested` status: amber notification, discount % input with live preview, "Apply Discount & Approve" or "Approve Without Discount" buttons.
+- **New Backend Endpoints**: `POST /estimates/:id/discount` (admin apply discount), `POST /estimates/:id/approve-final` (admin skip discount), `POST /me/estimates/:id/request-discount` (painter), `POST /me/estimates/:id/payment` (painter payment).
+- **Zoho Push Update**: Uses `final_grand_total` (post-discount) when discount applied. Discounted rates per item = `markup_unit_price * (1 - discount_pct/100)`.
+- **DB Migration**: `migrate-estimate-discount.js` — 7 new columns (discount_percentage, discount_amount, final_grand_total, discount_requested_at, discount_notes, discount_approved_by, discount_approved_at) + expanded status ENUM.
+- **Earlier (same day)**: Header logo, offer carousel, catalog earnings fix, GST removal, offer creation fix. See [feature-history.md] for details.
+- **Dashboard API**: `GET /me/dashboard` returns `businessLogo`, parallelizes 6 queries with `Promise.all`
+- **Migrations**: `migrate-painter-id-card.js`, `migrate-estimate-discount.js`
 
 ### Feb 28, 2026 — Painter Premium Features
 - **Profile Photo Upload**: PUT /me/profile-photo endpoint with Sharp resize (400x400 JPEG). Card cache invalidation on profile changes.
