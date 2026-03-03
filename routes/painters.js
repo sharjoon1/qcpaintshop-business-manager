@@ -757,8 +757,9 @@ router.post('/me/estimates', requirePainterAuth, async (req, res) => {
             });
         }
 
-        const gstAmount = subtotal * (gstPct / 100);
-        const grandTotal = subtotal + gstAmount;
+        // Prices already include GST — store 0 for gst_amount, grandTotal = subtotal
+        const gstAmount = 0;
+        const grandTotal = subtotal;
 
         const [result] = await pool.query(
             `INSERT INTO painter_estimates
@@ -1074,6 +1075,7 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
         // Stock from zoho_location_stock (sum across all branches)
         const [variants] = await pool.query(`
             SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
+                   ps.size as pack_size, ps.unit as pack_unit,
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
                    zim.zoho_rate as rate,
                    COALESCE((SELECT SUM(zls.stock_on_hand) FROM zoho_location_stock zls
@@ -2624,8 +2626,9 @@ router.post('/estimates/:estimateId/markup', requirePermission('painters', 'esti
             );
         }
 
-        const markupGst = markupSubtotal * (gstPct / 100);
-        const markupGrandTotal = markupSubtotal + markupGst;
+        // Prices already include GST — no separate GST calculation
+        const markupGst = 0;
+        const markupGrandTotal = markupSubtotal;
 
         await pool.query(
             `UPDATE painter_estimates SET markup_subtotal = ?, markup_gst_amount = ?, markup_grand_total = ?,

@@ -1,7 +1,7 @@
 /**
- * Painter Card Generator — Premium Design v4
- * Visiting card (1400x800) — centered name/phone, BIG logo
- * ID card (800x1200) — portrait badge, BIG logo
+ * Painter Card Generator — Premium Design v5
+ * Visiting card (1400x800) — professional layout, SVG icons, centered text
+ * ID card (800x1200) — portrait badge, premium design
  */
 const sharp = require('sharp');
 const QRCode = require('qrcode');
@@ -14,12 +14,24 @@ const ID_W = 800;
 const ID_H = 1200;
 const G = '#1B5E3B';
 const GOLD = '#D4A24E';
+const DARK = '#0d2818';
 const ORIGIN = process.env.APP_ORIGIN || 'https://act.qcpaintshop.com';
 
 const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 function specLabel(s) {
     return (s || 'both').replace('both', 'Interior & Exterior').replace('interior', 'Interior').replace('exterior', 'Exterior').replace('industrial', 'Industrial') + ' Specialist';
+}
+
+// SVG icon paths (Material Design, 24x24 viewBox)
+function phoneIcon(x, y, sz, color) {
+    const s = sz / 24;
+    return `<g transform="translate(${x},${y}) scale(${s})"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" fill="${color}"/></g>`;
+}
+
+function locationIcon(x, y, sz, color) {
+    const s = sz / 24;
+    return `<g transform="translate(${x},${y}) scale(${s})"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/></g>`;
 }
 
 async function loadLogo(pool, sz = 80) {
@@ -53,8 +65,7 @@ async function loadPhoto(photo, name, sz = 260, ringColor = 'white') {
 function ensureDir(d) { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); }
 
 // ══════════════════════════════════════════
-// VISITING CARD — 1400x800
-// Centered name/phone, big logo, photo right
+// VISITING CARD — 1400x800 Professional
 // ══════════════════════════════════════════
 
 async function generateCard(painter, pool) {
@@ -76,89 +87,105 @@ async function generateCard(painter, pool) {
 
     // Text centered in left portion (before photo area)
     const cx = 530;
+    const phoneY = exp ? 478 : 450;
+    const cityY = exp ? 540 : 510;
 
     const svg = `
     <svg width="${CARD_W}" height="${CARD_H}" xmlns="http://www.w3.org/2000/svg">
         <defs>
             <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" style="stop-color:${G}"/><stop offset="100%" style="stop-color:#2D7A4F"/>
+                <stop offset="0%" style="stop-color:${DARK}"/><stop offset="100%" style="stop-color:${G}"/>
             </linearGradient>
             <linearGradient id="fg" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" style="stop-color:${G}"/><stop offset="100%" style="stop-color:${GOLD}"/>
+            </linearGradient>
+            <linearGradient id="gg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:${GOLD}"/><stop offset="100%" style="stop-color:#b8860b"/>
             </linearGradient>
         </defs>
 
         <!-- Background -->
         <rect width="${CARD_W}" height="${CARD_H}" rx="28" fill="white"/>
 
-        <!-- Gold inner border -->
-        <rect x="6" y="6" width="${CARD_W - 12}" height="${CARD_H - 12}" rx="24" fill="none" stroke="${GOLD}" stroke-width="1.5" opacity="0.25"/>
+        <!-- Subtle pattern overlay -->
+        <rect x="33" y="0" width="${CARD_W - 33}" height="${CARD_H}" rx="0" fill="#fafbfc" opacity="0.5"/>
+
+        <!-- Gold double border -->
+        <rect x="5" y="5" width="${CARD_W - 10}" height="${CARD_H - 10}" rx="25" fill="none" stroke="${GOLD}" stroke-width="1" opacity="0.2"/>
+        <rect x="10" y="10" width="${CARD_W - 20}" height="${CARD_H - 20}" rx="22" fill="none" stroke="${GOLD}" stroke-width="0.5" opacity="0.15"/>
 
         <!-- Decorative circles behind photo -->
-        <circle cx="${CARD_W - 190}" cy="340" r="240" fill="#f0fdf4" opacity="0.3"/>
+        <circle cx="${CARD_W - 190}" cy="340" r="240" fill="${G}" opacity="0.03"/>
+        <circle cx="${CARD_W - 190}" cy="340" r="180" fill="${GOLD}" opacity="0.04"/>
 
         <!-- GREEN LEFT STRIP + gold edge -->
         <rect width="26" height="${CARD_H}" rx="28" fill="${G}"/>
         <rect x="22" width="8" height="${CARD_H}" fill="${G}"/>
-        <rect x="28" width="5" height="${CARD_H}" fill="${GOLD}"/>
+        <rect x="28" width="5" height="${CARD_H}" fill="url(#gg)"/>
 
-        <!-- Header bar — tall for big logo -->
-        <rect x="33" width="${CARD_W - 33}" height="190" fill="url(#hg)"/>
-        <rect x="33" y="0" width="28" height="190" fill="url(#hg)"/>
+        <!-- Header bar -->
+        <rect x="33" width="${CARD_W - 33}" height="180" fill="url(#hg)"/>
 
-        <!-- Company text (positioned after logo space) -->
-        <text x="${logo ? 250 : 60}" y="85" font-family="Arial,sans-serif" font-size="50" font-weight="bold" fill="white">QUALITY COLOURS</text>
-        <text x="${logo ? 250 : 60}" y="128" font-family="Arial,sans-serif" font-size="28" fill="white" opacity="0.9">Your Trusted Paint Shop</text>
+        <!-- Company text -->
+        <text x="${logo ? 250 : 60}" y="78" font-family="Arial,sans-serif" font-size="48" font-weight="bold" fill="white" letter-spacing="2">QUALITY COLOURS</text>
+        <text x="${logo ? 250 : 60}" y="118" font-family="Arial,sans-serif" font-size="24" fill="${GOLD}" opacity="0.9" letter-spacing="1">The Branded Paint Showroom</text>
+        <text x="${logo ? 250 : 60}" y="155" font-family="Arial,sans-serif" font-size="20" fill="white" opacity="0.6" letter-spacing="4">QC PAINTERS PROGRAM</text>
 
-        <!-- Gold accent -->
-        <rect x="33" y="188" width="${CARD_W - 33}" height="7" fill="${GOLD}"/>
+        <!-- Gold accent line -->
+        <rect x="33" y="178" width="${CARD_W - 33}" height="5" fill="url(#gg)"/>
 
-        <!-- NAME — CENTERED, HUGE -->
-        <text x="${cx}" y="295" font-family="Arial,sans-serif" font-size="90" font-weight="bold" fill="#111827" text-anchor="middle">${e(full_name)}</text>
+        <!-- NAME — CENTERED -->
+        <text x="${cx}" y="280" font-family="Arial,sans-serif" font-size="72" font-weight="bold" fill="#111827" text-anchor="middle">${e(full_name)}</text>
 
-        <!-- Gold underline centered -->
-        <rect x="${cx - 210}" y="310" width="420" height="5" rx="2.5" fill="${GOLD}"/>
+        <!-- Gold underline with diamond ends -->
+        <rect x="${cx - 180}" y="296" width="360" height="4" rx="2" fill="url(#gg)"/>
+        <rect x="${cx - 4}" y="292" width="8" height="12" rx="2" fill="${GOLD}" transform="rotate(45, ${cx}, 298)"/>
 
-        <!-- Spec centered -->
-        <text x="${cx}" y="365" font-family="Arial,sans-serif" font-size="36" fill="#4b5563" text-anchor="middle">${e(spec)}</text>
-        ${exp ? `<text x="${cx}" y="405" font-family="Arial,sans-serif" font-size="28" fill="#9ca3af" text-anchor="middle">${e(exp)}</text>` : ''}
+        <!-- Spec -->
+        <text x="${cx}" y="348" font-family="Arial,sans-serif" font-size="32" fill="${G}" text-anchor="middle" font-weight="600">${e(spec)}</text>
+        ${exp ? `<text x="${cx}" y="388" font-family="Arial,sans-serif" font-size="24" fill="#9ca3af" text-anchor="middle">${e(exp)}</text>` : ''}
 
-        <!-- Phone — CENTERED, BIG -->
-        <text x="${cx}" y="${exp ? 475 : 445}" font-family="Arial,sans-serif" font-size="50" font-weight="700" fill="#1f2937" text-anchor="middle">&#x1F4DE;  ${e(phone)}</text>
+        <!-- Phone with SVG icon -->
+        <rect x="${cx - 200}" y="${phoneY - 32}" width="400" height="48" rx="24" fill="${G}" opacity="0.06"/>
+        ${phoneIcon(cx - 180, phoneY - 30, 32, G)}
+        <text x="${cx + 10}" y="${phoneY}" font-family="Arial,sans-serif" font-size="42" font-weight="700" fill="#1f2937" text-anchor="middle">${e(phone)}</text>
 
-        <!-- City centered -->
-        ${city ? `<text x="${cx}" y="${exp ? 530 : 500}" font-family="Arial,sans-serif" font-size="38" fill="#374151" text-anchor="middle">&#x1F4CD;  ${e(city)}</text>` : ''}
+        <!-- City with SVG icon -->
+        ${city ? `
+            ${locationIcon(cx - 130, cityY - 24, 28, GOLD)}
+            <text x="${cx + 10}" y="${cityY}" font-family="Arial,sans-serif" font-size="30" fill="#4b5563" text-anchor="middle">${e(city)}</text>
+        ` : ''}
 
-        <!-- QR label -->
-        <text x="${CARD_W - 130}" y="${CARD_H - 145}" font-family="Arial,sans-serif" font-size="18" fill="#9ca3af" text-anchor="middle">Scan to join</text>
+        <!-- QR section -->
+        <rect x="${CARD_W - 250}" y="${CARD_H - 320}" width="230" height="230" rx="16" fill="white" stroke="${G}" stroke-width="1" opacity="0.3"/>
+        <text x="${CARD_W - 135}" y="${CARD_H - 132}" font-family="Arial,sans-serif" font-size="16" fill="#9ca3af" text-anchor="middle" letter-spacing="1">SCAN TO JOIN</text>
 
         <!-- Footer -->
-        <rect y="${CARD_H - 80}" width="${CARD_W}" height="80" fill="url(#fg)"/>
+        <rect y="${CARD_H - 75}" width="${CARD_W}" height="75" fill="url(#fg)"/>
         <rect x="0" y="${CARD_H - 28}" width="${CARD_W}" height="28" rx="28" fill="url(#fg)"/>
 
-        <text x="60" y="${CARD_H - 32}" font-family="Arial,sans-serif" font-size="24" fill="white" font-weight="700">QC PAINTERS PROGRAM</text>
-        <text x="${CARD_W / 2}" y="${CARD_H - 32}" font-family="Arial,sans-serif" font-size="30" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="4">Ref: ${e(referral_code)}</text>
-        <text x="${CARD_W - 60}" y="${CARD_H - 32}" font-family="Arial,sans-serif" font-size="22" fill="white" text-anchor="end" opacity="0.9">Your Paint Partner</text>
+        <text x="60" y="${CARD_H - 30}" font-family="Arial,sans-serif" font-size="22" fill="white" font-weight="700" letter-spacing="1">QC PAINTERS</text>
+        <text x="${CARD_W / 2}" y="${CARD_H - 30}" font-family="Arial,sans-serif" font-size="28" font-weight="bold" fill="${GOLD}" text-anchor="middle" letter-spacing="5">${e(referral_code)}</text>
+        <text x="${CARD_W - 60}" y="${CARD_H - 30}" font-family="Arial,sans-serif" font-size="20" fill="white" text-anchor="end" opacity="0.85">Your Paint Partner</text>
     </svg>`;
 
     const base = await sharp(Buffer.from(svg)).png().toBuffer();
-    const pTop = 210, pLeft = CARD_W - pSz - 65;
+    const pTop = 200, pLeft = CARD_W - pSz - 65;
     const comp = [
         { input: ring, top: pTop - 8, left: pLeft - 8 },
         { input: circ, top: pTop, left: pLeft },
-        { input: qr, top: CARD_H - 305, left: CARD_W - 220 },
+        { input: qr, top: CARD_H - 310, left: CARD_W - 225 },
     ];
-    if (logo) comp.push({ input: logo, top: 5, left: 42 });
+    if (logo) comp.push({ input: logo, top: 0, left: 42 });
 
     const dir = path.join(__dirname, '..', 'public', 'uploads', 'painter-cards');
     ensureDir(dir);
-    await sharp(base).composite(comp).png({ quality: 90 }).toFile(path.join(dir, `painter_${id}.png`));
+    await sharp(base).composite(comp).png({ quality: 95 }).toFile(path.join(dir, `painter_${id}.png`));
     return `/uploads/painter-cards/painter_${id}.png?v=${Date.now()}`;
 }
 
 // ══════════════════════════════════════════
 // ID CARD — 800x1200 Premium Badge
-// Big logo, big fonts
 // ══════════════════════════════════════════
 
 async function generateIdCard(painter, pool) {
@@ -180,73 +207,79 @@ async function generateIdCard(painter, pool) {
 
     const nameY = 520;
     const specY = 578;
-    const phoneY = info ? 660 : 628;
-    const divY = phoneY + 32;
-    const labelY = divY + 38;
+    const phoneY = info ? 660 : 630;
+    const divY = phoneY + 35;
+    const labelY = divY + 40;
     const boxY = labelY + 18;
-    const codeY = boxY + 48;
+    const codeY = boxY + 50;
 
     const svg = `
     <svg width="${ID_W}" height="${ID_H}" xmlns="http://www.w3.org/2000/svg">
         <defs>
             <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" style="stop-color:${G}"/><stop offset="100%" style="stop-color:#2D7A4F"/>
+                <stop offset="0%" style="stop-color:${DARK}"/><stop offset="100%" style="stop-color:${G}"/>
             </linearGradient>
             <linearGradient id="fg" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" style="stop-color:${G}"/><stop offset="100%" style="stop-color:${GOLD}"/>
+            </linearGradient>
+            <linearGradient id="gg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:${GOLD}"/><stop offset="100%" style="stop-color:#b8860b"/>
             </linearGradient>
         </defs>
 
         <!-- Background -->
         <rect width="${ID_W}" height="${ID_H}" rx="32" fill="white"/>
 
-        <!-- Gold inner border -->
-        <rect x="8" y="8" width="${ID_W - 16}" height="${ID_H - 16}" rx="28" fill="none" stroke="${GOLD}" stroke-width="2" opacity="0.35"/>
+        <!-- Gold double border -->
+        <rect x="6" y="6" width="${ID_W - 12}" height="${ID_H - 12}" rx="29" fill="none" stroke="${GOLD}" stroke-width="2" opacity="0.3"/>
+        <rect x="12" y="12" width="${ID_W - 24}" height="${ID_H - 24}" rx="26" fill="none" stroke="${GOLD}" stroke-width="0.5" opacity="0.15"/>
 
         <!-- Green header -->
         <rect width="${ID_W}" height="185" rx="32" fill="url(#hg)"/>
         <rect y="32" width="${ID_W}" height="153" fill="url(#hg)"/>
 
         <!-- Gold accent -->
-        <rect y="183" width="${ID_W}" height="7" fill="${GOLD}"/>
+        <rect y="183" width="${ID_W}" height="5" fill="url(#gg)"/>
 
         <!-- Header text -->
-        <text x="${ID_W / 2}" y="68" font-family="Arial,sans-serif" font-size="46" font-weight="bold" fill="white" text-anchor="middle">QUALITY COLOURS</text>
-        <text x="${ID_W / 2}" y="110" font-family="Arial,sans-serif" font-size="26" fill="white" text-anchor="middle" opacity="0.9">QC Painters Program</text>
-        <text x="${ID_W / 2}" y="153" font-family="Arial,sans-serif" font-size="24" fill="white" text-anchor="middle" opacity="0.75" letter-spacing="3">PAINTER IDENTITY CARD</text>
+        <text x="${ID_W / 2}" y="65" font-family="Arial,sans-serif" font-size="42" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="2">QUALITY COLOURS</text>
+        <text x="${ID_W / 2}" y="105" font-family="Arial,sans-serif" font-size="22" fill="${GOLD}" text-anchor="middle" letter-spacing="1">QC Painters Program</text>
+        <text x="${ID_W / 2}" y="152" font-family="Arial,sans-serif" font-size="22" fill="white" text-anchor="middle" opacity="0.7" letter-spacing="4">PAINTER IDENTITY CARD</text>
 
-        <!-- Name — BIG -->
-        <text x="${ID_W / 2}" y="${nameY}" font-family="Arial,sans-serif" font-size="68" font-weight="bold" fill="#111827" text-anchor="middle">${e(full_name)}</text>
+        <!-- Name -->
+        <text x="${ID_W / 2}" y="${nameY}" font-family="Arial,sans-serif" font-size="62" font-weight="bold" fill="#111827" text-anchor="middle">${e(full_name)}</text>
 
         <!-- Gold underline -->
-        <rect x="${(ID_W - 360) / 2}" y="${nameY + 14}" width="360" height="5" rx="2.5" fill="${GOLD}"/>
+        <rect x="${(ID_W - 320) / 2}" y="${nameY + 14}" width="320" height="4" rx="2" fill="url(#gg)"/>
 
         <!-- Spec -->
-        <text x="${ID_W / 2}" y="${specY}" font-family="Arial,sans-serif" font-size="34" fill="#4b5563" text-anchor="middle">${e(spec)}</text>
-        ${info ? `<text x="${ID_W / 2}" y="${specY + 42}" font-family="Arial,sans-serif" font-size="28" fill="#9ca3af" text-anchor="middle">${e(info)}</text>` : ''}
+        <text x="${ID_W / 2}" y="${specY}" font-family="Arial,sans-serif" font-size="30" fill="${G}" text-anchor="middle" font-weight="600">${e(spec)}</text>
+        ${info ? `<text x="${ID_W / 2}" y="${specY + 42}" font-family="Arial,sans-serif" font-size="24" fill="#9ca3af" text-anchor="middle">${e(info)}</text>` : ''}
 
-        <!-- Phone — BIG -->
-        <text x="${ID_W / 2}" y="${phoneY}" font-family="Arial,sans-serif" font-size="44" font-weight="600" fill="#1f2937" text-anchor="middle">&#x1F4DE;  ${e(phone)}</text>
+        <!-- Phone with SVG icon in pill -->
+        <rect x="${(ID_W - 340) / 2}" y="${phoneY - 30}" width="340" height="46" rx="23" fill="${G}" opacity="0.07"/>
+        ${phoneIcon((ID_W - 300) / 2, phoneY - 28, 28, G)}
+        <text x="${ID_W / 2 + 14}" y="${phoneY}" font-family="Arial,sans-serif" font-size="38" font-weight="700" fill="#1f2937" text-anchor="middle">${e(phone)}</text>
 
         <!-- Gold divider -->
-        <rect x="70" y="${divY}" width="${ID_W - 140}" height="4" fill="${GOLD}" rx="2"/>
+        <rect x="60" y="${divY}" width="${ID_W - 120}" height="3" fill="url(#gg)" rx="1.5"/>
 
         <!-- Referral label -->
-        <text x="${ID_W / 2}" y="${labelY}" font-family="Arial,sans-serif" font-size="22" fill="#9ca3af" text-anchor="middle" letter-spacing="3">REFERRAL CODE</text>
+        <text x="${ID_W / 2}" y="${labelY}" font-family="Arial,sans-serif" font-size="20" fill="#9ca3af" text-anchor="middle" letter-spacing="4">REFERRAL CODE</text>
 
         <!-- Code box -->
-        <rect x="130" y="${boxY}" width="${ID_W - 260}" height="70" rx="16" fill="#f0fdf4" stroke="${G}" stroke-width="3"/>
-        <text x="${ID_W / 2}" y="${codeY}" font-family="Arial,sans-serif" font-size="52" font-weight="bold" fill="${G}" text-anchor="middle" letter-spacing="6">${e(referral_code)}</text>
+        <rect x="120" y="${boxY}" width="${ID_W - 240}" height="72" rx="18" fill="#f0fdf4" stroke="${G}" stroke-width="2.5"/>
+        <text x="${ID_W / 2}" y="${codeY}" font-family="Arial,sans-serif" font-size="48" font-weight="bold" fill="${G}" text-anchor="middle" letter-spacing="6">${e(referral_code)}</text>
 
-        <!-- QR label -->
-        <text x="${ID_W / 2}" y="${ID_H - 340}" font-family="Arial,sans-serif" font-size="18" fill="#9ca3af" text-anchor="middle">Scan to join!</text>
+        <!-- QR section -->
+        <text x="${ID_W / 2}" y="${ID_H - 335}" font-family="Arial,sans-serif" font-size="16" fill="#9ca3af" text-anchor="middle" letter-spacing="2">SCAN TO JOIN</text>
 
         <!-- Footer -->
         <rect y="${ID_H - 90}" width="${ID_W}" height="90" fill="url(#fg)"/>
         <rect x="0" y="${ID_H - 32}" width="${ID_W}" height="32" rx="32" fill="url(#fg)"/>
 
-        <text x="${ID_W / 2}" y="${ID_H - 48}" font-family="Arial,sans-serif" font-size="22" fill="white" text-anchor="middle" font-weight="600">Join us &amp; earn loyalty points on every purchase!</text>
-        <text x="${ID_W / 2}" y="${ID_H - 18}" font-family="Arial,sans-serif" font-size="16" fill="white" text-anchor="middle" opacity="0.8">Quality Colours — Your Trusted Paint Partner</text>
+        <text x="${ID_W / 2}" y="${ID_H - 48}" font-family="Arial,sans-serif" font-size="20" fill="white" text-anchor="middle" font-weight="600" letter-spacing="0.5">Join us &amp; earn loyalty points on every purchase!</text>
+        <text x="${ID_W / 2}" y="${ID_H - 18}" font-family="Arial,sans-serif" font-size="15" fill="${GOLD}" text-anchor="middle" opacity="0.9">Quality Colours — Your Trusted Paint Partner</text>
     </svg>`;
 
     const base = await sharp(Buffer.from(svg)).png().toBuffer();
@@ -254,13 +287,13 @@ async function generateIdCard(painter, pool) {
     const comp = [
         { input: ring, top: pTop - 8, left: pLeft - 8 },
         { input: circ, top: pTop, left: pLeft },
-        { input: qr, top: ID_H - 325, left: (ID_W - 180) / 2 },
+        { input: qr, top: ID_H - 320, left: (ID_W - 180) / 2 },
     ];
     if (logo) comp.push({ input: logo, top: 8, left: 16 });
 
     const dir = path.join(__dirname, '..', 'public', 'uploads', 'painter-cards');
     ensureDir(dir);
-    await sharp(base).composite(comp).png({ quality: 90 }).toFile(path.join(dir, `painter_id_${id}.png`));
+    await sharp(base).composite(comp).png({ quality: 95 }).toFile(path.join(dir, `painter_id_${id}.png`));
     return `/uploads/painter-cards/painter_id_${id}.png?v=${Date.now()}`;
 }
 

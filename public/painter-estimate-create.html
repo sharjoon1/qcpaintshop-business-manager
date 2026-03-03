@@ -417,12 +417,12 @@
         ).join('');
 
         if (billingType === 'self') {
-            const subtotal = items.reduce((s, i) => s + (i.rate || 0) * i.quantity, 0);
+            const total = items.reduce((s, i) => s + (i.rate || 0) * i.quantity, 0);
             document.getElementById('cartTotals').innerHTML =
-                '<div class="flex justify-between text-sm text-gray-600 mb-1"><span>Subtotal</span><span>₹' + subtotal.toLocaleString('en-IN') + '</span></div>' +
-                '<div class="flex justify-between text-sm text-gray-600 mb-1"><span>GST (18%)</span><span>₹' + (subtotal * 0.18).toLocaleString('en-IN') + '</span></div>' +
-                '<div class="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200"><span>Grand Total</span><span>₹' + (subtotal * 1.18).toLocaleString('en-IN') + '</span></div>';
-            document.getElementById('floatingCartTotal').textContent = '₹' + (subtotal * 1.18).toLocaleString('en-IN');
+                '<div class="flex justify-between text-sm text-gray-600 mb-1"><span>Items (' + items.length + ')</span><span>₹' + total.toLocaleString('en-IN') + '</span></div>' +
+                '<div class="text-[0.65rem] text-gray-400 mb-1">* Prices include GST</div>' +
+                '<div class="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200"><span>Total</span><span>₹' + total.toLocaleString('en-IN') + '</span></div>';
+            document.getElementById('floatingCartTotal').textContent = '₹' + total.toLocaleString('en-IN');
         } else {
             document.getElementById('cartTotals').innerHTML = '<div class="text-sm text-gray-500 text-center">Prices will be set by admin after review</div>';
             document.getElementById('floatingCartTotal').textContent = '';

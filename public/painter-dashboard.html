@@ -207,6 +207,14 @@
             </div>
         </div>
 
+        <!-- Estimate detail bottom sheet -->
+        <div id="estimateModal" class="product-modal-overlay" onclick="if(event.target===this)closeEstimateModal()">
+            <div class="product-modal" style="max-height:90vh">
+                <div class="modal-handle"></div>
+                <div id="estimateModalContent"></div>
+            </div>
+        </div>
+
         <!-- 2. My Cards (Visiting + ID) -->
         <div class="section-card mb-6" id="myCardsSection">
             <div class="section-header">My Cards</div>
@@ -716,14 +724,17 @@
     function getOfferTagHtml(offer) {
         if (!offer) return '';
         const icons = { multiplier: '⚡', bonus_points: '🎁', discount: '💰', free_product: '🎉' };
-        const labels = {
-            multiplier: offer.multiplier_value ? `${offer.multiplier_value}x Points` : (offer.title || 'Multiplier Offer'),
-            bonus_points: offer.bonus_points ? `+${offer.bonus_points} Bonus` : (offer.title || 'Bonus Points'),
-            discount: offer.title || 'Special Discount',
-            free_product: offer.title || 'Free Product'
+        const typeDesc = {
+            multiplier: offer.multiplier_value ? `${offer.multiplier_value}x Points Multiplier` : 'Points Multiplier',
+            bonus_points: offer.bonus_points ? `+${offer.bonus_points} Bonus Points` : 'Bonus Points',
+            discount: 'Special Discount',
+            free_product: 'Free Product'
         };
         const cls = { multiplier: 'offer-tag-multiplier', bonus_points: 'offer-tag-bonus', discount: 'offer-tag-discount', free_product: 'offer-tag-free' };
-        return `<span class="offer-tag ${cls[offer.offer_type] || 'offer-tag-bonus'}">${icons[offer.offer_type] || '🎁'} ${labels[offer.offer_type] || offer.title}</span>`;
+        const label = typeDesc[offer.offer_type] || 'Special Offer';
+        let html = `<span class="offer-tag ${cls[offer.offer_type] || 'offer-tag-bonus'}">${icons[offer.offer_type] || '🎁'} ${label}</span>`;
+        if (offer.title) html += `<div style="font-size:0.75rem;color:rgba(255,255,255,0.6);margin-top:4px">${esc(offer.title)}</div>`;
+        return html;
     }
 
     function renderOfferProducts(brand) {
@@ -991,14 +1002,17 @@
                 const statusLabel = e.status.replace(/_/g, ' ');
                 const total = e.billing_type === 'self' ? `₹${parseFloat(e.grand_total).toLocaleString('en-IN')}` : (parseFloat(e.markup_grand_total) > 0 ? `₹${parseFloat(e.markup_grand_total).toLocaleString('en-IN')}` : 'Pending');
                 return `
-                    <div class="flex justify-between items-center py-3 border-b border-gray-100 last:border-0">
+                    <div class="flex justify-between items-center py-3 border-b border-gray-100 last:border-0 cursor-pointer" onclick="viewPainterEstimate(${e.id})" style="transition:background 0.15s" onmousedown="this.style.background='#f1f5f9'" onmouseup="this.style.background=''" onmouseleave="this.style.background=''">
                         <div>
                             <div class="text-sm font-medium">${esc(e.estimate_number)}</div>
                             <div class="text-xs text-gray-400">${e.billing_type === 'self' ? 'Self' : esc(e.customer_name || 'Customer')} &bull; ${new Date(e.created_at).toLocaleDateString()}</div>
                         </div>
-                        <div class="text-right">
-                            <div class="text-sm font-semibold">${total}</div>
-                            <span class="badge" style="${style}">${statusLabel}</span>
+                        <div class="text-right flex items-center gap-2">
+                            <div>
+                                <div class="text-sm font-semibold">${total}</div>
+                                <span class="badge" style="${style}">${statusLabel}</span>
+                            </div>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                         </div>
                     </div>
                 `;
@@ -1007,6 +1021,61 @@
             console.error('Load estimates error:', err);
             document.getElementById('estimatesList').innerHTML = '<div class="text-red-500 text-sm py-4" data-i18n="common.error_loading">Error loading estimates</div>';
         }
+    }
+
+    // ============ View Estimate Detail ============
+    async function viewPainterEstimate(id) {
+        try {
+            const res = await fetch(`${API}/me/estimates/${id}`, { headers: painterHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            const est = data.estimate;
+            const items = data.items || [];
+            const isSelf = est.billing_type === 'self';
+            const total = isSelf ? parseFloat(est.grand_total) : (parseFloat(est.markup_grand_total) || parseFloat(est.grand_total));
+            const statusColors = { draft:'#94a3b8', pending_admin:'#d97706', admin_review:'#3b82f6', approved:'#059669', sent_to_customer:'#6366f1', payment_recorded:'#4f46e5', pushed_to_zoho:'#059669', rejected:'#dc2626', cancelled:'#6b7280' };
+
+            const itemsHtml = items.map(i => {
+                const price = isSelf ? parseFloat(i.unit_price) : (parseFloat(i.markup_unit_price) || parseFloat(i.unit_price));
+                const lineTotal = isSelf ? parseFloat(i.line_total) : (parseFloat(i.markup_line_total) || parseFloat(i.line_total));
+                return `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9">
+                        <div style="flex:1;min-width:0">
+                            <div style="font-size:0.8125rem;font-weight:600;color:#1a1a2e">${esc(i.item_name)}</div>
+                            <div style="font-size:0.6875rem;color:#94a3b8">${esc(i.brand || '')} · Qty: ${parseFloat(i.quantity)} × ₹${price.toLocaleString('en-IN')}</div>
+                        </div>
+                        <div style="font-size:0.875rem;font-weight:700;color:#1B5E3B;white-space:nowrap;margin-left:12px">₹${lineTotal.toLocaleString('en-IN')}</div>
+                    </div>`;
+            }).join('');
+
+            const statusLabel = est.status.replace(/_/g, ' ');
+            document.getElementById('estimateModalContent').innerHTML = `
+                <div style="padding:16px 20px 0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <h3 style="font-size:1.125rem;font-weight:700;color:#1a1a2e;margin:0">${esc(est.estimate_number)}</h3>
+                        <span style="padding:4px 12px;border-radius:20px;font-size:0.6875rem;font-weight:700;color:#fff;background:${statusColors[est.status] || '#94a3b8'};text-transform:capitalize">${statusLabel}</span>
+                    </div>
+                    <div style="font-size:0.75rem;color:#94a3b8;margin-top:4px">${new Date(est.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'})} · ${isSelf ? 'Self Billing' : 'Customer: ' + esc(est.customer_name || '-')}</div>
+                </div>
+                <div style="padding:12px 20px">${itemsHtml}</div>
+                <div style="padding:0 20px 20px">
+                    <div style="background:linear-gradient(135deg,#0d2818,#1B5E3B);border-radius:14px;padding:16px 18px;color:#fff">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <span style="font-size:0.875rem;opacity:0.8">Total</span>
+                            <span style="font-size:1.375rem;font-weight:800;color:#D4A24E">₹${total.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div style="font-size:0.65rem;opacity:0.5;margin-top:4px;text-align:right">* Prices inclusive of GST</div>
+                    </div>
+                    ${est.admin_notes ? `<div style="margin-top:10px;padding:10px 14px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:0.75rem;color:#64748b"><strong>Admin Note:</strong> ${esc(est.admin_notes)}</div>` : ''}
+                    <button onclick="closeEstimateModal()" style="width:100%;margin-top:12px;padding:12px;border-radius:12px;background:linear-gradient(135deg,#D4A24E,#b8860b);color:#fff;font-weight:700;font-size:0.9375rem;border:none;cursor:pointer">Close</button>
+                </div>
+            `;
+            document.getElementById('estimateModal').classList.add('show');
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    function closeEstimateModal() {
+        document.getElementById('estimateModal').classList.remove('show');
     }
 
     // ============ Socket.io for real-time notifications ============
