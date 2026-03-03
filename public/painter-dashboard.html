@@ -33,48 +33,54 @@
         .referral-code { background: linear-gradient(135deg, #f0fdf4, #fefce8); border: 2px dashed #1B5E3B; border-radius: 12px; padding: 1.25rem; text-align: center; }
         .referral-code code { font-size: 1.5rem; font-weight: 800; color: #1B5E3B; letter-spacing: 2px; }
 
+        /* Offer section — dark green + gold premium theme */
+        #offerProductsSection.section-card { background: linear-gradient(160deg, #0d2818 0%, #1a3a2a 40%, #1B5E3B 100%); border: none; box-shadow: 0 4px 20px rgba(13,40,24,0.3); }
+        #offerProductsSection .section-header { color: #D4A24E; border-bottom-color: rgba(212,162,78,0.2); }
+        #offerProductsSection .section-header a { color: #D4A24E !important; opacity: 0.85; }
+
         /* Offer brand tabs */
         .offer-brand-tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
         .offer-brand-tabs::-webkit-scrollbar { display: none; }
-        .offer-brand-tab { flex: 0 0 auto; padding: 6px 14px; border-radius: 20px; font-size: 0.8125rem; font-weight: 600; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
-        .offer-brand-tab.active { background: #1B5E3B; color: #fff; border-color: #1B5E3B; }
+        .offer-brand-tab { flex: 0 0 auto; padding: 6px 14px; border-radius: 20px; font-size: 0.8125rem; font-weight: 600; border: 1.5px solid rgba(212,162,78,0.3); background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); cursor: pointer; white-space: nowrap; transition: all 0.2s; backdrop-filter: blur(4px); }
+        .offer-brand-tab.active { background: linear-gradient(135deg, #D4A24E, #b8860b); color: #fff; border-color: #D4A24E; }
 
-        /* Offer carousel — one product at a time, full width */
-        .offer-carousel-wrap { position: relative; overflow: hidden; border-radius: 14px; }
+        /* Offer carousel — one product at a time */
+        .offer-carousel-wrap { position: relative; overflow: hidden; border-radius: 16px; }
         .offer-carousel { display: flex; transition: transform 0.45s cubic-bezier(.4,0,.2,1); }
-        .offer-slide { flex: 0 0 100%; min-width: 100%; cursor: pointer; }
-        .offer-slide-inner { background: linear-gradient(135deg, #f0fdf4 0%, #fefce8 100%); border-radius: 14px; overflow: hidden; border: 1.5px solid #e2e8f0; }
-        .offer-slide img { width: 100%; height: 180px; object-fit: contain; background: #fff; }
-        .offer-slide .no-img { width: 100%; height: 180px; background: #fff; display: flex; align-items: center; justify-content: center; }
-        .offer-slide .slide-body { padding: 12px 14px; }
-        .offer-slide .slide-body h4 { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin: 0 0 4px; }
-        .offer-slide .slide-body .brand-label { font-size: 0.75rem; color: #64748b; font-weight: 500; }
-        .offer-slide .offer-tag { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 5px 12px; border-radius: 20px; font-size: 0.8125rem; font-weight: 700; }
-        .offer-tag-multiplier { background: linear-gradient(135deg, #D4A24E, #b8860b); color: #fff; }
-        .offer-tag-bonus { background: linear-gradient(135deg, #1B5E3B, #2d8a5e); color: #fff; }
-        .offer-tag-discount { background: linear-gradient(135deg, #dc2626, #ef4444); color: #fff; }
-        .offer-tag-free { background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; }
-        .offer-slide .pts-label { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; margin-left: 6px; padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: #f0fdf4; color: #1B5E3B; border: 1px solid #bbf7d0; }
+        .offer-slide { flex: 0 0 100%; min-width: 100%; cursor: pointer; padding: 0 2px; }
+        .offer-slide-inner { background: rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; border: 1px solid rgba(212,162,78,0.2); backdrop-filter: blur(8px); }
+        .offer-slide img { width: 100%; height: 180px; object-fit: contain; background: rgba(255,255,255,0.95); border-radius: 12px 12px 0 0; }
+        .offer-slide .no-img { width: 100%; height: 180px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; }
+        .offer-slide .no-img svg { stroke: rgba(212,162,78,0.4); }
+        .offer-slide .slide-body { padding: 14px 16px 16px; }
+        .offer-slide .slide-body h4 { font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0 0 3px; }
+        .offer-slide .slide-body .brand-label { font-size: 0.75rem; color: rgba(255,255,255,0.5); font-weight: 500; }
+        .offer-slide .offer-tag { display: inline-flex; align-items: center; gap: 4px; margin-top: 10px; padding: 6px 14px; border-radius: 20px; font-size: 0.8125rem; font-weight: 700; }
+        .offer-tag-multiplier { background: linear-gradient(135deg, #D4A24E, #b8860b); color: #fff; box-shadow: 0 2px 8px rgba(212,162,78,0.4); }
+        .offer-tag-bonus { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; box-shadow: 0 2px 8px rgba(34,197,94,0.3); }
+        .offer-tag-discount { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; box-shadow: 0 2px 8px rgba(239,68,68,0.3); }
+        .offer-tag-free { background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; box-shadow: 0 2px 8px rgba(168,85,247,0.3); }
+        .offer-slide .pts-label { display: inline-flex; align-items: center; gap: 4px; margin-top: 10px; margin-left: 8px; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: rgba(212,162,78,0.15); color: #D4A24E; border: 1px solid rgba(212,162,78,0.3); }
 
         /* Carousel dots */
-        .offer-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
-        .offer-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; transition: all 0.3s; cursor: pointer; }
-        .offer-dot.active { background: #1B5E3B; width: 20px; border-radius: 4px; }
+        .offer-dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
+        .offer-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); transition: all 0.3s; cursor: pointer; }
+        .offer-dot.active { background: #D4A24E; width: 22px; border-radius: 4px; }
 
-        /* Product detail modal */
-        .product-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1100; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+        /* Product detail modal — dark theme */
+        .product-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1100; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
         .product-modal-overlay.show { opacity: 1; pointer-events: auto; }
-        .product-modal { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; transform: translateY(100%); transition: transform 0.35s cubic-bezier(.4,0,.2,1); }
+        .product-modal { background: linear-gradient(180deg, #1a3a2a 0%, #0d2818 100%); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; transform: translateY(100%); transition: transform 0.35s cubic-bezier(.4,0,.2,1); }
         .product-modal-overlay.show .product-modal { transform: translateY(0); }
-        .product-modal .modal-handle { width: 40px; height: 4px; border-radius: 2px; background: #cbd5e1; margin: 10px auto 0; }
-        .product-modal .modal-img { width: 100%; height: 220px; object-fit: contain; background: linear-gradient(135deg, #f0fdf4, #fefce8); }
-        .product-modal .modal-img-placeholder { width: 100%; height: 220px; background: linear-gradient(135deg, #f0fdf4, #fefce8); display: flex; align-items: center; justify-content: center; }
+        .product-modal .modal-handle { width: 40px; height: 4px; border-radius: 2px; background: rgba(212,162,78,0.4); margin: 10px auto 0; }
+        .product-modal .modal-img { width: 100%; height: 220px; object-fit: contain; background: rgba(255,255,255,0.95); }
+        .product-modal .modal-img-placeholder { width: 100%; height: 220px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; }
         .product-modal .modal-body { padding: 16px 20px 28px; }
-        .product-modal .modal-body h3 { font-size: 1.25rem; font-weight: 700; color: #1a1a2e; margin: 0 0 4px; }
-        .product-modal .modal-body .meta-row { font-size: 0.8125rem; color: #64748b; margin-bottom: 12px; }
-        .product-modal .detail-card { background: #f8fafc; border-radius: 12px; padding: 14px; margin-bottom: 10px; border: 1px solid #e8ecf1; }
-        .product-modal .detail-card .label { font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-        .product-modal .detail-card .value { font-size: 1.1rem; font-weight: 700; color: #1B5E3B; }
+        .product-modal .modal-body h3 { font-size: 1.25rem; font-weight: 700; color: #fff; margin: 0 0 4px; }
+        .product-modal .modal-body .meta-row { font-size: 0.8125rem; color: rgba(255,255,255,0.5); margin-bottom: 14px; }
+        .product-modal .detail-card { background: rgba(255,255,255,0.07); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid rgba(212,162,78,0.15); backdrop-filter: blur(4px); }
+        .product-modal .detail-card .label { font-size: 0.7rem; color: #D4A24E; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+        .product-modal .detail-card .value { font-size: 1.1rem; font-weight: 700; color: #fff; }
 
         /* Cards section */
         .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -710,7 +716,12 @@
     function getOfferTagHtml(offer) {
         if (!offer) return '';
         const icons = { multiplier: '⚡', bonus_points: '🎁', discount: '💰', free_product: '🎉' };
-        const labels = { multiplier: `${offer.multiplier_value}x Points`, bonus_points: `+${offer.bonus_points} Bonus`, discount: 'Special Discount', free_product: 'Free Product' };
+        const labels = {
+            multiplier: offer.multiplier_value ? `${offer.multiplier_value}x Points` : (offer.title || 'Multiplier Offer'),
+            bonus_points: offer.bonus_points ? `+${offer.bonus_points} Bonus` : (offer.title || 'Bonus Points'),
+            discount: offer.title || 'Special Discount',
+            free_product: offer.title || 'Free Product'
+        };
         const cls = { multiplier: 'offer-tag-multiplier', bonus_points: 'offer-tag-bonus', discount: 'offer-tag-discount', free_product: 'offer-tag-free' };
         return `<span class="offer-tag ${cls[offer.offer_type] || 'offer-tag-bonus'}">${icons[offer.offer_type] || '🎁'} ${labels[offer.offer_type] || offer.title}</span>`;
     }
@@ -812,17 +823,18 @@
         let offerDetailHtml = '';
         if (offer) {
             let offerValue = '';
-            if (offer.offer_type === 'multiplier') offerValue = `${offer.multiplier_value}x on every purchase`;
-            else if (offer.offer_type === 'bonus_points') offerValue = `+${offer.bonus_points} bonus points`;
+            if (offer.offer_type === 'multiplier' && offer.multiplier_value) offerValue = `${offer.multiplier_value}x on every purchase`;
+            else if (offer.offer_type === 'bonus_points' && offer.bonus_points) offerValue = `+${offer.bonus_points} bonus points`;
             else if (offer.offer_type === 'discount') offerValue = 'Special discount available';
             else if (offer.offer_type === 'free_product') offerValue = 'Free product with purchase';
+            else offerValue = offer.title || 'Special offer active';
 
             offerDetailHtml = `
                 <div class="detail-card">
                     <div class="label">🎯 Active Offer</div>
-                    <div class="value">${esc(offer.title || offerTypeLabels[offer.offer_type])}</div>
-                    <div style="font-size:0.875rem;color:#475569;margin-top:4px">${offerValue}</div>
-                    <div style="font-size:0.75rem;color:#94a3b8;margin-top:4px">Applies to: ${offer.applies_to === 'all' ? 'All Products' : esc(offer.target_id || offer.applies_to)}</div>
+                    <div class="value">${esc(offer.title || offerTypeLabels[offer.offer_type] || 'Special Offer')}</div>
+                    <div style="font-size:0.875rem;color:rgba(255,255,255,0.6);margin-top:4px">${offerValue}</div>
+                    <div style="font-size:0.75rem;color:rgba(212,162,78,0.6);margin-top:4px">Applies to: ${offer.applies_to === 'all' ? 'All Products' : esc(offer.target_id || offer.applies_to)}</div>
                 </div>
             `;
         }
@@ -832,10 +844,12 @@
             const effectivePts = (offer && offer.offer_type === 'multiplier' && offer.multiplier_value)
                 ? (p.points_per_unit * offer.multiplier_value).toFixed(1)
                 : p.points_per_unit;
+            const multiplierNote = (offer && offer.offer_type === 'multiplier' && offer.multiplier_value)
+                ? ` <span style="font-size:0.75rem;color:#D4A24E">(${p.points_per_unit} × ${offer.multiplier_value}x)</span>` : '';
             pointsHtml = `
                 <div class="detail-card">
                     <div class="label">🏆 Points Per Unit</div>
-                    <div class="value">${effectivePts} pts${offer && offer.offer_type === 'multiplier' ? ` <span style="font-size:0.75rem;color:#D4A24E">(${p.points_per_unit} × ${offer.multiplier_value}x)</span>` : ''}</div>
+                    <div class="value">${effectivePts} pts${multiplierNote}</div>
                 </div>
             `;
         }
@@ -845,8 +859,8 @@
             priceHtml = `
                 <div class="detail-card">
                     <div class="label">💲 Price Range</div>
-                    <div class="value" style="color:#1a1a2e">₹${p.min_rate.toFixed(2)}${p.max_rate && p.max_rate !== p.min_rate ? ` — ₹${p.max_rate.toFixed(2)}` : ''}</div>
-                    <div style="font-size:0.75rem;color:#94a3b8;margin-top:2px">${p.variant_count || 1} variant${(p.variant_count || 1) > 1 ? 's' : ''} available</div>
+                    <div class="value">₹${p.min_rate.toFixed(2)}${p.max_rate && p.max_rate !== p.min_rate ? ` — ₹${p.max_rate.toFixed(2)}` : ''}</div>
+                    <div style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-top:2px">${p.variant_count || 1} variant${(p.variant_count || 1) > 1 ? 's' : ''} available</div>
                 </div>
             `;
         }
@@ -859,7 +873,7 @@
                 ${offerDetailHtml}
                 ${pointsHtml}
                 ${priceHtml}
-                <button onclick="closeProductModal()" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;background:#1B5E3B;color:#fff;font-weight:600;font-size:0.9375rem;border:none;cursor:pointer">Close</button>
+                <button onclick="closeProductModal()" style="width:100%;margin-top:10px;padding:13px;border-radius:12px;background:linear-gradient(135deg,#D4A24E,#b8860b);color:#fff;font-weight:700;font-size:0.9375rem;border:none;cursor:pointer;box-shadow:0 2px 10px rgba(212,162,78,0.3)">Close</button>
             </div>
         `;
         document.getElementById('productModal').classList.add('show');
