@@ -80,14 +80,11 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <div class="max-w-lg mx-auto px-4 pt-2 pb-3">
-            <!-- Centered Logo — compact -->
-            <div id="headerLogoWrap" class="flex justify-center mb-1" style="display:none">
-                <img id="headerLogo" style="width:44px;height:44px;border-radius:10px;object-fit:contain;box-shadow:0 2px 6px rgba(0,0,0,0.15)" alt="QC">
-            </div>
+        <div class="max-w-lg mx-auto px-4 py-3">
             <div class="flex items-center justify-between">
-                <!-- Left: Name -->
-                <div class="flex items-center gap-2">
+                <!-- Left: Logo + Name (same row) -->
+                <div class="flex items-center gap-2.5">
+                    <img id="headerLogo" style="width:48px;height:48px;border-radius:10px;object-fit:contain;display:none;box-shadow:0 2px 6px rgba(0,0,0,0.15)" alt="QC">
                     <div>
                         <p class="text-sm opacity-80" data-i18n="dashboard.welcome_back">Welcome back,</p>
                         <h1 class="text-xl font-bold" id="painterName">Painter</h1>
@@ -430,10 +427,10 @@
 
             dashboardData = data.dashboard;
 
-            // Show business logo centered (no fallback)
+            // Show business logo inline with name
             if (data.dashboard.businessLogo) {
                 document.getElementById('headerLogo').src = data.dashboard.businessLogo;
-                document.getElementById('headerLogoWrap').style.display = 'flex';
+                document.getElementById('headerLogo').style.display = 'block';
             }
 
             // Update profile avatar (top-right button)
