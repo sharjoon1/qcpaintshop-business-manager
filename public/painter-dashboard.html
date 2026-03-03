@@ -1002,15 +1002,19 @@
                 admin_review: 'background:#dbeafe;color:#1e40af',
                 approved: 'background:#d1fae5;color:#065f46',
                 sent_to_customer: 'background:#e0e7ff;color:#4338ca',
-                payment_recorded: 'background:#c7d2fe;color:#3730a3',
+                payment_submitted: 'background:#fef3c7;color:#92400e',
+                payment_recorded: 'background:#d1fae5;color:#065f46',
                 pushed_to_zoho: 'background:#d1fae5;color:#065f46',
                 rejected: 'background:#fee2e2;color:#991b1b',
                 cancelled: 'background:#e2e8f0;color:#64748b'
             };
+            const statusLabelsMap = {
+                payment_submitted: 'Submitted', payment_recorded: 'Paid'
+            };
 
             container.innerHTML = data.estimates.map(e => {
                 const style = statusColors[e.status] || '';
-                const statusLabel = e.status.replace(/_/g, ' ');
+                const statusLabel = statusLabelsMap[e.status] || e.status.replace(/_/g, ' ');
                 const total = e.billing_type === 'self' ? `₹${parseFloat(e.grand_total).toLocaleString('en-IN')}` : (parseFloat(e.markup_grand_total) > 0 ? `₹${parseFloat(e.markup_grand_total).toLocaleString('en-IN')}` : 'Pending');
                 return `
                     <div class="flex justify-between items-center py-3 border-b border-gray-100 last:border-0 cursor-pointer" onclick="viewPainterEstimate(${e.id})" style="transition:background 0.15s" onmousedown="this.style.background='#f1f5f9'" onmouseup="this.style.background=''" onmouseleave="this.style.background=''">
@@ -1059,15 +1063,19 @@
             const statusColors = {
                 draft:'#94a3b8', pending_admin:'#d97706', admin_review:'#3b82f6',
                 approved:'#059669', sent_to_customer:'#6366f1', discount_requested:'#f59e0b',
-                final_approved:'#059669', payment_recorded:'#4f46e5', pushed_to_zoho:'#059669',
-                rejected:'#dc2626', cancelled:'#6b7280'
+                final_approved:'#059669', payment_submitted:'#d97706', payment_recorded:'#059669',
+                pushed_to_zoho:'#059669', rejected:'#dc2626', cancelled:'#6b7280'
             };
             const statusLabels = {
                 draft:'Draft', pending_admin:'Pending Review', admin_review:'Under Review',
                 approved:'Approved', sent_to_customer:'Sent to Customer', discount_requested:'Discount Requested',
-                final_approved:'Final Approved', payment_recorded:'Payment Recorded', pushed_to_zoho:'Invoiced',
-                rejected:'Rejected', cancelled:'Cancelled'
+                final_approved:'Final Approved', payment_submitted:'Payment Submitted', payment_recorded:'Paid',
+                pushed_to_zoho:'Invoiced', rejected:'Rejected', cancelled:'Cancelled'
             };
+
+            // Balance calculation
+            const paidAmount = parseFloat(est.payment_amount) || 0;
+            const balanceDue = paidAmount > 0 ? Math.max(0, Math.round((total - paidAmount) * 100) / 100) : 0;
             const statusLabel = statusLabels[est.status] || est.status.replace(/_/g, ' ');
             const statusColor = statusColors[est.status] || '#94a3b8';
             const dateStr = new Date(est.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' });
@@ -1112,11 +1120,28 @@
                 </div>`;
             }
 
-            // Record Payment: final_approved only
-            if (est.status === 'final_approved') {
+            // Payment submitted — awaiting admin confirmation
+            if (est.status === 'payment_submitted') {
+                actionsHtml += `
+                <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;margin-bottom:8px">
+                    <div style="font-size:0.8rem;font-weight:700;color:#92400e;margin-bottom:4px">Payment Submitted</div>
+                    <div style="font-size:0.75rem;color:#78716c">Awaiting admin confirmation. You will be notified once confirmed.</div>
+                    ${paidAmount > 0 ? `<div style="font-size:0.8rem;color:#166534;font-weight:600;margin-top:6px">Amount: ₹${paidAmount.toLocaleString('en-IN',{minimumFractionDigits:2})}</div>` : ''}
+                </div>`;
+            }
+
+            // Record Payment: approved (self) / final_approved (customer) / payment_recorded with balance
+            const canPay = est.status === 'final_approved'
+                || (est.status === 'approved' && isSelf)
+                || (est.status === 'payment_recorded' && balanceDue > 0);
+
+            if (canPay) {
+                const payLabel = balanceDue > 0 ? `Pay Balance: ₹${balanceDue.toLocaleString('en-IN',{minimumFractionDigits:2})}` : 'Submit Payment';
+                const defaultAmount = balanceDue > 0 ? balanceDue : total;
                 actionsHtml += `
                 <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;margin-bottom:8px">
-                    <div style="font-size:0.8rem;font-weight:700;color:#166534;margin-bottom:10px">Record Payment</div>
+                    <div style="font-size:0.8rem;font-weight:700;color:#166534;margin-bottom:10px">${balanceDue > 0 ? 'Additional Payment Required' : 'Record Payment'}</div>
+                    ${balanceDue > 0 ? `<div style="font-size:0.75rem;color:#dc2626;margin-bottom:8px;font-weight:600">Balance Due: ₹${balanceDue.toLocaleString('en-IN',{minimumFractionDigits:2})} (Paid: ₹${paidAmount.toLocaleString('en-IN',{minimumFractionDigits:2})} / Total: ₹${total.toLocaleString('en-IN',{minimumFractionDigits:2})})</div>` : ''}
                     <select id="paymentMethod" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.8rem;margin-bottom:8px;background:#fff;outline:none">
                         <option value="">Select payment method</option>
                         <option value="Cash">Cash</option>
@@ -1126,12 +1151,24 @@
                     </select>
                     <input type="text" id="paymentReference" placeholder="Reference / Transaction ID (optional)"
                         style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.8rem;margin-bottom:8px;box-sizing:border-box;outline:none" />
-                    <input type="number" id="paymentAmount" placeholder="Amount (₹)" value="${total}"
+                    <input type="number" id="paymentAmount" placeholder="Amount (₹)" value="${defaultAmount}"
                         style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.8rem;margin-bottom:10px;box-sizing:border-box;outline:none" />
                     <button onclick="submitPayment(${est.id})"
                         style="width:100%;padding:12px;border-radius:10px;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-weight:700;font-size:0.875rem;border:none;cursor:pointer">
-                        Submit Payment
+                        ${esc(payLabel)}
                     </button>
+                </div>`;
+            }
+
+            // Payment confirmed — show paid info
+            if (est.status === 'payment_recorded' && balanceDue <= 0) {
+                actionsHtml += `
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;margin-bottom:8px;text-align:center">
+                    <div style="display:inline-flex;align-items:center;gap:8px;color:#059669;font-weight:700;font-size:0.9rem">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        Payment Confirmed — Paid
+                    </div>
+                    ${paidAmount > 0 ? `<div style="font-size:0.8rem;color:#166534;margin-top:4px">₹${paidAmount.toLocaleString('en-IN',{minimumFractionDigits:2})} via ${esc(est.payment_method || '-')}</div>` : ''}
                 </div>`;
             }
 
@@ -1237,6 +1274,16 @@
                                 <td colspan="4" style="padding:10px;border:1px solid #1B5E3B;text-align:right;font-size:0.85rem;font-weight:700;color:#fff">Grand Total</td>
                                 <td style="padding:10px;border:1px solid #1B5E3B;text-align:right;font-size:1rem;font-weight:800;color:${hasDiscount ? '#D4A24E' : '#fff'}">₹${total.toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
                             </tr>
+                            ${paidAmount > 0 ? `
+                            <tr>
+                                <td colspan="4" style="padding:8px 10px;border:1px solid #e5e7eb;text-align:right;font-size:0.8rem;color:#059669;font-weight:600">Paid</td>
+                                <td style="padding:8px 10px;border:1px solid #e5e7eb;text-align:right;font-size:0.8rem;font-weight:600;color:#059669">₹${paidAmount.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+                            </tr>` : ''}
+                            ${balanceDue > 0 ? `
+                            <tr style="background:#fef2f2">
+                                <td colspan="4" style="padding:8px 10px;border:1px solid #fecaca;text-align:right;font-size:0.8rem;color:#dc2626;font-weight:700">Balance Due</td>
+                                <td style="padding:8px 10px;border:1px solid #fecaca;text-align:right;font-size:0.9rem;font-weight:800;color:#dc2626">₹${balanceDue.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+                            </tr>` : ''}
                         </tfoot>
                     </table>
                     <div style="text-align:right;font-size:0.65rem;color:#94a3b8;margin-top:6px;font-style:italic">* Prices inclusive of GST</div>
@@ -1300,7 +1347,7 @@
             });
             const data = await res.json();
             if (!data.success) throw new Error(data.message);
-            showToast('Payment recorded successfully!', 'success');
+            showToast(data.message || 'Payment submitted — awaiting admin confirmation', 'success');
             closeEstimateModal();
             loadEstimates();
         } catch (err) {

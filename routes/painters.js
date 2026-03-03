@@ -932,32 +932,38 @@ router.post('/me/estimates/:estimateId/request-discount', requirePainterAuth, as
     }
 });
 
-// Painter: Record payment on final_approved estimate
+// Painter: Submit payment (pending admin confirmation)
+// Allowed from: approved (self), final_approved (customer), payment_recorded (balance payment)
 router.post('/me/estimates/:estimateId/payment', requirePainterAuth, async (req, res) => {
     try {
         const { payment_method, payment_reference, payment_amount } = req.body;
         if (!payment_method) return res.status(400).json({ success: false, message: 'Payment method is required' });
 
         const [estimates] = await pool.query(
-            "SELECT * FROM painter_estimates WHERE id = ? AND painter_id = ? AND status = 'final_approved'",
+            "SELECT * FROM painter_estimates WHERE id = ? AND painter_id = ? AND status IN ('approved','final_approved','payment_recorded')",
             [req.params.estimateId, req.painter.id]
         );
-        if (!estimates.length) return res.status(404).json({ success: false, message: 'Final approved estimate not found' });
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found or not payable' });
 
         const estimate = estimates[0];
-        const amount = parseFloat(payment_amount) || parseFloat(estimate.final_grand_total) || parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total);
+        const effectiveTotal = parseFloat(estimate.final_grand_total) || parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total);
+        const previousPaid = parseFloat(estimate.payment_amount) || 0;
+        const newPayment = parseFloat(payment_amount) || (effectiveTotal - previousPaid);
+        const totalPaid = previousPaid + newPayment;
 
+        const oldStatus = estimate.status;
         await pool.query(
-            `UPDATE painter_estimates SET status = 'payment_recorded', payment_method = ?, payment_reference = ?,
+            `UPDATE painter_estimates SET status = 'payment_submitted', payment_method = ?, payment_reference = ?,
              payment_amount = ?, payment_recorded_by = ?, payment_recorded_at = NOW() WHERE id = ?`,
-            [payment_method, payment_reference || null, amount, req.painter.id, estimate.id]
+            [payment_method, payment_reference || null, totalPaid, req.painter.id, estimate.id]
         );
-        await logEstimateStatusChange(estimate.id, 'final_approved', 'payment_recorded', req.painter.id, `Payment: ${payment_method}${payment_reference ? ' ref:' + payment_reference : ''}`);
+        await logEstimateStatusChange(estimate.id, oldStatus, 'payment_submitted', req.painter.id,
+            `Payment submitted: ${payment_method} ₹${newPayment}${previousPaid > 0 ? ' (additional, total: ₹' + totalPaid + ')' : ''}${payment_reference ? ' ref:' + payment_reference : ''}`);
 
-        res.json({ success: true, message: 'Payment recorded successfully' });
+        res.json({ success: true, message: 'Payment submitted — awaiting admin confirmation' });
     } catch (error) {
-        console.error('Painter record payment error:', error);
-        res.status(500).json({ success: false, message: 'Failed to record payment' });
+        console.error('Painter submit payment error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit payment' });
     }
 });
 
@@ -2667,7 +2673,7 @@ router.put('/estimates/:estimateId/items', requirePermission('painters', 'estima
             return res.status(400).json({ success: false, message: 'Items array is required' });
         }
 
-        const editableStatuses = ['admin_review', 'approved', 'sent_to_customer', 'final_approved'];
+        const editableStatuses = ['admin_review', 'approved', 'sent_to_customer', 'final_approved', 'payment_submitted', 'payment_recorded'];
         const [estimates] = await pool.query(
             'SELECT * FROM painter_estimates WHERE id = ? AND status IN (?)',
             [req.params.estimateId, editableStatuses]
@@ -2676,6 +2682,7 @@ router.put('/estimates/:estimateId/items', requirePermission('painters', 'estima
 
         const estimate = estimates[0];
         const isCustomer = estimate.billing_type === 'customer';
+        const hadPayment = ['payment_submitted', 'payment_recorded'].includes(estimate.status);
 
         // Fetch prices from zoho_items_map for all requested items
         const itemIds = items.map(i => i.item_id);
@@ -2728,15 +2735,25 @@ router.put('/estimates/:estimateId/items', requirePermission('painters', 'estima
             const oldStatus = estimate.status;
             if (oldStatus !== 'admin_review') {
                 updateFields.status = 'admin_review';
-                await logEstimateStatusChange(estimate.id, oldStatus, 'admin_review', req.user.id, 'Items edited by admin — markup cleared');
+                await logEstimateStatusChange(estimate.id, oldStatus, 'admin_review', req.user.id, 'Items edited by admin — markup cleared, needs re-markup');
             }
         }
+        // Self billing: keep status (even payment_recorded) — balance will be shown if total > paid
+        // Payment fields are always preserved
 
         const setClauses = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
         const setValues = Object.values(updateFields);
         await pool.query(`UPDATE painter_estimates SET ${setClauses} WHERE id = ?`, [...setValues, estimate.id]);
 
-        res.json({ success: true, message: `Items updated${isCustomer ? ' — markup cleared, set new markup' : ''}`, subtotal, grandTotal });
+        // Calculate balance if payment exists
+        const paidAmount = parseFloat(estimate.payment_amount) || 0;
+        const balanceDue = paidAmount > 0 ? Math.max(0, Math.round((grandTotal - paidAmount) * 100) / 100) : 0;
+
+        res.json({
+            success: true,
+            message: `Items updated${isCustomer ? ' — markup cleared, set new markup' : ''}${balanceDue > 0 ? ` — Balance due: ₹${balanceDue}` : ''}`,
+            subtotal, grandTotal, balanceDue
+        });
     } catch (error) {
         console.error('Edit estimate items error:', error);
         res.status(500).json({ success: false, message: 'Failed to update items' });
@@ -2981,27 +2998,53 @@ router.post('/estimates/:estimateId/approve-final', requirePermission('painters'
     }
 });
 
-// Record payment (admin)
+// Admin: Confirm painter-submitted payment
+router.post('/estimates/:estimateId/confirm-payment', requirePermission('painters', 'estimates'), async (req, res) => {
+    try {
+        const [estimates] = await pool.query(
+            "SELECT * FROM painter_estimates WHERE id = ? AND status = 'payment_submitted'",
+            [req.params.estimateId]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'No pending payment to confirm' });
+
+        const estimate = estimates[0];
+        await pool.query(
+            "UPDATE painter_estimates SET status = 'payment_recorded', payment_recorded_by = ?, payment_recorded_at = NOW() WHERE id = ?",
+            [req.user.id, estimate.id]
+        );
+        await logEstimateStatusChange(estimate.id, 'payment_submitted', 'payment_recorded', req.user.id, 'Payment confirmed by admin');
+
+        res.json({ success: true, message: 'Payment confirmed' });
+    } catch (error) {
+        console.error('Confirm payment error:', error);
+        res.status(500).json({ success: false, message: 'Failed to confirm payment' });
+    }
+});
+
+// Record payment (admin — directly confirmed, no painter step needed)
 router.post('/estimates/:estimateId/payment', requirePermission('painters', 'estimates'), async (req, res) => {
     try {
         const { payment_method, payment_reference, payment_amount } = req.body;
         if (!payment_method) return res.status(400).json({ success: false, message: 'Payment method is required' });
 
         const [estimates] = await pool.query(
-            "SELECT * FROM painter_estimates WHERE id = ? AND status IN ('approved','sent_to_customer','final_approved')",
+            "SELECT * FROM painter_estimates WHERE id = ? AND status IN ('approved','sent_to_customer','final_approved','payment_submitted')",
             [req.params.estimateId]
         );
-        if (!estimates.length) return res.status(404).json({ success: false, message: 'Approved estimate not found' });
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
 
         const estimate = estimates[0];
-        const amount = parseFloat(payment_amount) || parseFloat(estimate.final_grand_total) || parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total);
+        const previousPaid = parseFloat(estimate.payment_amount) || 0;
+        const effectiveTotal = parseFloat(estimate.final_grand_total) || parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total);
+        const amount = parseFloat(payment_amount) || (effectiveTotal - previousPaid);
+        const totalPaid = previousPaid > 0 ? previousPaid + amount : amount;
 
         await pool.query(
             `UPDATE painter_estimates SET status = 'payment_recorded', payment_method = ?, payment_reference = ?,
              payment_amount = ?, payment_recorded_by = ?, payment_recorded_at = NOW() WHERE id = ?`,
-            [payment_method, payment_reference || null, amount, req.user.id, estimate.id]
+            [payment_method, payment_reference || null, totalPaid, req.user.id, estimate.id]
         );
-        await logEstimateStatusChange(estimate.id, estimate.status, 'payment_recorded', req.user.id, `Payment: ${payment_method}${payment_reference ? ' ref:' + payment_reference : ''}`);
+        await logEstimateStatusChange(estimate.id, estimate.status, 'payment_recorded', req.user.id, `Payment: ${payment_method} ₹${amount}${payment_reference ? ' ref:' + payment_reference : ''}`);
 
         res.json({ success: true, message: 'Payment recorded' });
     } catch (error) {

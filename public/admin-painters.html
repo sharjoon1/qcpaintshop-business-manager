@@ -352,7 +352,8 @@
                             <option value="admin_review">Needs Markup</option>
                             <option value="approved">Approved</option>
                             <option value="sent_to_customer">Sent to Customer</option>
-                            <option value="payment_recorded">Payment Recorded</option>
+                            <option value="payment_submitted">Payment Submitted</option>
+                            <option value="payment_recorded">Payment Confirmed</option>
                             <option value="pushed_to_zoho">Pushed to Zoho</option>
                             <option value="discount_requested">Discount Requested</option>
                             <option value="final_approved">Final Approved</option>
@@ -1544,9 +1545,9 @@
         }
         const statusBadge = {
             draft: 'badge-suspended', pending_admin: 'badge-pending', admin_review: 'badge-pending',
-            approved: 'badge-approved', sent_to_customer: 'badge-paid', payment_recorded: 'badge-paid',
-            pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-suspended',
-            discount_requested: 'badge-pending', final_approved: 'badge-approved'
+            approved: 'badge-approved', sent_to_customer: 'badge-paid', payment_submitted: 'badge-pending',
+            payment_recorded: 'badge-paid', pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected',
+            cancelled: 'badge-suspended', discount_requested: 'badge-pending', final_approved: 'badge-approved'
         };
         body.innerHTML = estimates.map(e => {
             const total = e.billing_type === 'customer' && parseFloat(e.markup_grand_total) > 0
@@ -1594,9 +1595,9 @@
         const isCustomer = est.billing_type === 'customer';
         const statusBadge = {
             draft: 'badge-suspended', pending_admin: 'badge-pending', admin_review: 'badge-pending',
-            approved: 'badge-approved', sent_to_customer: 'badge-paid', payment_recorded: 'badge-paid',
-            pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-suspended',
-            discount_requested: 'badge-pending', final_approved: 'badge-approved'
+            approved: 'badge-approved', sent_to_customer: 'badge-paid', payment_submitted: 'badge-pending',
+            payment_recorded: 'badge-paid', pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected',
+            cancelled: 'badge-suspended', discount_requested: 'badge-pending', final_approved: 'badge-approved'
         };
 
         let actionsHtml = '';
@@ -1651,8 +1652,31 @@
                     </div>`;
             }
             actionsHtml += `<button class="btn-sm btn-success" onclick="showPaymentForm(${est.id})">Record Payment</button>`;
+        } else if (est.status === 'payment_submitted') {
+            actionsHtml = `
+                <div class="w-full mb-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div class="flex items-center gap-2 text-amber-800 font-semibold text-sm mb-1">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        Painter submitted payment — awaiting your confirmation
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        Method: <strong>${esc(est.payment_method || '-')}</strong>
+                        ${est.payment_reference ? ` | Ref: <strong>${esc(est.payment_reference)}</strong>` : ''}
+                        | Amount: <strong>₹${paidAmount.toLocaleString('en-IN')}</strong>
+                    </div>
+                    ${balanceDue > 0 ? `<div class="text-sm text-red-600 mt-1 font-semibold">Balance due: ₹${balanceDue.toLocaleString('en-IN')}</div>` : ''}
+                </div>
+                <button class="btn-sm btn-success" onclick="adminConfirmPayment(${est.id})">Confirm Payment</button>
+                <button class="btn-sm btn-outline" onclick="showPaymentForm(${est.id})">Record Different Amount</button>`;
         } else if (est.status === 'payment_recorded') {
-            actionsHtml = `<button class="btn-sm btn-primary" onclick="pushToZoho(${est.id})">Push to Zoho</button>`;
+            if (balanceDue > 0) {
+                actionsHtml = `
+                    <div class="w-full mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                        <div class="text-sm text-red-800 font-semibold">Balance Due: ₹${balanceDue.toLocaleString('en-IN')}</div>
+                        <div class="text-xs text-red-600 mt-1">Paid: ₹${paidAmount.toLocaleString('en-IN')} | Total: ₹${effectiveTotal.toLocaleString('en-IN')}</div>
+                    </div>`;
+            }
+            actionsHtml += `<button class="btn-sm btn-primary" onclick="pushToZoho(${est.id})"${balanceDue > 0 ? ' disabled title="Balance due — cannot push"' : ''}>Push to Zoho</button>`;
         }
 
         let itemsHtml = items.map((item, idx) => {
@@ -1692,9 +1716,14 @@
             }
         }).join('');
 
-        const editableStatuses = ['admin_review', 'approved', 'sent_to_customer', 'final_approved'];
+        const editableStatuses = ['admin_review', 'approved', 'sent_to_customer', 'final_approved', 'payment_submitted', 'payment_recorded'];
         const canEdit = editableStatuses.includes(est.status);
         const canPdf = est.status !== 'draft';
+
+        // Calculate balance due
+        const effectiveTotal = parseFloat(est.final_grand_total) || parseFloat(est.markup_grand_total) || parseFloat(est.grand_total) || 0;
+        const paidAmount = parseFloat(est.payment_amount) || 0;
+        const balanceDue = paidAmount > 0 ? Math.max(0, Math.round((effectiveTotal - paidAmount) * 100) / 100) : 0;
 
         const content = document.getElementById('estimateDetailContent');
         content.innerHTML = `
@@ -1750,11 +1779,15 @@
 
             <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
                 <div class="flex justify-between mb-1"><span>Subtotal (Cost):</span><span>₹${parseFloat(est.subtotal).toLocaleString('en-IN')}</span></div>
-                <div class="flex justify-between mb-1"><span>GST:</span><span>₹${parseFloat(est.gst_amount).toLocaleString('en-IN')}</span></div>
                 <div class="flex justify-between font-bold border-t pt-1"><span>Grand Total (Cost):</span><span>₹${parseFloat(est.grand_total).toLocaleString('en-IN')}</span></div>
                 ${isCustomer && parseFloat(est.markup_grand_total) > 0 ? `
                 <div class="flex justify-between mt-2 pt-2 border-t font-bold text-indigo-600"><span>Markup Grand Total:</span><span>₹${parseFloat(est.markup_grand_total).toLocaleString('en-IN')}</span></div>
+                ${parseFloat(est.discount_amount) > 0 ? `<div class="flex justify-between text-red-600"><span>Discount (${parseFloat(est.discount_percentage)}%):</span><span>-₹${parseFloat(est.discount_amount).toLocaleString('en-IN')}</span></div>
+                <div class="flex justify-between font-bold text-green-700"><span>Final Total:</span><span>₹${parseFloat(est.final_grand_total).toLocaleString('en-IN')}</span></div>` : ''}
                 ` : ''}
+                ${paidAmount > 0 ? `<div class="flex justify-between mt-2 pt-2 border-t"><span>Paid:</span><span class="text-green-600 font-semibold">₹${paidAmount.toLocaleString('en-IN')}</span></div>` : ''}
+                ${balanceDue > 0 ? `<div class="flex justify-between font-bold text-red-600"><span>Balance Due:</span><span>₹${balanceDue.toLocaleString('en-IN')}</span></div>` : ''}
+                <div class="text-xs text-gray-400 mt-1 italic">* All prices inclusive of GST</div>
             </div>
 
             ${est.notes ? `<div class="text-sm mb-2"><span class="text-gray-500">Notes:</span> ${esc(est.notes)}</div>` : ''}
@@ -1950,6 +1983,20 @@
             const data = await res.json();
             if (!data.success) throw new Error(data.message);
             alert('Payment recorded');
+            closeEstimateDetail();
+            loadEstimates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function adminConfirmPayment(id) {
+        if (!confirm('Confirm this payment from the painter?')) return;
+        try {
+            const res = await fetch(`${API}/estimates/${id}/confirm-payment`, {
+                method: 'POST', headers: authHeaders()
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert('Payment confirmed');
             closeEstimateDetail();
             loadEstimates();
         } catch (err) { alert('Error: ' + err.message); }
