@@ -907,6 +907,59 @@ router.post('/me/estimates/:estimateId/submit', requirePainterAuth, async (req, 
     }
 });
 
+// Painter: Request discount on approved customer estimate
+router.post('/me/estimates/:estimateId/request-discount', requirePainterAuth, async (req, res) => {
+    try {
+        const { notes } = req.body;
+        const [estimates] = await pool.query(
+            "SELECT * FROM painter_estimates WHERE id = ? AND painter_id = ? AND billing_type = 'customer' AND status IN ('approved','sent_to_customer')",
+            [req.params.estimateId, req.painter.id]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Approved customer estimate not found' });
+
+        const estimate = estimates[0];
+        await pool.query(
+            "UPDATE painter_estimates SET status = 'discount_requested', discount_requested_at = NOW(), discount_notes = ? WHERE id = ?",
+            [notes || null, estimate.id]
+        );
+        await logEstimateStatusChange(estimate.id, estimate.status, 'discount_requested', req.painter.id, notes || 'Discount requested by painter');
+
+        res.json({ success: true, message: 'Discount request sent to admin' });
+    } catch (error) {
+        console.error('Request discount error:', error);
+        res.status(500).json({ success: false, message: 'Failed to request discount' });
+    }
+});
+
+// Painter: Record payment on final_approved estimate
+router.post('/me/estimates/:estimateId/payment', requirePainterAuth, async (req, res) => {
+    try {
+        const { payment_method, payment_reference, payment_amount } = req.body;
+        if (!payment_method) return res.status(400).json({ success: false, message: 'Payment method is required' });
+
+        const [estimates] = await pool.query(
+            "SELECT * FROM painter_estimates WHERE id = ? AND painter_id = ? AND status = 'final_approved'",
+            [req.params.estimateId, req.painter.id]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Final approved estimate not found' });
+
+        const estimate = estimates[0];
+        const amount = parseFloat(payment_amount) || parseFloat(estimate.final_grand_total) || parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total);
+
+        await pool.query(
+            `UPDATE painter_estimates SET status = 'payment_recorded', payment_method = ?, payment_reference = ?,
+             payment_amount = ?, payment_recorded_by = ?, payment_recorded_at = NOW() WHERE id = ?`,
+            [payment_method, payment_reference || null, amount, req.painter.id, estimate.id]
+        );
+        await logEstimateStatusChange(estimate.id, 'final_approved', 'payment_recorded', req.painter.id, `Payment: ${payment_method}${payment_reference ? ' ref:' + payment_reference : ''}`);
+
+        res.json({ success: true, message: 'Payment recorded successfully' });
+    } catch (error) {
+        console.error('Painter record payment error:', error);
+        res.status(500).json({ success: false, message: 'Failed to record payment' });
+    }
+});
+
 // Cancel draft
 router.delete('/me/estimates/:estimateId', requirePainterAuth, async (req, res) => {
     try {
@@ -2537,7 +2590,10 @@ router.get('/estimates/:estimateId', requireAuth, async (req, res) => {
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
 
         const [items] = await pool.query(
-            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? ORDER BY display_order, id',
+            `SELECT pei.*, zim.zoho_description, zim.zoho_item_name as zoho_display_name
+             FROM painter_estimate_items pei
+             LEFT JOIN zoho_items_map zim ON pei.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+             WHERE pei.estimate_id = ? ORDER BY pei.display_order, pei.id`,
             [estimates[0].id]
         );
 
@@ -2598,11 +2654,11 @@ router.put('/estimates/:estimateId/review', requirePermission('painters', 'estim
     }
 });
 
-// Set markup prices (customer billing)
+// Set markup prices (customer billing) — supports % and absolute pricing
 router.post('/estimates/:estimateId/markup', requirePermission('painters', 'estimates'), async (req, res) => {
     try {
-        const { items } = req.body; // [{ id, markup_unit_price }]
-        if (!items || !items.length) return res.status(400).json({ success: false, message: 'Items with markup prices required' });
+        const { items, markup_percentage } = req.body; // items: [{ id, markup_unit_price?, markup_pct? }], markup_percentage: bulk %
+        if (!items && !markup_percentage) return res.status(400).json({ success: false, message: 'Items with markup prices or markup percentage required' });
 
         const [estimates] = await pool.query(
             "SELECT * FROM painter_estimates WHERE id = ? AND billing_type = 'customer' AND status IN ('pending_admin','admin_review')",
@@ -2610,32 +2666,50 @@ router.post('/estimates/:estimateId/markup', requirePermission('painters', 'esti
         );
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Customer-billing estimate not found' });
 
-        const [gstConfig] = await pool.query("SELECT config_value FROM ai_config WHERE config_key = 'painter_estimate_gst_pct'");
-        const gstPct = gstConfig.length ? parseFloat(gstConfig[0].config_value) : 18;
+        // Get all items for this estimate
+        const [allItems] = await pool.query(
+            'SELECT id, unit_price, quantity FROM painter_estimate_items WHERE estimate_id = ?',
+            [estimates[0].id]
+        );
+        const bulkPct = parseFloat(markup_percentage) || 0;
 
         let markupSubtotal = 0;
-        for (const item of items) {
-            const markupPrice = parseFloat(item.markup_unit_price) || 0;
-            const [lineItem] = await pool.query('SELECT quantity FROM painter_estimate_items WHERE id = ? AND estimate_id = ?', [item.id, estimates[0].id]);
-            if (!lineItem.length) continue;
-            const markupLineTotal = markupPrice * parseFloat(lineItem[0].quantity);
+        for (const dbItem of allItems) {
+            // Check if this item has a specific markup from the request
+            const reqItem = items ? items.find(i => i.id === dbItem.id || i.id === String(dbItem.id)) : null;
+            let markupPrice;
+
+            if (reqItem && reqItem.markup_unit_price) {
+                // Absolute price provided
+                markupPrice = parseFloat(reqItem.markup_unit_price);
+            } else if (reqItem && reqItem.markup_pct) {
+                // Per-item percentage
+                markupPrice = parseFloat(dbItem.unit_price) * (1 + parseFloat(reqItem.markup_pct) / 100);
+            } else if (bulkPct > 0) {
+                // Bulk percentage
+                markupPrice = parseFloat(dbItem.unit_price) * (1 + bulkPct / 100);
+            } else {
+                continue; // No markup specified for this item
+            }
+
+            markupPrice = Math.round(markupPrice * 100) / 100;
+            const markupLineTotal = markupPrice * parseFloat(dbItem.quantity);
             markupSubtotal += markupLineTotal;
             await pool.query(
                 'UPDATE painter_estimate_items SET markup_unit_price = ?, markup_line_total = ? WHERE id = ?',
-                [markupPrice, markupLineTotal, item.id]
+                [markupPrice, markupLineTotal, dbItem.id]
             );
         }
 
         // Prices already include GST — no separate GST calculation
-        const markupGst = 0;
         const markupGrandTotal = markupSubtotal;
 
         await pool.query(
-            `UPDATE painter_estimates SET markup_subtotal = ?, markup_gst_amount = ?, markup_grand_total = ?,
+            `UPDATE painter_estimates SET markup_subtotal = ?, markup_gst_amount = 0, markup_grand_total = ?,
              status = 'approved', reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
-            [markupSubtotal, markupGst, markupGrandTotal, req.user.id, estimates[0].id]
+            [markupSubtotal, markupGrandTotal, req.user.id, estimates[0].id]
         );
-        await logEstimateStatusChange(estimates[0].id, estimates[0].status, 'approved', req.user.id, 'Markup prices set and approved');
+        await logEstimateStatusChange(estimates[0].id, estimates[0].status, 'approved', req.user.id, `Markup set${bulkPct > 0 ? ' (' + bulkPct + '%)' : ''} and approved`);
 
         res.json({ success: true, message: 'Markup prices set and estimate approved', markupGrandTotal });
     } catch (error) {
@@ -2677,20 +2751,80 @@ router.post('/estimates/:estimateId/share', requirePermission('painters', 'estim
     }
 });
 
-// Record payment
+// Admin: Apply discount to customer estimate
+router.post('/estimates/:estimateId/discount', requirePermission('painters', 'estimates'), async (req, res) => {
+    try {
+        const { discount_percentage } = req.body;
+        if (!discount_percentage || parseFloat(discount_percentage) <= 0) {
+            return res.status(400).json({ success: false, message: 'Discount percentage is required' });
+        }
+
+        const [estimates] = await pool.query(
+            "SELECT * FROM painter_estimates WHERE id = ? AND status = 'discount_requested'",
+            [req.params.estimateId]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate with discount request not found' });
+
+        const estimate = estimates[0];
+        const baseTotal = parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total);
+        const pct = parseFloat(discount_percentage);
+        const discountAmount = Math.round(baseTotal * (pct / 100) * 100) / 100;
+        const finalTotal = Math.round((baseTotal - discountAmount) * 100) / 100;
+
+        await pool.query(
+            `UPDATE painter_estimates SET discount_percentage = ?, discount_amount = ?, final_grand_total = ?,
+             discount_approved_by = ?, discount_approved_at = NOW(), status = 'final_approved' WHERE id = ?`,
+            [pct, discountAmount, finalTotal, req.user.id, estimate.id]
+        );
+        await logEstimateStatusChange(estimate.id, 'discount_requested', 'final_approved', req.user.id, `Discount ${pct}% applied (₹${discountAmount})`);
+
+        res.json({ success: true, message: `Discount of ${pct}% applied. Final total: ₹${finalTotal}`, finalTotal, discountAmount });
+    } catch (error) {
+        console.error('Apply discount error:', error);
+        res.status(500).json({ success: false, message: 'Failed to apply discount' });
+    }
+});
+
+// Admin: Approve estimate without discount (skip discount, go straight to final_approved)
+router.post('/estimates/:estimateId/approve-final', requirePermission('painters', 'estimates'), async (req, res) => {
+    try {
+        const [estimates] = await pool.query(
+            "SELECT * FROM painter_estimates WHERE id = ? AND status IN ('approved','sent_to_customer','discount_requested')",
+            [req.params.estimateId]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+
+        const estimate = estimates[0];
+        const finalTotal = parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total);
+
+        await pool.query(
+            `UPDATE painter_estimates SET final_grand_total = ?, status = 'final_approved',
+             discount_approved_by = ?, discount_approved_at = NOW() WHERE id = ?`,
+            [finalTotal, req.user.id, estimate.id]
+        );
+        await logEstimateStatusChange(estimate.id, estimate.status, 'final_approved', req.user.id, 'Final approved (no discount)');
+
+        res.json({ success: true, message: 'Estimate final approved' });
+    } catch (error) {
+        console.error('Approve final error:', error);
+        res.status(500).json({ success: false, message: 'Failed to approve estimate' });
+    }
+});
+
+// Record payment (admin)
 router.post('/estimates/:estimateId/payment', requirePermission('painters', 'estimates'), async (req, res) => {
     try {
         const { payment_method, payment_reference, payment_amount } = req.body;
         if (!payment_method) return res.status(400).json({ success: false, message: 'Payment method is required' });
 
         const [estimates] = await pool.query(
-            "SELECT * FROM painter_estimates WHERE id = ? AND status IN ('approved','sent_to_customer')",
+            "SELECT * FROM painter_estimates WHERE id = ? AND status IN ('approved','sent_to_customer','final_approved')",
             [req.params.estimateId]
         );
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Approved estimate not found' });
 
         const estimate = estimates[0];
-        const amount = parseFloat(payment_amount) || parseFloat(estimate.grand_total);
+        const amount = parseFloat(payment_amount) || parseFloat(estimate.final_grand_total) || parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total);
 
         await pool.query(
             `UPDATE painter_estimates SET status = 'payment_recorded', payment_method = ?, payment_reference = ?,
@@ -2788,13 +2922,15 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
             // If credit check fails (e.g. table missing), allow the invoice to proceed
         }
 
-        // 2. Create Zoho invoice
+        // 2. Create Zoho invoice (use discounted rates if discount was applied)
         const isCustomer = estimate.billing_type === 'customer';
-        const lineItems = items.map(i => ({
-            item_id: i.zoho_item_id,
-            quantity: parseFloat(i.quantity),
-            rate: isCustomer ? parseFloat(i.markup_unit_price) : parseFloat(i.unit_price)
-        }));
+        const hasDiscount = parseFloat(estimate.discount_percentage) > 0;
+        const discountMultiplier = hasDiscount ? (1 - parseFloat(estimate.discount_percentage) / 100) : 1;
+        const lineItems = items.map(i => {
+            let rate = isCustomer ? parseFloat(i.markup_unit_price) : parseFloat(i.unit_price);
+            if (isCustomer && hasDiscount) rate = Math.round(rate * discountMultiplier * 100) / 100;
+            return { item_id: i.zoho_item_id, quantity: parseFloat(i.quantity), rate };
+        });
 
         let zohoInvoice;
         try {

@@ -354,6 +354,8 @@
                             <option value="sent_to_customer">Sent to Customer</option>
                             <option value="payment_recorded">Payment Recorded</option>
                             <option value="pushed_to_zoho">Pushed to Zoho</option>
+                            <option value="discount_requested">Discount Requested</option>
+                            <option value="final_approved">Final Approved</option>
                             <option value="rejected">Rejected</option>
                         </select>
                         <select id="estTypeFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadEstimates()">
@@ -1543,7 +1545,8 @@
         const statusBadge = {
             draft: 'badge-suspended', pending_admin: 'badge-pending', admin_review: 'badge-pending',
             approved: 'badge-approved', sent_to_customer: 'badge-paid', payment_recorded: 'badge-paid',
-            pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-suspended'
+            pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-suspended',
+            discount_requested: 'badge-pending', final_approved: 'badge-approved'
         };
         body.innerHTML = estimates.map(e => {
             const total = e.billing_type === 'customer' && parseFloat(e.markup_grand_total) > 0
@@ -1592,7 +1595,8 @@
         const statusBadge = {
             draft: 'badge-suspended', pending_admin: 'badge-pending', admin_review: 'badge-pending',
             approved: 'badge-approved', sent_to_customer: 'badge-paid', payment_recorded: 'badge-paid',
-            pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-suspended'
+            pushed_to_zoho: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-suspended',
+            discount_requested: 'badge-pending', final_approved: 'badge-approved'
         };
 
         let actionsHtml = '';
@@ -1613,22 +1617,80 @@
                 actionsHtml += `<button class="btn-sm btn-primary" onclick="shareEstimate(${est.id})">Share with Customer</button> `;
             }
             actionsHtml += `<button class="btn-sm btn-success" onclick="showPaymentForm(${est.id})">Record Payment</button>`;
+        } else if (est.status === 'discount_requested') {
+            const discountNotes = est.discount_notes ? `<div class="text-sm text-gray-600 mt-1"><strong>Notes:</strong> ${esc(est.discount_notes)}</div>` : '';
+            actionsHtml = `
+                <div class="w-full mb-3">
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                        <div class="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            Painter has requested a discount
+                        </div>
+                        ${discountNotes}
+                    </div>
+                    <div class="flex items-center gap-3 mb-3">
+                        <label class="text-sm font-medium text-gray-700">Discount %:</label>
+                        <input type="number" id="discountPctInput" step="0.5" min="0" max="100" class="w-24 px-2 py-1.5 border rounded text-sm" placeholder="e.g. 5" oninput="previewDiscount(${est.id})">
+                        <span id="discountPreview" class="text-sm text-gray-500"></span>
+                    </div>
+                </div>
+                <button class="btn-sm btn-success" onclick="applyDiscount(${est.id})">Apply Discount & Approve</button>
+                <button class="btn-sm btn-outline" onclick="approveFinal(${est.id})">Approve Without Discount</button>`;
+        } else if (est.status === 'final_approved') {
+            const discountPct = parseFloat(est.discount_percentage) || 0;
+            const discountAmt = parseFloat(est.discount_amount) || 0;
+            const finalTotal = parseFloat(est.final_grand_total || est.markup_grand_total || est.grand_total);
+            if (discountPct > 0) {
+                actionsHtml = `
+                    <div class="w-full mb-3 bg-green-50 border border-green-200 rounded-lg p-3">
+                        <div class="text-sm text-green-800">
+                            <div class="font-semibold mb-1">Discount Applied</div>
+                            <div>Discount: ${discountPct}% (₹${discountAmt.toLocaleString('en-IN')})</div>
+                            <div class="font-bold mt-1">Final Grand Total: ₹${finalTotal.toLocaleString('en-IN')}</div>
+                        </div>
+                    </div>`;
+            }
+            actionsHtml += `<button class="btn-sm btn-success" onclick="showPaymentForm(${est.id})">Record Payment</button>`;
         } else if (est.status === 'payment_recorded') {
             actionsHtml = `<button class="btn-sm btn-primary" onclick="pushToZoho(${est.id})">Push to Zoho</button>`;
         }
 
-        let itemsHtml = items.map((item, idx) => `
-            <tr>
-                <td>${esc(item.item_name)}</td>
-                <td class="text-xs text-gray-500">${esc(item.brand || '')}</td>
-                <td class="text-center">${parseFloat(item.quantity)}</td>
-                <td class="text-right">₹${parseFloat(item.unit_price).toLocaleString('en-IN')}</td>
-                <td class="text-right">₹${parseFloat(item.line_total).toLocaleString('en-IN')}</td>
-                ${isCustomer ? `<td class="text-right">
-                    ${est.status === 'admin_review' ? `<input type="number" step="0.01" min="0" class="markup-price-input" data-item-id="${item.id}" value="${parseFloat(item.markup_unit_price) || ''}" style="width:100px;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;text-align:right;font-size:0.8125rem">` : `₹${parseFloat(item.markup_unit_price || 0).toLocaleString('en-IN')}`}
-                </td>` : ''}
-            </tr>
-        `).join('');
+        let itemsHtml = items.map((item, idx) => {
+            const productName = esc(item.zoho_description || item.zoho_display_name || item.item_name);
+            const brandName = esc(item.brand || '');
+            const unitPrice = parseFloat(item.unit_price);
+            const qty = parseFloat(item.quantity);
+            const markupPrice = parseFloat(item.markup_unit_price) || 0;
+            const markupPct = unitPrice > 0 && markupPrice > 0 ? (((markupPrice / unitPrice) - 1) * 100).toFixed(1) : '';
+            const markupTotal = markupPrice > 0 ? (markupPrice * qty) : 0;
+
+            if (isCustomer && est.status === 'admin_review') {
+                return `<tr>
+                    <td><div>${productName}</div>${brandName ? `<div class="text-xs text-gray-400 mt-0.5">${brandName}</div>` : ''}</td>
+                    <td class="text-center">${qty}</td>
+                    <td class="text-right">₹${unitPrice.toLocaleString('en-IN')}</td>
+                    <td class="text-right"><input type="number" step="0.5" min="0" class="markup-pct-input" data-item-id="${item.id}" data-unit-price="${unitPrice}" value="${markupPct}" style="width:70px;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;text-align:right;font-size:0.8125rem" onchange="onMarkupPctChange(this)" oninput="onMarkupPctChange(this)"></td>
+                    <td class="text-right"><input type="number" step="0.01" min="0" class="markup-price-input" data-item-id="${item.id}" data-unit-price="${unitPrice}" value="${markupPrice || ''}" style="width:100px;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;text-align:right;font-size:0.8125rem" onchange="onMarkupPriceChange(this)" oninput="onMarkupPriceChange(this)"></td>
+                    <td class="text-right markup-total-cell" data-item-id="${item.id}">${markupTotal > 0 ? '₹' + markupTotal.toLocaleString('en-IN') : '-'}</td>
+                </tr>`;
+            } else if (isCustomer) {
+                return `<tr>
+                    <td><div>${productName}</div>${brandName ? `<div class="text-xs text-gray-400 mt-0.5">${brandName}</div>` : ''}</td>
+                    <td class="text-center">${qty}</td>
+                    <td class="text-right">₹${unitPrice.toLocaleString('en-IN')}</td>
+                    <td class="text-right">${markupPct ? markupPct + '%' : '-'}</td>
+                    <td class="text-right">${markupPrice > 0 ? '₹' + markupPrice.toLocaleString('en-IN') : '-'}</td>
+                    <td class="text-right">${markupTotal > 0 ? '₹' + markupTotal.toLocaleString('en-IN') : '-'}</td>
+                </tr>`;
+            } else {
+                return `<tr>
+                    <td><div>${productName}</div>${brandName ? `<div class="text-xs text-gray-400 mt-0.5">${brandName}</div>` : ''}</td>
+                    <td class="text-center">${qty}</td>
+                    <td class="text-right">₹${unitPrice.toLocaleString('en-IN')}</td>
+                    <td class="text-right">₹${parseFloat(item.line_total).toLocaleString('en-IN')}</td>
+                </tr>`;
+            }
+        }).join('');
 
         const content = document.getElementById('estimateDetailContent');
         content.innerHTML = `
@@ -1654,11 +1716,19 @@
                 ${est.points_awarded > 0 ? `<div><span class="text-gray-500">Points:</span> <strong>${parseFloat(est.points_awarded).toFixed(2)}</strong> (R:${parseFloat(est.regular_points_awarded).toFixed(2)} A:${parseFloat(est.annual_points_awarded).toFixed(2)})</div>` : ''}
             </div>
 
+            ${isCustomer && est.status === 'admin_review' ? `
+            <div class="flex items-center gap-3 mb-3 p-3 bg-indigo-50 rounded-lg">
+                <label class="text-sm font-medium text-indigo-800">Bulk Markup %:</label>
+                <input type="number" id="bulkMarkupPct" step="0.5" min="0" class="w-24 px-2 py-1.5 border rounded text-sm" placeholder="e.g. 20">
+                <button class="btn-sm btn-primary" onclick="applyBulkMarkup()">Apply to All</button>
+            </div>` : ''}
+
             <div class="overflow-x-auto mb-4">
                 <table class="data-table">
                     <thead><tr>
-                        <th>Product</th><th>Brand</th><th>Qty</th><th>Unit Price</th><th>Line Total</th>
-                        ${isCustomer ? '<th>Markup Price</th>' : ''}
+                        ${isCustomer
+                            ? '<th>Product Description</th><th>Qty</th><th>Cost Price</th><th>Markup %</th><th>Markup Price</th><th>Markup Total</th>'
+                            : '<th>Product Description</th><th>Qty</th><th>Cost Price</th><th>Line Total</th>'}
                     </tr></thead>
                     <tbody>${itemsHtml}</tbody>
                 </table>
@@ -1712,17 +1782,18 @@
     }
 
     async function saveMarkupPrices(estId) {
+        const bulkPct = parseFloat(document.getElementById('bulkMarkupPct')?.value) || 0;
         const inputs = document.querySelectorAll('.markup-price-input');
         const items = [];
         inputs.forEach(inp => {
             const val = parseFloat(inp.value);
             if (val > 0) items.push({ id: parseInt(inp.dataset.itemId), markup_unit_price: val });
         });
-        if (!items.length) { alert('Enter markup prices for at least one item'); return; }
+        if (!items.length && !bulkPct) { alert('Enter markup prices or percentage'); return; }
         try {
             const res = await fetch(`${API}/estimates/${estId}/markup`, {
                 method: 'POST', headers: authHeaders(),
-                body: JSON.stringify({ items })
+                body: JSON.stringify({ items, markup_percentage: bulkPct })
             });
             const data = await res.json();
             if (!data.success) throw new Error(data.message);
@@ -1730,6 +1801,104 @@
             closeEstimateDetail();
             loadEstimates();
         } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    function applyBulkMarkup() {
+        const bulkPct = parseFloat(document.getElementById('bulkMarkupPct')?.value);
+        if (!bulkPct || bulkPct <= 0) { alert('Enter a valid markup percentage'); return; }
+        document.querySelectorAll('.markup-pct-input').forEach(inp => {
+            inp.value = bulkPct;
+            onMarkupPctChange(inp);
+        });
+    }
+
+    function onMarkupPctChange(el) {
+        const pct = parseFloat(el.value) || 0;
+        const unitPrice = parseFloat(el.dataset.unitPrice) || 0;
+        const itemId = el.dataset.itemId;
+        const markupPrice = unitPrice * (1 + pct / 100);
+        const priceInput = document.querySelector(`.markup-price-input[data-item-id="${itemId}"]`);
+        if (priceInput) priceInput.value = markupPrice > 0 ? markupPrice.toFixed(2) : '';
+        updateMarkupTotal(itemId, markupPrice);
+    }
+
+    function onMarkupPriceChange(el) {
+        const price = parseFloat(el.value) || 0;
+        const unitPrice = parseFloat(el.dataset.unitPrice) || 0;
+        const itemId = el.dataset.itemId;
+        const pct = unitPrice > 0 && price > 0 ? ((price / unitPrice) - 1) * 100 : 0;
+        const pctInput = document.querySelector(`.markup-pct-input[data-item-id="${itemId}"]`);
+        if (pctInput) pctInput.value = pct > 0 ? pct.toFixed(1) : '';
+        updateMarkupTotal(itemId, price);
+    }
+
+    function updateMarkupTotal(itemId, markupPrice) {
+        const totalCell = document.querySelector(`.markup-total-cell[data-item-id="${itemId}"]`);
+        if (!totalCell) return;
+        const row = totalCell.closest('tr');
+        const qtyCell = row?.querySelectorAll('td')[1];
+        const qty = qtyCell ? parseFloat(qtyCell.textContent) || 0 : 0;
+        const total = markupPrice * qty;
+        totalCell.textContent = total > 0 ? '₹' + total.toLocaleString('en-IN') : '-';
+    }
+
+    async function applyDiscount(estId) {
+        const pctInput = document.getElementById('discountPctInput');
+        const pct = parseFloat(pctInput?.value);
+        if (!pct || pct <= 0 || pct > 100) { alert('Enter a valid discount percentage (1-100)'); return; }
+        if (!confirm(`Apply ${pct}% discount to this estimate?`)) return;
+        try {
+            const res = await fetch(`${API}/estimates/${estId}/discount`, {
+                method: 'POST', headers: authHeaders(),
+                body: JSON.stringify({ discount_percentage: pct })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(data.message);
+            closeEstimateDetail();
+            loadEstimates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function approveFinal(estId) {
+        if (!confirm('Approve this estimate without discount?')) return;
+        try {
+            const res = await fetch(`${API}/estimates/${estId}/approve-final`, {
+                method: 'POST', headers: authHeaders()
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(data.message);
+            closeEstimateDetail();
+            loadEstimates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    function previewDiscount(estId) {
+        const pct = parseFloat(document.getElementById('discountPctInput')?.value) || 0;
+        const preview = document.getElementById('discountPreview');
+        if (!preview) return;
+        if (pct > 0) {
+            // Get the markup or grand total from the summary section
+            const totalText = document.querySelector('.bg-gray-50.rounded-lg .font-bold span:last-child, .bg-gray-50.rounded-lg .text-indigo-600 span:last-child');
+            const totalEl = document.querySelectorAll('.bg-gray-50.rounded-lg .flex.justify-between');
+            let total = 0;
+            totalEl.forEach(row => {
+                if (row.textContent.includes('Markup Grand Total') || row.textContent.includes('Grand Total')) {
+                    const amt = row.querySelector('span:last-child')?.textContent?.replace(/[^0-9.]/g, '');
+                    if (amt) total = parseFloat(amt);
+                }
+            });
+            if (total > 0) {
+                const discountAmt = total * pct / 100;
+                const finalAmt = total - discountAmt;
+                preview.textContent = `Discount: ₹${discountAmt.toLocaleString('en-IN')} | Final: ₹${finalAmt.toLocaleString('en-IN')}`;
+            } else {
+                preview.textContent = '';
+            }
+        } else {
+            preview.textContent = '';
+        }
     }
 
     async function shareEstimate(id) {

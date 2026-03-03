@@ -1,7 +1,7 @@
 /**
- * Painter Card Generator — Premium Design v5
- * Visiting card (1400x800) — professional layout, SVG icons, centered text
- * ID card (800x1200) — portrait badge, premium design
+ * Painter Card Generator — Premium Design v6
+ * Visiting card (1400x800) — bigger logo with backdrop, improved text styling
+ * ID card (800x1200) — portrait badge, bigger logo with backdrop
  */
 const sharp = require('sharp');
 const QRCode = require('qrcode');
@@ -75,7 +75,7 @@ async function generateCard(painter, pool) {
     const qr = await QRCode.toBuffer(url, { width: 180, margin: 1, color: { dark: G, light: '#FFF' } });
 
     const pSz = 280;
-    const logoSz = 180;
+    const logoSz = 250;
     const [{ circ, ring }, logo] = await Promise.all([
         loadPhoto(profile_photo, full_name, pSz),
         pool ? loadLogo(pool, logoSz) : Promise.resolve(null)
@@ -126,29 +126,33 @@ async function generateCard(painter, pool) {
         <!-- Header bar -->
         <rect x="33" width="${CARD_W - 33}" height="180" fill="url(#hg)"/>
 
+        <!-- Logo backdrop — white circle glow for visibility -->
+        ${logo ? `<circle cx="155" cy="90" r="140" fill="white" opacity="0.12"/>` : ''}
+
         <!-- Company text -->
-        <text x="${logo ? 250 : 60}" y="78" font-family="Arial,sans-serif" font-size="48" font-weight="bold" fill="white" letter-spacing="2">QUALITY COLOURS</text>
-        <text x="${logo ? 250 : 60}" y="118" font-family="Arial,sans-serif" font-size="24" fill="${GOLD}" opacity="0.9" letter-spacing="1">The Branded Paint Showroom</text>
-        <text x="${logo ? 250 : 60}" y="155" font-family="Arial,sans-serif" font-size="20" fill="white" opacity="0.6" letter-spacing="4">QC PAINTERS PROGRAM</text>
+        <text x="${logo ? 300 : 60}" y="78" font-family="Arial,sans-serif" font-size="48" font-weight="bold" fill="white" letter-spacing="2">QUALITY COLOURS</text>
+        <text x="${logo ? 300 : 60}" y="118" font-family="Arial,sans-serif" font-size="24" fill="${GOLD}" opacity="0.9" letter-spacing="1">The Branded Paint Showroom</text>
+        <text x="${logo ? 300 : 60}" y="155" font-family="Arial,sans-serif" font-size="20" fill="white" opacity="0.6" letter-spacing="4">QC PAINTERS PROGRAM</text>
 
         <!-- Gold accent line -->
         <rect x="33" y="178" width="${CARD_W - 33}" height="5" fill="url(#gg)"/>
 
-        <!-- NAME — CENTERED -->
-        <text x="${cx}" y="280" font-family="Arial,sans-serif" font-size="72" font-weight="bold" fill="#111827" text-anchor="middle">${e(full_name)}</text>
+        <!-- NAME — CENTERED with shadow -->
+        <text x="${cx + 2}" y="282" font-family="Arial,sans-serif" font-size="72" font-weight="bold" fill="${G}" text-anchor="middle" opacity="0.08" letter-spacing="2">${e(full_name)}</text>
+        <text x="${cx}" y="280" font-family="Arial,sans-serif" font-size="72" font-weight="bold" fill="#111827" text-anchor="middle" letter-spacing="2">${e(full_name)}</text>
 
         <!-- Gold underline with diamond ends -->
-        <rect x="${cx - 180}" y="296" width="360" height="4" rx="2" fill="url(#gg)"/>
+        <rect x="${cx - 220}" y="296" width="440" height="4" rx="2" fill="url(#gg)"/>
         <rect x="${cx - 4}" y="292" width="8" height="12" rx="2" fill="${GOLD}" transform="rotate(45, ${cx}, 298)"/>
 
         <!-- Spec -->
         <text x="${cx}" y="348" font-family="Arial,sans-serif" font-size="32" fill="${G}" text-anchor="middle" font-weight="600">${e(spec)}</text>
         ${exp ? `<text x="${cx}" y="388" font-family="Arial,sans-serif" font-size="24" fill="#9ca3af" text-anchor="middle">${e(exp)}</text>` : ''}
 
-        <!-- Phone with SVG icon -->
-        <rect x="${cx - 200}" y="${phoneY - 32}" width="400" height="48" rx="24" fill="${G}" opacity="0.06"/>
-        ${phoneIcon(cx - 180, phoneY - 30, 32, G)}
-        <text x="${cx + 10}" y="${phoneY}" font-family="Arial,sans-serif" font-size="42" font-weight="700" fill="#1f2937" text-anchor="middle">${e(phone)}</text>
+        <!-- Phone with SVG icon — larger pill -->
+        <rect x="${cx - 230}" y="${phoneY - 34}" width="460" height="54" rx="27" fill="${G}" opacity="0.06"/>
+        ${phoneIcon(cx - 210, phoneY - 32, 36, G)}
+        <text x="${cx + 10}" y="${phoneY + 2}" font-family="Arial,sans-serif" font-size="46" font-weight="700" fill="#1f2937" text-anchor="middle" letter-spacing="1">${e(phone)}</text>
 
         <!-- City with SVG icon -->
         ${city ? `
@@ -176,7 +180,7 @@ async function generateCard(painter, pool) {
         { input: circ, top: pTop, left: pLeft },
         { input: qr, top: CARD_H - 310, left: CARD_W - 225 },
     ];
-    if (logo) comp.push({ input: logo, top: 0, left: 42 });
+    if (logo) comp.push({ input: logo, top: -35, left: 33 });
 
     const dir = path.join(__dirname, '..', 'public', 'uploads', 'painter-cards');
     ensureDir(dir);
@@ -195,7 +199,7 @@ async function generateIdCard(painter, pool) {
     const qr = await QRCode.toBuffer(url, { width: 180, margin: 1, color: { dark: G, light: '#FFF' } });
 
     const pSz = 260;
-    const logoSz = 130;
+    const logoSz = 180;
     const [{ circ, ring }, logo] = await Promise.all([
         loadPhoto(profile_photo, full_name, pSz, GOLD),
         pool ? loadLogo(pool, logoSz) : Promise.resolve(null)
@@ -238,19 +242,23 @@ async function generateIdCard(painter, pool) {
         <rect width="${ID_W}" height="185" rx="32" fill="url(#hg)"/>
         <rect y="32" width="${ID_W}" height="153" fill="url(#hg)"/>
 
+        <!-- Logo backdrop — white circle glow -->
+        ${logo ? `<circle cx="100" cy="95" r="100" fill="white" opacity="0.12"/>` : ''}
+
         <!-- Gold accent -->
         <rect y="183" width="${ID_W}" height="5" fill="url(#gg)"/>
 
         <!-- Header text -->
-        <text x="${ID_W / 2}" y="65" font-family="Arial,sans-serif" font-size="42" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="2">QUALITY COLOURS</text>
-        <text x="${ID_W / 2}" y="105" font-family="Arial,sans-serif" font-size="22" fill="${GOLD}" text-anchor="middle" letter-spacing="1">QC Painters Program</text>
-        <text x="${ID_W / 2}" y="152" font-family="Arial,sans-serif" font-size="22" fill="white" text-anchor="middle" opacity="0.7" letter-spacing="4">PAINTER IDENTITY CARD</text>
+        <text x="${logo ? 480 : ID_W / 2}" y="65" font-family="Arial,sans-serif" font-size="46" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="2">QUALITY COLOURS</text>
+        <text x="${logo ? 480 : ID_W / 2}" y="105" font-family="Arial,sans-serif" font-size="22" fill="${GOLD}" text-anchor="middle" letter-spacing="1">QC Painters Program</text>
+        <text x="${logo ? 480 : ID_W / 2}" y="152" font-family="Arial,sans-serif" font-size="22" fill="white" text-anchor="middle" opacity="0.7" letter-spacing="4">PAINTER IDENTITY CARD</text>
 
-        <!-- Name -->
-        <text x="${ID_W / 2}" y="${nameY}" font-family="Arial,sans-serif" font-size="62" font-weight="bold" fill="#111827" text-anchor="middle">${e(full_name)}</text>
+        <!-- Name with shadow -->
+        <text x="${ID_W / 2 + 2}" y="${nameY + 2}" font-family="Arial,sans-serif" font-size="62" font-weight="bold" fill="${G}" text-anchor="middle" opacity="0.08" letter-spacing="1.5">${e(full_name)}</text>
+        <text x="${ID_W / 2}" y="${nameY}" font-family="Arial,sans-serif" font-size="62" font-weight="bold" fill="#111827" text-anchor="middle" letter-spacing="1.5">${e(full_name)}</text>
 
-        <!-- Gold underline -->
-        <rect x="${(ID_W - 320) / 2}" y="${nameY + 14}" width="320" height="4" rx="2" fill="url(#gg)"/>
+        <!-- Gold underline — wider -->
+        <rect x="${(ID_W - 380) / 2}" y="${nameY + 14}" width="380" height="4" rx="2" fill="url(#gg)"/>
 
         <!-- Spec -->
         <text x="${ID_W / 2}" y="${specY}" font-family="Arial,sans-serif" font-size="30" fill="${G}" text-anchor="middle" font-weight="600">${e(spec)}</text>
@@ -267,8 +275,8 @@ async function generateIdCard(painter, pool) {
         <!-- Referral label -->
         <text x="${ID_W / 2}" y="${labelY}" font-family="Arial,sans-serif" font-size="20" fill="#9ca3af" text-anchor="middle" letter-spacing="4">REFERRAL CODE</text>
 
-        <!-- Code box -->
-        <rect x="120" y="${boxY}" width="${ID_W - 240}" height="72" rx="18" fill="#f0fdf4" stroke="${G}" stroke-width="2.5"/>
+        <!-- Code box — thicker gold border -->
+        <rect x="120" y="${boxY}" width="${ID_W - 240}" height="72" rx="18" fill="#f0fdf4" stroke="${GOLD}" stroke-width="3"/>
         <text x="${ID_W / 2}" y="${codeY}" font-family="Arial,sans-serif" font-size="48" font-weight="bold" fill="${G}" text-anchor="middle" letter-spacing="6">${e(referral_code)}</text>
 
         <!-- QR section -->
@@ -289,7 +297,7 @@ async function generateIdCard(painter, pool) {
         { input: circ, top: pTop, left: pLeft },
         { input: qr, top: ID_H - 320, left: (ID_W - 180) / 2 },
     ];
-    if (logo) comp.push({ input: logo, top: 8, left: 16 });
+    if (logo) comp.push({ input: logo, top: 4, left: 10 });
 
     const dir = path.join(__dirname, '..', 'public', 'uploads', 'painter-cards');
     ensureDir(dir);
