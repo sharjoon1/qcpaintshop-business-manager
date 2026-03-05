@@ -9,6 +9,7 @@ const { requirePermission, requireAuth } = require('../middleware/permissionMidd
 const leadManager = require('../services/ai-lead-manager');
 const notificationService = require('../services/notification-service');
 const aiEngine = require('../services/ai-engine');
+const activityFeed = require('../services/activity-feed');
 
 let io;
 
@@ -624,6 +625,10 @@ router.post('/my/create', requirePermission('leads', 'own.add'), async (req, res
             message: 'Lead created successfully',
             data: newLead[0]
         });
+
+        activityFeed.logActivity(req.user.id, req.user.branch_id, 'lead_created',
+            `${req.user.full_name} created lead: ${name}`, phone || null
+        ).catch(() => {});
 
     } catch (error) {
         console.error('Staff create lead error:', error);

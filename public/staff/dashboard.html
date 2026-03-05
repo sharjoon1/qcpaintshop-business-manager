@@ -742,6 +742,36 @@
         </div>
     </div>
 
+    <!-- Notice Board / Activity Feed -->
+    <div class="status-card" id="noticeBoardCard">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: 700;">!</div>
+                <h3 style="font-size: 16px; font-weight: 600; color: #1f2937;">Notice Board</h3>
+                <span id="noticeBadge" class="badge badge-danger" style="display:none; font-size: 10px; padding: 2px 8px;">0</span>
+            </div>
+            <button onclick="loadNoticeBoard()" style="background: none; border: none; color: #667eea; font-size: 13px; cursor: pointer; font-weight: 600; padding: 4px 8px;">Refresh</button>
+        </div>
+
+        <!-- Admin Notices -->
+        <div id="adminNotices" style="display: none; margin-bottom: 12px;"></div>
+
+        <!-- Activity Feed Tabs -->
+        <div style="display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <button class="nb-tab active" data-filter="all" onclick="filterFeed('all')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: linear-gradient(135deg, #667eea, #764ba2); color: white; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;">All</button>
+            <button class="nb-tab" data-filter="attendance" onclick="filterFeed('attendance')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Attendance</button>
+            <button class="nb-tab" data-filter="breaks" onclick="filterFeed('breaks')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Breaks</button>
+            <button class="nb-tab" data-filter="leads" onclick="filterFeed('leads')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Leads</button>
+        </div>
+
+        <!-- Feed Items -->
+        <div id="activityFeedContent" style="max-height: 320px; overflow-y: auto; min-height: 0;">
+            <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 13px;">
+                Loading activities...
+            </div>
+        </div>
+    </div>
+
     <!-- Your Work (Unified Stock Checks + Tasks) -->
     <div class="status-card" id="yourWorkCard">
         <div class="your-work-header">
@@ -1127,11 +1157,15 @@
             updateDateTime();
             setInterval(updateDateTime, 1000);
             await loadTodayAttendance();
+            loadNoticeBoard();
 
             // Auto-refresh every 30 seconds
             setInterval(() => {
                 loadTodayAttendance();
             }, 30000);
+
+            // Refresh notice board every 60 seconds
+            setInterval(loadNoticeBoard, 60000);
         }
 
         function loadProfileAvatar() {
@@ -2665,6 +2699,153 @@
 
         // ========================================
         // YOUR WORK — Unified Stock Checks + Tasks
+        // ========================================
+        // ========================================
+        // NOTICE BOARD / ACTIVITY FEED
+        // ========================================
+        let feedItems = [];
+        let feedFilter = 'all';
+
+        const FEED_TYPE_MAP = {
+            clock_in: 'attendance', clock_out: 'attendance',
+            break_start: 'breaks', break_end: 'breaks',
+            outside_start: 'breaks', outside_end: 'breaks',
+            prayer_start: 'breaks', prayer_end: 'breaks',
+            lead_created: 'leads', lead_followup: 'leads',
+            admin_notice: 'all', overtime: 'attendance',
+            task_completed: 'all', stock_check: 'all'
+        };
+
+        const FEED_COLORS = {
+            clock_in: '#10b981', clock_out: '#ef4444',
+            break_start: '#f59e0b', break_end: '#f59e0b',
+            outside_start: '#0891b2', outside_end: '#0891b2',
+            prayer_start: '#059669', prayer_end: '#059669',
+            lead_created: '#8b5cf6', lead_followup: '#6366f1',
+            admin_notice: '#dc2626', overtime: '#7c3aed',
+            task_completed: '#667eea', stock_check: '#059669'
+        };
+
+        async function loadNoticeBoard() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/activity-feed', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!data.success) return;
+
+                feedItems = data.feed || [];
+
+                // Render admin notices
+                const noticesDiv = document.getElementById('adminNotices');
+                if (data.notices && data.notices.length > 0) {
+                    noticesDiv.style.display = 'block';
+                    noticesDiv.innerHTML = data.notices.map(n => {
+                        const bgMap = { urgent: '#fef2f2', important: '#fefce8', normal: '#f0f9ff' };
+                        const borderMap = { urgent: '#ef4444', important: '#f59e0b', normal: '#3b82f6' };
+                        const labelMap = { urgent: 'URGENT', important: 'IMPORTANT', normal: '' };
+                        return `<div style="background: ${bgMap[n.priority]}; border-left: 4px solid ${borderMap[n.priority]}; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px;">
+                            ${labelMap[n.priority] ? `<div style="font-size: 10px; font-weight: 700; color: ${borderMap[n.priority]}; margin-bottom: 4px;">${labelMap[n.priority]}</div>` : ''}
+                            <div style="font-weight: 600; font-size: 13px; color: #1f2937; margin-bottom: 2px;">${escapeHtml(n.title)}</div>
+                            <div style="font-size: 12px; color: #4b5563;">${escapeHtml(n.message)}</div>
+                            <div style="font-size: 10px; color: #9ca3af; margin-top: 4px;">- ${escapeHtml(n.posted_by_name)}</div>
+                        </div>`;
+                    }).join('');
+
+                    const badge = document.getElementById('noticeBadge');
+                    const urgentCount = data.notices.filter(n => n.priority !== 'normal').length;
+                    if (urgentCount > 0) {
+                        badge.textContent = urgentCount;
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                } else {
+                    noticesDiv.style.display = 'none';
+                    document.getElementById('noticeBadge').style.display = 'none';
+                }
+
+                renderFeed();
+            } catch (e) {
+                console.error('Notice board load error:', e);
+            }
+        }
+
+        function renderFeed() {
+            const container = document.getElementById('activityFeedContent');
+            let items = feedItems;
+
+            if (feedFilter !== 'all') {
+                items = items.filter(f => FEED_TYPE_MAP[f.activity_type] === feedFilter);
+            }
+
+            if (items.length === 0) {
+                container.innerHTML = `<div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 13px;">No activities yet today</div>`;
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const color = FEED_COLORS[item.activity_type] || '#667eea';
+                const timeAgo = getTimeAgo(item.created_at);
+                const initial = (item.full_name || '?').charAt(0).toUpperCase();
+                return `<div style="display: flex; gap: 10px; padding: 8px 4px; border-bottom: 1px solid #f3f4f6; align-items: flex-start;">
+                    <div style="width: 32px; height: 32px; border-radius: 50%; background: ${color}15; border: 2px solid ${color}40; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <span style="font-size: 12px; font-weight: 700; color: ${color};">${initial}</span>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 13px; color: #1f2937; line-height: 1.4;">${escapeHtml(item.title)}</div>
+                        ${item.description ? `<div style="font-size: 11px; color: #6b7280; margin-top: 2px;">${escapeHtml(item.description)}</div>` : ''}
+                        <div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">${timeAgo}</div>
+                    </div>
+                    <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; flex-shrink: 0; margin-top: 6px;"></div>
+                </div>`;
+            }).join('');
+        }
+
+        function filterFeed(filter) {
+            feedFilter = filter;
+            document.querySelectorAll('.nb-tab').forEach(btn => {
+                const isActive = btn.dataset.filter === filter;
+                btn.style.background = isActive ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white';
+                btn.style.color = isActive ? 'white' : '#374151';
+                btn.classList.toggle('active', isActive);
+            });
+            renderFeed();
+        }
+
+        function getTimeAgo(dateStr) {
+            const now = new Date();
+            const then = new Date(dateStr);
+            const diffMs = now - then;
+            const diffMin = Math.floor(diffMs / 60000);
+            if (diffMin < 1) return 'Just now';
+            if (diffMin < 60) return `${diffMin}m ago`;
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return `${diffHr}h ago`;
+            return then.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Real-time activity feed via Socket.io
+        if (dashboardSocket) {
+            dashboardSocket.on('activity_feed_new', (item) => {
+                feedItems.unshift(item);
+                if (feedItems.length > 50) feedItems.pop();
+                renderFeed();
+            });
+            dashboardSocket.on('admin_notice_new', () => {
+                loadNoticeBoard();
+            });
+        }
+
+        // ========================================
+        // YOUR WORK
         // ========================================
         let yourWorkItems = [];
         let yourWorkFilter = 'all';

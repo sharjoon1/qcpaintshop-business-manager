@@ -79,6 +79,8 @@ const responseTracker = require('./middleware/responseTracker');
 const painterNotificationService = require('./services/painter-notification-service');
 const staffDailyWorkRoutes = require('./routes/staff-daily-work');
 const staffTaskGenerator = require('./services/staff-task-generator');
+const activityFeedRoutes = require('./routes/activity-feed');
+const activityFeed = require('./services/activity-feed');
 const fcmAdmin = require('./services/fcm-admin');
 
 const app = express();
@@ -223,6 +225,8 @@ anomalyDetector.setPool(pool);
 productionMonitor.setPool(pool);
 staffDailyWorkRoutes.setPool(pool);
 staffTaskGenerator.setPool(pool);
+activityFeedRoutes.setPool(pool);
+activityFeed.setPool(pool);
 productionMonitor.setNotificationService(notificationService);
 productionMonitor.setResponseTracker(responseTracker);
 
@@ -267,6 +271,7 @@ app.use('/api/credit-limits', creditLimitRoutes.router);
 app.use('/api/admin/dashboard', adminDashboardRoutes.router);
 app.use('/api/anomalies', anomalyRoutes.router);
 app.use('/api/staff/daily-work', staffDailyWorkRoutes.router);
+app.use('/api/activity-feed', activityFeedRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3513,6 +3518,8 @@ creditLimitRoutes.setIO(io);
 leadsRoutes.setIO(io);
 leadAutoAssignScheduler.setIO(io);
 productionMonitor.setIO(io);
+activityFeedRoutes.setIO(io);
+activityFeed.setIO(io);
 productionMonitor.setSessionManager(whatsappSessionManager);
 painterNotificationService.setDependencies(pool, io);
 

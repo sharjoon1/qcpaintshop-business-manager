@@ -11,6 +11,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
 const notificationService = require('../services/notification-service');
+const activityFeed = require('../services/activity-feed');
 
 // Configure multer for photo uploads
 const storage = multer.memoryStorage();
@@ -447,7 +448,14 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
                 permission_id: permissionId
             }
         });
-        
+
+        // Log to activity feed
+        const clockTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+        const lateNote = late ? ' (Late)' : '';
+        activityFeed.logActivity(userId, branchId, 'clock_in',
+            `${req.user.full_name} clocked in at ${clockTime}${lateNote}`
+        ).catch(() => {});
+
     } catch (error) {
         console.error('❌ Clock in error:', error);
         console.error('Error stack:', error.stack);
@@ -684,7 +692,15 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
                 is_early_checkout: isEarly
             }
         });
-        
+
+        // Log to activity feed
+        const fmtH = Math.floor(workingMinutes / 60);
+        const fmtM = workingMinutes % 60;
+        const workStr = fmtH > 0 ? `${fmtH}h ${fmtM}m` : `${fmtM}m`;
+        activityFeed.logActivity(userId, record.branch_id, 'clock_out',
+            `${req.user.full_name} clocked out (${workStr} worked)`
+        ).catch(() => {});
+
     } catch (error) {
         console.error('❌ Clock out error:', error);
         console.error('Error stack:', error.stack);
@@ -969,6 +985,10 @@ router.post('/break-start', requireAuth, upload.single('photo'), async (req, res
             }
         });
 
+        activityFeed.logActivity(userId, record.branch_id, 'break_start',
+            `${req.user.full_name} went on break`
+        ).catch(() => {});
+
     } catch (error) {
         console.error('Break start error:', error);
         res.status(500).json({
@@ -1123,6 +1143,10 @@ router.post('/break-end', requireAuth, upload.single('photo'), async (req, res) 
                 break_duration_hours: (breakDuration / 60).toFixed(2)
             }
         });
+
+        activityFeed.logActivity(userId, record.branch_id, 'break_end',
+            `${req.user.full_name} returned from break (${breakDuration}m)`
+        ).catch(() => {});
 
     } catch (error) {
         console.error('Break end error:', error);
@@ -2588,6 +2612,10 @@ router.post('/outside-work/start', requireAuth, async (req, res) => {
             data: { id: result.insertId, start_time: now, reason: reason.trim() }
         });
 
+        activityFeed.logActivity(userId, record.branch_id, 'outside_start',
+            `${req.user.full_name} went outside for work`, reason.trim()
+        ).catch(() => {});
+
     } catch (error) {
         console.error('Outside work start error:', error);
         res.status(500).json({ success: false, message: 'Failed to start outside work' });
@@ -2635,6 +2663,10 @@ router.post('/outside-work/end', requireAuth, async (req, res) => {
             message: `Outside work ended. Duration: ${durationMinutes} minutes. Geofence monitoring resumed.`,
             data: { id: period.id, duration_minutes: durationMinutes, end_time: now }
         });
+
+        activityFeed.logActivity(req.user.id, period.attendance_id ? null : null, 'outside_end',
+            `${req.user.full_name} returned from outside work (${durationMinutes}m)`
+        ).catch(() => {});
 
     } catch (error) {
         console.error('Outside work end error:', error);
@@ -2949,6 +2981,10 @@ router.post('/prayer/start', requireAuth, async (req, res) => {
             data: { id: result.insertId, start_time: now }
         });
 
+        activityFeed.logActivity(userId, record.branch_id, 'prayer_start',
+            `${req.user.full_name} went to prayer`
+        ).catch(() => {});
+
     } catch (error) {
         console.error('Prayer start error:', error);
         res.status(500).json({ success: false, message: 'Failed to start prayer' });
@@ -2996,6 +3032,10 @@ router.post('/prayer/end', requireAuth, async (req, res) => {
             message: `Prayer ended. Duration: ${durationMinutes} minutes. Geofence monitoring resumed.`,
             data: { id: period.id, duration_minutes: durationMinutes, end_time: now }
         });
+
+        activityFeed.logActivity(req.user.id, null, 'prayer_end',
+            `${req.user.full_name} returned from prayer (${durationMinutes}m)`
+        ).catch(() => {});
 
     } catch (error) {
         console.error('Prayer end error:', error);
