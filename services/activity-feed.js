@@ -73,7 +73,7 @@ async function getFeed(branchId = null, limit = 30) {
     if (!pool) return [];
     try {
         let query = `
-            SELECT f.*, u.full_name, u.profile_photo
+            SELECT f.*, u.full_name
             FROM staff_activity_feed f
             JOIN users u ON f.user_id = u.id
             WHERE f.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
