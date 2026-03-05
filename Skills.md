@@ -487,6 +487,19 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Admin timeline shows prayer_start/prayer_end events with green color
 - Migration: `migrations/migrate-prayer-and-reports.js`
 
+**Staff Notice Board / Activity Feed**
+- Real-time activity feed on staff dashboard showing all staff activities visible to everyone
+- Activity types: clock_in, clock_out, break_start/end, outside_start/end, prayer_start/end, lead_created, lead_followup, admin_notice, overtime, stock_check, task_completed
+- Admin notices: priority levels (urgent/important/normal), optional expiry, branch targeting
+- Filter tabs: All, Attendance, Breaks, Leads
+- Real-time updates via Socket.io (`activity_feed_new`, `admin_notice_new` events)
+- Auto-refresh every 60 seconds
+- Shows last 24 hours of activities
+- Tables: `staff_activity_feed`, `admin_notices`
+- Service: `services/activity-feed.js` (logActivity, getFeed, getNotices, createNotice)
+- Routes: `GET /api/activity-feed` (feed + notices), `POST /api/activity-feed/notices`, `DELETE /api/activity-feed/notices/:id`
+- Migration: `migrations/migrate-notice-board.js`
+
 **Daily Attendance Reports (10:05 PM IST)**
 - Auto-sends daily attendance summary to all staff + admin PDF at 10:05 PM IST via `node-cron`
 - **Delivery**: In-app FCM push notification (always) + WhatsApp (when session available)
