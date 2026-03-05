@@ -3635,6 +3635,54 @@ router.get('/report/staff-list', requirePermission('attendance.view'), async (re
     }
 });
 
+/**
+ * POST /api/attendance/report/send-admin
+ * Send admin PDF summary report for a date
+ */
+router.post('/report/send-admin', requirePermission('attendance.manage'), async (req, res) => {
+    try {
+        const { date } = req.body;
+        if (!date) {
+            return res.status(400).json({ success: false, message: 'date is required' });
+        }
+
+        if (!attendanceReportService) {
+            return res.status(500).json({ success: false, message: 'Report service not available' });
+        }
+
+        attendanceReportService.sendAdminReport(date);
+        res.json({ success: true, message: 'Admin report is being generated and sent.' });
+
+    } catch (error) {
+        console.error('Admin report error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send admin report' });
+    }
+});
+
+/**
+ * POST /api/attendance/report/send-lead-alerts
+ * Send lead creation + follow-up alerts to all staff
+ */
+router.post('/report/send-lead-alerts', requirePermission('attendance.manage'), async (req, res) => {
+    try {
+        const { date } = req.body;
+        if (!date) {
+            return res.status(400).json({ success: false, message: 'date is required' });
+        }
+
+        if (!attendanceReportService) {
+            return res.status(500).json({ success: false, message: 'Report service not available' });
+        }
+
+        attendanceReportService.sendLeadAlerts(date);
+        res.json({ success: true, message: 'Lead alerts are being sent.' });
+
+    } catch (error) {
+        console.error('Lead alerts error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send lead alerts' });
+    }
+});
+
 // ========================================
 // LEAVE BALANCE
 // ========================================
