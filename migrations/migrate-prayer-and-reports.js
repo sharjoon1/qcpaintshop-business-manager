@@ -82,11 +82,11 @@ async function migrate() {
                     user_id INT NOT NULL,
                     branch_id INT NULL,
                     report_date DATE NOT NULL,
-                    sent_via ENUM('whatsapp','manual') DEFAULT 'whatsapp',
+                    sent_via ENUM('whatsapp','manual','notification') DEFAULT 'notification',
                     sent_by INT NULL,
                     sent_at DATETIME NOT NULL,
                     report_text TEXT NOT NULL,
-                    delivery_status ENUM('sent','failed','pending') DEFAULT 'sent',
+                    delivery_status ENUM('sent','failed','pending','notification') DEFAULT 'sent',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                     UNIQUE KEY unique_user_date (user_id, report_date)

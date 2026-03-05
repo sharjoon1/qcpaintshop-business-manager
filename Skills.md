@@ -487,17 +487,26 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Admin timeline shows prayer_start/prayer_end events with green color
 - Migration: `migrations/migrate-prayer-and-reports.js`
 
-**Daily WhatsApp Attendance Reports**
-- Auto-sends daily attendance summary to all staff at 10 PM IST via `node-cron`
-- Manual send: admin can send to individual staff or all staff from "Daily Reports" tab
+**Daily Attendance Reports (10:05 PM IST)**
+- Auto-sends daily attendance summary to all staff + admin PDF at 10:05 PM IST via `node-cron`
+- **Delivery**: In-app FCM push notification (always) + WhatsApp (when session available)
 - Report includes: clock in/out, time breakdown (Shop, Outside, Prayer, Break), total working, status
-- Sent via WhatsApp session manager (branch session → fallback)
 - Logged in `attendance_daily_reports` table (unique per user+date, upserts on resend)
+- **Admin PDF Report**: Landscape A4 PDF with table of all staff, summary stats, auto-sent to all admin users
 - Admin UI: Daily Reports tab in admin-attendance.html with date/branch filter, per-staff Send/Preview, bulk Send All
 - Real-time: Socket.io `report_send_progress` and `report_send_complete` events to admin
-- Service: `services/attendance-report.js` (generateReport, sendReport, sendAllReports, 10 PM cron)
-- Endpoints: `GET /report/preview`, `POST /report/send`, `POST /report/send-all`, `GET /report/staff-list`
+- Service: `services/attendance-report.js` (generateReport, sendReport, sendAllReports, sendAdminReport, generateAdminPDF, sendLeadAlerts)
+- Endpoints: `GET /report/preview`, `POST /report/send`, `POST /report/send-all`, `POST /report/send-admin`, `POST /report/send-lead-alerts`, `GET /report/staff-list`
 - Migration: `migrations/migrate-prayer-and-reports.js`
+
+**Lead Alerts (6:05 PM IST)**
+- Auto-checks all active staff at 6:05 PM and sends alerts:
+  - No leads created today → creation reminder
+  - Overdue follow-ups → urgent alert with count
+  - Pending follow-ups for today → completion reminder
+- Delivery: In-app FCM notification + WhatsApp (when available)
+- Service: `sendLeadAlerts()` in `services/attendance-report.js`
+- Trigger endpoint: `POST /api/attendance/report/send-lead-alerts`
 
 **Permission Requests**
 - Staff can request permissions: late_arrival, early_checkout, extended_break, leave, half_day, re_clockin, outside_work
