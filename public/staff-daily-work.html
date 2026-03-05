@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>My Daily Work - QC Paint Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .task-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .task-card:active { transform: scale(0.985); }
+
+        .task-done { opacity: 0.6; }
+        .task-done .task-title { text-decoration: line-through; }
+
+        .section-card {
+            transition: transform 0.2s ease;
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .pulse-dot {
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+
+        .priority-high { border-left: 4px solid #ef4444; }
+        .priority-medium { border-left: 4px solid #f59e0b; }
+        .priority-low { border-left: 4px solid #10b981; }
+
+        .cat-lead_followup { background: #fef3c7; color: #92400e; }
+        .cat-lead_add { background: #dbeafe; color: #1e40af; }
+        .cat-outstanding_followup { background: #fee2e2; color: #991b1b; }
+        .cat-conversion { background: #d1fae5; color: #065f46; }
+        .cat-general { background: #e5e7eb; color: #374151; }
+
+        /* Toast */
+        .toast-enter { animation: toast-in 0.35s cubic-bezier(0.21,1.02,0.73,1) forwards; }
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="daily-work">
+
+    <div id="mainContent" class="px-4 sm:px-6 lg:px-8 py-4 pb-6 max-w-5xl mx-auto">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white rounded-2xl shadow-lg p-5 sm:p-6 mb-5 relative overflow-hidden">
+            <div class="absolute -top-8 -right-8 w-32 h-32 bg-white/5 rounded-full"></div>
+            <div class="absolute -bottom-4 -left-4 w-20 h-20 bg-white/5 rounded-full"></div>
+            <div class="flex items-center justify-between relative z-10">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-tight">Daily Work</h1>
+                    <p class="text-indigo-200 mt-1 text-xs sm:text-sm" id="headerDate"></p>
+                </div>
+                <div id="attendanceBadge" class="flex items-center gap-2 bg-white/10 backdrop-blur rounded-xl px-3 py-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-gray-400" id="attendanceDot"></span>
+                    <span class="text-xs font-medium" id="attendanceText">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="flex gap-3 overflow-x-auto scroll-hide pb-1 mb-5 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div class="bg-white rounded-xl shadow-sm p-3.5 min-w-[120px] flex-shrink-0 sm:flex-1 border border-gray-100">
+                <div class="text-xs font-medium text-gray-500 mb-1">Follow-ups</div>
+                <div class="text-xl font-bold text-indigo-600" id="statFollowups">-</div>
+                <div class="text-[10px] text-gray-400">Today</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-3.5 min-w-[120px] flex-shrink-0 sm:flex-1 border border-gray-100">
+                <div class="text-xs font-medium text-gray-500 mb-1">Overdue</div>
+                <div class="text-xl font-bold text-red-500" id="statOverdue">-</div>
+                <div class="text-[10px] text-gray-400">Pending</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-3.5 min-w-[120px] flex-shrink-0 sm:flex-1 border border-gray-100">
+                <div class="text-xs font-medium text-gray-500 mb-1">Conversions</div>
+                <div class="text-xl font-bold text-green-600" id="statConversions">-</div>
+                <div class="text-[10px] text-gray-400">This Month</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-3.5 min-w-[120px] flex-shrink-0 sm:flex-1 border border-gray-100">
+                <div class="text-xs font-medium text-gray-500 mb-1">Incentive</div>
+                <div class="text-xl font-bold text-purple-600" id="statIncentive">-</div>
+                <div class="text-[10px] text-gray-400">Earned</div>
+            </div>
+        </div>
+
+        <!-- AI Tamil Tasks Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 mb-5 overflow-hidden">
+            <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="font-semibold text-gray-800 text-sm">AI Daily Tasks</h2>
+                        <p class="text-[10px] text-gray-400" id="taskProgress">Loading...</p>
+                    </div>
+                </div>
+                <button onclick="regenerateTasks()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg hover:bg-indigo-50 transition" id="regenerateBtn">
+                    Refresh
+                </button>
+            </div>
+            <!-- AI Summary -->
+            <div id="aiSummary" class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-purple-50 text-sm text-gray-700 hidden"></div>
+            <!-- Tasks List -->
+            <div id="tasksList" class="divide-y divide-gray-50">
+                <div class="p-6 text-center text-gray-400 text-sm">Loading tasks...</div>
+            </div>
+            <!-- Motivation -->
+            <div id="aiMotivation" class="px-4 py-3 bg-gray-50 text-center text-xs text-gray-500 italic hidden"></div>
+        </div>
+
+        <!-- Leads to Follow Up -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 mb-5 overflow-hidden">
+            <div class="flex items-center gap-2 p-4 border-b border-gray-100">
+                <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <h2 class="font-semibold text-gray-800 text-sm">Leads to Follow Up</h2>
+                    <p class="text-[10px] text-gray-400" id="leadsSubtitle">Today's + Overdue</p>
+                </div>
+            </div>
+            <div id="leadsList" class="divide-y divide-gray-50">
+                <div class="p-6 text-center text-gray-400 text-sm">Loading...</div>
+            </div>
+            <div id="leadsFooter" class="px-4 py-3 border-t border-gray-100 hidden">
+                <a href="/staff-leads.html" class="text-xs text-indigo-600 font-medium hover:underline">View all leads &rarr;</a>
+            </div>
+        </div>
+
+        <!-- Outstanding Customers -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 mb-5 overflow-hidden">
+            <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="font-semibold text-gray-800 text-sm">Outstanding Customers</h2>
+                        <p class="text-[10px] text-gray-400" id="outstandingSubtitle">Your branch</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-gray-500">Total</div>
+                    <div class="text-sm font-bold text-red-600" id="totalOutstanding">-</div>
+                </div>
+            </div>
+            <div id="outstandingList" class="divide-y divide-gray-50">
+                <div class="p-6 text-center text-gray-400 text-sm">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Incentive Summary -->
+        <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100 p-5 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <h2 class="font-semibold text-green-800 text-sm">This Month's Incentive</h2>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div class="text-center">
+                    <div class="text-lg font-bold text-green-700" id="incConversions">0</div>
+                    <div class="text-[10px] text-green-600">Conversions</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-lg font-bold text-green-700" id="incApproved">₹0</div>
+                    <div class="text-[10px] text-green-600">Approved</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-lg font-bold text-amber-600" id="incPending">₹0</div>
+                    <div class="text-[10px] text-amber-600">Pending</div>
+                </div>
+            </div>
+            <a href="/staff-incentives.html" class="block text-center text-xs text-green-700 font-medium mt-3 hover:underline">View details &rarr;</a>
+        </div>
+
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2"></div>
+
+<script>
+const API_BASE = '/api/staff/daily-work';
+let dashboardData = null;
+
+// ─── Init ──────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    const now = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('headerDate').textContent = now.toLocaleDateString('ta-IN', options);
+    loadDashboard();
+});
+
+// ─── API Helper ────────────────────────────────────────────────
+
+async function api(url, options = {}) {
+    const token = localStorage.getItem('auth_token');
+    const res = await fetch(url, {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            ...options.headers
+        }
+    });
+    return res.json();
+}
+
+// ─── Load Dashboard ────────────────────────────────────────────
+
+async function loadDashboard() {
+    try {
+        const result = await api(API_BASE);
+        if (!result.success) throw new Error(result.message);
+        dashboardData = result.data;
+        renderAll();
+    } catch (e) {
+        console.error('Dashboard load error:', e);
+        showToast('Failed to load dashboard', 'error');
+    }
+}
+
+function renderAll() {
+    const d = dashboardData;
+
+    // Attendance badge
+    const dot = document.getElementById('attendanceDot');
+    const text = document.getElementById('attendanceText');
+    if (d.attendance.clocked_in && !d.attendance.clocked_out) {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-green-400 pulse-dot';
+        text.textContent = 'Working';
+    } else if (d.attendance.clocked_out) {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-gray-400';
+        text.textContent = 'Shift Done';
+    } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-yellow-400 pulse-dot';
+        text.textContent = 'Not Clocked In';
+    }
+
+    // Stats
+    document.getElementById('statFollowups').textContent = d.leads.stats.followups_today || 0;
+    document.getElementById('statOverdue').textContent = d.leads.stats.overdue || 0;
+    document.getElementById('statConversions').textContent = d.leads.stats.converted_this_month || 0;
+    document.getElementById('statIncentive').textContent = '₹' + formatNum(d.incentives.approved);
+
+    // AI Tasks
+    renderAiTasks(d.ai_tasks);
+
+    // Leads
+    renderLeads(d.leads);
+
+    // Outstanding
+    renderOutstanding(d.outstanding);
+
+    // Incentive
+    document.getElementById('incConversions').textContent = d.incentives.conversions;
+    document.getElementById('incApproved').textContent = '₹' + formatNum(d.incentives.approved);
+    document.getElementById('incPending').textContent = '₹' + formatNum(d.incentives.pending);
+}
+
+// ─── Render AI Tasks ───────────────────────────────────────────
+
+function renderAiTasks(aiData) {
+    const container = document.getElementById('tasksList');
+    const progressEl = document.getElementById('taskProgress');
+    const summaryEl = document.getElementById('aiSummary');
+    const motivationEl = document.getElementById('aiMotivation');
+
+    if (!aiData || !aiData.tasks || aiData.tasks.length === 0) {
+        container.innerHTML = `
+            <div class="p-6 text-center">
+                <p class="text-gray-400 text-sm mb-3">No tasks generated yet</p>
+                <button onclick="regenerateTasks()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition">
+                    Generate Tasks
+                </button>
+            </div>`;
+        progressEl.textContent = 'No tasks';
+        return;
+    }
+
+    const completed = aiData.tasks.filter(t => t.completed).length;
+    const total = aiData.tasks.length;
+    progressEl.textContent = `${completed}/${total} completed`;
+
+    if (aiData.summary) {
+        summaryEl.textContent = aiData.summary;
+        summaryEl.classList.remove('hidden');
+    }
+
+    container.innerHTML = aiData.tasks.map((task, i) => `
+        <div class="task-card p-4 flex items-start gap-3 cursor-pointer hover:bg-gray-50 transition ${task.completed ? 'task-done' : ''} priority-${task.priority || 'medium'}"
+             onclick="toggleTask(${i})">
+            <div class="mt-0.5 flex-shrink-0">
+                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition
+                    ${task.completed ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-indigo-400'}">
+                    ${task.completed ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : ''}
+                </div>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="task-title font-medium text-sm text-gray-800">${escHtml(task.title)}</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium cat-${task.category || 'general'}">
+                        ${getCategoryLabel(task.category)}
+                    </span>
+                </div>
+                <p class="text-xs text-gray-500 leading-relaxed">${escHtml(task.description || '')}</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getCategoryLabel(cat) {
+    const labels = {
+        lead_followup: 'Follow-up',
+        lead_add: 'New Lead',
+        outstanding_followup: 'Outstanding',
+        conversion: 'Convert',
+        general: 'General'
+    };
+    return labels[cat] || cat || 'General';
+}
+
+async function toggleTask(index) {
+    try {
+        const result = await api(`${API_BASE}/tasks/${index}/toggle`, { method: 'POST' });
+        if (result.success) {
+            dashboardData.ai_tasks.tasks = result.data.tasks;
+            dashboardData.ai_tasks.completed = result.data.completedCount;
+            renderAiTasks(dashboardData.ai_tasks);
+            showToast(result.data.tasks[index].completed ? 'Task completed!' : 'Task unchecked', 'success');
+        }
+    } catch (e) {
+        showToast('Failed to update task', 'error');
+    }
+}
+
+async function regenerateTasks() {
+    const btn = document.getElementById('regenerateBtn');
+    btn.textContent = 'Generating...';
+    btn.disabled = true;
+
+    try {
+        const result = await api(`${API_BASE}/tasks/generate`, { method: 'POST' });
+        if (result.success) {
+            await loadDashboard();
+            showToast('Tasks regenerated!', 'success');
+        } else {
+            showToast(result.message || 'Generation failed', 'error');
+        }
+    } catch (e) {
+        showToast('Failed to generate tasks', 'error');
+    } finally {
+        btn.textContent = 'Refresh';
+        btn.disabled = false;
+    }
+}
+
+// ─── Render Leads ──────────────────────────────────────────────
+
+function renderLeads(leadsData) {
+    const container = document.getElementById('leadsList');
+    const footer = document.getElementById('leadsFooter');
+    const allLeads = [...(leadsData.overdue || []), ...(leadsData.today_followups || [])];
+
+    if (allLeads.length === 0) {
+        container.innerHTML = `
+            <div class="p-6 text-center text-gray-400 text-sm">
+                No pending follow-ups.
+                <a href="/staff-leads.html" class="text-indigo-600 font-medium hover:underline">Add a new lead</a>
+            </div>`;
+        return;
+    }
+
+    const subtitle = document.getElementById('leadsSubtitle');
+    subtitle.textContent = `${leadsData.today_followups?.length || 0} today, ${leadsData.overdue?.length || 0} overdue`;
+
+    container.innerHTML = allLeads.map(lead => {
+        const isOverdue = lead.followup_type === 'overdue';
+        const daysOverdue = isOverdue ? Math.ceil((Date.now() - new Date(lead.next_followup_date).getTime()) / 86400000) : 0;
+
+        return `
+        <div class="p-4 flex items-center gap-3 hover:bg-gray-50 transition cursor-pointer"
+             onclick="window.location.href='/staff-leads.html?highlight=${lead.id}'">
+            <div class="flex-shrink-0">
+                <div class="w-10 h-10 rounded-full ${isOverdue ? 'bg-red-100' : 'bg-amber-100'} flex items-center justify-center">
+                    <span class="text-sm font-bold ${isOverdue ? 'text-red-600' : 'text-amber-600'}">${lead.name.charAt(0).toUpperCase()}</span>
+                </div>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                    <span class="font-medium text-sm text-gray-800 truncate">${escHtml(lead.name)}</span>
+                    ${isOverdue ? `<span class="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">${daysOverdue}d overdue</span>` : '<span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">Today</span>'}
+                </div>
+                <div class="flex items-center gap-2 mt-0.5">
+                    <span class="text-xs text-gray-500">${escHtml(lead.phone || '')}</span>
+                    <span class="text-[9px] text-gray-400">${lead.status}</span>
+                    ${lead.estimated_budget ? `<span class="text-[9px] text-gray-400">₹${formatNum(lead.estimated_budget)}</span>` : ''}
+                </div>
+            </div>
+            <a href="tel:${lead.phone}" onclick="event.stopPropagation()" class="flex-shrink-0 w-8 h-8 rounded-full bg-green-50 flex items-center justify-center hover:bg-green-100 transition">
+                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            </a>
+        </div>`;
+    }).join('');
+
+    footer.classList.remove('hidden');
+}
+
+// ─── Render Outstanding ────────────────────────────────────────
+
+function renderOutstanding(outstanding) {
+    const container = document.getElementById('outstandingList');
+    const totalEl = document.getElementById('totalOutstanding');
+
+    if (!outstanding || outstanding.length === 0) {
+        container.innerHTML = '<div class="p-6 text-center text-gray-400 text-sm">No outstanding in your branch</div>';
+        totalEl.textContent = '₹0';
+        return;
+    }
+
+    const total = outstanding.reduce((sum, c) => sum + parseFloat(c.outstanding || 0), 0);
+    totalEl.textContent = '₹' + formatNum(total);
+
+    const subtitle = document.getElementById('outstandingSubtitle');
+    subtitle.textContent = `${outstanding.length} customers`;
+
+    container.innerHTML = outstanding.slice(0, 10).map(cust => {
+        const daysOverdue = cust.days_overdue || 0;
+        const urgency = daysOverdue > 30 ? 'text-red-600' : daysOverdue > 15 ? 'text-amber-600' : 'text-gray-600';
+
+        return `
+        <div class="p-4 flex items-center gap-3 hover:bg-gray-50 transition">
+            <div class="flex-1 min-w-0">
+                <div class="font-medium text-sm text-gray-800 truncate">${escHtml(cust.customer_name)}</div>
+                <div class="flex items-center gap-2 mt-0.5">
+                    <span class="text-xs font-semibold ${urgency}">₹${formatNum(cust.outstanding)}</span>
+                    <span class="text-[9px] text-gray-400">${cust.invoice_count} invoice${cust.invoice_count !== 1 ? 's' : ''}</span>
+                    ${daysOverdue > 0 ? `<span class="text-[9px] text-red-500">${daysOverdue}d overdue</span>` : ''}
+                </div>
+            </div>
+            ${cust.phone ? `
+            <a href="tel:${cust.phone}" class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100 transition">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            </a>` : ''}
+        </div>`;
+    }).join('');
+
+    if (outstanding.length > 10) {
+        container.innerHTML += `<div class="px-4 py-3 text-center text-xs text-gray-400">+${outstanding.length - 10} more customers</div>`;
+    }
+}
+
+// ─── Utilities ─────────────────────────────────────────────────
+
+function formatNum(n) {
+    if (!n) return '0';
+    return Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+function escHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-indigo-600' };
+    const toast = document.createElement('div');
+    toast.className = `${colors[type] || colors.info} text-white px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium toast-enter`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+
+</body>
+</html>

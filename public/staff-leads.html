@@ -674,6 +674,18 @@
         };
     }
 
+    // Wrap fetch to handle 401 (expired session) -> redirect to login
+    async function authFetch(url, options = {}) {
+        const res = await fetch(url, options);
+        if (res.status === 401) {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+            throw new Error('Session expired');
+        }
+        return res;
+    }
+
     // ---- Utility Functions ----
     function escapeHtml(text) {
         if (!text) return '';
@@ -774,7 +786,7 @@
     // ---- Load Stats ----
     async function loadStats() {
         try {
-            const res = await fetch(`${API_BASE}/my/stats`, { headers: getHeaders() });
+            const res = await authFetch(`${API_BASE}/my/stats`, { headers: getHeaders() });
             const data = await res.json();
             if (data.success) {
                 const s = data.data;
@@ -837,7 +849,7 @@
         }
 
         try {
-            const res = await fetch(`${API_BASE}/my/list?${params}`, { headers: getHeaders() });
+            const res = await authFetch(`${API_BASE}/my/list?${params}`, { headers: getHeaders() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             if (data.success) {
@@ -1065,7 +1077,7 @@
         const method = leadId ? 'PUT' : 'POST';
 
         try {
-            const res = await fetch(url, { method, headers: getHeaders(), body: JSON.stringify(body) });
+            const res = await authFetch(url, { method, headers: getHeaders(), body: JSON.stringify(body) });
             const data = await res.json();
             if (data.success) {
                 closeModal('leadModal');
@@ -1206,7 +1218,7 @@
         container.innerHTML = '<div class="text-sm text-gray-400 py-4 text-center">Loading...</div>';
 
         try {
-            const res = await fetch(`${API_BASE}/my/${leadId}/followups`, { headers: getHeaders() });
+            const res = await authFetch(`${API_BASE}/my/${leadId}/followups`, { headers: getHeaders() });
             const data = await res.json();
             if (data.success && data.data.length > 0) {
                 container.innerHTML = data.data.map((f, i) => {
@@ -1252,7 +1264,7 @@
         }
 
         try {
-            const res = await fetch(`${API_BASE}/my/${id}/status`, {
+            const res = await authFetch(`${API_BASE}/my/${id}/status`, {
                 method: 'PATCH',
                 headers: getHeaders(),
                 body: JSON.stringify({ status })
@@ -1282,7 +1294,7 @@
         if (!confirm(`Convert "${currentLeadData.name}" to ${typeLabel}?\n\nThis will mark the lead as Won and create an incentive entry.`)) return;
 
         try {
-            const res = await fetch(`${API_BASE}/my/${currentLeadData.id}/convert`, {
+            const res = await authFetch(`${API_BASE}/my/${currentLeadData.id}/convert`, {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify({ lead_type: leadType })
@@ -1310,7 +1322,7 @@
             return;
         }
         try {
-            const res = await fetch(`${API_BASE}/my/${pendingLostId}/status`, {
+            const res = await authFetch(`${API_BASE}/my/${pendingLostId}/status`, {
                 method: 'PATCH',
                 headers: getHeaders(),
                 body: JSON.stringify({ status: 'lost', lost_reason: reason })
@@ -1355,7 +1367,7 @@
         };
 
         try {
-            const res = await fetch(`${API_BASE}/my/${currentLeadId}/followup`, {
+            const res = await authFetch(`${API_BASE}/my/${currentLeadId}/followup`, {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify(body)

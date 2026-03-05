@@ -11,6 +11,7 @@ const aiStaffAnalyzer = require('./ai-staff-analyzer');
 const aiLeadManager = require('./ai-lead-manager');
 const aiMarketing = require('./ai-marketing');
 const contextBuilder = require('./ai-context-builder');
+const staffTaskGenerator = require('./staff-task-generator');
 
 let pool = null;
 let sessionManager = null;
@@ -26,6 +27,7 @@ function setPool(p) {
     aiLeadManager.setPool(p);
     aiMarketing.setPool(p);
     contextBuilder.setPool(p);
+    staffTaskGenerator.setPool(p);
 }
 function setSessionManager(sm) { sessionManager = sm; }
 function setIO(i) { io = i; }
@@ -189,6 +191,24 @@ async function runMarketingWeekly() {
     }
 }
 
+// ─── Staff Daily Tamil Tasks ──────────────────────────────────
+
+async function runStaffDailyTasks() {
+    try {
+        const enabled = await getConfig('staff_daily_tasks_enabled');
+        if (enabled !== '1') { console.log('[AI Scheduler] Staff daily tasks disabled'); return; }
+
+        console.log('[AI Scheduler] Generating daily Tamil tasks for all staff...');
+        if (registry) registry.markRunning('ai-staff-daily-tasks');
+        const result = await staffTaskGenerator.generateForAllStaff();
+        console.log(`[AI Scheduler] Staff daily tasks done: ${result.generated} generated, ${result.failed} failed`);
+        if (registry) registry.markCompleted('ai-staff-daily-tasks', { recordsProcessed: result.generated });
+    } catch (e) {
+        console.error('[AI Scheduler] Staff daily tasks failed:', e.message);
+        if (registry) registry.markFailed('ai-staff-daily-tasks', { error: e.message });
+    }
+}
+
 // ─── Daily Snapshot ───────────────────────────────────────────
 
 async function runDailySnapshot() {
@@ -219,6 +239,7 @@ function start() {
         registry.register('ai-lead-scoring', { name: 'AI Lead Scoring', service: 'ai-scheduler', schedule: 'Every 6h', description: 'Score and rank all leads' });
         registry.register('ai-marketing-weekly', { name: 'AI Marketing Tips', service: 'ai-scheduler', schedule: 'Mon 9:00 AM', description: 'Weekly marketing insights' });
         registry.register('ai-daily-snapshot', { name: 'Business Snapshot', service: 'ai-scheduler', schedule: '6AM/12PM/6PM', description: 'Daily business data snapshot' });
+        registry.register('ai-staff-daily-tasks', { name: 'Staff Tamil Tasks', service: 'ai-scheduler', schedule: '9:00 AM IST', description: 'Generate personalized Tamil daily tasks for staff via Clawdbot' });
     }
 
     // Daily Zoho analysis — 9:00 PM IST (15:30 UTC)
@@ -236,12 +257,15 @@ function start() {
     // Weekly marketing tips — Monday 9:00 AM IST
     jobs.marketingWeekly = cron.schedule('0 9 * * 1', runMarketingWeekly, { timezone: 'Asia/Kolkata' });
 
+    // Staff daily Tamil tasks — 9:00 AM IST
+    jobs.staffDailyTasks = cron.schedule('0 9 * * *', runStaffDailyTasks, { timezone: 'Asia/Kolkata' });
+
     // Daily business snapshots — 6 AM, 12 PM, 6 PM IST
     jobs.snapshotMorning = cron.schedule('0 6 * * *', runDailySnapshot, { timezone: 'Asia/Kolkata' });
     jobs.snapshotNoon = cron.schedule('0 12 * * *', runDailySnapshot, { timezone: 'Asia/Kolkata' });
     jobs.snapshotEvening = cron.schedule('0 18 * * *', runDailySnapshot, { timezone: 'Asia/Kolkata' });
 
-    console.log('[AI Scheduler] Started: zoho-daily(21:00), staff-daily(22:30), lead-scoring(6h), marketing(Mon 9AM), snapshots(6AM/12PM/6PM)');
+    console.log('[AI Scheduler] Started: zoho-daily(21:00), staff-daily(22:30), lead-scoring(6h), marketing(Mon 9AM), snapshots(6AM/12PM/6PM), staff-tasks(9AM)');
 }
 
 function stop() {
@@ -262,5 +286,6 @@ module.exports = {
     runStaffDaily,
     runLeadScoring,
     runMarketingWeekly,
-    runDailySnapshot
+    runDailySnapshot,
+    runStaffDailyTasks
 };

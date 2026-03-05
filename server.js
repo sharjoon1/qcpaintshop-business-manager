@@ -77,6 +77,8 @@ const anomalyDetector = require('./services/anomaly-detector');
 const productionMonitor = require('./services/production-monitor');
 const responseTracker = require('./middleware/responseTracker');
 const painterNotificationService = require('./services/painter-notification-service');
+const staffDailyWorkRoutes = require('./routes/staff-daily-work');
+const staffTaskGenerator = require('./services/staff-task-generator');
 const fcmAdmin = require('./services/fcm-admin');
 
 const app = express();
@@ -219,6 +221,8 @@ errorHandlerMw.setErrorAnalysisService(errorAnalysisService);
 anomalyRoutes.setPool(pool);
 anomalyDetector.setPool(pool);
 productionMonitor.setPool(pool);
+staffDailyWorkRoutes.setPool(pool);
+staffTaskGenerator.setPool(pool);
 productionMonitor.setNotificationService(notificationService);
 productionMonitor.setResponseTracker(responseTracker);
 
@@ -262,6 +266,7 @@ app.use('/api/system', systemRoutes.router);
 app.use('/api/credit-limits', creditLimitRoutes.router);
 app.use('/api/admin/dashboard', adminDashboardRoutes.router);
 app.use('/api/anomalies', anomalyRoutes.router);
+app.use('/api/staff/daily-work', staffDailyWorkRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {

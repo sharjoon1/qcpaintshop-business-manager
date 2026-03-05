@@ -618,6 +618,27 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Admin summary view with date filtering
 - Pages: `admin-daily-tasks.html`, `staff/daily-tasks.html`
 
+**Staff Daily Work Dashboard (AI Tamil Task Generator)**
+- Unified daily work page showing everything a staff member needs after attendance
+- Sections: Attendance status, Quick stats, AI Tamil tasks, Leads to follow up, Outstanding customers, Incentive summary
+- AI Tamil Task Generator via Clawdbot: personalized tasks in Tamil based on staff's pending leads, overdue followups, branch outstanding, conversion targets
+- Cron: 9:00 AM IST daily (`ai-scheduler.js`) generates tasks for all active staff
+- Staff can toggle task completion, regenerate tasks on demand
+- Fallback tasks generated without AI if Clawdbot unavailable
+- Branch outstanding customers: staff see their branch's outstanding with phone call links
+- Incentive tracker: this month's conversions, approved/pending amounts
+- Table: `staff_daily_ai_tasks` (user_id, task_date, tasks_json, summary, lead_context)
+- Config: `staff_daily_tasks_enabled`, `staff_daily_tasks_time`, `staff_daily_tasks_language` in `ai_config`
+- Service: `services/staff-task-generator.js` (gatherStaffContext, generateTamilTasks, generateForAllStaff)
+- Route: `routes/staff-daily-work.js` (5 endpoints under `/api/staff/daily-work`)
+- Page: `staff-daily-work.html` (data-page="daily-work", in staff sidebar under "My Work")
+- Endpoints:
+  - `GET /api/staff/daily-work` - Full dashboard (attendance + leads + outstanding + incentives + AI tasks)
+  - `GET /api/staff/daily-work/tasks` - Today's AI Tamil tasks
+  - `POST /api/staff/daily-work/tasks/:index/toggle` - Toggle task completion
+  - `POST /api/staff/daily-work/tasks/generate` - Regenerate today's tasks
+  - `GET /api/staff/daily-work/outstanding` - Branch outstanding customers (search, sort)
+
 ---
 
 ### 2.13 Lead Management
