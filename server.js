@@ -82,6 +82,7 @@ const staffTaskGenerator = require('./services/staff-task-generator');
 const activityFeedRoutes = require('./routes/activity-feed');
 const activityFeed = require('./services/activity-feed');
 const fcmAdmin = require('./services/fcm-admin');
+const monitoringRoutes = require('./routes/monitoring');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)
@@ -227,6 +228,10 @@ staffDailyWorkRoutes.setPool(pool);
 staffTaskGenerator.setPool(pool);
 activityFeedRoutes.setPool(pool);
 activityFeed.setPool(pool);
+monitoringRoutes.setPool(pool);
+monitoringRoutes.setAutomationRegistry(automationRegistry);
+monitoringRoutes.setResponseTracker(responseTracker);
+monitoringRoutes.setProductionMonitor(productionMonitor);
 productionMonitor.setNotificationService(notificationService);
 productionMonitor.setResponseTracker(responseTracker);
 
@@ -272,6 +277,7 @@ app.use('/api/admin/dashboard', adminDashboardRoutes.router);
 app.use('/api/anomalies', anomalyRoutes.router);
 app.use('/api/staff/daily-work', staffDailyWorkRoutes.router);
 app.use('/api/activity-feed', activityFeedRoutes.router);
+app.use('/api/monitoring', monitoringRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
