@@ -16,6 +16,7 @@ const { uploadProductImage, uploadOfferBanner, uploadTraining, uploadPainterAtte
 const sharp = require('sharp');
 const cardGenerator = require('../services/painter-card-generator');
 const painterNotificationService = require('../services/painter-notification-service');
+const notificationService = require('../services/notification-service');
 const { generatePainterEstimatePDF } = require('./painter-estimate-pdf-generator');
 
 let pool;
@@ -3077,6 +3078,15 @@ router.post('/estimates/:estimateId/confirm-payment', requirePermission('painter
                              `Payment confirmed: Estimate #${estimate.estimate_number}`]
                         );
                         console.log(`[Incentive] Confirm-payment: staff ${leadMatch.assigned_to}, estimate ${estimate.id}, ₹${incAmount}`);
+                        // Notify staff
+                        try {
+                            await notificationService.send(leadMatch.assigned_to, {
+                                type: 'incentive_earned',
+                                title: 'Incentive Earned!',
+                                body: `You earned ₹${incAmount} incentive for estimate #${estimate.estimate_number} (${autoApproveVal ? 'auto-approved' : 'pending approval'})`,
+                                data: { page: 'my-incentives' }
+                            });
+                        } catch (nErr) { console.error('Incentive notification error:', nErr.message); }
                     }
                 }
             }
@@ -3349,6 +3359,15 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
                              `Payment received: Estimate #${estimate.estimate_number}, Zoho Invoice: ${invoiceNumber}`]
                         );
                         console.log(`[Incentive] Slab-based for staff ${leadMatch.assigned_to}, lead ${leadMatch.id}, estimate ${estimate.id}, total ₹${estimateTotal}, incentive ₹${incentiveAmount}`);
+                        // Notify staff
+                        try {
+                            await notificationService.send(leadMatch.assigned_to, {
+                                type: 'incentive_earned',
+                                title: 'Incentive Earned!',
+                                body: `You earned ₹${incentiveAmount} incentive for estimate #${estimate.estimate_number} (${autoApproveVal ? 'auto-approved' : 'pending approval'})`,
+                                data: { page: 'my-incentives' }
+                            });
+                        } catch (nErr) { console.error('Incentive notification error:', nErr.message); }
                     }
                 }
             }

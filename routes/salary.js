@@ -1917,6 +1917,16 @@ router.put('/incentives/:id/approve', requireRole('admin', 'manager'), requirePe
             ['approved', req.user.id, req.params.id]
         );
 
+        // Notify staff
+        try {
+            await notificationService.send(incentive[0].user_id, {
+                type: 'incentive_approved',
+                title: 'Incentive Approved!',
+                body: `Your ₹${parseFloat(incentive[0].amount).toLocaleString('en-IN')} incentive has been approved`,
+                data: { page: 'my-incentives' }
+            });
+        } catch (nErr) { console.error('Incentive approve notification error:', nErr.message); }
+
         res.json({ success: true, message: 'Incentive approved' });
     } catch (error) {
         console.error('Error approving incentive:', error);
@@ -1943,6 +1953,16 @@ router.put('/incentives/:id/reject', requireRole('admin', 'manager'), requirePer
             ['rejected', notes ? `\nRejected: ${notes}` : '', req.user.id, req.params.id]
         );
 
+        // Notify staff
+        try {
+            await notificationService.send(incentive[0].user_id, {
+                type: 'incentive_rejected',
+                title: 'Incentive Rejected',
+                body: `Your ₹${parseFloat(incentive[0].amount).toLocaleString('en-IN')} incentive was rejected${notes ? ': ' + notes : ''}`,
+                data: { page: 'my-incentives' }
+            });
+        } catch (nErr) { console.error('Incentive reject notification error:', nErr.message); }
+
         res.json({ success: true, message: 'Incentive rejected' });
     } catch (error) {
         console.error('Error rejecting incentive:', error);
@@ -1958,11 +1978,30 @@ router.put('/incentives/bulk-approve', requireRole('admin', 'manager'), requireP
         const { month } = req.body;
         if (!month) return res.status(400).json({ success: false, message: 'month is required' });
 
+        // Get pending incentives before approving (for notifications)
+        const [pendingIncentives] = await pool.query(
+            `SELECT user_id, SUM(amount) as total_amount, COUNT(*) as cnt FROM staff_incentives
+             WHERE incentive_month = ? AND status = 'pending' GROUP BY user_id`,
+            [month]
+        );
+
         const [result] = await pool.query(
             `UPDATE staff_incentives SET status = 'approved', approved_by = ?, approved_at = NOW()
              WHERE incentive_month = ? AND status = 'pending'`,
             [req.user.id, month]
         );
+
+        // Notify each staff
+        for (const pi of pendingIncentives) {
+            try {
+                await notificationService.send(pi.user_id, {
+                    type: 'incentive_approved',
+                    title: 'Incentives Approved!',
+                    body: `${pi.cnt} incentive(s) totaling ₹${parseFloat(pi.total_amount).toLocaleString('en-IN')} approved for ${month}`,
+                    data: { page: 'my-incentives' }
+                });
+            } catch (nErr) { console.error('Bulk approve notification error:', nErr.message); }
+        }
 
         res.json({ success: true, message: `${result.affectedRows} incentives approved`, count: result.affectedRows });
     } catch (error) {
@@ -2050,6 +2089,21 @@ router.post('/incentives/request', requireAuth, async (req, res) => {
             message: `Incentive request submitted (₹${incentiveAmount})`,
             data: { id: result.insertId, incentive_amount: incentiveAmount }
         });
+
+        // Notify admins about the manual incentive request
+        try {
+            const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin','super_admin') AND status = 'active'");
+            for (const admin of admins) {
+                await notificationService.send(admin.id, {
+                    type: 'incentive_request',
+                    title: 'New Incentive Request',
+                    body: `${req.user.full_name || 'Staff'} requested ₹${incentiveAmount} incentive (Invoice: ${invoice_reference})`,
+                    data: { page: 'salary-incentives' }
+                });
+            }
+        } catch (notifErr) {
+            console.error('Error sending incentive request notification:', notifErr);
+        }
     } catch (error) {
         console.error('Error requesting incentive:', error);
         res.status(500).json({ success: false, message: 'Failed to submit incentive request' });
