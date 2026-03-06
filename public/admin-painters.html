@@ -1600,6 +1600,11 @@
             cancelled: 'badge-suspended', discount_requested: 'badge-pending', final_approved: 'badge-approved'
         };
 
+        // Calculate balance due (needed by actions below)
+        const effectiveTotal = parseFloat(est.final_grand_total) || parseFloat(est.markup_grand_total) || parseFloat(est.grand_total) || 0;
+        const paidAmount = parseFloat(est.payment_amount) || 0;
+        const balanceDue = paidAmount > 0 ? Math.max(0, Math.round((effectiveTotal - paidAmount) * 100) / 100) : 0;
+
         let actionsHtml = '';
         if (est.status === 'pending_admin') {
             if (isCustomer) {
@@ -1719,11 +1724,6 @@
         const editableStatuses = ['admin_review', 'approved', 'sent_to_customer', 'final_approved', 'payment_submitted', 'payment_recorded'];
         const canEdit = editableStatuses.includes(est.status);
         const canPdf = est.status !== 'draft';
-
-        // Calculate balance due
-        const effectiveTotal = parseFloat(est.final_grand_total) || parseFloat(est.markup_grand_total) || parseFloat(est.grand_total) || 0;
-        const paidAmount = parseFloat(est.payment_amount) || 0;
-        const balanceDue = paidAmount > 0 ? Math.max(0, Math.round((effectiveTotal - paidAmount) * 100) / 100) : 0;
 
         const content = document.getElementById('estimateDetailContent');
         content.innerHTML = `
