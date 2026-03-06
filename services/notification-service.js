@@ -88,7 +88,7 @@ async function sendPushNotifications(userId, { type, title, body, data }) {
     for (const sub of subscriptions) {
         try {
             if (sub.type === 'web' && sub.endpoint) {
-                await sendWebPush(sub, { type, title, body, data });
+                await sendWebPush(sub, { type: type || 'notification', title, body, data });
             } else if (sub.type === 'fcm' && sub.fcm_token) {
                 const result = await fcmAdmin.sendToDevice(sub.fcm_token, {
                     title,
@@ -113,7 +113,7 @@ async function sendPushNotifications(userId, { type, title, body, data }) {
 /**
  * Send Web Push notification
  */
-async function sendWebPush(subscription, { title, body, data }) {
+async function sendWebPush(subscription, { type, title, body, data }) {
     if (!process.env.VAPID_PUBLIC_KEY) return;
 
     const pushSubscription = {
@@ -129,7 +129,7 @@ async function sendWebPush(subscription, { title, body, data }) {
         body,
         icon: '/icons/icon-192x192.png',
         badge: '/icons/icon-72x72.png',
-        data
+        data: { type: type || 'notification', ...(data || {}) }
     });
 
     await webPush.sendNotification(pushSubscription, payload, { TTL: 86400 });
