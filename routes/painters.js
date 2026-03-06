@@ -3002,7 +3002,9 @@ router.post('/estimates/:estimateId/approve-final', requirePermission('painters'
 router.post('/estimates/:estimateId/confirm-payment', requirePermission('painters', 'estimates'), async (req, res) => {
     try {
         const [estimates] = await pool.query(
-            "SELECT * FROM painter_estimates WHERE id = ? AND status = 'payment_submitted'",
+            `SELECT pe.*, p.full_name as painter_name, p.phone as painter_phone
+             FROM painter_estimates pe JOIN painters p ON pe.painter_id = p.id
+             WHERE pe.id = ? AND pe.status = 'payment_submitted'`,
             [req.params.estimateId]
         );
         if (!estimates.length) return res.status(404).json({ success: false, message: 'No pending payment to confirm' });
