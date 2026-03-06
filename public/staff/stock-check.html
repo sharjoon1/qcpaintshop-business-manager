@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#16a34a">
+    <meta name="theme-color" content="#1B5E3B">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -19,7 +19,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #16a34a 0%, #0d9488 100%);
+            background: linear-gradient(135deg, #1B5E3B 0%, #154D31 100%);
             min-height: 100vh;
         }
 
@@ -55,7 +55,7 @@
             transition: all 0.2s;
         }
         .tab-btn.active {
-            color: #16a34a;
+            color: #1B5E3B;
             background: white;
             box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
         }
@@ -113,7 +113,7 @@
             outline: none;
             transition: border-color 0.2s;
         }
-        .qty-input:focus { border-color: #16a34a; }
+        .qty-input:focus { border-color: #1B5E3B; }
         .qty-input.has-value { border-color: #a5b4fc; }
 
         .photo-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
@@ -144,7 +144,7 @@
             resize: none;
             outline: none;
         }
-        .notes-input:focus { border-color: #16a34a; }
+        .notes-input:focus { border-color: #1B5E3B; }
 
         .submit-btn {
             width: 100%;
@@ -154,7 +154,7 @@
             font-weight: 700;
             border: none;
             color: white;
-            background: linear-gradient(135deg, #16a34a, #0d9488);
+            background: linear-gradient(135deg, #1B5E3B, #154D31);
             cursor: pointer;
             transition: all 0.3s;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
@@ -223,7 +223,7 @@
             padding: 1px 6px;
             border-radius: 4px;
         }
-        .checked-recent { background: #dcfce7; color: #166534; }
+        .checked-recent { background: #dcfce7; color: #0D3D23; }
         .checked-old { background: #fef3c7; color: #92400e; }
         .checked-never { background: #fee2e2; color: #991b1b; }
 
@@ -255,7 +255,7 @@
         .progress-fill {
             height: 100%;
             border-radius: 99px;
-            background: linear-gradient(90deg, #16a34a, #059669);
+            background: linear-gradient(90deg, #1B5E3B, #059669);
             transition: width 0.5s ease;
         }
         .progress-text {
@@ -287,9 +287,9 @@
             transition: all 0.2s;
         }
         .filter-tab.active {
-            background: #16a34a;
+            background: #1B5E3B;
             color: white;
-            border-color: #16a34a;
+            border-color: #1B5E3B;
         }
 
         /* Item search */
@@ -317,7 +317,7 @@
             transition: border-color 0.2s;
             background: #f8fafc;
         }
-        .item-search:focus { border-color: #16a34a; background: white; }
+        .item-search:focus { border-color: #1B5E3B; background: white; }
         .item-search-count {
             position: absolute;
             right: 10px;
@@ -418,7 +418,7 @@
             font-weight: 700;
             border: none;
             color: white;
-            background: linear-gradient(135deg, #16a34a, #0d9488);
+            background: linear-gradient(135deg, #1B5E3B, #154D31);
             cursor: pointer;
             transition: all 0.3s;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
@@ -1413,7 +1413,7 @@ async function loadHistory(page) {
             if (totalPages > 1) {
                 html += '<div style="display:flex; justify-content:center; gap:4px; margin-top:12px;">';
                 for (let i = 1; i <= totalPages; i++) {
-                    html += `<button onclick="loadHistory(${i})" style="padding:4px 10px; border-radius:6px; border:1px solid ${i === historyPage ? '#16a34a' : '#e2e8f0'}; background:${i === historyPage ? '#16a34a' : 'white'}; color:${i === historyPage ? 'white' : '#64748b'}; font-size:0.75rem; cursor:pointer;">${i}</button>`;
+                    html += `<button onclick="loadHistory(${i})" style="padding:4px 10px; border-radius:6px; border:1px solid ${i === historyPage ? '#1B5E3B' : '#e2e8f0'}; background:${i === historyPage ? '#1B5E3B' : 'white'}; color:${i === historyPage ? 'white' : '#64748b'}; font-size:0.75rem; cursor:pointer;">${i}</button>`;
                 }
                 html += '</div>';
             }
@@ -1441,7 +1441,7 @@ async function viewSubmission(id) {
         const a = data.data;
         let html = `
             <div style="margin-bottom:12px;">
-                <button onclick="loadHistory(${historyPage})" style="background:none; border:none; color:#16a34a; font-size:0.8rem; cursor:pointer; font-weight:600;">&larr; Back to list</button>
+                <button onclick="loadHistory(${historyPage})" style="background:none; border:none; color:#1B5E3B; font-size:0.8rem; cursor:pointer; font-weight:600;">&larr; Back to list</button>
             </div>
             <div style="font-size:0.95rem; font-weight:700; color:#1e293b; margin-bottom:2px;">
                 ${a.branch_name || 'Stock Check'} #${a.id}
@@ -1748,7 +1748,7 @@ function showNewAssignmentAlert(notification) {
     alert.id = 'newAssignmentAlert';
     alert.style.cssText = `
         position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
-        background: linear-gradient(135deg, #16a34a, #0d9488);
+        background: linear-gradient(135deg, #1B5E3B, #154D31);
         color: white; padding: 14px 20px;
         display: flex; align-items: center; gap: 12px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.3);
