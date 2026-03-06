@@ -1390,6 +1390,27 @@ Comprehensive error tracking, system health monitoring, data integrity validatio
 
 **Migration**: `migrations/migrate-error-prevention.js`
 
+#### System Monitoring Dashboard (Mar 6)
+
+Comprehensive system monitoring dashboard with real-time health metrics, error tracking, integration status, background jobs, and business metrics.
+
+**Route**: `routes/monitoring.js` (mounted at `/api/monitoring`)
+- `GET /overview` — Full system overview (system info, DB stats, PM2, errors, integrations, jobs, business metrics, top issues)
+- `GET /errors` — Filtered error list (type, severity, pagination)
+- `GET /performance` — API response times + health snapshots
+- `GET /database/tables` — Table sizes and row counts
+- `GET /usage` — Feature usage analytics (active users, top pages, API call stats)
+
+**Dependencies**: `setPool`, `setAutomationRegistry`, `setResponseTracker`, `setProductionMonitor`
+
+**Page**: `admin-monitoring.html` (`data-page="monitoring"`)
+- **Navigation**: System sub-nav → "Monitor" tab
+- Sections: System Health (4 cards: uptime, memory, CPU, disk), Integration Status (3 cards: Zoho, WhatsApp, FCM), Business Metrics (6 mini cards), Background Jobs + Performance (2-col), Recent Errors table, Quick Actions bar, DB Tables modal
+- Auto-refresh every 30 seconds with toggle
+- Color-coded status indicators (green/amber/red)
+- Progress bars for memory/CPU usage
+- Responsive grid layout
+
 #### Bug Reports & Error Analysis System (Feb 23)
 
 Extends the error prevention system with bug tracking, AI-powered fix suggestions, error deduplication, and trend analysis.
@@ -1747,10 +1768,10 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 | Dashboard | `/api/dashboard/*` | 1 | `server.js` |
 | Public | `/api/public/*`, `/api/guest/*` | 6 | `server.js` |
 | Attendance | `/api/attendance/*` | 18 | `routes/attendance.js` |
-| Salary | `/api/salary/*` | 25 | `routes/salary.js` |
+| Salary | `/api/salary/*` | 30 | `routes/salary.js` |
 | Branches | `/api/branches/*` | 10 | `routes/branches.js` |
 | Roles | `/api/roles/*` | 10 | `routes/roles.js` |
-| Leads | `/api/leads/*` | 25 | `routes/leads.js` |
+| Leads | `/api/leads/*` | 28 | `routes/leads.js` |
 | Tasks | `/api/tasks/*` | 12 | `routes/tasks.js` |
 | Daily Tasks | `/api/daily-tasks/*` | 15 | `routes/daily-tasks.js` |
 | Activities | `/api/activities/*` | 9 | `routes/activities.js` |
@@ -2743,5 +2764,18 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 
 ---
 
+### Incentive Slab System (Mar 6, 2026)
+- **`incentive_slabs` table**: Amount-based tiers (`min_amount`, `max_amount` => `incentive_amount`). Default: 10K-30K=>200, 30K-60K=>400, 60K+=>600
+- **Auto-incentive on payment**: Both push-to-zoho and confirm-payment endpoints now use slab lookup (fallback to flat `incentive_per_conversion`)
+- **Multiple incentives per lead**: Different estimates create separate incentives (dedup by `lead_id + estimate_id`)
+- **New columns on `staff_incentives`**: `estimate_id`, `estimate_amount`, `source` (auto_estimate/manual_request/admin_added), `invoice_reference`
+- **Manual request flow**: Staff submits `POST /api/salary/incentives/request` with amount + invoice_reference => slab lookup => pending approval
+- **Slab CRUD**: `GET/POST/PUT/DELETE /api/salary/incentive-slabs` (admin)
+- **Re-engagement system**: `GET /api/leads/re-engage` lists dormant converted leads (no activity > X days), `POST /api/leads/:id/re-engage` resets to 'interested'
+- **New leads columns**: `re_engaged_at`, `re_engage_count`
+- **Config keys**: `incentive_slab_enabled`, `incentive_reengagement_days` (default 90)
+- **UI**: Slabs config section on `admin-salary-incentives.html`, "Request" button on `staff-incentives.html`, "Dormant" tab on `staff-leads.html`
+- **Migration**: `migrations/migrate-incentive-slabs.js`
+
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-03-01 | Version: 3.3.5 (Staff/Customer), 1.2.0 (Painter) | Maintained by: Development Team*
+*Last Updated: 2026-03-06 | Version: 3.3.5 (Staff/Customer), 1.2.0 (Painter) | Maintained by: Development Team*

@@ -124,10 +124,45 @@
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Search</label>
                     <input type="text" id="searchInput" placeholder="Name, phone, email..." class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
                 </div>
-                <div class="flex items-end">
-                    <button onclick="loadLeads()" class="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-semibold">
+                <div class="flex items-end gap-2">
+                    <button onclick="loadLeads()" class="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-semibold">
                         Apply Filters
                     </button>
+                    <button onclick="toggleDormantView()" id="dormantBtn" class="flex-1 bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 font-semibold text-sm">
+                        Dormant
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dormant Leads Section -->
+        <div id="dormantSection" class="hidden mb-6">
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-amber-800">Dormant Leads</h3>
+                        <p class="text-sm text-amber-600" id="dormantInfo">Converted leads with no activity in 90+ days</p>
+                    </div>
+                    <button onclick="toggleDormantView()" class="text-amber-600 hover:text-amber-800 text-sm font-semibold">Back to All</button>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gradient-to-r from-amber-500 to-amber-600 text-white">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-bold uppercase">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold uppercase">Phone</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold uppercase">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold uppercase">Assigned To</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold uppercase">Converted</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold uppercase">Last Activity</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold uppercase">Re-engaged</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold uppercase">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dormantTableBody"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -1263,6 +1298,82 @@
             const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
             document.getElementById('perfDateFrom').value = firstOfMonth.toISOString().split('T')[0];
             document.getElementById('perfDateTo').value = now.toISOString().split('T')[0];
+        }
+
+        // ---- Dormant Leads ----
+        let dormantVisible = false;
+
+        async function toggleDormantView() {
+            dormantVisible = !dormantVisible;
+            document.getElementById('dormantSection').classList.toggle('hidden', !dormantVisible);
+            document.getElementById('dormantBtn').textContent = dormantVisible ? 'All Leads' : 'Dormant';
+
+            if (dormantVisible) {
+                await loadDormantLeads();
+            }
+        }
+
+        async function loadDormantLeads() {
+            try {
+                const res = await fetch(`${API_BASE}/leads/re-engage`, { headers: getAuthHeaders() });
+                const result = await res.json();
+
+                if (result.success) {
+                    document.getElementById('dormantInfo').textContent =
+                        `${result.summary.total} converted leads with no activity in ${result.config.dormant_days}+ days`;
+                    renderDormantLeads(result.data);
+                }
+            } catch (err) {
+                console.error('Dormant leads error:', err);
+            }
+        }
+
+        function renderDormantLeads(data) {
+            const tbody = document.getElementById('dormantTableBody');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">No dormant leads found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(l => {
+                const converted = l.converted_at ? new Date(l.converted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '-';
+                const lastAct = l.last_activity_date ? new Date(l.last_activity_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '-';
+                const daysAgo = l.last_activity_date ? Math.floor((Date.now() - new Date(l.last_activity_date)) / 86400000) : '?';
+                const typeColors = { customer: 'bg-blue-100 text-blue-700', painter: 'bg-green-100 text-green-700', engineer: 'bg-amber-100 text-amber-700' };
+                return `<tr class="hover:bg-gray-50 border-b">
+                    <td class="px-6 py-3 text-sm font-semibold">${l.name}</td>
+                    <td class="px-6 py-3 text-sm">${l.phone || '-'}</td>
+                    <td class="px-6 py-3"><span class="px-2 py-1 text-xs font-semibold rounded-full ${typeColors[l.lead_type] || 'bg-gray-100'}">${l.lead_type || '-'}</span></td>
+                    <td class="px-6 py-3 text-sm">${l.assigned_to_name || '-'}</td>
+                    <td class="px-6 py-3 text-sm text-gray-500">${converted}</td>
+                    <td class="px-6 py-3 text-sm text-red-500 font-semibold">${lastAct} (${daysAgo}d)</td>
+                    <td class="px-6 py-3 text-sm">${l.re_engage_count > 0 ? `<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">x${l.re_engage_count}</span>` : '-'}</td>
+                    <td class="px-6 py-3">
+                        <button onclick="reEngageLead(${l.id})" class="bg-purple-600 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-purple-700">
+                            Re-engage
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function reEngageLead(id) {
+            if (!confirm('Re-engage this dormant lead? It will return to active leads as "Interested".')) return;
+            try {
+                const res = await fetch(`${API_BASE}/leads/${id}/re-engage`, {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert(result.message);
+                    loadDormantLeads();
+                    loadStats();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (err) {
+                alert('Network error');
+            }
         }
 
         // Initialize

@@ -1417,6 +1417,66 @@ router.post('/bulk/create', requirePermission('leads', 'add'), async (req, res) 
 });
 
 // ========================================
+// RE-ENGAGEMENT ENDPOINTS (must be before /:id routes)
+// ========================================
+
+/**
+ * GET /api/leads/re-engage - List dormant converted leads for re-engagement
+ */
+router.get('/re-engage', requirePermission('leads', 'view'), async (req, res) => {
+    try {
+        const [config] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'incentive_reengagement_days'"
+        );
+        const dormantDays = config.length > 0 ? parseInt(config[0].config_value) || 90 : 90;
+
+        const isAdmin = ['admin', 'super_admin', 'manager'].includes(req.user.role);
+
+        let query = `
+            SELECT l.id, l.name, l.phone, l.email, l.city, l.lead_type, l.assigned_to,
+                   l.converted_at, l.customer_id, l.re_engaged_at, l.re_engage_count,
+                   u.full_name as assigned_to_name,
+                   c.name as customer_name,
+                   MAX(pe.created_at) as last_estimate_date,
+                   MAX(zi.created_at) as last_invoice_date,
+                   GREATEST(
+                       COALESCE(MAX(pe.created_at), l.converted_at),
+                       COALESCE(MAX(zi.created_at), l.converted_at)
+                   ) as last_activity_date
+            FROM leads l
+            LEFT JOIN users u ON l.assigned_to = u.id
+            LEFT JOIN customers c ON l.customer_id = c.id
+            LEFT JOIN painter_estimates pe ON (pe.customer_phone = l.phone OR pe.painter_phone = l.phone) AND pe.status NOT IN ('draft')
+            LEFT JOIN zoho_invoices zi ON zi.customer_name = l.name
+            WHERE l.status = 'won' AND l.customer_id IS NOT NULL
+        `;
+        const params = [];
+
+        if (!isAdmin) {
+            query += ' AND l.assigned_to = ?';
+            params.push(req.user.id);
+        }
+
+        query += ` GROUP BY l.id
+            HAVING last_activity_date < DATE_SUB(NOW(), INTERVAL ? DAY)
+            ORDER BY last_activity_date ASC`;
+        params.push(dormantDays);
+
+        const [dormantLeads] = await pool.query(query, params);
+
+        res.json({
+            success: true,
+            data: dormantLeads,
+            config: { dormant_days: dormantDays },
+            summary: { total: dormantLeads.length }
+        });
+    } catch (error) {
+        console.error('Error fetching dormant leads:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch dormant leads' });
+    }
+});
+
+// ========================================
 // SINGLE LEAD ENDPOINTS
 // ========================================
 
@@ -2264,6 +2324,50 @@ router.post('/:id/convert', requirePermission('leads', 'convert'), async (req, r
         connection.release();
         console.error('Convert lead error:', error);
         res.status(500).json({ success: false, message: 'Failed to convert lead' });
+    }
+});
+
+/**
+ * POST /api/leads/:id/re-engage - Re-engage a dormant converted lead
+ */
+router.post('/:id/re-engage', requirePermission('leads', 'edit'), async (req, res) => {
+    try {
+        const leadId = req.params.id;
+        const [leads] = await pool.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+
+        if (leads.length === 0) {
+            return res.status(404).json({ success: false, message: 'Lead not found' });
+        }
+
+        const lead = leads[0];
+        if (lead.status !== 'won') {
+            return res.status(400).json({ success: false, message: 'Only won/converted leads can be re-engaged' });
+        }
+
+        await pool.query(
+            `UPDATE leads SET status = 'interested', re_engaged_at = NOW(), re_engage_count = re_engage_count + 1 WHERE id = ?`,
+            [leadId]
+        );
+
+        await pool.query(
+            `INSERT INTO lead_followups (lead_id, user_id, followup_type, notes, outcome)
+             VALUES (?, ?, 'other', 'Lead re-engaged for follow-up (dormant customer)', 'follow_up')`,
+            [leadId, req.user.id]
+        );
+
+        await pool.query(
+            `UPDATE leads SET total_followups = total_followups + 1, last_contact_date = CURDATE() WHERE id = ?`,
+            [leadId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Lead re-engaged successfully. It will now appear in active leads.',
+            data: { id: parseInt(leadId), status: 'interested', re_engage_count: (lead.re_engage_count || 0) + 1 }
+        });
+    } catch (error) {
+        console.error('Error re-engaging lead:', error);
+        res.status(500).json({ success: false, message: 'Failed to re-engage lead' });
     }
 });
 

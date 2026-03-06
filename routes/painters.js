@@ -3014,6 +3014,74 @@ router.post('/estimates/:estimateId/confirm-payment', requirePermission('painter
         );
         await logEstimateStatusChange(estimate.id, 'payment_submitted', 'payment_recorded', req.user.id, 'Payment confirmed by admin');
 
+        // Auto-create slab-based incentive on payment confirmation
+        try {
+            const customerPhone = estimate.customer_phone || estimate.painter_phone;
+            const customerName = estimate.customer_name || estimate.painter_name;
+            const estimateTotal = parseFloat(estimate.final_grand_total) || parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total) || 0;
+
+            let leadMatch = null;
+            if (customerPhone) {
+                const [leads] = await pool.query(
+                    `SELECT l.id, l.assigned_to, l.lead_type, l.customer_id FROM leads l
+                     WHERE l.status = 'won' AND l.lead_type IS NOT NULL AND l.customer_id IS NOT NULL AND l.phone = ?
+                     ORDER BY l.converted_at DESC LIMIT 1`, [customerPhone]
+                );
+                if (leads.length > 0) leadMatch = leads[0];
+            }
+            if (!leadMatch && customerName) {
+                const [leads] = await pool.query(
+                    `SELECT l.id, l.assigned_to, l.lead_type, l.customer_id FROM leads l
+                     WHERE l.status = 'won' AND l.lead_type IS NOT NULL AND l.customer_id IS NOT NULL AND l.name = ?
+                     ORDER BY l.converted_at DESC LIMIT 1`, [customerName]
+                );
+                if (leads.length > 0) leadMatch = leads[0];
+            }
+
+            if (leadMatch && leadMatch.assigned_to) {
+                const [existingInc] = await pool.query(
+                    'SELECT id FROM staff_incentives WHERE lead_id = ? AND estimate_id = ?', [leadMatch.id, estimate.id]
+                );
+                if (existingInc.length === 0) {
+                    const [incEnabled] = await pool.query("SELECT config_value FROM ai_config WHERE config_key = 'incentive_enabled'");
+                    if (!incEnabled.length || incEnabled[0].config_value === 'true') {
+                        const [slabEnabled] = await pool.query("SELECT config_value FROM ai_config WHERE config_key = 'incentive_slab_enabled'");
+                        const useSlabs = slabEnabled.length > 0 && slabEnabled[0].config_value === 'true';
+
+                        let incAmount = 0;
+                        if (useSlabs && estimateTotal > 0) {
+                            const [slabs] = await pool.query(
+                                'SELECT incentive_amount FROM incentive_slabs WHERE is_active = 1 AND min_amount <= ? AND max_amount >= ? LIMIT 1',
+                                [estimateTotal, estimateTotal]
+                            );
+                            if (slabs.length > 0) incAmount = parseFloat(slabs[0].incentive_amount);
+                        }
+                        if (incAmount === 0) {
+                            const [flatConfig] = await pool.query("SELECT config_value FROM ai_config WHERE config_key = 'incentive_per_conversion'");
+                            incAmount = flatConfig.length > 0 ? parseFloat(flatConfig[0].config_value) || 500 : 500;
+                        }
+
+                        const [autoApprove] = await pool.query("SELECT config_value FROM ai_config WHERE config_key = 'incentive_auto_approve'");
+                        const autoApproveVal = autoApprove.length > 0 && autoApprove[0].config_value === 'true';
+                        const now = new Date();
+                        const incMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+                        await pool.query(
+                            `INSERT INTO staff_incentives (user_id, lead_id, customer_id, lead_type, incentive_month, amount, estimate_id, estimate_amount, source, status, notes)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'auto_estimate', ?, ?)`,
+                            [leadMatch.assigned_to, leadMatch.id, leadMatch.customer_id, leadMatch.lead_type,
+                             incMonth, incAmount, estimate.id, estimateTotal,
+                             autoApproveVal ? 'approved' : 'pending',
+                             `Payment confirmed: Estimate #${estimate.estimate_number}`]
+                        );
+                        console.log(`[Incentive] Confirm-payment: staff ${leadMatch.assigned_to}, estimate ${estimate.id}, ₹${incAmount}`);
+                    }
+                }
+            }
+        } catch (incErr) {
+            console.error('Auto-incentive on confirm-payment (non-fatal):', incErr);
+        }
+
         res.json({ success: true, message: 'Payment confirmed' });
     } catch (error) {
         console.error('Confirm payment error:', error);
@@ -3197,6 +3265,7 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
             // Match customer to a converted lead by name+phone
             const customerName = estimate.customer_name || estimate.painter_name;
             const customerPhone = estimate.customer_phone || estimate.painter_phone;
+            const estimateTotal = parseFloat(estimate.final_grand_total) || parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total) || 0;
 
             let leadMatch = null;
             if (customerPhone) {
@@ -3223,9 +3292,9 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
             }
 
             if (leadMatch && leadMatch.assigned_to) {
-                // Check if incentive already exists for this lead
+                // Allow multiple incentives per lead (different estimates) — check by estimate_id
                 const [existingIncentive] = await pool.query(
-                    'SELECT id FROM staff_incentives WHERE lead_id = ?', [leadMatch.id]
+                    'SELECT id FROM staff_incentives WHERE lead_id = ? AND estimate_id = ?', [leadMatch.id, estimate.id]
                 );
 
                 if (existingIncentive.length === 0) {
@@ -3235,10 +3304,31 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
                     const isEnabled = !incentiveEnabled.length || incentiveEnabled[0].config_value === 'true';
 
                     if (isEnabled) {
-                        const [incentiveConfig] = await pool.query(
-                            "SELECT config_value FROM ai_config WHERE config_key = 'incentive_per_conversion'"
+                        // Check if slab system is enabled
+                        const [slabEnabled] = await pool.query(
+                            "SELECT config_value FROM ai_config WHERE config_key = 'incentive_slab_enabled'"
                         );
-                        const incentiveAmount = incentiveConfig.length > 0 ? parseFloat(incentiveConfig[0].config_value) || 500 : 500;
+                        const useSlabs = slabEnabled.length > 0 && slabEnabled[0].config_value === 'true';
+
+                        let incentiveAmount = 0;
+                        if (useSlabs && estimateTotal > 0) {
+                            // Slab-based lookup
+                            const [slabs] = await pool.query(
+                                'SELECT incentive_amount FROM incentive_slabs WHERE is_active = 1 AND min_amount <= ? AND max_amount >= ? LIMIT 1',
+                                [estimateTotal, estimateTotal]
+                            );
+                            if (slabs.length > 0) {
+                                incentiveAmount = parseFloat(slabs[0].incentive_amount);
+                            }
+                        }
+
+                        // Fallback to flat rate if no slab match or slabs disabled
+                        if (incentiveAmount === 0) {
+                            const [incentiveConfig] = await pool.query(
+                                "SELECT config_value FROM ai_config WHERE config_key = 'incentive_per_conversion'"
+                            );
+                            incentiveAmount = incentiveConfig.length > 0 ? parseFloat(incentiveConfig[0].config_value) || 500 : 500;
+                        }
 
                         const [autoApprove] = await pool.query(
                             "SELECT config_value FROM ai_config WHERE config_key = 'incentive_auto_approve'"
@@ -3249,14 +3339,14 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
                         const incentiveMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
                         await pool.query(
-                            `INSERT INTO staff_incentives (user_id, lead_id, customer_id, lead_type, incentive_month, amount, status, notes)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                            `INSERT INTO staff_incentives (user_id, lead_id, customer_id, lead_type, incentive_month, amount, estimate_id, estimate_amount, source, status, notes)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'auto_estimate', ?, ?)`,
                             [leadMatch.assigned_to, leadMatch.id, leadMatch.customer_id, leadMatch.lead_type,
-                             incentiveMonth, incentiveAmount,
+                             incentiveMonth, incentiveAmount, estimate.id, estimateTotal,
                              autoApproveVal ? 'approved' : 'pending',
                              `Payment received: Estimate #${estimate.estimate_number}, Zoho Invoice: ${invoiceNumber}`]
                         );
-                        console.log(`[Incentive] Created for staff ${leadMatch.assigned_to}, lead ${leadMatch.id}, amount ${incentiveAmount}`);
+                        console.log(`[Incentive] Slab-based for staff ${leadMatch.assigned_to}, lead ${leadMatch.id}, estimate ${estimate.id}, total ₹${estimateTotal}, incentive ₹${incentiveAmount}`);
                     }
                 }
             }

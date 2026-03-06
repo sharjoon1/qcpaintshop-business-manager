@@ -255,6 +255,9 @@
             <button data-tab="hot" onclick="loadLeads('hot')" class="filter-tab flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-200 transition-all hover:border-indigo-300">
                 Hot (80+)
             </button>
+            <button data-tab="dormant" onclick="loadDormantLeads()" class="filter-tab flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-200 transition-all hover:border-indigo-300">
+                Dormant
+            </button>
         </div>
 
         <!-- SECTION 4: Search Bar -->
@@ -815,6 +818,90 @@
             el.textContent = Math.round(current + (diff * (step / steps)));
             if (step >= steps) { clearInterval(timer); el.textContent = target; }
         }, stepTime);
+    }
+
+    // ---- Load Dormant Leads ----
+    async function loadDormantLeads() {
+        if (isLoading) return;
+        isLoading = true;
+        currentFilter = 'dormant';
+
+        // Update active tab
+        document.querySelectorAll('[data-tab]').forEach(t => {
+            const active = t.dataset.tab === 'dormant';
+            t.classList.toggle('bg-indigo-600', active);
+            t.classList.toggle('text-white', active);
+            t.classList.toggle('active', active);
+            t.classList.toggle('bg-white', !active);
+            t.classList.toggle('text-gray-600', !active);
+            t.classList.toggle('border', !active);
+            t.classList.toggle('border-gray-200', !active);
+        });
+
+        const container = document.getElementById('leadsContainer');
+        container.innerHTML = '<div class="skeleton h-28 w-full mb-3"></div><div class="skeleton h-28 w-full mb-3"></div>';
+        document.getElementById('pipelineView').classList.add('hidden');
+        container.classList.remove('hidden');
+
+        try {
+            const res = await authFetch(`${API_BASE}/re-engage`, { headers: getHeaders() });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            if (data.success && data.data.length > 0) {
+                document.getElementById('leadCount').textContent = `${data.data.length} dormant`;
+                container.innerHTML = data.data.map(l => {
+                    const lastDate = l.last_activity_date ? new Date(l.last_activity_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+                    const daysAgo = l.last_activity_date ? Math.floor((Date.now() - new Date(l.last_activity_date)) / 86400000) : '?';
+                    return `<div class="lead-card bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-3">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="font-bold text-gray-900 text-sm">${l.name}</span>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">${l.lead_type || 'customer'}</span>
+                                    ${l.re_engage_count > 0 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700">Re-engaged x${l.re_engage_count}</span>` : ''}
+                                </div>
+                                ${l.phone ? `<p class="text-xs text-gray-500">${l.phone}</p>` : ''}
+                                <p class="text-xs text-gray-400 mt-1">Last activity: ${lastDate} (${daysAgo}d ago)</p>
+                            </div>
+                            <button onclick="reEngageLead(${l.id})" class="ml-3 px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-semibold rounded-lg flex-shrink-0">
+                                Re-engage
+                            </button>
+                        </div>
+                    </div>`;
+                }).join('');
+                document.getElementById('emptyState').classList.add('hidden');
+            } else {
+                document.getElementById('leadCount').textContent = '0 dormant';
+                container.innerHTML = '';
+                document.getElementById('emptyState').classList.remove('hidden');
+                document.getElementById('emptyState').querySelector('h3').textContent = 'No dormant leads';
+                document.getElementById('emptyState').querySelector('p').textContent = `All converted customers have been active within ${data.config?.dormant_days || 90} days`;
+            }
+        } catch (e) {
+            console.error('Load dormant error:', e);
+            container.innerHTML = '<div class="text-center py-8 text-red-400 text-sm">Failed to load dormant leads</div>';
+        }
+        isLoading = false;
+    }
+
+    async function reEngageLead(id) {
+        if (!confirm('Re-engage this dormant lead? It will appear in your active leads.')) return;
+        try {
+            const res = await authFetch(`${API_BASE}/${id}/re-engage`, {
+                method: 'POST',
+                headers: getHeaders()
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(data.message);
+                loadDormantLeads();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (e) {
+            alert('Network error');
+        }
     }
 
     // ---- Load Leads ----

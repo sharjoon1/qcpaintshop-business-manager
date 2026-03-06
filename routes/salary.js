@@ -1669,6 +1669,96 @@ router.put('/advances/:id/pay', requireAuth, requirePermission('salary', 'manage
 });
 
 // ========================================
+// INCENTIVE SLAB ROUTES
+// ========================================
+
+/**
+ * GET /incentive-slabs - List all incentive slabs
+ */
+router.get('/incentive-slabs', requireAuth, async (req, res) => {
+    try {
+        const [slabs] = await pool.query('SELECT * FROM incentive_slabs ORDER BY min_amount ASC');
+        res.json({ success: true, data: slabs });
+    } catch (error) {
+        console.error('Error fetching incentive slabs:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch slabs' });
+    }
+});
+
+/**
+ * POST /incentive-slabs - Create a new slab
+ */
+router.post('/incentive-slabs', requireRole('admin', 'super_admin'), requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const { min_amount, max_amount, incentive_amount } = req.body;
+        if (!min_amount || !max_amount || !incentive_amount) {
+            return res.status(400).json({ success: false, message: 'min_amount, max_amount, and incentive_amount are required' });
+        }
+        if (parseFloat(min_amount) >= parseFloat(max_amount)) {
+            return res.status(400).json({ success: false, message: 'min_amount must be less than max_amount' });
+        }
+
+        const [result] = await pool.query(
+            'INSERT INTO incentive_slabs (min_amount, max_amount, incentive_amount) VALUES (?, ?, ?)',
+            [min_amount, max_amount, incentive_amount]
+        );
+        res.status(201).json({ success: true, message: 'Slab created', data: { id: result.insertId } });
+    } catch (error) {
+        console.error('Error creating slab:', error);
+        res.status(500).json({ success: false, message: 'Failed to create slab' });
+    }
+});
+
+/**
+ * PUT /incentive-slabs/:id - Update a slab
+ */
+router.put('/incentive-slabs/:id', requireRole('admin', 'super_admin'), requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const { min_amount, max_amount, incentive_amount, is_active } = req.body;
+        const updates = [];
+        const params = [];
+
+        if (min_amount !== undefined) { updates.push('min_amount = ?'); params.push(min_amount); }
+        if (max_amount !== undefined) { updates.push('max_amount = ?'); params.push(max_amount); }
+        if (incentive_amount !== undefined) { updates.push('incentive_amount = ?'); params.push(incentive_amount); }
+        if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active ? 1 : 0); }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ success: false, message: 'No fields to update' });
+        }
+
+        params.push(req.params.id);
+        const [result] = await pool.query(
+            `UPDATE incentive_slabs SET ${updates.join(', ')} WHERE id = ?`, params
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Slab not found' });
+        }
+        res.json({ success: true, message: 'Slab updated' });
+    } catch (error) {
+        console.error('Error updating slab:', error);
+        res.status(500).json({ success: false, message: 'Failed to update slab' });
+    }
+});
+
+/**
+ * DELETE /incentive-slabs/:id - Delete a slab
+ */
+router.delete('/incentive-slabs/:id', requireRole('admin', 'super_admin'), requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const [result] = await pool.query('DELETE FROM incentive_slabs WHERE id = ?', [req.params.id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Slab not found' });
+        }
+        res.json({ success: true, message: 'Slab deleted' });
+    } catch (error) {
+        console.error('Error deleting slab:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete slab' });
+    }
+});
+
+// ========================================
 // STAFF INCENTIVE ROUTES
 // ========================================
 
@@ -1682,11 +1772,13 @@ router.get('/incentives', requireAuth, async (req, res) => {
 
         let query = `
             SELECT si.*, u.full_name as staff_name, l.name as lead_name, l.phone as lead_phone,
-                   ab.full_name as approved_by_name
+                   ab.full_name as approved_by_name,
+                   pe.estimate_number
             FROM staff_incentives si
             JOIN users u ON si.user_id = u.id
             LEFT JOIN leads l ON si.lead_id = l.id
             LEFT JOIN users ab ON si.approved_by = ab.id
+            LEFT JOIN painter_estimates pe ON si.estimate_id = pe.id
             WHERE 1=1
         `;
         const params = [];
@@ -1897,6 +1989,70 @@ router.delete('/incentives/:id', requireRole('admin'), requirePermission('salary
     } catch (error) {
         console.error('Error deleting incentive:', error);
         res.status(500).json({ success: false, message: 'Failed to delete incentive' });
+    }
+});
+
+/**
+ * POST /incentives/request - Staff requests incentive for direct Zoho billing
+ */
+router.post('/incentives/request', requireAuth, async (req, res) => {
+    try {
+        const { lead_id, amount, invoice_reference, notes } = req.body;
+
+        if (!amount || parseFloat(amount) <= 0) {
+            return res.status(400).json({ success: false, message: 'Valid amount is required' });
+        }
+        if (!invoice_reference) {
+            return res.status(400).json({ success: false, message: 'Invoice reference is required' });
+        }
+
+        // Look up slab-based incentive amount if slab system is enabled
+        let incentiveAmount = parseFloat(amount);
+        const [slabEnabled] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'incentive_slab_enabled'"
+        );
+        const useSlabs = !slabEnabled.length || slabEnabled[0].config_value === 'true';
+
+        if (useSlabs) {
+            const [slabs] = await pool.query(
+                'SELECT incentive_amount FROM incentive_slabs WHERE is_active = 1 AND min_amount <= ? AND max_amount >= ? LIMIT 1',
+                [incentiveAmount, incentiveAmount]
+            );
+            if (slabs.length > 0) {
+                incentiveAmount = parseFloat(slabs[0].incentive_amount);
+            } else {
+                return res.status(400).json({ success: false, message: 'No incentive slab matches this amount. Contact admin.' });
+            }
+        }
+
+        // Resolve lead info if provided
+        let leadType = 'customer';
+        let customerId = null;
+        if (lead_id) {
+            const [leads] = await pool.query('SELECT lead_type, customer_id FROM leads WHERE id = ?', [lead_id]);
+            if (leads.length > 0) {
+                leadType = leads[0].lead_type || 'customer';
+                customerId = leads[0].customer_id;
+            }
+        }
+
+        const now = new Date();
+        const incentiveMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+        const [result] = await pool.query(
+            `INSERT INTO staff_incentives (user_id, lead_id, customer_id, lead_type, incentive_month, amount, estimate_amount, source, invoice_reference, status, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'manual_request', ?, 'pending', ?)`,
+            [req.user.id, lead_id || null, customerId, leadType, incentiveMonth, incentiveAmount, parseFloat(amount), invoice_reference, notes || `Manual request: Invoice ${invoice_reference}`]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: `Incentive request submitted (₹${incentiveAmount})`,
+            data: { id: result.insertId, incentive_amount: incentiveAmount }
+        });
+    } catch (error) {
+        console.error('Error requesting incentive:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit incentive request' });
     }
 });
 

@@ -121,6 +121,39 @@
             </div>
         </div>
 
+        <!-- Incentive Slabs Config -->
+        <div class="header" id="slabsSection">
+            <div class="header-top">
+                <div>
+                    <h2 style="font-size:18px;"><i class="fas fa-layer-group" style="color:#667eea;"></i> Incentive Slabs</h2>
+                    <p style="color: #666; margin-top: 3px; font-size: 13px;">Amount-based incentive tiers for estimate payments</p>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label style="font-size:13px; display:flex; align-items:center; gap:6px;">
+                        <input type="checkbox" id="slabEnabledToggle" onchange="toggleSlabEnabled()" checked>
+                        Slab System
+                    </label>
+                    <button class="btn btn-primary btn-sm" onclick="showAddSlabModal()">
+                        <i class="fas fa-plus"></i> Add Slab
+                    </button>
+                </div>
+            </div>
+            <div id="slabsTable" style="margin-top: 10px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Min Amount</th>
+                            <th>Max Amount</th>
+                            <th>Incentive</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="slabsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="filters">
             <div class="filter-row">
                 <div class="form-group">
@@ -167,8 +200,10 @@
                             <th>Staff</th>
                             <th>Lead</th>
                             <th>Type</th>
+                            <th>Source</th>
                             <th>Month</th>
-                            <th>Amount</th>
+                            <th>Est. Amount</th>
+                            <th>Incentive</th>
                             <th>Status</th>
                             <th>Created</th>
                             <th>Actions</th>
@@ -223,10 +258,175 @@
         </div>
     </div>
 
+    <!-- Add/Edit Slab Modal -->
+    <div id="slabModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2 id="slabModalTitle"><i class="fas fa-layer-group"></i> Add Incentive Slab</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label>Min Amount (&#8377;) *</label>
+                    <input type="number" id="slabMin" step="1" min="0" required style="width:100%;">
+                </div>
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label>Max Amount (&#8377;) *</label>
+                    <input type="number" id="slabMax" step="1" min="0" required style="width:100%;">
+                </div>
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label>Incentive Amount (&#8377;) *</label>
+                    <input type="number" id="slabIncentive" step="1" min="0" required style="width:100%;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSlabModal()">Cancel</button>
+                <button class="btn btn-success" onclick="saveSlab()">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = '';
         const fmtINR = n => parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        let editingSlabId = null;
 
+        // ========== SLAB FUNCTIONS ==========
+        async function loadSlabs() {
+            const token = localStorage.getItem('auth_token');
+            try {
+                const res = await fetch(`${API_BASE}/api/salary/incentive-slabs`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+                if (result.success) {
+                    renderSlabs(result.data);
+                }
+            } catch (err) {
+                console.error('Error loading slabs:', err);
+            }
+
+            // Load slab enabled setting
+            try {
+                const cfgRes = await fetch(`${API_BASE}/api/salary/incentive-slabs`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+            } catch (e) {}
+        }
+
+        function renderSlabs(slabs) {
+            const tbody = document.getElementById('slabsBody');
+            if (slabs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:20px;">No slabs configured. Add one to enable amount-based incentives.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = slabs.map(s => `<tr>
+                <td class="money">\u20B9${fmtINR(s.min_amount)}</td>
+                <td class="money">\u20B9${fmtINR(s.max_amount)}</td>
+                <td class="money" style="font-weight:700;">\u20B9${fmtINR(s.incentive_amount)}</td>
+                <td><span class="badge ${s.is_active ? 'badge-success' : 'badge-danger'}">${s.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn btn-warning btn-sm" onclick="editSlab(${s.id}, ${s.min_amount}, ${s.max_amount}, ${s.incentive_amount})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm ${s.is_active ? 'btn-secondary' : 'btn-success'}" onclick="toggleSlab(${s.id}, ${s.is_active ? 0 : 1})" title="${s.is_active ? 'Disable' : 'Enable'}">
+                            <i class="fas fa-${s.is_active ? 'pause' : 'play'}"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteSlab(${s.id})" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>`).join('');
+        }
+
+        function showAddSlabModal() {
+            editingSlabId = null;
+            document.getElementById('slabModalTitle').innerHTML = '<i class="fas fa-layer-group"></i> Add Incentive Slab';
+            document.getElementById('slabMin').value = '';
+            document.getElementById('slabMax').value = '';
+            document.getElementById('slabIncentive').value = '';
+            document.getElementById('slabModal').classList.add('active');
+        }
+
+        function editSlab(id, min, max, incentive) {
+            editingSlabId = id;
+            document.getElementById('slabModalTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Incentive Slab';
+            document.getElementById('slabMin').value = min;
+            document.getElementById('slabMax').value = max;
+            document.getElementById('slabIncentive').value = incentive;
+            document.getElementById('slabModal').classList.add('active');
+        }
+
+        function closeSlabModal() {
+            document.getElementById('slabModal').classList.remove('active');
+        }
+
+        async function saveSlab() {
+            const token = localStorage.getItem('auth_token');
+            const min_amount = parseFloat(document.getElementById('slabMin').value);
+            const max_amount = parseFloat(document.getElementById('slabMax').value);
+            const incentive_amount = parseFloat(document.getElementById('slabIncentive').value);
+
+            if (!min_amount || !max_amount || !incentive_amount) { alert('All fields are required'); return; }
+            if (min_amount >= max_amount) { alert('Min must be less than Max'); return; }
+
+            try {
+                const url = editingSlabId
+                    ? `${API_BASE}/api/salary/incentive-slabs/${editingSlabId}`
+                    : `${API_BASE}/api/salary/incentive-slabs`;
+                const res = await fetch(url, {
+                    method: editingSlabId ? 'PUT' : 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ min_amount, max_amount, incentive_amount })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    closeSlabModal();
+                    loadSlabs();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (err) { alert('Network error'); }
+        }
+
+        async function toggleSlab(id, newActive) {
+            const token = localStorage.getItem('auth_token');
+            try {
+                const res = await fetch(`${API_BASE}/api/salary/incentive-slabs/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: newActive })
+                });
+                const result = await res.json();
+                if (result.success) loadSlabs();
+                else alert('Error: ' + result.message);
+            } catch (err) { alert('Network error'); }
+        }
+
+        async function deleteSlab(id) {
+            if (!confirm('Delete this slab?')) return;
+            const token = localStorage.getItem('auth_token');
+            try {
+                const res = await fetch(`${API_BASE}/api/salary/incentive-slabs/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+                if (result.success) loadSlabs();
+                else alert('Error: ' + result.message);
+            } catch (err) { alert('Network error'); }
+        }
+
+        async function toggleSlabEnabled() {
+            // This is a visual toggle - actual config is managed via ai_config
+            const checked = document.getElementById('slabEnabledToggle').checked;
+            console.log('Slab system', checked ? 'enabled' : 'disabled', '(config managed server-side)');
+        }
+
+        // ========== EXISTING FUNCTIONS ==========
         function setDefaultMonth() {
             const now = new Date();
             const monthStr = now.toISOString().substring(0, 7);
@@ -310,11 +510,16 @@
                 const typeColors = { customer: 'customer', painter: 'painter', engineer: 'engineer' };
                 const created = new Date(i.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
+                const sourceLabels = { auto_estimate: 'Auto', manual_request: 'Manual', admin_added: 'Admin' };
+                const sourceColors = { auto_estimate: 'badge-info', manual_request: 'badge-warning', admin_added: 'badge-customer' };
+
                 return `<tr>
                     <td><strong>${i.staff_name}</strong></td>
-                    <td>${i.lead_name || '-'} ${i.lead_phone ? `<br><small style="color:#888">${i.lead_phone}</small>` : ''}</td>
+                    <td>${i.lead_name || '-'} ${i.lead_phone ? `<br><small style="color:#888">${i.lead_phone}</small>` : ''}${i.invoice_reference ? `<br><small style="color:#667eea;">Ref: ${i.invoice_reference}</small>` : ''}</td>
                     <td><span class="badge badge-${typeColors[i.lead_type]}">${i.lead_type}</span></td>
+                    <td><span class="badge ${sourceColors[i.source] || 'badge-info'}">${sourceLabels[i.source] || i.source || 'Legacy'}</span></td>
                     <td>${i.incentive_month}</td>
+                    <td>${i.estimate_amount ? '\u20B9' + fmtINR(i.estimate_amount) : '-'}</td>
                     <td class="money">\u20B9${fmtINR(i.amount)}</td>
                     <td><span class="badge badge-${statusColors[i.status]}">${i.status}</span></td>
                     <td>${created}${i.approved_by_name ? `<br><small style="color:#888">by ${i.approved_by_name}</small>` : ''}</td>
@@ -461,6 +666,7 @@
         (async function() {
             setDefaultMonth();
             await loadStaff();
+            loadSlabs();
             loadIncentives();
         })();
     </script>
