@@ -76,7 +76,7 @@ async function getFeed(branchId = null, limit = 30) {
             SELECT f.*, u.full_name
             FROM staff_activity_feed f
             JOIN users u ON f.user_id = u.id
-            WHERE f.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            WHERE f.created_at >= CURDATE()
         `;
         const params = [];
 
@@ -152,11 +152,34 @@ async function createNotice(postedBy, title, message, priority = 'normal', targe
     }
 }
 
+/**
+ * Delete activity feed entries older than today (runs daily at midnight)
+ */
+async function cleanupOldFeed() {
+    if (!pool) return;
+    try {
+        const [result] = await pool.query('DELETE FROM staff_activity_feed WHERE created_at < CURDATE()');
+        if (result.affectedRows > 0) {
+            console.log(`[ActivityFeed] Cleaned up ${result.affectedRows} old feed entries`);
+        }
+    } catch (e) {
+        console.error('[ActivityFeed] cleanup error:', e.message);
+    }
+}
+
+// Schedule daily cleanup at 00:05 IST
+const cron = require('node-cron');
+cron.schedule('35 18 * * *', () => {
+    // 18:35 UTC = 00:05 IST
+    cleanupOldFeed();
+}, { timezone: 'Asia/Kolkata' });
+
 module.exports = {
     setPool,
     setIO,
     logActivity,
     getFeed,
     getNotices,
-    createNotice
+    createNotice,
+    cleanupOldFeed
 };
