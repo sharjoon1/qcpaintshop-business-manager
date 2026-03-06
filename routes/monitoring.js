@@ -6,6 +6,10 @@ const express = require('express');
 const router = express.Router();
 const os = require('os');
 const { execSync } = require('child_process');
+const { requireRole } = require('../middleware/permissionMiddleware');
+
+// All monitoring endpoints require admin role
+router.use(requireRole(['admin', 'super_admin']));
 
 let pool;
 let automationRegistry = null;

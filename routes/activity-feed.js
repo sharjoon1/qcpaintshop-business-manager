@@ -5,6 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const activityFeed = require('../services/activity-feed');
+const { requireAuth, requireRole } = require('../middleware/permissionMiddleware');
 
 let pool;
 function setPool(p) {
@@ -15,18 +16,7 @@ function setIO(socketIO) {
     activityFeed.setIO(socketIO);
 }
 
-// Auth middleware
-function requireAuth(req, res, next) {
-    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
-    next();
-}
-
-function requireAdmin(req, res, next) {
-    if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
-        return res.status(403).json({ success: false, message: 'Admin access required' });
-    }
-    next();
-}
+const requireAdmin = requireRole(['admin', 'super_admin']);
 
 /**
  * GET /api/activity-feed
