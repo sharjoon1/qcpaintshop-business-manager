@@ -297,7 +297,7 @@
         align-items: center;
     }
     .qc-notification-panel-header h3 { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
-    .qc-notification-panel-header a { font-size: 0.75rem; color: #667eea; text-decoration: none; font-weight: 500; }
+    .qc-notification-panel-header a { font-size: 0.75rem; color: #16a34a; text-decoration: none; font-weight: 500; }
     .qc-notification-list {
         max-height: 340px;
         overflow-y: auto;
@@ -511,6 +511,15 @@ async function loadHeaderInfo() {
         const name = user.full_name || user.name;
         const initial = document.getElementById('headerProfileInitial');
         if (initial) initial.textContent = name.charAt(0).toUpperCase();
+    }
+
+    // Staff green theme for profile icon
+    if (user.role === 'staff' || user.role === 'manager') {
+        const initial = document.getElementById('headerProfileInitial');
+        if (initial) {
+            initial.style.background = 'linear-gradient(135deg, #16a34a, #0d9488)';
+            initial.style.borderColor = '#bbf7d0';
+        }
     }
 
     // Load business logo from settings
