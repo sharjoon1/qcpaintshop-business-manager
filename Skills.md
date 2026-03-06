@@ -1,8 +1,8 @@
 # QC Paint Shop Business Manager - System Skills & Capabilities
 
 > **Platform**: act.qcpaintshop.com
-> **Version**: 3.3.6
-> **Last Updated**: 2026-03-03
+> **Version**: 3.3.7
+> **Last Updated**: 2026-03-07
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
@@ -55,6 +55,18 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Soft-delete pattern (status = 'inactive') for all major entities
 - Modular route files with `setPool()` dependency injection
 - Background services (sync scheduler, WhatsApp processor)
+
+**Brand Theming** (Mar 7):
+| Audience | Primary | Gradient End | Darkest | CSS Variables |
+|----------|---------|-------------|---------|---------------|
+| **Admin** | `#667eea` | `#764ba2` | `#4338ca` | `design-system.css` `:root` vars |
+| **Staff** | `#1B5E3B` | `#154D31` | `#0D3D23` | Inline styles (override CSS vars) |
+| **Painter** | `#1B5E3B` | `#D4A24E` (gold) | `#154D31` | Inline styles |
+- Staff & Painter share the same dark green primary (`#1B5E3B`)
+- `header-v2.html` uses JS role detection to apply green profile icon for staff/manager
+- `design-system.css` CSS variables remain purple/indigo for admin; staff pages override with inline styles
+- `manifest.json` `theme_color` = `#1B5E3B`
+- Android `colors.xml` = `#1B5E3B` primary (shared across all build flavors)
 
 ---
 
@@ -2774,8 +2786,23 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 - **Re-engagement system**: `GET /api/leads/re-engage` lists dormant converted leads (no activity > X days), `POST /api/leads/:id/re-engage` resets to 'interested'
 - **New leads columns**: `re_engaged_at`, `re_engage_count`
 - **Config keys**: `incentive_slab_enabled`, `incentive_reengagement_days` (default 90)
-- **UI**: Slabs config section on `admin-salary-incentives.html`, "Request" button on `staff-incentives.html`, "Dormant" tab on `staff-leads.html`
+- **Notifications**: All incentive status changes trigger FCM push notifications:
+  - `incentive_earned` → staff when auto-incentive created (confirm-payment or push-to-zoho)
+  - `incentive_approved` → staff when admin approves (single or bulk)
+  - `incentive_rejected` → staff when admin rejects (includes rejection notes)
+  - `incentive_request` → admins when staff submits manual request
+- **Phone lookup**: `GET /api/leads/my/check-phone?phone=` checks painters table + existing leads, shows badge in staff lead form
+- **Staff dormant leads**: Separate `/my/re-engage` endpoints with `leads.own.view`/`leads.own.edit` permissions
+- **UI**: Slabs config section on `admin-salary-incentives.html`, "Request" button on `staff-incentives.html`, "Dormant" tab on `staff-leads.html` and `admin-leads.html`
 - **Migration**: `migrations/migrate-incentive-slabs.js`
+
+### Staff Panel Green Theme (Mar 7, 2026)
+- **Theme overhaul**: All 20+ staff pages rebranded from indigo/purple (`#667eea`/`#764ba2`) to green/teal (`#16a34a`/`#0d9488`)
+- **Color mapping**: `indigo-*` Tailwind → `green-*`, `purple-*` → `teal-*`
+- **Dashboard redesign**: Full-width gradient header bar (green→teal) with avatar, greeting, date. Body background: `#f0fdf4` (green-50)
+- **Files updated**: `staff/dashboard.html`, `staff-daily-work.html`, `staff-leads.html`, `staff-incentives.html`, `staff-requests.html`, `staff-estimates.html`, `staff-register.html`, all `staff/*.html` subpages, `components/staff-sidebar.html`
+- **Notification deep links**: Added `incentive_earned/approved/rejected/request` types to `header-v2.html`, `sw.js`, and Android `QCFirebaseMessagingService.kt`
+- **Android FCM**: Already green-themed (`#1B5E3B`), FCM working (server logs confirm delivery). Token refreshes on app open.
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
 *Last Updated: 2026-03-06 | Version: 3.3.5 (Staff/Customer), 1.2.0 (Painter) | Maintained by: Development Team*
