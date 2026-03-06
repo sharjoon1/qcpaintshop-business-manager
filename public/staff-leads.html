@@ -399,7 +399,8 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="form-label">Phone</label>
-                        <input type="tel" id="leadPhone" placeholder="Phone number" class="form-input">
+                        <input type="tel" id="leadPhone" placeholder="Phone number" class="form-input" oninput="checkPhoneLookup(this.value)">
+                        <div id="phoneLookupResult" class="hidden mt-1"></div>
                     </div>
                     <div>
                         <label class="form-label">Email</label>
@@ -844,7 +845,7 @@
         container.classList.remove('hidden');
 
         try {
-            const res = await authFetch(`${API_BASE}/re-engage`, { headers: getHeaders() });
+            const res = await authFetch(`${API_BASE}/my/re-engage`, { headers: getHeaders() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
 
@@ -888,7 +889,7 @@
     async function reEngageLead(id) {
         if (!confirm('Re-engage this dormant lead? It will appear in your active leads.')) return;
         try {
-            const res = await authFetch(`${API_BASE}/${id}/re-engage`, {
+            const res = await authFetch(`${API_BASE}/my/${id}/re-engage`, {
                 method: 'POST',
                 headers: getHeaders()
             });
@@ -1128,6 +1129,48 @@
 
         document.getElementById('leadModal').classList.remove('hidden');
         setTimeout(() => document.getElementById('leadName').focus(), 200);
+    }
+
+    let phoneLookupTimer = null;
+    async function checkPhoneLookup(phone) {
+        const container = document.getElementById('phoneLookupResult');
+        if (!phone || phone.replace(/\D/g, '').length < 7) {
+            container.classList.add('hidden');
+            return;
+        }
+        clearTimeout(phoneLookupTimer);
+        phoneLookupTimer = setTimeout(async () => {
+            try {
+                const res = await authFetch(`${API_BASE}/my/check-phone?phone=${encodeURIComponent(phone)}`, { headers: getHeaders() });
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const { painter, existing_leads } = data.data;
+                    let html = '';
+                    if (painter) {
+                        html += `<div class="flex items-center gap-1.5 px-2 py-1 bg-green-50 border border-green-200 rounded-lg text-xs">
+                            <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                            <span class="text-green-700 font-semibold">Painter: ${painter.name}</span>
+                            ${painter.has_card ? '<span class="text-green-500">(has card)</span>' : ''}
+                        </div>`;
+                    }
+                    if (existing_leads && existing_leads.length > 0) {
+                        const names = existing_leads.map(l => `${l.name} (${l.status})`).join(', ');
+                        html += `<div class="flex items-center gap-1.5 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg text-xs mt-1">
+                            <span class="w-2 h-2 bg-amber-500 rounded-full"></span>
+                            <span class="text-amber-700">Existing lead: ${names}</span>
+                        </div>`;
+                    }
+                    if (html) {
+                        container.innerHTML = html;
+                        container.classList.remove('hidden');
+                    } else {
+                        container.classList.add('hidden');
+                    }
+                }
+            } catch (e) {
+                container.classList.add('hidden');
+            }
+        }, 500);
     }
 
     async function saveLead() {

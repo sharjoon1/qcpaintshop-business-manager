@@ -113,7 +113,22 @@ async function migrate() {
             }
         }
 
-        // 5. Verify
+        // 5. Ensure painter_estimates status ENUM includes 'payment_submitted'
+        try {
+            const [statusCol] = await pool.query(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'painter_estimates' AND COLUMN_NAME = 'status'"
+            );
+            if (statusCol.length > 0 && !statusCol[0].COLUMN_TYPE.includes('payment_submitted')) {
+                await pool.query(`ALTER TABLE painter_estimates MODIFY COLUMN status ENUM('draft','pending_admin','admin_review','approved','sent_to_customer','discount_requested','final_approved','payment_submitted','payment_recorded','pushed_to_zoho','rejected','cancelled') DEFAULT 'draft'`);
+                console.log('Added payment_submitted to painter_estimates status ENUM');
+            } else {
+                console.log('painter_estimates status ENUM already includes payment_submitted');
+            }
+        } catch (err) {
+            console.log('painter_estimates ENUM update skipped:', err.message);
+        }
+
+        // 6. Verify
         console.log('\n--- Verification ---');
         const [slabs] = await pool.query('SELECT * FROM incentive_slabs ORDER BY min_amount');
         console.log(`Incentive slabs: ${slabs.length} rows`);

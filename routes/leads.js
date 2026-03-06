@@ -910,6 +910,122 @@ router.get('/my/:id/followups', requirePermission('leads', 'own.view'), async (r
 });
 
 /**
+ * GET /api/leads/my/check-phone?phone=xxx - Check if phone belongs to a painter
+ */
+router.get('/my/check-phone', requirePermission('leads', 'own.view'), async (req, res) => {
+    try {
+        const { phone } = req.query;
+        if (!phone || phone.length < 5) return res.json({ success: true, data: null });
+
+        const cleanPhone = phone.replace(/[^0-9+]/g, '');
+        // Check painters table
+        const [painters] = await pool.query(
+            "SELECT id, full_name, phone, status, card_generated_at FROM painters WHERE phone LIKE ? AND status = 'approved' LIMIT 1",
+            [`%${cleanPhone.slice(-10)}`]
+        );
+        // Also check existing leads with same phone
+        const [existingLeads] = await pool.query(
+            "SELECT id, name, status, assigned_to FROM leads WHERE phone LIKE ? AND status NOT IN ('inactive') LIMIT 3",
+            [`%${cleanPhone.slice(-10)}`]
+        );
+
+        res.json({
+            success: true,
+            data: {
+                painter: painters.length > 0 ? { id: painters[0].id, name: painters[0].full_name, status: painters[0].status, has_card: !!painters[0].card_generated_at } : null,
+                existing_leads: existingLeads
+            }
+        });
+    } catch (error) {
+        console.error('Check phone error:', error);
+        res.status(500).json({ success: false, message: 'Check failed' });
+    }
+});
+
+/**
+ * GET /api/leads/my/re-engage - Staff: list own dormant converted leads
+ */
+router.get('/my/re-engage', requirePermission('leads', 'own.view'), async (req, res) => {
+    try {
+        const [config] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'incentive_reengagement_days'"
+        );
+        const dormantDays = config.length > 0 ? parseInt(config[0].config_value) || 90 : 90;
+
+        const [dormantLeads] = await pool.query(`
+            SELECT l.id, l.name, l.phone, l.email, l.city, l.lead_type, l.assigned_to,
+                   l.converted_at, l.customer_id, l.re_engaged_at, l.re_engage_count,
+                   c.name as customer_name,
+                   MAX(pe.created_at) as last_estimate_date,
+                   MAX(zi.created_at) as last_invoice_date,
+                   GREATEST(
+                       COALESCE(MAX(pe.created_at), l.converted_at),
+                       COALESCE(MAX(zi.created_at), l.converted_at)
+                   ) as last_activity_date
+            FROM leads l
+            LEFT JOIN customers c ON l.customer_id = c.id
+            LEFT JOIN painter_estimates pe ON (pe.customer_phone = l.phone OR pe.painter_phone = l.phone) AND pe.status NOT IN ('draft')
+            LEFT JOIN zoho_invoices zi ON zi.customer_name = l.name
+            WHERE l.status = 'won' AND l.customer_id IS NOT NULL AND l.assigned_to = ?
+            GROUP BY l.id
+            HAVING last_activity_date < DATE_SUB(NOW(), INTERVAL ? DAY)
+            ORDER BY last_activity_date ASC
+        `, [req.user.id, dormantDays]);
+
+        res.json({
+            success: true,
+            data: dormantLeads,
+            config: { dormant_days: dormantDays },
+            summary: { total: dormantLeads.length }
+        });
+    } catch (error) {
+        console.error('Error fetching staff dormant leads:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch dormant leads' });
+    }
+});
+
+/**
+ * POST /api/leads/my/:id/re-engage - Staff: re-engage own dormant lead
+ */
+router.post('/my/:id/re-engage', requirePermission('leads', 'own.edit'), async (req, res) => {
+    try {
+        const leadId = req.params.id;
+        const ownership = await checkLeadOwnership(leadId, req.user.id);
+        if (!ownership.exists) return res.status(404).json({ success: false, message: 'Lead not found' });
+        if (!ownership.isOwner) return res.status(403).json({ success: false, message: 'Not your lead' });
+
+        const [leads] = await pool.query('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const lead = leads[0];
+        if (lead.status !== 'won') {
+            return res.status(400).json({ success: false, message: 'Only won/converted leads can be re-engaged' });
+        }
+
+        await pool.query(
+            `UPDATE leads SET status = 'interested', re_engaged_at = NOW(), re_engage_count = re_engage_count + 1 WHERE id = ?`,
+            [leadId]
+        );
+        await pool.query(
+            `INSERT INTO lead_followups (lead_id, user_id, followup_type, notes, outcome)
+             VALUES (?, ?, 'other', 'Lead re-engaged for follow-up (dormant customer)', 'follow_up')`,
+            [leadId, req.user.id]
+        );
+        await pool.query(
+            `UPDATE leads SET total_followups = total_followups + 1, last_contact_date = CURDATE() WHERE id = ?`,
+            [leadId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Lead re-engaged successfully. It will now appear in your active leads.',
+            data: { id: parseInt(leadId), status: 'interested', re_engage_count: (lead.re_engage_count || 0) + 1 }
+        });
+    } catch (error) {
+        console.error('Error re-engaging staff lead:', error);
+        res.status(500).json({ success: false, message: 'Failed to re-engage lead' });
+    }
+});
+
+/**
  * POST /api/leads/my/:id/convert
  * Staff converts own lead to customer/painter/engineer
  * Creates Zoho Books contact + local customers record
