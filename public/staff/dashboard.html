@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#16a34a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -20,7 +20,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            background: #f0fdf4 !important;
             min-height: 100vh;
         }
         .status-card {
@@ -124,8 +124,8 @@
             align-items: center;
             justify-content: space-between;
             padding: 10px 12px;
-            background: linear-gradient(135deg, #667eea15, #764ba215);
-            border: 1px solid #667eea30;
+            background: linear-gradient(135deg, #16a34a15, #0d948815);
+            border: 1px solid #16a34a30;
             border-radius: 8px;
             font-size: 14px; font-weight: 700; color: #4338ca;
         }
@@ -150,7 +150,7 @@
         .badge-danger { background: #fee2e2; color: #991b1b; }
         .loader {
             border: 3px solid #f3f4f6;
-            border-top: 3px solid #667eea;
+            border-top: 3px solid #16a34a;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -164,7 +164,7 @@
 
         /* Enhanced Timer Card */
         .timer-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #16a34a 0%, #0d9488 100%);
             border-radius: 16px;
             padding: 24px;
             text-align: center;
@@ -388,9 +388,9 @@
             transition: all 0.2s;
         }
         .your-work-tab.active {
-            background: #667eea;
+            background: #16a34a;
             color: white;
-            border-color: #667eea;
+            border-color: #16a34a;
         }
         .tab-count {
             font-size: 10px;
@@ -470,7 +470,7 @@
         }
         .work-progress-bar .fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: linear-gradient(90deg, #16a34a, #0d9488);
             border-radius: 3px;
             transition: width 0.5s;
         }
@@ -502,7 +502,7 @@
         }
         .wc-action-btn {
             padding: 6px 14px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #16a34a, #0d9488);
             color: white;
             border-radius: 8px;
             font-size: 12px;
@@ -534,22 +534,25 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- Header -->
-    <div class="status-card" style="margin-top: 16px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+    <div style="background: linear-gradient(135deg, #16a34a 0%, #0d9488 100%); padding: 20px 16px 24px; color: white; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: -30px; right: -30px; width: 100px; height: 100px; background: rgba(255,255,255,0.08); border-radius: 50%;"></div>
+        <div style="position: absolute; bottom: -20px; left: -20px; width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1;">
             <div style="display: flex; align-items: center; gap: 12px;">
-                <div id="profileAvatar" style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 20px; overflow: hidden; flex-shrink: 0;">
+                <div id="profileAvatar" style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 20px; overflow: hidden; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.3);">
                     <span id="profileInitial">?</span>
                 </div>
                 <div>
-                    <h1 style="font-size: 20px; font-weight: 700; color: #1f2937;" id="staffGreeting">My Attendance</h1>
-                    <p style="color: #6b7280; font-size: 14px;" id="currentDate">Loading...</p>
+                    <p style="font-size: 13px; opacity: 0.85;">Welcome back,</p>
+                    <h1 style="font-size: 20px; font-weight: 700;" id="staffGreeting">My Attendance</h1>
                 </div>
             </div>
             <div style="text-align: right;">
-                <div style="font-size: 28px; font-weight: 700; color: #667eea;" id="currentTime">--:--</div>
-                <div style="font-size: 12px; color: #6b7280;" id="currentDay">---</div>
+                <div style="font-size: 28px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.15);" id="currentTime">--:--</div>
+                <div style="font-size: 12px; opacity: 0.8;" id="currentDay">---</div>
             </div>
         </div>
+        <p style="font-size: 13px; opacity: 0.7; margin-top: 8px; position: relative; z-index: 1;" id="currentDate">Loading...</p>
     </div>
 
     <!-- Loading State -->
@@ -726,14 +729,14 @@
                 <div style="flex: 1;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span style="font-size: 13px; color: #6b7280;">Progress</span>
-                        <span style="font-size: 13px; font-weight: 700; color: #667eea;" id="dailyTasksProgress">0/0</span>
+                        <span style="font-size: 13px; font-weight: 700; color: #16a34a;" id="dailyTasksProgress">0/0</span>
                     </div>
                     <div style="background: #e5e7eb; border-radius: 6px; height: 8px; overflow: hidden;">
-                        <div id="dailyTasksBar" style="height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 6px; transition: width 0.5s; width: 0%;"></div>
+                        <div id="dailyTasksBar" style="height: 100%; background: linear-gradient(90deg, #16a34a, #0d9488); border-radius: 6px; transition: width 0.5s; width: 0%;"></div>
                     </div>
                 </div>
             </div>
-            <a href="daily-tasks.html" style="display: block; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            <a href="daily-tasks.html" style="display: block; padding: 12px; background: linear-gradient(135deg, #16a34a 0%, #0d9488 100%); color: white; text-align: center; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px;">
                 Open Daily Tasks
             </a>
         </div>
@@ -746,11 +749,11 @@
     <div class="status-card" id="noticeBoardCard">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
             <div style="display: flex; align-items: center; gap: 8px;">
-                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: 700;">!</div>
+                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #16a34a, #0d9488); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: 700;">!</div>
                 <h3 style="font-size: 16px; font-weight: 600; color: #1f2937;">Notice Board</h3>
                 <span id="noticeBadge" class="badge badge-danger" style="display:none; font-size: 10px; padding: 2px 8px;">0</span>
             </div>
-            <button onclick="loadNoticeBoard()" style="background: none; border: none; color: #667eea; font-size: 13px; cursor: pointer; font-weight: 600; padding: 4px 8px;">Refresh</button>
+            <button onclick="loadNoticeBoard()" style="background: none; border: none; color: #16a34a; font-size: 13px; cursor: pointer; font-weight: 600; padding: 4px 8px;">Refresh</button>
         </div>
 
         <!-- Admin Notices -->
@@ -758,7 +761,7 @@
 
         <!-- Activity Feed Tabs -->
         <div style="display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
-            <button class="nb-tab active" data-filter="all" onclick="filterFeed('all')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: linear-gradient(135deg, #667eea, #764ba2); color: white; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;">All</button>
+            <button class="nb-tab active" data-filter="all" onclick="filterFeed('all')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: linear-gradient(135deg, #16a34a, #0d9488); color: white; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;">All</button>
             <button class="nb-tab" data-filter="attendance" onclick="filterFeed('attendance')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Attendance</button>
             <button class="nb-tab" data-filter="breaks" onclick="filterFeed('breaks')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Breaks</button>
             <button class="nb-tab" data-filter="leads" onclick="filterFeed('leads')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Leads</button>
@@ -779,7 +782,7 @@
                 <h3 style="font-size: 16px; font-weight: 600; color: #1f2937;">Your Work</h3>
                 <span class="your-work-badge" id="yourWorkBadge" style="display:none;">0</span>
             </div>
-            <button onclick="loadYourWork()" style="background: none; border: none; color: #667eea; font-size: 13px; cursor: pointer; font-weight: 600; padding: 4px 8px;">Refresh</button>
+            <button onclick="loadYourWork()" style="background: none; border: none; color: #16a34a; font-size: 13px; cursor: pointer; font-weight: 600; padding: 4px 8px;">Refresh</button>
         </div>
         <div class="your-work-tabs" id="yourWorkTabs">
             <button class="your-work-tab active" data-filter="all" onclick="filterYourWork('all')">All</button>
@@ -800,7 +803,7 @@
         <div style="display: flex; flex-direction: column; gap: 12px;">
             <a href="history.html" style="padding: 16px; background: #f9fafb; border-radius: 12px; text-decoration: none; color: #1f2937; display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 40px; height: 40px; background: #667eea; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white;">
+                    <div style="width: 40px; height: 40px; background: #16a34a; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white;">
                         <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                         </svg>
@@ -896,7 +899,7 @@
     <div class="status-card" id="bankDetailsCard">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
             <h3 style="font-size: 16px; font-weight: 600; color: #1f2937;">Bank Details</h3>
-            <button id="bankEditToggle" onclick="toggleBankEdit()" style="background:none;border:none;color:#667eea;font-size:13px;cursor:pointer;font-weight:600;">Edit</button>
+            <button id="bankEditToggle" onclick="toggleBankEdit()" style="background:none;border:none;color:#16a34a;font-size:13px;cursor:pointer;font-weight:600;">Edit</button>
         </div>
         <!-- View Mode -->
         <div id="bankDetailsView">
@@ -913,7 +916,7 @@
             <div id="bankDetailsEmpty" style="display:none;text-align:center;padding:12px;">
                 <svg style="width:40px;height:40px;color:#d1d5db;margin:0 auto 8px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                 <p style="color:#6b7280;font-size:13px;margin-bottom:12px;">No bank details added yet</p>
-                <button onclick="toggleBankEdit()" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Add Bank Details</button>
+                <button onclick="toggleBankEdit()" style="background:linear-gradient(135deg,#16a34a,#0d9488);color:white;border:none;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Add Bank Details</button>
             </div>
         </div>
         <!-- Edit Mode -->
@@ -1071,7 +1074,7 @@
             </p>
         </div>
         <div id="forceClockoutCountdown" style="font-size: 48px; font-weight: 700; color: #dc2626; text-align: center; margin: 16px 0;">10</div>
-        <button onclick="acknowledgeForceClockout()" style="width: 100%; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #667eea, #764ba2); color: white;">
+        <button onclick="acknowledgeForceClockout()" style="width: 100%; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #16a34a, #0d9488); color: white;">
             👍 OK
         </button>
     </div>
@@ -1236,7 +1239,7 @@
                     <div style="text-align: center; padding: 20px;">
                         <div style="font-size: 48px; margin-bottom: 16px;">&#10060;</div>
                         <p style="color: #ef4444; font-weight: 600; margin-bottom: 8px;">Failed to load attendance</p>
-                        <button onclick="location.reload()" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                        <button onclick="location.reload()" style="padding: 12px 24px; background: #16a34a; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
                             Retry
                         </button>
                     </div>
@@ -2723,7 +2726,7 @@
             prayer_start: '#059669', prayer_end: '#059669',
             lead_created: '#8b5cf6', lead_followup: '#6366f1',
             admin_notice: '#dc2626', overtime: '#7c3aed',
-            task_completed: '#667eea', stock_check: '#059669'
+            task_completed: '#16a34a', stock_check: '#059669'
         };
 
         async function loadNoticeBoard() {
@@ -2787,7 +2790,7 @@
             }
 
             container.innerHTML = items.map(item => {
-                const color = FEED_COLORS[item.activity_type] || '#667eea';
+                const color = FEED_COLORS[item.activity_type] || '#16a34a';
                 const timeAgo = getTimeAgo(item.created_at);
                 const initial = (item.full_name || '?').charAt(0).toUpperCase();
                 return `<div style="display: flex; gap: 10px; padding: 8px 4px; border-bottom: 1px solid #f3f4f6; align-items: flex-start;">
@@ -2808,7 +2811,7 @@
             feedFilter = filter;
             document.querySelectorAll('.nb-tab').forEach(btn => {
                 const isActive = btn.dataset.filter === filter;
-                btn.style.background = isActive ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'white';
+                btn.style.background = isActive ? 'linear-gradient(135deg, #16a34a, #0d9488)' : 'white';
                 btn.style.color = isActive ? 'white' : '#374151';
                 btn.classList.toggle('active', isActive);
             });

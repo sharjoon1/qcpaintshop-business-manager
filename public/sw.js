@@ -143,6 +143,11 @@ self.addEventListener('notificationclick', (event) => {
       'new_registration':         '/admin-staff-registrations.html',
       'profile_updated':          '/staff/dashboard.html',
       'admin_notice':             '/staff/dashboard.html',
+      // Incentives
+      'incentive_earned':         '/staff-incentives.html',
+      'incentive_approved':       '/staff-incentives.html',
+      'incentive_rejected':       '/staff-incentives.html',
+      'incentive_request':        '/admin-salary-incentives.html',
     };
     path = routes[type] || '/staff/dashboard.html';
   }

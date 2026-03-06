@@ -651,7 +651,8 @@ function getNotifIcon(type) {
         'outside_work_start': '🚶', 'outside_work_end': '🚶',
         'prayer_start': '🕌', 'prayer_end': '🕌',
         'geofence_violation': '📍', 'document': '📄',
-        'admin_notice': '📣', 'profile_updated': '👤'
+        'admin_notice': '📣', 'profile_updated': '👤',
+        'incentive_earned': '🎉', 'incentive_approved': '✅', 'incentive_rejected': '❌', 'incentive_request': '📋'
     };
     return icons[type] || '🔔';
 }
@@ -762,6 +763,11 @@ async function handleNotifClick(id, type, dataB64) {
         'new_registration':         isAdmin ? '/admin-staff-registrations.html' : null,
         'profile_updated':          isAdmin ? '/admin-staff.html' : '/staff/dashboard.html',
         'admin_notice':             isStaff ? '/staff/dashboard.html' : '/admin-attendance.html',
+        // Incentives
+        'incentive_earned':         '/staff-incentives.html',
+        'incentive_approved':       '/staff-incentives.html',
+        'incentive_rejected':       '/staff-incentives.html',
+        'incentive_request':        isAdmin ? '/admin-salary-incentives.html' : '/staff-incentives.html',
     };
 
     const dest = routes[type];

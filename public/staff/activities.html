@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#16a34a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -20,9 +20,9 @@
 
     <div class="container mx-auto p-6">
         <!-- Page Header -->
-        <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg shadow-lg p-6 mb-6">
+        <div class="bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg shadow-lg p-6 mb-6">
             <h1 class="text-3xl font-bold">My Daily Activities</h1>
-            <p class="text-purple-100 mt-2">Track your daily work activities and manage your time</p>
+            <p class="text-teal-100 mt-2">Track your daily work activities and manage your time</p>
         </div>
 
         <!-- Summary Cards -->
@@ -32,10 +32,10 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-gray-500 text-sm font-medium">Activities Today</p>
-                        <p class="text-3xl font-bold text-purple-600 mt-2" id="todayCount">0</p>
+                        <p class="text-3xl font-bold text-teal-600 mt-2" id="todayCount">0</p>
                     </div>
-                    <div class="bg-purple-100 rounded-full p-3">
-                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="bg-teal-100 rounded-full p-3">
+                        <svg class="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                         </svg>
                     </div>
@@ -78,9 +78,9 @@
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <label class="text-gray-700 font-medium">View Date:</label>
-                    <input type="date" id="dateFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <input type="date" id="dateFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                 </div>
-                <button onclick="openActivityModal()" class="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-purple-800 transition-all shadow-md">
+                <button onclick="openActivityModal()" class="bg-gradient-to-r from-teal-600 to-teal-700 text-white px-6 py-3 rounded-lg font-medium hover:from-teal-700 hover:to-teal-800 transition-all shadow-md">
                     + Log New Activity
                 </button>
             </div>
@@ -106,7 +106,7 @@
     <!-- Activity Modal -->
     <div id="activityModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-lg">
+            <div class="bg-gradient-to-r from-teal-600 to-teal-700 text-white p-6 rounded-t-lg">
                 <h2 class="text-2xl font-bold" id="modalTitle">Log New Activity</h2>
             </div>
             <form id="activityForm" class="p-6 space-y-4">
@@ -115,7 +115,7 @@
                 <!-- Activity Type -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2">Activity Type *</label>
-                    <select id="activityType" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <select id="activityType" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                         <option value="">Select activity type</option>
                         <option value="customer_visit">Customer Visit</option>
                         <option value="phone_call">Phone Call</option>
@@ -132,24 +132,24 @@
                 <!-- Title -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2">Title *</label>
-                    <input type="text" id="activityTitle" required maxlength="200" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Brief title for the activity">
+                    <input type="text" id="activityTitle" required maxlength="200" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Brief title for the activity">
                 </div>
 
                 <!-- Description -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2">Description</label>
-                    <textarea id="activityDescription" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Detailed description of the activity"></textarea>
+                    <textarea id="activityDescription" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Detailed description of the activity"></textarea>
                 </div>
 
                 <!-- Time Fields -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-gray-700 font-medium mb-2">Start Time *</label>
-                        <input type="datetime-local" id="startTime" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <input type="datetime-local" id="startTime" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                     </div>
                     <div>
                         <label class="block text-gray-700 font-medium mb-2">End Time *</label>
-                        <input type="datetime-local" id="endTime" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <input type="datetime-local" id="endTime" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                     </div>
                 </div>
 
@@ -164,12 +164,12 @@
                 <!-- Notes -->
                 <div>
                     <label class="block text-gray-700 font-medium mb-2">Notes</label>
-                    <textarea id="activityNotes" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Additional notes or comments"></textarea>
+                    <textarea id="activityNotes" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Additional notes or comments"></textarea>
                 </div>
 
                 <!-- Form Actions -->
                 <div class="flex gap-3 pt-4">
-                    <button type="submit" class="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-purple-800 transition-all">
+                    <button type="submit" class="flex-1 bg-gradient-to-r from-teal-600 to-teal-700 text-white px-6 py-3 rounded-lg font-medium hover:from-teal-700 hover:to-teal-800 transition-all">
                         Save Activity
                     </button>
                     <button type="button" onclick="closeActivityModal()" class="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-300 transition-all">
@@ -306,7 +306,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         <p class="text-red-500">Failed to load activities</p>
-                        <button onclick="loadActivities()" class="mt-4 text-purple-600 hover:text-purple-700 font-medium">Try Again</button>
+                        <button onclick="loadActivities()" class="mt-4 text-teal-600 hover:text-teal-700 font-medium">Try Again</button>
                     </div>
                 `;
             }
@@ -321,10 +321,10 @@
                 customer_visit: 'bg-blue-100 text-blue-800',
                 phone_call: 'bg-green-100 text-green-800',
                 follow_up: 'bg-yellow-100 text-yellow-800',
-                product_demo: 'bg-purple-100 text-purple-800',
+                product_demo: 'bg-teal-100 text-teal-800',
                 delivery: 'bg-orange-100 text-orange-800',
                 store_maintenance: 'bg-red-100 text-red-800',
-                meeting: 'bg-indigo-100 text-indigo-800',
+                meeting: 'bg-green-100 text-green-800',
                 training: 'bg-pink-100 text-pink-800',
                 other: 'bg-gray-100 text-gray-800'
             };
@@ -345,7 +345,7 @@
             const typeLabel = typeLabels[activity.activity_type] || activity.activity_type;
 
             return `
-                <div class="border-l-4 border-purple-500 bg-gray-50 rounded-lg p-4 mb-4 hover:shadow-md transition-shadow">
+                <div class="border-l-4 border-teal-500 bg-gray-50 rounded-lg p-4 mb-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-start mb-3">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-2">
@@ -355,14 +355,14 @@
                                 <span class="text-sm text-gray-500">
                                     ${formatTime(startTime)} - ${formatTime(endTime)}
                                 </span>
-                                <span class="text-sm text-purple-600 font-medium">
+                                <span class="text-sm text-teal-600 font-medium">
                                     (${duration}h)
                                 </span>
                             </div>
                             <h3 class="text-lg font-bold text-gray-800">${escapeHtml(activity.title)}</h3>
                         </div>
                         <div class="flex gap-2 ml-4">
-                            <button onclick="editActivity(${activity.id})" class="text-purple-600 hover:text-purple-700 p-2" title="Edit">
+                            <button onclick="editActivity(${activity.id})" class="text-teal-600 hover:text-teal-700 p-2" title="Edit">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                 </svg>

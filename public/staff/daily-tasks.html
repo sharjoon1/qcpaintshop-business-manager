@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#16a34a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
@@ -22,7 +22,7 @@
             min-height: 100vh;
         }
         .gradient-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #16a34a 0%, #0d9488 100%);
             color: white;
             padding: 20px 16px;
             border-radius: 0 0 24px 24px;
@@ -95,7 +95,7 @@
             margin-bottom: 8px;
             outline: none;
         }
-        .detail-input:focus { border-color: #667eea; }
+        .detail-input:focus { border-color: #16a34a; }
         .reason-box {
             margin-top: 10px;
             display: none;
@@ -239,7 +239,7 @@
 
     <!-- Loading -->
     <div id="loadingState" style="text-align: center; padding: 40px;">
-        <div style="border: 3px solid #e5e7eb; border-top: 3px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+        <div style="border: 3px solid #e5e7eb; border-top: 3px solid #16a34a; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
         <p style="color: #6b7280; margin-top: 12px;">Loading tasks...</p>
     </div>
     <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
@@ -314,7 +314,7 @@
             } catch (error) {
                 console.error('Error loading tasks:', error);
                 document.getElementById('loadingState').innerHTML =
-                    '<p style="color:#ef4444;text-align:center;padding:40px;">Failed to load tasks. <a href="javascript:location.reload()" style="color:#667eea;">Retry</a></p>';
+                    '<p style="color:#ef4444;text-align:center;padding:40px;">Failed to load tasks. <a href="javascript:location.reload()" style="color:#16a34a;">Retry</a></p>';
             }
         }
 
