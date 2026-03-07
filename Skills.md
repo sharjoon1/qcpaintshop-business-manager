@@ -475,6 +475,19 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
   - `GET /api/attendance/break-status` endpoint for real-time break status
   - Migration: `migrations/migrate-break-enforcement.js`
 
+**Native Geofence Background Service (Android)**
+- `GeofenceLocationService.kt`: ForegroundService monitors GPS every 30s natively, independent of WebView
+- Reports to `POST /api/attendance/location-report` with lat/lng/accuracy/authToken
+- Server checks distance from branch location: 300m+ triggers FCM alert to staff + all admins
+- `geo_warning_started_at` set on first violation; after 5min grace → auto-clockout (`auto_clockout_type = 'geo'`)
+- `onProviderDisabled` detects GPS turned off → reports to `POST /api/attendance/location-off`
+- `location_off_at` column tracks GPS-off time; server cron (60s) auto-clockouts after 2min (`auto_clockout_type = 'location_off'`)
+- Skips enforcement during break/outside work/prayer (checks `break_start IS NOT NULL AND break_end IS NULL`, etc.)
+- FCM channel `qc_geofence_alerts`: IMPORTANCE_HIGH, alarm sound, bypass DND, vibration `[0,500,200,500,200,500]`
+- JS bridge: `QCApp.startGeofenceService(authToken)` called on clock-in, `QCApp.stopGeofenceService()` on clock-out
+- Service auto-stops on server `action: "stop_service"` or `"auto_clockout"`, or 401 auth expired
+- `ACCESS_BACKGROUND_LOCATION` permission requested on every app launch with rationale dialog
+
 **Outside Work Periods**
 - Staff can declare "Going Outside for Work" with a reason (e.g., client meeting, delivery)
 - **Geofence exemption**: geofence monitoring is paused during active outside work
@@ -2211,6 +2224,18 @@ Based on AI App Analyzer report, fixed critical production errors:
 - Admin staff list: profile avatars + KYC status column
 - Play Store assets generated: 6 screenshots, feature graphic, 512x512 icon
 - Release AAB v3.2.0 built for Play Store submission
+
+### v3.3.7 (2026-03-08) - Geofence Background Location Service
+- **Native Android GeofenceLocationService**: `ForegroundService` with `FOREGROUND_SERVICE_TYPE_LOCATION`, monitors GPS every 30s via `LocationManager`, independent of WebView
+- **Server endpoints**: `POST /api/attendance/location-report` (receives GPS, checks 300m geofence, sends FCM alerts, 5min grace→auto-clockout), `POST /api/attendance/location-off` (GPS-off detection, sets `location_off_at`)
+- **Server geofence cron**: Every 60s checks `location_off_at` > 2min and `geo_warning_started_at` > 5min → auto-clockout with FCM push
+- **FCM geofence channel**: `qc_geofence_alerts` with `IMPORTANCE_HIGH`, alarm sound, bypass DND, vibration pattern
+- **JS bridge**: `QCApp.startGeofenceService(authToken)` on clock-in, `QCApp.stopGeofenceService()` on clock-out
+- **Permission flow**: `ACCESS_BACKGROUND_LOCATION` requested on app launch with rationale dialog (Android Q+)
+- **Migration**: `migrate-location-off.js` adds `location_off_at DATETIME NULL` to `staff_attendance`
+- **Staff dark green theme**: All 26+ staff pages rebranded to `#1B5E3B`/`#154D31`
+- **Incentive slab system**: Amount-based tiers with FCM notifications on all status changes
+- **Version**: versionCode 15, Android AAB built, Play Store publish pending Background Location declaration
 
 ### Android App v3.2.2 (2026-02-15) - Play Store Submission
 - **Two flavors**: QC Staff (`com.qcpaintshop.staff`) + QC Customer (`com.qcpaintshop.customer`)
