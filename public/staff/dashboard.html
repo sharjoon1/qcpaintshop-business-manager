@@ -544,7 +544,7 @@
         <div style="position: absolute; bottom: -20px; left: -20px; width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
         <!-- Top row: Logo + Bell + Profile -->
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; position: relative; z-index: 1;">
-            <div id="profileAvatar" style="width: 44px; height: 44px; border-radius: 10px; background: white; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+            <div id="profileAvatar" style="width: 44px; height: 44px; border-radius: 10px; background: rgba(255,255,255,0.15); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
                 <img id="welcomeLogo" src="" alt="QC" style="width: 100%; height: 100%; object-fit: contain; display: none;">
                 <span id="profileInitial" style="color: #1B5E3B; font-weight: 700; font-size: 16px;">QC</span>
             </div>
@@ -573,6 +573,31 @@
             </div>
         </div>
     </div>
+
+    <!-- Relocate subnav below gradient header (nav-loader inserts it after hidden header-v2) -->
+    <script>
+    (function relocateSubnav() {
+        var gradientHeader = document.getElementById('staffGradientHeader');
+        function moveSubnav() {
+            var subnav = document.getElementById('attendanceSubnav');
+            if (subnav && gradientHeader) {
+                gradientHeader.parentNode.insertBefore(subnav, gradientHeader.nextSibling);
+            }
+        }
+        // Try immediately, then observe for dynamic insertion
+        moveSubnav();
+        var observer = new MutationObserver(function() {
+            var subnav = document.getElementById('attendanceSubnav');
+            if (subnav && gradientHeader && subnav.previousElementSibling !== gradientHeader) {
+                moveSubnav();
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        // Fallback timeout
+        setTimeout(function() { moveSubnav(); observer.disconnect(); }, 3000);
+    })();
+    </script>
 
     <!-- Loading State -->
     <div id="loadingState" class="status-card" style="padding: 24px;">
