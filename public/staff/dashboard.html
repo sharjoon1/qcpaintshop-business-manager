@@ -1408,22 +1408,22 @@
                 const excess = totalUsed - breakPolicy.allowance;
                 el.textContent = `-${excess}m`;
                 el.style.color = '#ef4444';
-                icon.style.background = '#fee2e2';
-                label.textContent = 'Break Excess';
+                if (icon) icon.style.background = '#fee2e2';
+                if (label) label.textContent = 'Break Excess';
             } else if (remaining <= 30) {
                 const h = Math.floor(remaining / 60);
                 const m = remaining % 60;
                 el.textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
                 el.style.color = '#d97706';
-                icon.style.background = '#fef3c7';
-                label.textContent = 'Break Left';
+                if (icon) icon.style.background = '#fef3c7';
+                if (label) label.textContent = 'Break Left';
             } else {
                 const h = Math.floor(remaining / 60);
                 const m = remaining % 60;
                 el.textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
                 el.style.color = '#10b981';
-                icon.style.background = '#d1fae5';
-                label.textContent = 'Break Left';
+                if (icon) icon.style.background = '#d1fae5';
+                if (label) label.textContent = 'Break Left';
             }
         }
 
