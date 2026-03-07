@@ -535,13 +535,14 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- Header -->
-    <div style="background: linear-gradient(135deg, #1B5E3B 0%, #154D31 100%); padding: 20px 16px 24px; color: white; position: relative; overflow: hidden;">
+    <div style="background: linear-gradient(135deg, #1B5E3B, #D4A24E); padding: 20px 16px 24px; color: white; position: relative; overflow: hidden;">
         <div style="position: absolute; top: -30px; right: -30px; width: 100px; height: 100px; background: rgba(255,255,255,0.08); border-radius: 50%;"></div>
         <div style="position: absolute; bottom: -20px; left: -20px; width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
         <div style="display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1;">
             <div style="display: flex; align-items: center; gap: 12px;">
-                <div id="profileAvatar" style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 20px; overflow: hidden; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.3);">
-                    <span id="profileInitial">?</span>
+                <div id="profileAvatar" style="width: 48px; height: 48px; border-radius: 10px; background: white; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                    <img id="welcomeLogo" src="" alt="QC" style="width: 100%; height: 100%; object-fit: contain; display: none;">
+                    <span id="profileInitial" style="color: #1B5E3B; font-weight: 700; font-size: 20px;">QC</span>
                 </div>
                 <div>
                     <p style="font-size: 13px; opacity: 0.85;">Welcome back,</p>
@@ -1107,6 +1108,7 @@
             try {
                 const token = localStorage.getItem('auth_token');
                 if (!token) return;
+                // Load user name
                 fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } })
                     .then(r => r.json())
                     .then(data => {
@@ -1114,11 +1116,22 @@
                         const user = data.user;
                         const name = user.full_name || '';
                         document.getElementById('staffGreeting').textContent = `Hi, ${name.split(' ')[0]}`;
-                        const avatar = document.getElementById('profileAvatar');
-                        if (user.profile_image_url) {
-                            avatar.innerHTML = `<img src="${user.profile_image_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<span>${name.charAt(0).toUpperCase()}</span>'">`;
-                        } else {
-                            document.getElementById('profileInitial').textContent = name.charAt(0).toUpperCase() || '?';
+                    }).catch(() => {});
+                // Load company logo into welcome header
+                fetch('/api/public/site-info')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.data && data.data.business_logo) {
+                            const logo = data.data.business_logo;
+                            const logoImg = document.getElementById('welcomeLogo');
+                            if (logoImg) {
+                                logoImg.src = logo.startsWith('/') ? logo : '/' + logo;
+                                logoImg.onload = function() {
+                                    this.style.display = 'block';
+                                    const initEl = document.getElementById('profileInitial');
+                                    if (initEl) initEl.style.display = 'none';
+                                };
+                            }
                         }
                     }).catch(() => {});
             } catch (e) {}
