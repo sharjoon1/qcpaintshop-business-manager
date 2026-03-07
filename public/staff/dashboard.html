@@ -536,9 +536,8 @@
 
     <!-- Combined Header (replaces header-v2 on this page) -->
     <style>
-        /* Hide the default header-v2 bar but keep notification panel accessible */
-        .qc-unified-header { height: 0 !important; overflow: visible !important; visibility: hidden !important; padding: 0 !important; margin: 0 !important; border: none !important; }
-        .qc-unified-header .qc-notification-panel { visibility: visible !important; position: fixed !important; top: 60px !important; right: 12px !important; z-index: 1100 !important; }
+        /* Hide the default header-v2 on staff dashboard */
+        .qc-unified-header { display: none !important; }
     </style>
     <div id="staffGradientHeader" style="background: linear-gradient(135deg, #1B5E3B, #D4A24E); color: white; position: relative; overflow: hidden;">
         <div style="position: absolute; top: -30px; right: -30px; width: 100px; height: 100px; background: rgba(255,255,255,0.08); border-radius: 50%;"></div>
@@ -588,26 +587,38 @@
 
     <!-- Relocate subnav below gradient header (nav-loader inserts it after hidden header-v2) -->
     <script>
-    (function relocateSubnav() {
+    (function relocateComponents() {
         var gradientHeader = document.getElementById('staffGradientHeader');
-        function moveSubnav() {
-            var subnav = document.getElementById('attendanceSubnav');
-            if (subnav && gradientHeader) {
-                gradientHeader.parentNode.insertBefore(subnav, gradientHeader.nextSibling);
+        var moved = { subnav: false, notif: false };
+        function moveComponents() {
+            // Move subnav below gradient header
+            if (!moved.subnav) {
+                var subnav = document.getElementById('attendanceSubnav');
+                if (subnav && gradientHeader) {
+                    gradientHeader.parentNode.insertBefore(subnav, gradientHeader.nextSibling);
+                    moved.subnav = true;
+                }
             }
+            // Move notification panel out of hidden header-v2 into body
+            if (!moved.notif) {
+                var notifPanel = document.getElementById('notifPanel');
+                if (notifPanel) {
+                    notifPanel.style.position = 'fixed';
+                    notifPanel.style.top = '60px';
+                    notifPanel.style.right = '12px';
+                    notifPanel.style.zIndex = '1200';
+                    document.body.appendChild(notifPanel);
+                    moved.notif = true;
+                }
+            }
+            return moved.subnav && moved.notif;
         }
-        // Try immediately, then observe for dynamic insertion
-        moveSubnav();
+        moveComponents();
         var observer = new MutationObserver(function() {
-            var subnav = document.getElementById('attendanceSubnav');
-            if (subnav && gradientHeader && subnav.previousElementSibling !== gradientHeader) {
-                moveSubnav();
-                observer.disconnect();
-            }
+            if (moveComponents()) observer.disconnect();
         });
         observer.observe(document.body, { childList: true, subtree: true });
-        // Fallback timeout
-        setTimeout(function() { moveSubnav(); observer.disconnect(); }, 3000);
+        setTimeout(function() { moveComponents(); observer.disconnect(); }, 3000);
     })();
     // Close profile menu on outside click
     document.addEventListener('click', function(e) {
