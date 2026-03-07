@@ -3714,6 +3714,125 @@ server.listen(PORT, () => {
     autoClockout.start();
     attendanceReport.start();
 
+    // Geofence enforcement — every 60 seconds
+    // Checks: (1) location turned off >2 min, (2) geo warning >5 min
+    setInterval(async () => {
+        try {
+            const now = new Date();
+            const offset = 5.5 * 60 * 60 * 1000;
+            const istDate = new Date(now.getTime() + offset);
+            const today = istDate.toISOString().split('T')[0];
+
+            // 1. Location-off auto-clockout (2 min grace)
+            const [locationOffRecords] = await pool.query(
+                `SELECT a.id, a.user_id, a.clock_in_time, a.break_duration_minutes
+                 FROM staff_attendance a
+                 WHERE a.date = ? AND a.clock_out_time IS NULL
+                   AND a.location_off_at IS NOT NULL
+                   AND TIMESTAMPDIFF(SECOND, a.location_off_at, NOW()) >= 120`,
+                [today]
+            );
+
+            for (const rec of locationOffRecords) {
+                const clockoutTime = new Date();
+                const breakMinutes = rec.break_duration_minutes || 0;
+                const workingMinutes = Math.round(((clockoutTime - new Date(rec.clock_in_time)) / 1000 / 60) - breakMinutes);
+
+                await pool.query(
+                    `UPDATE staff_attendance
+                     SET clock_out_time = ?, total_working_minutes = ?,
+                         auto_clockout_type = 'location_off', location_off_at = NULL,
+                         geo_warning_started_at = NULL,
+                         notes = CONCAT(COALESCE(notes, ''), '\n[Auto clock-out: Location turned off for >2 min]')
+                     WHERE id = ?`,
+                    [clockoutTime, workingMinutes, rec.id]
+                );
+
+                try {
+                    await notificationService.send(rec.user_id, {
+                        type: 'geo_auto_clockout',
+                        title: 'Auto Clock-Out!',
+                        body: 'Auto-clocked-out because location was off for over 2 minutes.',
+                        data: { type: 'geo_auto_clockout', reason: 'location_off', priority: 'high' }
+                    });
+                } catch(e) {}
+
+                try {
+                    const [userInfo] = await pool.query('SELECT full_name FROM users WHERE id = ?', [rec.user_id]);
+                    const staffName = userInfo[0]?.full_name || 'Staff';
+                    const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                    for (const admin of admins) {
+                        await notificationService.send(admin.id, {
+                            type: 'geo_auto_clockout_admin',
+                            title: 'Staff Auto Clock-Out (Location Off)',
+                            body: `${staffName} auto-clocked-out — location off >2 min.`,
+                            data: { type: 'geo_auto_clockout_admin', user_id: String(rec.user_id), reason: 'location_off', priority: 'high' }
+                        }).catch(() => {});
+                    }
+                } catch(e) {}
+                console.log(`[Geo Cron] Auto-clockout user ${rec.user_id} — location off >2 min`);
+            }
+
+            // 2. Stale geo warning auto-clockout (5 min at 300m+)
+            const [staleRecords] = await pool.query(
+                `SELECT a.id, a.user_id, a.clock_in_time, a.break_duration_minutes, a.last_geo_distance
+                 FROM staff_attendance a
+                 WHERE a.date = ? AND a.clock_out_time IS NULL
+                   AND a.geo_warning_started_at IS NOT NULL
+                   AND TIMESTAMPDIFF(SECOND, a.geo_warning_started_at, NOW()) >= 300`,
+                [today]
+            );
+
+            for (const rec of staleRecords) {
+                const [activeOW] = await pool.query("SELECT id FROM outside_work_periods WHERE user_id = ? AND status = 'active' LIMIT 1", [rec.user_id]);
+                const [activePrayer] = await pool.query("SELECT id FROM prayer_periods WHERE user_id = ? AND status = 'active' LIMIT 1", [rec.user_id]);
+                if (activeOW.length > 0 || activePrayer.length > 0) continue;
+
+                const clockoutTime = new Date();
+                const breakMinutes = rec.break_duration_minutes || 0;
+                const workingMinutes = Math.round(((clockoutTime - new Date(rec.clock_in_time)) / 1000 / 60) - breakMinutes);
+                const dist = rec.last_geo_distance || 0;
+
+                await pool.query(
+                    `UPDATE staff_attendance
+                     SET clock_out_time = ?, total_working_minutes = ?,
+                         auto_clockout_type = 'geo', auto_clockout_distance = ?,
+                         geo_warning_started_at = NULL,
+                         notes = CONCAT(COALESCE(notes, ''), '\n[Server auto clock-out: ${dist}m from branch, 5 min expired]')
+                     WHERE id = ?`,
+                    [clockoutTime, workingMinutes, dist, rec.id]
+                );
+
+                try {
+                    await notificationService.send(rec.user_id, {
+                        type: 'geo_auto_clockout',
+                        title: 'Auto Clock-Out!',
+                        body: `Auto-clocked-out — ${dist}m from branch for over 5 minutes.`,
+                        data: { type: 'geo_auto_clockout', distance: String(dist), priority: 'high' }
+                    });
+                } catch(e) {}
+
+                try {
+                    const [userInfo] = await pool.query('SELECT full_name FROM users WHERE id = ?', [rec.user_id]);
+                    const staffName = userInfo[0]?.full_name || 'Staff';
+                    const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                    for (const admin of admins) {
+                        await notificationService.send(admin.id, {
+                            type: 'geo_auto_clockout_admin',
+                            title: 'Staff Auto Clock-Out (Server)',
+                            body: `${staffName} auto-clocked-out — ${dist}m from branch, 5 min expired.`,
+                            data: { type: 'geo_auto_clockout_admin', user_id: String(rec.user_id), distance: String(dist), priority: 'high' }
+                        }).catch(() => {});
+                    }
+                } catch(e) {}
+                console.log(`[Geo Cron] Server auto-clockout user ${rec.user_id} — ${dist}m, 5 min expired`);
+            }
+        } catch (err) {
+            console.error('[Geo Cron] Error:', err.message);
+        }
+    }, 60 * 1000); // every 60 seconds
+    console.log('[Geo Cron] Geofence enforcement cron started (every 60s)');
+
     if (process.env.ZOHO_ORGANIZATION_ID) {
         syncScheduler.start().catch(err => {
             console.error('Failed to start sync scheduler:', err.message);

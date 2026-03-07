@@ -1299,6 +1299,10 @@
 
         // Show clocked out state
         function showClockedOutState(data, reclockinStatus, dayTotalMinutes) {
+            // Stop native Android geofence service
+            if (typeof QCApp !== 'undefined' && QCApp.isAndroidApp && QCApp.isAndroidApp()) {
+                try { if (QCApp.stopGeofenceService) QCApp.stopGeofenceService(); } catch(e) {}
+            }
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
@@ -1451,6 +1455,17 @@
 
             // Start timer
             startTimer(data.clock_in_time, data.break_duration_minutes || 0);
+
+            // Start native Android geofence background service
+            if (typeof QCApp !== 'undefined' && QCApp.isAndroidApp && QCApp.isAndroidApp()) {
+                try {
+                    var authToken = localStorage.getItem('auth_token');
+                    if (authToken && QCApp.startGeofenceService) {
+                        QCApp.startGeofenceService(authToken);
+                        console.log('Native geofence service started');
+                    }
+                } catch(e) { console.log('Geofence service start error:', e); }
+            }
 
             // Break button state
             if (data.break_start_time && !data.break_end_time) {
@@ -2700,6 +2715,10 @@
         }
 
         function stopGeoFenceMonitoring() {
+            // Also stop native Android geofence service
+            if (typeof QCApp !== 'undefined' && QCApp.isAndroidApp && QCApp.isAndroidApp()) {
+                try { if (QCApp.stopGeofenceService) QCApp.stopGeofenceService(); } catch(e) {}
+            }
             if (geoWatchId !== null) {
                 navigator.geolocation.clearWatch(geoWatchId);
                 geoWatchId = null;

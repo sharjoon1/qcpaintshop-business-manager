@@ -2371,6 +2371,255 @@ router.post('/geo-auto-clockout', requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/attendance/location-report
+ * Native Android background service reports location every 30s
+ * Checks geofence, sends alerts, triggers auto-clockout after 5 min at 300m+
+ */
+router.post('/location-report', requireAuth, async (req, res) => {
+    try {
+        const { latitude, longitude } = req.body;
+        const userId = req.user.id;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({ success: false, message: 'Location required' });
+        }
+
+        const today = getTodayIST();
+
+        const [records] = await pool.query(
+            `SELECT a.id, a.branch_id, a.geo_warning_started_at, a.clock_in_time,
+                    a.break_start_time, a.break_end_time, a.break_duration_minutes,
+                    b.latitude AS branch_lat, b.longitude AS branch_lng, b.geo_fence_radius
+             FROM staff_attendance a
+             JOIN branches b ON a.branch_id = b.id
+             WHERE a.user_id = ? AND a.date = ? AND a.clock_out_time IS NULL
+             ORDER BY a.id DESC LIMIT 1`,
+            [userId, today]
+        );
+
+        if (records.length === 0) {
+            return res.json({ success: true, action: 'stop_service', message: 'No active attendance' });
+        }
+
+        const record = records[0];
+        const radius = record.geo_fence_radius || 200;
+        const distance = Math.round(calculateDistance(
+            parseFloat(latitude), parseFloat(longitude),
+            parseFloat(record.branch_lat), parseFloat(record.branch_lng)
+        ));
+
+        // Skip enforcement during break/outside/prayer
+        if (record.break_start_time && !record.break_end_time) {
+            await pool.query(
+                `UPDATE staff_attendance SET last_geo_check_at = NOW(), last_geo_distance = ?, geo_warning_started_at = NULL, location_off_at = NULL WHERE id = ?`,
+                [distance, record.id]
+            );
+            return res.json({ success: true, action: 'none', status: 'on_break', distance });
+        }
+        const [activeOW] = await pool.query("SELECT id FROM outside_work_periods WHERE user_id = ? AND status = 'active' LIMIT 1", [userId]);
+        if (activeOW.length > 0) {
+            await pool.query(
+                `UPDATE staff_attendance SET last_geo_check_at = NOW(), last_geo_distance = ?, geo_warning_started_at = NULL, location_off_at = NULL WHERE id = ?`,
+                [distance, record.id]
+            );
+            return res.json({ success: true, action: 'none', status: 'outside_work', distance });
+        }
+        const [activePrayer] = await pool.query("SELECT id FROM prayer_periods WHERE user_id = ? AND status = 'active' LIMIT 1", [userId]);
+        if (activePrayer.length > 0) {
+            await pool.query(
+                `UPDATE staff_attendance SET last_geo_check_at = NOW(), last_geo_distance = ?, geo_warning_started_at = NULL, location_off_at = NULL WHERE id = ?`,
+                [distance, record.id]
+            );
+            return res.json({ success: true, action: 'none', status: 'prayer', distance });
+        }
+
+        // Clear location_off since we got a report (GPS is on)
+        const allowed = distance <= radius;
+
+        if (allowed) {
+            await pool.query(
+                `UPDATE staff_attendance SET last_geo_check_at = NOW(), last_geo_distance = ?, geo_warning_started_at = NULL, location_off_at = NULL WHERE id = ?`,
+                [distance, record.id]
+            );
+            return res.json({ success: true, action: 'none', status: 'inside', distance, radius });
+        }
+
+        // Outside fence
+        const now = new Date();
+
+        if (distance >= 300) {
+            if (!record.geo_warning_started_at) {
+                // First 300m+ detection — start grace, send alerts
+                await pool.query(
+                    `UPDATE staff_attendance SET geo_warning_started_at = ?, last_geo_check_at = ?, last_geo_distance = ?, location_off_at = NULL WHERE id = ?`,
+                    [now, now, distance, record.id]
+                );
+
+                const [userInfo] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
+                const staffName = userInfo[0]?.full_name || 'Staff';
+
+                // Alert staff
+                try {
+                    await notificationService.send(userId, {
+                        type: 'geofence_exit_warning',
+                        title: 'Geofence Warning!',
+                        body: `You are ${distance}m from branch. Return within 5 minutes or auto clock-out!`,
+                        data: { type: 'geofence_exit_warning', distance: String(distance), priority: 'high' }
+                    });
+                } catch(e) {}
+
+                // Alert all admins
+                try {
+                    const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                    for (const admin of admins) {
+                        await notificationService.send(admin.id, {
+                            type: 'geofence_exit_admin',
+                            title: 'Staff Left Branch Area!',
+                            body: `${staffName} is ${distance}m from branch. Auto clock-out in 5 min.`,
+                            data: { type: 'geofence_exit_admin', user_id: String(userId), distance: String(distance), priority: 'high' }
+                        }).catch(() => {});
+                    }
+                } catch(e) {}
+
+                // Log violation
+                try {
+                    await pool.query(
+                        `INSERT INTO geofence_violations (user_id, branch_id, latitude, longitude, distance, radius, violation_type) VALUES (?,?,?,?,?,?,?)`,
+                        [userId, record.branch_id, latitude, longitude, distance, radius, 'left_area']
+                    );
+                } catch(e) {}
+
+                return res.json({ success: true, action: 'warn', status: 'outside_grace', distance, radius, grace_remaining: 300 });
+            } else {
+                // Grace ongoing — check if expired
+                const warningStart = new Date(record.geo_warning_started_at).getTime();
+                const elapsed = now.getTime() - warningStart;
+                const graceMs = 5 * 60 * 1000;
+
+                await pool.query(
+                    `UPDATE staff_attendance SET last_geo_check_at = ?, last_geo_distance = ? WHERE id = ?`,
+                    [now, distance, record.id]
+                );
+
+                if (elapsed >= graceMs) {
+                    // Grace expired — auto clock out
+                    const breakMinutes = record.break_duration_minutes || 0;
+                    const workingMinutes = Math.round(((now - new Date(record.clock_in_time)) / 1000 / 60) - breakMinutes);
+                    const geoNote = `\n[Auto clock-out: ${distance}m from branch at ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}]`;
+
+                    await pool.query(
+                        `UPDATE staff_attendance
+                         SET clock_out_time = ?, total_working_minutes = ?,
+                             clock_out_lat = ?, clock_out_lng = ?, clock_out_distance = ?,
+                             auto_clockout_type = 'geo', auto_clockout_distance = ?,
+                             geo_warning_started_at = NULL,
+                             notes = CONCAT(COALESCE(notes, ''), ?)
+                         WHERE id = ?`,
+                        [now, workingMinutes, latitude, longitude, distance, distance, geoNote, record.id]
+                    );
+
+                    const [userInfo2] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
+                    const staffName2 = userInfo2[0]?.full_name || 'Staff';
+
+                    try {
+                        await notificationService.send(userId, {
+                            type: 'geo_auto_clockout',
+                            title: 'Auto Clock-Out!',
+                            body: `Auto-clocked-out — ${distance}m from branch for over 5 minutes.`,
+                            data: { type: 'geo_auto_clockout', attendance_id: String(record.id), distance: String(distance), priority: 'high' }
+                        });
+                    } catch(e) {}
+
+                    try {
+                        const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+                        for (const admin of admins) {
+                            await notificationService.send(admin.id, {
+                                type: 'geo_auto_clockout_admin',
+                                title: 'Staff Auto Clock-Out',
+                                body: `${staffName2} auto-clocked-out at ${distance}m from branch.`,
+                                data: { type: 'geo_auto_clockout_admin', user_id: String(userId), distance: String(distance), priority: 'high' }
+                            }).catch(() => {});
+                        }
+                    } catch(e) {}
+
+                    return res.json({ success: true, action: 'auto_clockout', status: 'clocked_out', distance });
+                }
+
+                const remainSec = Math.ceil((graceMs - elapsed) / 1000);
+                return res.json({ success: true, action: 'warn', status: 'outside_grace', distance, radius, grace_remaining: remainSec });
+            }
+        } else {
+            // Outside fence but < 300m — track only
+            await pool.query(
+                `UPDATE staff_attendance SET last_geo_check_at = NOW(), last_geo_distance = ?, location_off_at = NULL WHERE id = ?`,
+                [distance, record.id]
+            );
+            return res.json({ success: true, action: 'none', status: 'outside_soft', distance, radius });
+        }
+    } catch (error) {
+        console.error('Location report error:', error);
+        res.status(500).json({ success: false, message: 'Failed to process location report' });
+    }
+});
+
+/**
+ * POST /api/attendance/location-off
+ * Native app reports GPS was turned off — starts 2-min grace period
+ */
+router.post('/location-off', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const today = getTodayIST();
+
+        const [records] = await pool.query(
+            `SELECT a.id FROM staff_attendance a
+             WHERE a.user_id = ? AND a.date = ? AND a.clock_out_time IS NULL
+             ORDER BY a.id DESC LIMIT 1`,
+            [userId, today]
+        );
+
+        if (records.length === 0) {
+            return res.json({ success: true, message: 'No active attendance' });
+        }
+
+        await pool.query(
+            `UPDATE staff_attendance SET location_off_at = NOW(), last_geo_check_at = NOW() WHERE id = ?`,
+            [records[0].id]
+        );
+
+        // Warn staff
+        try {
+            await notificationService.send(userId, {
+                type: 'location_off_warning',
+                title: 'Location Turned Off!',
+                body: 'Turn on your location within 2 minutes or you will be auto-clocked-out.',
+                data: { type: 'location_off_warning', priority: 'high' }
+            });
+        } catch(e) {}
+
+        // Alert admins
+        try {
+            const [userInfo] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
+            const staffName = userInfo[0]?.full_name || 'Staff';
+            const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+            for (const admin of admins) {
+                await notificationService.send(admin.id, {
+                    type: 'location_off_admin',
+                    title: 'Staff Location Off!',
+                    body: `${staffName} turned off location. Auto clock-out in 2 min if not restored.`,
+                    data: { type: 'location_off_admin', user_id: String(userId), priority: 'high' }
+                }).catch(() => {});
+            }
+        } catch(e) {}
+
+        res.json({ success: true, message: 'Location-off recorded' });
+    } catch (error) {
+        console.error('Location-off error:', error);
+        res.status(500).json({ success: false, message: 'Failed' });
+    }
+});
+
+/**
  * POST /api/attendance/geofence-violation
  * Log a geofence violation (rate-limited: max 1 per 5 minutes per user)
  */
