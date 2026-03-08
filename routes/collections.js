@@ -29,11 +29,21 @@ function setPool(p) { pool = p; }
 const perm = requirePermission('zoho', 'collections');
 
 // Helper: resolve branch_id from user role
+// Returns { branchId, includeUnassigned } for proper filtering
 function getBranchFilter(req) {
     if (req.user.role === 'admin') {
         return req.query.branch_id ? parseInt(req.query.branch_id) : null;
     }
     return req.user.branch_id || null;
+}
+
+// Build branch WHERE clause that includes unassigned (NULL) customers for staff
+function buildBranchWhere(branchId, tableAlias = 'zcm') {
+    if (!branchId) return { clause: '', params: [] };
+    return {
+        clause: ` AND (${tableAlias}.branch_id = ? OR ${tableAlias}.branch_id IS NULL)`,
+        params: [branchId]
+    };
 }
 
 // ========================================
@@ -45,7 +55,7 @@ router.get('/summary', perm, async (req, res) => {
         const branchId = getBranchFilter(req);
 
         const branchJoin = branchId ? 'LEFT JOIN zoho_customers_map zcm ON zi.zoho_customer_id = zcm.zoho_contact_id' : '';
-        const branchWhere = branchId ? 'AND zcm.branch_id = ?' : '';
+        const branchWhere = branchId ? 'AND (zcm.branch_id = ? OR zcm.branch_id IS NULL)' : '';
         const branchParams = branchId ? [branchId] : [];
 
         // Outstanding & overdue totals
@@ -134,7 +144,7 @@ router.get('/customers', perm, async (req, res) => {
         const params = [];
 
         if (branchId) {
-            where += ' AND zcm.branch_id = ?';
+            where += ' AND (zcm.branch_id = ? OR zcm.branch_id IS NULL)';
             params.push(branchId);
         }
 
@@ -207,7 +217,7 @@ router.get('/invoices', perm, async (req, res) => {
         const params = [];
 
         if (branchId) {
-            where += ' AND zcm.branch_id = ?';
+            where += ' AND (zcm.branch_id = ? OR zcm.branch_id IS NULL)';
             params.push(branchId);
         }
 
