@@ -21,6 +21,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission } = require('../middleware/permissionMiddleware');
+const activityFeed = require('../services/activity-feed');
 
 let pool;
 function setPool(p) { pool = p; }
@@ -355,6 +356,14 @@ router.post('/remind', perm, async (req, res) => {
             message: `${successCount}/${reminders.length} reminders queued`,
             data: results
         });
+
+        // Log to activity feed
+        if (successCount > 0) {
+            const custName = reminders[0]?.customer_name || 'customer';
+            activityFeed.logActivity(req.user.id, req.user.branch_id, 'lead_followup',
+                `${req.user.full_name} sent WhatsApp reminder to ${custName}`, null, 'all'
+            ).catch(() => {});
+        }
     } catch (error) {
         console.error('[Collections] Remind error:', error.message);
         res.status(500).json({ success: false, message: error.message });
@@ -394,6 +403,13 @@ router.post('/remind/log', perm, async (req, res) => {
             message: `${reminder_type} logged successfully`,
             data: { id: result.insertId }
         });
+
+        // Log to activity feed
+        const typeLabels = { call: 'called', visit: 'visited', email: 'emailed' };
+        activityFeed.logActivity(req.user.id, req.user.branch_id, 'lead_followup',
+            `${req.user.full_name} ${typeLabels[reminder_type] || reminder_type} ${customer_name || 'customer'} (outstanding follow-up)`,
+            notes || null, 'all'
+        ).catch(() => {});
     } catch (error) {
         console.error('[Collections] Log reminder error:', error.message);
         res.status(500).json({ success: false, message: error.message });
@@ -560,6 +576,13 @@ router.post('/promises', perm, async (req, res) => {
             message: 'Promise recorded',
             data: { id: result.insertId }
         });
+
+        // Log to activity feed
+        const fmtAmt = parseFloat(promise_amount).toLocaleString('en-IN');
+        activityFeed.logActivity(req.user.id, req.user.branch_id, 'lead_followup',
+            `${req.user.full_name} recorded payment promise from ${customer_name || 'customer'} (\u20B9${fmtAmt})`,
+            null, 'all'
+        ).catch(() => {});
     } catch (error) {
         console.error('[Collections] Create promise error:', error.message);
         res.status(500).json({ success: false, message: error.message });
