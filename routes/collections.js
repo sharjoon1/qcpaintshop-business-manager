@@ -340,7 +340,7 @@ router.post('/remind', perm, async (req, res) => {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)
             `, [
                 r.zoho_customer_id || null, r.zoho_invoice_id || null,
-                r.customer_name || 'Unknown', r.phone, 'payment_reminder', r.message_body,
+                r.customer_name || 'Unknown', r.phone, 'custom', r.message_body,
                 r.balance || null, req.user.id, msgBranchId || null
             ]);
 
