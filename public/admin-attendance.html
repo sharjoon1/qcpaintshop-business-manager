@@ -450,6 +450,7 @@
                                     <th>Clock Out</th>
                                     <th>Break</th>
                                     <th>Working Hours</th>
+                                    <th>Activity</th>
                                     <th>Distance</th>
                                     <th>Status</th>
                                     <th>Late</th>
@@ -457,7 +458,7 @@
                                 </tr>
                             </thead>
                             <tbody id="liveTableBody">
-                                <tr><td colspan="10" class="text-center py-8 text-gray-400">Loading...</td></tr>
+                                <tr><td colspan="11" class="text-center py-8 text-gray-400">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1138,7 +1139,7 @@
             const date = document.getElementById('liveDate').value;
             const branchId = document.getElementById('liveBranch').value;
             const tbody = document.getElementById('liveTableBody');
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center py-8 text-gray-400">Loading...</td></tr>';
 
             try {
                 let url = `/api/attendance/report?date=${date}`;
@@ -1148,15 +1149,25 @@
                 const data = await res.json();
 
                 if (!data.success) {
-                    tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-gray-400">${escapeHtml(data.message)}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-gray-400">${escapeHtml(data.message)}</td></tr>`;
                     return;
                 }
 
                 const rows = data.attendance || [];
                 if (rows.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No attendance records for this date</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="11" class="text-center py-8 text-gray-400">No attendance records for this date</td></tr>';
                     return;
                 }
+
+                // Fetch live activity data and merge
+                let activityMap = {};
+                try {
+                    const actRes = await fetch('/api/activity-tracker/admin/live', { headers: getAuthHeaders() });
+                    const actData = await actRes.json();
+                    if (actData.success && actData.data) {
+                        actData.data.forEach(a => { activityMap[a.user_id] = a; });
+                    }
+                } catch (e) { /* activity data optional */ }
 
                 tbody.innerHTML = rows.map(r => {
                     const clockIn = r.clock_in_time ? formatTime(r.clock_in_time) : '--:--';
@@ -1193,6 +1204,21 @@
                             : `${r.clock_in_distance}m`;
                     }
 
+                    // Activity column
+                    const act = activityMap[r.user_id];
+                    let activityHtml = '<span style="color:#9ca3af;">--</span>';
+                    if (act && r.clock_in_time && !r.clock_out_time) {
+                        const actEmojis = { marketing: '\uD83D\uDCC8', outstanding_followup: '\uD83D\uDCB0', material_arrangement: '\uD83D\uDCE6', material_receiving: '\uD83D\uDE9A', attending_customer: '\uD83E\uDDD1', shop_maintenance: '\uD83E\uDDF9' };
+                        const emoji = actEmojis[act.activity_type] || '\u2699\uFE0F';
+                        const elapsedMin = Math.floor((Date.now() - new Date(act.started_at).getTime()) / 60000);
+                        const elapsedStr = elapsedMin >= 60 ? `${Math.floor(elapsedMin/60)}h${elapsedMin%60}m` : `${elapsedMin}m`;
+                        if (act.is_idle) {
+                            activityHtml = `<span class="activity-cell" style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;">Idle ${elapsedStr}</span>`;
+                        } else {
+                            activityHtml = `<span class="activity-cell" style="font-size:12px;">${emoji} ${escapeHtml(act.label || act.activity_type)} <span style="color:#6b7280;">${elapsedStr}</span></span>`;
+                        }
+                    }
+
                     return `<tr>
                         <td class="font-semibold">${escapeHtml(r.full_name)}</td>
                         <td>${escapeHtml(r.branch_name)}</td>
@@ -1200,6 +1226,7 @@
                         <td>${clockOut}</td>
                         <td>${breakDur}</td>
                         <td>${workHrs}</td>
+                        <td>${activityHtml}</td>
                         <td>${distDisplay}</td>
                         <td><span class="badge badge-${statusClass}">${statusClass}</span></td>
                         <td>${r.is_late ? '<span class="badge badge-late">LATE</span>' : '-'}</td>
@@ -1213,7 +1240,7 @@
 
             } catch (e) {
                 console.error('Load live attendance error:', e);
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-red-500">Failed to load attendance data</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center py-8 text-red-500">Failed to load attendance data</td></tr>';
             }
         }
 

@@ -23,8 +23,10 @@ const ACTIVITY_ICONS = {
     lead_followup:  { icon: 'FUP', color: '#6366f1' },
     task_completed: { icon: 'TSK', color: '#667eea' },
     admin_notice:   { icon: 'ADM', color: '#dc2626' },
-    overtime:       { icon: 'OT',  color: '#7c3aed' },
-    stock_check:    { icon: 'STK', color: '#059669' }
+    overtime:           { icon: 'OT',  color: '#7c3aed' },
+    stock_check:        { icon: 'STK', color: '#059669' },
+    activity_started:   { icon: 'ACT', color: '#6366f1' },
+    activity_ended:     { icon: 'ACT', color: '#10b981' }
 };
 
 /**

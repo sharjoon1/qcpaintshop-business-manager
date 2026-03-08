@@ -32,6 +32,7 @@ const upload = multer({
 // Database connection (imported from main app)
 let pool;
 let io;
+let activityTrackerService;
 
 function setPool(dbPool) {
     pool = dbPool;
@@ -39,6 +40,10 @@ function setPool(dbPool) {
 
 function setIO(socketIO) {
     io = socketIO;
+}
+
+function setActivityTrackerService(svc) {
+    activityTrackerService = svc;
 }
 
 // ========================================
@@ -540,6 +545,11 @@ router.post('/clock-out', requireAuth, upload.single('photo'), async (req, res) 
             });
         }
 
+        // Auto-end any active activity tracker session
+        if (activityTrackerService) {
+            activityTrackerService.endActiveSession(userId, true).catch(e => console.error('[ActivityTracker] auto-end on clock-out error:', e.message));
+        }
+
         // Check if user has geo-fence enabled
         const [userGeoRows] = await pool.query(
             'SELECT geo_fence_enabled FROM users WHERE id = ?', [userId]
@@ -944,6 +954,11 @@ router.post('/break-start', requireAuth, upload.single('photo'), async (req, res
                 message: 'Break already started',
                 code: 'BREAK_ALREADY_STARTED'
             });
+        }
+
+        // Auto-end any active activity tracker session
+        if (activityTrackerService) {
+            activityTrackerService.endActiveSession(userId, true).catch(e => console.error('[ActivityTracker] auto-end on break error:', e.message));
         }
 
         // If previous break was completed, accumulate duration and reset for new break
@@ -2842,6 +2857,11 @@ router.post('/outside-work/start', requireAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Please end your prayer time before starting outside work' });
         }
 
+        // Auto-end any active activity tracker session
+        if (activityTrackerService) {
+            activityTrackerService.endActiveSession(userId, true).catch(e => console.error('[ActivityTracker] auto-end on outside-work error:', e.message));
+        }
+
         const now = new Date();
         const [result] = await pool.query(
             `INSERT INTO outside_work_periods (attendance_id, user_id, reason, start_time, start_lat, start_lng)
@@ -3209,6 +3229,11 @@ router.post('/prayer/start', requireAuth, async (req, res) => {
         );
         if (activePrayer.length > 0) {
             return res.status(400).json({ success: false, message: 'You already have an active prayer period' });
+        }
+
+        // Auto-end any active activity tracker session
+        if (activityTrackerService) {
+            activityTrackerService.endActiveSession(userId, true).catch(e => console.error('[ActivityTracker] auto-end on prayer error:', e.message));
         }
 
         const now = new Date();
@@ -4055,5 +4080,6 @@ module.exports = {
     router,
     setPool,
     setIO,
-    setReportService
+    setReportService,
+    setActivityTrackerService
 };

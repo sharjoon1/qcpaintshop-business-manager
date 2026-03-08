@@ -167,6 +167,7 @@ const pool = createPool();
 // Initialize shared pool for middleware and all route modules
 initPool(pool);
 attendanceRoutes.setPool(pool);
+attendanceRoutes.setActivityTrackerService(activityTrackerService);
 salaryRoutes.setPool(pool);
 estimateRequestRoutes.setPool(pool);
 rolesRoutes.setPool(pool);
