@@ -812,6 +812,10 @@
                     <div id="activeActivityStartTime" style="font-size: 11px; opacity: 0.7;"></div>
                 </div>
             </div>
+            <!-- Go to page button -->
+            <a id="activityGoBtn" href="#" style="display: none; margin-bottom: 10px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; text-decoration: none; font-weight: 600; font-size: 13px; text-align: center; backdrop-filter: blur(4px);" onclick="event.stopPropagation();">
+                <span id="activityGoBtnText">Go to Page</span> <span style="margin-left: 4px;">&#8594;</span>
+            </a>
             <div style="display: flex; gap: 8px;">
                 <button onclick="switchActivity()" style="flex: 1; padding: 10px; border: 2px solid rgba(255,255,255,0.3); border-radius: 10px; background: rgba(255,255,255,0.1); color: white; font-weight: 600; font-size: 13px; cursor: pointer;">Switch Activity</button>
                 <button onclick="stopCurrentActivity()" style="padding: 10px 20px; border: none; border-radius: 10px; background: #ef4444; color: white; font-weight: 600; font-size: 13px; cursor: pointer;">Stop</button>
@@ -898,13 +902,15 @@
         <!-- Admin Notices -->
         <div id="adminNotices" style="display: none; margin-bottom: 12px;"></div>
 
-        <!-- Activity Feed Tabs -->
-        <div style="display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
-            <button class="nb-tab active" data-filter="all" onclick="filterFeed('all')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: linear-gradient(135deg, #1B5E3B, #154D31); color: white; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;">All</button>
-            <button class="nb-tab" data-filter="attendance" onclick="filterFeed('attendance')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Attendance</button>
-            <button class="nb-tab" data-filter="breaks" onclick="filterFeed('breaks')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Breaks</button>
-            <button class="nb-tab" data-filter="leads" onclick="filterFeed('leads')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Leads</button>
-            <button class="nb-tab" data-filter="activities" onclick="filterFeed('activities')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Activities</button>
+        <!-- Main Tabs -->
+        <div style="display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid #e5e7eb;">
+            <button class="nb-main-tab active" data-main="all" onclick="switchMainTab('all')" style="flex: 1; padding: 8px 4px; border: none; background: none; font-size: 12px; font-weight: 700; color: #1B5E3B; cursor: pointer; border-bottom: 2px solid #1B5E3B; margin-bottom: -2px;">All</button>
+            <button class="nb-main-tab" data-main="attendance" onclick="switchMainTab('attendance')" style="flex: 1; padding: 8px 4px; border: none; background: none; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;">Attendance</button>
+            <button class="nb-main-tab" data-main="work" onclick="switchMainTab('work')" style="flex: 1; padding: 8px 4px; border: none; background: none; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;">Work</button>
+        </div>
+        <!-- Sub Tabs (shown only for Attendance & Work) -->
+        <div id="nbSubTabs" style="display: none; padding: 8px 0 4px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <div style="display: flex; gap: 4px;"></div>
         </div>
 
         <!-- Feed Items -->
@@ -2976,13 +2982,64 @@
             }).join('');
         }
 
+        let activeMainTab = 'all';
+
+        const MAIN_TAB_SUBTABS = {
+            'attendance': [
+                { key: 'attendance', label: 'Clock In/Out' },
+                { key: 'breaks', label: 'Breaks / Prayer' }
+            ],
+            'work': [
+                { key: 'leads', label: 'Leads' },
+                { key: 'activities', label: 'Activities' }
+            ]
+        };
+
+        // Maps feed filter keys to the main tab group they belong to
+        const FILTER_TO_MAIN = {
+            'attendance': 'attendance', 'breaks': 'attendance',
+            'leads': 'work', 'activities': 'work'
+        };
+
+        function switchMainTab(main) {
+            activeMainTab = main;
+            // Update main tab styles
+            document.querySelectorAll('.nb-main-tab').forEach(btn => {
+                const isActive = btn.dataset.main === main;
+                btn.style.color = isActive ? '#1B5E3B' : '#6b7280';
+                btn.style.fontWeight = isActive ? '700' : '600';
+                btn.style.borderBottomColor = isActive ? '#1B5E3B' : 'transparent';
+            });
+
+            const subContainer = document.getElementById('nbSubTabs');
+            const subtabs = MAIN_TAB_SUBTABS[main];
+
+            if (subtabs) {
+                // Show sub-tabs
+                const inner = subContainer.querySelector('div');
+                inner.innerHTML = subtabs.map((st, i) =>
+                    `<button class="nb-sub-tab${i === 0 ? ' active' : ''}" data-filter="${st.key}" onclick="filterFeed('${st.key}')" style="padding: 5px 12px; border-radius: 16px; border: 1px solid ${i === 0 ? '#1B5E3B' : '#e5e7eb'}; background: ${i === 0 ? '#f0fdf4' : 'white'}; color: ${i === 0 ? '#1B5E3B' : '#6b7280'}; font-size: 11px; font-weight: ${i === 0 ? '600' : '500'}; white-space: nowrap; cursor: pointer;">${st.label}</button>`
+                ).join('');
+                subContainer.style.display = 'block';
+                // Apply first sub-tab filter
+                feedFilter = subtabs[0].key;
+            } else {
+                // "All" tab — hide sub-tabs
+                subContainer.style.display = 'none';
+                feedFilter = 'all';
+            }
+            renderFeed();
+        }
+
         function filterFeed(filter) {
             feedFilter = filter;
-            document.querySelectorAll('.nb-tab').forEach(btn => {
+            // Update sub-tab styles
+            document.querySelectorAll('.nb-sub-tab').forEach(btn => {
                 const isActive = btn.dataset.filter === filter;
-                btn.style.background = isActive ? 'linear-gradient(135deg, #1B5E3B, #154D31)' : 'white';
-                btn.style.color = isActive ? 'white' : '#374151';
-                btn.classList.toggle('active', isActive);
+                btn.style.background = isActive ? '#f0fdf4' : 'white';
+                btn.style.color = isActive ? '#1B5E3B' : '#6b7280';
+                btn.style.borderColor = isActive ? '#1B5E3B' : '#e5e7eb';
+                btn.style.fontWeight = isActive ? '600' : '500';
             });
             renderFeed();
         }
@@ -3400,6 +3457,7 @@
         let currentActivity = null;
 
         const ACTIVITY_LABELS = {
+            'marketing': 'Marketing / Lead Work',
             'marketing_lead_work': 'Marketing / Lead Work',
             'outstanding_followup': 'Outstanding Follow-up',
             'material_arrangement': 'Material Arrangement',
@@ -3408,7 +3466,15 @@
             'shop_maintenance': 'Shop Maintenance'
         };
 
+        const ACTIVITY_REDIRECTS = {
+            'marketing': '/staff-leads.html',
+            'marketing_lead_work': '/staff-leads.html',
+            'outstanding_followup': '/staff/collections.html',
+            'material_receiving': '/staff/daily-tasks.html'
+        };
+
         const ACTIVITY_COLORS = {
+            'marketing': '#2563eb',
             'marketing_lead_work': '#2563eb',
             'outstanding_followup': '#d97706',
             'material_arrangement': '#7c3aed',
@@ -3442,6 +3508,22 @@
             document.getElementById('activitySelector').style.display = 'none';
             document.getElementById('activeActivityDisplay').style.display = 'block';
             document.getElementById('activeActivityLabel').textContent = ACTIVITY_LABELS[session.activity_type] || session.activity_type;
+
+            // Show/hide "Go to page" button
+            const goBtn = document.getElementById('activityGoBtn');
+            const redirect = ACTIVITY_REDIRECTS[session.activity_type];
+            if (redirect) {
+                const goLabels = {
+                    'marketing': 'Leads Page', 'marketing_lead_work': 'Leads Page',
+                    'outstanding_followup': 'Collections Page',
+                    'material_receiving': 'Daily Tasks'
+                };
+                goBtn.href = redirect;
+                document.getElementById('activityGoBtnText').textContent = goLabels[session.activity_type] || 'Go to Page';
+                goBtn.style.display = 'block';
+            } else {
+                goBtn.style.display = 'none';
+            }
 
             const startTime = new Date(session.started_at);
             document.getElementById('activeActivityStartTime').textContent = 'Started ' + startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
