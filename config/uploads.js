@@ -18,6 +18,7 @@ const uploadDirs = [
     'public/uploads/visualizations',
     'public/uploads/aadhar',
     'public/uploads/daily-tasks',
+    'public/uploads/activity',
     'public/uploads/website',
     'uploads/attendance/break',
     'uploads/stock-check',
@@ -134,6 +135,13 @@ const uploadPainterVisualization = multer({
     fileFilter: imageFilter
 });
 
+// Activity tracker photo upload (5MB, images only)
+const uploadActivity = multer({
+    storage: createDiskStorage('public/uploads/activity/', 'activity'),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: imageFilter
+});
+
 module.exports = {
     ensureUploadDirs,
     uploadLogo,
@@ -144,5 +152,6 @@ module.exports = {
     uploadOfferBanner,
     uploadTraining,
     uploadPainterAttendance,
-    uploadPainterVisualization
+    uploadPainterVisualization,
+    uploadActivity
 };
