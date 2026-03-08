@@ -16,9 +16,9 @@ function setNotificationService(ns) { notificationService = ns; }
 
 // ── Activity type configuration ──────────────────────────────────────────────
 const ACTIVITY_CONFIG = {
-    marketing:            { label: 'Marketing / Lead Work',        redirect: '/staff/leads.html',       icon: 'MKT', color: '#8b5cf6', dailyTaskSection: null },
+    marketing:            { label: 'Marketing / Lead Work',        redirect: null,                      icon: 'MKT', color: '#8b5cf6', dailyTaskSection: null },
     outstanding_followup: { label: 'Outstanding Follow-up',        redirect: '/staff/collections.html', icon: 'OUT', color: '#f59e0b', dailyTaskSection: 'outstanding' },
-    material_arrangement: { label: 'Material Arrangement',         redirect: '/staff/products.html',    icon: 'MAT', color: '#0891b2', dailyTaskSection: null },
+    material_arrangement: { label: 'Material Arrangement',         redirect: null,                      icon: 'MAT', color: '#0891b2', dailyTaskSection: null },
     material_receiving:   { label: 'Material Receiving & Billing', redirect: '/staff/daily-tasks.html', icon: 'RCV', color: '#059669', dailyTaskSection: 'material' },
     attending_customer:   { label: 'Attending Customer',           redirect: null,                      icon: 'CUS', color: '#6366f1', dailyTaskSection: 'sales' },
     shop_maintenance:     { label: 'Shop Maintenance',             redirect: null,                      icon: 'SHP', color: '#10b981', dailyTaskSection: 'morning' }
