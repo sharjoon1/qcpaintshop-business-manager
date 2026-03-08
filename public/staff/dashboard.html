@@ -904,6 +904,7 @@
             <button class="nb-tab" data-filter="attendance" onclick="filterFeed('attendance')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Attendance</button>
             <button class="nb-tab" data-filter="breaks" onclick="filterFeed('breaks')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Breaks</button>
             <button class="nb-tab" data-filter="leads" onclick="filterFeed('leads')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Leads</button>
+            <button class="nb-tab" data-filter="activities" onclick="filterFeed('activities')" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #e5e7eb; background: white; color: #374151; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;">Activities</button>
         </div>
 
         <!-- Feed Items -->
@@ -2882,7 +2883,8 @@
             prayer_start: 'breaks', prayer_end: 'breaks',
             lead_created: 'leads', lead_followup: 'leads',
             admin_notice: 'all', overtime: 'attendance',
-            task_completed: 'all', stock_check: 'all'
+            task_completed: 'all', stock_check: 'all',
+            activity_started: 'activities', activity_ended: 'activities'
         };
 
         const FEED_COLORS = {
@@ -2892,7 +2894,8 @@
             prayer_start: '#059669', prayer_end: '#059669',
             lead_created: '#8b5cf6', lead_followup: '#6366f1',
             admin_notice: '#dc2626', overtime: '#7c3aed',
-            task_completed: '#1B5E3B', stock_check: '#059669'
+            task_completed: '#1B5E3B', stock_check: '#059669',
+            activity_started: '#6366f1', activity_ended: '#10b981'
         };
 
         async function loadNoticeBoard() {

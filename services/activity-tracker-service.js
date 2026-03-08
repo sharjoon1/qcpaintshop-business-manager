@@ -72,8 +72,10 @@ async function startActivity(userId, branchId, activityType, metadata = {}) {
         [userId, branchId, activityType, JSON.stringify(meta)]
     );
 
-    // Log to activity feed
-    activityFeed.logActivity(userId, branchId, 'activity_started', `Started: ${config.label}`, null, 'all');
+    // Log to activity feed (include staff name)
+    const [userRow] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
+    const staffName = userRow[0]?.full_name || 'Staff';
+    activityFeed.logActivity(userId, branchId, 'activity_started', `${staffName} started: ${config.label}`, null, 'all');
 
     // Broadcast
     broadcast(userId, branchId, activityType, 'started');
@@ -135,12 +137,14 @@ async function stopActivity(userId, metadata = {}, photos = null) {
     // Auto-complete daily task if applicable
     await autoCompleteDailyTask(userId, session.activity_type, mergedMeta);
 
-    // Log to activity feed
+    // Log to activity feed (include staff name)
     const config = ACTIVITY_CONFIG[session.activity_type] || {};
+    const [stopUserRow] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
+    const stopStaffName = stopUserRow[0]?.full_name || 'Staff';
     activityFeed.logActivity(
         userId, session.branch_id,
         'activity_ended',
-        `Ended: ${config.label || session.activity_type} (${duration} min)`,
+        `${stopStaffName} completed: ${config.label || session.activity_type} (${duration} min)`,
         null, 'all'
     );
 
