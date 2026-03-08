@@ -767,6 +767,96 @@
         </div>
     </div>
 
+    <!-- Activity Tracker -->
+    <div class="status-card" id="activityTrackerCard" style="display:none;">
+        <!-- State A: Activity Selector -->
+        <div id="activitySelector">
+            <h3 style="font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 12px;">What are you going to do now?</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                <button onclick="startActivity('marketing_lead_work')" style="padding: 14px 8px; border: 2px solid #e5e7eb; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s;" onmouseover="this.style.borderColor='#15803d';this.style.background='#f0fdf4'" onmouseout="this.style.borderColor='#e5e7eb';this.style.background='white'">
+                    <div style="font-size: 22px; margin-bottom: 4px;">📣</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #374151;">Marketing / Lead Work</div>
+                </button>
+                <button onclick="startActivity('outstanding_followup')" style="padding: 14px 8px; border: 2px solid #e5e7eb; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s;" onmouseover="this.style.borderColor='#15803d';this.style.background='#f0fdf4'" onmouseout="this.style.borderColor='#e5e7eb';this.style.background='white'">
+                    <div style="font-size: 22px; margin-bottom: 4px;">💰</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #374151;">Outstanding Follow-up</div>
+                </button>
+                <button onclick="startActivity('material_arrangement')" style="padding: 14px 8px; border: 2px solid #e5e7eb; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s;" onmouseover="this.style.borderColor='#15803d';this.style.background='#f0fdf4'" onmouseout="this.style.borderColor='#e5e7eb';this.style.background='white'">
+                    <div style="font-size: 22px; margin-bottom: 4px;">📦</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #374151;">Material Arrangement</div>
+                </button>
+                <button onclick="startActivity('material_receiving')" style="padding: 14px 8px; border: 2px solid #e5e7eb; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s;" onmouseover="this.style.borderColor='#15803d';this.style.background='#f0fdf4'" onmouseout="this.style.borderColor='#e5e7eb';this.style.background='white'">
+                    <div style="font-size: 22px; margin-bottom: 4px;">🚚</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #374151;">Material Receiving</div>
+                </button>
+                <button onclick="promptAttendingCustomer()" style="padding: 14px 8px; border: 2px solid #e5e7eb; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s;" onmouseover="this.style.borderColor='#15803d';this.style.background='#f0fdf4'" onmouseout="this.style.borderColor='#e5e7eb';this.style.background='white'">
+                    <div style="font-size: 22px; margin-bottom: 4px;">🤝</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #374151;">Attending Customer</div>
+                </button>
+                <button onclick="startActivity('shop_maintenance')" style="padding: 14px 8px; border: 2px solid #e5e7eb; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s;" onmouseover="this.style.borderColor='#15803d';this.style.background='#f0fdf4'" onmouseout="this.style.borderColor='#e5e7eb';this.style.background='white'">
+                    <div style="font-size: 22px; margin-bottom: 4px;">🧹</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #374151;">Shop Maintenance</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- State B: Active Activity -->
+        <div id="activeActivityDisplay" style="display:none; background: linear-gradient(135deg, #1B5E3B 0%, #154D31 100%); border-radius: 12px; padding: 20px; color: white;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div>
+                    <div style="font-size: 12px; opacity: 0.8;">Currently doing</div>
+                    <div id="activeActivityLabel" style="font-size: 18px; font-weight: 700;"></div>
+                </div>
+                <div style="text-align: right;">
+                    <div id="activeActivityTimer" style="font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums;">00:00:00</div>
+                    <div id="activeActivityStartTime" style="font-size: 11px; opacity: 0.7;"></div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button onclick="switchActivity()" style="flex: 1; padding: 10px; border: 2px solid rgba(255,255,255,0.3); border-radius: 10px; background: rgba(255,255,255,0.1); color: white; font-weight: 600; font-size: 13px; cursor: pointer;">Switch Activity</button>
+                <button onclick="stopCurrentActivity()" style="padding: 10px 20px; border: none; border-radius: 10px; background: #ef4444; color: white; font-weight: 600; font-size: 13px; cursor: pointer;">Stop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Timeline -->
+    <div class="status-card" id="activityTimelineCard" style="display:none;">
+        <h3 style="font-size: 14px; font-weight: 600; color: #6b7280; margin-bottom: 10px;">Today's Activities</h3>
+        <div id="activityTimelineContent">
+            <p style="font-size: 13px; color: #9ca3af; text-align: center;">No activities yet</p>
+        </div>
+    </div>
+
+    <!-- Customer Note Modal -->
+    <div id="customerNoteModal" style="display:none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div style="background: white; border-radius: 16px; padding: 24px; margin: 16px; max-width: 400px; width: 100%;">
+            <h3 style="font-size: 18px; font-weight: 700; color: #1f2937; margin-bottom: 4px;">Attending Customer</h3>
+            <p style="font-size: 13px; color: #6b7280; margin-bottom: 16px;">Enter the customer name or note</p>
+            <input type="text" id="customerNoteInput" placeholder="e.g. Ravi Kumar - wall paint enquiry" style="width: 100%; padding: 12px 14px; border: 2px solid #d1d5db; border-radius: 10px; font-size: 14px; outline: none; box-sizing: border-box;" onfocus="this.style.borderColor='#1B5E3B'" onblur="this.style.borderColor='#d1d5db'">
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button onclick="closeCustomerModal()" style="flex: 1; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px; background: white; color: #374151; font-weight: 600; font-size: 14px; cursor: pointer;">Cancel</button>
+                <button onclick="confirmAttendingCustomer()" style="flex: 1; padding: 12px; border: none; border-radius: 10px; background: linear-gradient(135deg, #1B5E3B, #154D31); color: white; font-weight: 600; font-size: 14px; cursor: pointer;">Start</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Maintenance Photo Modal -->
+    <div id="maintenancePhotoModal" style="display:none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div style="background: white; border-radius: 16px; padding: 24px; margin: 16px; max-width: 400px; width: 100%;">
+            <h3 style="font-size: 18px; font-weight: 700; color: #1f2937; margin-bottom: 4px;">Maintenance Complete</h3>
+            <p style="font-size: 13px; color: #6b7280; margin-bottom: 16px;">Take a photo of the completed work</p>
+            <label style="display: block; padding: 20px; border: 2px dashed #d1d5db; border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.2s;" id="maintenancePhotoLabel">
+                <div style="font-size: 32px; margin-bottom: 8px;">📷</div>
+                <div style="font-size: 13px; color: #6b7280;" id="maintenancePhotoText">Tap to take photo</div>
+                <input type="file" id="maintenancePhotoInput" accept="image/*" capture="environment" style="display:none;" onchange="onMaintenancePhotoSelected(this)">
+            </label>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button onclick="closeMaintenanceModal()" style="flex: 1; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px; background: white; color: #374151; font-weight: 600; font-size: 14px; cursor: pointer;">Cancel</button>
+                <button onclick="confirmMaintenanceStop()" id="maintenanceCompleteBtn" disabled style="flex: 1; padding: 12px; border: none; border-radius: 10px; background: #d1d5db; color: white; font-weight: 600; font-size: 14px; cursor: not-allowed;">Complete</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Daily Tasks Status -->
     <div class="status-card" id="dailyTasksCard">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
@@ -1315,6 +1405,11 @@
             document.getElementById('clockedInState').style.display = 'none';
             document.getElementById('notClockedInState').style.display = 'none';
 
+            // Hide activity tracker
+            document.getElementById('activityTrackerCard').style.display = 'none';
+            document.getElementById('activityTimelineCard').style.display = 'none';
+            if (activityTimerInterval) { clearInterval(activityTimerInterval); activityTimerInterval = null; }
+
             // Determine re-clock-in section
             const expectedMinutes = parseFloat(data.expected_hours || 0) * 60;
             const hoursCompleted = (dayTotalMinutes || 0) >= expectedMinutes;
@@ -1522,6 +1617,9 @@
 
             // Show expected clock-out
             updateExpectedClockOut(data);
+
+            // Load activity tracker
+            loadCurrentActivity();
         }
 
         function updateBreakLeftDisplay() {
@@ -1845,6 +1943,7 @@
                         showToast(`Break ended! Duration: ${data.data.break_duration_minutes} minutes`, 'success');
                         setBreakActive(false);
                         breakStartTime = null;
+                        loadCurrentActivity();
                     } else {
                         setBreakActive(true);
                         breakStartTime = new Date().toISOString();
@@ -2195,6 +2294,7 @@
                     setOutsideWorkActive(false);
                     showToast(`Outside work ended (${data.data.duration_minutes}m). Geofence resumed.`, 'success');
                     loadTodayAttendance();
+                    loadCurrentActivity();
                 } else {
                     showToast(data.message || 'Failed to end outside work', 'error');
                 }
@@ -2335,6 +2435,7 @@
                     setPrayerActive(false);
                     showToast(`Prayer ended (${data.data.duration_minutes}m). Geofence resumed.`, 'success');
                     loadTodayAttendance();
+                    loadCurrentActivity();
                 } else {
                     showToast(data.message || 'Failed to end prayer', 'error');
                 }
@@ -3288,6 +3389,271 @@
 
         // Clean up on page unload
         window.addEventListener('beforeunload', stopGeoFenceMonitoring);
+
+        // ========================================
+        // ACTIVITY TRACKER
+        // ========================================
+        let activityTimerInterval = null;
+        let currentActivity = null;
+
+        const ACTIVITY_LABELS = {
+            'marketing_lead_work': 'Marketing / Lead Work',
+            'outstanding_followup': 'Outstanding Follow-up',
+            'material_arrangement': 'Material Arrangement',
+            'material_receiving': 'Material Receiving',
+            'attending_customer': 'Attending Customer',
+            'shop_maintenance': 'Shop Maintenance'
+        };
+
+        const ACTIVITY_COLORS = {
+            'marketing_lead_work': '#2563eb',
+            'outstanding_followup': '#d97706',
+            'material_arrangement': '#7c3aed',
+            'material_receiving': '#0891b2',
+            'attending_customer': '#059669',
+            'shop_maintenance': '#dc2626'
+        };
+
+        async function loadCurrentActivity() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/activity-tracker/current', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                if (data.success && data.session) {
+                    currentActivity = data.session;
+                    showActiveActivity(data.session);
+                } else {
+                    currentActivity = null;
+                    showActivitySelector();
+                }
+                document.getElementById('activityTrackerCard').style.display = 'block';
+                loadActivityTimeline();
+            } catch (err) {
+                console.error('Failed to load activity:', err);
+            }
+        }
+
+        function showActiveActivity(session) {
+            document.getElementById('activitySelector').style.display = 'none';
+            document.getElementById('activeActivityDisplay').style.display = 'block';
+            document.getElementById('activeActivityLabel').textContent = ACTIVITY_LABELS[session.activity_type] || session.activity_type;
+
+            const startTime = new Date(session.started_at);
+            document.getElementById('activeActivityStartTime').textContent = 'Started ' + startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+            if (activityTimerInterval) clearInterval(activityTimerInterval);
+            function updateTimer() {
+                const now = Date.now();
+                const elapsed = Math.floor((now - startTime.getTime()) / 1000);
+                const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+                const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+                const s = String(elapsed % 60).padStart(2, '0');
+                document.getElementById('activeActivityTimer').textContent = h + ':' + m + ':' + s;
+            }
+            updateTimer();
+            activityTimerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function showActivitySelector() {
+            document.getElementById('activitySelector').style.display = 'block';
+            document.getElementById('activeActivityDisplay').style.display = 'none';
+            if (activityTimerInterval) {
+                clearInterval(activityTimerInterval);
+                activityTimerInterval = null;
+            }
+        }
+
+        function switchActivity() {
+            showActivitySelector();
+        }
+
+        async function startActivity(type, metadata) {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const body = { activity_type: type };
+                if (metadata) body.metadata = metadata;
+
+                const res = await fetch('/api/activity-tracker/start', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentActivity = data.session;
+                    showActiveActivity(data.session);
+                    loadActivityTimeline();
+                    showToast('Activity started: ' + (ACTIVITY_LABELS[type] || type), 'success');
+
+                    // If server says redirect (e.g. leads page for marketing)
+                    if (data.redirect) {
+                        setTimeout(() => { window.location.href = data.redirect; }, 300);
+                    }
+                } else {
+                    showToast(data.message || 'Failed to start activity', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Please try again.', 'error');
+            }
+        }
+
+        function promptAttendingCustomer() {
+            const modal = document.getElementById('customerNoteModal');
+            modal.style.display = 'flex';
+            document.getElementById('customerNoteInput').value = '';
+            setTimeout(() => document.getElementById('customerNoteInput').focus(), 100);
+        }
+
+        function closeCustomerModal() {
+            document.getElementById('customerNoteModal').style.display = 'none';
+        }
+
+        function confirmAttendingCustomer() {
+            const note = document.getElementById('customerNoteInput').value.trim();
+            if (!note) {
+                showToast('Please enter a customer name or note', 'error');
+                return;
+            }
+            closeCustomerModal();
+            startActivity('attending_customer', { customer_note: note });
+        }
+
+        async function stopCurrentActivity() {
+            if (currentActivity && currentActivity.activity_type === 'shop_maintenance') {
+                // Show photo modal for maintenance
+                const modal = document.getElementById('maintenancePhotoModal');
+                modal.style.display = 'flex';
+                document.getElementById('maintenancePhotoInput').value = '';
+                document.getElementById('maintenancePhotoText').textContent = 'Tap to take photo';
+                document.getElementById('maintenancePhotoLabel').style.borderColor = '#d1d5db';
+                const btn = document.getElementById('maintenanceCompleteBtn');
+                btn.disabled = true;
+                btn.style.background = '#d1d5db';
+                btn.style.cursor = 'not-allowed';
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/activity-tracker/stop', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentActivity = null;
+                    showActivitySelector();
+                    loadActivityTimeline();
+                    const mins = data.session && data.session.duration_minutes ? data.session.duration_minutes : 0;
+                    showToast('Activity stopped (' + mins + ' min)', 'success');
+                } else {
+                    showToast(data.message || 'Failed to stop activity', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Please try again.', 'error');
+            }
+        }
+
+        function onMaintenancePhotoSelected(input) {
+            if (input.files && input.files[0]) {
+                document.getElementById('maintenancePhotoText').textContent = input.files[0].name;
+                document.getElementById('maintenancePhotoLabel').style.borderColor = '#1B5E3B';
+                const btn = document.getElementById('maintenanceCompleteBtn');
+                btn.disabled = false;
+                btn.style.background = 'linear-gradient(135deg, #1B5E3B, #154D31)';
+                btn.style.cursor = 'pointer';
+            }
+        }
+
+        function closeMaintenanceModal() {
+            document.getElementById('maintenancePhotoModal').style.display = 'none';
+        }
+
+        async function confirmMaintenanceStop() {
+            const fileInput = document.getElementById('maintenancePhotoInput');
+            if (!fileInput.files || !fileInput.files[0]) {
+                showToast('Please take a photo first', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('maintenanceCompleteBtn');
+            btn.disabled = true;
+            btn.textContent = 'Uploading...';
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const formData = new FormData();
+                formData.append('photo', fileInput.files[0]);
+
+                const res = await fetch('/api/activity-tracker/stop-with-photo', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeMaintenanceModal();
+                    currentActivity = null;
+                    showActivitySelector();
+                    loadActivityTimeline();
+                    const mins = data.session && data.session.duration_minutes ? data.session.duration_minutes : 0;
+                    showToast('Maintenance completed (' + mins + ' min)', 'success');
+                } else {
+                    showToast(data.message || 'Failed to complete', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Please try again.', 'error');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Complete';
+        }
+
+        async function loadActivityTimeline() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/activity-tracker/today', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                const container = document.getElementById('activityTimelineContent');
+                const card = document.getElementById('activityTimelineCard');
+
+                if (data.success && data.sessions && data.sessions.length > 0) {
+                    card.style.display = 'block';
+                    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                    data.sessions.forEach(s => {
+                        const startT = new Date(s.started_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                        const endT = s.ended_at ? new Date(s.ended_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'now';
+                        const label = ACTIVITY_LABELS[s.activity_type] || s.activity_type;
+                        const color = ACTIVITY_COLORS[s.activity_type] || '#6b7280';
+                        const dur = s.duration_minutes ? s.duration_minutes + 'm' : 'ongoing';
+                        const isActive = !s.ended_at;
+                        let meta = '';
+                        if (s.metadata) {
+                            try {
+                                const m = typeof s.metadata === 'string' ? JSON.parse(s.metadata) : s.metadata;
+                                if (m.customer_note) meta = '<div style="font-size:11px;color:#9ca3af;margin-top:2px;">' + m.customer_note + '</div>';
+                            } catch(e) {}
+                        }
+
+                        html += '<div style="display: flex; align-items: flex-start; gap: 10px; padding: 8px 0;' + (isActive ? 'opacity:1' : 'opacity:0.8') + '">';
+                        html += '<div style="font-size: 11px; color: #9ca3af; min-width: 52px; text-align: right; padding-top: 2px;">' + startT + '</div>';
+                        html += '<div style="width: 10px; height: 10px; border-radius: 50%; background: ' + color + '; margin-top: 4px; flex-shrink: 0;' + (isActive ? 'box-shadow: 0 0 0 3px ' + color + '33;' : '') + '"></div>';
+                        html += '<div style="flex:1;"><div style="font-size: 13px; font-weight: 600; color: #374151;">' + label + ' <span style="font-weight:400;color:#9ca3af;font-size:12px;">(' + dur + ')</span></div>' + meta + '</div>';
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    card.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Failed to load activity timeline:', err);
+            }
+        }
 
         // Init on load
         init();
