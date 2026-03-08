@@ -30,9 +30,9 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 /**
  * Send notification to a user
  * @param {number} userId
- * @param {Object} opts - { type, title, body, data }
+ * @param {Object} opts - { type, title, body, data, ttlSeconds }
  */
-async function send(userId, { type, title, body, data }) {
+async function send(userId, { type, title, body, data, ttlSeconds }) {
     try {
         // 1. Insert into DB
         const [result] = await pool.query(
@@ -49,7 +49,7 @@ async function send(userId, { type, title, body, data }) {
         }
 
         // 3. Send push notifications (async, don't block)
-        sendPushNotifications(userId, { type, title, body, data }).catch(err => {
+        sendPushNotifications(userId, { type, title, body, data, ttlSeconds }).catch(err => {
             console.error(`Push notification error for user ${userId}:`, err.message);
         });
 
@@ -79,7 +79,7 @@ async function sendToMany(userIds, opts) {
 /**
  * Send push notifications (Web Push + FCM)
  */
-async function sendPushNotifications(userId, { type, title, body, data }) {
+async function sendPushNotifications(userId, { type, title, body, data, ttlSeconds }) {
     const [subscriptions] = await pool.query(
         'SELECT * FROM push_subscriptions WHERE user_id = ?',
         [userId]
@@ -88,12 +88,13 @@ async function sendPushNotifications(userId, { type, title, body, data }) {
     for (const sub of subscriptions) {
         try {
             if (sub.type === 'web' && sub.endpoint) {
-                await sendWebPush(sub, { type: type || 'notification', title, body, data });
+                await sendWebPush(sub, { type: type || 'notification', title, body, data, ttlSeconds });
             } else if (sub.type === 'fcm' && sub.fcm_token) {
                 const result = await fcmAdmin.sendToDevice(sub.fcm_token, {
                     title,
                     body,
-                    data: { type: type || 'notification', ...(data || {}) }
+                    data: { type: type || 'notification', ...(data || {}) },
+                    ttlSeconds
                 });
                 if (result.invalidToken) {
                     await pool.query('DELETE FROM push_subscriptions WHERE id = ?', [sub.id]);
@@ -113,7 +114,7 @@ async function sendPushNotifications(userId, { type, title, body, data }) {
 /**
  * Send Web Push notification
  */
-async function sendWebPush(subscription, { type, title, body, data }) {
+async function sendWebPush(subscription, { type, title, body, data, ttlSeconds }) {
     if (!process.env.VAPID_PUBLIC_KEY) return;
 
     const pushSubscription = {
@@ -132,7 +133,7 @@ async function sendWebPush(subscription, { type, title, body, data }) {
         data: { type: type || 'notification', ...(data || {}) }
     });
 
-    await webPush.sendNotification(pushSubscription, payload, { TTL: 86400 });
+    await webPush.sendNotification(pushSubscription, payload, { TTL: ttlSeconds || 86400 });
 }
 
 module.exports = { setPool, setIO, send, sendToMany };

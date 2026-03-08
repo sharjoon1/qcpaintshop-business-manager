@@ -48,9 +48,10 @@ let initialized = false;
  * @param {string} opts.title - Notification title
  * @param {string} opts.body - Notification body
  * @param {Object} [opts.data] - Custom data payload (all values must be strings)
+ * @param {number} [opts.ttlSeconds] - Time-to-live in seconds (0 = immediate delivery only, omit = no expiry)
  * @returns {Promise<{ success: boolean, messageId?: string, invalidToken?: boolean }>}
  */
-async function sendToDevice(fcmToken, { title, body, data }) {
+async function sendToDevice(fcmToken, { title, body, data, ttlSeconds }) {
     if (!initialized) return { success: false };
 
     // FCM data values must all be strings
@@ -67,6 +68,7 @@ async function sendToDevice(fcmToken, { title, body, data }) {
         data: stringData,
         android: {
             priority: 'high',
+            ...(ttlSeconds !== undefined ? { ttl: ttlSeconds * 1000 } : {}),
             notification: {
                 channelId: 'qc_notifications',
                 sound: 'default'

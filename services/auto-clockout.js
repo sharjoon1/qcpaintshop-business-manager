@@ -127,6 +127,18 @@ async function autoClockoutForOTTimeout(record, now) {
             });
         }
 
+        // FCM push to staff
+        try {
+            await notificationService.send(record.user_id, {
+                type: 'ot_timeout_clockout',
+                title: 'Auto Clock-Out (OT Timeout)',
+                body: `You were automatically clocked out — no response to overtime prompt within ${record.ot_auto_timeout_minutes || 15} minutes.`,
+                data: { type: 'ot_timeout_clockout', attendance_id: String(record.id) }
+            });
+        } catch (notifErr) {
+            console.error(`[OT-Timeout] Staff FCM error for ${record.full_name}:`, notifErr.message);
+        }
+
         // Notify admins
         try {
             const [admins] = await pool.query(
@@ -273,13 +285,79 @@ async function checkGeoWarnings() {
 }
 
 /**
+ * Auto-close stale attendance records from previous days that were never clocked out.
+ * Runs once per cycle alongside checkOvertimePrompts.
+ */
+async function cleanupStaleAttendance() {
+    if (!pool) return;
+
+    try {
+        const today = getTodayIST();
+        const now = new Date();
+
+        // Find open records from BEFORE today
+        const [staleRecords] = await pool.query(
+            `SELECT a.id, a.user_id, a.date, a.clock_in_time, a.branch_id,
+                    a.break_duration_minutes, a.expected_hours,
+                    u.full_name
+             FROM staff_attendance a
+             JOIN users u ON a.user_id = u.id
+             WHERE a.date < ? AND a.clock_out_time IS NULL`,
+            [today]
+        );
+
+        for (const record of staleRecords) {
+            try {
+                const clockIn = new Date(record.clock_in_time);
+                // Clock out at the end of that day (10 PM IST)
+                const recordDate = new Date(record.date);
+                const clockOutTime = new Date(recordDate.getTime() + (22 * 60 + 0) * 60 * 1000); // 10 PM on that date
+                // If clock-in was after 10 PM, just add 10 hours
+                const finalClockOut = clockOutTime > clockIn ? clockOutTime : new Date(clockIn.getTime() + 10 * 60 * 60 * 1000);
+
+                const elapsedMinutes = (finalClockOut - clockIn) / 1000 / 60;
+                const breakMinutes = record.break_duration_minutes || 0;
+                const workingMinutes = Math.round(elapsedMinutes - breakMinutes);
+                const expectedMinutes = (record.expected_hours || 10) * 60;
+                const overtimeMinutes = Math.max(0, workingMinutes - expectedMinutes);
+
+                await endActivePeriods(record, finalClockOut);
+
+                await pool.query(
+                    `UPDATE staff_attendance
+                     SET clock_out_time = ?, total_working_minutes = ?,
+                         overtime_minutes = ?, auto_clockout_type = 'end_of_day',
+                         is_early_checkout = 0,
+                         notes = CONCAT(COALESCE(notes, ''), '\n[System cleanup: stale record auto-closed]')
+                     WHERE id = ?`,
+                    [finalClockOut, workingMinutes, overtimeMinutes, record.id]
+                );
+
+                console.log(`[Cleanup] Closed stale attendance: ${record.full_name} from ${record.date} (${workingMinutes}min)`);
+            } catch (err) {
+                console.error(`[Cleanup] Error closing stale record ${record.id}:`, err.message);
+            }
+        }
+
+        if (staleRecords.length > 0) {
+            console.log(`[Cleanup] Closed ${staleRecords.length} stale attendance records`);
+        }
+    } catch (error) {
+        console.error('[Cleanup] Stale attendance check error:', error.message);
+    }
+}
+
+/**
  * Check for staff who exceeded expected hours.
- * - Emit prompt ONCE (set ot_prompt_shown_at)
+ * - Emit prompt ONCE (set ot_prompt_shown_at) + send FCM push notification
  * - Auto-clock-out if timeout exceeded
  * Runs every 5 minutes.
  */
 async function checkOvertimePrompts() {
     if (!pool) return;
+
+    // First clean up any stale records from previous days
+    await cleanupStaleAttendance();
 
     try {
         const now = new Date();
@@ -331,9 +409,14 @@ async function checkOvertimePrompts() {
                     [now, record.id]
                 );
 
+                const workedHours = Math.floor(workingMinutes / 60);
+                const workedMins = Math.round(workingMinutes % 60);
+                const workedStr = workedMins > 0 ? `${workedHours}h ${workedMins}m` : `${workedHours}h`;
+
+                // Socket.io for real-time (if app is open)
                 if (io) {
                     io.to(`user_${record.user_id}`).emit('overtime_prompt', {
-                        message: `You have completed ${record.expected_hours || 10} hours. Request overtime or clock out?`,
+                        message: `You have completed ${workedStr}. Request overtime or clock out?`,
                         working_minutes: Math.round(workingMinutes),
                         expected_minutes: expectedMinutes,
                         attendance_id: record.id,
@@ -341,7 +424,31 @@ async function checkOvertimePrompts() {
                     });
                 }
 
-                console.log(`[Overtime] Prompt sent to ${record.full_name} (timeout: ${record.ot_auto_timeout_minutes}min)`);
+                // FCM push notification (reaches even if app is backgrounded/closed)
+                // TTL: expire at 10 PM IST (end of day) so notification auto-clears
+                const nowIST = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+                const endOfDayIST = new Date(nowIST);
+                endOfDayIST.setHours(22, 0, 0, 0);
+                const ttlSeconds = Math.max(60, Math.floor((endOfDayIST - nowIST) / 1000));
+
+                try {
+                    await notificationService.send(record.user_id, {
+                        type: 'overtime_alert',
+                        title: 'Working Hours Completed',
+                        body: `You have worked ${workedStr}. Please request overtime or clock out within ${record.ot_auto_timeout_minutes} minutes.`,
+                        ttlSeconds,
+                        data: {
+                            type: 'overtime_alert',
+                            attendance_id: String(record.id),
+                            working_minutes: String(Math.round(workingMinutes)),
+                            timeout_minutes: String(record.ot_auto_timeout_minutes)
+                        }
+                    });
+                } catch (notifErr) {
+                    console.error(`[Overtime] FCM notification error for ${record.full_name}:`, notifErr.message);
+                }
+
+                console.log(`[Overtime] Prompt + FCM sent to ${record.full_name} (${workedStr}, timeout: ${record.ot_auto_timeout_minutes}min)`);
             }
         }
     } catch (error) {
@@ -436,6 +543,18 @@ async function forceClockoutAll() {
                     });
                 }
 
+                // FCM push notification for force clock-out
+                try {
+                    await notificationService.send(record.user_id, {
+                        type: 'force_clockout',
+                        title: 'Auto Clock-Out (10 PM)',
+                        body: `You have been automatically clocked out. Worked: ${Math.floor(workingMinutes / 60)}h ${workingMinutes % 60}m` + (overtimeMinutes > 0 ? `, OT: ${overtimeMinutes}m` : ''),
+                        data: { type: 'force_clockout', attendance_id: String(record.id) }
+                    });
+                } catch (notifErr) {
+                    console.error(`[Auto-clockout] FCM error for ${record.full_name}:`, notifErr.message);
+                }
+
                 console.log(`[Auto-clockout] 10PM: ${record.full_name} - ${workingMinutes}min worked, ${overtimeMinutes}min OT, ${otApprovedMinutes}min approved`);
             } catch (err) {
                 console.error(`[Auto-clockout] Error clocking out ${record.full_name}:`, err.message);
@@ -483,4 +602,4 @@ function start() {
     console.log('[Auto-clockout] 10 PM IST force clock-out cron scheduled');
 }
 
-module.exports = { setPool, setIO, setAutomationRegistry, start, checkOvertimePrompts, checkGeoWarnings, forceClockoutAll, endActivePeriods };
+module.exports = { setPool, setIO, setAutomationRegistry, start, checkOvertimePrompts, checkGeoWarnings, forceClockoutAll, endActivePeriods, cleanupStaleAttendance };
