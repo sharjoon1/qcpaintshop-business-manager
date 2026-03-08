@@ -81,6 +81,8 @@ const staffDailyWorkRoutes = require('./routes/staff-daily-work');
 const staffTaskGenerator = require('./services/staff-task-generator');
 const activityFeedRoutes = require('./routes/activity-feed');
 const activityFeed = require('./services/activity-feed');
+const activityTrackerService = require('./services/activity-tracker-service');
+const activityTrackerRoutes = require('./routes/activity-tracker');
 const fcmAdmin = require('./services/fcm-admin');
 const monitoringRoutes = require('./routes/monitoring');
 
@@ -228,6 +230,11 @@ staffDailyWorkRoutes.setPool(pool);
 staffTaskGenerator.setPool(pool);
 activityFeedRoutes.setPool(pool);
 activityFeed.setPool(pool);
+activityTrackerService.setPool(pool);
+activityTrackerService.setNotificationService(notificationService);
+activityTrackerRoutes.setPool(pool);
+activityTrackerRoutes.setActivityService(activityTrackerService);
+activityTrackerRoutes.setNotificationService(notificationService);
 monitoringRoutes.setPool(pool);
 monitoringRoutes.setAutomationRegistry(automationRegistry);
 monitoringRoutes.setResponseTracker(responseTracker);
@@ -257,6 +264,7 @@ app.use('/api/tasks', tasksRoutes.router);
 app.use('/api/zoho', zohoRoutes.router);
 app.use('/api/staff-registration', staffRegistrationRoutes.router);
 app.use('/api/daily-tasks', dailyTasksRoutes.router);
+app.use('/api/activity-tracker', activityTrackerRoutes.router);
 app.use('/api/chat', chatRoutes.router);
 app.use('/api/notifications', notificationRoutes.router);
 app.use('/api/estimates', estimatePdfRoutes.router);
@@ -3526,6 +3534,8 @@ leadAutoAssignScheduler.setIO(io);
 productionMonitor.setIO(io);
 activityFeedRoutes.setIO(io);
 activityFeed.setIO(io);
+activityTrackerService.setIO(io);
+activityTrackerRoutes.setIO(io);
 productionMonitor.setSessionManager(whatsappSessionManager);
 painterNotificationService.setDependencies(pool, io);
 
@@ -3829,6 +3839,13 @@ server.listen(PORT, () => {
             }
         } catch (err) {
             console.error('[Geo Cron] Error:', err.message);
+        }
+
+        // Activity tracker idle detection
+        try {
+            await activityTrackerService.checkIdleStaff();
+        } catch (err) {
+            console.error('[ActivityTracker Cron] Idle check error:', err.message);
         }
     }, 60 * 1000); // every 60 seconds
     console.log('[Geo Cron] Geofence enforcement cron started (every 60s)');
