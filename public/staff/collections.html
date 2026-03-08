@@ -464,6 +464,7 @@ async function loadCustomers(page, append) {
 
         list.innerHTML = custData.map(c => {
             const daysStr = c.oldest_due_date ? Math.max(0, Math.floor((Date.now() - new Date(c.oldest_due_date)) / 86400000)) : 0;
+            const unusedCredits = parseFloat(c.unused_credits || 0);
             return `
             <div class="list-item">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -471,9 +472,11 @@ async function loadCustomers(page, append) {
                         <div class="name">${esc(c.customer_name || 'Unknown')}</div>
                         <div class="meta">${esc(c.phone || 'No phone')} · ${c.invoice_count} invoices</div>
                         ${c.overdue_count > 0 ? `<div class="overdue">${c.overdue_count} overdue · ${fmtFull(c.overdue_amount)}</div>` : ''}
+                        ${unusedCredits > 0 ? `<div style="font-size:0.7rem;color:#0891b2;font-weight:600;margin-top:2px;">Unadjusted Credit: ${fmtFull(unusedCredits)}</div>` : ''}
                     </div>
                     <div style="text-align:right">
                         <div class="amount">${fmtFull(c.total_outstanding)}</div>
+                        ${unusedCredits > 0 ? `<div style="font-size:0.65rem;color:#0891b2;margin-top:2px;">Net: ${fmtFull(c.total_outstanding - unusedCredits)}</div>` : ''}
                         ${c.overdue_amount > 0 ? '<span class="badge badge-overdue">Overdue</span>' : '<span class="badge badge-ok">Current</span>'}
                     </div>
                 </div>
