@@ -3472,7 +3472,7 @@
         async function startActivity(type, metadata) {
             try {
                 const token = localStorage.getItem('auth_token');
-                const body = { activity_type: type };
+                const body = { type: type };
                 if (metadata) body.metadata = metadata;
 
                 const res = await fetch('/api/activity-tracker/start', {
@@ -3482,8 +3482,9 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    currentActivity = data.session;
-                    showActiveActivity(data.session);
+                    const session = { activity_type: type, started_at: data.startedAt || new Date().toISOString(), sessionId: data.sessionId };
+                    currentActivity = session;
+                    showActiveActivity(session);
                     loadActivityTimeline();
                     showToast('Activity started: ' + (ACTIVITY_LABELS[type] || type), 'success');
 
@@ -3492,7 +3493,7 @@
                         setTimeout(() => { window.location.href = data.redirect; }, 300);
                     }
                 } else {
-                    showToast(data.message || 'Failed to start activity', 'error');
+                    showToast(data.error || data.message || 'Failed to start activity', 'error');
                 }
             } catch (err) {
                 showToast('Network error. Please try again.', 'error');
