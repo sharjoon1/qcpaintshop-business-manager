@@ -16,7 +16,7 @@ function setNotificationService(ns) { notificationService = ns; }
 
 // ── Activity type configuration ──────────────────────────────────────────────
 const ACTIVITY_CONFIG = {
-    marketing:            { label: 'Marketing / Lead Work',        redirect: null,                      icon: 'MKT', color: '#8b5cf6', dailyTaskSection: null },
+    marketing:            { label: 'Marketing / Lead Work',        redirect: '/staff-leads.html',        icon: 'MKT', color: '#8b5cf6', dailyTaskSection: 'marketing' },
     outstanding_followup: { label: 'Outstanding Follow-up',        redirect: '/staff/collections.html', icon: 'OUT', color: '#f59e0b', dailyTaskSection: 'outstanding' },
     material_arrangement: { label: 'Material Arrangement',         redirect: null,                      icon: 'MAT', color: '#0891b2', dailyTaskSection: null },
     material_receiving:   { label: 'Material Receiving & Billing', redirect: '/staff/daily-tasks.html', icon: 'RCV', color: '#059669', dailyTaskSection: 'material' },
@@ -301,7 +301,6 @@ async function autoCompleteDailyTask(userId, activityType, metadata = {}) {
     const meta = parseMeta(metadata);
 
     // Condition checks per activity type
-    if (activityType === 'marketing' && (!meta.calls_made || meta.calls_made <= 0)) return;
     if (activityType === 'outstanding_followup' && (!meta.amount_collected || meta.amount_collected <= 0)) return;
     if (activityType === 'shop_maintenance' && (!meta.photos || meta.photos.length === 0)) return;
 
