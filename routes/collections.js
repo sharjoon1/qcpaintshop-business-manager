@@ -54,11 +54,10 @@ router.get('/summary', perm, async (req, res) => {
     try {
         const branchId = getBranchFilter(req);
 
-        const branchJoin = branchId ? 'LEFT JOIN zoho_customers_map zcm ON zi.zoho_customer_id = zcm.zoho_contact_id' : '';
-        const branchWhere = branchId ? 'AND (zcm.branch_id = ? OR zcm.branch_id IS NULL)' : '';
+        const branchWhere = branchId ? 'AND zi.local_branch_id = ?' : '';
         const branchParams = branchId ? [branchId] : [];
 
-        // Outstanding & overdue totals
+        // Outstanding & overdue totals (filtered by invoice branch)
         const [totals] = await pool.query(`
             SELECT
                 COALESCE(SUM(zi.balance), 0) as total_outstanding,
@@ -67,18 +66,18 @@ router.get('/summary', perm, async (req, res) => {
                 COUNT(CASE WHEN zi.balance > 0 THEN 1 END) as outstanding_count,
                 COALESCE(AVG(CASE WHEN zi.due_date < CURDATE() AND zi.balance > 0 THEN DATEDIFF(CURDATE(), zi.due_date) END), 0) as avg_days_overdue
             FROM zoho_invoices zi
-            ${branchJoin}
             WHERE zi.balance > 0 AND zi.status NOT IN ('void', 'draft')
             ${branchWhere}
         `, branchParams);
 
-        // Collection rate (30 days)
+        // Collection rate (30 days) — payments don't have branch, use customer mapping
+        const paymentBranchWhere = branchId ? 'AND (zcm.branch_id = ? OR zcm.branch_id IS NULL)' : '';
         const [collected30d] = await pool.query(`
             SELECT COALESCE(SUM(zp.amount), 0) as collected
             FROM zoho_payments zp
             ${branchId ? 'LEFT JOIN zoho_customers_map zcm ON zp.zoho_customer_id = zcm.zoho_contact_id' : ''}
             WHERE zp.payment_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-            ${branchWhere}
+            ${paymentBranchWhere}
         `, branchParams);
 
         // Reminders sent today
@@ -144,7 +143,7 @@ router.get('/customers', perm, async (req, res) => {
         const params = [];
 
         if (branchId) {
-            where += ' AND (zcm.branch_id = ? OR zcm.branch_id IS NULL)';
+            where += ' AND zi.local_branch_id = ?';
             params.push(branchId);
         }
 
@@ -218,7 +217,7 @@ router.get('/invoices', perm, async (req, res) => {
         const params = [];
 
         if (branchId) {
-            where += ' AND (zcm.branch_id = ? OR zcm.branch_id IS NULL)';
+            where += ' AND zi.local_branch_id = ?';
             params.push(branchId);
         }
 
@@ -647,7 +646,7 @@ router.get('/export', perm, async (req, res) => {
         const params = [];
 
         if (branchId) {
-            where += ' AND zcm.branch_id = ?';
+            where += ' AND zi.local_branch_id = ?';
             params.push(branchId);
         }
 

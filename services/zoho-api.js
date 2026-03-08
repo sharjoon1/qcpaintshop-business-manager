@@ -303,19 +303,33 @@ async function syncInvoices(triggeredBy = null) {
                         [inv.customer_id]
                     );
 
+                    // Resolve local branch from Zoho location_id
+                    let localBranchId = null;
+                    const zohoLocationId = inv.branch_id || inv.location_id || null;
+                    if (zohoLocationId) {
+                        const [locMap] = await pool.query(
+                            'SELECT local_branch_id FROM zoho_locations_map WHERE zoho_location_id = ? LIMIT 1',
+                            [zohoLocationId]
+                        );
+                        if (locMap.length > 0) localBranchId = locMap[0].local_branch_id;
+                    }
+
                     await pool.query(`
                         INSERT INTO zoho_invoices (
                             zoho_invoice_id, zoho_customer_id, local_customer_id,
                             invoice_number, reference_number, invoice_date, due_date,
                             currency_code, sub_total, tax_total, total, balance,
-                            status, customer_name, created_time, last_modified_time, last_synced_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                            status, customer_name, zoho_location_id, local_branch_id,
+                            created_time, last_modified_time, last_synced_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                         ON DUPLICATE KEY UPDATE
                             balance = VALUES(balance),
                             status = VALUES(status),
                             sub_total = VALUES(sub_total),
                             tax_total = VALUES(tax_total),
                             total = VALUES(total),
+                            zoho_location_id = VALUES(zoho_location_id),
+                            local_branch_id = VALUES(local_branch_id),
                             last_modified_time = VALUES(last_modified_time),
                             last_synced_at = NOW(),
                             updated_at = CURRENT_TIMESTAMP
@@ -328,6 +342,7 @@ async function syncInvoices(triggeredBy = null) {
                         inv.sub_total || 0, inv.tax_total || 0,
                         inv.total || 0, inv.balance || 0,
                         mapZohoStatus(inv.status), inv.customer_name,
+                        zohoLocationId, localBranchId,
                         toMySQLDatetime(inv.created_time), toMySQLDatetime(inv.last_modified_time)
                     ]);
                     totalSynced++;
