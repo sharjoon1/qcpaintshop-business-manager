@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <title>Staff Activity Monitor - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <style>
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #f1f5f9; }
+
+        /* Live indicator pulse */
+        .live-dot {
+            width: 10px; height: 10px; border-radius: 50%; background: #10b981;
+            display: inline-block; margin-right: 6px; position: relative;
+        }
+        .live-dot::after {
+            content: ''; position: absolute; top: -3px; left: -3px;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: rgba(16, 185, 129, 0.3);
+            animation: pulse-ring 2s ease-out infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+
+        /* Summary cards */
+        .summary-card {
+            background: white; border-radius: 12px; padding: 16px 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
+            text-align: center; transition: box-shadow 0.2s;
+        }
+        .summary-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .summary-value { font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1.2; }
+        .summary-label { font-size: 12px; color: #64748b; font-weight: 500; margin-top: 2px; }
+
+        /* Staff cards grid */
+        .staff-grid {
+            display: grid; gap: 16px;
+            grid-template-columns: repeat(3, 1fr);
+        }
+        @media (max-width: 1024px) { .staff-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 640px) { .staff-grid { grid-template-columns: 1fr; } }
+
+        .staff-card {
+            background: white; border-radius: 12px; padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
+            cursor: pointer; transition: all 0.2s; border-left: 4px solid transparent;
+        }
+        .staff-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+        .staff-card.active { border-left-color: #10b981; }
+        .staff-card.idle { border-left-color: #f59e0b; }
+        .staff-card.on-break { border-left-color: #3b82f6; }
+
+        /* Badges */
+        .badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .badge-green { background: #d1fae5; color: #065f46; }
+        .badge-amber { background: #fef3c7; color: #92400e; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        .badge-gray { background: #f1f5f9; color: #475569; }
+
+        /* Reminder button */
+        .btn-reminder {
+            padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+            border: 1px solid #f59e0b; background: #fffbeb; color: #92400e;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .btn-reminder:hover { background: #fef3c7; }
+        .btn-reminder:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Primary button */
+        .btn-primary {
+            padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            border: none; background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Summary table */
+        .summary-table { width: 100%; border-collapse: collapse; }
+        .summary-table th {
+            padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;
+            background: #f8fafc; border-bottom: 2px solid #e2e8f0;
+        }
+        .summary-table td {
+            padding: 10px 12px; font-size: 13px; color: #334155;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .summary-table tr:hover td { background: #f8fafc; }
+        .summary-table .total-row td { font-weight: 700; background: #f8fafc; border-top: 2px solid #e2e8f0; }
+
+        /* Timeline slideout */
+        .slideout-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            z-index: 1000; transition: opacity 0.3s;
+        }
+        .slideout-overlay.active { display: block; }
+        .slideout-panel {
+            position: fixed; top: 0; right: -480px; width: 480px; max-width: 100vw;
+            height: 100vh; background: white; z-index: 1001;
+            box-shadow: -4px 0 20px rgba(0,0,0,0.1); transition: right 0.3s ease;
+            display: flex; flex-direction: column;
+        }
+        .slideout-panel.active { right: 0; }
+        .slideout-header {
+            padding: 20px; border-bottom: 1px solid #e2e8f0;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .slideout-body { flex: 1; overflow-y: auto; padding: 20px; min-height: 0; }
+
+        /* Timeline entries */
+        .timeline-entry {
+            display: flex; gap: 12px; padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .timeline-entry:last-child { border-bottom: none; }
+        .timeline-dot {
+            width: 36px; height: 36px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0;
+        }
+        .timeline-dot.active { background: #d1fae5; }
+        .timeline-dot.completed { background: #f1f5f9; }
+
+        /* Filter row */
+        .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .filter-select, .filter-input {
+            padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;
+            font-size: 13px; color: #334155; background: white; outline: none;
+        }
+        .filter-select:focus, .filter-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+
+        /* Section header */
+        .section-header {
+            font-size: 16px; font-weight: 700; color: #0f172a;
+            margin: 24px 0 12px; display: flex; align-items: center; gap: 8px;
+        }
+
+        /* Loading skeleton */
+        .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 48px 20px; color: #94a3b8; }
+        .empty-state svg { width: 48px; height: 48px; margin: 0 auto 12px; opacity: 0.5; }
+
+        /* Summary cards grid */
+        .summary-grid {
+            display: grid; gap: 12px;
+            grid-template-columns: repeat(4, 1fr);
+        }
+        @media (max-width: 1024px) { .summary-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 640px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        /* Refresh spin */
+        .refresh-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Elapsed time */
+        .elapsed { font-size: 12px; color: #64748b; font-weight: 500; }
+    </style>
+    <script src="/universal-nav-loader.js"></script>
+</head>
+<body data-page="attendance">
+
+<div style="max-width: 1400px; margin: 0 auto; padding: 16px;">
+
+    <!-- Header -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <h1 style="font-size: 24px; font-weight: 700; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 10px;">
+                Staff Activity Monitor
+                <span id="liveDot" class="live-dot" title="Live updates active"></span>
+                <span style="font-size: 12px; color: #10b981; font-weight: 500;">LIVE</span>
+            </h1>
+            <p style="font-size: 13px; color: #64748b; margin: 4px 0 0;" id="lastUpdated">Loading...</p>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <label style="font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 4px;">
+                <input type="checkbox" id="autoRefresh" checked style="accent-color: #667eea;">
+                Auto (30s)
+            </label>
+            <button onclick="refreshAll()" class="btn-primary" id="refreshBtn">
+                <svg id="refreshIcon" style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid" id="summaryCards">
+        <div class="summary-card"><div class="skeleton" style="height:60px;"></div></div>
+        <div class="summary-card"><div class="skeleton" style="height:60px;"></div></div>
+        <div class="summary-card"><div class="skeleton" style="height:60px;"></div></div>
+        <div class="summary-card"><div class="skeleton" style="height:60px;"></div></div>
+    </div>
+
+    <!-- Activity Type Counts -->
+    <div class="summary-grid" id="activityTypeCounts" style="margin-top: 12px;">
+    </div>
+
+    <!-- Staff Cards Section -->
+    <div class="section-header" style="margin-top: 24px;">
+        <svg style="width:20px;height:20px;" fill="none" stroke="#0f172a" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Active Staff
+        <span id="activeCount" class="badge badge-green" style="font-size:12px;">0</span>
+    </div>
+    <div class="staff-grid" id="activeStaffGrid">
+        <div class="summary-card"><div class="skeleton" style="height:80px;"></div></div>
+        <div class="summary-card"><div class="skeleton" style="height:80px;"></div></div>
+        <div class="summary-card"><div class="skeleton" style="height:80px;"></div></div>
+    </div>
+
+    <!-- Idle Staff Section -->
+    <div class="section-header">
+        <svg style="width:20px;height:20px;" fill="none" stroke="#f59e0b" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Idle Staff
+        <span id="idleCount" class="badge badge-amber" style="font-size:12px;">0</span>
+    </div>
+    <div class="staff-grid" id="idleStaffGrid">
+        <div class="summary-card"><div class="skeleton" style="height:80px;"></div></div>
+    </div>
+
+    <!-- On Break Section -->
+    <div class="section-header">
+        <svg style="width:20px;height:20px;" fill="none" stroke="#3b82f6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        On Break
+        <span id="breakCount" class="badge badge-blue" style="font-size:12px;">0</span>
+    </div>
+    <div class="staff-grid" id="breakStaffGrid">
+    </div>
+
+    <!-- Day Summary Section -->
+    <div style="margin-top: 32px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; overflow: hidden;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <h2 style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0;">Day Summary</h2>
+            <div class="filter-row">
+                <input type="date" id="summaryDate" class="filter-input" />
+                <select id="summaryBranch" class="filter-select">
+                    <option value="">All Branches</option>
+                </select>
+                <button onclick="loadDaySummary()" class="btn-primary" style="padding: 8px 14px; font-size: 12px;">Load</button>
+            </div>
+        </div>
+        <div id="summaryTableContainer" style="overflow-x: auto; padding: 0;">
+            <div class="empty-state">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <p style="font-size: 14px; font-weight: 500;">Select a date and click Load to see the summary</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Timeline Slideout -->
+<div class="slideout-overlay" id="slideoutOverlay" onclick="closeSlideout()"></div>
+<div class="slideout-panel" id="slideoutPanel">
+    <div class="slideout-header">
+        <div>
+            <h3 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0;" id="slideoutTitle">Staff Timeline</h3>
+            <p style="font-size: 12px; color: #64748b; margin: 4px 0 0;" id="slideoutSubtitle"></p>
+        </div>
+        <button onclick="closeSlideout()" style="background: none; border: none; cursor: pointer; padding: 4px; color: #94a3b8;">
+            <svg style="width:24px;height:24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+    <div class="slideout-body" id="slideoutBody">
+        <div class="empty-state"><p>Loading timeline...</p></div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ── Activity type definitions ──
+const ACTIVITY_ICONS = {
+    marketing:              { emoji: '\uD83D\uDCE2', label: 'Marketing',        color: '#8b5cf6', bg: '#ede9fe' },
+    outstanding_followup:   { emoji: '\uD83D\uDCB0', label: 'Outstanding',      color: '#f59e0b', bg: '#fef3c7' },
+    material_arrangement:   { emoji: '\uD83D\uDCE6', label: 'Material Arrange', color: '#3b82f6', bg: '#dbeafe' },
+    material_receiving:     { emoji: '\uD83D\uDE9B', label: 'Material Receiving',color: '#06b6d4', bg: '#cffafe' },
+    attending_customer:     { emoji: '\uD83E\uDD1D', label: 'Customer',         color: '#10b981', bg: '#d1fae5' },
+    shop_maintenance:       { emoji: '\uD83E\uDDF9', label: 'Maintenance',      color: '#64748b', bg: '#f1f5f9' }
+};
+
+const ACTIVITY_KEYS = Object.keys(ACTIVITY_ICONS);
+
+let refreshInterval = null;
+let liveData = null;
+
+// ── Helpers ──
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatMinutes(m) {
+    if (!m && m !== 0) return '-';
+    m = Math.round(m);
+    if (m < 60) return m + 'm';
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return h + 'h ' + (rm > 0 ? rm + 'm' : '');
+}
+
+function elapsedSince(dateStr) {
+    if (!dateStr) return '';
+    const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    if (diff < 1) return 'just now';
+    if (diff < 60) return diff + 'm ago';
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    return h + 'h ' + m + 'm';
+}
+
+function elapsedMinutes(dateStr) {
+    if (!dateStr) return 0;
+    return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+}
+
+function timeStr(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function todayISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// ── Initialize ──
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('summaryDate').value = todayISO();
+    loadBranches();
+    loadLiveData();
+    loadDaySummary();
+    startAutoRefresh();
+});
+
+// ── Auto-refresh ──
+function startAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(function() {
+        if (document.getElementById('autoRefresh').checked) {
+            loadLiveData();
+        }
+    }, 30000);
+}
+
+function refreshAll() {
+    const icon = document.getElementById('refreshIcon');
+    icon.classList.add('refresh-spin');
+    loadLiveData().finally(function() {
+        setTimeout(function() { icon.classList.remove('refresh-spin'); }, 500);
+    });
+    loadDaySummary();
+}
+
+// ── Load branches ──
+async function loadBranches() {
+    try {
+        const res = await fetch('/api/branches', { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const sel = document.getElementById('summaryBranch');
+        const branches = data.branches || data || [];
+        branches.forEach(function(b) {
+            const opt = document.createElement('option');
+            opt.value = b.id;
+            opt.textContent = b.name || b.branch_name || ('Branch ' + b.id);
+            sel.appendChild(opt);
+        });
+    } catch (e) { console.error('Failed to load branches:', e); }
+}
+
+// ── Load live data ──
+async function loadLiveData() {
+    try {
+        const res = await fetch('/api/activity-tracker/admin/live', { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        liveData = data;
+        renderSummaryCards(data);
+        renderStaffCards(data);
+        document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    } catch (e) {
+        console.error('Failed to load live data:', e);
+        document.getElementById('lastUpdated').textContent = 'Failed to load - ' + e.message;
+    }
+}
+
+// ── Render summary cards ──
+function renderSummaryCards(data) {
+    const activeStaff = (data.active_staff || []);
+    const idleStaff = (data.idle_staff || []);
+    const breakStaff = (data.on_break_staff || []);
+
+    const activeCount = activeStaff.length;
+    const idleCount = idleStaff.length;
+    const breakCount = breakStaff.length;
+
+    // Count per activity type
+    const typeCounts = {};
+    ACTIVITY_KEYS.forEach(function(k) { typeCounts[k] = 0; });
+    activeStaff.forEach(function(s) {
+        const t = s.activity_type || s.current_activity;
+        if (t && typeCounts[t] !== undefined) typeCounts[t]++;
+    });
+
+    // Main summary cards
+    document.getElementById('summaryCards').innerHTML =
+        renderSummaryCard('Active', activeCount, '#10b981', '#d1fae5') +
+        renderSummaryCard('Idle', idleCount, '#f59e0b', '#fef3c7') +
+        renderSummaryCard('On Break', breakCount, '#3b82f6', '#dbeafe') +
+        renderSummaryCard('Total Tracked', activeCount + idleCount + breakCount, '#667eea', '#eef2ff');
+
+    // Activity type cards
+    let typeHtml = '';
+    ACTIVITY_KEYS.forEach(function(k) {
+        const info = ACTIVITY_ICONS[k];
+        typeHtml += '<div class="summary-card" style="display:flex;align-items:center;gap:10px;text-align:left;">' +
+            '<span style="font-size:20px;">' + info.emoji + '</span>' +
+            '<div>' +
+                '<div style="font-size:20px;font-weight:700;color:' + info.color + ';">' + typeCounts[k] + '</div>' +
+                '<div class="summary-label">' + escapeHtml(info.label) + '</div>' +
+            '</div></div>';
+    });
+    document.getElementById('activityTypeCounts').innerHTML = typeHtml;
+}
+
+function renderSummaryCard(label, value, color, bg) {
+    return '<div class="summary-card">' +
+        '<div style="width:36px;height:36px;border-radius:10px;background:' + bg + ';display:flex;align-items:center;justify-content:center;margin:0 auto 8px;">' +
+            '<div style="width:12px;height:12px;border-radius:50%;background:' + color + ';"></div>' +
+        '</div>' +
+        '<div class="summary-value" style="color:' + color + ';">' + value + '</div>' +
+        '<div class="summary-label">' + escapeHtml(label) + '</div>' +
+    '</div>';
+}
+
+// ── Render staff cards ──
+function renderStaffCards(data) {
+    const activeStaff = data.active_staff || [];
+    const idleStaff = data.idle_staff || [];
+    const breakStaff = data.on_break_staff || [];
+
+    // Active cards
+    document.getElementById('activeCount').textContent = activeStaff.length;
+    if (activeStaff.length === 0) {
+        document.getElementById('activeStaffGrid').innerHTML =
+            '<div class="empty-state" style="grid-column:1/-1;padding:24px;"><p>No active staff right now</p></div>';
+    } else {
+        document.getElementById('activeStaffGrid').innerHTML = activeStaff.map(function(s) {
+            const type = s.activity_type || s.current_activity || 'unknown';
+            const info = ACTIVITY_ICONS[type] || { emoji: '\u2753', label: type, color: '#64748b', bg: '#f1f5f9' };
+            const elapsed = elapsedSince(s.started_at || s.activity_started_at);
+            return '<div class="staff-card active" onclick="viewStaffTimeline(' + s.user_id + ', \'' + escapeHtml((s.full_name || s.name || '').replace(/'/g, "\\'")) + '\')">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+                    '<div>' +
+                        '<div style="font-size:14px;font-weight:600;color:#0f172a;">' + escapeHtml(s.full_name || s.name) + '</div>' +
+                        '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">' + escapeHtml(s.branch_name || '') + '</div>' +
+                    '</div>' +
+                    '<span class="badge badge-green">Active</span>' +
+                '</div>' +
+                '<div style="margin-top:12px;display:flex;align-items:center;gap:8px;">' +
+                    '<span style="font-size:20px;">' + info.emoji + '</span>' +
+                    '<div>' +
+                        '<div style="font-size:13px;font-weight:600;color:' + info.color + ';">' + escapeHtml(info.label) + '</div>' +
+                        '<div class="elapsed">' + elapsed + '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // Idle cards
+    document.getElementById('idleCount').textContent = idleStaff.length;
+    if (idleStaff.length === 0) {
+        document.getElementById('idleStaffGrid').innerHTML =
+            '<div class="empty-state" style="grid-column:1/-1;padding:24px;"><p>No idle staff</p></div>';
+    } else {
+        document.getElementById('idleStaffGrid').innerHTML = idleStaff.map(function(s) {
+            const idleMins = s.idle_minutes || elapsedMinutes(s.last_activity_end || s.idle_since);
+            return '<div class="staff-card idle" onclick="viewStaffTimeline(' + s.user_id + ', \'' + escapeHtml((s.full_name || s.name || '').replace(/'/g, "\\'")) + '\')">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+                    '<div>' +
+                        '<div style="font-size:14px;font-weight:600;color:#0f172a;">' + escapeHtml(s.full_name || s.name) + '</div>' +
+                        '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">' + escapeHtml(s.branch_name || '') + '</div>' +
+                    '</div>' +
+                    '<span class="badge badge-amber">IDLE ' + formatMinutes(idleMins) + '</span>' +
+                '</div>' +
+                '<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;">' +
+                    '<div class="elapsed">Last active: ' + (s.last_activity_end ? elapsedSince(s.last_activity_end) : 'N/A') + '</div>' +
+                    '<button class="btn-reminder" onclick="event.stopPropagation(); sendReminder(' + s.user_id + ', this)">Send Reminder</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // Break cards
+    document.getElementById('breakCount').textContent = breakStaff.length;
+    if (breakStaff.length === 0) {
+        document.getElementById('breakStaffGrid').innerHTML =
+            '<div class="empty-state" style="grid-column:1/-1;padding:24px;"><p>No staff on break</p></div>';
+    } else {
+        document.getElementById('breakStaffGrid').innerHTML = breakStaff.map(function(s) {
+            const elapsed = elapsedSince(s.break_started_at || s.started_at);
+            return '<div class="staff-card on-break" onclick="viewStaffTimeline(' + s.user_id + ', \'' + escapeHtml((s.full_name || s.name || '').replace(/'/g, "\\'")) + '\')">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+                    '<div>' +
+                        '<div style="font-size:14px;font-weight:600;color:#0f172a;">' + escapeHtml(s.full_name || s.name) + '</div>' +
+                        '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">' + escapeHtml(s.branch_name || '') + '</div>' +
+                    '</div>' +
+                    '<span class="badge badge-blue">Break ' + elapsed + '</span>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+}
+
+// ── Send Reminder ──
+async function sendReminder(userId, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+    try {
+        const res = await fetch('/api/activity-tracker/admin/send-reminder/' + userId, {
+            method: 'POST',
+            headers: getAuthHeaders()
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(function() { return {}; });
+            throw new Error(err.error || 'Failed');
+        }
+        if (btn) { btn.textContent = 'Sent!'; btn.style.background = '#d1fae5'; btn.style.color = '#065f46'; btn.style.borderColor = '#10b981'; }
+        setTimeout(function() {
+            if (btn) { btn.textContent = 'Send Reminder'; btn.disabled = false; btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; }
+        }, 3000);
+    } catch (e) {
+        alert('Failed to send reminder: ' + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = 'Send Reminder'; }
+    }
+}
+
+// ── Day Summary ──
+async function loadDaySummary() {
+    const date = document.getElementById('summaryDate').value;
+    const branch = document.getElementById('summaryBranch').value;
+    if (!date) return;
+
+    const container = document.getElementById('summaryTableContainer');
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;">Loading summary...</div>';
+
+    try {
+        let url = '/api/activity-tracker/admin/summary?date=' + date;
+        if (branch) url += '&branch_id=' + branch;
+        const res = await fetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        renderDaySummary(data);
+    } catch (e) {
+        console.error('Failed to load summary:', e);
+        container.innerHTML = '<div class="empty-state"><p>Failed to load summary: ' + escapeHtml(e.message) + '</p></div>';
+    }
+}
+
+function renderDaySummary(data) {
+    const container = document.getElementById('summaryTableContainer');
+    const staffSummaries = data.staff_summaries || data.summaries || data || [];
+
+    if (!Array.isArray(staffSummaries) || staffSummaries.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No activity data for this date</p></div>';
+        return;
+    }
+
+    // Build totals
+    const totals = {};
+    ACTIVITY_KEYS.forEach(function(k) { totals[k] = 0; });
+    let grandTotal = 0;
+
+    let rows = staffSummaries.map(function(s) {
+        let rowTotal = 0;
+        let cells = '';
+        ACTIVITY_KEYS.forEach(function(k) {
+            const mins = s[k] || (s.activities && s.activities[k]) || 0;
+            totals[k] += mins;
+            rowTotal += mins;
+            cells += '<td style="text-align:center;">' + (mins > 0 ? formatMinutes(mins) : '<span style="color:#cbd5e1;">-</span>') + '</td>';
+        });
+        grandTotal += rowTotal;
+        return '<tr>' +
+            '<td style="font-weight:600;">' + escapeHtml(s.full_name || s.name || s.staff_name) + '</td>' +
+            cells +
+            '<td style="text-align:center;font-weight:700;">' + formatMinutes(rowTotal) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    // Totals row
+    let totalCells = '';
+    ACTIVITY_KEYS.forEach(function(k) {
+        totalCells += '<td style="text-align:center;">' + (totals[k] > 0 ? formatMinutes(totals[k]) : '-') + '</td>';
+    });
+
+    const html = '<table class="summary-table">' +
+        '<thead><tr>' +
+            '<th>Staff Name</th>' +
+            ACTIVITY_KEYS.map(function(k) { return '<th style="text-align:center;">' + ACTIVITY_ICONS[k].emoji + ' ' + escapeHtml(ACTIVITY_ICONS[k].label) + '</th>'; }).join('') +
+            '<th style="text-align:center;">Total</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows +
+        '<tr class="total-row"><td>TOTAL</td>' + totalCells + '<td style="text-align:center;">' + formatMinutes(grandTotal) + '</td></tr>' +
+        '</tbody></table>';
+
+    container.innerHTML = html;
+}
+
+// ── Staff Timeline Slideout ──
+async function viewStaffTimeline(userId, name) {
+    document.getElementById('slideoutOverlay').classList.add('active');
+    document.getElementById('slideoutPanel').classList.add('active');
+    document.getElementById('slideoutTitle').textContent = escapeHtml(name) + '\'s Timeline';
+    document.getElementById('slideoutSubtitle').textContent = 'Today - ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+    document.getElementById('slideoutBody').innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;">Loading timeline...</div>';
+
+    try {
+        const res = await fetch('/api/activity-tracker/admin/staff/' + userId + '/timeline', { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        renderTimeline(data);
+    } catch (e) {
+        document.getElementById('slideoutBody').innerHTML = '<div class="empty-state"><p>Failed to load timeline: ' + escapeHtml(e.message) + '</p></div>';
+    }
+}
+
+function renderTimeline(data) {
+    const entries = data.timeline || data.entries || data || [];
+    const body = document.getElementById('slideoutBody');
+
+    if (!Array.isArray(entries) || entries.length === 0) {
+        body.innerHTML = '<div class="empty-state"><p>No activity entries for today</p></div>';
+        return;
+    }
+
+    // Summary at top
+    const totalMins = entries.reduce(function(acc, e) { return acc + (e.duration_minutes || 0); }, 0);
+    let summaryHtml = '<div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:16px;">' +
+        '<div style="font-size:12px;color:#64748b;font-weight:500;">Total Activity Time</div>' +
+        '<div style="font-size:22px;font-weight:700;color:#0f172a;">' + formatMinutes(totalMins) + '</div>' +
+        '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">';
+
+    // Per-type breakdown
+    const typeBreakdown = {};
+    entries.forEach(function(e) {
+        const t = e.activity_type;
+        if (!typeBreakdown[t]) typeBreakdown[t] = 0;
+        typeBreakdown[t] += (e.duration_minutes || 0);
+    });
+    Object.keys(typeBreakdown).forEach(function(t) {
+        const info = ACTIVITY_ICONS[t] || { emoji: '\u2753', label: t, bg: '#f1f5f9', color: '#64748b' };
+        summaryHtml += '<span style="background:' + info.bg + ';color:' + info.color + ';padding:3px 8px;border-radius:8px;font-size:11px;font-weight:600;">' +
+            info.emoji + ' ' + escapeHtml(info.label) + ': ' + formatMinutes(typeBreakdown[t]) + '</span>';
+    });
+    summaryHtml += '</div></div>';
+
+    // Timeline entries
+    let timelineHtml = entries.map(function(e) {
+        const info = ACTIVITY_ICONS[e.activity_type] || { emoji: '\u2753', label: e.activity_type, bg: '#f1f5f9', color: '#64748b' };
+        const isActive = !e.ended_at;
+        const duration = e.duration_minutes ? formatMinutes(e.duration_minutes) : (isActive ? 'In progress' : '-');
+
+        return '<div class="timeline-entry">' +
+            '<div class="timeline-dot ' + (isActive ? 'active' : 'completed') + '">' + info.emoji + '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<div style="font-size:13px;font-weight:600;color:' + info.color + ';">' + escapeHtml(info.label) + '</div>' +
+                    '<div style="font-size:11px;color:#94a3b8;">' + duration + '</div>' +
+                '</div>' +
+                '<div style="font-size:12px;color:#64748b;margin-top:2px;">' +
+                    timeStr(e.started_at) + (e.ended_at ? ' - ' + timeStr(e.ended_at) : ' - ongoing') +
+                '</div>' +
+                (e.notes ? '<div style="font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic;">' + escapeHtml(e.notes) + '</div>' : '') +
+            '</div>' +
+        '</div>';
+    }).join('');
+
+    body.innerHTML = summaryHtml + timelineHtml;
+}
+
+function closeSlideout() {
+    document.getElementById('slideoutOverlay').classList.remove('active');
+    document.getElementById('slideoutPanel').classList.remove('active');
+}
+
+// Close on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeSlideout();
+});
+
+// ── Socket.io live updates ──
+try {
+    const socket = io({ auth: { token: localStorage.getItem('auth_token') } });
+    socket.on('connect', function() {
+        console.log('Activity monitor socket connected');
+    });
+    socket.on('activity_tracker_update', function(data) {
+        loadLiveData();
+    });
+    socket.on('activity_tracker_idle', function(data) {
+        loadLiveData();
+    });
+} catch (e) {
+    console.warn('Socket.io not available:', e);
+}
+</script>
+</body>
+</html>
