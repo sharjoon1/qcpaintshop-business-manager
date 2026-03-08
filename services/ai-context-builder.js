@@ -498,19 +498,61 @@ async function buildInventoryContext() {
             ORDER BY (zoho_stock_on_hand / zoho_reorder_level) ASC LIMIT 20
         `);
 
-        // Recent stock check results
+        // Recent stock check results — detailed per-branch breakdown
         let recentChecks = [];
+        let branchCheckSummary = [];
         try {
             const [sc] = await pool.query(`
                 SELECT sca.status, COUNT(*) as count,
-                       SUM(CASE WHEN sca.status = 'completed' THEN 1 ELSE 0 END) as completed,
                        MAX(sca.updated_at) as last_check
                 FROM stock_check_assignments sca
-                WHERE sca.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                WHERE sca.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                 GROUP BY sca.status
             `);
             recentChecks = sc;
+
+            // Per-branch assignment summary with staff details
+            const [branchSc] = await pool.query(`
+                SELECT b.name as branch_name, b.id as branch_id,
+                       u.full_name as staff_name, sca.status,
+                       COUNT(DISTINCT sca.id) as assignment_count,
+                       SUM((SELECT COUNT(*) FROM stock_check_items sci WHERE sci.assignment_id = sca.id)) as item_count
+                FROM stock_check_assignments sca
+                JOIN branches b ON sca.branch_id = b.id
+                JOIN users u ON sca.staff_id = u.id
+                WHERE sca.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                GROUP BY b.id, b.name, u.full_name, sca.status
+                ORDER BY b.id, u.full_name, sca.status
+            `);
+            branchCheckSummary = branchSc;
         } catch (e) { /* table may not exist */ }
+
+        // Staff-branch mapping for assignments
+        let staffBranches = [];
+        try {
+            const [sb] = await pool.query(`
+                SELECT u.id, u.full_name, u.branch_id, b.name as branch_name
+                FROM users u
+                JOIN branches b ON u.branch_id = b.id
+                WHERE u.status = 'active' AND u.role IN ('staff', 'sales_staff', 'branch_manager')
+                ORDER BY b.id, u.full_name
+            `);
+            staffBranches = sb;
+        } catch (e) { /* ignore */ }
+
+        // Items per branch location (total and adjusted counts)
+        let branchItemCounts = [];
+        try {
+            const [bic] = await pool.query(`
+                SELECT b.id as branch_id, b.name as branch_name,
+                       (SELECT COUNT(*) FROM zoho_location_stock zls WHERE zls.zoho_location_id = b.zoho_location_id) as total_items,
+                       (SELECT COUNT(DISTINCT sci.zoho_item_id) FROM stock_check_items sci
+                        JOIN stock_check_assignments sca ON sci.assignment_id = sca.id
+                        WHERE sca.branch_id = b.id AND sca.status = 'adjusted') as adjusted_items
+                FROM branches b WHERE b.status = 'active' AND b.zoho_location_id IS NOT NULL
+            `);
+            branchItemCounts = bic;
+        } catch (e) { /* ignore */ }
 
         let text = '## Inventory Report\n';
 
@@ -531,8 +573,29 @@ async function buildInventoryContext() {
         }
 
         if (recentChecks.length) {
-            text += '\n**Recent Stock Checks (last 7 days):**\n';
+            text += '\n**Stock Check Assignments (last 30 days):**\n';
             recentChecks.forEach(c => { text += `- ${c.status}: ${c.count} assignments\n`; });
+        }
+
+        if (branchItemCounts.length) {
+            text += '\n**Branch Stock Check Progress:**\n';
+            branchItemCounts.forEach(b => {
+                const remaining = b.total_items - (b.adjusted_items || 0);
+                const pct = b.total_items > 0 ? Math.round((b.adjusted_items || 0) / b.total_items * 100) : 0;
+                text += `- ${b.branch_name}: ${b.adjusted_items || 0}/${b.total_items} adjusted (${pct}%), ${remaining} remaining\n`;
+            });
+        }
+
+        if (branchCheckSummary.length) {
+            text += '\n**Current Assignments Detail:**\n';
+            branchCheckSummary.forEach(s => {
+                text += `- ${s.branch_name} → ${s.staff_name}: ${s.assignment_count} assignments (${s.status}), ${s.item_count} items\n`;
+            });
+        }
+
+        if (staffBranches.length) {
+            text += '\n**Staff-Branch Mapping (for assignments):**\n';
+            staffBranches.forEach(s => { text += `- ${s.full_name} (id:${s.id}) → ${s.branch_name} (branch_id:${s.branch_id})\n`; });
         }
 
         return text;
