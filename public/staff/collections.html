@@ -23,6 +23,13 @@
         }
 
         /* Hamburger button used in header banner */
+
+        /* Sort bar */
+        .sort-bar { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 4px; -webkit-overflow-scrolling: touch; }
+        .sort-bar::-webkit-scrollbar { display: none; }
+        .sort-label { font-size: 0.7rem; color: rgba(255,255,255,0.7); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+        .sort-pill { padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); font-size: 0.7rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.2s; }
+        .sort-pill.active { background: rgba(255,255,255,0.95); color: #1B5E3B; border-color: transparent; }
         .hamburger { background: rgba(255,255,255,0.2); border: none; color: white; width: 40px; height: 40px; border-radius: 10px; font-size: 1.25rem; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 
         .container { max-width: 600px; margin: 0 auto; padding: 0 16px 24px; }
@@ -250,6 +257,14 @@
     <!-- ====== CUSTOMERS TAB ====== -->
     <div id="tab-customers" style="display:none">
         <input type="text" class="search-input" id="custSearchInput" placeholder="Search customer or phone..." onkeydown="if(event.key==='Enter')loadCustomers()">
+        <!-- Sort bar -->
+        <div class="sort-bar" id="custSortBar">
+            <span class="sort-label">Sort:</span>
+            <button class="sort-pill active" data-sort="total_outstanding" data-order="desc" onclick="setCustSort(this)">Amount ↓</button>
+            <button class="sort-pill" data-sort="oldest_due_date" data-order="asc" onclick="setCustSort(this)">Oldest Due</button>
+            <button class="sort-pill" data-sort="overdue_amount" data-order="desc" onclick="setCustSort(this)">Overdue ↓</button>
+            <button class="sort-pill" data-sort="customer_name" data-order="asc" onclick="setCustSort(this)">Name A-Z</button>
+        </div>
         <div class="card" id="custList">
             <div class="empty-state"><div class="icon">👥</div>Loading...</div>
         </div>
@@ -261,6 +276,15 @@
     <!-- ====== INVOICES TAB ====== -->
     <div id="tab-invoices" style="display:none">
         <input type="text" class="search-input" id="invSearchInput" placeholder="Search invoice # or customer..." onkeydown="if(event.key==='Enter')loadInvoices()">
+        <!-- Sort bar -->
+        <div class="sort-bar" id="invSortBar">
+            <span class="sort-label">Sort:</span>
+            <button class="sort-pill active" data-sort="balance" data-order="desc" onclick="setInvSort(this)">Amount ↓</button>
+            <button class="sort-pill" data-sort="days_overdue" data-order="desc" onclick="setInvSort(this)">Most Overdue</button>
+            <button class="sort-pill" data-sort="due_date" data-order="asc" onclick="setInvSort(this)">Due Date</button>
+            <button class="sort-pill" data-sort="invoice_date" data-order="desc" onclick="setInvSort(this)">Newest</button>
+            <button class="sort-pill" data-sort="customer_name" data-order="asc" onclick="setInvSort(this)">Name A-Z</button>
+        </div>
         <div class="card" id="invList">
             <div class="empty-state"><div class="icon">📄</div>Loading...</div>
         </div>
@@ -367,6 +391,24 @@
 const API = '/api/zoho/collections';
 let custPage = 1, invPage = 1;
 let custData = [], invData = [];
+let custSort = 'total_outstanding', custOrder = 'desc';
+let invSort = 'balance', invOrder = 'desc';
+
+function setCustSort(btn) {
+    custSort = btn.dataset.sort;
+    custOrder = btn.dataset.order;
+    document.querySelectorAll('#custSortBar .sort-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadCustomers();
+}
+
+function setInvSort(btn) {
+    invSort = btn.dataset.sort;
+    invOrder = btn.dataset.order;
+    document.querySelectorAll('#invSortBar .sort-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadInvoices();
+}
 
 // ========================================
 // HELPERS
@@ -467,7 +509,7 @@ async function loadSummary() {
 async function loadCustomers(page, append) {
     custPage = page || 1;
     const search = document.getElementById('custSearchInput').value;
-    const params = new URLSearchParams({ search, sort: 'total_outstanding', order: 'desc', page: custPage, limit: 20 });
+    const params = new URLSearchParams({ search, sort: custSort, order: custOrder, page: custPage, limit: 20 });
 
     try {
         const { data, pagination } = await apiJson(API + '/customers?' + params);
@@ -521,7 +563,7 @@ async function loadCustomers(page, append) {
 async function loadInvoices(page, append) {
     invPage = page || 1;
     const search = document.getElementById('invSearchInput').value;
-    const params = new URLSearchParams({ search, sort: 'balance', order: 'desc', page: invPage, limit: 20 });
+    const params = new URLSearchParams({ search, sort: invSort, order: invOrder, page: invPage, limit: 20 });
 
     try {
         const { data, pagination } = await apiJson(API + '/invoices?' + params);
