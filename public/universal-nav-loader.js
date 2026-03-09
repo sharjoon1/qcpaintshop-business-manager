@@ -81,6 +81,7 @@
         'bug-reports': CONFIG.SYSTEM_SUBNAV_PATH,
         'anomalies': CONFIG.SYSTEM_SUBNAV_PATH,
         'monitoring': CONFIG.SYSTEM_SUBNAV_PATH,
+        'photos': CONFIG.SYSTEM_SUBNAV_PATH,
         // Painters
         'painters': CONFIG.PAINTERS_SUBNAV_PATH,
         'painter-points': CONFIG.PAINTERS_SUBNAV_PATH,

@@ -85,6 +85,7 @@ const activityTrackerService = require('./services/activity-tracker-service');
 const activityTrackerRoutes = require('./routes/activity-tracker');
 const fcmAdmin = require('./services/fcm-admin');
 const monitoringRoutes = require('./routes/monitoring');
+const photosRoutes = require('./routes/photos');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (nginx/aaPanel)
@@ -237,6 +238,7 @@ activityTrackerRoutes.setPool(pool);
 activityTrackerRoutes.setActivityService(activityTrackerService);
 activityTrackerRoutes.setNotificationService(notificationService);
 monitoringRoutes.setPool(pool);
+photosRoutes.setPool(pool);
 monitoringRoutes.setAutomationRegistry(automationRegistry);
 monitoringRoutes.setResponseTracker(responseTracker);
 monitoringRoutes.setProductionMonitor(productionMonitor);
@@ -287,6 +289,7 @@ app.use('/api/anomalies', anomalyRoutes.router);
 app.use('/api/staff/daily-work', staffDailyWorkRoutes.router);
 app.use('/api/activity-feed', activityFeedRoutes.router);
 app.use('/api/monitoring', monitoringRoutes.router);
+app.use('/api/photos', photosRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
@@ -3864,6 +3867,7 @@ server.listen(PORT, () => {
         console.log('Background services started: sync-scheduler, whatsapp-processor, whatsapp-sessions, wa-campaign-engine, auto-clockout, ai-scheduler, painter-scheduler');
         systemHealthService.startAutoHealthChecks(300000); // every 5 min
         productionMonitor.start(); // Production health monitoring + self-healing
+        photosRoutes.startCleanupCron(); // Photo cleanup daily 2 AM IST
         // Anomaly detection scan every 6 hours
         setInterval(async () => {
             try {

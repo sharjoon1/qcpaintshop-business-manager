@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <title>Photo Gallery - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <style>
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #f1f5f9; }
+
+        /* Header gradient */
+        .page-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 20px 24px; border-radius: 16px;
+            margin-bottom: 20px; box-shadow: 0 4px 15px rgba(102,126,234,0.3);
+        }
+        .page-header h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+        .page-header p { font-size: 13px; opacity: 0.85; margin: 0; }
+
+        /* Summary strip */
+        .summary-strip {
+            display: flex; gap: 16px; margin-top: 14px; flex-wrap: wrap;
+        }
+        .summary-item {
+            background: rgba(255,255,255,0.15); border-radius: 10px;
+            padding: 8px 16px; min-width: 100px; text-align: center;
+        }
+        .summary-item .val { font-size: 20px; font-weight: 700; }
+        .summary-item .lbl { font-size: 11px; opacity: 0.8; }
+
+        /* Category pills */
+        .cat-bar {
+            display: flex; gap: 8px; overflow-x: auto; padding: 2px 0;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+        }
+        .cat-bar::-webkit-scrollbar { display: none; }
+        .cat-pill {
+            flex-shrink: 0; padding: 8px 16px; border-radius: 20px;
+            border: 1px solid #e2e8f0; background: white; color: #475569;
+            font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; gap: 6px; white-space: nowrap;
+        }
+        .cat-pill:hover { border-color: #667eea; color: #667eea; }
+        .cat-pill.active { background: #667eea; color: white; border-color: #667eea; }
+        .cat-pill .count {
+            background: rgba(0,0,0,0.1); border-radius: 10px;
+            padding: 1px 8px; font-size: 11px; font-weight: 600;
+        }
+        .cat-pill.active .count { background: rgba(255,255,255,0.25); }
+
+        /* Filter bar */
+        .filter-bar {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            margin: 16px 0;
+        }
+
+        /* Photo grid */
+        .photo-grid {
+            display: grid; gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        }
+        @media (min-width: 768px) {
+            .photo-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+        }
+
+        .photo-card {
+            background: white; border-radius: 10px; overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
+            cursor: pointer; transition: all 0.2s; position: relative;
+        }
+        .photo-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .photo-card img {
+            width: 100%; height: 160px; object-fit: cover; display: block;
+            background: #f1f5f9;
+        }
+        .photo-card .info {
+            padding: 8px 10px; font-size: 11px; color: #64748b;
+        }
+        .photo-card .info .name { color: #0f172a; font-weight: 600; font-size: 12px; }
+        .photo-card .info .meta { margin-top: 2px; }
+
+        /* Lightbox */
+        .lightbox {
+            display: none; position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.92); justify-content: center; align-items: center;
+            flex-direction: column;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 92vw; max-height: 80vh; border-radius: 8px;
+            object-fit: contain;
+        }
+        .lightbox .lb-info {
+            color: white; margin-top: 12px; text-align: center; font-size: 13px;
+            opacity: 0.85;
+        }
+        .lightbox .lb-close {
+            position: absolute; top: 16px; right: 20px;
+            background: rgba(255,255,255,0.15); border: none; color: white;
+            width: 40px; height: 40px; border-radius: 50%; font-size: 20px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .lightbox .lb-close:hover { background: rgba(255,255,255,0.3); }
+        .lightbox .lb-nav {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(255,255,255,0.15); border: none; color: white;
+            width: 44px; height: 44px; border-radius: 50%; font-size: 22px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .lightbox .lb-nav:hover { background: rgba(255,255,255,0.3); }
+        .lightbox .lb-prev { left: 16px; }
+        .lightbox .lb-next { right: 16px; }
+
+        /* Cleanup button */
+        .btn-cleanup {
+            padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .btn-cleanup:hover { background: #fee2e2; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center; padding: 60px 20px; color: #94a3b8;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state p { font-size: 14px; }
+
+        /* Loading */
+        .spinner {
+            width: 28px; height: 28px; border: 3px solid #e2e8f0;
+            border-top-color: #667eea; border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 40px auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Group labels */
+        .group-label {
+            font-size: 11px; font-weight: 600; text-transform: uppercase;
+            color: #94a3b8; letter-spacing: 0.5px; padding: 0 4px;
+        }
+        .group-sep {
+            width: 1px; height: 24px; background: #e2e8f0; flex-shrink: 0;
+        }
+    </style>
+    <script src="/universal-nav-loader.js"></script>
+</head>
+<body data-page="photos">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 16px;">
+
+        <!-- Header -->
+        <div class="page-header">
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+                <div>
+                    <h1>Photo Gallery</h1>
+                    <p>Browse all uploaded photos &bull; Auto-cleanup active</p>
+                </div>
+                <button class="btn-cleanup" onclick="manualCleanup()" id="cleanupBtn">
+                    🗑 Run Cleanup
+                </button>
+            </div>
+            <div class="summary-strip" id="summaryStrip"></div>
+        </div>
+
+        <!-- Category pills -->
+        <div class="cat-bar" id="catBar"></div>
+
+        <!-- Filter bar -->
+        <div class="filter-bar">
+            <input type="date" id="dateFilter" style="padding:7px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:13px; background:white;">
+            <button onclick="document.getElementById('dateFilter').value=''; loadPhotos()" style="padding:7px 14px; border-radius:8px; border:1px solid #e2e8f0; background:white; font-size:13px; cursor:pointer; color:#64748b;">All Dates</button>
+            <span id="photoCount" style="font-size:13px; color:#64748b; margin-left:auto;"></span>
+        </div>
+
+        <!-- Photo grid -->
+        <div id="photoGrid" class="photo-grid"></div>
+        <div id="loading" style="display:none;"><div class="spinner"></div></div>
+        <div id="emptyState" class="empty-state" style="display:none;">
+            <div class="icon">📷</div>
+            <p>No photos in this category</p>
+        </div>
+
+        <!-- Load more -->
+        <div id="loadMoreWrap" style="text-align:center; margin:20px 0; display:none;">
+            <button onclick="loadMore()" style="padding:10px 28px; border-radius:10px; border:1px solid #e2e8f0; background:white; font-size:13px; font-weight:600; cursor:pointer; color:#667eea;">
+                Load More
+            </button>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox">
+        <button class="lb-close" onclick="closeLightbox()">✕</button>
+        <button class="lb-nav lb-prev" onclick="navLightbox(-1)">‹</button>
+        <button class="lb-nav lb-next" onclick="navLightbox(1)">›</button>
+        <img id="lbImg" src="" alt="">
+        <div class="lb-info" id="lbInfo"></div>
+    </div>
+
+<script>
+const API = '/api/photos';
+const token = localStorage.getItem('auth_token');
+const headers = { 'Authorization': 'Bearer ' + token };
+
+let categories = [];
+let currentCat = '';
+let currentPhotos = [];
+let currentPage = 1;
+let totalPhotos = 0;
+let lbIndex = 0;
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadCategories();
+    document.getElementById('dateFilter').addEventListener('change', () => {
+        currentPage = 1;
+        loadPhotos();
+    });
+    // Set today as default
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    document.getElementById('dateFilter').value = `${yyyy}-${mm}-${dd}`;
+});
+
+// ── Load categories ──
+async function loadCategories() {
+    try {
+        const resp = await fetch(API + '/categories', { headers });
+        const data = await resp.json();
+        if (!data.success) return;
+        categories = data.categories;
+
+        // Summary
+        const totalFiles = categories.reduce((s, c) => s + c.count, 0);
+        const totalSize = categories.reduce((s, c) => s + parseFloat(c.totalSizeMB), 0);
+        const attCount = categories.filter(c => c.group === 'attendance').reduce((s, c) => s + c.count, 0);
+        const otherCount = categories.filter(c => c.group === 'other').reduce((s, c) => s + c.count, 0);
+
+        document.getElementById('summaryStrip').innerHTML = `
+            <div class="summary-item"><div class="val">${totalFiles}</div><div class="lbl">Total Photos</div></div>
+            <div class="summary-item"><div class="val">${totalSize.toFixed(1)} MB</div><div class="lbl">Total Size</div></div>
+            <div class="summary-item"><div class="val">${attCount}</div><div class="lbl">Attendance (2d)</div></div>
+            <div class="summary-item"><div class="val">${otherCount}</div><div class="lbl">Other (7d)</div></div>
+        `;
+
+        // Category pills
+        let html = '<span class="group-label">Attendance</span>';
+        categories.filter(c => c.group === 'attendance').forEach(c => {
+            html += `<button class="cat-pill" data-cat="${c.key}" onclick="selectCat('${c.key}')">
+                ${c.label} <span class="count">${c.count}</span>
+            </button>`;
+        });
+        html += '<div class="group-sep"></div><span class="group-label">Other</span>';
+        categories.filter(c => c.group === 'other').forEach(c => {
+            html += `<button class="cat-pill" data-cat="${c.key}" onclick="selectCat('${c.key}')">
+                ${c.label} <span class="count">${c.count}</span>
+            </button>`;
+        });
+        document.getElementById('catBar').innerHTML = html;
+
+        // Auto-select first category with photos, or first
+        const firstWithPhotos = categories.find(c => c.count > 0) || categories[0];
+        if (firstWithPhotos) selectCat(firstWithPhotos.key);
+    } catch (err) {
+        console.error('loadCategories error:', err);
+    }
+}
+
+// ── Select category ──
+function selectCat(key) {
+    currentCat = key;
+    currentPage = 1;
+    currentPhotos = [];
+
+    // Update pill active state
+    document.querySelectorAll('.cat-pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.cat === key);
+    });
+
+    loadPhotos();
+}
+
+// ── Load photos ──
+async function loadPhotos() {
+    const grid = document.getElementById('photoGrid');
+    const loading = document.getElementById('loading');
+    const empty = document.getElementById('emptyState');
+    const loadMoreWrap = document.getElementById('loadMoreWrap');
+
+    if (currentPage === 1) {
+        grid.innerHTML = '';
+        currentPhotos = [];
+    }
+    loading.style.display = 'block';
+    empty.style.display = 'none';
+    loadMoreWrap.style.display = 'none';
+
+    try {
+        const date = document.getElementById('dateFilter').value;
+        const url = `${API}/list?category=${currentCat}&page=${currentPage}&limit=60${date ? '&date=' + date : ''}`;
+        const resp = await fetch(url, { headers });
+        const data = await resp.json();
+
+        loading.style.display = 'none';
+
+        if (!data.success) return;
+
+        totalPhotos = data.total;
+        document.getElementById('photoCount').textContent = `${totalPhotos} photo${totalPhotos !== 1 ? 's' : ''}`;
+
+        if (data.photos.length === 0 && currentPage === 1) {
+            empty.style.display = 'block';
+            return;
+        }
+
+        const startIdx = currentPhotos.length;
+        currentPhotos.push(...data.photos);
+
+        data.photos.forEach((photo, i) => {
+            const card = document.createElement('div');
+            card.className = 'photo-card';
+            card.onclick = () => openLightbox(startIdx + i);
+
+            const timeStr = fmtTime(photo.mtime);
+            card.innerHTML = `
+                <img src="${photo.url}" alt="${photo.filename}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f1f5f9%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-size=%2212%22>No preview</text></svg>'">
+                <div class="info">
+                    <div class="name">${photo.userName || 'Unknown'}</div>
+                    <div class="meta">${timeStr} &bull; ${photo.sizeMB} MB</div>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+
+        // Show load more if there's more
+        if (currentPhotos.length < totalPhotos) {
+            loadMoreWrap.style.display = 'block';
+        }
+    } catch (err) {
+        loading.style.display = 'none';
+        console.error('loadPhotos error:', err);
+    }
+}
+
+function loadMore() {
+    currentPage++;
+    loadPhotos();
+}
+
+// ── Lightbox ──
+function openLightbox(idx) {
+    lbIndex = idx;
+    showLightboxPhoto();
+    document.getElementById('lightbox').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function navLightbox(dir) {
+    lbIndex = Math.max(0, Math.min(currentPhotos.length - 1, lbIndex + dir));
+    showLightboxPhoto();
+}
+
+function showLightboxPhoto() {
+    const photo = currentPhotos[lbIndex];
+    if (!photo) return;
+    document.getElementById('lbImg').src = photo.url;
+    document.getElementById('lbInfo').innerHTML =
+        `<strong>${photo.userName || 'Unknown'}</strong> &bull; ${fmtTime(photo.mtime)} &bull; ${photo.sizeMB} MB<br>
+        <span style="opacity:0.6; font-size:11px;">${photo.filename}</span>`;
+}
+
+// Keyboard nav
+document.addEventListener('keydown', e => {
+    if (!document.getElementById('lightbox').classList.contains('open')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') navLightbox(-1);
+    if (e.key === 'ArrowRight') navLightbox(1);
+});
+
+// ── Manual cleanup ──
+async function manualCleanup() {
+    if (!confirm('Delete all photos older than their retention period?\n\nAttendance: 2 days\nOther: 7 days')) return;
+    const btn = document.getElementById('cleanupBtn');
+    btn.disabled = true;
+    btn.textContent = 'Cleaning...';
+    try {
+        const resp = await fetch(API + '/cleanup', { method: 'DELETE', headers });
+        const data = await resp.json();
+        if (data.success) {
+            let msg = `Deleted ${data.deleted} files.`;
+            if (data.errors > 0) msg += ` (${data.errors} errors)`;
+
+            // Show per-category breakdown
+            const details = Object.entries(data.byCategory || {})
+                .filter(([, v]) => v.deleted > 0)
+                .map(([k, v]) => `${k}: ${v.deleted}`)
+                .join(', ');
+            if (details) msg += '\n\n' + details;
+
+            alert(msg);
+            loadCategories(); // Refresh
+        } else {
+            alert('Cleanup failed: ' + (data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+    btn.disabled = false;
+    btn.textContent = '🗑 Run Cleanup';
+}
+
+// ── Helpers ──
+function fmtTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const day = d.getDate();
+    const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+    const h = d.getHours(), m = d.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${day} ${mon} ${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+</script>
+</body>
+</html>
