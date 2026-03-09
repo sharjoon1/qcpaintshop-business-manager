@@ -3017,6 +3017,37 @@ router.post('/estimates/:estimateId/confirm-payment', requirePermission('painter
         );
         await logEstimateStatusChange(estimate.id, 'payment_submitted', 'payment_recorded', req.user.id, 'Payment confirmed by admin');
 
+        // Award painter loyalty points on payment confirmation
+        let pointsResult = { regularPoints: 0, annualPoints: 0 };
+        try {
+            const [items] = await pool.query(
+                'SELECT zoho_item_id, quantity, line_total FROM painter_estimate_items WHERE estimate_id = ?',
+                [estimate.id]
+            );
+            const invoiceForPoints = {
+                invoice_id: `EST-${estimate.id}`,
+                invoice_number: estimate.estimate_number || `EST-${estimate.id}`,
+                date: new Date().toISOString().split('T')[0],
+                total: parseFloat(estimate.final_grand_total) || parseFloat(estimate.markup_grand_total) || parseFloat(estimate.grand_total) || 0,
+                line_items: items.map(i => ({
+                    item_id: i.zoho_item_id,
+                    quantity: parseFloat(i.quantity),
+                    item_total: parseFloat(i.line_total)
+                }))
+            };
+            pointsResult = await pointsEngine.processInvoice(estimate.painter_id, invoiceForPoints, estimate.billing_type, req.user.id);
+            if (pointsResult && !pointsResult.alreadyProcessed) {
+                await pool.query(
+                    'UPDATE painter_estimates SET points_awarded = ?, regular_points_awarded = ?, annual_points_awarded = ? WHERE id = ?',
+                    [(pointsResult.regularPoints || 0) + (pointsResult.annualPoints || 0),
+                     pointsResult.regularPoints || 0, pointsResult.annualPoints || 0, estimate.id]
+                );
+                console.log(`[Points] Confirm-payment: painter ${estimate.painter_id}, estimate ${estimate.id}, regular=${pointsResult.regularPoints}, annual=${pointsResult.annualPoints}`);
+            }
+        } catch (ptsErr) {
+            console.error('Points award on confirm-payment (non-fatal):', ptsErr.message);
+        }
+
         // Auto-create slab-based incentive on payment confirmation
         try {
             const customerPhone = estimate.customer_phone || estimate.painter_phone;
@@ -3241,24 +3272,27 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
         const invoiceId = zohoInvoice?.invoice?.invoice_id || 'unknown';
         const invoiceNumber = zohoInvoice?.invoice?.invoice_number || 'unknown';
 
-        // 3. Award points via pointsEngine
-        let pointsResult = { regularPoints: 0, annualPoints: 0 };
-        try {
-            const invoiceForPoints = {
-                invoice_id: invoiceId,
-                invoice_number: invoiceNumber,
-                date: new Date().toISOString().split('T')[0],
-                total: parseFloat(estimate.grand_total),
-                line_items: items.map(i => ({
-                    item_id: i.zoho_item_id,
-                    quantity: parseFloat(i.quantity),
-                    item_total: parseFloat(i.line_total)
-                }))
-            };
-            pointsResult = await pointsEngine.processInvoice(estimate.painter_id, invoiceForPoints, estimate.billing_type, req.user.id);
-        } catch (pointsErr) {
-            console.error('Points award error:', pointsErr.message);
-            // Don't fail the whole operation — Zoho invoice was already created
+        // 3. Award points via pointsEngine (skip if already awarded at confirm-payment)
+        let pointsResult = { regularPoints: estimate.regular_points_awarded || 0, annualPoints: estimate.annual_points_awarded || 0 };
+        if ((estimate.points_awarded || 0) === 0) {
+            try {
+                const invoiceForPoints = {
+                    invoice_id: invoiceId,
+                    invoice_number: invoiceNumber,
+                    date: new Date().toISOString().split('T')[0],
+                    total: parseFloat(estimate.grand_total),
+                    line_items: items.map(i => ({
+                        item_id: i.zoho_item_id,
+                        quantity: parseFloat(i.quantity),
+                        item_total: parseFloat(i.line_total)
+                    }))
+                };
+                pointsResult = await pointsEngine.processInvoice(estimate.painter_id, invoiceForPoints, estimate.billing_type, req.user.id);
+            } catch (pointsErr) {
+                console.error('Points award error:', pointsErr.message);
+            }
+        } else {
+            console.log(`[Points] Push-to-Zoho: skipping — already awarded ${estimate.points_awarded} points at confirm-payment`);
         }
 
         // 4. Update estimate
