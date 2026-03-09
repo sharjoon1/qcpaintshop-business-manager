@@ -546,6 +546,18 @@ router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
             ? (logoVal.startsWith('/') ? logoVal : `/uploads/logos/${logoVal}`)
             : null;
 
+        // Annual withdrawal window info
+        let annualWithdrawalInfo = null;
+        try {
+            const [awConfig] = await pool.query("SELECT config_key, config_value FROM ai_config WHERE config_key IN ('painter_annual_withdrawal_month', 'painter_annual_withdrawal_day')");
+            const cfgMap = {};
+            awConfig.forEach(c => { cfgMap[c.config_key] = c.config_value; });
+            const awMonth = parseInt(cfgMap.painter_annual_withdrawal_month) || 1;
+            const awDay = parseInt(cfgMap.painter_annual_withdrawal_day) || 1;
+            const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            annualWithdrawalInfo = { month: awMonth, day: awDay, label: `Withdrawal opens on ${monthNames[awMonth]} ${awDay}` };
+        } catch (e) {}
+
         res.json({
             success: true,
             dashboard: {
@@ -556,7 +568,8 @@ router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
                 referralCount: referralCount[0].count,
                 recentTransactions: recentTxns,
                 pendingWithdrawals: { count: pendingWithdrawals[0].count, total: parseFloat(pendingWithdrawals[0].total) },
-                businessLogo
+                businessLogo,
+                annualWithdrawalInfo
             }
         });
     } catch (error) {

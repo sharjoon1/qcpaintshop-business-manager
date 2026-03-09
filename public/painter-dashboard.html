@@ -170,17 +170,17 @@
     </div>
 
     <div class="max-w-lg mx-auto px-4 -mt-2 pb-20">
-        <!-- Balance Cards -->
+        <!-- Balance Cards (clickable) -->
         <div class="grid grid-cols-2 gap-3 mb-4">
-            <div class="stat-card">
+            <div class="stat-card" onclick="openPointsSheet('regular')" style="cursor:pointer;position:relative;transition:transform 0.15s;">
                 <div class="stat-value text-emerald-700" id="regularBalance">0</div>
                 <div class="stat-label" data-i18n="dashboard.regular_points">Regular Points</div>
-                <div class="text-xs text-gray-400 mt-1" data-i18n="dashboard.withdraw_anytime">Withdraw anytime</div>
+                <div class="text-xs text-emerald-600 mt-1 font-medium">Withdraw anytime →</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" onclick="openPointsSheet('annual')" style="cursor:pointer;position:relative;transition:transform 0.15s;">
                 <div class="stat-value" style="color:#D4A24E" id="annualBalance">0</div>
                 <div class="stat-label" data-i18n="dashboard.annual_points">Annual Points</div>
-                <div class="text-xs text-gray-400 mt-1" data-i18n="dashboard.annual_withdrawal">Annual withdrawal</div>
+                <div class="text-xs text-gray-400 mt-1" id="annualWindowInfo">View history →</div>
             </div>
         </div>
 
@@ -345,6 +345,14 @@
         <div class="section-card" id="referralSection" style="display:none">
             <div class="section-header" data-i18n="dashboard.my_referrals">My Referrals</div>
             <div class="section-body" id="referralList"></div>
+        </div>
+    </div>
+
+    <!-- Points Detail Bottom Sheet -->
+    <div id="pointsSheet" class="product-modal-overlay" onclick="if(event.target===this)closePointsSheet()">
+        <div class="product-modal" style="max-height:85vh;">
+            <div class="modal-handle"></div>
+            <div id="pointsSheetContent"></div>
         </div>
     </div>
 
@@ -516,6 +524,12 @@
             document.getElementById('referralCount').textContent = data.dashboard.referralCount;
             document.getElementById('referralCode').textContent = data.dashboard.referralCode || '---';
 
+            // Show annual withdrawal info
+            if (data.dashboard.annualWithdrawalInfo) {
+                const aw = data.dashboard.annualWithdrawalInfo;
+                document.getElementById('annualWindowInfo').textContent = aw.label + ' →';
+            }
+
             // Render recent transactions
             renderTransactions(data.dashboard.recentTransactions, 'recentTransactions');
         } catch (err) {
@@ -604,6 +618,116 @@
             document.getElementById('referralSection').scrollIntoView({ behavior: 'smooth' });
         } catch (err) {
             document.getElementById('referralList').innerHTML = '<div class="text-red-500 text-sm py-4" data-i18n="common.error_loading">Error loading referrals</div>';
+        }
+    }
+
+    async function openPointsSheet(pool) {
+        const sheet = document.getElementById('pointsSheet');
+        const content = document.getElementById('pointsSheetContent');
+        const bal = dashboardData?.balance || {};
+        const balance = pool === 'regular' ? (bal.regular || 0) : (bal.annual || 0);
+        const isRegular = pool === 'regular';
+
+        // Header + action area
+        const headerColor = isRegular ? '#1B5E3B' : '#D4A24E';
+        const headerBg = isRegular ? '#ecfdf5' : '#fffbeb';
+        const poolLabel = isRegular ? 'Regular Points' : 'Annual Points';
+
+        let actionHtml = '';
+        if (isRegular) {
+            actionHtml = `
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    <input type="number" id="sheetWithdrawAmt" placeholder="Enter amount" step="0.01" min="1" max="${balance}"
+                        style="flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;font-size:14px;outline:none;">
+                    <button onclick="submitSheetWithdraw('regular')" style="padding:10px 20px;background:#1B5E3B;color:white;border:none;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;">
+                        Withdraw
+                    </button>
+                </div>
+                <div style="font-size:11px;color:#6b7280;margin-top:4px;">Available: ${balance.toFixed(2)} points — withdraw anytime</div>`;
+        } else {
+            const awInfo = dashboardData?.annualWithdrawalInfo;
+            const windowLabel = awInfo ? awInfo.label : 'Annual points can be withdrawn on the date set by admin';
+            // Check if withdrawal is open now
+            const now = new Date();
+            const isWindowOpen = awInfo && now.getMonth() + 1 === awInfo.month && now.getDate() >= awInfo.day;
+            actionHtml = `
+                <div style="margin-top:12px;padding:10px 14px;background:${isWindowOpen ? '#ecfdf5' : '#fef3c7'};border:1px solid ${isWindowOpen ? '#a7f3d0' : '#fde68a'};border-radius:10px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <svg width="18" height="18" fill="none" stroke="${isWindowOpen ? '#059669' : '#d97706'}" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <span style="font-size:12px;color:${isWindowOpen ? '#065f46' : '#92400e'};font-weight:500;">${isWindowOpen ? 'Withdrawal window is OPEN!' : windowLabel}</span>
+                    </div>
+                </div>
+                ${isWindowOpen ? `
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                    <input type="number" id="sheetWithdrawAmt" placeholder="Enter amount" step="0.01" min="1" max="${balance}"
+                        style="flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;font-size:14px;outline:none;">
+                    <button onclick="submitSheetWithdraw('annual')" style="padding:10px 20px;background:#D4A24E;color:white;border:none;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;">
+                        Withdraw
+                    </button>
+                </div>
+                <div style="font-size:11px;color:#6b7280;margin-top:4px;">Available: ${balance.toFixed(2)} annual points</div>` : ''}`;
+        }
+
+        content.innerHTML = `
+            <div style="background:${headerBg};border-radius:12px;padding:16px;margin-bottom:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-size:12px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${poolLabel}</div>
+                        <div style="font-size:28px;font-weight:800;color:${headerColor};margin-top:4px;">${balance.toFixed(2)}</div>
+                    </div>
+                    <div style="width:48px;height:48px;border-radius:12px;background:${headerColor};display:flex;align-items:center;justify-content:center;">
+                        <svg width="24" height="24" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+                            ${isRegular ? '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>' : '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'}
+                        </svg>
+                    </div>
+                </div>
+                ${actionHtml}
+            </div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#1f2937;">Transaction History</div>
+            <div id="sheetTxnList" style="max-height:45vh;overflow-y:auto;">
+                <div style="text-align:center;padding:16px;color:#9ca3af;font-size:13px;">Loading...</div>
+            </div>`;
+
+        sheet.classList.add('show');
+
+        // Load transactions
+        try {
+            const res = await fetch(`${API}/me/points/${pool}?limit=100`, { headers: painterHeaders() });
+            const data = await res.json();
+            const txns = data.transactions || [];
+            if (!txns.length) {
+                document.getElementById('sheetTxnList').innerHTML = '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px;">No transactions yet</div>';
+                return;
+            }
+            renderTransactions(txns, 'sheetTxnList');
+        } catch (err) {
+            document.getElementById('sheetTxnList').innerHTML = '<div style="text-align:center;padding:16px;color:#ef4444;font-size:13px;">Error loading transactions</div>';
+        }
+    }
+
+    function closePointsSheet() {
+        document.getElementById('pointsSheet').classList.remove('show');
+    }
+
+    async function submitSheetWithdraw(pool) {
+        const amtInput = document.getElementById('sheetWithdrawAmt');
+        const amount = parseFloat(amtInput.value);
+        if (!amount || amount <= 0) return alert('Enter a valid amount');
+
+        try {
+            const res = await fetch(`${API}/me/withdraw`, {
+                method: 'POST',
+                headers: painterHeaders(),
+                body: JSON.stringify({ pool, amount })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            alert('Withdrawal request submitted! You will be notified when processed.');
+            closePointsSheet();
+            loadDashboard();
+        } catch (err) {
+            alert('Error: ' + err.message);
         }
     }
 
