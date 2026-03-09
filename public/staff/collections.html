@@ -216,6 +216,7 @@
         <button class="tab-btn active" onclick="switchTab('summary', this)">Summary</button>
         <button class="tab-btn" onclick="switchTab('customers', this)">Customers</button>
         <button class="tab-btn" onclick="switchTab('invoices', this)">Invoices</button>
+        <button class="tab-btn" onclick="switchTab('history', this)">History</button>
     </div>
 
     <!-- ====== SUMMARY TAB ====== -->
@@ -290,6 +291,35 @@
         </div>
         <div class="load-more" id="invMore" style="display:none">
             <button onclick="loadInvoices(invPage+1, true)">Load More</button>
+        </div>
+    </div>
+
+    <!-- ====== HISTORY TAB ====== -->
+    <div id="tab-history" style="display:none">
+        <!-- Sub-tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+            <button class="sort-pill active" id="histSubCalls" onclick="switchHistSub('calls')">Calls / Visits</button>
+            <button class="sort-pill" id="histSubPromises" onclick="switchHistSub('promises')">Promises</button>
+        </div>
+
+        <!-- Calls list -->
+        <div id="histCalls">
+            <div class="card" id="callsList">
+                <div class="empty-state"><div class="icon">📞</div>Loading...</div>
+            </div>
+            <div class="load-more" id="callsMore" style="display:none">
+                <button onclick="loadCalls(callsPage+1, true)">Load More</button>
+            </div>
+        </div>
+
+        <!-- Promises list -->
+        <div id="histPromises" style="display:none">
+            <div class="card" id="promisesList">
+                <div class="empty-state"><div class="icon">🤝</div>Loading...</div>
+            </div>
+            <div class="load-more" id="promisesMore" style="display:none">
+                <button onclick="loadPromises(promisesPage+1, true)">Load More</button>
+            </div>
         </div>
     </div>
 </div>
@@ -476,6 +506,7 @@ function switchTab(tab, btn) {
     if (tab === 'summary') loadSummary();
     else if (tab === 'customers') loadCustomers();
     else if (tab === 'invoices') loadInvoices();
+    else if (tab === 'history') loadCalls();
 }
 
 // ========================================
@@ -729,6 +760,104 @@ async function submitPromise() {
     } catch (err) {
         showToast('Failed: ' + err.message, 'error');
     }
+}
+
+// ========================================
+// HISTORY
+// ========================================
+
+let callsPage = 1, promisesPage = 1;
+let callsData = [], promisesData = [];
+
+function switchHistSub(sub) {
+    document.getElementById('histCalls').style.display = sub === 'calls' ? '' : 'none';
+    document.getElementById('histPromises').style.display = sub === 'promises' ? '' : 'none';
+    document.getElementById('histSubCalls').classList.toggle('active', sub === 'calls');
+    document.getElementById('histSubPromises').classList.toggle('active', sub === 'promises');
+    if (sub === 'calls') loadCalls();
+    else loadPromises();
+}
+
+async function loadCalls(page, append) {
+    callsPage = page || 1;
+    try {
+        const { data, pagination } = await apiJson(API + '/reminders?page=' + callsPage + '&limit=20');
+        if (!append) callsData = data;
+        else callsData = callsData.concat(data);
+
+        const list = document.getElementById('callsList');
+        if (callsData.length === 0) {
+            list.innerHTML = '<div class="empty-state"><div class="icon">📞</div>No calls or visits logged yet</div>';
+            document.getElementById('callsMore').style.display = 'none';
+            return;
+        }
+
+        const typeIcons = { call: '📞', visit: '🏪', email: '📧', whatsapp: '💬' };
+        list.innerHTML = callsData.map(r => `
+            <div class="list-item">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div>
+                        <div class="name">${typeIcons[r.reminder_type] || '📋'} ${esc(r.customer_name || 'Unknown')}</div>
+                        <div class="meta">${esc(r.reminder_type)} · by ${esc(r.sent_by_name || '--')} · ${fmtDateTime(r.created_at)}</div>
+                        ${r.notes ? `<div style="font-size:0.75rem;color:#64748b;margin-top:4px;white-space:pre-line;">${esc(r.notes)}</div>` : ''}
+                    </div>
+                    <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:0.65rem;">${esc(r.reminder_type)}</span>
+                </div>
+            </div>
+        `).join('');
+
+        document.getElementById('callsMore').style.display = (pagination.page * pagination.limit < pagination.total) ? '' : 'none';
+    } catch (err) {
+        showToast('Failed to load call history', 'error');
+    }
+}
+
+async function loadPromises(page, append) {
+    promisesPage = page || 1;
+    try {
+        const { data, pagination } = await apiJson(API + '/promises?page=' + promisesPage + '&limit=20');
+        if (!append) promisesData = data;
+        else promisesData = promisesData.concat(data);
+
+        const list = document.getElementById('promisesList');
+        if (promisesData.length === 0) {
+            list.innerHTML = '<div class="empty-state"><div class="icon">🤝</div>No promises recorded yet</div>';
+            document.getElementById('promisesMore').style.display = 'none';
+            return;
+        }
+
+        list.innerHTML = promisesData.map(p => {
+            const isBroken = p.is_broken || (p.status === 'pending' && new Date(p.promise_date) < new Date());
+            const statusBadge = p.status === 'fulfilled' ? '<span class="badge badge-ok">Fulfilled</span>'
+                : isBroken ? '<span class="badge badge-overdue">Broken</span>'
+                : '<span class="badge" style="background:#fef3c7;color:#92400e;font-size:0.65rem;">Pending</span>';
+            return `
+            <div class="list-item">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div>
+                        <div class="name">${esc(p.customer_name || 'Unknown')}</div>
+                        <div class="meta">Promise date: ${fmtDate(p.promise_date)} · by ${esc(p.created_by_name || '--')}</div>
+                        ${p.notes ? `<div style="font-size:0.75rem;color:#64748b;margin-top:4px;">${esc(p.notes)}</div>` : ''}
+                    </div>
+                    <div style="text-align:right">
+                        <div class="amount">${fmtFull(p.promise_amount)}</div>
+                        ${statusBadge}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        document.getElementById('promisesMore').style.display = (pagination.page * pagination.limit < pagination.total) ? '' : 'none';
+    } catch (err) {
+        showToast('Failed to load promises', 'error');
+    }
+}
+
+function fmtDateTime(d) {
+    if (!d) return '--';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' +
+           dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 // ========================================
