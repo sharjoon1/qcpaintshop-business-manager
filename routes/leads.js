@@ -595,17 +595,21 @@ router.post('/my/create', requirePermission('leads', 'own.add'), async (req, res
             return res.status(400).json({ success: false, message: 'Lead name is required' });
         }
 
-        // Check for duplicate phone
+        // Sanitize and validate phone — strip to last 10 digits
+        let cleanedPhone = null;
         if (phone) {
-            const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-            if (cleanPhone.length >= 10) {
-                const [existing] = await pool.query(
-                    `SELECT id, lead_number, name, status FROM leads WHERE status != 'inactive' AND REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
-                    [`%${cleanPhone}`]
-                );
-                if (existing.length > 0) {
-                    return res.status(409).json({ success: false, message: `Duplicate lead! Phone already exists in ${existing[0].lead_number} (${existing[0].name}) - Status: ${existing[0].status}` });
-                }
+            const digits = phone.replace(/\D/g, '').slice(-10);
+            if (digits.length !== 10) {
+                return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits' });
+            }
+            cleanedPhone = digits;
+            // Check for duplicate
+            const [existing] = await pool.query(
+                `SELECT id, lead_number, name, status FROM leads WHERE status != 'inactive' AND REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
+                [`%${cleanedPhone}`]
+            );
+            if (existing.length > 0) {
+                return res.status(409).json({ success: false, message: `Duplicate lead! Phone already exists in ${existing[0].lead_number} (${existing[0].name}) - Status: ${existing[0].status}` });
             }
         }
 
@@ -619,7 +623,7 @@ router.post('/my/create', requirePermission('leads', 'own.add'), async (req, res
               status, priority, assigned_to, branch_id, next_followup_date, created_by)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?)`,
             [
-                leadNumber, name, phone || null, email || null, company || null,
+                leadNumber, name, cleanedPhone, email || null, company || null,
                 address || null, city || null, state || null, pincode || null,
                 source || 'walk_in', project_type || 'interior', property_type || 'house',
                 estimated_area_sqft || null, estimated_budget || null,
@@ -1690,16 +1694,21 @@ router.post('/', requirePermission('leads', 'add'), async (req, res) => {
         }
 
         // Check for duplicate phone
+        // Sanitize and validate phone — strip to last 10 digits
+        let cleanedPhone = null;
         if (phone) {
-            const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-            if (cleanPhone.length >= 10) {
-                const [existing] = await pool.query(
-                    `SELECT id, lead_number, name, status FROM leads WHERE status != 'inactive' AND REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
-                    [`%${cleanPhone}`]
-                );
-                if (existing.length > 0) {
-                    return res.status(409).json({ success: false, message: `Duplicate lead! Phone already exists in ${existing[0].lead_number} (${existing[0].name}) - Status: ${existing[0].status}` });
-                }
+            const digits = phone.replace(/\D/g, '').slice(-10);
+            if (digits.length !== 10) {
+                return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits' });
+            }
+            cleanedPhone = digits;
+            // Check for duplicate
+            const [existing] = await pool.query(
+                `SELECT id, lead_number, name, status FROM leads WHERE status != 'inactive' AND REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
+                [`%${cleanedPhone}`]
+            );
+            if (existing.length > 0) {
+                return res.status(409).json({ success: false, message: `Duplicate lead! Phone already exists in ${existing[0].lead_number} (${existing[0].name}) - Status: ${existing[0].status}` });
             }
         }
 
@@ -1715,7 +1724,7 @@ router.post('/', requirePermission('leads', 'add'), async (req, res) => {
               status, priority, assigned_to, branch_id, next_followup_date, created_by)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?)`,
             [
-                leadNumber, name, phone || null, email || null, company || null,
+                leadNumber, name, cleanedPhone, email || null, company || null,
                 address || null, city || null, state || null, pincode || null,
                 source || 'walk_in', project_type || 'interior', property_type || 'house',
                 estimated_area_sqft || null, estimated_budget || null,
