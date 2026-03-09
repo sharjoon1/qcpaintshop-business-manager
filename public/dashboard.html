@@ -467,21 +467,24 @@
                 const res = await fetch('/api/activity-tracker/admin/live', { headers });
                 if (!res.ok) throw new Error('Failed');
                 const data = await res.json();
-                const staff = data.data || [];
+                // Combine active sessions + idle staff
+                const activeStaff = (data.active || []).map(s => ({ ...s, _status: 'active' }));
+                const idleStaff = (data.idle || []).map(s => ({ ...s, _status: 'idle' }));
+                const staff = [...activeStaff, ...idleStaff];
                 const container = document.getElementById('activityMonitor');
                 if (!staff.length) {
-                    container.innerHTML = '<div class="text-center text-gray-400 py-4 text-sm" style="grid-column:1/-1;">No staff currently active</div>';
+                    container.innerHTML = '<div class="text-center text-gray-400 py-4 text-sm" style="grid-column:1/-1;">No staff currently clocked in</div>';
                     return;
                 }
                 container.innerHTML = staff.map(s => {
-                    const isIdle = s.idle_minutes >= 15;
+                    const isIdle = s._status === 'idle' || s.idle_minutes >= 15;
                     const onBreak = s.on_break;
                     const cls = onBreak ? 'on-break' : (isIdle ? 'idle' : '');
                     const badge = onBreak ? '<span class="act-badge act-badge-break">On Break</span>'
-                        : isIdle ? `<span class="act-badge act-badge-idle">Idle ${s.idle_minutes}m</span>`
+                        : isIdle ? `<span class="act-badge act-badge-idle">Idle ${s.idle_minutes || 0}m</span>`
                         : '<span class="act-badge act-badge-active">Active</span>';
-                    const activity = s.current_activity || 'No activity';
-                    const elapsed = s.activity_started_at ? elapsedStr(s.activity_started_at) : '';
+                    const activity = s.activity_type || s.current_activity || (isIdle ? 'Idle' : 'Working');
+                    const elapsed = s.started_at || s.activity_started_at ? elapsedStr(s.started_at || s.activity_started_at) : '';
                     return `<div class="act-card ${cls}">
                         <div style="display:flex;justify-content:space-between;align-items:start;">
                             <div class="act-name">${escHtml(s.full_name || s.user_name || 'Staff')}</div>

@@ -248,6 +248,7 @@ async function requireAuth(req, res, next) {
  * Require specific role(s)
  */
 function requireRole(...roles) {
+    const flatRoles = roles.flat();
     return async (req, res, next) => {
         try {
             const token = req.headers.authorization?.replace('Bearer ', '');
@@ -286,7 +287,7 @@ function requireRole(...roles) {
                 branch_id: user.branch_id || null
             };
 
-            if (!roles.includes(user.role)) {
+            if (!flatRoles.includes(user.role)) {
                 return res.status(403).json({
                     success: false,
                     message: `Access denied. Required role: ${roles.join(' or ')}`,
