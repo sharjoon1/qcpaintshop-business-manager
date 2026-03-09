@@ -865,23 +865,35 @@
                     </div>
                 </div>` : ''}
                 <div class="border-t pt-4 mt-4">
-                    <h4 class="font-semibold mb-2">Recent Transactions</h4>
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-semibold">Points History</h4>
+                        <div class="flex gap-2">
+                            <button onclick="loadDetailTxns(${p.id},'all')" class="text-xs px-2 py-1 rounded bg-gray-800 text-white" id="dtxAll">All</button>
+                            <button onclick="loadDetailTxns(${p.id},'regular')" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600" id="dtxRegular">Regular</button>
+                            <button onclick="loadDetailTxns(${p.id},'annual')" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600" id="dtxAnnual">Annual</button>
+                        </div>
+                    </div>
+                    <div id="detailTxnContainer">
                     ${data.recentTransactions.length ? `
                     <table class="data-table">
-                        <thead><tr><th>Date</th><th>Pool</th><th>Type</th><th>Amount</th><th>Source</th><th>Description</th></tr></thead>
+                        <thead><tr><th>Date</th><th>Pool</th><th>Type</th><th>Amount</th><th>Balance</th><th>Source</th><th>Description</th></tr></thead>
                         <tbody>
                             ${data.recentTransactions.map(t => `
                                 <tr>
-                                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
-                                    <td>${t.pool}</td>
+                                    <td class="text-xs">${new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})}</td>
+                                    <td><span class="badge badge-${t.pool === 'regular' ? 'active' : 'pending'}">${t.pool}</span></td>
                                     <td>${t.type}</td>
-                                    <td class="${parseFloat(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}">${parseFloat(t.amount).toFixed(2)}</td>
-                                    <td>${t.source}</td>
+                                    <td class="font-semibold ${parseFloat(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}">${parseFloat(t.amount) >= 0 ? '+' : ''}${parseFloat(t.amount).toFixed(2)}</td>
+                                    <td class="text-xs text-gray-500">${t.balance_after != null ? parseFloat(t.balance_after).toFixed(2) : '-'}</td>
+                                    <td class="text-xs">${(t.source || '').replace(/_/g, ' ')}</td>
                                     <td class="text-xs">${esc(t.description || '-')}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
-                    </table>` : '<p class="text-gray-400 text-sm">No transactions yet</p>'}
+                    </table>
+                    ${data.recentTransactions.length >= 20 ? `<div class="text-center mt-2"><button onclick="loadDetailTxns(${p.id},'all',100)" class="text-xs text-indigo-600 hover:underline">Load more (100)</button></div>` : ''}
+                    ` : '<p class="text-gray-400 text-sm">No transactions yet</p>'}
+                    </div>
                 </div>
             `;
             document.getElementById('painterDetailModal').style.display = 'flex';
@@ -889,6 +901,42 @@
     }
 
     function closePainterDetail() { document.getElementById('painterDetailModal').style.display = 'none'; }
+
+    async function loadDetailTxns(painterId, pool, limit) {
+        limit = limit || 50;
+        ['dtxAll','dtxRegular','dtxAnnual'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.className = 'text-xs px-2 py-1 rounded ' + (id === 'dtx' + pool.charAt(0).toUpperCase() + pool.slice(1) ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600');
+        });
+        const container = document.getElementById('detailTxnContainer');
+        container.innerHTML = '<p class="text-gray-400 text-sm py-2">Loading...</p>';
+        try {
+            let txns = [];
+            if (pool === 'all') {
+                const [r1, r2] = await Promise.all([
+                    fetch(`${API}/${painterId}/points/regular?limit=${limit}`, { headers: authHeaders() }).then(r => r.json()),
+                    fetch(`${API}/${painterId}/points/annual?limit=${limit}`, { headers: authHeaders() }).then(r => r.json())
+                ]);
+                txns = [...(r1.transactions || []), ...(r2.transactions || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, limit);
+            } else {
+                const res = await fetch(`${API}/${painterId}/points/${pool}?limit=${limit}`, { headers: authHeaders() });
+                const data = await res.json();
+                txns = data.transactions || [];
+            }
+            if (!txns.length) { container.innerHTML = '<p class="text-gray-400 text-sm">No transactions</p>'; return; }
+            container.innerHTML = `<table class="data-table">
+                <thead><tr><th>Date</th><th>Pool</th><th>Type</th><th>Amount</th><th>Balance</th><th>Source</th><th>Description</th></tr></thead>
+                <tbody>${txns.map(t => `<tr>
+                    <td class="text-xs">${new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})}</td>
+                    <td><span class="badge badge-${t.pool === 'regular' ? 'active' : 'pending'}">${t.pool}</span></td>
+                    <td>${t.type}</td>
+                    <td class="font-semibold ${parseFloat(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}">${parseFloat(t.amount) >= 0 ? '+' : ''}${parseFloat(t.amount).toFixed(2)}</td>
+                    <td class="text-xs text-gray-500">${t.balance_after != null ? parseFloat(t.balance_after).toFixed(2) : '-'}</td>
+                    <td class="text-xs">${(t.source || '').replace(/_/g, ' ')}</td>
+                    <td class="text-xs">${esc(t.description || '-')}</td>
+                </tr>`).join('')}</tbody></table>`;
+        } catch (err) { container.innerHTML = '<p class="text-red-500 text-sm">Error loading: ' + err.message + '</p>'; }
+    }
 
     async function updateCredit(painterId, enabled) {
         const limit = document.getElementById('detailCreditLimit')?.value || 0;
