@@ -43,6 +43,38 @@ async function logEstimateStatusChange(estimateId, oldStatus, newStatus, changed
     } catch (err) {
         console.error('[Painters] Failed to log estimate status change:', err.message);
     }
+
+    // Send painter notification for key status changes
+    const NOTIFY_STATUSES = {
+        'approved': { type: 'estimate_approved', title: 'Estimate Approved', body: 'Your estimate #{est} has been approved.' },
+        'rejected': { type: 'estimate_rejected', title: 'Estimate Rejected', body: 'Your estimate #{est} was rejected.{notes}' },
+        'sent_to_customer': { type: 'estimate_sent', title: 'Estimate Sent to Customer', body: 'Your estimate #{est} has been sent to the customer.' },
+        'final_approved': { type: 'estimate_final_approved', title: 'Estimate Final Approved', body: 'Your estimate #{est} has been final approved.{notes}' },
+        'payment_recorded': { type: 'payment_confirmed', title: 'Payment Confirmed', body: 'Payment for estimate #{est} has been confirmed.' },
+        'pushed_to_zoho': { type: 'estimate_invoiced', title: 'Invoice Created', body: 'Zoho invoice created for estimate #{est}.' },
+        'discount_requested': null, // painter initiated, no need to notify
+        'payment_submitted': null // painter initiated
+    };
+    try {
+        const notifConfig = NOTIFY_STATUSES[newStatus];
+        if (notifConfig) {
+            const [estRows] = await pool.query('SELECT painter_id, estimate_number FROM painter_estimates WHERE id = ?', [estimateId]);
+            if (estRows.length) {
+                const est = estRows[0];
+                const body = notifConfig.body
+                    .replace('{est}', est.estimate_number || estimateId)
+                    .replace('{notes}', notes ? ' ' + notes : '');
+                await painterNotificationService.sendToPainter(est.painter_id, {
+                    type: notifConfig.type,
+                    title: notifConfig.title,
+                    body,
+                    data: { estimate_id: String(estimateId), status: newStatus }
+                });
+            }
+        }
+    } catch (notifErr) {
+        console.error('[Painters] Estimate notification error (non-fatal):', notifErr.message);
+    }
 }
 
 // ─── Haversine Distance (meters) ─────────────────────────────
@@ -2491,8 +2523,41 @@ router.put('/withdrawals/:id', requirePermission('painters', 'points'), async (r
     try {
         const { action, payment_reference, notes } = req.body;
         if (!action) return res.status(400).json({ success: false, message: 'Action required (approve/reject/paid)' });
+
+        // Get withdrawal details before processing (for notification)
+        const [wRows] = await pool.query('SELECT painter_id, pool, amount FROM painter_withdrawals WHERE id = ?', [req.params.id]);
+        const withdrawal = wRows[0];
+
         const result = await pointsEngine.processWithdrawal(parseInt(req.params.id), action, req.user.id, payment_reference, notes);
         res.json({ success: true, message: `Withdrawal ${action}d`, ...result });
+
+        // Send notification to painter
+        if (withdrawal) {
+            try {
+                const amt = parseFloat(withdrawal.amount).toFixed(2);
+                const poolLabel = withdrawal.pool === 'regular' ? 'Regular' : 'Annual';
+                let title, body, type;
+                if (action === 'approve' || action === 'paid') {
+                    type = 'withdrawal_approved';
+                    title = 'Withdrawal Approved!';
+                    body = `Your ${poolLabel} points withdrawal of ${amt} has been ${action === 'paid' ? 'paid' : 'approved'}.${payment_reference ? ' Ref: ' + payment_reference : ''}`;
+                } else if (action === 'reject') {
+                    type = 'withdrawal_rejected';
+                    title = 'Withdrawal Rejected';
+                    body = `Your ${poolLabel} points withdrawal of ${amt} was rejected.${notes ? ' Reason: ' + notes : ''}`;
+                }
+                if (type) {
+                    await painterNotificationService.sendToPainter(withdrawal.painter_id, {
+                        type,
+                        title,
+                        body,
+                        data: { withdrawal_id: String(req.params.id), action }
+                    });
+                }
+            } catch (notifErr) {
+                console.error('Withdrawal notification error (non-fatal):', notifErr.message);
+            }
+        }
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
@@ -3056,6 +3121,19 @@ router.post('/estimates/:estimateId/confirm-payment', requirePermission('painter
                      pointsResult.regularPoints || 0, pointsResult.annualPoints || 0, estimate.id]
                 );
                 console.log(`[Points] Confirm-payment: painter ${estimate.painter_id}, estimate ${estimate.id}, regular=${pointsResult.regularPoints}, annual=${pointsResult.annualPoints}`);
+                // Notify painter about points
+                const totalPts = (pointsResult.regularPoints || 0) + (pointsResult.annualPoints || 0);
+                if (totalPts > 0) {
+                    const parts = [];
+                    if (pointsResult.regularPoints > 0) parts.push(`${pointsResult.regularPoints} regular`);
+                    if (pointsResult.annualPoints > 0) parts.push(`${pointsResult.annualPoints.toFixed(2)} annual`);
+                    painterNotificationService.sendToPainter(estimate.painter_id, {
+                        type: 'points_earned',
+                        title: 'Points Earned!',
+                        body: `You earned ${parts.join(' + ')} points for estimate #${estimate.estimate_number || estimate.id}.`,
+                        data: { estimate_id: String(estimate.id), points: String(totalPts) }
+                    }).catch(e => console.error('Points notification error:', e.message));
+                }
             }
         } catch (ptsErr) {
             console.error('Points award on confirm-payment (non-fatal):', ptsErr.message);
