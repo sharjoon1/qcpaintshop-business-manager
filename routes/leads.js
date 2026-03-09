@@ -595,6 +595,20 @@ router.post('/my/create', requirePermission('leads', 'own.add'), async (req, res
             return res.status(400).json({ success: false, message: 'Lead name is required' });
         }
 
+        // Check for duplicate phone
+        if (phone) {
+            const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+            if (cleanPhone.length >= 10) {
+                const [existing] = await pool.query(
+                    `SELECT id, lead_number, name, status FROM leads WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
+                    [`%${cleanPhone}`]
+                );
+                if (existing.length > 0) {
+                    return res.status(409).json({ success: false, message: `Duplicate lead! Phone already exists in ${existing[0].lead_number} (${existing[0].name}) - Status: ${existing[0].status}` });
+                }
+            }
+        }
+
         const leadNumber = await generateLeadNumber();
 
         const [result] = await pool.query(
@@ -1673,6 +1687,20 @@ router.post('/', requirePermission('leads', 'add'), async (req, res) => {
                 success: false,
                 message: 'Lead name is required'
             });
+        }
+
+        // Check for duplicate phone
+        if (phone) {
+            const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+            if (cleanPhone.length >= 10) {
+                const [existing] = await pool.query(
+                    `SELECT id, lead_number, name, status FROM leads WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
+                    [`%${cleanPhone}`]
+                );
+                if (existing.length > 0) {
+                    return res.status(409).json({ success: false, message: `Duplicate lead! Phone already exists in ${existing[0].lead_number} (${existing[0].name}) - Status: ${existing[0].status}` });
+                }
+            }
         }
 
         const leadNumber = await generateLeadNumber();
