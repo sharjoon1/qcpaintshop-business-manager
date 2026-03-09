@@ -1227,14 +1227,21 @@
             }
             // 2. Suffix: "Product Name 4 Ltr"
             const sfx = n.match(new RegExp('^(.+?)\\s+(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_PATTERN + ')\\s*$', 'i'));
-            if (sfx) return { productName: sfx[1].trim(), sizeLabel: sfx[2] + ' ' + sfx[3] };
+            if (sfx) {
+                let pName = sfx[1].trim();
+                // Strip leading SKU code like IPR01, APD20, WDXP04 (letters+digits at start)
+                pName = pName.replace(/^[A-Z]{2,6}\d{1,4}\s+/i, '');
+                return { productName: pName, sizeLabel: sfx[2] + ' ' + sfx[3] };
+            }
             // 3. Prefix with unit: "4 Ltr Product Name"
             const pfxU = n.match(new RegExp('^(\\d+(?:\\.\\d+)?)\\s*(' + UNIT_PATTERN + ')\\s+(.+)$', 'i'));
             if (pfxU) return { productName: pfxU[3].trim(), sizeLabel: pfxU[1] + ' ' + pfxU[2] };
             // 4. Prefix number: "100 AJAX PAPER"
             const pfxN = n.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
             if (pfxN) return { productName: pfxN[2].trim(), sizeLabel: pfxN[1] };
-            // 5. Fallback
+            // 5. Fallback — still try stripping leading SKU code
+            const skuStripped = n.replace(/^[A-Z]{2,6}\d{1,4}\s+/i, '');
+            if (skuStripped !== n) return { productName: skuStripped, sizeLabel: '' };
             return { productName: n, sizeLabel: '' };
         }
 
@@ -1285,11 +1292,28 @@
                 </div>`;
             }
 
-            body.innerHTML = warningHtml + reviewGroups.map((g, idx) => {
+            // Merge button (show if 2+ groups)
+            let mergeBarHtml = '';
+            if (reviewGroups.length > 1) {
+                mergeBarHtml = `<div class="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 mb-3">
+                    <label class="flex items-center gap-2 text-sm text-blue-800 cursor-pointer whitespace-nowrap">
+                        <input type="checkbox" id="reviewSelectAll" onchange="toggleAllReviewGroups(this.checked)" class="rounded">
+                        Select All
+                    </label>
+                    <span class="text-xs text-blue-600 flex-1" id="mergeSelCount">0 selected</span>
+                    <button onclick="mergeSelectedGroups()" id="mergeBtn" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                        Merge Selected
+                    </button>
+                </div>`;
+            }
+
+            body.innerHTML = warningHtml + mergeBarHtml + reviewGroups.map((g, idx) => {
                 const firstItemId = g.items[0]?.zoho_item_id || g.items[0]?.item_id || '';
                 return `
-                <div class="border border-gray-200 rounded-xl p-4 hover:border-purple-200 transition">
+                <div class="border border-gray-200 rounded-xl p-4 hover:border-purple-200 transition" id="reviewGroup_${idx}">
                     <div class="flex gap-4">
+                        <!-- Merge checkbox -->
+                        ${reviewGroups.length > 1 ? `<div class="flex-shrink-0 pt-1"><input type="checkbox" class="review-merge-cb rounded" data-idx="${idx}" onchange="updateMergeSelection()"></div>` : ''}
                         <!-- Image -->
                         <div class="flex-shrink-0">
                             ${g.image_url
@@ -1354,6 +1378,57 @@
             reviewGroups[idx].product_type = value;
             const coverageEl = document.getElementById('reviewCoverage_' + idx);
             if (coverageEl) coverageEl.style.display = value === 'area_wise' ? '' : 'none';
+        }
+
+        function toggleAllReviewGroups(checked) {
+            document.querySelectorAll('.review-merge-cb').forEach(cb => cb.checked = checked);
+            updateMergeSelection();
+        }
+
+        function updateMergeSelection() {
+            const checked = document.querySelectorAll('.review-merge-cb:checked');
+            const countEl = document.getElementById('mergeSelCount');
+            const btn = document.getElementById('mergeBtn');
+            if (countEl) countEl.textContent = checked.length + ' selected';
+            if (btn) btn.disabled = checked.length < 2;
+        }
+
+        function mergeSelectedGroups() {
+            const checkedIdxs = Array.from(document.querySelectorAll('.review-merge-cb:checked'))
+                .map(cb => parseInt(cb.dataset.idx))
+                .sort((a, b) => a - b);
+            if (checkedIdxs.length < 2) return alert('Select at least 2 groups to merge');
+
+            // Merge into the first selected group
+            const target = reviewGroups[checkedIdxs[0]];
+            const mergedItems = [];
+            const names = [];
+            for (const idx of checkedIdxs) {
+                mergedItems.push(...reviewGroups[idx].items);
+                names.push(reviewGroups[idx].name);
+                if (!target.image_url && reviewGroups[idx].image_url) target.image_url = reviewGroups[idx].image_url;
+            }
+            target.items = mergedItems;
+
+            // Find common name substring or keep first
+            const commonName = findCommonName(names);
+            if (commonName.length > 3) target.name = commonName;
+
+            // Remove merged groups (in reverse order to preserve indices)
+            for (let i = checkedIdxs.length - 1; i >= 1; i--) {
+                reviewGroups.splice(checkedIdxs[i], 1);
+            }
+
+            renderImportReview();
+        }
+
+        function findCommonName(names) {
+            if (names.length === 0) return '';
+            if (names.length === 1) return names[0];
+            // Find longest common substring by comparing words
+            const wordSets = names.map(n => n.toUpperCase().split(/\s+/));
+            const common = wordSets[0].filter(w => wordSets.every(ws => ws.includes(w)));
+            return common.join(' ') || names[0];
         }
 
         function triggerReviewImage(groupIdx, itemId) {
