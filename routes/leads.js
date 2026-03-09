@@ -600,7 +600,7 @@ router.post('/my/create', requirePermission('leads', 'own.add'), async (req, res
             const cleanPhone = phone.replace(/\D/g, '').slice(-10);
             if (cleanPhone.length >= 10) {
                 const [existing] = await pool.query(
-                    `SELECT id, lead_number, name, status FROM leads WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
+                    `SELECT id, lead_number, name, status FROM leads WHERE status != 'inactive' AND REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
                     [`%${cleanPhone}`]
                 );
                 if (existing.length > 0) {
@@ -1694,7 +1694,7 @@ router.post('/', requirePermission('leads', 'add'), async (req, res) => {
             const cleanPhone = phone.replace(/\D/g, '').slice(-10);
             if (cleanPhone.length >= 10) {
                 const [existing] = await pool.query(
-                    `SELECT id, lead_number, name, status FROM leads WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
+                    `SELECT id, lead_number, name, status FROM leads WHERE status != 'inactive' AND REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ? LIMIT 1`,
                     [`%${cleanPhone}`]
                 );
                 if (existing.length > 0) {
@@ -1877,22 +1877,12 @@ router.delete('/:id', requirePermission('leads', 'delete'), async (req, res) => 
             });
         }
 
-        if (existing[0].status === 'inactive') {
-            return res.status(400).json({
-                success: false,
-                message: 'Lead is already inactive'
-            });
-        }
-
-        await pool.query(
-            `UPDATE leads SET status = 'inactive' WHERE id = ?`,
-            [leadId]
-        );
+        await pool.query('DELETE FROM leads WHERE id = ?', [leadId]);
 
         res.json({
             success: true,
-            message: 'Lead deactivated successfully',
-            data: { id: parseInt(leadId), status: 'inactive' }
+            message: 'Lead deleted successfully',
+            data: { id: parseInt(leadId) }
         });
 
     } catch (error) {
