@@ -71,7 +71,10 @@ async function sendToDevice(fcmToken, { title, body, data, ttlSeconds }) {
             ...(ttlSeconds !== undefined ? { ttl: ttlSeconds * 1000 } : {}),
             notification: {
                 channelId: 'qc_notifications',
-                sound: 'default'
+                sound: 'default',
+                defaultSound: true,
+                defaultVibrateTimings: true,
+                notificationPriority: 'PRIORITY_HIGH'
             }
         }
     };

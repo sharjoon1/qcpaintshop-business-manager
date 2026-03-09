@@ -192,10 +192,12 @@
         .act-card {
             background: white; border-radius: 12px; padding: 14px;
             box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
-            border-left: 4px solid #10b981;
+            border-left: 4px solid #10b981; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
         }
+        .act-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .act-card.idle { border-left-color: #f59e0b; }
         .act-card.on-break { border-left-color: #3b82f6; }
+        .act-card.prayer { border-left-color: #8b5cf6; }
         .act-card .act-name { font-weight: 700; font-size: 0.875rem; color: #1e293b; }
         .act-card .act-type { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
         .act-card .act-time { font-size: 0.7rem; color: #94a3b8; margin-top: 4px; }
@@ -206,6 +208,34 @@
         .act-badge-active { background: #d1fae5; color: #065f46; }
         .act-badge-idle { background: #fef3c7; color: #92400e; }
         .act-badge-break { background: #dbeafe; color: #1e40af; }
+        .act-badge-prayer { background: #ede9fe; color: #5b21b6; }
+        .act-badge-outside { background: #fce7f3; color: #9d174d; }
+
+        /* Timeline slide-out panel */
+        .timeline-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9998; }
+        .timeline-overlay.open { display:block; }
+        .timeline-panel {
+            position:fixed; top:0; right:-420px; width:400px; max-width:90vw; height:100vh;
+            background:white; z-index:9999; box-shadow:-4px 0 20px rgba(0,0,0,0.15);
+            transition: right 0.3s ease; overflow-y:auto;
+        }
+        .timeline-panel.open { right:0; }
+        .tl-header { padding:16px 20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:white; z-index:1; }
+        .tl-header h3 { font-size:1rem; font-weight:700; color:#1e293b; }
+        .tl-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8; padding:4px 8px; }
+        .tl-close:hover { color:#1e293b; }
+        .tl-body { padding:16px 20px; }
+        .tl-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+        .tl-dot { width:10px; height:10px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+        .tl-dot.active { background:#10b981; }
+        .tl-dot.ended { background:#94a3b8; }
+        .tl-dot.break { background:#3b82f6; }
+        .tl-dot.prayer { background:#8b5cf6; }
+        .tl-dot.outside { background:#ec4899; }
+        .tl-detail { flex:1; }
+        .tl-detail .tl-type { font-weight:600; font-size:0.8125rem; color:#1e293b; }
+        .tl-detail .tl-times { font-size:0.75rem; color:#64748b; margin-top:2px; }
+        .tl-detail .tl-dur { font-size:0.7rem; color:#94a3b8; margin-top:1px; }
 
         .recent-activity {
             margin: 2rem 0;
@@ -386,6 +416,18 @@
         </div>
     </div>
 
+    <!-- Timeline slide-out panel -->
+    <div class="timeline-overlay" id="tlOverlay" onclick="closeTimeline()"></div>
+    <div class="timeline-panel" id="tlPanel">
+        <div class="tl-header">
+            <h3 id="tlTitle">Staff Timeline</h3>
+            <button class="tl-close" onclick="closeTimeline()">&times;</button>
+        </div>
+        <div class="tl-body" id="tlBody">
+            <div class="text-center text-gray-400 py-8 text-sm">Loading...</div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('navigationLoaded', initDashboard);
         setTimeout(initDashboard, 1000);
@@ -467,25 +509,33 @@
                 const res = await fetch('/api/activity-tracker/admin/live', { headers });
                 if (!res.ok) throw new Error('Failed');
                 const data = await res.json();
-                // Combine active sessions + idle staff
+                // Combine active + idle + break/away staff
                 const activeStaff = (data.active || []).map(s => ({ ...s, _status: 'active' }));
+                const awayStaff = (data.on_break_or_away || []).map(s => ({ ...s, _status: s.away_type || 'break' }));
                 const idleStaff = (data.idle || []).map(s => ({ ...s, _status: 'idle' }));
-                const staff = [...activeStaff, ...idleStaff];
+                const staff = [...activeStaff, ...awayStaff, ...idleStaff];
                 const container = document.getElementById('activityMonitor');
                 if (!staff.length) {
                     container.innerHTML = '<div class="text-center text-gray-400 py-4 text-sm" style="grid-column:1/-1;">No staff currently clocked in</div>';
                     return;
                 }
                 container.innerHTML = staff.map(s => {
-                    const isIdle = s._status === 'idle' || s.idle_minutes >= 15;
-                    const onBreak = s.on_break;
-                    const cls = onBreak ? 'on-break' : (isIdle ? 'idle' : '');
-                    const badge = onBreak ? '<span class="act-badge act-badge-break">On Break</span>'
-                        : isIdle ? `<span class="act-badge act-badge-idle">Idle ${s.idle_minutes || 0}m</span>`
-                        : '<span class="act-badge act-badge-active">Active</span>';
-                    const activity = s.activity_type || s.current_activity || (isIdle ? 'Idle' : 'Working');
+                    const st = s._status;
+                    const isIdle = st === 'idle';
+                    const isBreak = st === 'break';
+                    const isPrayer = st === 'prayer';
+                    const isOutside = st === 'outside_work';
+                    const cls = isBreak ? 'on-break' : isPrayer ? 'prayer' : isOutside ? 'on-break' : isIdle ? 'idle' : '';
+                    let badge;
+                    if (isBreak) badge = `<span class="act-badge act-badge-break">Break ${s.away_minutes || 0}m</span>`;
+                    else if (isPrayer) badge = `<span class="act-badge act-badge-prayer">Prayer ${s.away_minutes || 0}m</span>`;
+                    else if (isOutside) badge = `<span class="act-badge act-badge-outside">Outside ${s.away_minutes || 0}m</span>`;
+                    else if (isIdle) badge = `<span class="act-badge act-badge-idle">Idle ${s.idle_minutes || 0}m</span>`;
+                    else badge = '<span class="act-badge act-badge-active">Active</span>';
+                    const activity = s.activity_type || s.current_activity || (isBreak ? 'On Break' : isPrayer ? 'At Prayer' : isOutside ? 'Outside Work' : isIdle ? 'Idle' : 'Working');
                     const elapsed = s.started_at || s.activity_started_at ? elapsedStr(s.started_at || s.activity_started_at) : '';
-                    return `<div class="act-card ${cls}">
+                    const uid = s.user_id || s.userId || '';
+                    return `<div class="act-card ${cls}" onclick="openTimeline(${uid}, '${escHtml(s.full_name || s.user_name || 'Staff')}')">
                         <div style="display:flex;justify-content:space-between;align-items:start;">
                             <div class="act-name">${escHtml(s.full_name || s.user_name || 'Staff')}</div>
                             ${badge}
@@ -597,6 +647,60 @@
             const hrs = Math.floor(mins / 60);
             const rm = mins % 60;
             return hrs + 'h ' + rm + 'm';
+        }
+
+        // ===== Timeline Panel =====
+        async function openTimeline(userId, name) {
+            if (!userId) return;
+            document.getElementById('tlTitle').textContent = name + ' — Today';
+            document.getElementById('tlBody').innerHTML = '<div class="text-center text-gray-400 py-8 text-sm">Loading timeline...</div>';
+            document.getElementById('tlOverlay').classList.add('open');
+            document.getElementById('tlPanel').classList.add('open');
+            try {
+                const headers = window.getAuthHeaders ? window.getAuthHeaders() : {
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                    'Content-Type': 'application/json'
+                };
+                const res = await fetch(`/api/activity-tracker/admin/staff/${userId}/timeline`, { headers });
+                if (!res.ok) throw new Error('Failed');
+                const data = await res.json();
+                const items = data.timeline || [];
+                if (!items.length) {
+                    document.getElementById('tlBody').innerHTML = '<div class="text-center text-gray-400 py-8 text-sm">No activity recorded today</div>';
+                    return;
+                }
+                document.getElementById('tlBody').innerHTML = items.map(item => {
+                    const type = item.type || item.activity_type || '';
+                    const isBreak = type.includes('break');
+                    const isPrayer = type.includes('prayer');
+                    const isOutside = type.includes('outside');
+                    const isActive = !item.ended_at && !item.end_time;
+                    const dotCls = isBreak ? 'break' : isPrayer ? 'prayer' : isOutside ? 'outside' : isActive ? 'active' : 'ended';
+                    const start = item.started_at || item.start_time || '';
+                    const end = item.ended_at || item.end_time || '';
+                    const startStr = start ? new Date(start).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '';
+                    const endStr = end ? new Date(end).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : 'ongoing';
+                    const dur = item.duration_minutes ? item.duration_minutes + 'm' : (start ? elapsedStr(start) : '');
+                    const label = (type || 'Activity').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    return `<div class="tl-item">
+                        <div class="tl-dot ${dotCls}"></div>
+                        <div class="tl-detail">
+                            <div class="tl-type">${escHtml(label)}</div>
+                            <div class="tl-times">${startStr} → ${endStr}</div>
+                            ${dur ? `<div class="tl-dur">${dur}</div>` : ''}
+                            ${item.notes ? `<div class="tl-dur">${escHtml(item.notes)}</div>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                console.error('Timeline error:', e);
+                document.getElementById('tlBody').innerHTML = '<div class="text-center text-red-400 py-8 text-sm">Failed to load timeline</div>';
+            }
+        }
+
+        function closeTimeline() {
+            document.getElementById('tlOverlay').classList.remove('open');
+            document.getElementById('tlPanel').classList.remove('open');
         }
 
         function displayRecentEstimates(estimates) {

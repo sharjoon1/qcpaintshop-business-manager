@@ -197,7 +197,7 @@ router.get('/admin/live', requireAuth, requirePermission('attendance', 'view'), 
         // Get active sessions
         const active = await activityService.getLiveSessions();
 
-        // Get idle staff (clocked in, no active session)
+        // Get idle staff (clocked in, no active session, NOT on break/outside/prayer)
         const [idle] = await pool.query(`
             SELECT a.user_id, u.full_name, u.branch_id, b.name as branch_name, a.clock_in_time,
                 (SELECT MAX(ended_at) FROM staff_activity_sessions WHERE user_id = a.user_id AND DATE(started_at) = CURDATE()) as last_activity_ended
@@ -206,6 +206,9 @@ router.get('/admin/live', requireAuth, requirePermission('attendance', 'view'), 
             LEFT JOIN branches b ON b.id = u.branch_id
             WHERE a.date = CURDATE() AND a.clock_in_time IS NOT NULL AND a.clock_out_time IS NULL
                 AND NOT EXISTS (SELECT 1 FROM staff_activity_sessions WHERE user_id = a.user_id AND ended_at IS NULL)
+                AND (a.break_start_time IS NULL OR a.break_end_time IS NOT NULL)
+                AND NOT EXISTS (SELECT 1 FROM outside_work_periods WHERE user_id = a.user_id AND status = 'active')
+                AND NOT EXISTS (SELECT 1 FROM prayer_periods WHERE user_id = a.user_id AND status = 'active')
         `);
 
         // Calculate idle_minutes for each idle staff member
@@ -215,10 +218,44 @@ router.get('/admin/live', requireAuth, requirePermission('attendance', 'view'), 
             return { ...staff, idle_minutes: idleMinutes };
         });
 
+        // Get staff on break/outside work/prayer (clocked in, no active activity session)
+        const [onBreakOrAway] = await pool.query(`
+            SELECT a.user_id, u.full_name, u.branch_id, b.name as branch_name, a.clock_in_time,
+                CASE
+                    WHEN a.break_start_time IS NOT NULL AND a.break_end_time IS NULL THEN 'break'
+                    WHEN EXISTS (SELECT 1 FROM outside_work_periods WHERE user_id = a.user_id AND status = 'active') THEN 'outside_work'
+                    WHEN EXISTS (SELECT 1 FROM prayer_periods WHERE user_id = a.user_id AND status = 'active') THEN 'prayer'
+                END as away_type,
+                CASE
+                    WHEN a.break_start_time IS NOT NULL AND a.break_end_time IS NULL THEN a.break_start_time
+                    WHEN EXISTS (SELECT 1 FROM outside_work_periods WHERE user_id = a.user_id AND status = 'active')
+                        THEN (SELECT start_time FROM outside_work_periods WHERE user_id = a.user_id AND status = 'active' ORDER BY id DESC LIMIT 1)
+                    WHEN EXISTS (SELECT 1 FROM prayer_periods WHERE user_id = a.user_id AND status = 'active')
+                        THEN (SELECT start_time FROM prayer_periods WHERE user_id = a.user_id AND status = 'active' ORDER BY id DESC LIMIT 1)
+                END as away_since
+            FROM staff_attendance a
+            JOIN users u ON u.id = a.user_id
+            LEFT JOIN branches b ON b.id = u.branch_id
+            WHERE a.date = CURDATE() AND a.clock_in_time IS NOT NULL AND a.clock_out_time IS NULL
+                AND (
+                    (a.break_start_time IS NOT NULL AND a.break_end_time IS NULL)
+                    OR EXISTS (SELECT 1 FROM outside_work_periods WHERE user_id = a.user_id AND status = 'active')
+                    OR EXISTS (SELECT 1 FROM prayer_periods WHERE user_id = a.user_id AND status = 'active')
+                )
+        `);
+
+        // Calculate away_minutes
+        const awayWithMinutes = onBreakOrAway.map(staff => {
+            const awaySince = staff.away_since ? new Date(staff.away_since).getTime() : Date.now();
+            const awayMinutes = Math.floor((Date.now() - awaySince) / 60000);
+            return { ...staff, away_minutes: awayMinutes };
+        });
+
         res.json({
             success: true,
             active,
             idle: idleWithMinutes,
+            on_break_or_away: awayWithMinutes,
             config: activityService.ACTIVITY_CONFIG
         });
     } catch (err) {
