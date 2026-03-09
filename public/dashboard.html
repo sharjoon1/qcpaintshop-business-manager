@@ -504,10 +504,10 @@
                     'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
                     'Content-Type': 'application/json'
                 };
-                const res = await fetch('/api/activity-feed/notices', { headers });
+                const res = await fetch('/api/activity-feed', { headers });
                 if (!res.ok) throw new Error('Failed');
                 const data = await res.json();
-                const notices = data.data || [];
+                const notices = data.notices || [];
                 const container = document.getElementById('noticeBoard');
                 if (!notices.length) {
                     container.innerHTML = '<div class="text-center text-gray-400 py-4 text-sm">No notices posted yet</div>';
@@ -516,12 +516,12 @@
                 container.innerHTML = notices.map(n => {
                     const priClass = n.priority === 'urgent' ? 'urgent' : n.priority === 'important' ? 'important' : '';
                     const user = JSON.parse(localStorage.getItem('user') || '{}');
-                    const canDel = user.role === 'admin' || n.created_by === user.id;
+                    const canDel = user.role === 'admin' || n.posted_by === user.id;
                     return `<div class="notice-card ${priClass}">
                         <div style="display:flex;justify-content:space-between;align-items:start;">
                             <div>
                                 <div class="n-title">${n.priority !== 'normal' ? (n.priority === 'urgent' ? '🔴 ' : '🟡 ') : ''}${escHtml(n.title || n.message || '')}</div>
-                                <div class="n-meta">${escHtml(n.author_name || '')} · ${fmtRelative(n.created_at)}</div>
+                                <div class="n-meta">${escHtml(n.posted_by_name || '')} · ${fmtRelative(n.created_at)}</div>
                             </div>
                             ${canDel ? `<button onclick="deleteNotice(${n.id})" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;" title="Delete">×</button>` : ''}
                         </div>
@@ -545,7 +545,7 @@
                 };
                 const res = await fetch('/api/activity-feed/notices', {
                     method: 'POST', headers,
-                    body: JSON.stringify({ title: text, message: '', priority })
+                    body: JSON.stringify({ title: text, message: text, priority })
                 });
                 if (res.ok) {
                     document.getElementById('noticeText').value = '';
