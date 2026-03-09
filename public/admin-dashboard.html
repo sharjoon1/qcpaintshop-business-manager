@@ -92,6 +92,39 @@
             .stat-value { font-size: 2.25rem; }
             .stat-label { font-size: 0.9rem; }
         }
+
+        /* Notice Board */
+        .notice-card {
+            padding: 12px 14px; border-radius: 10px; margin-bottom: 8px;
+            border-left: 4px solid #667eea; background: #f8fafc;
+        }
+        .notice-card.urgent { border-left-color: #dc2626; background: #fef2f2; }
+        .notice-card.important { border-left-color: #f59e0b; background: #fffbeb; }
+        .notice-card .n-title { font-weight: 600; font-size: 0.8125rem; color: #1e293b; }
+        .notice-card .n-meta { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
+        .notice-card .n-body { font-size: 0.8rem; color: #475569; margin-top: 4px; }
+        .notice-form textarea { width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.8125rem; outline: none; resize: vertical; }
+        .notice-form textarea:focus { border-color: #667eea; }
+
+        /* Activity cards */
+        .act-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+        .act-card {
+            background: white; border-radius: 12px; padding: 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
+            border-left: 4px solid #10b981;
+        }
+        .act-card.idle { border-left-color: #f59e0b; }
+        .act-card.on-break { border-left-color: #3b82f6; }
+        .act-card .act-name { font-weight: 700; font-size: 0.875rem; color: #1e293b; }
+        .act-card .act-type { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+        .act-card .act-time { font-size: 0.7rem; color: #94a3b8; margin-top: 4px; }
+        .act-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 0.65rem; font-weight: 600;
+        }
+        .act-badge-active { background: #d1fae5; color: #065f46; }
+        .act-badge-idle { background: #fef3c7; color: #92400e; }
+        .act-badge-break { background: #dbeafe; color: #1e40af; }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -198,6 +231,46 @@
                     <div class="text-2xl font-bold text-blue-700" id="monthNewLeads">0</div>
                     <div class="text-xs text-gray-600 mt-1">New Leads</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Staff Activity Monitor -->
+        <div class="card mb-6">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
+                <h3 style="font-size:1.1rem;font-weight:700;color:#374151;margin:0;">🔍 What Staff Are Doing</h3>
+                <a href="/admin-activity-monitor.html" style="font-size:0.75rem;color:#667eea;font-weight:600;text-decoration:none;">View Full Monitor →</a>
+            </div>
+            <div id="actSummary" style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+                <span class="act-badge act-badge-active" id="actActiveCount">0 Active</span>
+                <span class="act-badge act-badge-idle" id="actIdleCount">0 Idle</span>
+                <span class="act-badge act-badge-break" id="actBreakCount">0 On Break</span>
+            </div>
+            <div class="act-grid" id="actGrid">
+                <div style="text-align:center;color:#94a3b8;font-size:0.8rem;padding:20px;grid-column:1/-1;">Loading staff activity...</div>
+            </div>
+        </div>
+
+        <!-- Notice Board -->
+        <div class="card mb-6">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
+                <h3 style="font-size:1.1rem;font-weight:700;color:#374151;margin:0;">📢 Notice Board</h3>
+                <button onclick="document.getElementById('noticeForm').style.display=document.getElementById('noticeForm').style.display==='none'?'':'none'" style="font-size:0.75rem;color:#667eea;font-weight:600;background:none;border:none;cursor:pointer;">+ Post Notice</button>
+            </div>
+            <!-- Post form (hidden) -->
+            <div id="noticeForm" class="notice-form" style="display:none;margin-bottom:14px;padding:14px;background:#f8fafc;border-radius:10px;">
+                <input id="nfTitle" placeholder="Notice title..." style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:0.8125rem;margin-bottom:8px;outline:none;">
+                <textarea id="nfBody" rows="2" placeholder="Notice message..."></textarea>
+                <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+                    <select id="nfPriority" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:0.8rem;">
+                        <option value="normal">Normal</option>
+                        <option value="important">Important</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                    <button onclick="postNotice()" style="padding:8px 18px;background:#667eea;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;">Post</button>
+                </div>
+            </div>
+            <div id="noticeList">
+                <div style="text-align:center;color:#94a3b8;font-size:0.8rem;padding:16px;">Loading notices...</div>
             </div>
         </div>
 
@@ -314,6 +387,199 @@
     }
 
     loadDashboard();
+
+    // ── Staff Activity Monitor ──
+    const ACT_TYPES = {
+        marketing: { emoji: '📣', label: 'Marketing' },
+        outstanding_followup: { emoji: '💰', label: 'Collections' },
+        material_arrangement: { emoji: '📦', label: 'Material' },
+        material_receiving: { emoji: '🚛', label: 'Receiving' },
+        attending_customer: { emoji: '🧑‍💼', label: 'Customer' },
+        shop_maintenance: { emoji: '🔧', label: 'Maintenance' }
+    };
+
+    function elapsedStr(startedAt) {
+        const mins = Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000);
+        if (mins < 60) return mins + 'm';
+        return Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+    }
+
+    async function loadStaffActivity() {
+        try {
+            const resp = await fetch('/api/activity-tracker/admin/live', { headers: getAuthHeaders() });
+            const data = await resp.json();
+            if (!data.success) return;
+
+            const staff = data.data || [];
+            let active = 0, idle = 0, onBreak = 0;
+            staff.forEach(s => {
+                if (s.on_break) onBreak++;
+                else if (s.is_idle) idle++;
+                else if (s.current_activity) active++;
+            });
+
+            document.getElementById('actActiveCount').textContent = active + ' Active';
+            document.getElementById('actIdleCount').textContent = idle + ' Idle';
+            document.getElementById('actBreakCount').textContent = onBreak + ' On Break';
+
+            const grid = document.getElementById('actGrid');
+            const tracked = staff.filter(s => s.current_activity || s.on_break || s.is_idle);
+
+            if (tracked.length === 0) {
+                grid.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:0.8rem;padding:20px;grid-column:1/-1;">No staff activity tracked right now</div>';
+                return;
+            }
+
+            grid.innerHTML = tracked.map(s => {
+                let cls = 'act-card';
+                let badge = '';
+                let typeStr = '';
+
+                if (s.on_break) {
+                    cls += ' on-break';
+                    badge = '<span class="act-badge act-badge-break">On Break</span>';
+                    typeStr = 'Break';
+                } else if (s.is_idle) {
+                    cls += ' idle';
+                    const idleMins = s.idle_minutes || 0;
+                    badge = `<span class="act-badge act-badge-idle">Idle ${idleMins}m</span>`;
+                    typeStr = s.current_activity ? (ACT_TYPES[s.current_activity]?.label || s.current_activity) : 'No Activity';
+                } else if (s.current_activity) {
+                    const at = ACT_TYPES[s.current_activity] || { emoji: '📋', label: s.current_activity };
+                    badge = '<span class="act-badge act-badge-active">Active</span>';
+                    typeStr = at.emoji + ' ' + at.label;
+                }
+
+                const elapsed = s.session_started_at ? elapsedStr(s.session_started_at) : '';
+
+                return `<div class="${cls}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div class="act-name">${s.full_name || 'Staff #' + s.user_id}</div>
+                        ${badge}
+                    </div>
+                    <div class="act-type">${typeStr}</div>
+                    ${elapsed ? `<div class="act-time">Started ${elapsed} ago · ${s.branch_name || ''}</div>` : `<div class="act-time">${s.branch_name || ''}</div>`}
+                </div>`;
+            }).join('');
+        } catch (err) {
+            console.error('Activity load error:', err);
+        }
+    }
+
+    // ── Notice Board ──
+    async function loadNotices() {
+        try {
+            const resp = await fetch('/api/activity-feed', { headers: getAuthHeaders() });
+            const data = await resp.json();
+            if (!data.success) return;
+
+            const notices = data.notices || [];
+            const feed = (data.feed || []).slice(0, 8); // Last 8 activities
+            const list = document.getElementById('noticeList');
+
+            let html = '';
+
+            // Admin notices
+            if (notices.length > 0) {
+                notices.forEach(n => {
+                    const pri = n.priority || 'normal';
+                    html += `<div class="notice-card ${pri}">
+                        <div style="display:flex;justify-content:space-between;align-items:start;">
+                            <div class="n-title">${pri === 'urgent' ? '🔴 ' : pri === 'important' ? '🟡 ' : ''}${escHtml(n.title)}</div>
+                            <button onclick="deleteNotice(${n.id})" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;" title="Delete">×</button>
+                        </div>
+                        ${n.message ? `<div class="n-body">${escHtml(n.message)}</div>` : ''}
+                        <div class="n-meta">by ${escHtml(n.posted_by_name || 'Admin')} · ${fmtRelative(n.created_at)}</div>
+                    </div>`;
+                });
+            }
+
+            // Recent activity feed
+            if (feed.length > 0) {
+                html += '<div style="font-size:0.7rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 8px;">Recent Activity</div>';
+                const feedIcons = {
+                    clock_in: '🟢', clock_out: '🔴', break_start: '☕', break_end: '☕',
+                    lead_created: '🎯', task_completed: '✅', activity_started: '▶️', activity_ended: '⏹️',
+                    overtime: '⏰', stock_check: '📦'
+                };
+                feed.forEach(f => {
+                    html += `<div style="display:flex;gap:8px;align-items:start;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                        <span style="font-size:0.875rem;">${feedIcons[f.activity_type] || '📋'}</span>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:0.8rem;color:#1e293b;font-weight:500;">${escHtml(f.title || f.activity_type)}</div>
+                            <div style="font-size:0.7rem;color:#94a3b8;">${escHtml(f.user_name || '')} · ${fmtRelative(f.created_at)}</div>
+                        </div>
+                    </div>`;
+                });
+            }
+
+            if (!html) {
+                html = '<div style="text-align:center;color:#94a3b8;font-size:0.8rem;padding:16px;">No notices or activity yet</div>';
+            }
+
+            list.innerHTML = html;
+        } catch (err) {
+            console.error('Notice load error:', err);
+        }
+    }
+
+    async function postNotice() {
+        const title = document.getElementById('nfTitle').value.trim();
+        const message = document.getElementById('nfBody').value.trim();
+        const priority = document.getElementById('nfPriority').value;
+        if (!title) return alert('Title required');
+
+        try {
+            const resp = await fetch('/api/activity-feed/notices', {
+                method: 'POST',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, message, priority, target: 'all' })
+            });
+            if (!resp.ok) throw new Error('Failed');
+            document.getElementById('nfTitle').value = '';
+            document.getElementById('nfBody').value = '';
+            document.getElementById('noticeForm').style.display = 'none';
+            loadNotices();
+        } catch (err) {
+            alert('Failed to post notice: ' + err.message);
+        }
+    }
+
+    async function deleteNotice(id) {
+        if (!confirm('Delete this notice?')) return;
+        try {
+            await fetch('/api/activity-feed/notices/' + id, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+            loadNotices();
+        } catch (err) {
+            console.error('Delete notice error:', err);
+        }
+    }
+
+    function escHtml(s) {
+        if (!s) return '';
+        const d = document.createElement('div');
+        d.textContent = String(s);
+        return d.innerHTML;
+    }
+
+    function fmtRelative(dt) {
+        if (!dt) return '';
+        const diff = Math.floor((Date.now() - new Date(dt).getTime()) / 60000);
+        if (diff < 1) return 'just now';
+        if (diff < 60) return diff + 'm ago';
+        if (diff < 1440) return Math.floor(diff / 60) + 'h ago';
+        return Math.floor(diff / 1440) + 'd ago';
+    }
+
+    // Load activity + notices on init
+    loadStaffActivity();
+    loadNotices();
+
+    // Auto-refresh every 60s
+    setInterval(() => { loadStaffActivity(); loadNotices(); }, 60000);
 </script>
 </body>
 </html>

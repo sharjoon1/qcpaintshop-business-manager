@@ -640,6 +640,7 @@
                     <td>${formatDate(c.oldest_due_date)}</td>
                     <td>${c.last_reminder ? formatDateTime(c.last_reminder) : '<span class="text-gray-400">Never</span>'}</td>
                     <td class="flex gap-1 flex-wrap">
+                        ${c.phone ? `<a href="tel:${esc(c.phone)}" class="px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 inline-flex items-center gap-1" title="Call ${esc(c.phone)}">📞 Call</a>` : ''}
                         <button onclick="viewCustomerInvoices('${c.zoho_customer_id}')" class="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100" title="View Invoices">Invoices</button>
                         ${c.phone ? `<button onclick="sendCustomerReminder('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone)}',${c.total_outstanding})" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100" title="Send Reminder">Remind</button>` : ''}
                         <button onclick="openPromiseForCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}')" class="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100" title="Add Promise">Promise</button>
@@ -706,6 +707,7 @@
                     <td><span class="status-badge status-${inv.days_overdue > 0 ? 'overdue' : inv.status}">${inv.days_overdue > 0 ? 'Overdue' : inv.status}</span></td>
                     <td>${inv.reminder_count > 0 ? `<span class="text-xs text-gray-500">${inv.reminder_count}x</span>` : '--'}</td>
                     <td class="flex gap-1">
+                        ${inv.phone ? `<a href="tel:${esc(inv.phone)}" class="px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 inline-flex items-center gap-1" title="Call">📞</a>` : ''}
                         ${inv.phone ? `<button onclick="openReminderModal(${idx})" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">Remind</button>` : '<span class="text-xs text-gray-400">No phone</span>'}
                         <button onclick="openPromiseForInvoice(${idx})" class="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100">Promise</button>
                     </td>

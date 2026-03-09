@@ -108,6 +108,8 @@
         .btn-remind:hover { background: #a7f3d0; }
         .btn-call { background: #dbeafe; color: #1e40af; }
         .btn-call:hover { background: #bfdbfe; }
+        .btn-phone { background: #d1fae5; color: #065f46; text-decoration: none; }
+        .btn-phone:hover { background: #a7f3d0; }
         .btn-promise { background: #fef3c7; color: #92400e; }
         .btn-promise:hover { background: #fde68a; }
 
@@ -574,6 +576,7 @@ async function loadCustomers(page, append) {
                     </div>
                 </div>
                 <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+                    ${c.phone ? `<a href="tel:${esc(c.phone)}" class="action-btn btn-phone">📞 Call</a>` : ''}
                     ${c.phone ? `<button class="action-btn btn-remind" onclick="openRemindCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone)}',${c.total_outstanding})">WhatsApp</button>` : ''}
                     <button class="action-btn btn-call" onclick="openLogModal('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone || '')}')">Log Call</button>
                     <button class="action-btn btn-promise" onclick="openPromiseModal('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}',${c.total_outstanding})">Promise</button>
@@ -623,6 +626,7 @@ async function loadInvoices(page, append) {
                     </div>
                 </div>
                 <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+                    ${inv.phone ? `<a href="tel:${esc(inv.phone)}" class="action-btn btn-phone">📞 Call</a>` : ''}
                     ${inv.phone ? `<button class="action-btn btn-remind" onclick="openRemindInvoice(${idx})">WhatsApp</button>` : ''}
                     <button class="action-btn btn-call" onclick="openLogModal('${esc(inv.zoho_customer_id)}','${esc(inv.customer_name)}','${esc(inv.phone || '')}')">Log Call</button>
                     <button class="action-btn btn-promise" onclick="openPromiseModal('${esc(inv.zoho_customer_id)}','${esc(inv.customer_name)}',${inv.balance})">Promise</button>
