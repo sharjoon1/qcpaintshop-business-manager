@@ -98,7 +98,15 @@ router.post('/stop', requireAuth, async (req, res) => {
  * POST /stop-with-photo — Stop shop_maintenance with a photo
  * Multipart: photo file + metadata in body
  */
-router.post('/stop-with-photo', requireAuth, uploadActivity.single('photo'), async (req, res) => {
+router.post('/stop-with-photo', requireAuth, (req, res, next) => {
+    uploadActivity.single('photo')(req, res, (err) => {
+        if (err) {
+            const msg = err.code === 'LIMIT_FILE_SIZE' ? 'Photo too large. Max 15MB.' : err.message;
+            return res.status(400).json({ success: false, error: msg });
+        }
+        next();
+    });
+}, async (req, res) => {
     try {
         const userId = req.user.id;
 

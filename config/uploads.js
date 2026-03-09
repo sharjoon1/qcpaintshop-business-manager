@@ -135,10 +135,10 @@ const uploadPainterVisualization = multer({
     fileFilter: imageFilter
 });
 
-// Activity tracker photo upload (5MB, images only)
+// Activity tracker photo upload (15MB — phone cameras produce large files, sharp compresses after)
 const uploadActivity = multer({
     storage: createDiskStorage('public/uploads/activity/', 'activity'),
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 15 * 1024 * 1024 },
     fileFilter: imageFilter
 });
 
