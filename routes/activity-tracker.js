@@ -377,6 +377,33 @@ router.get('/admin/daily-report', requireAuth, requirePermission('attendance', '
 });
 
 /**
+ * POST /admin/daily-report/send-all — Send individual activity reports to all staff
+ * Body: { date }
+ */
+router.post('/admin/daily-report/send-all', requireAuth, requirePermission('attendance', 'view'), async (req, res) => {
+    try {
+        const date = req.body.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+        if (!reportService) {
+            return res.status(500).json({ success: false, error: 'Report service not available' });
+        }
+
+        // Send in background, respond immediately
+        res.json({ success: true, message: 'Sending activity reports to all staff...', date });
+
+        // Fire and forget
+        reportService.sendAllStaffActivityReports(date, req.user.id).then(result => {
+            console.log(`[ActivityReport] Manual send-all done: ${result.sent} sent, ${result.failed} failed`);
+        }).catch(err => {
+            console.error('[ActivityReport] Manual send-all error:', err.message);
+        });
+    } catch (err) {
+        console.error('[ActivityTracker] POST /admin/daily-report/send-all error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
  * POST /admin/daily-report/generate-pdf — Generate PDF for a specific date
  * Body: { date }
  */

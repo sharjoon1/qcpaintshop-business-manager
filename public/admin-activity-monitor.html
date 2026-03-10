@@ -291,6 +291,9 @@
                     <button onclick="generateReportPDF()" class="btn-primary" style="padding: 8px 14px; font-size: 12px; background: linear-gradient(135deg, #059669, #047857);">
                         PDF Download
                     </button>
+                    <button onclick="sendActivityReportsToAll(this)" class="btn-primary" id="btnSendAll" style="padding: 8px 14px; font-size: 12px; background: linear-gradient(135deg, #f59e0b, #d97706);">
+                        Send to All Staff
+                    </button>
                 </div>
             </div>
         </div>
@@ -926,6 +929,38 @@ async function generateReportPDF() {
         }
     } catch (e) {
         alert('PDF generation failed: ' + e.message);
+    }
+}
+
+async function sendActivityReportsToAll(btn) {
+    var date = document.getElementById('reportDate').value;
+    if (!date) { alert('Please select a date'); return; }
+    if (!confirm('Send activity reports to all staff for ' + date + '?')) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+        var res = await fetch('/api/activity-tracker/admin/daily-report/send-all', {
+            method: 'POST',
+            headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ date: date })
+        });
+        if (!res.ok) {
+            var err = await res.json().catch(function() { return {}; });
+            throw new Error(err.error || 'Failed');
+        }
+        btn.textContent = 'Sent!';
+        btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        setTimeout(function() {
+            btn.disabled = false;
+            btn.textContent = 'Send to All Staff';
+            btn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+        }, 5000);
+    } catch (e) {
+        alert('Failed: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Send to All Staff';
     }
 }
 

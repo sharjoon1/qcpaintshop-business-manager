@@ -802,6 +802,166 @@ _QC Paint Shop - Activity Report_`;
     }
 }
 
+// ─── Activity type Tamil labels ───────────────────────────────
+const ACTIVITY_TAMIL = {
+    marketing: 'மார்க்கெட்டிங் / லீட் வேலை',
+    outstanding_followup: 'நிலுவை தொகை வசூல்',
+    material_arrangement: 'பொருள் ஏற்பாடு',
+    material_receiving: 'பொருள் பெறுதல் & பில்லிங்',
+    attending_customer: 'வாடிக்கையாளர் சேவை',
+    shop_maintenance: 'கடை பராமரிப்பு'
+};
+
+/**
+ * Generate individual activity report text in Tamil for a staff member
+ */
+function generateStaffActivityText(staffData, date) {
+    const dateObj = new Date(date + 'T00:00:00');
+    const dateStr = dateObj.toLocaleDateString('ta-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    // Build activity breakdown lines
+    let activityLines = '';
+    const activityKeys = ['marketing', 'outstanding_followup', 'material_arrangement', 'material_receiving', 'attending_customer', 'shop_maintenance'];
+    for (const key of activityKeys) {
+        const data = staffData.activities[key];
+        if (data && data.minutes > 0) {
+            activityLines += `  ${ACTIVITY_TAMIL[key]}: ${formatMinutes(data.minutes)}\n`;
+        }
+    }
+
+    if (!activityLines) {
+        activityLines = '  எந்த செயலும் பதிவாகவில்லை\n';
+    }
+
+    const text = `*தினசரி செயல்பாட்டு அறிக்கை*
+---
+*${staffData.full_name}*
+${staffData.branch_name}
+${dateStr}
+---
+வருகை: ${staffData.clock_in}
+வெளியேற்றம்: ${staffData.clock_out}
+
+*செயல்பாடுகள்:*
+${activityLines}
+*மொத்த வேலை நேரம்: ${formatMinutes(staffData.total_active)}*
+இடைவேளை: ${formatMinutes(staffData.break_minutes)}
+தொழுகை: ${formatMinutes(staffData.prayer_minutes)}
+வெளி வேலை: ${formatMinutes(staffData.outside_minutes)}
+---
+*வேலை செய்யாமல் இருந்த நேரம்: ${formatMinutes(staffData.idle_minutes)} (${staffData.idle_percent}%)*
+---
+_QC Paint Shop - Auto Report_`;
+
+    return text;
+}
+
+/**
+ * Send individual activity report to a single staff member
+ */
+async function sendStaffActivityReport(userId, date, sentBy) {
+    if (!pool) return { success: false, message: 'Database not available' };
+
+    try {
+        const reportData = await generateActivityReportData(date);
+        const staffReport = reportData.find(r => r.user_id === userId);
+
+        if (!staffReport) {
+            return { success: false, message: 'No activity data found' };
+        }
+
+        const text = generateStaffActivityText(staffReport, date);
+        let deliveryStatus = 'notification';
+
+        // Get phone number
+        const [userRow] = await pool.query('SELECT phone FROM users WHERE id = ?', [userId]);
+        const phone = userRow[0]?.phone;
+
+        // 1. In-app notification
+        try {
+            await notificationService.send(userId, {
+                type: 'activity_report',
+                title: 'தினசரி செயல்பாட்டு அறிக்கை',
+                body: `வேலை: ${formatMinutes(staffReport.total_active)} | வேலை செய்யாமல்: ${formatMinutes(staffReport.idle_minutes)} (${staffReport.idle_percent}%)`,
+                data: { date, active: staffReport.total_active, idle: staffReport.idle_minutes, idle_percent: staffReport.idle_percent }
+            });
+        } catch (e) {
+            console.error(`[ActivityReport] Notification error for user ${userId}:`, e.message);
+        }
+
+        // 2. WhatsApp
+        if (whatsappSessionManager && phone) {
+            let waPhone = phone.replace(/[^0-9]/g, '');
+            if (waPhone.length === 10) waPhone = '91' + waPhone;
+            try {
+                const sent = await whatsappSessionManager.sendMessage(staffReport.branch_id, waPhone, text);
+                if (sent) deliveryStatus = 'sent';
+            } catch (err) {
+                console.error('[ActivityReport] WhatsApp send error:', err.message);
+            }
+        }
+
+        if (io && sentBy) {
+            io.to(`user_${sentBy}`).emit('activity_report_send_progress', {
+                user_id: userId,
+                full_name: staffReport.full_name,
+                status: deliveryStatus
+            });
+        }
+
+        return { success: true, message: `Activity report sent to ${staffReport.full_name} (${deliveryStatus})`, delivery_status: deliveryStatus };
+    } catch (error) {
+        console.error('[ActivityReport] sendStaffActivityReport error:', error.message);
+        return { success: false, message: error.message };
+    }
+}
+
+/**
+ * Send individual activity reports to all staff who clocked in on a date
+ */
+async function sendAllStaffActivityReports(date, sentBy) {
+    if (!pool) return { sent: 0, failed: 0, total: 0 };
+
+    try {
+        const reportData = await generateActivityReportData(date);
+        if (reportData.length === 0) {
+            console.log('[ActivityReport] No staff data for', date);
+            return { sent: 0, failed: 0, total: 0 };
+        }
+
+        console.log(`[ActivityReport] Sending individual activity reports for ${date} to ${reportData.length} staff`);
+
+        let sent = 0, failed = 0;
+
+        for (const staffReport of reportData) {
+            try {
+                const result = await sendStaffActivityReport(staffReport.user_id, date, sentBy);
+                if (result.success) sent++;
+                else failed++;
+            } catch (e) {
+                failed++;
+                console.error(`[ActivityReport] Failed for ${staffReport.full_name}:`, e.message);
+            }
+
+            // 1 second delay between sends
+            if (reportData.indexOf(staffReport) < reportData.length - 1) {
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+
+        console.log(`[ActivityReport] Staff reports done: ${sent} sent, ${failed} failed`);
+
+        if (io && sentBy) {
+            io.to(`user_${sentBy}`).emit('activity_report_send_complete', { date, total: reportData.length, sent, failed });
+        }
+
+        return { sent, failed, total: reportData.length };
+    } catch (error) {
+        console.error('[ActivityReport] sendAllStaffActivityReports error:', error.message);
+        return { sent: 0, failed: 0, total: 0 };
+    }
+}
+
 // ─── Lead Alerts ───────────────────────────────────────────────
 
 /**
@@ -938,11 +1098,12 @@ function start() {
             await sendAdminReport(today);
             if (registry) registry.markCompleted('attendance-daily-report', { details: `${result.sent} sent, ${result.failed} failed` });
 
-            // Send activity report to admins
+            // Send activity reports: individual to each staff + admin summary
             if (registry) registry.markRunning('activity-daily-report');
             try {
+                const actResult = await sendAllStaffActivityReports(today);
                 await sendActivityAdminReport(today);
-                if (registry) registry.markCompleted('activity-daily-report', { details: 'Activity report sent' });
+                if (registry) registry.markCompleted('activity-daily-report', { details: `${actResult.sent} staff + admin report sent` });
             } catch (actErr) {
                 console.error('[ActivityReport] Cron error:', actErr.message);
                 if (registry) registry.markFailed('activity-daily-report', { error: actErr.message });
@@ -985,5 +1146,7 @@ module.exports = {
     sendLeadAlerts,
     generateActivityReportData,
     generateActivityPDF,
-    sendActivityAdminReport
+    sendActivityAdminReport,
+    sendStaffActivityReport,
+    sendAllStaffActivityReports
 };
