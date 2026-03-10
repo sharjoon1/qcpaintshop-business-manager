@@ -496,6 +496,312 @@ _QC Paint Shop - Admin Report_`;
     }
 }
 
+// ─── Activity Report ──────────────────────────────────────────
+
+/**
+ * Generate daily activity report data for all staff on a date
+ * Returns array of staff objects with activity breakdown + idle time
+ */
+async function generateActivityReportData(date) {
+    if (!pool) return [];
+
+    try {
+        // Get all staff who clocked in on this date
+        const [staff] = await pool.query(
+            `SELECT a.user_id, u.full_name, b.name as branch_name, a.branch_id,
+                    a.clock_in_time, a.clock_out_time,
+                    a.total_working_minutes, a.break_duration_minutes,
+                    a.outside_work_minutes, a.prayer_minutes, a.overtime_minutes
+             FROM staff_attendance a
+             JOIN users u ON a.user_id = u.id
+             JOIN branches b ON a.branch_id = b.id
+             WHERE a.date = ? AND u.role NOT IN ('customer', 'super_admin')
+             ORDER BY b.name, u.full_name`,
+            [date]
+        );
+
+        if (staff.length === 0) return [];
+
+        // Get activity sessions for all staff on this date
+        const [sessions] = await pool.query(
+            `SELECT user_id, activity_type,
+                    SUM(COALESCE(duration_minutes, TIMESTAMPDIFF(MINUTE, started_at, COALESCE(ended_at, NOW())))) as total_minutes,
+                    COUNT(*) as session_count
+             FROM staff_activity_sessions
+             WHERE DATE(started_at) = ?
+             GROUP BY user_id, activity_type`,
+            [date]
+        );
+
+        // Build a map: userId -> { activityType -> minutes }
+        const activityMap = {};
+        for (const s of sessions) {
+            if (!activityMap[s.user_id]) activityMap[s.user_id] = {};
+            activityMap[s.user_id][s.activity_type] = {
+                minutes: Math.round(s.total_minutes || 0),
+                count: s.session_count
+            };
+        }
+
+        // Build report data per staff
+        const reportData = staff.map(s => {
+            const activities = activityMap[s.user_id] || {};
+            const totalActiveMinutes = Object.values(activities).reduce((sum, a) => sum + a.minutes, 0);
+            const totalWorking = s.total_working_minutes || 0;
+            const breakMins = s.break_duration_minutes || 0;
+            const prayerMins = s.prayer_minutes || 0;
+            const outsideMins = s.outside_work_minutes || 0;
+
+            // Idle = total working - active - break - prayer - outside
+            const idleMinutes = Math.max(0, totalWorking - totalActiveMinutes - breakMins - prayerMins - outsideMins);
+
+            return {
+                user_id: s.user_id,
+                full_name: s.full_name,
+                branch_name: s.branch_name,
+                branch_id: s.branch_id,
+                clock_in: formatTime(s.clock_in_time),
+                clock_out: s.clock_out_time ? formatTime(s.clock_out_time) : 'Still working',
+                total_working: totalWorking,
+                break_minutes: breakMins,
+                prayer_minutes: prayerMins,
+                outside_minutes: outsideMins,
+                activities,
+                total_active: totalActiveMinutes,
+                idle_minutes: idleMinutes,
+                idle_percent: totalWorking > 0 ? Math.round((idleMinutes / totalWorking) * 100) : 0
+            };
+        });
+
+        return reportData;
+    } catch (error) {
+        console.error('[ActivityReport] generateActivityReportData error:', error.message);
+        return [];
+    }
+}
+
+/**
+ * Generate PDF of daily activity report for all staff
+ */
+async function generateActivityPDF(date) {
+    if (!pool) return null;
+
+    try {
+        const reportData = await generateActivityReportData(date);
+        if (reportData.length === 0) return null;
+
+        const dir = path.join(__dirname, '..', 'public', 'uploads', 'reports');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+        const filename = `activity-report-${date}.pdf`;
+        const filepath = path.join(dir, filename);
+
+        const dateObj = new Date(date + 'T00:00:00');
+        const dateStr = dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+        // Activity type labels (short)
+        const activityTypes = [
+            { key: 'marketing', label: 'MKT' },
+            { key: 'outstanding_followup', label: 'OUT' },
+            { key: 'material_arrangement', label: 'MAT' },
+            { key: 'material_receiving', label: 'RCV' },
+            { key: 'attending_customer', label: 'CUS' },
+            { key: 'shop_maintenance', label: 'SHP' }
+        ];
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ size: 'A4', margin: 30, layout: 'landscape' });
+            const stream = fs.createWriteStream(filepath);
+            doc.pipe(stream);
+
+            // Header
+            doc.fontSize(16).font('Helvetica-Bold').text('Quality Colours - Daily Activity Report', { align: 'center' });
+            doc.fontSize(11).font('Helvetica').text(dateStr, { align: 'center' });
+            doc.moveDown(0.3);
+            doc.fontSize(9).text(`Total Staff: ${reportData.length} | Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`, { align: 'center' });
+            doc.moveDown(0.8);
+
+            // Table columns
+            const headers = ['#', 'Name', 'Branch', 'In', 'Out', ...activityTypes.map(a => a.label), 'Active', 'Idle*', 'Idle%'];
+            const colWidths = [20, 95, 75, 50, 50, 42, 42, 42, 42, 42, 42, 48, 48, 38];
+            const startX = 30;
+            let y = doc.y;
+
+            // Header row
+            doc.font('Helvetica-Bold').fontSize(7);
+            let x = startX;
+            headers.forEach((h, i) => {
+                doc.text(h, x, y, { width: colWidths[i], align: 'center' });
+                x += colWidths[i] + 3;
+            });
+            y += 14;
+            const tableWidth = colWidths.reduce((a, b) => a + b, 0) + (colWidths.length - 1) * 3;
+            doc.moveTo(startX, y).lineTo(startX + tableWidth, y).stroke();
+            y += 4;
+
+            // Data rows
+            doc.font('Helvetica').fontSize(7);
+            let totalActive = 0, totalIdle = 0;
+
+            reportData.forEach((row, idx) => {
+                if (y > 520) {
+                    doc.addPage({ layout: 'landscape' });
+                    y = 30;
+                    doc.font('Helvetica-Bold').fontSize(7);
+                    x = startX;
+                    headers.forEach((h, i) => {
+                        doc.text(h, x, y, { width: colWidths[i], align: 'center' });
+                        x += colWidths[i] + 3;
+                    });
+                    y += 14;
+                    doc.moveTo(startX, y).lineTo(startX + tableWidth, y).stroke();
+                    y += 4;
+                    doc.font('Helvetica').fontSize(7);
+                }
+
+                totalActive += row.total_active;
+                totalIdle += row.idle_minutes;
+
+                // Alternate row bg
+                if (idx % 2 === 0) {
+                    doc.rect(startX - 2, y - 2, tableWidth + 4, 13).fill('#f8f9fa').fillColor('black');
+                }
+
+                const vals = [
+                    String(idx + 1),
+                    row.full_name,
+                    row.branch_name,
+                    row.clock_in,
+                    row.clock_out,
+                    ...activityTypes.map(a => {
+                        const mins = row.activities[a.key]?.minutes || 0;
+                        return mins > 0 ? formatMinutes(mins) : '-';
+                    }),
+                    formatMinutes(row.total_active),
+                    formatMinutes(row.idle_minutes),
+                    row.idle_percent + '%'
+                ];
+
+                x = startX;
+                vals.forEach((v, i) => {
+                    const align = i <= 2 ? 'left' : 'center';
+                    doc.text(v, x, y, { width: colWidths[i], align });
+                    x += colWidths[i] + 3;
+                });
+                y += 13;
+            });
+
+            // Footer
+            y += 8;
+            doc.moveTo(startX, y).lineTo(startX + tableWidth, y).stroke();
+            y += 6;
+            doc.font('Helvetica-Bold').fontSize(8);
+            doc.text(`Summary: ${reportData.length} staff | Total Active: ${formatMinutes(totalActive)} | Total Idle: ${formatMinutes(totalIdle)}`, startX, y);
+            y += 14;
+            doc.font('Helvetica').fontSize(7).fillColor('#666666');
+            doc.text('* Idle = Total Working - Active Activities - Break - Prayer - Outside Work', startX, y);
+
+            doc.end();
+
+            stream.on('finish', () => {
+                resolve({ filepath, filename, url: `/uploads/reports/${filename}`, staffCount: reportData.length });
+            });
+            stream.on('error', reject);
+        });
+    } catch (error) {
+        console.error('[ActivityReport] generateActivityPDF error:', error.message);
+        return null;
+    }
+}
+
+/**
+ * Send daily activity report to admin users (notification + WhatsApp + PDF)
+ */
+async function sendActivityAdminReport(date) {
+    if (!pool) return;
+
+    try {
+        const [admins] = await pool.query(
+            `SELECT id, full_name, phone FROM users WHERE role = 'admin' AND status = 'active'`
+        );
+        if (admins.length === 0) return;
+
+        const reportData = await generateActivityReportData(date);
+        if (reportData.length === 0) {
+            console.log('[ActivityReport] No activity data for', date);
+            return;
+        }
+
+        const pdf = await generateActivityPDF(date);
+
+        // Build text summary
+        const totalActive = reportData.reduce((s, r) => s + r.total_active, 0);
+        const totalIdle = reportData.reduce((s, r) => s + r.idle_minutes, 0);
+        const avgIdlePct = reportData.length > 0
+            ? Math.round(reportData.reduce((s, r) => s + r.idle_percent, 0) / reportData.length)
+            : 0;
+
+        const dateObj = new Date(date + 'T00:00:00');
+        const dateStr = dateObj.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+        // Top 3 idle staff
+        const topIdle = [...reportData].sort((a, b) => b.idle_minutes - a.idle_minutes).slice(0, 3);
+        let idleList = topIdle.map(s => `  ${s.full_name}: ${formatMinutes(s.idle_minutes)} (${s.idle_percent}%)`).join('\n');
+
+        const adminText = `*Daily Activity Report*
+---
+${dateStr}
+---
+Total Staff: ${reportData.length}
+Total Active Time: ${formatMinutes(totalActive)}
+வேலை செய்யாமல் இருந்த மொத்த நேரம்: ${formatMinutes(totalIdle)}
+Avg Idle: ${avgIdlePct}%
+
+*அதிக நேரம் வேலை செய்யாமல் இருந்தவர்கள்:*
+${idleList}
+${pdf ? `\nPDF: https://act.qcpaintshop.com${pdf.url}` : ''}
+---
+_QC Paint Shop - Activity Report_`;
+
+        for (const admin of admins) {
+            try {
+                await notificationService.send(admin.id, {
+                    type: 'admin_activity_report',
+                    title: 'Daily Activity Report',
+                    body: `${reportData.length} staff | Active: ${formatMinutes(totalActive)} | Idle: ${formatMinutes(totalIdle)} (${avgIdlePct}%)`,
+                    data: { date, pdf_url: pdf?.url, total: reportData.length }
+                });
+            } catch (e) {
+                console.error('[ActivityReport] Admin notification error:', e.message);
+            }
+
+            if (whatsappSessionManager && admin.phone) {
+                let waPhone = admin.phone.replace(/[^0-9]/g, '');
+                if (waPhone.length === 10) waPhone = '91' + waPhone;
+                try {
+                    await whatsappSessionManager.sendMessage(0, waPhone, adminText);
+                    if (pdf) {
+                        try {
+                            await whatsappSessionManager.sendMessage(0, waPhone, null, {
+                                source: 'activity_report',
+                                document: { path: pdf.filepath, filename: pdf.filename }
+                            });
+                        } catch (docErr) {
+                            console.error('[ActivityReport] PDF send error:', docErr.message);
+                        }
+                    }
+                } catch (err) {
+                    console.error('[ActivityReport] Admin WhatsApp error:', err.message);
+                }
+            }
+        }
+
+        console.log(`[ActivityReport] Admin activity report sent to ${admins.length} admin(s)`);
+    } catch (error) {
+        console.error('[ActivityReport] sendActivityAdminReport error:', error.message);
+    }
+}
+
 // ─── Lead Alerts ───────────────────────────────────────────────
 
 /**
@@ -618,6 +924,7 @@ async function sendLeadAlerts(date) {
 function start() {
     if (registry) {
         registry.register('attendance-daily-report', { name: 'Attendance Reports', service: 'attendance-report', schedule: '5 22 * * *', description: 'Daily attendance reports to staff + admin PDF at 10:05 PM' });
+        registry.register('activity-daily-report', { name: 'Activity Reports', service: 'attendance-report', schedule: '5 22 * * *', description: 'Daily activity report to admin at 10:05 PM' });
         registry.register('lead-daily-alerts', { name: 'Lead Alerts', service: 'attendance-report', schedule: '5 18 * * *', description: 'Lead creation + follow-up alerts at 6:05 PM' });
     }
 
@@ -630,6 +937,16 @@ function start() {
             const result = await sendAllReports(today);
             await sendAdminReport(today);
             if (registry) registry.markCompleted('attendance-daily-report', { details: `${result.sent} sent, ${result.failed} failed` });
+
+            // Send activity report to admins
+            if (registry) registry.markRunning('activity-daily-report');
+            try {
+                await sendActivityAdminReport(today);
+                if (registry) registry.markCompleted('activity-daily-report', { details: 'Activity report sent' });
+            } catch (actErr) {
+                console.error('[ActivityReport] Cron error:', actErr.message);
+                if (registry) registry.markFailed('activity-daily-report', { error: actErr.message });
+            }
         } catch (e) {
             console.error('[AttendanceReport] Cron error:', e.message);
             if (registry) registry.markFailed('attendance-daily-report', { error: e.message });
@@ -665,5 +982,8 @@ module.exports = {
     sendAllReports,
     sendAdminReport,
     generateAdminPDF,
-    sendLeadAlerts
+    sendLeadAlerts,
+    generateActivityReportData,
+    generateActivityPDF,
+    sendActivityAdminReport
 };

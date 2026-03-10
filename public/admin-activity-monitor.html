@@ -196,6 +196,21 @@
         </div>
     </div>
 
+    <!-- Tabs -->
+    <div style="display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
+        <button class="tab-btn active" onclick="switchTab('live')" id="tabLive"
+            style="padding: 10px 20px; font-size: 13px; font-weight: 600; border: none; background: none; cursor: pointer; color: #667eea; border-bottom: 2px solid #667eea; margin-bottom: -2px;">
+            Live Monitor
+        </button>
+        <button class="tab-btn" onclick="switchTab('report')" id="tabReport"
+            style="padding: 10px 20px; font-size: 13px; font-weight: 600; border: none; background: none; cursor: pointer; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -2px;">
+            Daily Report
+        </button>
+    </div>
+
+    <!-- Live Monitor Tab -->
+    <div id="tabContentLive">
+
     <!-- Summary Cards -->
     <div class="summary-grid" id="summaryCards">
         <div class="summary-card"><div class="skeleton" style="height:60px;"></div></div>
@@ -258,6 +273,42 @@
             </div>
         </div>
     </div>
+
+    </div><!-- end tabContentLive -->
+
+    <!-- Daily Report Tab -->
+    <div id="tabContentReport" style="display: none;">
+        <!-- Report Header -->
+        <div style="background: white; border-radius: 12px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <h2 style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0;">Daily Activity Report</h2>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <input type="date" id="reportDate" class="filter-input" />
+                    <select id="reportBranch" class="filter-select">
+                        <option value="">All Branches</option>
+                    </select>
+                    <button onclick="loadDailyReport()" class="btn-primary" style="padding: 8px 14px; font-size: 12px;">Load Report</button>
+                    <button onclick="generateReportPDF()" class="btn-primary" style="padding: 8px 14px; font-size: 12px; background: linear-gradient(135deg, #059669, #047857);">
+                        PDF Download
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report Summary Cards -->
+        <div class="summary-grid" id="reportSummaryCards" style="margin-bottom: 16px;"></div>
+
+        <!-- Report Table -->
+        <div style="background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; overflow: hidden;">
+            <div id="reportTableContainer" style="overflow-x: auto; padding: 0;">
+                <div class="empty-state">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <p style="font-size: 14px; font-weight: 500;">Select a date and click Load Report</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- Timeline Slideout -->
@@ -700,6 +751,183 @@ function closeSlideout() {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeSlideout();
 });
+
+// ── Tab switching ──
+function switchTab(tab) {
+    document.getElementById('tabContentLive').style.display = tab === 'live' ? '' : 'none';
+    document.getElementById('tabContentReport').style.display = tab === 'report' ? '' : 'none';
+
+    document.getElementById('tabLive').style.color = tab === 'live' ? '#667eea' : '#64748b';
+    document.getElementById('tabLive').style.borderBottomColor = tab === 'live' ? '#667eea' : 'transparent';
+    document.getElementById('tabReport').style.color = tab === 'report' ? '#667eea' : '#64748b';
+    document.getElementById('tabReport').style.borderBottomColor = tab === 'report' ? '#667eea' : 'transparent';
+
+    if (tab === 'report' && !document.getElementById('reportDate').value) {
+        document.getElementById('reportDate').value = todayISO();
+        loadReportBranches();
+        loadDailyReport();
+    }
+}
+
+async function loadReportBranches() {
+    try {
+        const res = await fetch('/api/branches', { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const sel = document.getElementById('reportBranch');
+        if (sel.options.length > 1) return;
+        const branches = data.branches || data || [];
+        branches.forEach(function(b) {
+            const opt = document.createElement('option');
+            opt.value = b.id;
+            opt.textContent = b.name || b.branch_name || ('Branch ' + b.id);
+            sel.appendChild(opt);
+        });
+    } catch (e) { console.error('Failed to load report branches:', e); }
+}
+
+// ── Daily Report ──
+let currentReportData = null;
+
+async function loadDailyReport() {
+    const date = document.getElementById('reportDate').value;
+    if (!date) return;
+
+    const container = document.getElementById('reportTableContainer');
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;">Loading report...</div>';
+    document.getElementById('reportSummaryCards').innerHTML = '';
+
+    try {
+        let url = '/api/activity-tracker/admin/daily-report?date=' + date;
+        const res = await fetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        currentReportData = data;
+
+        const report = data.report || [];
+        const branchFilter = document.getElementById('reportBranch').value;
+        const filtered = branchFilter ? report.filter(function(r) { return String(r.branch_id) === branchFilter; }) : report;
+
+        renderReportSummary(filtered);
+        renderReportTable(filtered, data.pdf_url);
+    } catch (e) {
+        console.error('Failed to load daily report:', e);
+        container.innerHTML = '<div class="empty-state"><p>Failed to load: ' + escapeHtml(e.message) + '</p></div>';
+    }
+}
+
+function renderReportSummary(data) {
+    if (!data || data.length === 0) {
+        document.getElementById('reportSummaryCards').innerHTML = '';
+        return;
+    }
+
+    var totalStaff = data.length;
+    var totalActive = data.reduce(function(s, r) { return s + r.total_active; }, 0);
+    var totalIdle = data.reduce(function(s, r) { return s + r.idle_minutes; }, 0);
+    var avgIdlePct = Math.round(data.reduce(function(s, r) { return s + r.idle_percent; }, 0) / totalStaff);
+
+    document.getElementById('reportSummaryCards').innerHTML =
+        renderSummaryCard('Total Staff', totalStaff, '#667eea', '#eef2ff') +
+        renderSummaryCard('Active Time', formatMinutes(totalActive), '#10b981', '#d1fae5') +
+        '<div class="summary-card"><div style="width:36px;height:36px;border-radius:10px;background:#fef3c7;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><div style="width:12px;height:12px;border-radius:50%;background:#f59e0b;"></div></div><div class="summary-value" style="color:#f59e0b;">' + formatMinutes(totalIdle) + '</div><div class="summary-label">\u0BB5\u0BC7\u0BB2\u0BC8 \u0B9A\u0BC6\u0BAF\u0BCD\u0BAF\u0BBE\u0BAE\u0BB2\u0BCD \u0B87\u0BB0\u0BC1\u0BA8\u0BCD\u0BA4 \u0BA8\u0BC7\u0BB0\u0BAE\u0BCD</div></div>' +
+        renderSummaryCard('Avg Idle %', avgIdlePct + '%', avgIdlePct > 30 ? '#ef4444' : '#f59e0b', avgIdlePct > 30 ? '#fef2f2' : '#fef3c7');
+}
+
+function renderReportTable(data, pdfUrl) {
+    var container = document.getElementById('reportTableContainer');
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No activity data for this date</p></div>';
+        return;
+    }
+
+    var grandTotalActive = 0, grandTotalIdle = 0;
+    var actTypes = [
+        { key: 'marketing', label: 'MKT', emoji: '\uD83D\uDCE2' },
+        { key: 'outstanding_followup', label: 'OUT', emoji: '\uD83D\uDCB0' },
+        { key: 'material_arrangement', label: 'MAT', emoji: '\uD83D\uDCE6' },
+        { key: 'material_receiving', label: 'RCV', emoji: '\uD83D\uDE9B' },
+        { key: 'attending_customer', label: 'CUS', emoji: '\uD83E\uDD1D' },
+        { key: 'shop_maintenance', label: 'SHP', emoji: '\uD83E\uDDF9' }
+    ];
+
+    var actTotals = {};
+    actTypes.forEach(function(a) { actTotals[a.key] = 0; });
+
+    var rows = data.map(function(s, idx) {
+        grandTotalActive += s.total_active;
+        grandTotalIdle += s.idle_minutes;
+
+        var cells = '';
+        actTypes.forEach(function(a) {
+            var mins = s.activities[a.key] ? s.activities[a.key].minutes : 0;
+            actTotals[a.key] += mins;
+            cells += '<td style="text-align:center;">' + (mins > 0 ? formatMinutes(mins) : '<span style="color:#cbd5e1;">-</span>') + '</td>';
+        });
+
+        var idleColor = s.idle_percent > 50 ? '#ef4444' : (s.idle_percent > 30 ? '#f59e0b' : '#10b981');
+
+        return '<tr>' +
+            '<td>' + (idx + 1) + '</td>' +
+            '<td style="font-weight:600;">' + escapeHtml(s.full_name) + '</td>' +
+            '<td>' + escapeHtml(s.branch_name) + '</td>' +
+            '<td>' + escapeHtml(s.clock_in) + '</td>' +
+            '<td>' + escapeHtml(s.clock_out) + '</td>' +
+            cells +
+            '<td style="text-align:center;font-weight:600;color:#10b981;">' + formatMinutes(s.total_active) + '</td>' +
+            '<td style="text-align:center;font-weight:600;color:' + idleColor + ';">' + formatMinutes(s.idle_minutes) + '</td>' +
+            '<td style="text-align:center;font-weight:700;color:' + idleColor + ';">' + s.idle_percent + '%</td>' +
+        '</tr>';
+    }).join('');
+
+    var totalCells = '';
+    actTypes.forEach(function(a) {
+        totalCells += '<td style="text-align:center;">' + (actTotals[a.key] > 0 ? formatMinutes(actTotals[a.key]) : '-') + '</td>';
+    });
+
+    var html = '<table class="summary-table">' +
+        '<thead><tr>' +
+            '<th>#</th><th>Staff</th><th>Branch</th><th>In</th><th>Out</th>' +
+            actTypes.map(function(a) { return '<th style="text-align:center;" title="' + escapeHtml(a.label) + '">' + a.emoji + ' ' + a.label + '</th>'; }).join('') +
+            '<th style="text-align:center;">Active</th>' +
+            '<th style="text-align:center;">Idle*</th>' +
+            '<th style="text-align:center;">Idle%</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows +
+        '<tr class="total-row"><td></td><td>TOTAL</td><td></td><td></td><td></td>' +
+            totalCells +
+            '<td style="text-align:center;">' + formatMinutes(grandTotalActive) + '</td>' +
+            '<td style="text-align:center;">' + formatMinutes(grandTotalIdle) + '</td>' +
+            '<td></td>' +
+        '</tr></tbody></table>' +
+        '<div style="padding:8px 12px;font-size:11px;color:#94a3b8;">* Idle (\u0BB5\u0BC7\u0BB2\u0BC8 \u0B9A\u0BC6\u0BAF\u0BCD\u0BAF\u0BBE\u0BAE\u0BB2\u0BCD \u0B87\u0BB0\u0BC1\u0BA8\u0BCD\u0BA4 \u0BA8\u0BC7\u0BB0\u0BAE\u0BCD) = Total Working - Activities - Break - Prayer - Outside Work</div>';
+
+    container.innerHTML = html;
+}
+
+async function generateReportPDF() {
+    var date = document.getElementById('reportDate').value;
+    if (!date) { alert('Please select a date'); return; }
+
+    try {
+        var res = await fetch('/api/activity-tracker/admin/daily-report/generate-pdf', {
+            method: 'POST',
+            headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ date: date })
+        });
+        if (!res.ok) {
+            var err = await res.json().catch(function() { return {}; });
+            throw new Error(err.error || 'Failed to generate PDF');
+        }
+        var data = await res.json();
+        if (data.pdf_url) {
+            window.open(data.pdf_url, '_blank');
+        }
+    } catch (e) {
+        alert('PDF generation failed: ' + e.message);
+    }
+}
 
 // ── Socket.io live updates ──
 try {

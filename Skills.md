@@ -2,7 +2,7 @@
 
 > **Platform**: act.qcpaintshop.com
 > **Version**: 3.3.7
-> **Last Updated**: 2026-03-07
+> **Last Updated**: 2026-03-09
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
@@ -731,16 +731,37 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 
 ---
 
-### 2.14 Activity Tracker
+### 2.14 Activity Tracker (Mar 8-9)
 
-**Activity Logging**
-- Staff log their daily activities
-- Fields: type, title, description, start_time, end_time, status
-- Customer/lead association
-- My activities view (personal history)
-- Statistics: total activities, completion rate, time spent
-- Admin reports: daily activity report, user-specific reports
-- Page: `staff/activities.html`
+**Staff Activity Sessions** (`services/activity-tracker-service.js`, `routes/activity-tracker.js`)
+- 6 activity types: marketing, outstanding_followup, material_arrangement, material_receiving, attending_customer, shop_maintenance
+- Session start/stop with timer, idle detection (15+ min), daily task auto-sync
+- Photo upload required for shop_maintenance stop
+- Customer note modal for attending_customer
+- Auto-end on break/prayer/outside work/clock-out (via `attendance.js`)
+- Tables: `staff_activity_sessions`, `staff_idle_alerts`
+
+**Staff Dashboard Integration** (`public/staff/dashboard.html`)
+- Activity selector grid (6 buttons) when no active session
+- Active session display: "Currently doing" card with live timer + "Go to Page" button (contextual navigation to leads/collections/daily-tasks)
+- Notice Board tabs: Main tabs (All / Attendance / Work) with sub-tabs (Clock In-Out, Breaks-Prayer / Leads, Activities)
+- Activity feed entries show staff name + activity type with color coding
+
+**Admin Views**
+- Admin attendance page: "Activity" column with emoji + type + elapsed time, amber "Idle Xm" badge
+- Admin activity monitor page: `admin-activity-monitor.html` with live staff cards + Daily Report tab
+- Page: `staff/activities.html` (personal history)
+
+**Daily Activity Report** (Mar 10)
+- Automated daily report sent at 10:05 PM IST (with attendance reports) to admin users
+- Delivery: PDF + in-app notification + WhatsApp (text summary + PDF attachment)
+- Per-staff breakdown: clock in/out, activity-wise durations (MKT/OUT/MAT/RCV/CUS/SHP), total active time, idle time (வேலை செய்யாமல் இருந்த நேரம்), idle %
+- Idle calculation: Total Working - Active Activities - Break - Prayer - Outside Work
+- WhatsApp summary includes top 3 idle staff with Tamil labels
+- Admin panel: "Daily Report" tab in `admin-activity-monitor.html` — date picker, branch filter, summary cards, detailed table, PDF download
+- API: `GET /api/activity-tracker/admin/daily-report?date=`, `POST /api/activity-tracker/admin/daily-report/generate-pdf`
+- PDF: A4 landscape via PDFKit, saved to `/uploads/reports/activity-report-{date}.pdf`
+- Functions in `services/attendance-report.js`: `generateActivityReportData()`, `generateActivityPDF()`, `sendActivityAdminReport()`
 
 ---
 
@@ -786,7 +807,9 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - `handleNotifClick(id, type, dataStr)` in `header-v2.html` routes to correct pages based on notification type
 - Previously only handled `conversation_id` (chat) — all other notifications just closed the panel
 - Role-aware routing: staff users → staff pages, admin → admin pages (e.g. `stock_check_assigned` → `/staff/stock-check.html` for staff, `/admin-stock-check.html` for admin)
-- 16 notification types mapped: `chat_message`, `stock_check_assigned`/`submitted`, `permission_approved`/`rejected`, `reclockin_request`, `break_exceeded`, `force_clockout`, `geo_auto_clockout`, `geo_auto_clockout_admin`, `task_assigned`/`completed`, `salary_generated`/`paid`, `advance_approved`/`rejected`
+- 20+ notification types mapped: `chat_message`, `stock_check_assigned`/`submitted`, `permission_approved`/`rejected`, `reclockin_request`, `break_exceeded`, `force_clockout`, `geo_auto_clockout`, `geo_auto_clockout_admin`, `task_assigned`/`completed`, `salary_generated`/`paid`, `advance_approved`/`rejected`, `overtime_alert`, `ot_timeout_clockout`, `activity_started`/`activity_ended`
+- **OT FCM Push** (Mar 9): Overtime alerts now send FCM push notification (not just Socket.io). TTL set to expire at 10 PM IST so notification auto-dismisses at end of day. Also: OT timeout auto-clockout and 10 PM force-clockout send FCM push to staff.
+- **Stale attendance cleanup** (Mar 9): `cleanupStaleAttendance()` in `auto-clockout.js` runs every 5 min, auto-closes attendance records left open from previous days with `end_of_day` type.
 - Service worker (`sw.js`) push notification click handler also updated with matching routes
 - Notification icons updated: type-specific icons for all 16+ notification types (previously only 6)
 
@@ -1046,15 +1069,18 @@ Centralized tool for managing outstanding invoices, sending payment reminders (W
 4. **Reminders** — Timeline of all sent reminders (WhatsApp/call/visit/email), filter by type/date, "Log Call/Visit" button
 5. **Promises** — Promise-to-pay tracking with status badges, auto-detect broken promises (past due + pending), quick status actions
 
-**Staff Page** (`staff/collections.html`, data-page: `collections`, 3 tabs):
-- Summary, Customers, Invoices — mobile-first, auto-filtered to staff's branch
+**Staff Page** (`staff/collections.html`, data-page: `collections`, 4 tabs):
+- Summary, Customers, Invoices, History — mobile-first, auto-filtered to staff's branch
+- Gradient header with summary strip (Outstanding/Overdue/Customers count)
+- Sort pills: Customers (Amount/Oldest Due/Overdue/Name), Invoices (Amount/Most Overdue/Due Date/Newest/Name)
+- History tab: Calls/Promises sub-tabs with date+time formatted entries
 - Actions: Send WhatsApp, Log Call, Add Promise (bottom-sheet modals)
 
-**Branch Filtering**: Admin sees branch dropdown filter at top; staff auto-filtered by `req.user.branch_id`. All 12 endpoints respect branch filtering via `getBranchFilter()` helper.
+**Branch Filtering** (Mar 9 — Invoice-level): All collection endpoints (summary, customers, invoices, export) now filter by `zi.local_branch_id` (invoice's branch), NOT `zcm.branch_id` (customer's branch). This ensures invoices are shown based on which branch created them. Payment rate query still uses customer branch as fallback (payments don't have branch). Migration: `migrate-invoice-branch.js` added `zoho_location_id` + `local_branch_id` to `zoho_invoices`. Zoho sync (`syncInvoices()`) populates via `zoho_locations_map` lookup.
 
 **Customer-Branch Assignment**: Admin can assign customers to branches via dropdown in Customers tab, or bulk assign via API.
 
-**WhatsApp Integration**: Dual-write to `whatsapp_followups` (operational queue) + `collection_reminders` (audit log). Dual-mode sending: per-branch session (whatsapp-web.js) → fallback to HTTP API.
+**WhatsApp Integration**: Dual-write to `whatsapp_followups` (operational queue, `message_type: 'custom'`) + `collection_reminders` (audit log). Uses `custom` type so staff's composed message is sent as-is (NOT `payment_reminder` which triggers a template). Dual-mode sending: per-branch session (whatsapp-web.js) → fallback to HTTP API.
 
 **API Endpoints** (`routes/collections.js`, 12 endpoints):
 | Method | Endpoint | Purpose |
@@ -1266,8 +1292,11 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
 - Weekly marketing tips: Monday 9 AM IST
 - **Daily business snapshots: 6 AM, 12 PM, 6 PM IST** (cached context for chat)
 
-**Chat Features (Assistant Manager — upgraded Feb 23)**:
-- **Dedicated CHAT_SYSTEM_PROMPT**: Full "QC Assistant Manager" persona — data-first, comparative, proactive, actionable
+**Chat Features (Assistant Manager — upgraded Feb 23, trained Mar 9)**:
+- **Dedicated CHAT_SYSTEM_PROMPT**: Full "QC Business Manager" persona — data-first, comparative, proactive, actionable
+- **READ-ONLY limitations** (Mar 9): Prompt explicitly states AI cannot create assignments, send messages, or modify DB. Must provide plans and say "ask admin/Claude Code to execute"
+- **Stock check domain knowledge** (Mar 9): Staff-branch mapping rules, adjusted items exclusion, assignment flow
+- **WhatsApp style**: No greetings ("வணக்கம்"), direct professional tone
 - **Two-tier context system** (`ai-context-builder.js`):
   - Tier 1: Quick summary always injected (~50ms) — today's revenue vs yesterday, collections, overdue, staff, leads, stock
   - Tier 2: Category-specific deep context triggered by keyword matching (8 categories):
@@ -1275,7 +1304,7 @@ A company-wide WhatsApp session that uses `branch_id = 0` as a sentinel value. W
     - Collections: collection rate, overdue aging brackets (1-30/31-60/61-90/90+), top 10 debtors, payment promises
     - Staff: currently clocked-in, absent list, late arrivals, break excess, pending OT, completed shifts
     - Leads: status funnel, stale leads, today's follow-ups, top AI-scored leads
-    - Inventory: out-of-stock items, below reorder level, recent stock checks
+    - Inventory: out-of-stock items, below reorder level, **per-branch stock check progress** (adjusted/remaining counts), **staff-branch mapping**, **current assignment details**
     - WhatsApp: recent campaign stats
     - Insights: unread critical/warning alerts
     - General: loads ALL categories above
@@ -2522,6 +2551,14 @@ Based on AI App Analyzer report, fixed critical production errors:
   - Push button: "Push X Discrepancies to Zoho" (only submitted items); refreshes panel after push instead of closing
   - Waiting state: shows "Waiting for staff to submit more items" when no submitted items left
 
+### Mar 9, 2026 — Collections Enhancements + Product Grouping + Painter Points & Notifications
+- **Staff collections**: Gradient header with summary strip, sort pills for Customers/Invoices tabs, History tab with Calls/Promises sub-tabs
+- **Product import grouping**: SKU code stripping in `extractProductInfoJS()`, manual merge UI with checkboxes
+- **Painter points auto-award**: Points awarded at confirm-payment (dedup via `EST-{id}`), push-to-zoho skips re-award
+- **Points history UI**: Painter bottom sheet with transactions + inline withdraw. Admin detail modal with All/Regular/Annual filters.
+- **Painter notifications**: Push notifications for withdrawal approval/rejection, 6 estimate status changes, points earned. Android FCM token registration for painter auth.
+- **One-time script**: `scripts/award-pending-points.js` awarded points for existing paid estimates
+
 ### Mar 3, 2026 — Grouped Product Rates in Painter Admin Tab 3
 - **Replaced**: Tab 3 "Rates & Slabs" now shows products grouped by `products` table (matching painter catalog view) instead of 1822 individual Zoho items. Shows variant count, price range, and aggregate rates per product.
 - **Added**: Expand/collapse per product — lazy-loads individual variants with per-variant rate overrides. "Mixed" badge when variants have differing rates.
@@ -2537,7 +2574,7 @@ Based on AI App Analyzer report, fixed critical production errors:
 - **No backend changes** — all data (`points_per_unit`, `annual_eligible`, `annual_pct`) already returned by `GET /me/catalog/:productId`.
 
 ### Mar 2, 2026 — Product Import Pipeline & Estimate Product Management
-- **Added**: Zoho → Estimate Product import flow: select items → smart grouping (`extractProductInfo()`) → Import Review modal → create products + pack_sizes
+- **Added**: Zoho → Estimate Product import flow: select items → smart grouping (`extractProductInfo()`) → Import Review modal → create products + pack_sizes. SKU code stripping (`/^[A-Z]{2,6}\d{1,4}\s+/i`) ensures items with different SKU prefixes group correctly. Manual merge UI (checkboxes + "Merge Selected") as fallback.
 - **Added**: Import Review modal with editable product names, unit_wise/area_wise toggle per group
 - **Added**: Force re-import for already-mapped items (amber warning, deletes old pack_size mappings)
 - **Added**: Bulk Map tab (`?tab=bulk-map`) — map unmapped pack sizes to Zoho items in bulk
@@ -2632,7 +2669,7 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 - `public/admin-painters.html` — Admin 10-tab page (Painters, Points, Rates, Withdrawals, Reports, Estimates, Offers, Training, Catalog, Visualizations)
 - `public/painter-register.html` — Multi-step self-registration (phone OTP → details → referral). Auto-fills `?ref=` code from URL.
 - `public/painter-login.html` — OTP-based painter login
-- `public/painter-dashboard.html` — Premium dashboard (logo+avatar header, stats, brand-tabbed offer products, dual card section (visiting+ID), quick actions, referrals, estimates, transactions, visualizations)
+- `public/painter-dashboard.html` — Premium dashboard (logo+avatar header, stats, brand-tabbed offer products, dual card section (visiting+ID), quick actions, referrals, estimates, transactions, visualizations). Clickable balance cards → bottom sheet with transaction history + inline withdraw (regular) or withdrawal window info (annual).
 - `public/painter-profile.html` — Profile editing page with avatar photo upload, editable fields, dirty tracking
 - `public/painter-catalog.html` — Product catalog for painters. Stock shown as "In Stock"/"Out of Stock" only (no numeric counts). Detail panel shows "Your Earnings" breakdown (Customer Billing vs Self Billing points per variant). Rates from `painter_product_point_rates` table (admin-configurable in Tab 3).
 - `public/components/painters-subnav.html` — Module sub-navigation
@@ -2645,7 +2682,7 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 - **Admin Visualizations**: GET /admin/visualizations(?status=), PUT /admin/visualizations/:id, POST /admin/visualizations/:id/upload-result
 - **Points**: GET/POST /:id/points/adjust, POST /invoice/process, GET /invoice/search
 - **Config**: GET /config/product-rates/grouped (products grouped with variant counts, price ranges, mixed-rate flags, unmapped items, filter dropdowns), GET /config/product-rates/grouped/:productId (lazy-load variants), PUT /config/product-rates/grouped (fan-out product rates to variants + per-variant overrides + unmapped), POST /config/product-rates/sync (reads from `zoho_items_map`), CRUD /config/slabs | Legacy: GET/PUT /config/product-rates
-- **Withdrawals**: GET /withdrawals, PUT /withdrawals/:id
+- **Withdrawals**: GET /withdrawals, PUT /withdrawals/:id (sends push notification on approval/rejection)
 - **Reports**: GET /reports/summary, GET /reports/top-earners, GET /referrals, GET /attendance
 
 ### Permissions
@@ -2729,7 +2766,8 @@ Painters create estimates for paint purchases; admin reviews, records payment, p
 #### Key Implementation Details
 - `unit_price` always set SERVER-SIDE from `zoho_items_map.zoho_rate` (never trusts client)
 - All prices GST-inclusive — no separate GST calculation, `gst_amount = 0`, `markup_gst_amount = 0`
-- Push-to-Zoho resolves contact (painter's zoho_contact_id or creates new), creates invoice, calls `pointsEngine.processInvoice()`
+- **Points awarded at confirm-payment** (not push-to-zoho): `pointsEngine.processInvoice()` called with `invoice_id: EST-{id}` for dedup. Push-to-zoho checks `points_awarded > 0` and skips re-award.
+- Push-to-Zoho resolves contact (painter's zoho_contact_id or creates new), creates invoice
 - Share tokens expire after 7 days
 - Balance due = `effectiveTotal - payment_amount`, calculated dynamically (no extra column)
 - `effectiveTotal` = `final_grand_total || markup_grand_total || grand_total`

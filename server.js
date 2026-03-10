@@ -237,6 +237,7 @@ activityTrackerService.setNotificationService(notificationService);
 activityTrackerRoutes.setPool(pool);
 activityTrackerRoutes.setActivityService(activityTrackerService);
 activityTrackerRoutes.setNotificationService(notificationService);
+activityTrackerRoutes.setReportService(attendanceReport);
 monitoringRoutes.setPool(pool);
 photosRoutes.setPool(pool);
 monitoringRoutes.setAutomationRegistry(automationRegistry);

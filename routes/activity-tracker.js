@@ -11,11 +11,12 @@ const fs = require('fs');
 const path = require('path');
 const { uploadActivity } = require('../config/uploads');
 
-let pool, io, activityService, notificationService;
+let pool, io, activityService, notificationService, reportService;
 function setPool(p) { pool = p; }
 function setIO(socketIO) { io = socketIO; }
 function setActivityService(svc) { activityService = svc; }
 function setNotificationService(ns) { notificationService = ns; }
+function setReportService(rs) { reportService = rs; }
 
 // ── Staff endpoints ──────────────────────────────────────────────────────────
 
@@ -344,4 +345,64 @@ router.post('/admin/send-reminder/:userId', requireAuth, requirePermission('atte
     }
 });
 
-module.exports = { router, setPool, setIO, setActivityService, setNotificationService };
+/**
+ * GET /admin/daily-report — Get daily activity report data for a date
+ * Query: date (YYYY-MM-DD), defaults to today
+ */
+router.get('/admin/daily-report', requireAuth, requirePermission('attendance', 'view'), async (req, res) => {
+    try {
+        const date = req.query.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+        if (!reportService) {
+            return res.status(500).json({ success: false, error: 'Report service not available' });
+        }
+
+        const reportData = await reportService.generateActivityReportData(date);
+
+        // Check if PDF exists for this date
+        const pdfFilename = `activity-report-${date}.pdf`;
+        const pdfPath = path.join(__dirname, '..', 'public', 'uploads', 'reports', pdfFilename);
+        const pdfExists = fs.existsSync(pdfPath);
+
+        res.json({
+            success: true,
+            date,
+            report: reportData,
+            pdf_url: pdfExists ? `/uploads/reports/${pdfFilename}` : null
+        });
+    } catch (err) {
+        console.error('[ActivityTracker] GET /admin/daily-report error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * POST /admin/daily-report/generate-pdf — Generate PDF for a specific date
+ * Body: { date }
+ */
+router.post('/admin/daily-report/generate-pdf', requireAuth, requirePermission('attendance', 'view'), async (req, res) => {
+    try {
+        const date = req.body.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+        if (!reportService) {
+            return res.status(500).json({ success: false, error: 'Report service not available' });
+        }
+
+        const pdf = await reportService.generateActivityPDF(date);
+        if (!pdf) {
+            return res.status(404).json({ success: false, error: 'No activity data for this date' });
+        }
+
+        res.json({
+            success: true,
+            pdf_url: pdf.url,
+            filename: pdf.filename,
+            staffCount: pdf.staffCount
+        });
+    } catch (err) {
+        console.error('[ActivityTracker] POST /admin/daily-report/generate-pdf error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+module.exports = { router, setPool, setIO, setActivityService, setNotificationService, setReportService };
