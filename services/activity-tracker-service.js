@@ -441,6 +441,65 @@ async function checkIdleStaff() {
     }
 }
 
+// ── Max duration check (called every 60s alongside idle check) ──────────────
+
+const MAX_ACTIVITY_MINUTES = 120; // 2 hours
+
+/**
+ * Auto-stop activity sessions that exceed 2 hours.
+ * Prevents misuse / forgotten sessions.
+ */
+async function checkMaxDuration() {
+    if (!pool) return;
+
+    try {
+        const [longSessions] = await pool.query(
+            `SELECT s.id, s.user_id, s.branch_id, s.activity_type, s.started_at,
+                    TIMESTAMPDIFF(MINUTE, s.started_at, NOW()) AS elapsed_minutes,
+                    u.full_name
+             FROM staff_activity_sessions s
+             JOIN users u ON s.user_id = u.id
+             WHERE s.ended_at IS NULL
+               AND TIMESTAMPDIFF(MINUTE, s.started_at, NOW()) >= ?`,
+            [MAX_ACTIVITY_MINUTES]
+        );
+
+        for (const session of longSessions) {
+            // Auto-end the session
+            await pool.query(
+                `UPDATE staff_activity_sessions
+                 SET ended_at = NOW(),
+                     duration_minutes = TIMESTAMPDIFF(MINUTE, started_at, NOW()),
+                     auto_ended = 1
+                 WHERE id = ?`,
+                [session.id]
+            );
+
+            const config = ACTIVITY_CONFIG[session.activity_type] || {};
+
+            // Notify the staff member
+            if (notificationService) {
+                await notificationService.send(session.user_id, {
+                    type: 'activity_auto_stopped',
+                    title: 'Activity auto-stopped',
+                    body: `"${config.label || session.activity_type}" was automatically stopped after ${MAX_ACTIVITY_MINUTES} minutes. Please select your current activity.`,
+                    data: { type: 'activity_auto_stopped', activityType: session.activity_type, priority: 'high' }
+                });
+            }
+
+            // Broadcast
+            broadcast(session.user_id, session.branch_id, session.activity_type, 'auto_stopped_max_duration', {
+                duration: session.elapsed_minutes,
+                staffName: session.full_name
+            });
+
+            console.log(`[ActivityTracker] Max duration auto-stop: ${session.full_name} - ${config.label || session.activity_type} (${session.elapsed_minutes}min)`);
+        }
+    } catch (e) {
+        console.error('[ActivityTracker] checkMaxDuration error:', e.message);
+    }
+}
+
 // ── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -456,5 +515,6 @@ module.exports = {
     getLiveSessions,
     getStaffTimeline,
     getDaySummary,
-    checkIdleStaff
+    checkIdleStaff,
+    checkMaxDuration
 };

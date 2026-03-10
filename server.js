@@ -189,6 +189,7 @@ estimatePdfRoutes.setPool(pool);
 shareRoutes.setPool(pool);
 notificationService.setPool(pool);
 autoClockout.setPool(pool);
+autoClockout.setActivityTrackerService(activityTrackerService);
 websiteRoutes.setPool(pool);
 guidesRoutes.setPool(pool);
 stockCheckRoutes.setPool(pool);
@@ -3846,11 +3847,12 @@ server.listen(PORT, () => {
             console.error('[Geo Cron] Error:', err.message);
         }
 
-        // Activity tracker idle detection
+        // Activity tracker idle detection + max duration check
         try {
             await activityTrackerService.checkIdleStaff();
+            await activityTrackerService.checkMaxDuration();
         } catch (err) {
-            console.error('[ActivityTracker Cron] Idle check error:', err.message);
+            console.error('[ActivityTracker Cron] Idle/max-duration check error:', err.message);
         }
     }, 60 * 1000); // every 60 seconds
     console.log('[Geo Cron] Geofence enforcement cron started (every 60s)');

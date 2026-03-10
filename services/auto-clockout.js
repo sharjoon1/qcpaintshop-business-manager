@@ -15,10 +15,24 @@ const notificationService = require('./notification-service');
 let pool;
 let io;
 let registry = null;
+let activityTrackerService = null;
 
 function setPool(dbPool) { pool = dbPool; }
 function setIO(socketIO) { io = socketIO; }
 function setAutomationRegistry(r) { registry = r; }
+function setActivityTrackerService(svc) { activityTrackerService = svc; }
+
+/**
+ * End active activity session for a user (called during auto-clockout)
+ */
+async function endActivitySession(userId) {
+    if (!activityTrackerService) return;
+    try {
+        await activityTrackerService.endActiveSession(userId, true);
+    } catch (e) {
+        console.error(`[Auto-clockout] endActivitySession error for user ${userId}:`, e.message);
+    }
+}
 
 /**
  * Get today's date in IST (YYYY-MM-DD)
@@ -95,6 +109,7 @@ async function autoClockoutForOTTimeout(record, now) {
 
         // End all active periods
         await endActivePeriods(record, now);
+        await endActivitySession(record.user_id);
 
         // Clock out with ot_timeout reason — no OT pay (not approved)
         await pool.query(
@@ -212,6 +227,7 @@ async function checkGeoWarnings() {
 
                 // End all active periods FIRST (safety — may update break_duration_minutes)
                 await endActivePeriods(record, now);
+                await endActivitySession(record.user_id);
 
                 // Re-fetch break duration after ending any active periods
                 const [refreshed] = await pool.query(
@@ -322,6 +338,7 @@ async function cleanupStaleAttendance() {
                 const overtimeMinutes = Math.max(0, workingMinutes - expectedMinutes);
 
                 await endActivePeriods(record, finalClockOut);
+                await endActivitySession(record.user_id);
 
                 await pool.query(
                     `UPDATE staff_attendance
@@ -496,6 +513,7 @@ async function forceClockoutAll() {
 
                 // End all active periods
                 await endActivePeriods(record, now);
+                await endActivitySession(record.user_id);
 
                 // Determine ot_approved_minutes based on request status
                 let otApprovedMinutes = 0;
@@ -602,4 +620,4 @@ function start() {
     console.log('[Auto-clockout] 10 PM IST force clock-out cron scheduled');
 }
 
-module.exports = { setPool, setIO, setAutomationRegistry, start, checkOvertimePrompts, checkGeoWarnings, forceClockoutAll, endActivePeriods, cleanupStaleAttendance };
+module.exports = { setPool, setIO, setAutomationRegistry, setActivityTrackerService, start, checkOvertimePrompts, checkGeoWarnings, forceClockoutAll, endActivePeriods, cleanupStaleAttendance };
