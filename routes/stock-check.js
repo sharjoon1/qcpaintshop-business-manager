@@ -890,6 +890,21 @@ router.post('/adjust/:id', requirePermission('zoho', 'stock_check'), async (req,
             return res.status(400).json({ success: false, message: 'No Zoho location linked' });
         }
 
+        // If location is inactive (e.g. warehouse), resolve to the active location for the same branch
+        const [locCheck] = await pool.query('SELECT is_active, local_branch_id FROM zoho_locations_map WHERE zoho_location_id = ?', [locationId]);
+        if (locCheck.length && !locCheck[0].is_active) {
+            const [activeLoc] = await pool.query(
+                'SELECT zoho_location_id FROM zoho_locations_map WHERE local_branch_id = ? AND is_active = 1 LIMIT 1',
+                [locCheck[0].local_branch_id]
+            );
+            if (activeLoc.length) {
+                console.log(`[Stock Check] Location ${locationId} is inactive, resolved to active: ${activeLoc[0].zoho_location_id}`);
+                locationId = activeLoc[0].zoho_location_id;
+                // Update assignment to prevent repeated lookups
+                await pool.query('UPDATE stock_check_assignments SET zoho_location_id = ? WHERE id = ?', [locationId, req.params.id]);
+            }
+        }
+
         // Get ALL submitted items
         const [items] = await pool.query(
             `SELECT * FROM stock_check_items WHERE assignment_id = ? AND item_status = 'submitted'`,
