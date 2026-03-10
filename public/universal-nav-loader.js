@@ -52,6 +52,7 @@
         // HR & Attendance (admin pages)
         'admin-tasks': CONFIG.ATTENDANCE_SUBNAV_PATH,
         'admin-daily-tasks': CONFIG.ATTENDANCE_SUBNAV_PATH,
+        'activity-monitor': CONFIG.ATTENDANCE_SUBNAV_PATH,
         'geofence-logs': CONFIG.ATTENDANCE_SUBNAV_PATH,
         // Salary & Payroll
         'salary-config': CONFIG.SALARY_SUBNAV_PATH,
