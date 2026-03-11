@@ -1018,7 +1018,7 @@ Admin assigns specific Zoho Books products to branch staff for daily physical st
 - `POST /submit/:id` — Staff submits checked items as batch (sets `item_status='submitted'`; skips already submitted/adjusted; keeps assignment pending if items remain)
 - `POST /self-request` — Staff self-initiates stock check (creates assignment + items with `item_status='submitted'`, `request_type='self_requested'`)
 - `GET /review/:id` — Admin review with **live stock comparison**: LEFT JOINs `zoho_location_stock` for each item, returns `current_system_qty`, `live_difference`, `live_variance_pct` alongside original `system_qty`. Summary stats use live values.
-- `POST /adjust/:id` — Push submitted items to Zoho using **live stock difference** (JOINs `zoho_location_stock` at push time). Updates `stock_check_items.system_qty`/`difference`/`variance_pct` with actual values used for audit trail. Marks all submitted→adjusted; auto-completes assignment when all items adjusted; stores comma-separated adjustment IDs for multiple pushes.
+- `POST /adjust/:id` — Push submitted items to Zoho using **live stock difference** (JOINs `zoho_location_stock` at push time). **Auto-resolves inactive locations** (e.g. deactivated warehouse) to the active branch location via `zoho_locations_map` lookup; updates assignment record to prevent repeated lookups. Updates `stock_check_items.system_qty`/`difference`/`variance_pct` with actual values used for audit trail. Marks all submitted→adjusted; auto-completes assignment when all items adjusted; stores comma-separated adjustment IDs for multiple pushes.
 - `GET /dashboard` — Summary stats per branch
 - `GET /products/suggest` — Items not checked in 30+ days (accepts `zoho_location_id`)
 - `GET /products/search` — Search products from `zoho_location_stock` with `MAX(submitted_at)` as `last_checked`
@@ -2550,6 +2550,10 @@ Based on AI App Analyzer report, fixed critical production errors:
   - Review panel: 6 stat cards (Total/Submitted/Adjusted/Match/Discrepancy/Pending), filter toggle (Submitted/Adjusted vs All Items), item_status badge per row
   - Push button: "Push X Discrepancies to Zoho" (only submitted items); refreshes panel after push instead of closing
   - Waiting state: shows "Waiting for staff to submit more items" when no submitted items left
+
+### Mar 11, 2026 — Bulk Zoho Product Import + Stock Check Warehouse Fix
+- **Bulk product import**: `scripts/import-all-zoho-products.js` — imports all 1848 active Zoho items as 995 grouped products with pack_sizes. Smart grouping by extracted product name + brand (strips SKU codes, extracts sizes). Primer/emulsion products (378) → `area_wise`, others (617) → `unit_wise`. ML→L and GM→KG conversion. All items mapped to local products.
+- **Stock check warehouse fix**: Updated `branches.zoho_location_id` from inactive warehouse locations to active branch locations. Updated 8 pending assignments (#79-86) and 7817 item `system_qty` values. Added auto-resolve fallback in `POST /api/stock-check/adjust/:id` — if assignment location is inactive, resolves to active location for same branch via `zoho_locations_map`.
 
 ### Mar 9, 2026 — Collections Enhancements + Product Grouping + Painter Points & Notifications
 - **Staff collections**: Gradient header with summary strip, sort pills for Customers/Invoices tabs, History tab with Calls/Promises sub-tabs
