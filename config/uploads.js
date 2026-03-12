@@ -142,6 +142,19 @@ const uploadActivity = multer({
     fileFilter: imageFilter
 });
 
+// Price list PDF upload (10MB, memory storage for parsing)
+const uploadPriceList = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF files allowed'));
+        }
+    }
+});
+
 module.exports = {
     ensureUploadDirs,
     uploadLogo,
@@ -153,5 +166,6 @@ module.exports = {
     uploadTraining,
     uploadPainterAttendance,
     uploadPainterVisualization,
-    uploadActivity
+    uploadActivity,
+    uploadPriceList
 };

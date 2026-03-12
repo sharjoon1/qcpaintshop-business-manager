@@ -1698,7 +1698,7 @@ router.get('/inventory-adjustments', requirePermission('zoho', 'view'), async (r
  */
 router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
     try {
-        const { search, page = 1, limit = 50 } = req.query;
+        const { search, brand, category, page = 1, limit = 50 } = req.query;
 
         let where = "WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)";
         const params = [];
@@ -1706,6 +1706,14 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
         if (search) {
             where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_sku LIKE ?)';
             params.push(`%${search}%`, `%${search}%`);
+        }
+        if (brand) {
+            where += ' AND zim.zoho_brand = ?';
+            params.push(brand);
+        }
+        if (category) {
+            where += ' AND zim.zoho_category_name = ?';
+            params.push(category);
         }
 
         const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
@@ -3247,6 +3255,73 @@ router.get('/purchase-suggestions/batch/:batchId', requirePermission('zoho', 'vi
     try {
         const result = await purchaseSuggestion.getSuggestionsByBatch(req.params.batchId, req.query);
         res.json({ success: true, data: { ...result, batchId: req.params.batchId } });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * POST /api/zoho/items/parse-price-list - Parse a brand dealer price list PDF
+ * Returns extracted items with product name, pack size, and DPL
+ * Optionally matches against existing Zoho items
+ */
+const { uploadPriceList } = require('../config/uploads');
+const priceListParser = require('../services/price-list-parser');
+
+router.post('/items/parse-price-list', requirePermission('zoho', 'manage'), uploadPriceList.single('pdf'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'PDF file is required' });
+        }
+
+        const result = await priceListParser.parsePriceList(req.file.buffer, req.file.originalname);
+
+        // If requested, match against existing Zoho items
+        if (req.body.match !== 'false') {
+            const [zohoItems] = await pool.query(
+                `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_rate AS rate, zoho_cf_dpl AS cf_dpl, zoho_unit AS unit
+                 FROM zoho_items_map WHERE zoho_status = 'active'`
+            );
+            const matchResult = priceListParser.matchWithZohoItems(result.items, zohoItems);
+            result.matched = matchResult.matched;
+            result.unmatched = matchResult.unmatched;
+            result.matchedCount = matchResult.matched.length;
+            result.unmatchedCount = matchResult.unmatched.length;
+        }
+
+        res.json({ success: true, data: result });
+    } catch (error) {
+        console.error('Price list parse error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * POST /api/zoho/items/apply-price-list - Apply parsed price list DPL values to items
+ * Accepts array of { zoho_item_id, cf_dpl } to update in zoho_items_map
+ */
+router.post('/items/apply-price-list', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const { items } = req.body;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: 'items array required' });
+        }
+
+        let updated = 0;
+        for (const item of items) {
+            if (!item.zoho_item_id || item.cf_dpl === undefined) continue;
+            const [result] = await pool.query(
+                `UPDATE zoho_items_map SET zoho_cf_dpl = ? WHERE zoho_item_id = ?`,
+                [item.cf_dpl, item.zoho_item_id]
+            );
+            if (result.affectedRows > 0) updated++;
+        }
+
+        res.json({
+            success: true,
+            data: { updated, total: items.length },
+            message: `Updated DPL for ${updated} of ${items.length} items`
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

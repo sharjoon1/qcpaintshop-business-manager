@@ -182,6 +182,10 @@
                     </button>
                     <div id="colDropdown" class="col-toggle-dropdown hidden"></div>
                 </div>
+                <button onclick="openPriceListImport()" class="px-3 py-1.5 rounded-lg border border-green-300 bg-green-50 hover:bg-green-100 text-xs font-medium text-green-700 flex items-center gap-1.5 transition" title="Import DPL from brand price list PDF">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3-3m0 0l3 3m-3-3v12"></path></svg>
+                    Import DPL
+                </button>
                 <button onclick="syncItems()" id="syncBtn" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1.5 transition">
                     <svg id="syncIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     <span id="syncBtnText">Sync</span>
@@ -1242,6 +1246,271 @@
         }
     }
 
+    // ============ PRICE LIST IMPORT ============
+    var priceListData = null; // { matched: [], unmatched: [], brand, totalExtracted }
+
+    function openPriceListImport() {
+        document.getElementById('priceListModal').classList.remove('hidden');
+        document.getElementById('plUploadSection').classList.remove('hidden');
+        document.getElementById('plResultSection').classList.add('hidden');
+        document.getElementById('plFileInput').value = '';
+        priceListData = null;
+    }
+
+    function closePriceListImport() {
+        document.getElementById('priceListModal').classList.add('hidden');
+    }
+
+    async function uploadPriceList() {
+        var fileInput = document.getElementById('plFileInput');
+        if (!fileInput.files.length) { showToast('Select a PDF file', 'error'); return; }
+
+        var file = fileInput.files[0];
+        if (file.type !== 'application/pdf') { showToast('Only PDF files supported', 'error'); return; }
+
+        var btn = document.getElementById('plUploadBtn');
+        var spinner = document.getElementById('plSpinner');
+        btn.disabled = true; spinner.classList.remove('hidden');
+        document.getElementById('plStatus').textContent = 'Parsing ' + file.name + '...';
+        document.getElementById('plStatus').classList.remove('hidden');
+
+        var formData = new FormData();
+        formData.append('pdf', file);
+        formData.append('match', 'true');
+
+        try {
+            var resp = await fetch('/api/zoho/items/parse-price-list', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + (JSON.parse(localStorage.getItem('auth_token') || '""')) },
+                body: formData
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Parse failed');
+
+            priceListData = data.data;
+            renderPriceListResults();
+        } catch (err) {
+            showToast('Parse error: ' + err.message, 'error');
+            document.getElementById('plStatus').textContent = 'Error: ' + err.message;
+        } finally {
+            btn.disabled = false; spinner.classList.add('hidden');
+        }
+    }
+
+    function renderPriceListResults() {
+        var d = priceListData;
+        document.getElementById('plUploadSection').classList.add('hidden');
+        document.getElementById('plResultSection').classList.remove('hidden');
+        document.getElementById('plStatus').classList.add('hidden');
+
+        // Summary
+        var brandLabel = (d.brand || 'Unknown').replace('-', ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
+        document.getElementById('plSummary').innerHTML =
+            '<div class="flex flex-wrap gap-3">' +
+            '<span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-semibold">' + escapeHtml(brandLabel) + '</span>' +
+            '<span class="text-xs text-gray-600">' + d.pages + ' pages</span>' +
+            '<span class="text-xs text-gray-600">' + d.totalExtracted + ' prices extracted</span>' +
+            '<span class="text-xs text-green-600 font-semibold">' + (d.matchedCount || 0) + ' matched</span>' +
+            '<span class="text-xs text-amber-600">' + (d.unmatchedCount || 0) + ' unmatched</span>' +
+            '</div>';
+
+        // Matched items table
+        var matched = d.matched || [];
+        var html = '';
+        if (matched.length === 0) {
+            html = '<div class="text-center py-6 text-gray-400 text-sm">No items matched with Zoho items</div>';
+        } else {
+            html += '<div class="flex items-center gap-2 mb-2"><input type="checkbox" id="plSelectAll" onchange="plToggleAll()" checked class="item-checkbox"> <span class="text-xs text-gray-500">Select all (' + matched.length + ')</span></div>';
+            html += '<div style="max-height:400px;overflow-y:auto;"><table class="w-full text-xs border-collapse">';
+            html += '<thead><tr class="bg-gray-50 sticky top-0"><th class="p-1.5 text-left w-8"></th><th class="p-1.5 text-left">Zoho Item</th><th class="p-1.5 text-left">PDF Product</th><th class="p-1.5 text-right">Pack</th><th class="p-1.5 text-right">New DPL</th><th class="p-1.5 text-right">Current DPL</th><th class="p-1.5 text-right">Current Rate</th></tr></thead><tbody>';
+            matched.forEach(function(m, idx) {
+                var dplChanged = m.dpl !== parseFloat(m.currentDpl || 0);
+                var rowClass = dplChanged ? 'bg-green-50' : '';
+                html += '<tr class="border-b border-gray-100 ' + rowClass + '">';
+                html += '<td class="p-1.5"><input type="checkbox" class="pl-item-cb item-checkbox" data-idx="' + idx + '" ' + (dplChanged ? 'checked' : '') + '></td>';
+                html += '<td class="p-1.5 font-medium truncate" style="max-width:200px" title="' + escapeHtml(m.zoho_item_name) + '">' + escapeHtml(m.zoho_item_name) + '</td>';
+                html += '<td class="p-1.5 text-gray-500 truncate" style="max-width:180px" title="' + escapeHtml(m.product) + '">' + escapeHtml(m.product) + '</td>';
+                html += '<td class="p-1.5 text-right">' + escapeHtml(m.packSize) + '</td>';
+                html += '<td class="p-1.5 text-right font-bold text-green-700">' + formatINR(m.dpl) + '</td>';
+                html += '<td class="p-1.5 text-right text-gray-500">' + formatINR(m.currentDpl) + '</td>';
+                html += '<td class="p-1.5 text-right text-gray-500">' + formatINR(m.currentRate) + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+        }
+        document.getElementById('plMatchedTable').innerHTML = html;
+
+        // Unmatched items (collapsed by default)
+        var unmatched = d.unmatched || [];
+        if (unmatched.length > 0) {
+            var uhtml = '<details class="mt-3"><summary class="text-xs text-amber-600 cursor-pointer font-semibold">Show ' + unmatched.length + ' unmatched items</summary>';
+            uhtml += '<div style="max-height:200px;overflow-y:auto;" class="mt-1"><table class="w-full text-xs"><thead><tr class="bg-amber-50"><th class="p-1.5 text-left">Product</th><th class="p-1.5 text-right">Pack</th><th class="p-1.5 text-right">DPL</th></tr></thead><tbody>';
+            unmatched.forEach(function(u) {
+                uhtml += '<tr class="border-b border-gray-100"><td class="p-1.5">' + escapeHtml(u.product) + '</td><td class="p-1.5 text-right">' + escapeHtml(u.packSize) + '</td><td class="p-1.5 text-right">' + formatINR(u.dpl) + '</td></tr>';
+            });
+            uhtml += '</tbody></table></div></details>';
+            document.getElementById('plUnmatchedSection').innerHTML = uhtml;
+        } else {
+            document.getElementById('plUnmatchedSection').innerHTML = '';
+        }
+    }
+
+    function plToggleAll() {
+        var checked = document.getElementById('plSelectAll').checked;
+        document.querySelectorAll('.pl-item-cb').forEach(function(cb) { cb.checked = checked; });
+    }
+
+    function plApplyAsReference() {
+        // Convert matched items to tab-separated reference data and feed into AI command
+        if (!priceListData || !priceListData.matched) return;
+        var matched = priceListData.matched;
+        var selected = [];
+        document.querySelectorAll('.pl-item-cb:checked').forEach(function(cb) {
+            selected.push(matched[parseInt(cb.getAttribute('data-idx'))]);
+        });
+        if (selected.length === 0) { showToast('Select at least one item', 'error'); return; }
+
+        // Build tab-separated data: Item Name\tDPL
+        var tsv = 'Item Name\tDPL\n';
+        selected.forEach(function(m) {
+            tsv += m.zoho_item_name + '\t' + m.dpl + '\n';
+        });
+
+        // Set as AI command with reference data
+        document.getElementById('aiCommandInput').value = 'Update DPL from price list reference data';
+
+        // Inject as context via chat
+        closePriceListImport();
+
+        // Use the existing AI edit flow with reference data
+        runAiCommandWithContext(tsv, selected.length);
+    }
+
+    async function runAiCommandWithContext(context, count) {
+        if (isAiRunning) return;
+        if (items.length === 0) { showToast('No items loaded', 'info'); return; }
+
+        isAiRunning = true;
+        var btn = document.getElementById('aiApplyBtn');
+        var spinner = document.getElementById('aiSpinner');
+        var icon = document.getElementById('aiIcon');
+        btn.disabled = true; spinner.classList.remove('hidden'); icon.classList.add('hidden');
+        document.getElementById('aiResultBanner').classList.add('hidden');
+
+        var dirtyBefore = new Map();
+        dirtyItems.forEach(function(v, k) { dirtyBefore.set(k, Object.assign({}, v)); });
+        aiUndoSnapshot = { dirtyBefore: dirtyBefore, affectedIds: [] };
+
+        try {
+            var controller = new AbortController();
+            var timeout = setTimeout(function() { controller.abort(); }, 300000);
+            var resp = await fetch('/api/zoho/items/ai-edit', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                signal: controller.signal,
+                body: JSON.stringify({
+                    command: 'Update DPL from price list reference data',
+                    items: compactItemsForAI(items),
+                    context: context
+                })
+            });
+            clearTimeout(timeout);
+
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'AI request failed');
+
+            var edits = data.edits || [];
+            if (edits.length === 0) {
+                showToast('No matching items found', 'info');
+                return;
+            }
+
+            var appliedCount = 0;
+            edits.forEach(function(edit) {
+                var itemId = String(edit.zoho_item_id);
+                var item = items.find(function(it) { return String(it.item_id || it.zoho_item_id) === itemId; });
+                if (!item) return;
+                if (!originalValues.has(itemId)) {
+                    var orig = {};
+                    allColumns.forEach(function(col) { orig[col.key] = item[col.key] !== undefined ? item[col.key] : null; });
+                    originalValues.set(itemId, orig);
+                }
+                var existing = dirtyItems.get(itemId) || { _itemName: item.name || item.item_name || '' };
+                var changes = edit.changes || {};
+                for (var field in changes) {
+                    if (changes.hasOwnProperty(field)) {
+                        existing[field] = changes[field];
+                        item[field] = changes[field];
+                    }
+                }
+                dirtyItems.set(itemId, existing);
+                aiUndoSnapshot.affectedIds.push(itemId);
+                appliedCount++;
+            });
+
+            renderTable(); renderCards(); updateChangesUI(); updateAiScope();
+            var banner = document.getElementById('aiResultBanner');
+            banner.style.background = '';
+            document.getElementById('aiResultText').textContent = 'Price list import: ' + appliedCount + ' DPL values updated (via ' + (data.model || 'deterministic') + ')';
+            banner.classList.remove('hidden');
+            showToast('Applied ' + appliedCount + ' DPL updates from price list', 'success');
+        } catch (err) {
+            showToast('Import error: ' + err.message, 'error');
+        } finally {
+            isAiRunning = false;
+            btn.disabled = false; spinner.classList.add('hidden'); icon.classList.remove('hidden');
+        }
+    }
+
+    function plApplyDirect() {
+        // Directly set DPL values on matched items without going through AI
+        if (!priceListData || !priceListData.matched) return;
+        var matched = priceListData.matched;
+        var selected = [];
+        document.querySelectorAll('.pl-item-cb:checked').forEach(function(cb) {
+            selected.push(matched[parseInt(cb.getAttribute('data-idx'))]);
+        });
+        if (selected.length === 0) { showToast('Select at least one item', 'error'); return; }
+
+        // Save undo snapshot
+        var dirtyBefore = new Map();
+        dirtyItems.forEach(function(v, k) { dirtyBefore.set(k, Object.assign({}, v)); });
+        aiUndoSnapshot = { dirtyBefore: dirtyBefore, affectedIds: [] };
+
+        var appliedCount = 0;
+        selected.forEach(function(m) {
+            var itemId = String(m.zoho_item_id);
+            var item = items.find(function(it) { return String(it.item_id || it.zoho_item_id) === itemId; });
+            if (!item) return;
+
+            if (!originalValues.has(itemId)) {
+                var orig = {};
+                allColumns.forEach(function(col) { orig[col.key] = item[col.key] !== undefined ? item[col.key] : null; });
+                originalValues.set(itemId, orig);
+            }
+
+            setDirty(itemId, 'cf_dpl', String(m.dpl));
+            item.cf_dpl = m.dpl;
+            aiUndoSnapshot.affectedIds.push(itemId);
+            appliedCount++;
+        });
+
+        closePriceListImport();
+        renderTable(); renderCards(); updateChangesUI();
+
+        var banner = document.getElementById('aiResultBanner');
+        banner.style.background = '';
+        document.getElementById('aiResultText').textContent = 'Price list: ' + appliedCount + ' DPL values set directly';
+        banner.classList.remove('hidden');
+        showToast('Set DPL for ' + appliedCount + ' items from price list', 'success');
+    }
+
+    function plBackToUpload() {
+        document.getElementById('plUploadSection').classList.remove('hidden');
+        document.getElementById('plResultSection').classList.add('hidden');
+        priceListData = null;
+    }
+
     // ============ INIT ============
     document.addEventListener('DOMContentLoaded', function() { loadItems(); updateAiScope(); });
     window.addEventListener('beforeunload', function(e) { if(getDirtyItemCount()>0){e.preventDefault();e.returnValue='';} });
@@ -1251,5 +1520,55 @@
         if (!document.getElementById('pctAdjustWrap').contains(e.target)) document.getElementById('pctPopover').classList.add('hidden');
     });
     </script>
+
+    <!-- Price List Import Modal -->
+    <div id="priceListModal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.5);" onclick="if(event.target===this)closePriceListImport()">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="px-5 py-3 border-b bg-gradient-to-r from-green-50 to-emerald-50 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <h3 class="font-bold text-gray-800 text-sm">Import DPL from Price List PDF</h3>
+                </div>
+                <button onclick="closePriceListImport()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-5 overflow-y-auto flex-1">
+                <!-- Upload Section -->
+                <div id="plUploadSection">
+                    <p class="text-xs text-gray-500 mb-3">Upload a brand dealer price list PDF. Supported brands: Asian Paints, Berger, Birla Opus, Gem/Astral, JSW, Nippon.</p>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-green-400 transition">
+                        <svg class="mx-auto w-10 h-10 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <input type="file" id="plFileInput" accept=".pdf" class="block mx-auto text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                        <p class="text-xs text-gray-400 mt-2">Max 10MB PDF file</p>
+                    </div>
+                    <div id="plStatus" class="hidden mt-3 text-xs text-gray-500 text-center"></div>
+                    <div class="mt-4 flex justify-end">
+                        <button onclick="uploadPriceList()" id="plUploadBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-xs transition flex items-center gap-2">
+                            <svg id="plSpinner" class="hidden w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Parse &amp; Match
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="plResultSection" class="hidden">
+                    <div id="plSummary" class="mb-3"></div>
+                    <div id="plMatchedTable"></div>
+                    <div id="plUnmatchedSection"></div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-5 py-3 border-t bg-gray-50 flex items-center justify-between flex-shrink-0">
+                <button onclick="plBackToUpload()" class="text-xs text-gray-500 hover:text-gray-700 underline">Upload another PDF</button>
+                <div class="flex gap-2">
+                    <button onclick="closePriceListImport()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-600">Cancel</button>
+                    <button onclick="plApplyDirect()" class="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition">Apply DPL to Items</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
