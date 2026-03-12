@@ -195,34 +195,52 @@ function parseBirlaOpus(text) {
             // or "1 104  484  1,902  4,740  9,390"
             const tokens = rest.split(/\s+/);
 
-            // Find where numbers start (skip base code suffix like "White", "1", "2", "99")
-            let priceStart = 0;
-            for (let j = 0; j < tokens.length; j++) {
-                if (tokens[j].match(/^[\d,]+$/)) {
-                    priceStart = j;
-                    break;
+            // First token is ALWAYS the base code suffix (e.g., "White", "1", "2", "99", "13")
+            // Skip it — everything after is prices
+            const priceStart = 1;
+
+            const prices = tokens.slice(priceStart).map(t => cleanPrice(t)).filter(p => p > 0);
+
+            // PDF text extraction loses column alignment — empty cells disappear.
+            // Use price VALUE RANGES to determine pack size instead of column position.
+            // Typical Birla Opus price ranges:
+            //   200ml: 50-250, 1L: 250-1000, 4L: 1000-3500, 10L: 3500-13000, 20L: 6000-25000
+            // Available sizes from header (for reference only, not used for positional mapping)
+            const availableSizes = sizeHeaders.map(s => {
+                if (s.match(/^\d+ml$/i)) return s;
+                return s.includes('L') || s.includes('l') ? s : s + 'L';
+            });
+            const has200ml = availableSizes.some(s => /200ml/i.test(s));
+
+            for (const price of prices) {
+                let packSize;
+                if (price < 250 && has200ml) {
+                    packSize = '200ml';
+                } else if (price >= 250 && price < 1000) {
+                    // Could be 0.9L or 1L — prefer 1L if available in header
+                    packSize = availableSizes.some(s => /^1L$/i.test(s)) ? '1L' : '0.9L';
+                } else if (price >= 1000 && price < 3500) {
+                    // Could be 3.6L or 4L — prefer 4L if available
+                    packSize = availableSizes.some(s => /^4L$/i.test(s)) ? '4L' : '3.6L';
+                } else if (price >= 3500 && price < 7000) {
+                    // Could be 9L or 10L — prefer 10L if available
+                    packSize = availableSizes.some(s => /^10L$/i.test(s)) ? '10L' : '9L';
+                } else if (price >= 7000) {
+                    // Could be 18L or 20L — prefer 20L if available
+                    packSize = availableSizes.some(s => /^20L$/i.test(s)) ? '20L' : '18L';
+                } else {
+                    // Small price but no 200ml in header — treat as 1L
+                    packSize = '1L';
                 }
-            }
 
-            const prices = tokens.slice(priceStart).map(t => cleanPrice(t));
-
-            // Map prices to size headers (prices fill from left to right, some may be missing for larger sizes)
-            for (let j = 0; j < prices.length && j < sizeHeaders.length; j++) {
-                if (prices[j]) {
-                    let packSize = sizeHeaders[j];
-                    // Normalize: "0.9L" stays, "200ml" stays
-                    if (packSize.match(/^\d+ml$/i)) packSize = packSize;
-                    else if (!packSize.includes('L') && !packSize.includes('l')) packSize += 'L';
-
-                    results.push({
-                        brand: 'Birla Opus',
-                        product: currentProduct + ' - ' + baseName,
-                        packSize: packSize,
-                        dpl: prices[j],
-                        baseCode: dataMatch[1],
-                        category: currentCategory
-                    });
-                }
+                results.push({
+                    brand: 'Birla Opus',
+                    product: currentProduct + ' - ' + baseName,
+                    packSize: packSize,
+                    dpl: price,
+                    baseCode: dataMatch[1],
+                    category: currentCategory
+                });
             }
             continue;
         }
