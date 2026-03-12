@@ -2021,7 +2021,7 @@ app.delete('/api/categories/:id', requirePermission('categories', 'delete'), asy
 app.get('/api/users', requirePermission('staff', 'view'), async (req, res) => {
     try {
         const { role, branch_id, status, assignable } = req.query;
-        let query = `SELECT id, username, email, full_name, phone, role, branch_id, geo_fence_enabled, status, created_at, last_login, profile_image_url, kyc_status FROM users WHERE 1=1`;
+        let query = `SELECT id, username, email, full_name, phone, role, branch_id, geo_fence_enabled, status, created_at, last_login, profile_image_url, kyc_status, aadhar_number, pan_number FROM users WHERE 1=1`;
         const params = [];
 
         if (assignable === '1') {
@@ -2254,7 +2254,8 @@ app.put('/api/users/:id', requirePermission('staff', 'edit'), async (req, res) =
             return res.status(400).json({ error: 'No fields to update' });
         }
 
-        // Accept pan_number if provided
+        // Accept KYC fields if provided
+        if (req.body.aadhar_number !== undefined) { setClauses.push('aadhar_number = ?'); params.push(req.body.aadhar_number); }
         if (req.body.pan_number !== undefined) { setClauses.push('pan_number = ?'); params.push(req.body.pan_number); }
 
         if (setClauses.length > 0) {
@@ -2533,11 +2534,17 @@ app.post('/api/products/bulk-map', requirePermission('products', 'edit'), async 
 app.get('/api/products/mapped-zoho-ids', requireAuth, async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT DISTINCT ps.zoho_item_id FROM pack_sizes ps
+            `SELECT ps.zoho_item_id, ps.product_id, p.name as product_name
+             FROM pack_sizes ps
              INNER JOIN products p ON p.id = ps.product_id AND p.status = 'active'
              WHERE ps.zoho_item_id IS NOT NULL AND ps.zoho_item_id != '' AND ps.is_active = 1`
         );
-        res.json({ success: true, ids: rows.map(r => r.zoho_item_id) });
+        // ids: for backward compat, mappings: zoho_item_id → { product_id, product_name }
+        const mappings = {};
+        for (const r of rows) {
+            mappings[r.zoho_item_id] = { product_id: r.product_id, product_name: r.product_name };
+        }
+        res.json({ success: true, ids: rows.map(r => r.zoho_item_id), mappings });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -2695,12 +2702,23 @@ app.post('/api/products/:itemId/image', requirePermission('products', 'edit'), u
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'Image file is required' });
         }
-        const [existing] = await pool.query('SELECT zoho_item_id FROM zoho_items_map WHERE zoho_item_id = ?', [itemId]);
-        if (!existing.length) {
-            return res.status(404).json({ success: false, message: 'Product not found in Zoho items' });
-        }
         const imageUrl = `/uploads/products/${req.file.filename}`;
-        await pool.query('UPDATE zoho_items_map SET image_url = ? WHERE zoho_item_id = ?', [imageUrl, itemId]);
+        // If itemId is numeric, it's a product ID — update products table
+        if (/^\d+$/.test(itemId)) {
+            await pool.query('UPDATE products SET image_url = ? WHERE id = ?', [imageUrl, itemId]);
+            // Also update zoho_items_map for all pack_sizes of this product
+            await pool.query(
+                `UPDATE zoho_items_map zim JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id
+                 SET zim.image_url = ? WHERE ps.product_id = ?`, [imageUrl, itemId]
+            );
+        } else {
+            // Otherwise it's a zoho_item_id
+            const [existing] = await pool.query('SELECT zoho_item_id FROM zoho_items_map WHERE zoho_item_id = ?', [itemId]);
+            if (!existing.length) {
+                return res.status(404).json({ success: false, message: 'Product not found in Zoho items' });
+            }
+            await pool.query('UPDATE zoho_items_map SET image_url = ? WHERE zoho_item_id = ?', [imageUrl, itemId]);
+        }
         res.json({ success: true, message: 'Product image uploaded', image_url: imageUrl });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -2741,9 +2759,12 @@ app.get('/api/products/:id', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Product not found' });
         }
 
-        // Get pack sizes
+        // Get pack sizes with zoho item names
         const [packSizes] = await pool.query(
-            'SELECT * FROM pack_sizes WHERE product_id = ? AND is_active = 1 ORDER BY size',
+            `SELECT ps.*, zim.zoho_item_name
+             FROM pack_sizes ps
+             LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+             WHERE ps.product_id = ? AND ps.is_active = 1 ORDER BY ps.size`,
             [req.params.id]
         );
 
@@ -2824,6 +2845,28 @@ app.delete('/api/products/:id', requirePermission('products', 'delete'), async (
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Bulk delete (deactivate) products
+app.post('/api/products/bulk-delete', requirePermission('products', 'delete'), async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || !ids.length) {
+            return res.status(400).json({ success: false, error: 'No product IDs provided' });
+        }
+        // Sanitize: ensure all are integers
+        const safeIds = ids.map(id => parseInt(id)).filter(id => id > 0);
+        if (!safeIds.length) return res.status(400).json({ success: false, error: 'Invalid IDs' });
+
+        const placeholders = safeIds.map(() => '?').join(',');
+        await pool.query(`UPDATE products SET status = 'inactive' WHERE id IN (${placeholders})`, safeIds);
+        await pool.query(`UPDATE pack_sizes SET is_active = 0 WHERE product_id IN (${placeholders})`, safeIds);
+
+        res.json({ success: true, deleted: safeIds.length });
+    } catch (err) {
+        console.error('Bulk delete error:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

@@ -1040,8 +1040,9 @@
                 const response = await fetch(`${API_BASE}/branches`, { headers: getAuthHeaders() });
                 const result = await response.json();
 
-                if (Array.isArray(result)) {
-                    branches = result;
+                const branchList = result.success ? result.data : (Array.isArray(result) ? result : []);
+                if (branchList.length) {
+                    branches = branchList;
                     const select = document.getElementById('leadBranch');
                     select.innerHTML = '<option value="">-- Select Branch --</option>' +
                         branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');

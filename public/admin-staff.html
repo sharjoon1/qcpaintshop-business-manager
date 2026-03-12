@@ -153,7 +153,22 @@
                                 </div>
                             </label>
                         </div>
-                        
+
+                        <!-- KYC Documents Section -->
+                        <div id="kycSection" class="hidden border-t pt-4 mt-2">
+                            <p class="text-sm font-semibold text-gray-700 mb-3">KYC Documents</p>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Aadhar Number</label>
+                                    <input type="text" id="aadharNumber" maxlength="12" inputmode="numeric" placeholder="12-digit Aadhar" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">PAN Number</label>
+                                    <input type="text" id="panNumber" maxlength="10" placeholder="ABCDE1234F" style="text-transform: uppercase;" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm">
+                                </div>
+                            </div>
+                        </div>
+
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Role *</label>
                             <select id="roleId" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
@@ -387,6 +402,9 @@
             document.getElementById('staffId').value = '';
             document.getElementById('password').required = true;
             document.getElementById('geoFenceEnabled').checked = true;
+            document.getElementById('kycSection').classList.add('hidden');
+            document.getElementById('aadharNumber').value = '';
+            document.getElementById('panNumber').value = '';
             document.querySelectorAll('#branchCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
             updatePrimaryBranchSelect();
             document.getElementById('staffModal').classList.remove('hidden');
@@ -415,6 +433,11 @@
 
             // Geo-fence toggle
             document.getElementById('geoFenceEnabled').checked = staff.geo_fence_enabled !== undefined ? !!staff.geo_fence_enabled : true;
+
+            // KYC fields (only shown when editing)
+            document.getElementById('kycSection').classList.remove('hidden');
+            document.getElementById('aadharNumber').value = staff.aadhar_number || '';
+            document.getElementById('panNumber').value = staff.pan_number || '';
 
             // Match role by name since users table stores role as text, not role_id
             const matchedRole = roles.find(r => r.name.toLowerCase() === (staff.role || '').toLowerCase());
@@ -462,6 +485,18 @@
                 status: document.getElementById('status').value,
                 role: selectedRole ? selectedRole.name.toLowerCase() : 'staff'
             };
+
+            // KYC fields (only when editing)
+            if (editingStaffId) {
+                const aadhar = document.getElementById('aadharNumber').value.trim();
+                const pan = document.getElementById('panNumber').value.trim().toUpperCase();
+                if (pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
+                    alert('Invalid PAN format (e.g. ABCDE1234F)');
+                    return;
+                }
+                staffData.aadhar_number = aadhar || null;
+                staffData.pan_number = pan || null;
+            }
             
             const password = document.getElementById('password').value;
             if (password) {
