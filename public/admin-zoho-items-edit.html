@@ -1246,87 +1246,8 @@
         }
     }
 
-    // ============ DPL IMPORT BRIDGE ============
-    // When navigated from admin-dpl.html with ?dpl_import=true, auto-apply reference data via AI
-    function checkDplImport() {
-        if (!window.location.search.includes('dpl_import=true')) return;
-        var tsv = sessionStorage.getItem('dpl_reference_data');
-        var count = sessionStorage.getItem('dpl_item_count');
-        var brand = sessionStorage.getItem('dpl_brand');
-        if (!tsv) return;
-
-        // Clean up
-        sessionStorage.removeItem('dpl_reference_data');
-        sessionStorage.removeItem('dpl_item_count');
-        sessionStorage.removeItem('dpl_brand');
-        history.replaceState(null, '', window.location.pathname);
-
-        // Wait for items to load, then run AI with reference data
-        var waitForItems = setInterval(function() {
-            if (items.length > 0) {
-                clearInterval(waitForItems);
-                document.getElementById('aiCommandInput').value = 'Update DPL from ' + (brand || 'price list') + ' reference data (' + count + ' items)';
-                // Trigger AI edit with reference context
-                isAiRunning = true;
-                var btn = document.getElementById('aiApplyBtn');
-                var spinner = document.getElementById('aiSpinner');
-                var icon = document.getElementById('aiIcon');
-                btn.disabled = true; spinner.classList.remove('hidden'); icon.classList.add('hidden');
-                document.getElementById('aiResultBanner').classList.add('hidden');
-
-                var dirtyBefore = new Map();
-                dirtyItems.forEach(function(v, k) { dirtyBefore.set(k, Object.assign({}, v)); });
-                aiUndoSnapshot = { dirtyBefore: dirtyBefore, affectedIds: [] };
-
-                fetch('/api/zoho/items/ai-edit', {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify({
-                        command: 'Update DPL from price list',
-                        items: compactItemsForAI(items),
-                        context: tsv
-                    })
-                }).then(function(resp) { return resp.json(); })
-                .then(function(data) {
-                    if (!data.success) throw new Error(data.message || 'AI request failed');
-                    var edits = data.edits || [];
-                    var appliedCount = 0;
-                    edits.forEach(function(edit) {
-                        var itemId = String(edit.zoho_item_id);
-                        var item = items.find(function(it) { return String(it.item_id || it.zoho_item_id) === itemId; });
-                        if (!item) return;
-                        if (!originalValues.has(itemId)) {
-                            var orig = {};
-                            allColumns.forEach(function(col) { orig[col.key] = item[col.key] !== undefined ? item[col.key] : null; });
-                            originalValues.set(itemId, orig);
-                        }
-                        var existing = dirtyItems.get(itemId) || { _itemName: item.name || item.item_name || '' };
-                        var changes = edit.changes || {};
-                        for (var field in changes) {
-                            if (changes.hasOwnProperty(field)) { existing[field] = changes[field]; item[field] = changes[field]; }
-                        }
-                        dirtyItems.set(itemId, existing);
-                        aiUndoSnapshot.affectedIds.push(itemId);
-                        appliedCount++;
-                    });
-                    renderTable(); renderCards(); updateChangesUI(); updateAiScope();
-                    var banner = document.getElementById('aiResultBanner');
-                    banner.style.background = '';
-                    document.getElementById('aiResultText').textContent = 'DPL import: ' + appliedCount + ' values updated via ' + (data.model || 'deterministic') + ' matching';
-                    banner.classList.remove('hidden');
-                    showToast('Applied ' + appliedCount + ' DPL updates from price list', 'success');
-                }).catch(function(err) {
-                    showToast('DPL import error: ' + err.message, 'error');
-                }).finally(function() {
-                    isAiRunning = false;
-                    btn.disabled = false; spinner.classList.add('hidden'); icon.classList.remove('hidden');
-                });
-            }
-        }, 500);
-    }
-
     // ============ INIT ============
-    document.addEventListener('DOMContentLoaded', function() { loadItems(); updateAiScope(); checkDplImport(); });
+    document.addEventListener('DOMContentLoaded', function() { loadItems(); updateAiScope(); });
     window.addEventListener('beforeunload', function(e) { if(getDirtyItemCount()>0){e.preventDefault();e.returnValue='';} });
     // Close dropdowns on outside click
     document.addEventListener('click', function(e) {

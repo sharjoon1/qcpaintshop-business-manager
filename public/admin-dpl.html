@@ -227,12 +227,9 @@
             <div class="bg-white rounded-lg shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div class="flex gap-2">
                     <button onclick="backToUpload()" class="px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition">Upload Another PDF</button>
-                    <button onclick="sendToKai()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1.5" title="Send matched data to KAI on Edit Items page for AI-powered DPL update">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                        Send to KAI (Edit Items)
-                    </button>
                 </div>
                 <div class="flex gap-2">
+                    <span id="selectedCount" class="text-xs text-gray-500 self-center"></span>
                     <button onclick="applyDplDirect()" id="applyBtn" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold transition flex items-center gap-2 disabled:opacity-50">
                         <svg id="applySpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         Apply DPL to Zoho Items
@@ -396,7 +393,7 @@
             visibleCount++;
             var rowClass = changed ? 'row-changed' : 'row-same';
             html += '<tr class="' + rowClass + '">';
-            html += '<td><input type="checkbox" class="match-cb" data-idx="' + idx + '" ' + (changed ? 'checked' : '') + '></td>';
+            html += '<td><input type="checkbox" class="match-cb" data-idx="' + idx + '" ' + (changed ? 'checked' : '') + ' onchange="updateSelectedCount()"></td>';
             html += '<td class="font-medium" style="max-width:220px" title="' + escapeHtml(m.zoho_item_name) + '"><div class="truncate">' + escapeHtml(m.zoho_item_name) + '</div></td>';
             html += '<td class="text-gray-500" style="max-width:180px" title="' + escapeHtml(m.product) + '"><div class="truncate">' + escapeHtml(m.product) + '</div></td>';
             html += '<td class="text-right">' + escapeHtml(m.packSize) + '</td>';
@@ -417,6 +414,13 @@
             html = '<tr><td colspan="8" class="text-center py-6 text-gray-400">No matching items found</td></tr>';
         }
         document.getElementById('matchedBody').innerHTML = html;
+        updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+        var count = document.querySelectorAll('.match-cb:checked').length;
+        var el = document.getElementById('selectedCount');
+        if (el) el.textContent = count > 0 ? count + ' selected' : '';
     }
 
     function renderUnmatchedTable() {
@@ -439,6 +443,7 @@
     function toggleAllMatched() {
         var checked = document.getElementById('selectAllMatched').checked;
         document.querySelectorAll('.match-cb').forEach(function(cb) { cb.checked = checked; });
+        updateSelectedCount();
     }
 
     // ============ APPLY DPL DIRECTLY ============
@@ -483,107 +488,6 @@
             showToast('Apply error: ' + err.message, 'error');
         } finally {
             btn.disabled = false; spinner.classList.add('hidden');
-        }
-    }
-
-    // ============ SEND TO KAI ============
-    async function sendToKai() {
-        if (!parseResult || !parseResult.matched) return;
-        var matched = parseResult.matched;
-        var selected = [];
-        document.querySelectorAll('.match-cb:checked').forEach(function(cb) {
-            var idx = parseInt(cb.getAttribute('data-idx'));
-            if (matched[idx]) selected.push(matched[idx]);
-        });
-        if (selected.length === 0) { showToast('Select at least one item', 'error'); return; }
-
-        if (!confirm('Send ' + selected.length + ' items to KAI for DPL update via Edit Items page?')) return;
-
-        // Build tab-separated reference data
-        var tsv = 'Item Name\tDPL\n';
-        selected.forEach(function(m) {
-            tsv += m.zoho_item_name + '\t' + m.dpl + '\n';
-        });
-
-        var kaiBtn = document.querySelector('[onclick="sendToKai()"]');
-        var origHtml = kaiBtn.innerHTML;
-        kaiBtn.disabled = true;
-        kaiBtn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Loading items...';
-
-        try {
-            // Step 1: Fetch all Zoho items
-            var itemsResp = await fetch('/api/zoho/items?page=1&limit=10000', {
-                headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' }
-            });
-            if (!itemsResp.ok) throw new Error('Failed to load Zoho items');
-            var itemsData = await itemsResp.json();
-            var allItems = (itemsData.data || []).map(function(it) {
-                return {
-                    zoho_item_id: it.item_id || it.zoho_item_id,
-                    name: it.name || it.item_name,
-                    sku: it.sku || '',
-                    rate: parseFloat(it.rate) || 0,
-                    purchase_rate: parseFloat(it.purchase_rate) || 0,
-                    cf_dpl: parseFloat(it.cf_dpl) || 0,
-                    brand: it.brand || '',
-                    unit: it.unit || '',
-                    category_name: it.category_name || '',
-                    description: it.description || '',
-                    hsn_or_sac: it.hsn_or_sac || '',
-                    tax_percentage: parseFloat(it.tax_percentage) || 0
-                };
-            });
-
-            kaiBtn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> KAI matching...';
-
-            // Step 2: Send to AI edit endpoint with TSV context
-            var aiResp = await fetch('/api/zoho/items/ai-edit', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: 'Update DPL from ' + (parseResult.brand || 'price list') + ' reference data',
-                    items: allItems,
-                    context: tsv
-                })
-            });
-            var aiData = await aiResp.json();
-            if (!aiData.success) throw new Error(aiData.message || 'KAI request failed');
-
-            var edits = aiData.edits || [];
-            if (edits.length === 0) {
-                showToast('KAI found no items to update (names may not match exactly)', 'info');
-                return;
-            }
-
-            // Step 3: Apply edits via apply-price-list endpoint
-            var applyPayload = edits.map(function(e) {
-                return { zoho_item_id: e.zoho_item_id || e.id, cf_dpl: (e.changes || {}).cf_dpl };
-            }).filter(function(e) { return e.cf_dpl != null; });
-
-            if (applyPayload.length === 0) {
-                showToast('KAI matched ' + edits.length + ' items but no DPL changes found', 'info');
-                return;
-            }
-
-            var applyResp = await fetch('/api/zoho/items/apply-price-list', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: applyPayload })
-            });
-            var applyData = await applyResp.json();
-            if (!applyData.success) throw new Error(applyData.message || 'Apply failed');
-
-            // Show step 3
-            setStep(3);
-            document.getElementById('doneTitle').textContent = 'KAI DPL Update Complete!';
-            document.getElementById('doneMsg').textContent = 'KAI matched and updated ' + applyData.data.updated + ' items via ' + (aiData.model || 'deterministic') + ' matching. Go to Edit Items to review.';
-            showToast('KAI updated DPL for ' + applyData.data.updated + ' items', 'success');
-
-        } catch (err) {
-            showToast('KAI error: ' + err.message, 'error');
-        } finally {
-            kaiBtn.disabled = false;
-            kaiBtn.innerHTML = origHtml;
         }
     }
 
