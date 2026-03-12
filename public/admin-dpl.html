@@ -487,7 +487,7 @@
     }
 
     // ============ SEND TO KAI ============
-    function sendToKai() {
+    async function sendToKai() {
         if (!parseResult || !parseResult.matched) return;
         var matched = parseResult.matched;
         var selected = [];
@@ -495,9 +495,9 @@
             var idx = parseInt(cb.getAttribute('data-idx'));
             if (matched[idx]) selected.push(matched[idx]);
         });
+        if (selected.length === 0) { showToast('Select at least one item', 'error'); return; }
 
-        // Also include unmatched for AI matching
-        var unmatched = parseResult.unmatched || [];
+        if (!confirm('Send ' + selected.length + ' items to KAI for DPL update via Edit Items page?')) return;
 
         // Build tab-separated reference data
         var tsv = 'Item Name\tDPL\n';
@@ -505,13 +505,86 @@
             tsv += m.zoho_item_name + '\t' + m.dpl + '\n';
         });
 
-        // Store in sessionStorage for Edit Items page to pick up
-        sessionStorage.setItem('dpl_reference_data', tsv);
-        sessionStorage.setItem('dpl_item_count', String(selected.length));
-        sessionStorage.setItem('dpl_brand', parseResult.brand || '');
+        var kaiBtn = document.querySelector('[onclick="sendToKai()"]');
+        var origHtml = kaiBtn.innerHTML;
+        kaiBtn.disabled = true;
+        kaiBtn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Loading items...';
 
-        // Navigate to edit items page
-        window.location.href = '/admin-zoho-items-edit.html?dpl_import=true';
+        try {
+            // Step 1: Fetch all Zoho items
+            var itemsResp = await fetch('/api/zoho/items?page=1&limit=10000', {
+                headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' }
+            });
+            if (!itemsResp.ok) throw new Error('Failed to load Zoho items');
+            var itemsData = await itemsResp.json();
+            var allItems = (itemsData.data || []).map(function(it) {
+                return {
+                    zoho_item_id: it.item_id || it.zoho_item_id,
+                    name: it.name || it.item_name,
+                    sku: it.sku || '',
+                    rate: parseFloat(it.rate) || 0,
+                    purchase_rate: parseFloat(it.purchase_rate) || 0,
+                    cf_dpl: parseFloat(it.cf_dpl) || 0,
+                    brand: it.brand || '',
+                    unit: it.unit || '',
+                    category_name: it.category_name || '',
+                    description: it.description || '',
+                    hsn_or_sac: it.hsn_or_sac || '',
+                    tax_percentage: parseFloat(it.tax_percentage) || 0
+                };
+            });
+
+            kaiBtn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> KAI matching...';
+
+            // Step 2: Send to AI edit endpoint with TSV context
+            var aiResp = await fetch('/api/zoho/items/ai-edit', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    command: 'Update DPL from ' + (parseResult.brand || 'price list') + ' reference data',
+                    items: allItems,
+                    context: tsv
+                })
+            });
+            var aiData = await aiResp.json();
+            if (!aiData.success) throw new Error(aiData.message || 'KAI request failed');
+
+            var edits = aiData.edits || [];
+            if (edits.length === 0) {
+                showToast('KAI found no items to update (names may not match exactly)', 'info');
+                return;
+            }
+
+            // Step 3: Apply edits via apply-price-list endpoint
+            var applyPayload = edits.map(function(e) {
+                return { zoho_item_id: e.zoho_item_id || e.id, cf_dpl: (e.changes || {}).cf_dpl };
+            }).filter(function(e) { return e.cf_dpl != null; });
+
+            if (applyPayload.length === 0) {
+                showToast('KAI matched ' + edits.length + ' items but no DPL changes found', 'info');
+                return;
+            }
+
+            var applyResp = await fetch('/api/zoho/items/apply-price-list', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: applyPayload })
+            });
+            var applyData = await applyResp.json();
+            if (!applyData.success) throw new Error(applyData.message || 'Apply failed');
+
+            // Show step 3
+            setStep(3);
+            document.getElementById('doneTitle').textContent = 'KAI DPL Update Complete!';
+            document.getElementById('doneMsg').textContent = 'KAI matched and updated ' + applyData.data.updated + ' items via ' + (aiData.model || 'deterministic') + ' matching. Go to Edit Items to review.';
+            showToast('KAI updated DPL for ' + applyData.data.updated + ' items', 'success');
+
+        } catch (err) {
+            showToast('KAI error: ' + err.message, 'error');
+        } finally {
+            kaiBtn.disabled = false;
+            kaiBtn.innerHTML = origHtml;
+        }
     }
 
     // ============ NAVIGATION ============
