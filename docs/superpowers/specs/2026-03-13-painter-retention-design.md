@@ -20,13 +20,14 @@
 
 - Level badge shown on dashboard header, visiting card, ID card, profile
 - Level-up triggers celebratory push notification + full-screen confetti + share-to-WhatsApp modal
-- Multiplier applied at point-award time in `painter-points-engine.js`
+- Multiplier applied via wrapper function `addPointsWithMultiplier()` — only used for invoice processing, attendance, and streak bonuses. Core `addPoints()` is NOT modified (admin adjustments, slabs stay at 1x).
 - Admin sees each painter's level in `admin-painters.html`
 - Thresholds tuned: ~1,000-2,000 pts/month typical → Silver in 3-5 months, Gold ~1.5 years, Diamond aspirational
 
 ## 2. Daily Streak System
 
-- Dashboard load auto-records a daily check-in (one per calendar day, IST, no manual button)
+- Dashboard load auto-records a daily check-in via `PUT /me/daily-streak` (idempotent — PUT not POST). Called once per session using `sessionStorage` guard to avoid duplicate requests on refresh/navigation.
+- Conceptually distinct from physical store attendance (`POST /me/attendance/check-in` which requires GPS). This is "app open" tracking only.
 - Consecutive days = streak. Miss a day = reset to 0.
 - Bonus points to Regular pool (withdrawable). Level multiplier applies.
 
@@ -42,14 +43,14 @@
 - Streak reset at midnight IST for painters whose `last_checkin_date` < yesterday
 - Streak flame icon on dashboard, colored by length: 1-6 orange, 7-13 red, 14-29 blue, 30+ purple with sparkle
 - Tapping flame opens streak calendar bottom sheet (green dots for checked-in days)
-- `longest_streak` tracked for bragging rights
+- `longest_streak` tracked — shown on profile page ("Personal best: 45 days") and in streak calendar bottom sheet
 
 ## 3. Morning Briefing Card
 
 Dynamic card at top of dashboard, replaces static balance cards row. Three sections in one card:
 
 ### "What you earned"
-- Points earned since last visit (animated green counter)
+- Points earned since last visit (animated green counter). Anchored to `last_briefing_at` TIMESTAMP column (not DATE) for accuracy across multiple daily visits.
 - Pending estimate status changes ("Estimate #45 approved!")
 - Withdrawal status updates
 
@@ -57,6 +58,7 @@ Dynamic card at top of dashboard, replaces static balance cards row. Three secti
 - Daily bonus product with 2x-3x multiplier, rotates at midnight IST
 - "Buy today, earn 3x points on Birla Opus Emulsion!"
 - Live countdown timer (hours remaining)
+- Per-painter daily cap: max 500 bonus points from daily bonus product (prevents windfall on large purchases)
 - Falls back to best active special offer if no bonus product configured
 
 ### "Your progress"
@@ -84,19 +86,21 @@ CREATE TABLE painter_daily_checkins (
 ### New table: `painter_levels` (config)
 ```sql
 CREATE TABLE painter_levels (
-    level_name      VARCHAR(20) PRIMARY KEY,
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    level_name      VARCHAR(20) NOT NULL UNIQUE,
     min_points      INT NOT NULL,
     multiplier      DECIMAL(3,2) NOT NULL DEFAULT 1.00,
     badge_color     VARCHAR(7) NOT NULL,
     sort_order      INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO painter_levels VALUES
+INSERT INTO painter_levels (level_name, min_points, multiplier, badge_color, sort_order) VALUES
 ('bronze',  0,      1.00, '#CD7F32', 1),
 ('silver',  5000,   1.20, '#9CA3AF', 2),
 ('gold',    25000,  1.50, '#D4A24E', 3),
 ('diamond', 100000, 2.00, '#3B82F6', 4);
 ```
+Note: INT auto-increment PK is consistent with the rest of the schema. `level_name` has UNIQUE constraint. Values must be lowercase.
 
 ### Columns added to `painters` table
 ```sql
@@ -104,30 +108,40 @@ ALTER TABLE painters ADD COLUMN current_level VARCHAR(20) DEFAULT 'bronze';
 ALTER TABLE painters ADD COLUMN current_streak INT DEFAULT 0;
 ALTER TABLE painters ADD COLUMN last_checkin_date DATE NULL;
 ALTER TABLE painters ADD COLUMN longest_streak INT DEFAULT 0;
+ALTER TABLE painters ADD COLUMN last_briefing_at TIMESTAMP NULL;
+```
+
+### ALTER `painter_point_transactions` source ENUM
+```sql
+ALTER TABLE painter_point_transactions MODIFY source
+    ENUM('self_billing','customer_billing','referral','attendance','monthly_slab',
+         'quarterly_slab','withdrawal','credit_debit','admin_adjustment',
+         'streak_bonus','daily_bonus') NOT NULL;
 ```
 
 ### New `ai_config` keys
 ```
 painter_daily_bonus_product_id    — rotated by scheduler at midnight IST
 painter_daily_bonus_multiplier    — 2 or 3 (randomized)
+painter_daily_bonus_cap           — 500 (max bonus points per painter per day from daily bonus product)
 painter_streak_reminder_enabled   — 1 (toggle for 8PM reminder push)
 ```
 
 ## 5. Backend Changes
 
 ### New endpoints in `routes/painters.js`
-- `POST /me/checkin` — Record daily check-in, calculate streak, award milestone bonuses, check level-up. Called by dashboard on load.
-- `GET /me/briefing` — Returns earnings since last visit, pending estimate updates, daily bonus product, streak info, level progress. Single API call for entire briefing card.
+- `PUT /me/daily-streak` — Idempotent daily check-in. Calculates streak, awards milestone bonuses, checks level-up. Called by dashboard on load (guarded by `sessionStorage` to fire once per session).
+- `GET /me/briefing` — Returns earnings since `last_briefing_at`, pending estimate updates, daily bonus product, streak info, level progress. Updates `last_briefing_at` timestamp on each call.
 
 ### Modified files
-- **`painter-points-engine.js`** — Add `getLevelMultiplier(painterId)` function. Apply multiplier when awarding points (regular, annual, referral, slab, streak bonuses).
-- **`painter-scheduler.js`** — 3 new cron jobs:
-  - Midnight IST: Rotate daily bonus product (random active product from `products` table, multiplier 2 or 3)
-  - Midnight IST: Reset streaks for painters whose `last_checkin_date` < yesterday
-  - 8 PM IST: Send `streak_at_risk` push to painters with streak > 0 who haven't checked in today
+- **`painter-points-engine.js`** — Add `getLevelMultiplier(painterId)` and `addPointsWithMultiplier(painterId, pool, baseAmount, ...)` wrapper. Core `addPoints()` unchanged — admin adjustments and slabs remain at 1x. Wrapper used only in: `processInvoice()`, `awardAttendancePoints()`, streak bonus awards.
+- **`painter-scheduler.js`** — 3 new cron jobs (staggered to avoid race):
+  - 00:00 IST: Reset streaks for painters whose `last_checkin_date` < yesterday (uses `DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))` for timezone safety)
+  - 00:05 IST: Rotate daily bonus product (random active product from `products` table, multiplier 2 or 3)
+  - 20:00 IST: Send `streak_at_risk` push to painters with streak > 0 who haven't checked in today
 - **`painter-notification-service.js`** — New notification types: `streak_milestone`, `streak_at_risk`, `level_up`, `daily_bonus`
-- **`painter-card-generator.js`** — Add level badge (colored circle + text) to visiting card and ID card
-- **`QCFirebaseMessagingService.kt`** — Route new notification types to `/painter-dashboard.html`
+- **`painter-card-generator.js`** — Add level badge (colored SVG circle + text, NO emoji) to visiting card and ID card. Must use SVG `<circle>` + `<text>` elements (Sharp SVG does not render emoji).
+- **`QCFirebaseMessagingService.kt`** — Add explicit routing for `streak_milestone`, `streak_at_risk`, `level_up`, `daily_bonus` → `/painter-dashboard.html` in the painter `when` block (don't rely on `else` fallthrough)
 
 ### Unchanged
 Estimate flow, withdrawal flow, referral system, catalog, profile, attendance, training — all untouched.
@@ -192,9 +206,10 @@ Estimate flow, withdrawal flow, referral system, catalog, profile, attendance, t
 
 Single migration file: `migrations/migrate-painter-retention.js`
 - Creates `painter_daily_checkins` table
-- Creates `painter_levels` table with seed data
-- Adds columns to `painters` table
-- Inserts `ai_config` keys
+- Creates `painter_levels` table with seed data (4 tiers)
+- Adds columns to `painters` table (`current_level`, `current_streak`, `last_checkin_date`, `longest_streak`, `last_briefing_at`)
+- Alters `painter_point_transactions.source` ENUM to add `streak_bonus`, `daily_bonus`
+- Inserts `ai_config` keys (4 keys)
 - Idempotent (checks before creating)
 
 ## 9. Files Changed Summary
@@ -202,7 +217,7 @@ Single migration file: `migrations/migrate-painter-retention.js`
 | File | Change |
 |------|--------|
 | `migrations/migrate-painter-retention.js` | NEW — migration |
-| `routes/painters.js` | ADD `/me/checkin`, `/me/briefing` endpoints |
+| `routes/painters.js` | ADD `PUT /me/daily-streak`, `GET /me/briefing` endpoints |
 | `services/painter-points-engine.js` | ADD level multiplier logic |
 | `services/painter-scheduler.js` | ADD 3 cron jobs (bonus rotation, streak reset, streak reminder) |
 | `services/painter-notification-service.js` | ADD 4 notification types |
