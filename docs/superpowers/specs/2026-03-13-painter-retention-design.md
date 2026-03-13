@@ -134,10 +134,11 @@ painter_streak_reminder_enabled   — 1 (toggle for 8PM reminder push)
 - `GET /me/briefing` — Returns earnings since `last_briefing_at`, pending estimate updates, daily bonus product, streak info, level progress. Updates `last_briefing_at` timestamp on each call.
 
 ### Modified files
-- **`painter-points-engine.js`** — Add `getLevelMultiplier(painterId)` and `addPointsWithMultiplier(painterId, pool, baseAmount, ...)` wrapper. Core `addPoints()` unchanged — admin adjustments and slabs remain at 1x. Wrapper used only in: `processInvoice()`, `awardAttendancePoints()`, streak bonus awards.
+- **`painter-points-engine.js`** — Add `getLevelMultiplier(painterId)` and `addPointsWithMultiplier(painterId, pool, baseAmount, ...)` wrapper. Core `addPoints()` unchanged — admin adjustments and slabs remain at 1x. Wrapper used only in: `processInvoice()` (regular + annual points only, NOT referral points which have their own tier scaling), `awardAttendancePoints()`, streak bonus awards.
 - **`painter-scheduler.js`** — 3 new cron jobs (staggered to avoid race):
   - 00:00 IST: Reset streaks for painters whose `last_checkin_date` < yesterday (uses `DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))` for timezone safety)
   - 00:05 IST: Rotate daily bonus product (random active product from `products` table, multiplier 2 or 3)
+  - 07:00 IST: Send `daily_bonus` push notification to all approved painters with today's bonus product info
   - 20:00 IST: Send `streak_at_risk` push to painters with streak > 0 who haven't checked in today
 - **`painter-notification-service.js`** — New notification types: `streak_milestone`, `streak_at_risk`, `level_up`, `daily_bonus`
 - **`painter-card-generator.js`** — Add level badge (colored SVG circle + text, NO emoji) to visiting card and ID card. Must use SVG `<circle>` + `<text>` elements (Sharp SVG does not render emoji).
@@ -219,7 +220,7 @@ Single migration file: `migrations/migrate-painter-retention.js`
 | `migrations/migrate-painter-retention.js` | NEW — migration |
 | `routes/painters.js` | ADD `PUT /me/daily-streak`, `GET /me/briefing` endpoints |
 | `services/painter-points-engine.js` | ADD level multiplier logic |
-| `services/painter-scheduler.js` | ADD 3 cron jobs (bonus rotation, streak reset, streak reminder) |
+| `services/painter-scheduler.js` | ADD 4 cron jobs (streak reset, bonus rotation, daily bonus push, streak reminder) |
 | `services/painter-notification-service.js` | ADD 4 notification types |
 | `services/painter-card-generator.js` | ADD level badge to cards |
 | `public/painter-dashboard.html` | REDESIGN top section: briefing card, streak, levels |
