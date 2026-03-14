@@ -1542,10 +1542,10 @@
 
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || data.message || 'Failed to save');
-                alert('Product updated successfully!');
                 closeEditReview();
                 await loadZohoMappedIds();
-                await loadZohoItems();
+                await Promise.all([loadZohoItems(), loadData()]);
+                alert('Product updated successfully!');
             } catch(err) {
                 alert('Save failed: ' + err.message);
             } finally {
