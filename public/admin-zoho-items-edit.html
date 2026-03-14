@@ -941,7 +941,36 @@
         }
         words = words.slice(descStartIdx);
 
-        // Step 4: Expand abbreviations
+        // Step 4: Extract size+unit from the end (e.g., "01 L", "20 LTR", "0.5 KG", "500 ML")
+        var sizeUnit = '';
+        var sizeUnitMatch = words.join(' ').match(/\s(\d+(?:\.\d+)?)\s*(L|LTR|LTRS?|KG|KGS?|ML|GM?|M|MTR|PC|PCS?|LITRE?S?|KILO?S?|GALLON?S?)?\s*$/i);
+        if (sizeUnitMatch) {
+            var sizeVal = sizeUnitMatch[1];
+            var unitVal = (sizeUnitMatch[2] || '').toUpperCase();
+            // Normalize unit
+            unitVal = /^(L|LTR|LTRS?|LITRES?|LITERS?)$/i.test(unitVal) ? 'L'
+                : /^(KG|KGS?|KILO?S?)$/i.test(unitVal) ? 'KG'
+                : /^(ML)$/i.test(unitVal) ? 'ML'
+                : /^(GM?)$/i.test(unitVal) ? 'GM'
+                : /^(M|MTR|MTRS?)$/i.test(unitVal) ? 'M'
+                : /^(PC|PCS?)$/i.test(unitVal) ? 'PC'
+                : unitVal || 'L';
+            sizeUnit = sizeVal + ' ' + unitVal;
+            // Remove size+unit from words
+            var joined = words.join(' ');
+            joined = joined.replace(/\s+\d+(?:\.\d+)?\s*(?:L|LTR|LTRS?|KG|KGS?|ML|GM?|M|MTR|PC|PCS?|LITRE?S?|KILO?S?|GALLON?S?)?\s*$/i, '');
+            words = joined.split(/\s+/).filter(function(w) { return w; });
+        }
+
+        // Step 5: Remove brand name words from description (e.g., "OPUS" from "BIRLA OPUS")
+        if (brandName) {
+            var brandWords = brandName.trim().toUpperCase().split(/\s+/);
+            words = words.filter(function(w) {
+                return brandWords.indexOf(w.replace(/[^A-Z0-9]/g, '')) === -1;
+            });
+        }
+
+        // Step 6: Expand abbreviations
         words = words.map(function(w) {
             var clean = w.replace(/[^A-Z0-9\/]/g, '');
             var expanded = PAINT_ABBREVIATIONS[clean];
@@ -949,7 +978,7 @@
             return w;
         });
 
-        // Step 5: Join and clean up
+        // Step 7: Join and clean up
         var desc = words.join(' ').replace(/\s+/g, ' ').trim();
 
         // Title case (first letter caps, rest lower)
@@ -958,6 +987,15 @@
             if (m.length <= 2) return m;
             return first + rest.toLowerCase();
         });
+
+        // Step 8: Append brand name + size unit at the end
+        var brandClean = brandName ? brandName.trim().toUpperCase() : '';
+        if (brandClean && desc) {
+            desc = desc + ' ' + brandClean;
+        }
+        if (sizeUnit) {
+            desc = desc + ' ' + sizeUnit;
+        }
 
         return desc;
     }
