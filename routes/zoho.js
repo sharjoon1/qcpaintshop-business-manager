@@ -1700,7 +1700,8 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const { search, brand, category, page = 1, limit = 50 } = req.query;
 
-        let where = "WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)";
+        const showInactive = req.query.show_inactive === '1';
+        let where = showInactive ? "WHERE 1=1" : "WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)";
         const params = [];
 
         if (search) {
@@ -1746,6 +1747,7 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
                 zim.zoho_part_number as part_number,
                 zim.zoho_cf_product_name as cf_product_name,
                 zim.zoho_cf_dpl as cf_dpl,
+                zim.zoho_status as status,
                 zim.last_synced_at as last_synced
             FROM zoho_items_map zim
             ${where}
