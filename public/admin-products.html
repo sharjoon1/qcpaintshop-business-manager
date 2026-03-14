@@ -1527,25 +1527,30 @@
                     zoho_item_id: ps.zoho_item_id || null
                 }));
 
+                console.log('[saveEditReview] Saving product', p.id, 'with', packSizesData.length, 'pack sizes:', JSON.stringify(packSizesData));
+
+                const payload = {
+                    name, brand_id: p.brand_id, category_id: p.category_id,
+                    product_type: productType, area_coverage: areaCoverage || null,
+                    gst_percentage: p.gst_percentage || 18,
+                    base_price: packSizesData[0]?.base_price || 0,
+                    status, description: p.description || '',
+                    available_sizes: JSON.stringify(packSizesData)
+                };
+
                 const res = await fetch(`/api/products/${p.id}`, {
                     method: 'PUT',
                     headers: getAuthHeaders(),
-                    body: JSON.stringify({
-                        name, brand_id: p.brand_id, category_id: p.category_id,
-                        product_type: productType, area_coverage: areaCoverage || null,
-                        gst_percentage: p.gst_percentage || 18,
-                        base_price: packSizesData[0]?.base_price || 0,
-                        status, description: p.description || '',
-                        available_sizes: JSON.stringify(packSizesData)
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await res.json();
+                console.log('[saveEditReview] Response:', JSON.stringify(data));
                 if (!res.ok || !data.success) throw new Error(data.error || data.message || 'Failed to save');
                 closeEditReview();
                 await loadZohoMappedIds();
                 await Promise.all([loadZohoItems(), loadData()]);
-                alert('Product updated successfully!');
+                alert(`Product updated! ${data.pack_sizes_saved || 0} variants saved.`);
             } catch(err) {
                 alert('Save failed: ' + err.message);
             } finally {

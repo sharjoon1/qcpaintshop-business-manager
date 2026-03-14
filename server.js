@@ -2820,21 +2820,27 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
 
         await pool.query('DELETE FROM pack_sizes WHERE product_id = ?', [req.params.id]);
 
+        let packSizesInserted = 0;
         if (available_sizes) {
             try {
                 const packSizes = JSON.parse(available_sizes);
+                console.log(`[PUT /api/products/${req.params.id}] Inserting ${packSizes.length} pack sizes`);
                 for (const pack of packSizes) {
                     await pool.query(
                         'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
                         [req.params.id, pack.size, pack.unit || 'L', pack.base_price || pack.price, pack.zoho_item_id || null]
                     );
+                    packSizesInserted++;
                 }
             } catch (e) {
-                console.error('Error updating pack sizes:', e);
+                console.error(`[PUT /api/products/${req.params.id}] Error inserting pack sizes:`, e.message);
+                return res.status(500).json({ success: false, error: 'Failed to save pack sizes: ' + e.message });
             }
+        } else {
+            console.log(`[PUT /api/products/${req.params.id}] No available_sizes in request body`);
         }
 
-        res.json({ success: true });
+        res.json({ success: true, pack_sizes_saved: packSizesInserted });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
