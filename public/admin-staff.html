@@ -253,8 +253,9 @@
                 const response = await fetch('/api/users', { headers: getAuthHeaders() });
                 const users = await response.json();
                 
-                // Filter only staff and admin
-                allStaff = users.filter(u => u.role === 'staff' || u.role === 'admin');
+                // Filter staff-type roles (exclude customers)
+                const customerRoles = ['customer', 'retail_customer', 'contractor', 'builder', 'dealer', 'guest'];
+                allStaff = users.filter(u => !customerRoles.includes(u.role));
                 
                 // Update stats
                 updateStats();
