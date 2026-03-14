@@ -3839,12 +3839,34 @@ router.get('/:id', requireAuth, async (req, res) => {
 // Update painter
 router.put('/:id', requirePermission('painters', 'manage'), async (req, res) => {
     try {
-        const { full_name, email, phone, city, district, state, pincode, experience_years, specialization, notes, zoho_contact_id } = req.body;
+        const { full_name, email, phone, city, district, state, pincode, experience_years, specialization, notes, zoho_contact_id, assign_referral_code } = req.body;
+
+        // Handle referral code assignment
+        if (assign_referral_code) {
+            const code = assign_referral_code.trim().toUpperCase();
+            const [referrer] = await pool.query('SELECT id FROM painters WHERE referral_code = ? AND status = "approved"', [code]);
+            if (!referrer.length) {
+                return res.status(400).json({ success: false, message: 'Invalid referral code — no approved painter found with this code' });
+            }
+            const painterId = parseInt(req.params.id);
+            if (referrer[0].id === painterId) {
+                return res.status(400).json({ success: false, message: 'Cannot assign own referral code' });
+            }
+            // Check not already referred
+            const [existing] = await pool.query('SELECT id FROM painter_referrals WHERE referred_id = ?', [painterId]);
+            if (existing.length) {
+                return res.status(400).json({ success: false, message: 'This painter already has a referrer assigned' });
+            }
+            await pool.query('UPDATE painters SET referred_by = ? WHERE id = ?', [referrer[0].id, painterId]);
+            await pool.query('INSERT INTO painter_referrals (referrer_id, referred_id, status) VALUES (?, ?, "active")', [referrer[0].id, painterId]);
+        }
+
         await pool.query(
             `UPDATE painters SET full_name = COALESCE(?, full_name), email = COALESCE(?, email), phone = COALESCE(?, phone),
              city = COALESCE(?, city), district = COALESCE(?, district), state = COALESCE(?, state), pincode = COALESCE(?, pincode),
              experience_years = COALESCE(?, experience_years), specialization = COALESCE(?, specialization),
-             notes = COALESCE(?, notes), zoho_contact_id = COALESCE(?, zoho_contact_id) WHERE id = ?`,
+             notes = COALESCE(?, notes), zoho_contact_id = COALESCE(?, zoho_contact_id),
+             card_generated_at = NULL, id_card_generated_at = NULL WHERE id = ?`,
             [full_name, email, phone, city, district, state, pincode, experience_years, specialization, notes, zoho_contact_id, req.params.id]
         );
         res.json({ success: true, message: 'Painter updated' });

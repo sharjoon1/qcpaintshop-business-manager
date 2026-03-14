@@ -820,12 +820,17 @@
         } catch (err) { alert('Error: ' + err.message); }
     }
 
+    let currentDetailPainter = null;
+
     async function showPainterDetail(id) {
         try {
             const res = await fetch(`${API}/${id}`, { headers: authHeaders() });
             const data = await res.json();
             if (!data.success) throw new Error(data.message);
             const p = data.painter;
+            currentDetailPainter = p;
+
+            const levelColors = {bronze:'#CD7F32',silver:'#9CA3AF',gold:'#D4A24E',diamond:'#3B82F6'};
 
             document.getElementById('painterDetailContent').innerHTML = `
                 <div class="flex justify-between items-start mb-4">
@@ -833,24 +838,70 @@
                         <h2 class="text-xl font-bold">${esc(p.full_name)}</h2>
                         <p class="text-gray-500">${esc(p.phone)} ${p.email ? '| ' + esc(p.email) : ''}</p>
                     </div>
-                    <button onclick="closePainterDetail()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="toggleEditMode(${p.id})" class="btn-sm btn-outline" id="editToggleBtn">Edit</button>
+                        <button onclick="closePainterDetail()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                     <div class="stat-card"><div class="stat-value text-lg">${parseFloat(p.regular_points).toFixed(2)}</div><div class="stat-label">Regular Points</div></div>
                     <div class="stat-card"><div class="stat-value text-lg">${parseFloat(p.annual_points).toFixed(2)}</div><div class="stat-label">Annual Points</div></div>
-                    <div class="stat-card"><div class="stat-value text-lg" style="color:${{bronze:'#CD7F32',silver:'#9CA3AF',gold:'#D4A24E',diamond:'#3B82F6'}[p.current_level||'bronze']||'#CD7F32'}">${(p.current_level||'bronze').charAt(0).toUpperCase()+(p.current_level||'bronze').slice(1)}</div><div class="stat-label">Level</div></div>
+                    <div class="stat-card"><div class="stat-value text-lg" style="color:${levelColors[p.current_level||'bronze']||'#CD7F32'}">${(p.current_level||'bronze').charAt(0).toUpperCase()+(p.current_level||'bronze').slice(1)}</div><div class="stat-label">Level</div></div>
                     <div class="stat-card"><div class="stat-value text-lg">${p.current_streak||0} ${(p.current_streak||0)>0?'🔥':''}</div><div class="stat-label">Streak (Best: ${p.longest_streak||0})</div></div>
                 </div>
-                <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
-                    <div><strong>City:</strong> ${esc(p.city || '-')}</div>
-                    <div><strong>District:</strong> ${esc(p.district || '-')}</div>
-                    <div><strong>Specialization:</strong> ${p.specialization}</div>
-                    <div><strong>Referral Code:</strong> <code>${esc(p.referral_code || '-')}</code></div>
-                    <div><strong>Credit:</strong> ${p.credit_enabled ? '₹' + parseFloat(p.credit_limit).toLocaleString() + ' (used: ₹' + parseFloat(p.credit_used).toLocaleString() + ')' : 'Disabled'}</div>
-                    ${data.referrer ? `<div><strong>Referred by:</strong> ${esc(data.referrer.full_name)} (${data.referrer.phone})</div>` : ''}
-                    <div><strong>Zoho Contact:</strong> ${esc(p.zoho_contact_id || 'Not linked')}</div>
-                    <div><strong>Joined:</strong> ${new Date(p.created_at).toLocaleDateString()}</div>
+
+                <!-- View Mode -->
+                <div id="viewModeSection">
+                    <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                        <div><strong>City:</strong> ${esc(p.city || '-')}</div>
+                        <div><strong>District:</strong> ${esc(p.district || '-')}</div>
+                        <div><strong>Specialization:</strong> ${p.specialization}</div>
+                        <div><strong>Referral Code:</strong> <code>${esc(p.referral_code || '-')}</code></div>
+                        <div><strong>Credit:</strong> ${p.credit_enabled ? '₹' + parseFloat(p.credit_limit).toLocaleString() + ' (used: ₹' + parseFloat(p.credit_used).toLocaleString() + ')' : 'Disabled'}</div>
+                        ${data.referrer ? `<div><strong>Referred by:</strong> ${esc(data.referrer.full_name)} (${data.referrer.phone})</div>` : `<div><strong>Referred by:</strong> <span class="text-gray-400">None</span></div>`}
+                        <div><strong>Zoho Contact:</strong> ${esc(p.zoho_contact_id || 'Not linked')}</div>
+                        <div><strong>Joined:</strong> ${new Date(p.created_at).toLocaleDateString()}</div>
+                        ${p.address ? `<div class="col-span-2"><strong>Address:</strong> ${esc(p.address)}${p.pincode ? ', ' + esc(p.pincode) : ''}</div>` : ''}
+                    </div>
                 </div>
+
+                <!-- Edit Mode (hidden by default) -->
+                <div id="editModeSection" style="display:none">
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div class="form-group mb-0"><label>Full Name</label><input type="text" id="editName" value="${esc(p.full_name || '')}" class="text-sm"></div>
+                        <div class="form-group mb-0"><label>Phone</label><input type="text" id="editPhone" value="${esc(p.phone || '')}" class="text-sm"></div>
+                        <div class="form-group mb-0"><label>Email</label><input type="email" id="editEmail" value="${esc(p.email || '')}" class="text-sm"></div>
+                        <div class="form-group mb-0"><label>City</label><input type="text" id="editCity" value="${esc(p.city || '')}" class="text-sm"></div>
+                        <div class="form-group mb-0"><label>District</label><input type="text" id="editDistrict" value="${esc(p.district || '')}" class="text-sm"></div>
+                        <div class="form-group mb-0"><label>State</label><input type="text" id="editState" value="${esc(p.state || '')}" class="text-sm"></div>
+                        <div class="form-group mb-0"><label>Pincode</label><input type="text" id="editPincode" value="${esc(p.pincode || '')}" class="text-sm"></div>
+                        <div class="form-group mb-0"><label>Experience (years)</label><input type="number" id="editExp" value="${p.experience_years || 0}" class="text-sm"></div>
+                        <div class="form-group mb-0">
+                            <label>Specialization</label>
+                            <select id="editSpec" class="text-sm">
+                                <option value="interior" ${p.specialization==='interior'?'selected':''}>Interior</option>
+                                <option value="exterior" ${p.specialization==='exterior'?'selected':''}>Exterior</option>
+                                <option value="both" ${p.specialization==='both'?'selected':''}>Both</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0"><label>Zoho Contact ID</label><input type="text" id="editZoho" value="${esc(p.zoho_contact_id || '')}" class="text-sm"></div>
+                        <div class="form-group mb-0 col-span-2"><label>Address</label><input type="text" id="editAddress" value="${esc(p.address || '')}" class="text-sm"></div>
+                        <div class="form-group mb-0 col-span-2"><label>Notes</label><textarea id="editNotes" class="text-sm" rows="2">${esc(p.notes || '')}</textarea></div>
+                    </div>
+                    ${!data.referrer ? `
+                    <div class="border rounded-lg p-3 mb-3" style="border-color:#D4A24E;background:#fffbeb">
+                        <label class="text-sm font-semibold" style="color:#92400e">Assign Referral Code (who referred this painter?)</label>
+                        <div class="flex gap-2 mt-1">
+                            <input type="text" id="editReferralCode" placeholder="Enter referrer's code" class="text-sm flex-1" style="text-transform:uppercase">
+                            <span id="referralValidation" class="text-xs self-center"></span>
+                        </div>
+                    </div>` : ''}
+                    <div class="flex gap-2">
+                        <button onclick="savePainterEdit(${p.id})" class="btn-sm btn-primary" id="saveEditBtn">Save Changes</button>
+                        <button onclick="toggleEditMode(${p.id})" class="btn-sm btn-outline">Cancel</button>
+                    </div>
+                </div>
+
                 ${p.credit_enabled ? '' : `
                 <div class="border-t pt-4 mt-4">
                     <h4 class="font-semibold mb-2">Credit Settings</h4>
@@ -902,6 +953,66 @@
             `;
             document.getElementById('painterDetailModal').style.display = 'flex';
         } catch (err) { alert('Error loading painter: ' + err.message); }
+    }
+
+    function toggleEditMode() {
+        const viewEl = document.getElementById('viewModeSection');
+        const editEl = document.getElementById('editModeSection');
+        const btn = document.getElementById('editToggleBtn');
+        if (editEl.style.display === 'none') {
+            editEl.style.display = 'block';
+            viewEl.style.display = 'none';
+            btn.textContent = 'Cancel';
+        } else {
+            editEl.style.display = 'none';
+            viewEl.style.display = 'block';
+            btn.textContent = 'Edit';
+        }
+    }
+
+    async function savePainterEdit(painterId) {
+        const btn = document.getElementById('saveEditBtn');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        try {
+            const body = {
+                full_name: document.getElementById('editName').value.trim() || undefined,
+                phone: document.getElementById('editPhone').value.trim() || undefined,
+                email: document.getElementById('editEmail').value.trim() || undefined,
+                city: document.getElementById('editCity').value.trim() || undefined,
+                district: document.getElementById('editDistrict').value.trim() || undefined,
+                state: document.getElementById('editState').value.trim() || undefined,
+                pincode: document.getElementById('editPincode').value.trim() || undefined,
+                experience_years: parseInt(document.getElementById('editExp').value) || undefined,
+                specialization: document.getElementById('editSpec').value,
+                zoho_contact_id: document.getElementById('editZoho').value.trim() || undefined,
+                notes: document.getElementById('editNotes').value.trim() || undefined
+            };
+
+            // Check for referral code assignment
+            const refInput = document.getElementById('editReferralCode');
+            if (refInput && refInput.value.trim()) {
+                body.assign_referral_code = refInput.value.trim();
+            }
+
+            const res = await fetch(`${API}/${painterId}`, {
+                method: 'PUT',
+                headers: authHeaders(),
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            alert('Painter updated successfully!');
+            showPainterDetail(painterId); // Reload detail view
+            loadPainters(); // Refresh table
+        } catch (err) {
+            alert('Error: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Save Changes';
+        }
     }
 
     function closePainterDetail() { document.getElementById('painterDetailModal').style.display = 'none'; }

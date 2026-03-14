@@ -217,9 +217,21 @@
             const data = await res.json();
 
             if (data.success) {
-                // Check if already registered and approved
+                // Block if already registered (any status)
                 if (data.status === 'approved') {
                     showError('phoneError', 'Already registered! Please login instead.');
+                    document.getElementById('sendOtpBtn').disabled = false;
+                    document.getElementById('sendOtpBtn').textContent = 'Send OTP';
+                    return;
+                }
+                if (data.status === 'pending') {
+                    showError('phoneError', 'Your registration is pending approval. Please wait for admin to approve your account.');
+                    document.getElementById('sendOtpBtn').disabled = false;
+                    document.getElementById('sendOtpBtn').textContent = 'Send OTP';
+                    return;
+                }
+                if (data.status === 'rejected') {
+                    showError('phoneError', 'Your registration was not approved. Please contact admin for help.');
                     document.getElementById('sendOtpBtn').disabled = false;
                     document.getElementById('sendOtpBtn').textContent = 'Send OTP';
                     return;
