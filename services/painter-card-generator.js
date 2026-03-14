@@ -34,6 +34,19 @@ function locationIcon(x, y, sz, color) {
     return `<g transform="translate(${x},${y}) scale(${s})"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/></g>`;
 }
 
+function levelBadge(x, y, level) {
+    const LEVEL_COLORS = {
+        bronze: '#CD7F32', silver: '#9CA3AF', gold: '#D4A24E', diamond: '#3B82F6'
+    };
+    const color = LEVEL_COLORS[level] || LEVEL_COLORS.bronze;
+    const label = (level || 'bronze').charAt(0).toUpperCase() + (level || 'bronze').slice(1);
+    return `
+        <rect x="${x}" y="${y}" width="140" height="36" rx="18" fill="${color}" opacity="0.15"/>
+        <circle cx="${x + 20}" cy="${y + 18}" r="8" fill="${color}"/>
+        <text x="${x + 36}" y="${y + 24}" font-family="Arial,sans-serif" font-size="20" font-weight="700" fill="${color}">${label}</text>
+    `;
+}
+
 async function loadLogo(pool, sz = 80) {
     try {
         const [r] = await pool.query("SELECT setting_value FROM settings WHERE setting_key='business_logo' LIMIT 1");
@@ -69,7 +82,7 @@ function ensureDir(d) { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true
 // ══════════════════════════════════════════
 
 async function generateCard(painter, pool) {
-    const { id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo } = painter;
+    const { id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo, current_level } = painter;
 
     const url = `${ORIGIN}/painter-register.html?ref=${referral_code}`;
     const qr = await QRCode.toBuffer(url, { width: 180, margin: 1, color: { dark: G, light: '#FFF' } });
@@ -134,6 +147,9 @@ async function generateCard(painter, pool) {
         <text x="${logo ? 300 : 60}" y="118" font-family="Arial,sans-serif" font-size="24" fill="${GOLD}" opacity="0.9" letter-spacing="1">The Branded Paint Showroom</text>
         <text x="${logo ? 300 : 60}" y="155" font-family="Arial,sans-serif" font-size="20" fill="white" opacity="0.6" letter-spacing="4">QC PAINTERS PROGRAM</text>
 
+        <!-- Level badge -->
+        ${levelBadge(CARD_W - 200, 148, current_level)}
+
         <!-- Gold accent line -->
         <rect x="33" y="178" width="${CARD_W - 33}" height="5" fill="url(#gg)"/>
 
@@ -193,7 +209,7 @@ async function generateCard(painter, pool) {
 // ══════════════════════════════════════════
 
 async function generateIdCard(painter, pool) {
-    const { id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo } = painter;
+    const { id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo, current_level } = painter;
 
     const url = `${ORIGIN}/painter-register.html?ref=${referral_code}`;
     const qr = await QRCode.toBuffer(url, { width: 180, margin: 1, color: { dark: G, light: '#FFF' } });
@@ -252,6 +268,9 @@ async function generateIdCard(painter, pool) {
         <text x="${logo ? 480 : ID_W / 2}" y="65" font-family="Arial,sans-serif" font-size="46" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="2">QUALITY COLOURS</text>
         <text x="${logo ? 480 : ID_W / 2}" y="105" font-family="Arial,sans-serif" font-size="22" fill="${GOLD}" text-anchor="middle" letter-spacing="1">QC Painters Program</text>
         <text x="${logo ? 480 : ID_W / 2}" y="152" font-family="Arial,sans-serif" font-size="22" fill="white" text-anchor="middle" opacity="0.7" letter-spacing="4">PAINTER IDENTITY CARD</text>
+
+        <!-- Level badge -->
+        ${levelBadge((ID_W - 140) / 2, 160, current_level)}
 
         <!-- Name with shadow -->
         <text x="${ID_W / 2 + 2}" y="${nameY + 2}" font-family="Arial,sans-serif" font-size="62" font-weight="bold" fill="${G}" text-anchor="middle" opacity="0.08" letter-spacing="1.5">${e(full_name)}</text>

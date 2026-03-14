@@ -120,6 +120,58 @@
         }
         @keyframes shareSpin { to { transform: rotate(360deg); } }
         .share-loading-text { color: white; font-size: 0.875rem; font-weight: 500; }
+
+        /* Streak flame colors */
+        .streak-flame { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+        .streak-flame:hover svg { transform: scale(1.15); transition: transform 0.3s; }
+        .streak-1-6 { color: #f97316; }
+        .streak-7-13 { color: #ef4444; }
+        .streak-14-29 { color: #3b82f6; }
+        .streak-30 { color: #a855f7; }
+
+        /* Briefing card — gradient border */
+        .briefing-card {
+            background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #1B5E3B, #D4A24E) border-box;
+            border: 2px solid transparent;
+            border-radius: 16px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 16px rgba(27,94,59,0.08);
+            overflow: hidden;
+        }
+        .briefing-divider { height: 1px; background: linear-gradient(90deg, transparent, #e5e7eb, transparent); margin: 12px 0; }
+
+        /* Level badge pill */
+        .level-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+        .level-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        /* Level progress panel */
+        .level-panel { display: none; background: #fff; border-radius: 16px; padding: 1.25rem; border: 1px solid #e8ecf1; margin-bottom: 1rem; }
+        .level-panel.show { display: block; }
+        .level-tier { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+        .level-tier .tier-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+        .level-tier.current { background: #f0fdf4; border-radius: 8px; padding: 8px 12px; margin: 0 -12px; }
+
+        /* Streak calendar bottom sheet */
+        .streak-sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1100; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+        .streak-sheet-overlay.show { opacity: 1; pointer-events: auto; }
+        .streak-sheet { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; max-height: 70vh; overflow-y: auto; padding: 20px; transform: translateY(100%); transition: transform 0.35s cubic-bezier(.4,0,.2,1); }
+        .streak-sheet-overlay.show .streak-sheet { transform: translateY(0); }
+        .streak-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+        .streak-calendar .day { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8125rem; margin: 0 auto; }
+        .streak-calendar .day.checked { background: #d1fae5; color: #065f46; font-weight: 600; }
+        .streak-calendar .day.today { border: 2px solid #1B5E3B; }
+
+        /* Level-up celebration */
+        .celebration-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; }
+        .celebration-card { background: #fff; border-radius: 24px; padding: 2rem; text-align: center; max-width: 340px; width: 90%; }
+
+        /* Progress bar */
+        .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+
+        @keyframes countUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .count-up { animation: countUp 0.5s ease forwards; }
     </style>
 </head>
 <body>
@@ -127,12 +179,16 @@
     <div class="header">
         <div class="max-w-lg mx-auto px-4 py-3">
             <div class="flex items-center justify-between">
-                <!-- Left: Logo + Name (same row) -->
+                <!-- Left: Logo + Greeting + Level Badge -->
                 <div class="flex items-center gap-2.5">
                     <img id="headerLogo" style="width:48px;height:48px;border-radius:10px;object-fit:contain;display:none;box-shadow:0 2px 6px rgba(0,0,0,0.15)" alt="QC">
                     <div>
-                        <p class="text-sm opacity-80" data-i18n="dashboard.welcome_back">Welcome back,</p>
-                        <h1 class="text-xl font-bold" id="painterName">Painter</h1>
+                        <p class="text-sm opacity-80" id="greetingText">Good Morning,</p>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-xl font-bold" id="painterName">Painter</h1>
+                            <span id="streakFlame" class="streak-flame" onclick="showStreakSheet()" style="display:none" title="Tap for streak details"></span>
+                        </div>
+                        <span id="levelBadge" class="level-pill" onclick="toggleLevelPanel()" style="display:none"></span>
                     </div>
                 </div>
                 <!-- Right: Lang + Bell + Profile -->
@@ -170,6 +226,58 @@
     </div>
 
     <div class="max-w-lg mx-auto px-4 -mt-2 pb-20">
+        <!-- Morning Briefing Card -->
+        <div id="briefingCard" class="briefing-card" style="display:none">
+            <div id="briefingEarned">
+                <div class="flex items-center gap-2 mb-1">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B5E3B" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                    <span class="text-sm font-semibold text-gray-600">Since your last visit</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="briefingPointsEarned" class="text-2xl font-bold text-emerald-700 count-up">0</span>
+                    <span class="text-sm text-gray-400">points earned</span>
+                </div>
+                <div id="briefingUpdates" class="mt-1 space-y-1"></div>
+            </div>
+            <div class="briefing-divider"></div>
+            <div id="briefingBonus" style="display:none">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4A24E" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span class="text-sm font-semibold text-gray-600">Today's Opportunity</span>
+                    <span id="bonusCountdown" class="text-xs text-gray-400 ml-auto"></span>
+                </div>
+                <div class="flex items-center gap-3 p-2 rounded-xl" style="background:#fefce8">
+                    <img id="bonusProductImg" class="w-12 h-12 rounded-lg object-contain bg-white" src="" alt="" onerror="this.style.display='none'">
+                    <div class="flex-1 min-w-0">
+                        <p id="bonusProductName" class="text-sm font-bold text-gray-800 truncate"></p>
+                        <p id="bonusProductBrand" class="text-xs text-gray-400"></p>
+                    </div>
+                    <span id="bonusMultiplierTag" class="offer-tag offer-tag-multiplier text-sm"></span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Max <span id="bonusCap">500</span> bonus points per day</p>
+            </div>
+            <div id="briefingBonusDivider" class="briefing-divider" style="display:none"></div>
+            <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B5E3B" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    <span class="text-sm font-semibold text-gray-600">Your Progress</span>
+                </div>
+                <div id="briefingLevelProgress">
+                    <div class="flex items-center justify-between mb-1">
+                        <span id="progressLabel" class="text-xs font-medium text-gray-500"></span>
+                        <span id="progressPct" class="text-xs font-bold text-emerald-700"></span>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="progressBarFill" class="progress-bar-fill" style="width:0%;background:linear-gradient(90deg,#1B5E3B,#D4A24E)"></div>
+                    </div>
+                    <p id="progressNext" class="text-xs text-gray-400 mt-1"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Level Progress Panel (shown on badge tap) -->
+        <div id="levelPanel" class="level-panel"></div>
+
         <!-- Balance Cards (clickable) -->
         <div class="grid grid-cols-2 gap-3 mb-4">
             <div class="stat-card" onclick="openPointsSheet('regular')" style="cursor:pointer;position:relative;transition:transform 0.15s;">
@@ -515,6 +623,17 @@
             if (data.dashboard.painterName) {
                 document.getElementById('painterName').textContent = data.dashboard.painterName;
             }
+
+            // Set time-of-day greeting
+            document.getElementById('greetingText').textContent = getGreeting();
+
+            // Update level badge and streak
+            if (data.dashboard.level) updateLevelBadge(data.dashboard.level);
+            if (data.dashboard.streak > 0) updateStreakUI(data.dashboard.streak, data.dashboard.longestStreak);
+
+            // Record streak + load briefing (parallel, non-blocking)
+            recordDailyStreak();
+            loadBriefing();
 
             const b = data.dashboard.balance;
 
@@ -1825,6 +1944,259 @@
         }
     }
 
+    // ═══════════════════════════════════════════
+    // RETENTION: STREAK, BRIEFING, LEVELS
+    // ═══════════════════════════════════════════
+
+    let briefingData = null;
+
+    async function recordDailyStreak() {
+        if (sessionStorage.getItem('streak_recorded')) return;
+        try {
+            const resp = await fetch(`${API}/me/daily-streak`, {
+                method: 'PUT',
+                headers: { ...painterHeaders(), 'Content-Type': 'application/json' }
+            });
+            const data = await resp.json();
+            if (data.success) {
+                sessionStorage.setItem('streak_recorded', '1');
+                updateStreakUI(data.streak, data.longestStreak);
+                if (data.levelUp) showLevelUpCelebration(data.levelUp);
+                if (data.milestoneHit && data.bonusAwarded) {
+                    showToast(`${data.milestoneHit}-day streak! +${data.bonusAwarded} bonus points!`);
+                }
+            }
+        } catch (e) { console.error('Streak error:', e); }
+    }
+
+    async function loadBriefing() {
+        try {
+            const resp = await fetch(`${API}/me/briefing`, { headers: painterHeaders() });
+            const data = await resp.json();
+            if (data.success) {
+                briefingData = data.briefing;
+                renderBriefingCard(data.briefing);
+            }
+        } catch (e) { console.error('Briefing error:', e); }
+    }
+
+    function renderBriefingCard(b) {
+        const card = document.getElementById('briefingCard');
+        card.style.display = '';
+
+        const earnedEl = document.getElementById('briefingPointsEarned');
+        animateCounter(earnedEl, b.earned.pointsSinceLastVisit);
+
+        const updatesEl = document.getElementById('briefingUpdates');
+        updatesEl.innerHTML = '';
+        (b.earned.estimateUpdates || []).slice(0, 3).forEach(e => {
+            updatesEl.innerHTML += `<p class="text-xs text-gray-500">Estimate #${e.estimate_number} — <span class="font-medium">${formatStatus(e.status)}</span></p>`;
+        });
+        (b.earned.withdrawalUpdates || []).slice(0, 2).forEach(w => {
+            updatesEl.innerHTML += `<p class="text-xs text-gray-500">Withdrawal ${parseFloat(w.amount).toFixed(0)} pts — <span class="font-medium">${w.status}</span></p>`;
+        });
+
+        if (b.dailyBonus) {
+            document.getElementById('briefingBonus').style.display = '';
+            document.getElementById('briefingBonusDivider').style.display = '';
+            const prod = b.dailyBonus.product;
+            document.getElementById('bonusProductName').textContent = prod.name;
+            document.getElementById('bonusProductBrand').textContent = prod.brand || '';
+            if (prod.image_url) {
+                document.getElementById('bonusProductImg').src = prod.image_url;
+                document.getElementById('bonusProductImg').style.display = '';
+            }
+            document.getElementById('bonusMultiplierTag').textContent = `${b.dailyBonus.multiplier}x Points`;
+            document.getElementById('bonusCap').textContent = b.dailyBonus.cap;
+            startBonusCountdown(b.dailyBonus.hoursLeft);
+        }
+
+        const lp = b.progress.level;
+        if (lp.next) {
+            document.getElementById('progressLabel').textContent = `${capitalize(lp.current)} → ${capitalize(lp.next)}`;
+            document.getElementById('progressPct').textContent = `${lp.percentage}%`;
+            setTimeout(() => { document.getElementById('progressBarFill').style.width = `${lp.percentage}%`; }, 300);
+            document.getElementById('progressNext').textContent = `${Math.round(lp.pointsNeeded).toLocaleString()} pts to unlock ${lp.nextMultiplier}x multiplier!`;
+        } else {
+            document.getElementById('progressLabel').textContent = `${capitalize(lp.current)} — Max Level!`;
+            document.getElementById('progressPct').textContent = '100%';
+            document.getElementById('progressBarFill').style.width = '100%';
+            document.getElementById('progressNext').textContent = 'You are at the highest level!';
+        }
+    }
+
+    function updateStreakUI(streak, longestStreak) {
+        const flame = document.getElementById('streakFlame');
+        if (streak > 0) {
+            let colorClass = 'streak-1-6';
+            if (streak >= 30) colorClass = 'streak-30';
+            else if (streak >= 14) colorClass = 'streak-14-29';
+            else if (streak >= 7) colorClass = 'streak-7-13';
+
+            flame.className = `streak-flame ${colorClass}`;
+            flame.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 23c-3.6 0-7-2.5-7-7 0-3.1 2-5.7 3.2-7.2.4-.5 1.2-.3 1.3.3.2 1 .7 2.3 1.5 3.2.1-.3.1-.7.1-1.1 0-1.6-.3-3.4-.8-4.8-.2-.5.2-1 .7-.9C14.3 6.4 19 9.5 19 16c0 4.5-3.4 7-7 7z"/>
+                </svg>
+                <span class="text-sm font-bold">${streak}</span>`;
+            flame.style.display = 'inline-flex';
+        }
+        flame.dataset.streak = streak;
+        flame.dataset.longest = longestStreak;
+    }
+
+    function updateLevelBadge(level) {
+        const COLORS = { bronze: '#CD7F32', silver: '#9CA3AF', gold: '#D4A24E', diamond: '#3B82F6' };
+        const badge = document.getElementById('levelBadge');
+        const color = COLORS[level] || COLORS.bronze;
+        badge.innerHTML = `<span class="dot" style="background:${color}"></span>${capitalize(level)}`;
+        badge.style.background = `${color}15`;
+        badge.style.color = color;
+        badge.style.display = 'inline-flex';
+    }
+
+    function getGreeting() {
+        const h = new Date().getHours();
+        if (h < 12) return 'Good Morning,';
+        if (h < 17) return 'Good Afternoon,';
+        return 'Good Evening,';
+    }
+
+    function animateCounter(el, target) {
+        target = Math.round(target);
+        if (target === 0) { el.textContent = '0'; return; }
+        let current = 0;
+        const step = Math.max(1, Math.ceil(target / 30));
+        const interval = setInterval(() => {
+            current = Math.min(current + step, target);
+            el.textContent = current.toLocaleString();
+            if (current >= target) clearInterval(interval);
+        }, 30);
+    }
+
+    function startBonusCountdown(hoursLeft) {
+        const el = document.getElementById('bonusCountdown');
+        let remaining = hoursLeft * 3600;
+        function update() {
+            if (remaining <= 0) { el.textContent = 'Expired'; return; }
+            const h = Math.floor(remaining / 3600);
+            const m = Math.floor((remaining % 3600) / 60);
+            el.textContent = `${h}h ${m}m left`;
+            remaining -= 60;
+        }
+        update();
+        setInterval(update, 60000);
+    }
+
+    function showStreakSheet() {
+        const overlay = document.getElementById('streakSheetOverlay');
+        const flame = document.getElementById('streakFlame');
+        const streak = parseInt(flame.dataset.streak) || 0;
+        document.getElementById('streakSheetCount').textContent = streak;
+        document.getElementById('streakSheetBest').textContent = `Personal best: ${flame.dataset.longest || '0'} days`;
+
+        const cal = document.getElementById('streakCalendar');
+        const now = new Date();
+        const year = now.getFullYear(), month = now.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDay = new Date(year, month, 1).getDay();
+        const today = now.getDate();
+        const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+        cal.innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d =>
+            `<div class="text-xs font-semibold text-gray-400 py-1">${d}</div>`
+        ).join('');
+        for (let i = 0; i < firstDay; i++) cal.innerHTML += '<div></div>';
+
+        fetch(`${API}/me/checkin-history?month=${monthStr}`, { headers: painterHeaders() })
+            .then(r => r.json())
+            .then(data => {
+                const checkedDays = new Set();
+                if (data.success && data.checkins) {
+                    data.checkins.forEach(c => { checkedDays.add(new Date(c.date).getDate()); });
+                }
+                cal.innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d =>
+                    `<div class="text-xs font-semibold text-gray-400 py-1">${d}</div>`
+                ).join('');
+                for (let i = 0; i < firstDay; i++) cal.innerHTML += '<div></div>';
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const classes = ['day'];
+                    if (checkedDays.has(d)) classes.push('checked');
+                    if (d === today) classes.push('today');
+                    cal.innerHTML += `<div class="${classes.join(' ')}">${d}</div>`;
+                }
+            })
+            .catch(() => {
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const classes = ['day'];
+                    if (d <= today && d > today - streak) classes.push('checked');
+                    if (d === today) classes.push('today');
+                    cal.innerHTML += `<div class="${classes.join(' ')}">${d}</div>`;
+                }
+            });
+
+        overlay.classList.add('show');
+    }
+
+    function closeStreakSheet() { document.getElementById('streakSheetOverlay').classList.remove('show'); }
+
+    function toggleLevelPanel() {
+        const panel = document.getElementById('levelPanel');
+        if (panel.classList.contains('show')) { panel.classList.remove('show'); return; }
+        if (!briefingData) return;
+
+        const lp = briefingData.progress.level;
+        const LEVELS = [
+            { name: 'bronze', label: 'Bronze', color: '#CD7F32', threshold: '0', multiplier: '1x', perks: 'Base rates' },
+            { name: 'silver', label: 'Silver', color: '#9CA3AF', threshold: '5,000', multiplier: '1.2x', perks: '1.2x point multiplier' },
+            { name: 'gold', label: 'Gold', color: '#D4A24E', threshold: '25,000', multiplier: '1.5x', perks: '1.5x multiplier + priority approval' },
+            { name: 'diamond', label: 'Diamond', color: '#3B82F6', threshold: '100,000', multiplier: '2x', perks: '2x multiplier + exclusive offers' }
+        ];
+
+        panel.innerHTML = '<h3 class="font-bold text-gray-800 mb-3">Level Tiers</h3>' +
+            LEVELS.map(l => `
+                <div class="level-tier ${l.name === lp.current ? 'current' : ''}">
+                    <div class="tier-dot" style="background:${l.color}"></div>
+                    <div class="flex-1">
+                        <p class="text-sm font-semibold" style="color:${l.color}">${l.label} ${l.name === lp.current ? '← You' : ''}</p>
+                        <p class="text-xs text-gray-400">${l.threshold} pts — ${l.perks}</p>
+                    </div>
+                    <span class="text-sm font-bold" style="color:${l.color}">${l.multiplier}</span>
+                </div>
+            `).join('');
+
+        panel.classList.add('show');
+    }
+
+    function showLevelUpCelebration(levelUp) {
+        const PERKS = {
+            silver: ['1.2x multiplier on all earnings', 'Silver badge on your card'],
+            gold: ['1.5x multiplier on all earnings', 'Priority estimate approval', 'Gold badge on your card'],
+            diamond: ['2x multiplier on all earnings', 'Exclusive offers', 'Featured painter card', 'Diamond badge']
+        };
+        document.getElementById('celebrationMsg').textContent = `You've reached ${capitalize(levelUp.newLevel)} level!`;
+        document.getElementById('celebrationPerks').innerHTML =
+            `<p class="font-semibold text-green-800 mb-2">Your new perks:</p>` +
+            (PERKS[levelUp.newLevel] || []).map(p => `<p class="text-green-700">✓ ${p}</p>`).join('');
+        document.getElementById('celebrationOverlay').style.display = 'flex';
+    }
+
+    function closeCelebration() { document.getElementById('celebrationOverlay').style.display = 'none'; }
+
+    function shareLevelUp() {
+        const level = briefingData?.progress?.level?.current || 'silver';
+        const text = `I just reached ${capitalize(level)} level on QC Painters! Earning ${briefingData?.progress?.multiplier || 1}x points on every purchase. Join me: ${window.location.origin}/painter-register.html`;
+        if (navigator.share) {
+            navigator.share({ title: 'QC Painters Level Up!', text }).catch(() => {});
+        } else {
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        }
+        closeCelebration();
+    }
+
+    function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+    function formatStatus(s) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+
     // ============ Init ============
     loadDashboard();
     loadEstimates();
@@ -1840,5 +2212,44 @@
         registerFCMToken();
     });
     </script>
+
+    <!-- Streak Calendar Bottom Sheet -->
+    <div id="streakSheetOverlay" class="streak-sheet-overlay" onclick="if(event.target===this)closeStreakSheet()">
+        <div class="streak-sheet">
+            <div style="width:40px;height:4px;border-radius:2px;background:#d1d5db;margin:0 auto 16px"></div>
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-lg font-bold text-gray-800">Your Streak</h3>
+                <div class="text-right">
+                    <p id="streakSheetCount" class="text-2xl font-bold text-emerald-700">0</p>
+                    <p class="text-xs text-gray-400">current streak</p>
+                </div>
+            </div>
+            <p id="streakSheetBest" class="text-sm text-gray-500 mb-4"></p>
+            <div id="streakCalendar" class="streak-calendar"></div>
+            <div class="mt-4 p-3 rounded-xl bg-gray-50">
+                <p class="text-sm font-semibold text-gray-700 mb-2">Streak Milestones</p>
+                <div class="space-y-1 text-xs text-gray-500">
+                    <div class="flex justify-between"><span>3 days</span><span class="font-semibold text-emerald-600">+10 pts</span></div>
+                    <div class="flex justify-between"><span>7 days</span><span class="font-semibold text-emerald-600">+50 pts</span></div>
+                    <div class="flex justify-between"><span>14 days</span><span class="font-semibold text-emerald-600">+150 pts</span></div>
+                    <div class="flex justify-between"><span>30 days</span><span class="font-semibold text-emerald-600">+500 pts</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Level-Up Celebration -->
+    <div id="celebrationOverlay" class="celebration-overlay" style="display:none" onclick="closeCelebration()">
+        <div class="celebration-card" onclick="event.stopPropagation()">
+            <div style="font-size:3rem;margin-bottom:8px">&#127881;</div>
+            <h2 class="text-xl font-bold text-gray-800 mb-1">Congratulations!</h2>
+            <p id="celebrationMsg" class="text-gray-600 mb-3"></p>
+            <div id="celebrationPerks" class="text-left bg-green-50 rounded-xl p-3 mb-4 text-sm"></div>
+            <button onclick="shareLevelUp()" class="w-full py-2.5 rounded-xl text-white font-semibold" style="background:linear-gradient(135deg,#1B5E3B,#D4A24E)">
+                Share on WhatsApp
+            </button>
+            <button onclick="closeCelebration()" class="w-full py-2 mt-2 text-sm text-gray-400">Maybe later</button>
+        </div>
+    </div>
 </body>
 </html>

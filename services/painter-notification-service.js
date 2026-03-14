@@ -241,10 +241,62 @@ async function markRead(painterId, notificationId) {
     }
 }
 
+// ═══════════════════════════════════════════
+// RETENTION NOTIFICATION HELPERS
+// ═══════════════════════════════════════════
+
+const RETENTION_NOTIFICATIONS = {
+    streak_milestone: (days, points) => ({
+        type: 'streak_milestone',
+        title: `${days}-day streak! ${points} bonus points added!`,
+        title_ta: `${days}-நாள் தொடர்! ${points} போனஸ் புள்ளிகள் சேர்க்கப்பட்டது!`,
+        body: days >= 30 ? `Incredible! You've kept a ${days}-day streak. ${points} points added to your wallet!`
+            : days >= 14 ? `2 week warrior! ${points} bonus points earned!`
+            : days >= 7 ? `1 week streak! You're on fire! ${points} bonus points!`
+            : `${days}-day streak! Keep going! ${points} bonus points!`,
+        body_ta: `${days}-நாள் தொடர்! ${points} போனஸ் புள்ளிகள் உங்கள் வாலட்டில்!`,
+        data: { screen: 'dashboard', streak: String(days), points: String(points) }
+    }),
+
+    streak_at_risk: (days) => ({
+        type: 'streak_at_risk',
+        title: `Your ${days}-day streak is at risk!`,
+        title_ta: `உங்கள் ${days}-நாள் தொடர் ஆபத்தில்!`,
+        body: 'Open the app to keep it alive',
+        body_ta: 'அதை காப்பாற்ற ஆப்பை திறக்கவும்',
+        data: { screen: 'dashboard', streak: String(days) }
+    }),
+
+    level_up: (newLevel, multiplier) => ({
+        type: 'level_up',
+        title: `You've reached ${newLevel.charAt(0).toUpperCase() + newLevel.slice(1)} level!`,
+        title_ta: `நீங்கள் ${newLevel} நிலையை அடைந்தீர்கள்!`,
+        body: `All earnings now get ${multiplier}x multiplier!`,
+        body_ta: `அனைத்து வருமானமும் ${multiplier}x பெருக்கி பெறும்!`,
+        data: { screen: 'dashboard', level: newLevel, multiplier: String(multiplier) }
+    }),
+
+    daily_bonus: (productName, multiplier) => ({
+        type: 'daily_bonus',
+        title: `Today's bonus: ${multiplier}x points on ${productName}!`,
+        title_ta: `இன்றைய போனஸ்: ${productName} மீது ${multiplier}x புள்ளிகள்!`,
+        body: 'Offer ends midnight. Open app for details.',
+        body_ta: 'நள்ளிரவில் முடிவடையும். விவரங்களுக்கு ஆப்பை திறக்கவும்.',
+        data: { screen: 'dashboard', type: 'daily_bonus' }
+    })
+};
+
+function getRetentionNotification(type, ...args) {
+    const builder = RETENTION_NOTIFICATIONS[type];
+    if (!builder) throw new Error(`Unknown retention notification type: ${type}`);
+    return builder(...args);
+}
+
 module.exports = {
     setDependencies,
     sendToPainter,
     sendToAll,
     getNotifications,
-    markRead
+    markRead,
+    getRetentionNotification
 };

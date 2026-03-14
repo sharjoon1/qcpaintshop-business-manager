@@ -176,14 +176,59 @@ async function processInvoice(painterId, invoice, billingType, createdBy) {
     totalRegularPoints = Math.round(totalRegularPoints * 100) / 100;
     totalAnnualPoints = Math.round(totalAnnualPoints * 100) / 100;
 
-    // Award points
+    // Daily bonus product multiplier (capped per day)
+    let dailyBonusPoints = 0;
+    try {
+        const [bonusCfg] = await pool.query(
+            "SELECT config_key, config_value FROM ai_config WHERE config_key IN ('painter_daily_bonus_product_id', 'painter_daily_bonus_multiplier', 'painter_daily_bonus_cap')"
+        );
+        const bcfg = {};
+        bonusCfg.forEach(c => { bcfg[c.config_key] = c.config_value; });
+        const bonusProductId = bcfg.painter_daily_bonus_product_id;
+        const bonusMultiplier = parseInt(bcfg.painter_daily_bonus_multiplier) || 2;
+        const bonusCap = parseInt(bcfg.painter_daily_bonus_cap) || 500;
+
+        if (bonusProductId && totalRegularPoints > 0) {
+            // Check if any line items match the daily bonus product
+            for (const item of lineItems) {
+                const [mapped] = await pool.query(
+                    'SELECT product_id FROM zoho_items_map WHERE zoho_item_id = ? AND product_id = ?',
+                    [item.item_id, bonusProductId]
+                );
+                if (mapped.length) {
+                    const bonusExtra = Math.round(totalRegularPoints * (bonusMultiplier - 1) * 100) / 100;
+                    // Check how much bonus already earned today
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    const [todayBonus] = await pool.query(
+                        `SELECT COALESCE(SUM(amount), 0) as total FROM painter_point_transactions
+                         WHERE painter_id = ? AND source = 'daily_bonus' AND DATE(created_at) = ?`,
+                        [painterId, todayStr]
+                    );
+                    const alreadyEarned = parseFloat(todayBonus[0].total);
+                    const remaining = Math.max(0, bonusCap - alreadyEarned);
+                    dailyBonusPoints = Math.min(bonusExtra, remaining);
+                    break;
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[Points] Daily bonus check failed:', e.message);
+    }
+
+    // Award points (with level multiplier)
     if (totalRegularPoints > 0) {
-        await addPoints(painterId, 'regular', totalRegularPoints, billingType === 'self' ? 'self_billing' : 'customer_billing',
+        await addPointsWithMultiplier(painterId, 'regular', totalRegularPoints, billingType === 'self' ? 'self_billing' : 'customer_billing',
             invoice.invoice_id, 'invoice', `Invoice ${invoice.invoice_number || invoice.invoice_id}`, createdBy);
     }
     if (totalAnnualPoints > 0) {
-        await addPoints(painterId, 'annual', totalAnnualPoints, billingType === 'self' ? 'self_billing' : 'customer_billing',
+        await addPointsWithMultiplier(painterId, 'annual', totalAnnualPoints, billingType === 'self' ? 'self_billing' : 'customer_billing',
             invoice.invoice_id, 'invoice', `Invoice ${invoice.invoice_number || invoice.invoice_id}`, createdBy);
+    }
+
+    // Award daily bonus points if applicable
+    if (dailyBonusPoints > 0) {
+        await addPoints(painterId, 'regular', dailyBonusPoints, 'daily_bonus',
+            invoice.invoice_id, 'invoice', 'Daily bonus product multiplier', createdBy);
     }
 
     // Process referral points
@@ -442,7 +487,7 @@ async function awardAttendancePoints(painterId, attendanceId) {
     const points = config.length ? parseFloat(config[0].config_value) : 5;
 
     if (points > 0) {
-        await addPoints(painterId, 'regular', points, 'attendance',
+        await addPointsWithMultiplier(painterId, 'regular', points, 'attendance',
             String(attendanceId), 'attendance', 'Attendance points', null);
     }
 
@@ -460,6 +505,64 @@ function generateReferralCode(name) {
     return `${prefix}${random}`;
 }
 
+// ═══════════════════════════════════════════
+// LEVEL SYSTEM
+// ═══════════════════════════════════════════
+
+async function getLevelMultiplier(painterId) {
+    const [rows] = await pool.query(
+        `SELECT pl.multiplier FROM painters p
+         JOIN painter_levels pl ON pl.level_name = p.current_level
+         WHERE p.id = ?`,
+        [painterId]
+    );
+    return rows.length ? parseFloat(rows[0].multiplier) : 1.0;
+}
+
+async function addPointsWithMultiplier(painterId, pointPool, baseAmount, source, refId, refType, description, createdBy) {
+    const multiplier = await getLevelMultiplier(painterId);
+    const adjustedAmount = Math.round(baseAmount * multiplier * 100) / 100;
+    const result = await addPoints(painterId, pointPool, adjustedAmount, source, refId, refType,
+        multiplier > 1 ? `${description} (${multiplier}x level bonus)` : description, createdBy);
+    // Check for level-up after awarding points — sends notification if leveled up
+    const levelUp = await checkLevelUp(painterId);
+    if (levelUp) {
+        try {
+            const painterNotificationService = require('./painter-notification-service');
+            const [lvl] = await pool.query('SELECT multiplier FROM painter_levels WHERE level_name = ?', [levelUp.newLevel]);
+            const notif = painterNotificationService.getRetentionNotification('level_up', levelUp.newLevel, lvl[0]?.multiplier || 1);
+            painterNotificationService.sendToPainter(painterId, notif).catch(e =>
+                console.error(`[Points] Level-up notification failed:`, e.message)
+            );
+        } catch (e) { /* notification service may not be initialized yet */ }
+    }
+    return { balance: result, levelUp };
+}
+
+async function checkLevelUp(painterId) {
+    const [painter] = await pool.query(
+        'SELECT current_level, total_earned_regular, total_earned_annual, full_name FROM painters WHERE id = ?',
+        [painterId]
+    );
+    if (!painter.length) return null;
+
+    const p = painter[0];
+    const lifetime = parseFloat(p.total_earned_regular) + parseFloat(p.total_earned_annual);
+
+    const [levels] = await pool.query(
+        'SELECT * FROM painter_levels WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1',
+        [lifetime]
+    );
+    if (!levels.length) return null;
+
+    const newLevel = levels[0].level_name;
+    if (newLevel !== p.current_level) {
+        await pool.query('UPDATE painters SET current_level = ?, card_generated_at = NULL, id_card_generated_at = NULL WHERE id = ?', [newLevel, painterId]);
+        return { previousLevel: p.current_level, newLevel, painterName: p.full_name };
+    }
+    return null;
+}
+
 module.exports = {
     setPool,
     getReferralTier,
@@ -474,5 +577,8 @@ module.exports = {
     requestWithdrawal,
     processWithdrawal,
     awardAttendancePoints,
-    generateReferralCode
+    generateReferralCode,
+    getLevelMultiplier,
+    addPointsWithMultiplier,
+    checkLevelUp
 };

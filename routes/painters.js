@@ -384,7 +384,7 @@ router.put('/me/profile-photo', requirePainterAuth, uploadProfile.single('photo'
 router.get('/me/visiting-card', requirePainterAuth, async (req, res) => {
     try {
         const [painters] = await pool.query(
-            'SELECT id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo, card_generated_at, updated_at FROM painters WHERE id = ?',
+            'SELECT id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo, current_level, card_generated_at, updated_at FROM painters WHERE id = ?',
             [req.painter.id]
         );
         if (!painters.length) return res.status(404).json({ success: false, message: 'Painter not found' });
@@ -419,7 +419,7 @@ router.get('/me/visiting-card', requirePainterAuth, async (req, res) => {
 router.get('/me/id-card', requirePainterAuth, async (req, res) => {
     try {
         const [painters] = await pool.query(
-            'SELECT id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo, id_card_generated_at, updated_at FROM painters WHERE id = ?',
+            'SELECT id, full_name, phone, city, specialization, experience_years, referral_code, profile_photo, current_level, id_card_generated_at, updated_at FROM painters WHERE id = ?',
             [req.painter.id]
         );
         if (!painters.length) return res.status(404).json({ success: false, message: 'Painter not found' });
@@ -564,13 +564,14 @@ router.get('/me/attendance', requirePainterAuth, async (req, res) => {
 
 router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
     try {
-        const [balance, [referralCount], [recentTxns], [pendingWithdrawals], [painter], [logoSetting]] = await Promise.all([
+        const [balance, [referralCount], [recentTxns], [pendingWithdrawals], [painter], [logoSetting], [painterLevel]] = await Promise.all([
             pointsEngine.getBalance(req.painter.id),
             pool.query('SELECT COUNT(*) as count FROM painter_referrals WHERE referrer_id = ?', [req.painter.id]),
             pool.query('SELECT * FROM painter_point_transactions WHERE painter_id = ? ORDER BY created_at DESC LIMIT 10', [req.painter.id]),
             pool.query('SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM painter_withdrawals WHERE painter_id = ? AND status = "pending"', [req.painter.id]),
             pool.query('SELECT referral_code, profile_photo, full_name FROM painters WHERE id = ?', [req.painter.id]),
-            pool.query("SELECT setting_value FROM settings WHERE setting_key = 'business_logo' LIMIT 1")
+            pool.query("SELECT setting_value FROM settings WHERE setting_key = 'business_logo' LIMIT 1"),
+            pool.query('SELECT current_level, current_streak, longest_streak FROM painters WHERE id = ?', [req.painter.id])
         ]);
 
         const logoVal = logoSetting[0]?.setting_value || null;
@@ -601,11 +602,279 @@ router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
                 recentTransactions: recentTxns,
                 pendingWithdrawals: { count: pendingWithdrawals[0].count, total: parseFloat(pendingWithdrawals[0].total) },
                 businessLogo,
-                annualWithdrawalInfo
+                annualWithdrawalInfo,
+                level: painterLevel[0]?.current_level || 'bronze',
+                streak: painterLevel[0]?.current_streak || 0,
+                longestStreak: painterLevel[0]?.longest_streak || 0
             }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to load dashboard' });
+    }
+});
+
+// ═══════════════════════════════════════════
+// DAILY STREAK CHECK-IN
+// ═══════════════════════════════════════════
+
+router.put('/me/daily-streak', requirePainterAuth, async (req, res) => {
+    try {
+        const painterId = req.painter.id;
+        const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const todayStr = `${todayIST.getFullYear()}-${String(todayIST.getMonth() + 1).padStart(2, '0')}-${String(todayIST.getDate()).padStart(2, '0')}`;
+
+        // Check if already checked in today (idempotent)
+        const [existing] = await pool.query(
+            'SELECT streak_count, bonus_awarded FROM painter_daily_checkins WHERE painter_id = ? AND checkin_date = ?',
+            [painterId, todayStr]
+        );
+        if (existing.length) {
+            const [painter] = await pool.query(
+                'SELECT current_streak, longest_streak, current_level FROM painters WHERE id = ?',
+                [painterId]
+            );
+            return res.json({
+                success: true,
+                alreadyCheckedIn: true,
+                streak: painter[0].current_streak,
+                longestStreak: painter[0].longest_streak,
+                level: painter[0].current_level
+            });
+        }
+
+        // Get painter's last check-in
+        const [painter] = await pool.query(
+            'SELECT current_streak, longest_streak, last_checkin_date, current_level FROM painters WHERE id = ?',
+            [painterId]
+        );
+        if (!painter.length) return res.status(404).json({ success: false, message: 'Painter not found' });
+
+        const p = painter[0];
+        let newStreak = 1;
+
+        // Check if yesterday was last check-in (consecutive day)
+        if (p.last_checkin_date) {
+            const lastDate = new Date(p.last_checkin_date);
+            const yesterday = new Date(todayIST);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            if (lastDate.toISOString().slice(0, 10) === yesterday.toISOString().slice(0, 10)) {
+                newStreak = p.current_streak + 1;
+            } else if (lastDate.toISOString().slice(0, 10) === todayStr) {
+                newStreak = p.current_streak;
+            }
+        }
+
+        const newLongest = Math.max(newStreak, p.longest_streak || 0);
+
+        // Determine milestone bonus
+        const MILESTONES = { 3: 10, 7: 50, 14: 150, 30: 500 };
+        let bonusAwarded = 0;
+        let milestoneHit = null;
+
+        if (MILESTONES[newStreak]) {
+            bonusAwarded = MILESTONES[newStreak];
+            milestoneHit = newStreak;
+        } else if (newStreak > 30 && newStreak % 30 === 0) {
+            bonusAwarded = 500;
+            milestoneHit = newStreak;
+        }
+
+        // Insert check-in record
+        await pool.query(
+            'INSERT INTO painter_daily_checkins (painter_id, checkin_date, streak_count, bonus_awarded) VALUES (?, ?, ?, ?)',
+            [painterId, todayStr, newStreak, bonusAwarded]
+        );
+
+        // Update painter record
+        await pool.query(
+            'UPDATE painters SET current_streak = ?, longest_streak = ?, last_checkin_date = ? WHERE id = ?',
+            [newStreak, newLongest, todayStr, painterId]
+        );
+
+        // Award milestone bonus (with level multiplier — also handles level-up notification internally)
+        let levelUp = null;
+        if (bonusAwarded > 0) {
+            const result = await pointsEngine.addPointsWithMultiplier(
+                painterId, 'regular', bonusAwarded, 'streak_bonus',
+                todayStr, 'streak', `${newStreak}-day streak bonus`, null
+            );
+            levelUp = result.levelUp;
+
+            // Send milestone notification
+            const notif = painterNotificationService.getRetentionNotification('streak_milestone', newStreak, bonusAwarded);
+            painterNotificationService.sendToPainter(painterId, notif).catch(e =>
+                console.error(`[Streak] Milestone notification failed:`, e.message)
+            );
+        }
+
+        res.json({
+            success: true,
+            alreadyCheckedIn: false,
+            streak: newStreak,
+            longestStreak: newLongest,
+            bonusAwarded,
+            milestoneHit,
+            levelUp,
+            level: levelUp ? levelUp.newLevel : p.current_level
+        });
+    } catch (error) {
+        console.error('[Streak] Check-in error:', error);
+        res.status(500).json({ success: false, message: 'Failed to record streak' });
+    }
+});
+
+// ═══════════════════════════════════════════
+// MORNING BRIEFING
+// ═══════════════════════════════════════════
+
+router.get('/me/briefing', requirePainterAuth, async (req, res) => {
+    try {
+        const painterId = req.painter.id;
+
+        const [painter] = await pool.query(
+            `SELECT current_level, current_streak, longest_streak, last_checkin_date, last_briefing_at,
+                    total_earned_regular, total_earned_annual, regular_points, annual_points, full_name
+             FROM painters WHERE id = ?`,
+            [painterId]
+        );
+        if (!painter.length) return res.status(404).json({ success: false, message: 'Painter not found' });
+        const p = painter[0];
+
+        // 1. "What you earned" — points since last briefing
+        const lastBriefing = p.last_briefing_at || new Date(0);
+        const [recentPoints] = await pool.query(
+            `SELECT COALESCE(SUM(amount), 0) as earned
+             FROM painter_point_transactions
+             WHERE painter_id = ? AND type = 'earn' AND created_at > ?`,
+            [painterId, lastBriefing]
+        );
+        const earnedSinceLastVisit = parseFloat(recentPoints[0].earned);
+
+        const [estimateUpdates] = await pool.query(
+            `SELECT id, estimate_number, status, updated_at
+             FROM painter_estimates
+             WHERE painter_id = ? AND updated_at > ?
+             ORDER BY updated_at DESC LIMIT 5`,
+            [painterId, lastBriefing]
+        );
+
+        const [withdrawalUpdates] = await pool.query(
+            `SELECT id, pool, amount, status, processed_at
+             FROM painter_withdrawals
+             WHERE painter_id = ? AND (processed_at > ? OR requested_at > ?)
+             ORDER BY COALESCE(processed_at, requested_at) DESC LIMIT 5`,
+            [painterId, lastBriefing, lastBriefing]
+        );
+
+        // 2. "Today's opportunity" — daily bonus product
+        const [bonusConfig] = await pool.query(
+            "SELECT config_key, config_value FROM ai_config WHERE config_key IN ('painter_daily_bonus_product_id', 'painter_daily_bonus_multiplier', 'painter_daily_bonus_cap')"
+        );
+        const cfg = {};
+        bonusConfig.forEach(c => { cfg[c.config_key] = c.config_value; });
+
+        let dailyBonus = null;
+        if (cfg.painter_daily_bonus_product_id) {
+            const [product] = await pool.query(
+                'SELECT id, name, brand, category, image_url FROM products WHERE id = ?',
+                [cfg.painter_daily_bonus_product_id]
+            );
+            if (product.length) {
+                const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+                const midnightIST = new Date(nowIST);
+                midnightIST.setHours(24, 0, 0, 0);
+                const hoursLeft = Math.max(0, Math.round((midnightIST - nowIST) / (1000 * 60 * 60) * 10) / 10);
+
+                dailyBonus = {
+                    product: product[0],
+                    multiplier: parseInt(cfg.painter_daily_bonus_multiplier) || 2,
+                    cap: parseInt(cfg.painter_daily_bonus_cap) || 500,
+                    hoursLeft
+                };
+            }
+        }
+
+        // 3. "Your progress" — level + streak
+        const lifetime = parseFloat(p.total_earned_regular) + parseFloat(p.total_earned_annual);
+        const [levels] = await pool.query('SELECT * FROM painter_levels ORDER BY min_points ASC');
+        const currentLevelData = levels.find(l => l.level_name === p.current_level) || levels[0];
+        const nextLevel = levels.find(l => l.min_points > lifetime);
+
+        const levelProgress = nextLevel ? {
+            current: p.current_level,
+            next: nextLevel.level_name,
+            currentPoints: lifetime,
+            nextThreshold: nextLevel.min_points,
+            percentage: Math.min(100, Math.round((lifetime / nextLevel.min_points) * 100)),
+            pointsNeeded: nextLevel.min_points - lifetime,
+            nextMultiplier: parseFloat(nextLevel.multiplier),
+            badgeColor: currentLevelData.badge_color,
+            nextBadgeColor: nextLevel.badge_color
+        } : {
+            current: p.current_level,
+            next: null,
+            currentPoints: lifetime,
+            percentage: 100,
+            pointsNeeded: 0,
+            badgeColor: currentLevelData.badge_color
+        };
+
+        // Update last_briefing_at
+        await pool.query('UPDATE painters SET last_briefing_at = NOW() WHERE id = ?', [painterId]);
+
+        res.json({
+            success: true,
+            briefing: {
+                earned: {
+                    pointsSinceLastVisit: earnedSinceLastVisit,
+                    estimateUpdates,
+                    withdrawalUpdates
+                },
+                dailyBonus,
+                progress: {
+                    streak: p.current_streak || 0,
+                    longestStreak: p.longest_streak || 0,
+                    level: levelProgress,
+                    multiplier: parseFloat(currentLevelData.multiplier)
+                }
+            }
+        });
+    } catch (error) {
+        console.error('[Briefing] Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load briefing' });
+    }
+});
+
+// ═══════════════════════════════════════════
+// CHECK-IN HISTORY (for streak calendar)
+// ═══════════════════════════════════════════
+
+router.get('/me/checkin-history', requirePainterAuth, async (req, res) => {
+    try {
+        const month = req.query.month; // format: YYYY-MM
+        if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+            return res.status(400).json({ success: false, message: 'month param required (YYYY-MM)' });
+        }
+
+        const [checkins] = await pool.query(
+            `SELECT checkin_date, streak_count, bonus_awarded
+             FROM painter_daily_checkins
+             WHERE painter_id = ? AND checkin_date LIKE ?
+             ORDER BY checkin_date ASC`,
+            [req.painter.id, `${month}%`]
+        );
+
+        res.json({
+            success: true,
+            checkins: checkins.map(c => ({
+                date: c.checkin_date,
+                streak: c.streak_count,
+                bonus: parseFloat(c.bonus_awarded)
+            }))
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to load check-in history' });
     }
 });
 
@@ -658,7 +927,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
         }
 
         const [rows] = await pool.query(`
-            SELECT p.id, p.name, p.product_type, p.area_coverage, p.gst_percentage,
+            SELECT p.id, p.name, p.product_type, p.area_coverage, p.gst_percentage, p.image_url,
                    b.name as brand, b.id as brand_id,
                    c.name as category, c.id as category_id,
                    ps.id as pack_size_id, ps.size, ps.unit, ps.base_price, ps.zoho_item_id,
@@ -679,6 +948,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
                 productMap[row.id] = {
                     id: row.id,
                     name: row.name,
+                    image_url: row.image_url || null,
                     brand: row.brand,
                     brand_id: row.brand_id,
                     category: row.category,
