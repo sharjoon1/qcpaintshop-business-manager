@@ -2440,8 +2440,8 @@ app.get('/api/products/zoho-items-search', requireAuth, async (req, res) => {
         let where = "WHERE (zoho_status = 'active' OR zoho_status IS NULL)";
         const params = [];
         if (search) {
-            where += ' AND (zoho_item_name LIKE ? OR zoho_brand LIKE ? OR zoho_sku LIKE ?)';
-            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+            where += ' AND (zoho_item_name LIKE ? OR zoho_brand LIKE ? OR zoho_sku LIKE ? OR zoho_item_id = ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`, search);
         }
         const [items] = await pool.query(`
             SELECT zoho_item_id, zoho_item_name, zoho_brand, zoho_rate, zoho_sku

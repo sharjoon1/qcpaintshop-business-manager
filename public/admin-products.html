@@ -1429,17 +1429,20 @@
             editReviewAddTimer = setTimeout(doEditReviewAddSearch, 300);
         }
 
+        let editReviewSearchResults = []; // cache search results for adding
+
         async function doEditReviewAddSearch() {
             const q = document.getElementById('editReviewAddSearch').value.trim();
             const resultsDiv = document.getElementById('editReviewAddResults');
-            if (!q) { resultsDiv.innerHTML = ''; return; }
+            if (!q) { resultsDiv.innerHTML = ''; editReviewSearchResults = []; return; }
             resultsDiv.innerHTML = '<div class="text-xs text-gray-400 py-2">Searching...</div>';
             try {
                 const items = await searchZohoItems(q);
+                editReviewSearchResults = items;
                 if (!items.length) { resultsDiv.innerHTML = '<div class="text-xs text-gray-400 py-2">No items found</div>'; return; }
-                resultsDiv.innerHTML = items.map(item => {
+                resultsDiv.innerHTML = items.map((item, idx) => {
                     const alreadyAdded = editReviewProduct.pack_sizes.some(ps => ps.zoho_item_id === item.zoho_item_id);
-                    return `<div class="flex items-center justify-between px-3 py-2 text-xs hover:bg-purple-50 rounded cursor-pointer border-b border-gray-100 ${alreadyAdded ? 'opacity-50' : ''}" data-zoho-id="${escH(item.zoho_item_id)}" onclick="${alreadyAdded ? '' : `addEditReviewZohoItem(this.dataset.zohoId)`}">
+                    return `<div class="flex items-center justify-between px-3 py-2 text-xs hover:bg-purple-50 rounded cursor-pointer border-b border-gray-100 ${alreadyAdded ? 'opacity-50' : ''}" onclick="${alreadyAdded ? '' : `addEditReviewZohoItem(${idx})`}">
                         <div class="flex-1 min-w-0">
                             <span class="font-medium text-gray-800">${escH(item.zoho_item_name)}</span>
                             <span class="text-gray-400 ml-2">${escH(item.zoho_brand || '')}${item.zoho_rate ? ' · ₹' + item.zoho_rate : ''}</span>
@@ -1452,27 +1455,24 @@
             }
         }
 
-        async function addEditReviewZohoItem(zohoItemId) {
-            try {
-                // Get full item info
-                const items = await searchZohoItems(zohoItemId);
-                const item = items.find(i => i.zoho_item_id === zohoItemId);
-                if (!item) return;
-                // Extract size info
-                const info = extractProductInfoJS(item.zoho_item_name, item.cf_product_name);
-                const sizeMatch = (info.sizeLabel || '').match(/([\d.]+)\s*(\w+)/);
-                const size = sizeMatch ? parseFloat(sizeMatch[1]) : 1;
-                const unit = sizeMatch ? sizeMatch[2].toUpperCase().replace(/^LTR?$/i, 'L').replace(/^KGS?$/i, 'KG') : 'L';
+        function addEditReviewZohoItem(idx) {
+            const item = editReviewSearchResults[idx];
+            if (!item) return;
+            // Extract size info
+            const info = extractProductInfoJS(item.zoho_item_name, item.cf_product_name);
+            const sizeMatch = (info.sizeLabel || '').match(/([\d.]+)\s*(\w+)/);
+            const size = sizeMatch ? parseFloat(sizeMatch[1]) : 1;
+            const unit = sizeMatch ? sizeMatch[2].toUpperCase().replace(/^LTR?$/i, 'L').replace(/^KGS?$/i, 'KG') : 'L';
 
-                editReviewProduct.pack_sizes.push({
-                    size, unit,
-                    base_price: parseFloat(item.zoho_rate) || 0,
-                    zoho_item_id: item.zoho_item_id,
-                    zoho_item_name: item.zoho_item_name
-                });
-                document.getElementById('editReviewAddVariant').classList.add('hidden');
-                renderEditReview();
-            } catch(e) { alert('Failed to add: ' + e.message); }
+            editReviewProduct.pack_sizes.push({
+                size, unit,
+                base_price: parseFloat(item.zoho_rate) || 0,
+                zoho_item_id: item.zoho_item_id,
+                zoho_item_name: item.zoho_item_name
+            });
+            document.getElementById('editReviewAddVariant').classList.add('hidden');
+            editReviewSearchResults = [];
+            renderEditReview();
         }
 
         function triggerEditReviewImage() {
