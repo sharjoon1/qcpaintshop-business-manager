@@ -230,6 +230,7 @@
                     <button onclick="setAiCommand('Find items with missing or zero purchase_rate')" class="px-2 py-0.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs transition">Missing Prices</button>
                     <button onclick="setAiCommand('Set purchase_rate to 60% of rate for items where purchase_rate is 0')" class="px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs transition">Fix Purchase Rate</button>
                     <button onclick="setAiCommand('Update [Brand] category to [Category] where item name contains [keyword]')" class="px-2 py-0.5 rounded-full bg-green-50 hover:bg-green-100 text-green-700 text-xs transition">Bulk Category</button>
+                    <button onclick="setAiCommand('Generate description from name for [Brand]')" class="px-2 py-0.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs transition">Desc from Name</button>
                 </div>
                 <div id="aiScopeLabel" class="text-xs text-gray-400 whitespace-nowrap ml-2">all items</div>
             </div>
@@ -854,6 +855,277 @@
     }
 
     // ═══════════════════════════════════════
+    // DESCRIPTION FROM NAME — SMART EXTRACTION
+    // Strips SKU codes, brand/line codes, product line names, expands abbreviations
+    // ═══════════════════════════════════════
+
+    // Paint industry abbreviation map
+    var PAINT_ABBREVIATIONS = {
+        'EXT': 'EXTERIOR', 'INT': 'INTERIOR', 'PRM': 'PREMIUM', 'PREM': 'PREMIUM',
+        'EMU': 'EMULSION', 'ENM': 'ENAMEL', 'PRI': 'PRIMER', 'PRMR': 'PRIMER',
+        'PUT': 'PUTTY', 'DIST': 'DISTEMPER', 'DSTM': 'DISTEMPER',
+        'SLR': 'SEALER', 'THN': 'THINNER', 'STNR': 'STAINER',
+        'LSTR': 'LUSTRE', 'SHN': 'SHEEN', 'TXT': 'TEXTURE', 'TXTD': 'TEXTURED',
+        'WP': 'WATERPROOF', 'W/P': 'WATERPROOF', 'WTR': 'WATER', 'WTRPRF': 'WATERPROOF',
+        'ACR': 'ACRYLIC', 'ALK': 'ALKYD', 'CEIL': 'CEILING', 'FLR': 'FLOOR',
+        'MATT': 'MATTE', 'S/S': 'SOFT SHEEN', 'SS': 'SOFT SHEEN',
+        'UND': 'UNDERCOAT', 'UNDCT': 'UNDERCOAT', 'PRO': 'PROFESSIONAL',
+        'BRIT': 'BRIGHT', 'BLK': 'BLACK', 'WHT': 'WHITE', 'CLR': 'CLEAR',
+        'RST': 'RUST', 'ANTCRV': 'ANTICORROSIVE', 'GLS': 'GLOSS', 'GLSY': 'GLOSSY',
+        'S/GLO': 'SEMI GLOSS', 'HI/GLO': 'HIGH GLOSS', 'LO/SHN': 'LOW SHEEN',
+        'STL': 'STEEL', 'WD': 'WOOD', 'MTL': 'METAL', 'CONC': 'CONCRETE',
+        'CEIL': 'CEILING', 'RDR': 'RENDER', 'WTHSHLD': 'WEATHERSHIELD',
+        'WTHRSHD': 'WEATHERSHIELD', 'WTHSH': 'WEATHERSHIELD'
+    };
+
+    // Known paint product keywords — used to detect where actual description starts
+    var PAINT_KEYWORDS = [
+        'PRIMER', 'PAINT', 'ENAMEL', 'EMULSION', 'PUTTY', 'DISTEMPER', 'SEALER',
+        'THINNER', 'STAINER', 'LUSTRE', 'SHEEN', 'TEXTURE', 'TEXTURED', 'COAT',
+        'FINISH', 'ACRYLIC', 'LATEX', 'ALKYD', 'UNDERCOAT', 'VARNISH', 'LACQUER',
+        'EPOXY', 'POLYURETHANE', 'GLOSS', 'MATTE', 'SATIN', 'SILK', 'VELVET',
+        'WEATHERSHIELD', 'WEATHERCOAT', 'DAMPPROOF', 'WATERPROOF', 'RUSTOLEUM',
+        'ANTICORROSIVE', 'CEMENT', 'WOOD', 'METAL', 'FLOOR', 'CEILING', 'WALL',
+        'EXTERIOR', 'INTERIOR', 'PREMIUM', 'PROFESSIONAL', 'ADVANCED',
+        'ROYALE', 'LUXURY', 'ULTIMA', 'CLASSIC', 'ULTRA', 'SUPER', 'HI',
+        'SMOOTH', 'RICH', 'SOFT', 'BRIGHT', 'CLEAR', 'BASE', 'TINTING',
+        'STOPPER', 'FILLER', 'CRACK', 'SPRAY', 'ROLLER', 'BRUSH'
+    ];
+
+    function generateDescriptionFromName(itemName, brandName) {
+        if (!itemName) return '';
+        var name = itemName.trim().toUpperCase();
+
+        // Step 1: Strip leading SKU code (e.g., "EPR01", "INT003", "BIRLA01")
+        name = name.replace(/^[A-Z]{2,6}\d{1,4}\s+/, '');
+
+        // Step 2: Strip short brand/product-line abbreviation codes (2-4 uppercase letters not in keywords)
+        // Only strip the FIRST token if it's a short code and NOT a paint keyword or abbreviation
+        var words = name.split(/\s+/);
+        if (words.length > 1) {
+            var firstWord = words[0];
+            var isKeyword = PAINT_KEYWORDS.indexOf(firstWord) !== -1;
+            var isAbbrev = PAINT_ABBREVIATIONS.hasOwnProperty(firstWord);
+            // Short code: 2-4 uppercase letters, not a keyword or known abbreviation
+            if (firstWord.length >= 2 && firstWord.length <= 4 && /^[A-Z]+$/.test(firstWord) && !isKeyword && !isAbbrev) {
+                words.shift(); // remove brand/line code
+            }
+        }
+
+        // Step 3: Strip product line name (words before first paint keyword or abbreviation)
+        // Find index of first word that is a paint keyword OR a known abbreviation
+        var descStartIdx = 0;
+        for (var i = 0; i < words.length; i++) {
+            var w = words[i].replace(/[^A-Z0-9\/]/g, ''); // clean punctuation
+            if (PAINT_KEYWORDS.indexOf(w) !== -1 || PAINT_ABBREVIATIONS.hasOwnProperty(w)) {
+                descStartIdx = i;
+                break;
+            }
+            // Also check if it looks like a size (e.g., "01", "20", "0.5") — keep sizes
+            if (/^\d+(\.\d+)?$/.test(w) && i > 0) {
+                descStartIdx = i;
+                break;
+            }
+        }
+        // If no keyword found, keep everything (don't strip)
+        if (descStartIdx === 0 && words.length > 0) {
+            var anyKeyword = false;
+            for (var j = 0; j < words.length; j++) {
+                var wj = words[j].replace(/[^A-Z0-9\/]/g, '');
+                if (PAINT_KEYWORDS.indexOf(wj) !== -1 || PAINT_ABBREVIATIONS.hasOwnProperty(wj)) {
+                    anyKeyword = true;
+                    break;
+                }
+            }
+            if (!anyKeyword) descStartIdx = 0; // keep all words
+        }
+        words = words.slice(descStartIdx);
+
+        // Step 4: Expand abbreviations
+        words = words.map(function(w) {
+            var clean = w.replace(/[^A-Z0-9\/]/g, '');
+            var expanded = PAINT_ABBREVIATIONS[clean];
+            if (expanded) return expanded;
+            return w;
+        });
+
+        // Step 5: Join and clean up
+        var desc = words.join(' ').replace(/\s+/g, ' ').trim();
+
+        // Title case (first letter caps, rest lower)
+        desc = desc.replace(/\b([A-Z])([A-Z]+)\b/g, function(m, first, rest) {
+            // Keep short words (<=2 chars like "01", "L", "KG") uppercase
+            if (m.length <= 2) return m;
+            return first + rest.toLowerCase();
+        });
+
+        return desc;
+    }
+
+    function tryDescriptionFromName(command) {
+        var cmd = command.trim();
+
+        // Patterns:
+        // "Generate description from name for BIRLA OPUS"
+        // "Extract description from item name for Berger"
+        // "Update description from name for Asian Paints where name contains Primer"
+        // "Set description from name for all BIRLA OPUS items"
+        // "Description from name BIRLA OPUS"
+        var patterns = [
+            /(?:generate|extract|update|set|create|derive|build|make)\s+desc(?:ription)?\s+from\s+(?:item\s+)?name\s+(?:for\s+(?:all\s+)?)?(.+?)(?:\s+(?:items?|products?))?\s*(?:where\s+(?:item\s+)?name\s+(?:contains?|has|includes?|like)\s+['"]?([^'"]+?)['"]?)?\s*$/i,
+            /desc(?:ription)?\s+from\s+(?:item\s+)?name\s+(?:for\s+)?(.+?)(?:\s+(?:items?|products?))?\s*(?:where\s+(?:item\s+)?name\s+(?:contains?|has|includes?|like)\s+['"]?([^'"]+?)['"]?)?\s*$/i,
+            /(?:auto|smart)\s*[\-\s]?desc(?:ription)?\s+(?:for\s+(?:all\s+)?)?(.+?)(?:\s+(?:items?|products?))?\s*(?:where\s+(?:item\s+)?name\s+(?:contains?|has|includes?|like)\s+['"]?([^'"]+?)['"]?)?\s*$/i
+        ];
+
+        var brand = null, nameFilter = null;
+        for (var i = 0; i < patterns.length; i++) {
+            var m = cmd.match(patterns[i]);
+            if (m) {
+                brand = m[1].trim().replace(/['']s?\s*$/i, '').replace(/\s+brand$/i, '').replace(/\s+items?$/i, '').trim();
+                nameFilter = m[2] ? m[2].trim() : null;
+                break;
+            }
+        }
+
+        if (!brand) return null;
+
+        // Find matching items
+        var brandLower = brand.toLowerCase();
+        var srcItems = selectedItemIds.size > 0
+            ? items.filter(function(it) { return selectedItemIds.has(String(it.item_id || it.zoho_item_id)); })
+            : items;
+
+        var matched = srcItems.filter(function(it) {
+            var itemBrand = (it.brand || '').toLowerCase();
+            if (itemBrand.indexOf(brandLower) === -1) return false;
+            if (nameFilter) {
+                var itemName = (it.name || it.item_name || '').toLowerCase();
+                if (itemName.indexOf(nameFilter.toLowerCase()) === -1) return false;
+            }
+            return true;
+        });
+
+        if (matched.length === 0) return null;
+
+        // Generate descriptions for each matched item
+        var transformations = matched.map(function(it) {
+            var originalName = it.name || it.item_name || '';
+            var newDesc = generateDescriptionFromName(originalName, it.brand || '');
+            return {
+                item: it,
+                originalName: originalName,
+                currentDesc: it.description || '',
+                newDesc: newDesc
+            };
+        });
+
+        return {
+            brand: brand,
+            nameFilter: nameFilter,
+            transformations: transformations
+        };
+    }
+
+    function showDescFromNamePreview(parsed) {
+        var existing = document.getElementById('bulkUpdatePreviewModal');
+        if (existing) existing.remove();
+
+        var sampleItems = parsed.transformations.slice(0, 30);
+        var moreCount = parsed.transformations.length - sampleItems.length;
+
+        var html = '<div id="bulkUpdatePreviewModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">'
+            + '<div class="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl">'
+            + '<div class="px-6 py-4 border-b flex items-center justify-between">'
+            + '<div>'
+            + '<h3 class="text-lg font-bold text-gray-800">Description from Name — Preview</h3>'
+            + '<p class="text-sm text-gray-500 mt-0.5">' + parsed.transformations.length + ' items for <strong>' + escapeHtml(parsed.brand) + '</strong>'
+            + (parsed.nameFilter ? ' (name contains "' + escapeHtml(parsed.nameFilter) + '")' : '') + '</p>'
+            + '</div>'
+            + '<button onclick="document.getElementById(\'bulkUpdatePreviewModal\').remove()" class="text-gray-400 hover:text-gray-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>'
+            + '</div>'
+            + '<div class="px-6 py-3 bg-amber-50 border-b text-sm text-amber-700">'
+            + '<strong>How it works:</strong> Strips SKU codes, brand/line codes, and product line names from the item name, then expands abbreviations (EXT&rarr;Exterior, INT&rarr;Interior, etc.)'
+            + '</div>'
+            + '<div class="flex-1 overflow-y-auto px-6 py-3" style="min-height:0">'
+            + '<table class="w-full text-sm">'
+            + '<thead class="sticky top-0 bg-white"><tr class="border-b">'
+            + '<th class="text-left py-2 text-xs text-gray-500 font-semibold w-[45%]">Item Name</th>'
+            + '<th class="text-left py-2 text-xs text-gray-500 font-semibold w-[25%]">Current Desc</th>'
+            + '<th class="text-left py-2 text-xs text-gray-500 font-semibold w-[30%]">New Description</th>'
+            + '</tr></thead><tbody>';
+
+        sampleItems.forEach(function(t) {
+            var isSame = t.currentDesc.toLowerCase() === t.newDesc.toLowerCase();
+            var isEmpty = !t.newDesc;
+            html += '<tr class="border-b border-gray-100 ' + (isSame ? 'opacity-40' : '') + (isEmpty ? ' bg-red-50' : '') + '">'
+                + '<td class="py-1.5 text-gray-700 max-w-[300px]" title="' + escapeHtml(t.originalName) + '"><span class="text-xs font-mono">' + escapeHtml(t.originalName) + '</span></td>'
+                + '<td class="py-1.5 text-gray-400 max-w-[180px] truncate">' + (t.currentDesc ? escapeHtml(t.currentDesc) : '<em class="text-gray-300">empty</em>') + '</td>'
+                + '<td class="py-1.5 font-semibold text-indigo-700">' + (t.newDesc ? escapeHtml(t.newDesc) : '<em class="text-red-400">empty</em>') + '</td>'
+                + '</tr>';
+        });
+
+        if (moreCount > 0) {
+            html += '<tr><td colspan="3" class="py-2 text-center text-xs text-gray-400">... and ' + moreCount + ' more items</td></tr>';
+        }
+
+        html += '</tbody></table></div>'
+            + '<div class="flex items-center justify-between px-6 py-4 border-t bg-gray-50 rounded-b-2xl">'
+            + '<span class="text-sm text-gray-500">' + parsed.transformations.length + ' items matched</span>'
+            + '<div class="flex gap-3">'
+            + '<button onclick="document.getElementById(\'bulkUpdatePreviewModal\').remove()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button>'
+            + '<button onclick="applyDescFromName()" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Apply ' + parsed.transformations.length + ' Descriptions</button>'
+            + '</div></div></div></div>';
+
+        document.body.insertAdjacentHTML('beforeend', html);
+        window._pendingDescFromName = parsed;
+    }
+
+    function applyDescFromName() {
+        var parsed = window._pendingDescFromName;
+        if (!parsed) return;
+
+        // Save undo snapshot
+        var dirtyBefore = new Map();
+        dirtyItems.forEach(function(v, k) { dirtyBefore.set(k, Object.assign({}, v)); });
+        aiUndoSnapshot = { dirtyBefore: dirtyBefore, affectedIds: [] };
+
+        var appliedCount = 0;
+        parsed.transformations.forEach(function(t) {
+            if (!t.newDesc) return; // skip empty
+            var item = t.item;
+            var itemId = String(item.item_id || item.zoho_item_id);
+
+            if (!originalValues.has(itemId)) {
+                var orig = {};
+                allColumns.forEach(function(col) { orig[col.key] = item[col.key] !== undefined ? item[col.key] : null; });
+                originalValues.set(itemId, orig);
+            }
+
+            var existing = dirtyItems.get(itemId) || { _itemName: item.name || item.item_name || '' };
+            existing['description'] = t.newDesc;
+            item['description'] = t.newDesc;
+            dirtyItems.set(itemId, existing);
+            aiUndoSnapshot.affectedIds.push(itemId);
+            appliedCount++;
+        });
+
+        var modal = document.getElementById('bulkUpdatePreviewModal');
+        if (modal) modal.remove();
+        window._pendingDescFromName = null;
+
+        renderTable();
+        renderCards();
+        updateChangesUI();
+        updateAiScope();
+
+        var banner = document.getElementById('aiResultBanner');
+        document.getElementById('aiResultText').textContent = 'Description from Name: Updated ' + appliedCount + ' ' + parsed.brand + ' items' + (parsed.nameFilter ? ' (name contains "' + parsed.nameFilter + '")' : '');
+        banner.style.background = '';
+        banner.classList.remove('hidden');
+        showToast('Applied ' + appliedCount + ' descriptions. Review and Push to Zoho when ready.', 'success');
+    }
+
+    // ═══════════════════════════════════════
     // DETERMINISTIC BULK UPDATE PARSER
     // Handles: "Update [brand] category to [value] where item name contains [pattern]"
     // Also handles: set, change, update [field] to [value] for [brand] where/containing [pattern]
@@ -1063,6 +1335,13 @@
         if (!command) { showToast('Type a command for KAI', 'info'); return; }
         if (isAiRunning) return;
         if (items.length === 0) { showToast('No items loaded', 'info'); return; }
+
+        // Try description-from-name command (instant, no AI needed)
+        var descParsed = tryDescriptionFromName(command);
+        if (descParsed) {
+            showDescFromNamePreview(descParsed);
+            return;
+        }
 
         // Try deterministic bulk update first (instant, no AI needed)
         var bulkParsed = tryDeterministicBulkUpdate(command);
