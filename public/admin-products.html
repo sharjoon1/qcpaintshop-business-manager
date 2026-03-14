@@ -1462,7 +1462,12 @@
             const info = extractProductInfoJS(item.zoho_item_name, item.cf_product_name);
             const sizeMatch = (info.sizeLabel || '').match(/([\d.]+)\s*(\w+)/);
             const size = sizeMatch ? parseFloat(sizeMatch[1]) : 1;
-            const unit = sizeMatch ? sizeMatch[2].toUpperCase().replace(/^LTR?$/i, 'L').replace(/^KGS?$/i, 'KG') : 'L';
+            const rawUnit = sizeMatch ? sizeMatch[2].toUpperCase() : '';
+            const unit = /^(L|LTR|LTRS?|LITRES?|LITERS?)$/i.test(rawUnit) ? 'L'
+                : /^(KG|KGS?|GRAMS?|GM?)$/i.test(rawUnit) ? 'KG'
+                : /^(M|MTR|MTRS?|METRES?|METERS?)$/i.test(rawUnit) ? 'M'
+                : /^(PC|PCS?|PIECES?)$/i.test(rawUnit) ? 'PC'
+                : 'L';
 
             editReviewProduct.pack_sizes.push({
                 size, unit,

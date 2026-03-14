@@ -2824,11 +2824,17 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
         if (available_sizes) {
             try {
                 const packSizes = JSON.parse(available_sizes);
-                console.log(`[PUT /api/products/${req.params.id}] Inserting ${packSizes.length} pack sizes`);
                 for (const pack of packSizes) {
+                    // Sanitize unit to valid ENUM values
+                    const rawUnit = (pack.unit || 'L').toUpperCase();
+                    const unit = /^(L|LTR|LTRS?|LITRES?|LITERS?)$/i.test(rawUnit) ? 'L'
+                        : /^(KG|KGS?|GRAMS?|GM?)$/i.test(rawUnit) ? 'KG'
+                        : /^(M|MTR|MTRS?|METRES?|METERS?)$/i.test(rawUnit) ? 'M'
+                        : /^(PC|PCS?|PIECES?)$/i.test(rawUnit) ? 'PC'
+                        : 'L';
                     await pool.query(
                         'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
-                        [req.params.id, pack.size, pack.unit || 'L', pack.base_price || pack.price, pack.zoho_item_id || null]
+                        [req.params.id, pack.size, unit, pack.base_price || pack.price, pack.zoho_item_id || null]
                     );
                     packSizesInserted++;
                 }
@@ -2836,8 +2842,6 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
                 console.error(`[PUT /api/products/${req.params.id}] Error inserting pack sizes:`, e.message);
                 return res.status(500).json({ success: false, error: 'Failed to save pack sizes: ' + e.message });
             }
-        } else {
-            console.log(`[PUT /api/products/${req.params.id}] No available_sizes in request body`);
         }
 
         res.json({ success: true, pack_sizes_saved: packSizesInserted });
