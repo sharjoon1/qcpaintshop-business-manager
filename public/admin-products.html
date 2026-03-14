@@ -221,6 +221,11 @@
                     <select id="zohoFilterCategory" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="zohoCurrentPage=1; loadZohoItems()">
                         <option value="">All Categories</option>
                     </select>
+                    <select id="zohoFilterMapped" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="zohoCurrentPage=1; loadZohoItems()">
+                        <option value="">All Items</option>
+                        <option value="unmapped">Unmapped Only</option>
+                        <option value="mapped">Already Imported</option>
+                    </select>
                     <button onclick="syncZohoItems()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2" id="syncZohoItemsBtn">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         Sync from Zoho Books
@@ -1148,6 +1153,14 @@
 
                 let items = data.data || [];
 
+                // Apply mapped/unmapped filter client-side
+                const mappedFilter = document.getElementById('zohoFilterMapped')?.value || '';
+                if (mappedFilter === 'mapped') {
+                    items = items.filter(i => zohoMappedIds.has(i.zoho_item_id || i.item_id));
+                } else if (mappedFilter === 'unmapped') {
+                    items = items.filter(i => !zohoMappedIds.has(i.zoho_item_id || i.item_id));
+                }
+
                 // Update summary cards
                 document.getElementById('zohoTotalItems').textContent = data.pagination?.total || items.length;
                 const uniqueBrands = new Set(items.map(i => i.brand).filter(Boolean));
@@ -1170,7 +1183,10 @@
                         <tr class="hover:bg-gray-50 border-b border-gray-100 ${isSelected ? 'bg-purple-50' : ''}">
                             <td class="px-3 py-2 text-center">
                                 ${isMapped
-                                    ? `<a href="admin-products.html?edit=${zohoMappedInfo[itemId]?.product_id || ''}" onclick="event.preventDefault(); switchToProductsAndEdit(${zohoMappedInfo[itemId]?.product_id})" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 hover:bg-green-200 cursor-pointer" title="Mapped to: ${escH(zohoMappedInfo[itemId]?.product_name || '')} — Click to edit">&#10003; Edit</a>`
+                                    ? `<button onclick="switchToProductsAndEdit(${zohoMappedInfo[itemId]?.product_id})" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-900 cursor-pointer border border-green-200 transition" title="Mapped to: ${escH(zohoMappedInfo[itemId]?.product_name || '')} — Click to edit grouping">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        Edit
+                                    </button>`
                                     : `<input type="checkbox" value="${itemId}" ${isSelected ? 'checked' : ''} onchange="toggleZohoItemSelect('${itemId}', this.checked)" class="zoho-item-cb w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">`
                                 }
                             </td>
