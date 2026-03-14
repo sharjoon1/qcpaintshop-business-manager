@@ -211,7 +211,7 @@
                     <span class="text-xs font-bold">KAI</span>
                 </div>
                 <div class="flex-1 relative">
-                    <input type="text" id="aiCommandInput" placeholder="Ask KAI: 'Set DPL to 80% of rate', 'Increase Asian Paints rates by 5%', 'Find items where DPL > rate'..." class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition pr-20" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();runAiCommand()}">
+                    <input type="text" id="aiCommandInput" placeholder="Try: 'Update Berger category to ENAMEL where name contains Enamel', 'Set DPL to 80% of rate'..." class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition pr-20" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();runAiCommand()}">
                 </div>
                 <button onclick="runAiCommand()" id="aiApplyBtn" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-lg text-xs transition flex items-center gap-1.5 whitespace-nowrap">
                     <svg id="aiSpinner" class="hidden w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -229,6 +229,7 @@
                     <button onclick="setAiCommand('Increase all rates by 5%')" class="px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs transition">+5% Rate</button>
                     <button onclick="setAiCommand('Find items with missing or zero purchase_rate')" class="px-2 py-0.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs transition">Missing Prices</button>
                     <button onclick="setAiCommand('Set purchase_rate to 60% of rate for items where purchase_rate is 0')" class="px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs transition">Fix Purchase Rate</button>
+                    <button onclick="setAiCommand('Update [Brand] category to [Category] where item name contains [keyword]')" class="px-2 py-0.5 rounded-full bg-green-50 hover:bg-green-100 text-green-700 text-xs transition">Bulk Category</button>
                 </div>
                 <div id="aiScopeLabel" class="text-xs text-gray-400 whitespace-nowrap ml-2">all items</div>
             </div>
@@ -852,11 +853,223 @@
         });
     }
 
+    // ═══════════════════════════════════════
+    // DETERMINISTIC BULK UPDATE PARSER
+    // Handles: "Update [brand] category to [value] where item name contains [pattern]"
+    // Also handles: set, change, update [field] to [value] for [brand] where/containing [pattern]
+    // ═══════════════════════════════════════
+    function tryDeterministicBulkUpdate(command) {
+        var cmd = command.trim();
+
+        // Field alias map
+        var fieldAliases = {
+            'category': 'category_name', 'cat': 'category_name',
+            'brand': 'brand', 'hsn': 'hsn_or_sac', 'unit': 'unit',
+            'description': 'description', 'desc': 'description',
+            'manufacturer': 'manufacturer', 'sku': 'sku',
+            'cf_product_name': 'cf_product_name', 'product name': 'cf_product_name'
+        };
+
+        // Pattern 1: "Update [brand]'s category to [value] where item name contains [pattern]"
+        // Pattern 2: "Set category to [value] for [brand] where name contains [pattern]"
+        // Pattern 3: "Change [brand] [field] to [value] — reference: item name contains [pattern]"
+        var patterns = [
+            // "Update Berger Brand's Category to 'ENAMEL' where/— item name contains 'Enamel'"
+            /(?:update|set|change)\s+(?:all\s+)?(.+?)(?:\s+brand(?:'s)?|\s+items?)?\s*(?:'s)?\s*(category|cat|brand|hsn|unit|desc(?:ription)?|manufacturer|sku|cf_product_name|product\s*name)\s*(?:column)?\s*(?:to|=|:)\s*['"]?([^'"—\-]+?)['"]?\s*(?:—|--|where|if|when|for\s+items?\s+(?:where|whose|with|that))\s*(?:.*?)(?:item\s*)?name\s*(?:contains?|has|includes?|like|matches?|with)\s*['"]?([^'"]+?)['"]?\s*$/i,
+            // "Set category to 'ENAMEL' for Berger where name contains 'Enamel'"
+            /(?:update|set|change)\s*(?:the\s+)?(category|cat|brand|hsn|unit|desc(?:ription)?|manufacturer|sku|cf_product_name|product\s*name)\s*(?:column)?\s*(?:to|=|:)\s*['"]?([^'"—\-]+?)['"]?\s*(?:for|of|in)\s+(?:all\s+)?(.+?)(?:\s+brand(?:'s)?)?\s*(?:items?)?\s*(?:where|if|when|whose|with|that)\s*(?:.*?)(?:item\s*)?name\s*(?:contains?|has|includes?|like|matches?|with)\s*['"]?([^'"]+?)['"]?\s*$/i,
+            // "Berger items containing 'Enamel' → set category ENAMEL"
+            /(.+?)(?:\s+brand(?:'s)?)?\s+items?\s+(?:containing|with|having|where\s+name\s+(?:contains?|includes?))\s+['"]?([^'"]+?)['"]?\s*(?:→|->|:|—|set|update|change)\s*(?:the\s+)?(category|cat|brand|hsn|unit|desc(?:ription)?|manufacturer|sku)\s*(?:to|=|:)?\s*['"]?([^'"]+?)['"]?\s*$/i
+        ];
+
+        var brand, field, value, namePattern;
+
+        // Try pattern 1: brand first
+        var m = cmd.match(patterns[0]);
+        if (m) {
+            brand = m[1].trim();
+            field = m[2].trim().toLowerCase();
+            value = m[3].trim();
+            namePattern = m[4].trim();
+        }
+        // Try pattern 2: field first
+        if (!m) {
+            m = cmd.match(patterns[1]);
+            if (m) {
+                field = m[1].trim().toLowerCase();
+                value = m[2].trim();
+                brand = m[3].trim();
+                namePattern = m[4].trim();
+            }
+        }
+        // Try pattern 3: brand items containing
+        if (!m) {
+            m = cmd.match(patterns[2]);
+            if (m) {
+                brand = m[1].trim();
+                namePattern = m[2].trim();
+                field = m[3].trim().toLowerCase();
+                value = m[4].trim();
+            }
+        }
+
+        if (!m) return null;
+
+        // Resolve field alias
+        var resolvedField = fieldAliases[field] || fieldAliases[field.replace(/\s+/g, '_')] || null;
+        if (!resolvedField) return null;
+
+        // Clean up brand name (remove trailing possessive, "brand", etc.)
+        brand = brand.replace(/['']s?\s*$/i, '').replace(/\s+brand$/i, '').trim();
+
+        // Find matching items
+        var brandLower = brand.toLowerCase();
+        var patternLower = namePattern.toLowerCase();
+        var srcItems = selectedItemIds.size > 0
+            ? items.filter(function(it) { return selectedItemIds.has(String(it.item_id || it.zoho_item_id)); })
+            : items;
+
+        var matched = srcItems.filter(function(it) {
+            var itemBrand = (it.brand || '').toLowerCase();
+            var itemName = (it.name || it.item_name || '').toLowerCase();
+            var brandMatch = itemBrand.indexOf(brandLower) !== -1;
+            var nameMatch = itemName.indexOf(patternLower) !== -1;
+            return brandMatch && nameMatch;
+        });
+
+        if (matched.length === 0) return null;
+
+        return {
+            brand: brand,
+            field: resolvedField,
+            fieldLabel: allColumns.find(function(c) { return c.key === resolvedField; })?.label || resolvedField,
+            value: value,
+            namePattern: namePattern,
+            matchedItems: matched
+        };
+    }
+
+    function showBulkUpdatePreview(parsed) {
+        // Build preview modal
+        var existing = document.getElementById('bulkUpdatePreviewModal');
+        if (existing) existing.remove();
+
+        var sampleItems = parsed.matchedItems.slice(0, 20);
+        var moreCount = parsed.matchedItems.length - sampleItems.length;
+
+        var html = '<div id="bulkUpdatePreviewModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">'
+            + '<div class="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">'
+            + '<div class="px-6 py-4 border-b flex items-center justify-between">'
+            + '<div>'
+            + '<h3 class="text-lg font-bold text-gray-800">Bulk Update Preview</h3>'
+            + '<p class="text-sm text-gray-500 mt-0.5">' + parsed.matchedItems.length + ' items will be updated</p>'
+            + '</div>'
+            + '<button onclick="document.getElementById(\'bulkUpdatePreviewModal\').remove()" class="text-gray-400 hover:text-gray-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>'
+            + '</div>'
+            + '<div class="px-6 py-4 bg-indigo-50 border-b">'
+            + '<div class="grid grid-cols-2 gap-3 text-sm">'
+            + '<div><span class="text-gray-500">Brand:</span> <strong class="text-gray-800">' + escapeHtml(parsed.brand) + '</strong></div>'
+            + '<div><span class="text-gray-500">Name contains:</span> <strong class="text-gray-800">' + escapeHtml(parsed.namePattern) + '</strong></div>'
+            + '<div><span class="text-gray-500">Field:</span> <strong class="text-gray-800">' + escapeHtml(parsed.fieldLabel) + '</strong></div>'
+            + '<div><span class="text-gray-500">New value:</span> <strong class="text-indigo-700">' + escapeHtml(parsed.value) + '</strong></div>'
+            + '</div>'
+            + '</div>'
+            + '<div class="flex-1 overflow-y-auto px-6 py-3" style="min-height:0">'
+            + '<table class="w-full text-sm">'
+            + '<thead class="sticky top-0 bg-white"><tr class="border-b">'
+            + '<th class="text-left py-2 text-xs text-gray-500 font-semibold">Item Name</th>'
+            + '<th class="text-left py-2 text-xs text-gray-500 font-semibold">Brand</th>'
+            + '<th class="text-left py-2 text-xs text-gray-500 font-semibold">Current ' + escapeHtml(parsed.fieldLabel) + '</th>'
+            + '<th class="text-left py-2 text-xs text-gray-500 font-semibold">New</th>'
+            + '</tr></thead><tbody>';
+
+        sampleItems.forEach(function(it) {
+            var currentVal = it[parsed.field] || '<em class="text-gray-300">empty</em>';
+            var isSame = String(it[parsed.field] || '').toLowerCase() === parsed.value.toLowerCase();
+            html += '<tr class="border-b border-gray-100 ' + (isSame ? 'opacity-50' : '') + '">'
+                + '<td class="py-1.5 text-gray-800 max-w-[250px] truncate" title="' + escapeHtml(it.name || it.item_name) + '">' + escapeHtml(it.name || it.item_name) + '</td>'
+                + '<td class="py-1.5 text-gray-600">' + escapeHtml(it.brand) + '</td>'
+                + '<td class="py-1.5 text-gray-500">' + currentVal + '</td>'
+                + '<td class="py-1.5 font-semibold text-indigo-700">' + escapeHtml(parsed.value) + '</td>'
+                + '</tr>';
+        });
+
+        if (moreCount > 0) {
+            html += '<tr><td colspan="4" class="py-2 text-center text-xs text-gray-400">... and ' + moreCount + ' more items</td></tr>';
+        }
+
+        html += '</tbody></table></div>'
+            + '<div class="flex items-center justify-between px-6 py-4 border-t bg-gray-50 rounded-b-2xl">'
+            + '<span class="text-sm text-gray-500">' + parsed.matchedItems.length + ' items matched</span>'
+            + '<div class="flex gap-3">'
+            + '<button onclick="document.getElementById(\'bulkUpdatePreviewModal\').remove()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button>'
+            + '<button onclick="applyBulkUpdate()" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Apply ' + parsed.matchedItems.length + ' Changes</button>'
+            + '</div></div></div></div>';
+
+        document.body.insertAdjacentHTML('beforeend', html);
+        // Store parsed for apply
+        window._pendingBulkUpdate = parsed;
+    }
+
+    function applyBulkUpdate() {
+        var parsed = window._pendingBulkUpdate;
+        if (!parsed) return;
+
+        // Save undo snapshot
+        var dirtyBefore = new Map();
+        dirtyItems.forEach(function(v, k) { dirtyBefore.set(k, Object.assign({}, v)); });
+        aiUndoSnapshot = { dirtyBefore: dirtyBefore, affectedIds: [] };
+
+        var appliedCount = 0;
+        parsed.matchedItems.forEach(function(item) {
+            var itemId = String(item.item_id || item.zoho_item_id);
+
+            // Store original if not yet tracked
+            if (!originalValues.has(itemId)) {
+                var orig = {};
+                allColumns.forEach(function(col) { orig[col.key] = item[col.key] !== undefined ? item[col.key] : null; });
+                originalValues.set(itemId, orig);
+            }
+
+            var existing = dirtyItems.get(itemId) || { _itemName: item.name || item.item_name || '' };
+            existing[parsed.field] = parsed.value;
+            item[parsed.field] = parsed.value;
+            dirtyItems.set(itemId, existing);
+            aiUndoSnapshot.affectedIds.push(itemId);
+            appliedCount++;
+        });
+
+        // Close modal
+        var modal = document.getElementById('bulkUpdatePreviewModal');
+        if (modal) modal.remove();
+        window._pendingBulkUpdate = null;
+
+        // Re-render
+        renderTable();
+        renderCards();
+        updateChangesUI();
+        updateAiScope();
+
+        // Show result
+        var banner = document.getElementById('aiResultBanner');
+        document.getElementById('aiResultText').textContent = 'Bulk update: Set ' + parsed.fieldLabel + ' to "' + parsed.value + '" for ' + appliedCount + ' ' + parsed.brand + ' items (name contains "' + parsed.namePattern + '")';
+        banner.style.background = '';
+        banner.classList.remove('hidden');
+        showToast('Applied ' + appliedCount + ' changes. Review and Push to Zoho when ready.', 'success');
+    }
+
     async function runAiCommand() {
         var command = document.getElementById('aiCommandInput').value.trim();
         if (!command) { showToast('Type a command for KAI', 'info'); return; }
         if (isAiRunning) return;
         if (items.length === 0) { showToast('No items loaded', 'info'); return; }
+
+        // Try deterministic bulk update first (instant, no AI needed)
+        var bulkParsed = tryDeterministicBulkUpdate(command);
+        if (bulkParsed) {
+            showBulkUpdatePreview(bulkParsed);
+            return;
+        }
 
         isAiRunning = true;
         var btn = document.getElementById('aiApplyBtn');
