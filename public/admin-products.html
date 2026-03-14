@@ -85,6 +85,7 @@
                     <table class="table">
                         <thead>
                             <tr>
+                                <th class="w-10 text-center"><input type="checkbox" id="productSelectAll" onchange="toggleProductSelectAll(this.checked)" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"></th>
                                 <th class="w-14">Image</th><th>Name</th><th>Brand</th><th>Category</th><th>Type</th>
                                 <th class="text-right">Price</th><th>Status</th><th class="text-center">Actions</th>
                             </tr>
@@ -99,6 +100,20 @@
                     <h3 class="text-lg font-semibold text-gray-800 mb-2">No products found</h3>
                     <p class="text-gray-600 mb-4">Add your first product to get started</p>
                     <button onclick="openAddModal()" class="btn btn-primary" data-permission-module="products" data-permission-action="add">Add Product</button>
+                </div>
+            </div>
+
+            <!-- Bulk Delete Action Bar -->
+            <div id="productBulkBar" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-50">
+                <div class="max-w-7xl mx-auto flex items-center justify-between">
+                    <span class="text-sm text-gray-600"><strong id="productBulkCount">0</strong> products selected</span>
+                    <div class="flex gap-3">
+                        <button onclick="clearProductSelection()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50">Clear</button>
+                        <button onclick="bulkDeleteProducts()" class="px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition flex items-center gap-2" data-permission-module="products" data-permission-action="delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            Delete Selected
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -200,10 +215,10 @@
                         </svg>
                         <input type="text" id="zohoSearchInput" placeholder="Search items by name or SKU..." class="w-full pl-9 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none text-sm" oninput="debounceZohoSearch()">
                     </div>
-                    <select id="zohoFilterBrand" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="loadZohoItems()">
+                    <select id="zohoFilterBrand" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="zohoCurrentPage=1; loadZohoItems()">
                         <option value="">All Brands</option>
                     </select>
-                    <select id="zohoFilterCategory" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="loadZohoItems()">
+                    <select id="zohoFilterCategory" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="zohoCurrentPage=1; loadZohoItems()">
                         <option value="">All Categories</option>
                     </select>
                     <button onclick="syncZohoItems()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2" id="syncZohoItemsBtn">
@@ -294,6 +309,30 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit Review Modal (for editing grouped products from Zoho Import tab) -->
+    <div id="editReviewModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl">
+            <div class="flex items-center justify-between px-6 py-4 border-b">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">Edit Product</h3>
+                    <p class="text-sm text-gray-500" id="editReviewSubtitle">Edit grouped product and its variants</p>
+                </div>
+                <button onclick="closeEditReview()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4" id="editReviewBody" style="min-height:0"></div>
+            <div class="flex items-center justify-between px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
+                <span class="text-sm text-gray-500" id="editReviewFooter"></span>
+                <div class="flex gap-3">
+                    <button onclick="closeEditReview()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100">Cancel</button>
+                    <button onclick="saveEditReview()" id="saveEditReviewBtn" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="editReviewImageInput" accept="image/*" class="hidden" onchange="uploadEditReviewImage(event)">
 
     <!-- Add/Edit Modal -->
     <div id="productModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -547,16 +586,19 @@
                 : `${products.length} products`;
 
             if (filtered.length === 0 && products.length > 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No products match your filters. <button onclick="clearFilters()" class="text-emerald-600 hover:text-emerald-800 font-semibold underline">Clear filters</button></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="px-4 py-8 text-center text-gray-500">No products match your filters. <button onclick="clearFilters()" class="text-emerald-600 hover:text-emerald-800 font-semibold underline">Clear filters</button></td></tr>`;
                 return;
             }
 
             tbody.innerHTML = filtered.map(product => `
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-gray-50 ${selectedProductIds.has(product.id) ? 'bg-purple-50' : ''}">
+                    <td class="px-3 py-2 text-center">
+                        <input type="checkbox" value="${product.id}" ${selectedProductIds.has(product.id) ? 'checked' : ''} onchange="toggleProductSelect(${product.id}, this.checked)" class="product-cb w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                    </td>
                     <td class="px-3 py-2 text-center">
                         ${product.image_url
-                            ? `<img src="${escHtml(product.image_url)}" class="w-10 h-10 object-cover rounded border border-gray-200">`
-                            : `<div class="w-10 h-10 bg-gray-100 rounded border border-gray-200 flex items-center justify-center"><svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`
+                            ? `<img src="${escHtml(product.image_url)}" class="w-10 h-10 object-cover rounded border border-gray-200 cursor-pointer hover:border-purple-400 hover:shadow transition" onclick="triggerProductImageUpload(${product.id})" title="Click to change image">`
+                            : `<div class="w-10 h-10 bg-gray-100 rounded border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition" onclick="triggerProductImageUpload(${product.id})" title="Upload image"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg></div>`
                         }
                     </td>
                     <td class="px-4 py-3 text-sm font-semibold text-gray-900">${product.name}</td>
@@ -677,7 +719,7 @@
                                 value="${ps.zoho_item_name ? ps.zoho_item_name.replace(/"/g, '&quot;') : ''}"
                             >
                         </div>
-                        ${ps.zoho_item_id ? `<span class="text-xs text-green-600 font-medium whitespace-nowrap">&#10003; Mapped</span>` : `<span class="text-xs text-orange-500 whitespace-nowrap">Not mapped</span>`}
+                        ${ps.zoho_item_id ? `<span class="text-xs text-green-600 font-medium" title="${ps.zoho_item_name ? ps.zoho_item_name.replace(/"/g, '&quot;') : ps.zoho_item_id}">&#10003; ${ps.zoho_item_name ? ps.zoho_item_name.replace(/</g, '&lt;').substring(0, 40) : 'Mapped'}</span>` : `<span class="text-xs text-orange-500 whitespace-nowrap">Not mapped</span>`}
                     </div>
                     <!-- Inline search results (renders inside card, no z-index/overflow issues) -->
                     <div id="zohoResults_${idx}" class="hidden"></div>
@@ -800,7 +842,7 @@
 
             toggleAreaCoverage(); // Show/hide area coverage field based on product type
             
-            // Load pack sizes from server (includes zoho_item_id)
+            // Load pack sizes from server (includes zoho_item_id + zoho_item_name via JOIN)
             packSizes = [];
             try {
                 const psRes = await fetch('/api/products/' + id, { headers: getAuthHeaders() });
@@ -812,15 +854,7 @@
                         price: parseFloat(ps.base_price),
                         base_price: parseFloat(ps.base_price),
                         zoho_item_id: ps.zoho_item_id || null,
-                        zoho_item_name: ''
-                    }));
-                    // Fetch Zoho item names in parallel
-                    await Promise.all(packSizes.map(async (ps, i) => {
-                        if (ps.zoho_item_id) {
-                            const items = await searchZohoItems(ps.zoho_item_id);
-                            const match = items.find(it => String(it.zoho_item_id) === String(ps.zoho_item_id));
-                            if (match) packSizes[i].zoho_item_name = match.zoho_item_name;
-                        }
+                        zoho_item_name: ps.zoho_item_name || ''
                     }));
                 } else if (product.available_sizes) {
                     try {
@@ -940,6 +974,69 @@
         }
 
         // ═══════════════════════════════════════
+        // BULK PRODUCT SELECTION & DELETE
+        // ═══════════════════════════════════════
+        const selectedProductIds = new Set();
+
+        function toggleProductSelect(id, checked) {
+            if (checked) selectedProductIds.add(id);
+            else selectedProductIds.delete(id);
+            updateProductBulkUI();
+        }
+
+        function toggleProductSelectAll(checked) {
+            const filtered = getFilteredProducts();
+            filtered.forEach(p => {
+                if (checked) selectedProductIds.add(p.id);
+                else selectedProductIds.delete(p.id);
+            });
+            updateProductBulkUI();
+            renderProducts();
+        }
+
+        function updateProductBulkUI() {
+            const count = selectedProductIds.size;
+            document.getElementById('productBulkCount').textContent = count;
+            const bar = document.getElementById('productBulkBar');
+            if (count > 0) bar.classList.remove('hidden');
+            else bar.classList.add('hidden');
+            // Sync select-all checkbox
+            const filtered = getFilteredProducts();
+            const allCb = document.getElementById('productSelectAll');
+            if (allCb) allCb.checked = filtered.length > 0 && filtered.every(p => selectedProductIds.has(p.id));
+        }
+
+        function clearProductSelection() {
+            selectedProductIds.clear();
+            updateProductBulkUI();
+            renderProducts();
+        }
+
+        async function bulkDeleteProducts() {
+            const count = selectedProductIds.size;
+            if (!count) return;
+            if (!confirm(`Are you sure you want to delete ${count} product${count > 1 ? 's' : ''}? This will deactivate them and their pack sizes.`)) return;
+
+            try {
+                const ids = Array.from(selectedProductIds);
+                const res = await fetch('/api/products/bulk-delete', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ ids })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed');
+                alert(`${data.deleted} product${data.deleted > 1 ? 's' : ''} deleted successfully!`);
+                selectedProductIds.clear();
+                updateProductBulkUI();
+                loadData();
+            } catch (err) {
+                console.error('Bulk delete error:', err);
+                alert('Failed to delete products: ' + err.message);
+            }
+        }
+
+        // ═══════════════════════════════════════
         // TAB MANAGEMENT (Products vs Zoho Import)
         // ═══════════════════════════════════════
         let currentProductTab = 'products';
@@ -955,6 +1052,8 @@
             if (bulkBar) bulkBar.classList.add('hidden');
             const zohoBar = document.getElementById('zohoImportActionBar');
             if (zohoBar) zohoBar.classList.add('hidden');
+            const productBar = document.getElementById('productBulkBar');
+            if (productBar) productBar.classList.add('hidden');
 
             // Update header
             if (tab === 'zoho-import') {
@@ -996,11 +1095,15 @@
             zohoSearchTimer = setTimeout(() => { zohoCurrentPage = 1; loadZohoItems(); }, 400);
         }
 
+        let zohoMappedInfo = {}; // zoho_item_id → { product_id, product_name }
         async function loadZohoMappedIds() {
             try {
                 const res = await fetch('/api/products/mapped-zoho-ids', { headers: getAuthHeaders() });
                 const data = await res.json();
-                if (data.success) zohoMappedIds = new Set(data.ids || []);
+                if (data.success) {
+                    zohoMappedIds = new Set(data.ids || []);
+                    zohoMappedInfo = data.mappings || {};
+                }
             } catch (e) { console.error('Failed to load mapped IDs:', e); }
         }
 
@@ -1035,6 +1138,8 @@
 
             const params = new URLSearchParams({ page: zohoCurrentPage, limit: 50 });
             if (search) params.set('search', search);
+            if (brand) params.set('brand', brand);
+            if (category) params.set('category', category);
 
             try {
                 const res = await fetch(`/api/zoho/items?${params}`, { headers: getAuthHeaders() });
@@ -1042,10 +1147,6 @@
                 if (!data.success) throw new Error(data.message);
 
                 let items = data.data || [];
-
-                // Client-side brand/category filter (server only supports search)
-                if (brand) items = items.filter(i => i.brand === brand);
-                if (category) items = items.filter(i => i.category_name === category);
 
                 // Update summary cards
                 document.getElementById('zohoTotalItems').textContent = data.pagination?.total || items.length;
@@ -1069,7 +1170,7 @@
                         <tr class="hover:bg-gray-50 border-b border-gray-100 ${isSelected ? 'bg-purple-50' : ''}">
                             <td class="px-3 py-2 text-center">
                                 ${isMapped
-                                    ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700" title="Already imported">&#10003;</span>`
+                                    ? `<a href="admin-products.html?edit=${zohoMappedInfo[itemId]?.product_id || ''}" onclick="event.preventDefault(); switchToProductsAndEdit(${zohoMappedInfo[itemId]?.product_id})" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 hover:bg-green-200 cursor-pointer" title="Mapped to: ${escH(zohoMappedInfo[itemId]?.product_name || '')} — Click to edit">&#10003; Edit</a>`
                                     : `<input type="checkbox" value="${itemId}" ${isSelected ? 'checked' : ''} onchange="toggleZohoItemSelect('${itemId}', this.checked)" class="zoho-item-cb w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">`
                                 }
                             </td>
@@ -1081,7 +1182,10 @@
                                        </div>`
                                 }
                             </td>
-                            <td class="px-4 py-3 text-sm font-medium text-gray-900">${escH(item.name || item.item_name || '')}</td>
+                            <td class="px-4 py-3">
+                                <div class="text-sm font-medium text-gray-900">${escH(item.name || item.item_name || '')}</div>
+                                ${isMapped && zohoMappedInfo[itemId]?.product_name ? `<div class="text-[11px] text-purple-600 mt-0.5">&#x2192; ${escH(zohoMappedInfo[itemId].product_name)}</div>` : ''}
+                            </td>
                             <td class="px-4 py-3 text-xs text-gray-500 font-mono">${escH(item.sku || '-')}</td>
                             <td class="px-4 py-3 text-sm text-gray-600">${escH(item.brand || '-')}</td>
                             <td class="px-4 py-3 text-sm text-gray-600">${escH(item.category_name || '-')}</td>
@@ -1156,6 +1260,281 @@
             const d = document.createElement('div');
             d.textContent = s;
             return d.innerHTML;
+        }
+
+        // ═══════════════════════════════════════
+        // EDIT REVIEW MODAL (for editing grouped products from Zoho Import tab)
+        // ═══════════════════════════════════════
+        let editReviewProduct = null; // { id, name, brand_id, brand_name, category_id, category_name, product_type, area_coverage, image_url, status, gst_percentage, pack_sizes: [...] }
+        let editReviewImageTarget = null;
+
+        async function switchToProductsAndEdit(productId) {
+            if (!productId) return;
+            try {
+                const res = await fetch('/api/products/' + productId, { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (!data.id) return alert('Product not found');
+                editReviewProduct = data;
+                renderEditReview();
+                document.getElementById('editReviewModal').classList.remove('hidden');
+            } catch(e) {
+                alert('Failed to load product: ' + e.message);
+            }
+        }
+
+        function closeEditReview() {
+            document.getElementById('editReviewModal').classList.add('hidden');
+            editReviewProduct = null;
+        }
+
+        function renderEditReview() {
+            const p = editReviewProduct;
+            if (!p) return;
+            const ps = p.pack_sizes || [];
+            document.getElementById('editReviewSubtitle').textContent = `${ps.length} variant${ps.length !== 1 ? 's' : ''} · ${p.brand_name || ''} · ${p.category_name || ''}`;
+            document.getElementById('editReviewFooter').textContent = `Product #${p.id} · ${p.status}`;
+
+            const body = document.getElementById('editReviewBody');
+            body.innerHTML = `
+                <div class="border border-gray-200 rounded-xl p-4">
+                    <div class="flex gap-4">
+                        <!-- Image -->
+                        <div class="flex-shrink-0">
+                            ${p.image_url
+                                ? `<img src="${escH(p.image_url)}" class="w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:border-purple-400 transition" onclick="triggerEditReviewImage()" title="Click to change">`
+                                : `<div class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition" onclick="triggerEditReviewImage()" title="Upload image">
+                                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <span class="text-[10px] text-gray-400 mt-1">Upload</span>
+                                   </div>`
+                            }
+                        </div>
+                        <!-- Details -->
+                        <div class="flex-1 min-w-0">
+                            <input type="text" id="editReviewName" value="${escH(p.name)}"
+                                class="font-semibold text-gray-900 text-base w-full border-b-2 border-gray-200 hover:border-gray-400 focus:border-purple-500 focus:outline-none bg-transparent px-0 py-1"
+                                placeholder="Product name">
+                            <div class="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1.5">
+                                ${p.brand_name ? `<span>Brand: <strong>${escH(p.brand_name)}</strong></span>` : ''}
+                                ${p.category_name ? `<span>Category: <strong>${escH(p.category_name)}</strong></span>` : ''}
+                            </div>
+                            <!-- Type & Coverage -->
+                            <div class="flex flex-wrap items-center gap-3 mt-3">
+                                <div class="flex items-center gap-2">
+                                    <label class="text-xs font-medium text-gray-600">Type:</label>
+                                    <select id="editReviewType" onchange="document.getElementById('editReviewCoverage').style.display = this.value === 'area_wise' ? '' : 'none'" class="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:border-purple-500 focus:outline-none">
+                                        <option value="unit_wise" ${p.product_type === 'unit_wise' ? 'selected' : ''}>Unit Wise</option>
+                                        <option value="area_wise" ${p.product_type === 'area_wise' ? 'selected' : ''}>Area Wise</option>
+                                    </select>
+                                </div>
+                                <div id="editReviewCoverage" class="flex items-center gap-2" style="${p.product_type === 'area_wise' ? '' : 'display:none'}">
+                                    <label class="text-xs font-medium text-gray-600">Coverage:</label>
+                                    <input type="number" step="0.01" id="editReviewAreaCoverage" placeholder="sq ft/L" value="${p.area_coverage || ''}"
+                                        class="w-24 px-2 py-1 border border-gray-300 rounded-lg text-xs focus:border-purple-500 focus:outline-none">
+                                    <span class="text-[10px] text-gray-400">sq ft per L/KG</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <label class="text-xs font-medium text-gray-600">Status:</label>
+                                    <select id="editReviewStatus" class="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:border-purple-500 focus:outline-none">
+                                        <option value="active" ${p.status === 'active' ? 'selected' : ''}>Active</option>
+                                        <option value="inactive" ${p.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pack Sizes / Variants -->
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-2.5 flex items-center justify-between border-b">
+                        <span class="text-sm font-semibold text-gray-700">Variants (${ps.length})</span>
+                        <button onclick="addEditReviewVariant()" class="text-xs text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
+                            Add Variant
+                        </button>
+                    </div>
+                    <div class="divide-y divide-gray-100" id="editReviewVariants">
+                        ${ps.map((v, i) => renderEditReviewVariant(v, i)).join('')}
+                    </div>
+                </div>
+
+                <!-- Add variant inline search -->
+                <div id="editReviewAddVariant" class="hidden border border-dashed border-purple-300 rounded-xl p-4 bg-purple-50">
+                    <div class="flex items-center gap-2 mb-2">
+                        <label class="text-xs font-semibold text-purple-700">Search Zoho item to add:</label>
+                        <button onclick="document.getElementById('editReviewAddVariant').classList.add('hidden')" class="text-xs text-gray-500 hover:text-gray-700 ml-auto">Cancel</button>
+                    </div>
+                    <input type="text" id="editReviewAddSearch" placeholder="Type item name or SKU..."
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-purple-500 focus:outline-none"
+                        oninput="debounceEditReviewAddSearch()">
+                    <div id="editReviewAddResults" class="mt-2 max-h-48 overflow-y-auto"></div>
+                </div>
+            `;
+        }
+
+        function renderEditReviewVariant(v, idx) {
+            const zohoName = v.zoho_item_name || '';
+            const size = parseFloat(v.size) || 0;
+            const unit = v.unit || 'L';
+            const price = parseFloat(v.base_price) || 0;
+            return `<div class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 group">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">${size} ${unit}</span>
+                        <span class="text-sm font-semibold text-gray-900">₹${price.toFixed(2)}</span>
+                    </div>
+                    ${zohoName ? `<div class="text-[11px] text-gray-500 mt-0.5 truncate" title="${escH(zohoName)}">${escH(zohoName)}</div>` : ''}
+                    ${v.zoho_item_id ? `<div class="text-[10px] text-green-600 font-medium">&#10003; Zoho: ${escH(v.zoho_item_id)}</div>` : `<div class="text-[10px] text-orange-500">Not mapped to Zoho</div>`}
+                </div>
+                <button onclick="removeEditReviewVariant(${idx})" class="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition" title="Remove variant">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </div>`;
+        }
+
+        function removeEditReviewVariant(idx) {
+            if (!editReviewProduct) return;
+            const ps = editReviewProduct.pack_sizes;
+            if (ps.length <= 1) return alert('Product must have at least 1 variant');
+            ps.splice(idx, 1);
+            renderEditReview();
+        }
+
+        function addEditReviewVariant() {
+            document.getElementById('editReviewAddVariant').classList.remove('hidden');
+            document.getElementById('editReviewAddSearch').value = '';
+            document.getElementById('editReviewAddResults').innerHTML = '';
+            document.getElementById('editReviewAddSearch').focus();
+        }
+
+        let editReviewAddTimer;
+        function debounceEditReviewAddSearch() {
+            clearTimeout(editReviewAddTimer);
+            editReviewAddTimer = setTimeout(doEditReviewAddSearch, 300);
+        }
+
+        async function doEditReviewAddSearch() {
+            const q = document.getElementById('editReviewAddSearch').value.trim();
+            const resultsDiv = document.getElementById('editReviewAddResults');
+            if (!q) { resultsDiv.innerHTML = ''; return; }
+            resultsDiv.innerHTML = '<div class="text-xs text-gray-400 py-2">Searching...</div>';
+            try {
+                const items = await searchZohoItems(q);
+                if (!items.length) { resultsDiv.innerHTML = '<div class="text-xs text-gray-400 py-2">No items found</div>'; return; }
+                resultsDiv.innerHTML = items.map(item => {
+                    const alreadyAdded = editReviewProduct.pack_sizes.some(ps => ps.zoho_item_id === item.zoho_item_id);
+                    return `<div class="flex items-center justify-between px-3 py-2 text-xs hover:bg-purple-50 rounded cursor-pointer border-b border-gray-100 ${alreadyAdded ? 'opacity-50' : ''}" data-zoho-id="${escH(item.zoho_item_id)}" onclick="${alreadyAdded ? '' : `addEditReviewZohoItem(this.dataset.zohoId)`}">
+                        <div class="flex-1 min-w-0">
+                            <span class="font-medium text-gray-800">${escH(item.zoho_item_name)}</span>
+                            <span class="text-gray-400 ml-2">${escH(item.zoho_brand || '')}${item.zoho_rate ? ' · ₹' + item.zoho_rate : ''}</span>
+                        </div>
+                        ${alreadyAdded ? '<span class="text-green-600 text-[10px] font-bold ml-2">Already added</span>' : '<span class="text-purple-600 font-bold ml-2">+ Add</span>'}
+                    </div>`;
+                }).join('');
+            } catch(e) {
+                resultsDiv.innerHTML = '<div class="text-xs text-red-500 py-2">Search failed</div>';
+            }
+        }
+
+        async function addEditReviewZohoItem(zohoItemId) {
+            try {
+                // Get full item info
+                const items = await searchZohoItems(zohoItemId);
+                const item = items.find(i => i.zoho_item_id === zohoItemId);
+                if (!item) return;
+                // Extract size info
+                const info = extractProductInfoJS(item.zoho_item_name, item.cf_product_name);
+                const sizeMatch = (info.sizeLabel || '').match(/([\d.]+)\s*(\w+)/);
+                const size = sizeMatch ? parseFloat(sizeMatch[1]) : 1;
+                const unit = sizeMatch ? sizeMatch[2].toUpperCase().replace(/^LTR?$/i, 'L').replace(/^KGS?$/i, 'KG') : 'L';
+
+                editReviewProduct.pack_sizes.push({
+                    size, unit,
+                    base_price: parseFloat(item.zoho_rate) || 0,
+                    zoho_item_id: item.zoho_item_id,
+                    zoho_item_name: item.zoho_item_name
+                });
+                document.getElementById('editReviewAddVariant').classList.add('hidden');
+                renderEditReview();
+            } catch(e) { alert('Failed to add: ' + e.message); }
+        }
+
+        function triggerEditReviewImage() {
+            editReviewImageTarget = true;
+            const input = document.getElementById('editReviewImageInput');
+            input.value = '';
+            input.click();
+        }
+
+        async function uploadEditReviewImage(event) {
+            const file = event.target.files[0];
+            if (!file || !editReviewProduct) return;
+            const formData = new FormData();
+            formData.append('image', file);
+            try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch(`/api/products/${editReviewProduct.id}/image`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message || data.error);
+                editReviewProduct.image_url = data.image_url;
+                renderEditReview();
+            } catch (err) {
+                alert('Image upload failed: ' + err.message);
+            } finally {
+                editReviewImageTarget = null;
+            }
+        }
+
+        async function saveEditReview() {
+            if (!editReviewProduct) return;
+            const p = editReviewProduct;
+            const name = document.getElementById('editReviewName').value.trim();
+            if (!name) return alert('Product name is required');
+
+            const productType = document.getElementById('editReviewType').value;
+            const areaCoverage = document.getElementById('editReviewAreaCoverage')?.value || '';
+            const status = document.getElementById('editReviewStatus').value;
+
+            const btn = document.getElementById('saveEditReviewBtn');
+            btn.disabled = true; btn.textContent = 'Saving...';
+
+            try {
+                const packSizesData = p.pack_sizes.map(ps => ({
+                    size: ps.size,
+                    unit: ps.unit || 'L',
+                    base_price: ps.base_price,
+                    price: ps.base_price,
+                    zoho_item_id: ps.zoho_item_id || null
+                }));
+
+                const res = await fetch(`/api/products/${p.id}`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        name, brand_id: p.brand_id, category_id: p.category_id,
+                        product_type: productType, area_coverage: areaCoverage || null,
+                        gst_percentage: p.gst_percentage || 18,
+                        base_price: packSizesData[0]?.base_price || 0,
+                        status, description: p.description || '',
+                        available_sizes: JSON.stringify(packSizesData)
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || data.message || 'Failed to save');
+                alert('Product updated successfully!');
+                closeEditReview();
+                await loadZohoMappedIds();
+                await loadZohoItems();
+            } catch(err) {
+                alert('Save failed: ' + err.message);
+            } finally {
+                btn.disabled = false; btn.textContent = 'Save Changes';
+            }
         }
 
         // ═══════════════════════════════════════
@@ -1517,12 +1896,22 @@
         }
 
         // ═══════════════════════════════════════
-        // PRODUCT IMAGE UPLOAD (Zoho Import tab)
+        // PRODUCT IMAGE UPLOAD
         // ═══════════════════════════════════════
         let imageUploadItemId = null;
+        let imageUploadSource = 'zoho'; // 'zoho' or 'products'
 
         function triggerImageUpload(itemId) {
             imageUploadItemId = itemId;
+            imageUploadSource = 'zoho';
+            const input = document.getElementById('productImageInput');
+            input.value = '';
+            input.click();
+        }
+
+        function triggerProductImageUpload(productId) {
+            imageUploadItemId = productId;
+            imageUploadSource = 'products';
             const input = document.getElementById('productImageInput');
             input.value = '';
             input.click();
@@ -1544,7 +1933,11 @@
                 });
                 const data = await res.json();
                 if (!data.success) throw new Error(data.message || data.error);
-                loadZohoItems();
+                if (imageUploadSource === 'products') {
+                    loadData();
+                } else {
+                    loadZohoItems();
+                }
             } catch (err) {
                 alert('Image upload failed: ' + err.message);
             } finally {
