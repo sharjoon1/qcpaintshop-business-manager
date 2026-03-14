@@ -10,7 +10,7 @@
     let sidebarPath = '/components/sidebar-complete.html';
     try {
         const u = JSON.parse(localStorage.getItem('user') || '{}');
-        if (u.role && !['admin', 'manager', 'super_admin'].includes(u.role)) {
+        if (u.role && !['admin', 'manager', 'branch_manager', 'super_admin'].includes(u.role)) {
             sidebarPath = '/components/staff-sidebar.html';
         }
     } catch(e) {}

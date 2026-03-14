@@ -160,7 +160,7 @@
 
                     // Redirect based on user role
                     const role = data.user.role;
-                    if (role === 'admin' || role === 'manager') {
+                    if (role === 'admin' || role === 'manager' || role === 'branch_manager') {
                         window.location.href = '/dashboard.html';
                     } else if (role === 'customer') {
                         window.location.href = '/customer-dashboard.html';

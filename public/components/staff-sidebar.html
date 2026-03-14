@@ -1062,6 +1062,18 @@ async function filterSidebarByPermissions() {
         permData.loadedAt = Date.now();
         localStorage.setItem('user_permissions', JSON.stringify(permData));
 
+        // Sync role from server → localStorage (keeps UI in sync after admin changes role)
+        if (permData.role) {
+            userRole = permData.role;
+            try {
+                const u = JSON.parse(localStorage.getItem('user') || '{}');
+                if (u.role !== permData.role) {
+                    u.role = permData.role;
+                    localStorage.setItem('user', JSON.stringify(u));
+                }
+            } catch(e) {}
+        }
+
         // Admin bypass — show everything
         if (permData.is_admin) return;
 
