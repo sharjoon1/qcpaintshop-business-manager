@@ -2047,6 +2047,85 @@ router.post('/admin/force-clockout', requirePermission('attendance', 'manage'), 
 });
 
 /**
+ * POST /api/attendance/admin/adjust-time
+ * Admin: Manually add/subtract working minutes for a staff attendance record
+ * Used when staff forgot OT request, late clock-in, or other corrections
+ */
+router.post('/admin/adjust-time', requirePermission('attendance', 'manage'), async (req, res) => {
+    try {
+        const adminId = req.user.id;
+        const { attendance_id, minutes, reason, type } = req.body;
+
+        if (!attendance_id || minutes === undefined || minutes === null) {
+            return res.status(400).json({ success: false, message: 'attendance_id and minutes are required' });
+        }
+
+        const adjustMinutes = parseInt(minutes);
+        if (isNaN(adjustMinutes) || adjustMinutes === 0) {
+            return res.status(400).json({ success: false, message: 'Minutes must be a non-zero number' });
+        }
+
+        // Get current record
+        const [records] = await pool.query(
+            `SELECT sa.*, u.full_name FROM staff_attendance sa
+             JOIN users u ON sa.user_id = u.id
+             WHERE sa.id = ?`,
+            [attendance_id]
+        );
+
+        if (records.length === 0) {
+            return res.status(404).json({ success: false, message: 'Attendance record not found' });
+        }
+
+        const record = records[0];
+        const currentWorking = record.total_working_minutes || 0;
+        const currentEffective = record.effective_working_minutes || currentWorking;
+
+        // Calculate new values
+        const newWorking = Math.max(0, currentWorking + adjustMinutes);
+        const newEffective = Math.max(0, currentEffective + adjustMinutes);
+
+        // Determine OT: if new working exceeds expected, calculate overtime
+        const expectedMinutes = (parseFloat(record.expected_hours) || 10) * 60;
+        const newOvertimeMinutes = Math.max(0, newWorking - expectedMinutes);
+        const isNowOvertime = newWorking > expectedMinutes;
+
+        // Build admin note
+        const adjustType = type || (adjustMinutes > 0 ? 'add' : 'deduct');
+        const adminNote = `\n[Time Adjustment by Admin ID ${adminId}]: ${adjustMinutes > 0 ? '+' : ''}${adjustMinutes} min (${adjustType}). Reason: ${reason || 'Manual adjustment'}. Previous: ${currentWorking}min, New: ${newWorking}min`;
+
+        // Update the record
+        await pool.query(
+            `UPDATE staff_attendance SET
+                total_working_minutes = ?,
+                effective_working_minutes = ?,
+                overtime_minutes = ?,
+                is_overtime = ?,
+                notes = CONCAT(COALESCE(notes, ''), ?)
+             WHERE id = ?`,
+            [newWorking, newEffective, newOvertimeMinutes, isNowOvertime ? 1 : 0, adminNote, attendance_id]
+        );
+
+        res.json({
+            success: true,
+            message: `Adjusted ${record.full_name}'s working time by ${adjustMinutes > 0 ? '+' : ''}${adjustMinutes} minutes`,
+            data: {
+                attendance_id,
+                staff_name: record.full_name,
+                previous_minutes: currentWorking,
+                new_minutes: newWorking,
+                overtime_minutes: newOvertimeMinutes,
+                adjustment: adjustMinutes
+            }
+        });
+
+    } catch (error) {
+        console.error('Admin adjust time error:', error);
+        res.status(500).json({ success: false, message: 'Failed to adjust working time' });
+    }
+});
+
+/**
  * GET /api/attendance/admin/today-summary
  * Consolidated stats for admin dashboard
  */

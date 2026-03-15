@@ -817,6 +817,82 @@
         </div>
     </div>
 
+    <!-- Adjust Time Modal -->
+    <div class="modal" id="adjustTimeModal">
+        <div class="modal-content" style="max-width: 480px;">
+            <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="text-lg font-bold text-gray-900">Adjust Working Time</h3>
+                <button onclick="closeModal('adjustTimeModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">&times;</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div class="mb-3">
+                    <span class="text-sm text-gray-500">Staff:</span>
+                    <strong class="text-gray-900 ml-1" id="adjustStaffName"></strong>
+                </div>
+                <div class="mb-4 p-3 rounded-lg" style="background: #f3f4f6;">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Current Working</span>
+                        <strong id="adjustCurrentTime" class="text-gray-800"></strong>
+                    </div>
+                    <div class="flex justify-between text-sm mt-1">
+                        <span class="text-gray-500">Expected</span>
+                        <strong id="adjustExpectedTime" class="text-gray-800"></strong>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Adjustment Type</label>
+                    <div class="flex gap-2">
+                        <button type="button" id="adjustTypeAdd" onclick="setAdjustType('add')" class="flex-1 px-3 py-2 rounded-lg text-sm font-semibold border-2 transition" style="border-color:#059669;background:#d1fae5;color:#065f46;">+ Add Time</button>
+                        <button type="button" id="adjustTypeDeduct" onclick="setAdjustType('deduct')" class="flex-1 px-3 py-2 rounded-lg text-sm font-semibold border-2 transition" style="border-color:#e5e7eb;background:white;color:#6b7280;">- Deduct Time</button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Minutes</label>
+                    <div class="flex gap-2 items-center">
+                        <input type="number" id="adjustMinutes" min="1" max="600" placeholder="e.g. 30" class="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" onchange="updateAdjustPreview()" oninput="updateAdjustPreview()">
+                        <span class="text-sm text-gray-500">minutes</span>
+                    </div>
+                    <div class="flex gap-1 mt-2">
+                        <button onclick="document.getElementById('adjustMinutes').value=15;updateAdjustPreview()" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-xs text-gray-700">+15m</button>
+                        <button onclick="document.getElementById('adjustMinutes').value=30;updateAdjustPreview()" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-xs text-gray-700">+30m</button>
+                        <button onclick="document.getElementById('adjustMinutes').value=60;updateAdjustPreview()" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-xs text-gray-700">+1h</button>
+                        <button onclick="document.getElementById('adjustMinutes').value=90;updateAdjustPreview()" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-xs text-gray-700">+1.5h</button>
+                        <button onclick="document.getElementById('adjustMinutes').value=120;updateAdjustPreview()" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-xs text-gray-700">+2h</button>
+                    </div>
+                </div>
+
+                <div id="adjustPreview" class="mb-3 p-3 rounded-lg hidden" style="background:#eef2ff;border:1px solid #c7d2fe;">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-indigo-600 font-medium">New Working Time</span>
+                        <strong id="adjustNewTime" class="text-indigo-700"></strong>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Reason <span class="text-red-500">*</span></label>
+                    <select id="adjustReason" class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none mb-2">
+                        <option value="">Select reason...</option>
+                        <option value="Forgot OT request">Forgot OT request</option>
+                        <option value="Late clock-in (was working)">Late clock-in (was working)</option>
+                        <option value="Early clock-out correction">Early clock-out correction</option>
+                        <option value="System error / auto-clockout">System error / auto-clockout</option>
+                        <option value="Break time correction">Break time correction</option>
+                        <option value="Outside work not recorded">Outside work not recorded</option>
+                        <option value="other">Other (specify below)</option>
+                    </select>
+                    <input type="text" id="adjustReasonOther" placeholder="Additional notes (optional)" class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="closeModal('adjustTimeModal')" class="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+                    <button onclick="submitAdjustTime()" id="adjustSubmitBtn" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">Apply Adjustment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let branches = [];
         let staffList = [];
@@ -930,6 +1006,104 @@
                 if (e.target === modal) modal.classList.remove('active');
             });
         });
+
+        // ========================================
+        // ADJUST TIME
+        // ========================================
+        let adjustAttendanceId = null;
+        let adjustCurrentMinutes = 0;
+        let adjustExpectedHours = 10;
+        let adjustTypeMode = 'add';
+
+        function openAdjustTime(attendanceId, staffName, currentMins, expectedHrs) {
+            adjustAttendanceId = attendanceId;
+            adjustCurrentMinutes = currentMins || 0;
+            adjustExpectedHours = expectedHrs || 10;
+            adjustTypeMode = 'add';
+
+            document.getElementById('adjustStaffName').textContent = staffName;
+            document.getElementById('adjustCurrentTime').textContent = formatMinutesToHours(adjustCurrentMinutes);
+            document.getElementById('adjustExpectedTime').textContent = formatMinutesToHours(Math.round(adjustExpectedHours * 60));
+            document.getElementById('adjustMinutes').value = '';
+            document.getElementById('adjustReason').value = '';
+            document.getElementById('adjustReasonOther').value = '';
+            document.getElementById('adjustPreview').classList.add('hidden');
+            setAdjustType('add');
+            openModal('adjustTimeModal');
+        }
+
+        function setAdjustType(type) {
+            adjustTypeMode = type;
+            const addBtn = document.getElementById('adjustTypeAdd');
+            const deductBtn = document.getElementById('adjustTypeDeduct');
+            if (type === 'add') {
+                addBtn.style.borderColor = '#059669'; addBtn.style.background = '#d1fae5'; addBtn.style.color = '#065f46';
+                deductBtn.style.borderColor = '#e5e7eb'; deductBtn.style.background = 'white'; deductBtn.style.color = '#6b7280';
+            } else {
+                deductBtn.style.borderColor = '#dc2626'; deductBtn.style.background = '#fee2e2'; deductBtn.style.color = '#991b1b';
+                addBtn.style.borderColor = '#e5e7eb'; addBtn.style.background = 'white'; addBtn.style.color = '#6b7280';
+            }
+            updateAdjustPreview();
+        }
+
+        function updateAdjustPreview() {
+            const mins = parseInt(document.getElementById('adjustMinutes').value) || 0;
+            const preview = document.getElementById('adjustPreview');
+            if (mins <= 0) { preview.classList.add('hidden'); return; }
+
+            const delta = adjustTypeMode === 'add' ? mins : -mins;
+            const newTotal = Math.max(0, adjustCurrentMinutes + delta);
+            document.getElementById('adjustNewTime').textContent = formatMinutesToHours(newTotal);
+            preview.classList.remove('hidden');
+
+            // Color the preview based on add/deduct
+            if (adjustTypeMode === 'add') {
+                preview.style.background = '#ecfdf5'; preview.style.borderColor = '#a7f3d0';
+                document.getElementById('adjustNewTime').style.color = '#065f46';
+            } else {
+                preview.style.background = '#fef2f2'; preview.style.borderColor = '#fecaca';
+                document.getElementById('adjustNewTime').style.color = '#991b1b';
+            }
+        }
+
+        async function submitAdjustTime() {
+            const mins = parseInt(document.getElementById('adjustMinutes').value) || 0;
+            if (mins <= 0) { showToast('Enter minutes to adjust', 'error'); return; }
+
+            const reasonSelect = document.getElementById('adjustReason').value;
+            const reasonOther = document.getElementById('adjustReasonOther').value.trim();
+            if (!reasonSelect) { showToast('Select a reason', 'error'); return; }
+            const reason = reasonSelect === 'other' ? (reasonOther || 'Other') : reasonSelect + (reasonOther ? ' - ' + reasonOther : '');
+
+            const adjustedMins = adjustTypeMode === 'add' ? mins : -mins;
+
+            const btn = document.getElementById('adjustSubmitBtn');
+            btn.disabled = true; btn.textContent = 'Applying...';
+
+            try {
+                const res = await fetch('/api/attendance/admin/adjust-time', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        attendance_id: adjustAttendanceId,
+                        minutes: adjustedMins,
+                        reason: reason,
+                        type: adjustTypeMode
+                    })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+
+                showToast(data.message, 'success');
+                closeModal('adjustTimeModal');
+                loadLiveAttendance();
+                loadSummaryStats();
+            } catch (e) {
+                showToast('Failed: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Apply Adjustment';
+            }
+        }
 
         // ========================================
         // LOAD BRANCHES & STAFF
@@ -1233,6 +1407,7 @@
                         <td>
                             ${r.clock_in_time ? `<button class="action-btn-sm btn-primary" onclick="viewPhotos(${r.id})" title="View Photos">Photos</button>` : '-'}
                             ${r.clock_in_time ? ` <button class="action-btn-sm btn-secondary" onclick="openTimelineFor(${r.user_id}, '${date}')" title="View Timeline">Timeline</button>` : ''}
+                            ${r.clock_in_time ? ` <button class="action-btn-sm" style="background:#eef2ff;color:#4f46e5;border:1px solid #c7d2fe;" onclick="openAdjustTime(${r.id}, '${escapeHtml(r.full_name)}', ${r.total_working_minutes || 0}, ${r.expected_hours || 10})" title="Adjust Working Time">Adjust</button>` : ''}
                             ${r.clock_in_time && !r.clock_out_time ? ` <button class="action-btn-sm btn-danger" onclick="forceClockOut(${r.id}, '${escapeHtml(r.full_name)}')" title="Force Clock Out">Clock Out</button>` : ''}
                         </td>
                     </tr>`;
