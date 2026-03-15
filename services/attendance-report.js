@@ -980,7 +980,7 @@ async function sendLeadAlerts(date) {
         // Get all active staff
         const [staff] = await pool.query(
             `SELECT u.id, u.full_name, u.phone, u.branch_id FROM users u
-             WHERE u.status = 'active' AND u.role IN ('staff', 'manager')
+             WHERE u.status = 'active' AND u.role IN ('staff', 'branch_manager', 'manager')
              ORDER BY u.id`
         );
 
@@ -1059,16 +1059,55 @@ async function sendLeadAlerts(date) {
                 }
             }
 
-            // WhatsApp alert for no leads + overdue (combined message)
+            // WhatsApp alert — Tamil motivational reminder (only for staff who missed leads/followups)
             if (whatsappSessionManager && user.phone && alerts.length > 0) {
                 let waPhone = user.phone.replace(/[^0-9]/g, '');
                 if (waPhone.length === 10) waPhone = '91' + waPhone;
 
-                let waMsg = `*QC Paint Shop - Daily Alerts*\n---\n`;
-                for (const alert of alerts) {
-                    waMsg += `\n*${alert.title}*\n${alert.body}\n`;
+                const noLeads = leadsToday[0].count === 0;
+                const hasOverdue = overdue[0].count > 0;
+                const pendingFollowups = todayFollowups[0].count > 0 && followupsDone[0].count < todayFollowups[0].count;
+                const pendingCount = todayFollowups[0].count - followupsDone[0].count;
+                const overdueCount = overdue[0].count;
+
+                let waMsg = `🎯 *QC Paint Shop - Lead Reminder*\n\n`;
+                waMsg += `*${user.full_name}*,\n\n`;
+
+                if (noLeads && (hasOverdue || pendingFollowups)) {
+                    // Both: no leads AND pending follow-ups
+                    waMsg += `இன்று நீங்கள் ஒரு lead கூட add செய்யவில்லை.\n\n`;
+                    waMsg += `🏪 Walk-in, 📞 Phone call, 🤝 Referral — எல்லா வாய்ப்பையும் lead-ஆ add பண்ணுங்க!\n\n`;
+                    if (hasOverdue) {
+                        waMsg += `⚠️ *${overdueCount} overdue follow-up${overdueCount > 1 ? 's' : ''}* பாக்கி இருக்கு — இன்னைக்கே contact பண்ணுங்க!\n`;
+                    }
+                    if (pendingFollowups) {
+                        waMsg += `📋 இன்றைக்கு *${pendingCount} follow-up${pendingCount > 1 ? 's' : ''}* pending — முடிக்காம விடாதீங்க!\n`;
+                    }
+                } else if (noLeads) {
+                    // Only: no leads created
+                    waMsg += `இன்று நீங்கள் ஒரு lead கூட add செய்யவில்லை.\n\n`;
+                    waMsg += `🏪 கடைக்கு வந்த customer-ஐ lead-ஆ add பண்ணுங்க\n`;
+                    waMsg += `📞 Phone call வந்தா — lead create பண்ணுங்க\n`;
+                    waMsg += `🤝 யாராவது refer பண்ணா — உடனே enter பண்ணுங்க\n`;
+                } else if (hasOverdue || pendingFollowups) {
+                    // Only: pending follow-ups (leads were created)
+                    if (hasOverdue) {
+                        waMsg += `⚠️ உங்களிடம் *${overdueCount} overdue follow-up${overdueCount > 1 ? 's' : ''}* இருக்கு!\n`;
+                        waMsg += `Customer-கிட்ட உடனே தொடர்பு கொள்ளுங்க.\n\n`;
+                    }
+                    if (pendingFollowups) {
+                        waMsg += `📋 இன்றைக்கு *${pendingCount} follow-up${pendingCount > 1 ? 's' : ''}* pending.\n`;
+                        waMsg += `இன்னைக்குள்ள complete பண்ணுங்க!\n\n`;
+                    }
                 }
-                waMsg += `\n_Auto-generated alert_`;
+
+                waMsg += `\n💰 *உங்க Effort = உங்க Earning!*\n`;
+                waMsg += `✅ Lead add → Points\n`;
+                waMsg += `✅ Follow-up → Customer நம்பிக்கை\n`;
+                waMsg += `✅ Sale convert → *Incentive + Bonus*\n\n`;
+                waMsg += `தினமும் lead create + follow-up = அதிக sales = *அதிக வருமானம்* 💵\n\n`;
+                waMsg += `உங்க முயற்சிக்கு நிச்சயம் reward இருக்கு! 🏆\n\n`;
+                waMsg += `— QC Paint Shop Management`;
 
                 try {
                     await whatsappSessionManager.sendMessage(user.branch_id || 0, waPhone, waMsg);
