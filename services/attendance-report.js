@@ -309,9 +309,16 @@ async function generateAdminPDF(date) {
             doc.fontSize(10).text(`Total Staff: ${rows.length} | Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`, { align: 'center' });
             doc.moveDown(1);
 
-            // Table headers
-            const headers = ['#', 'Name', 'Branch', 'Clock In', 'Clock Out', 'Working', 'Break', 'OT', 'Adj', 'Status', 'Late'];
-            const colWidths = [22, 110, 90, 60, 60, 52, 45, 40, 40, 60, 45];
+            // Check if any row has manual adjustments
+            const hasAnyAdjustment = rows.some(r => r.manual_adjustment_minutes && r.manual_adjustment_minutes !== 0);
+
+            // Table headers — include Adj column only when adjustments exist
+            const headers = hasAnyAdjustment
+                ? ['#', 'Name', 'Branch', 'Clock In', 'Clock Out', 'Working', 'Break', 'OT', 'Adj', 'Status', 'Late']
+                : ['#', 'Name', 'Branch', 'Clock In', 'Clock Out', 'Working', 'Break', 'OT', 'Status', 'Late'];
+            const colWidths = hasAnyAdjustment
+                ? [22, 110, 90, 60, 60, 52, 45, 40, 40, 60, 45]
+                : [25, 120, 100, 65, 65, 55, 50, 45, 70, 50];
             const startX = 40;
             let y = doc.y;
 
@@ -361,7 +368,7 @@ async function generateAdminPDF(date) {
                 if (row.is_late) lateCount++;
 
                 x = startX;
-                const vals = [
+                const baseVals = [
                     String(idx + 1),
                     row.full_name,
                     row.branch_name,
@@ -369,11 +376,14 @@ async function generateAdminPDF(date) {
                     row.clock_out_time ? formatTime(row.clock_out_time) : 'Working',
                     formatMinutes(working),
                     formatMinutes(breakMins),
-                    ot > 0 ? formatMinutes(ot) : '-',
-                    adj !== 0 ? `${adj > 0 ? '+' : ''}${adj}m` : '-',
-                    status.charAt(0).toUpperCase() + status.slice(1),
-                    late
+                    ot > 0 ? formatMinutes(ot) : '-'
                 ];
+                if (hasAnyAdjustment) {
+                    baseVals.push(adj !== 0 ? `${adj > 0 ? '+' : ''}${adj}m` : '-');
+                }
+                baseVals.push(status.charAt(0).toUpperCase() + status.slice(1));
+                baseVals.push(late);
+                const vals = baseVals;
 
                 // Alternate row background
                 if (idx % 2 === 0) {
