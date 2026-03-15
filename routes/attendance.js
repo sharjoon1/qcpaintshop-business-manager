@@ -377,7 +377,10 @@ router.post('/clock-in', requireAuth, upload.single('photo'), async (req, res) =
         const late = isReclockin ? false : isLateArrival(currentTime, shopHours.open_time, shopHours.late_threshold_minutes);
 
         // Determine if this re-clock-in counts as overtime
-        const expectedMinutes = parseFloat(shopHours.expected_hours) * 60;
+        // Use fallback of 5h (Sunday) or 10h if expected_hours is 0 or missing
+        const rawExpected = parseFloat(shopHours.expected_hours);
+        const isSunday = now.getDay() === 0;
+        const expectedMinutes = (rawExpected > 0 ? rawExpected : (isSunday ? 5 : 10)) * 60;
         const isOvertime = isReclockin && previousWorkedMinutes >= expectedMinutes;
 
         // Save photo
