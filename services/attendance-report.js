@@ -76,6 +76,7 @@ async function generateReport(userId, date) {
         const totalOutside = records.reduce((s, r) => s + (r.outside_work_minutes || 0), 0);
         const totalPrayer = records.reduce((s, r) => s + (r.prayer_minutes || 0), 0);
         const totalOvertime = records.reduce((s, r) => s + (r.overtime_minutes || 0), 0);
+        const totalAdjustment = records.reduce((s, r) => s + (r.manual_adjustment_minutes || 0), 0);
         const shopTime = Math.max(0, totalWorking - totalOutside - totalPrayer);
 
         const clockIn = formatTime(staff.clock_in_time);
@@ -88,6 +89,7 @@ async function generateReport(userId, date) {
         const dateStr = dateObj.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
         const overtimeLine = totalOvertime > 0 ? `\n*Overtime: ${formatMinutes(totalOvertime)}*` : '';
+        const adjustmentLine = totalAdjustment !== 0 ? `\nAdmin Adjusted: ${totalAdjustment > 0 ? '+' : ''}${formatMinutes(Math.abs(totalAdjustment))}` : '';
 
         const text = `*Daily Attendance Report*
 ---
@@ -102,7 +104,7 @@ Clock Out: ${clockOut}
 Shop Time: ${formatMinutes(shopTime)}
 Outside Work: ${formatMinutes(totalOutside)}
 Prayer: ${formatMinutes(totalPrayer)}
-Break: ${formatMinutes(totalBreak)}
+Break: ${formatMinutes(totalBreak)}${adjustmentLine}
 ---
 *Total Working: ${formatMinutes(totalWorking)}*${overtimeLine}
 Status: ${status}${autoClockoutNote}
@@ -124,6 +126,7 @@ _QC Paint Shop - Auto Report_`;
                 total_outside: totalOutside,
                 total_prayer: totalPrayer,
                 total_overtime: totalOvertime,
+                total_adjustment: totalAdjustment,
                 shop_time: shopTime,
                 status,
                 is_late: staff.is_late,
@@ -272,6 +275,7 @@ async function generateAdminPDF(date) {
                     a.clock_in_time, a.clock_out_time,
                     a.total_working_minutes, a.break_duration_minutes,
                     a.outside_work_minutes, a.prayer_minutes, a.overtime_minutes,
+                    a.manual_adjustment_minutes,
                     a.status, a.is_late, a.late_minutes, a.auto_clockout_type
              FROM staff_attendance a
              JOIN users u ON a.user_id = u.id
@@ -306,8 +310,8 @@ async function generateAdminPDF(date) {
             doc.moveDown(1);
 
             // Table headers
-            const headers = ['#', 'Name', 'Branch', 'Clock In', 'Clock Out', 'Working', 'Break', 'OT', 'Status', 'Late'];
-            const colWidths = [25, 120, 100, 65, 65, 55, 50, 45, 70, 50];
+            const headers = ['#', 'Name', 'Branch', 'Clock In', 'Clock Out', 'Working', 'Break', 'OT', 'Adj', 'Status', 'Late'];
+            const colWidths = [22, 110, 90, 60, 60, 52, 45, 40, 40, 60, 45];
             const startX = 40;
             let y = doc.y;
 
@@ -348,6 +352,7 @@ async function generateAdminPDF(date) {
                 const working = row.total_working_minutes || 0;
                 const breakMins = row.break_duration_minutes || 0;
                 const ot = row.overtime_minutes || 0;
+                const adj = row.manual_adjustment_minutes || 0;
                 const status = row.auto_clockout_type === 'end_of_day' ? 'Auto-Out' : (row.status || 'present');
                 const late = row.is_late ? `${row.late_minutes || 0}m` : '-';
 
@@ -365,6 +370,7 @@ async function generateAdminPDF(date) {
                     formatMinutes(working),
                     formatMinutes(breakMins),
                     ot > 0 ? formatMinutes(ot) : '-',
+                    adj !== 0 ? `${adj > 0 ? '+' : ''}${adj}m` : '-',
                     status.charAt(0).toUpperCase() + status.slice(1),
                     late
                 ];

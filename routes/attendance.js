@@ -2094,6 +2094,10 @@ router.post('/admin/adjust-time', requirePermission('attendance', 'manage'), asy
         const adjustType = type || (adjustMinutes > 0 ? 'add' : 'deduct');
         const adminNote = `\n[Time Adjustment by Admin ID ${adminId}]: ${adjustMinutes > 0 ? '+' : ''}${adjustMinutes} min (${adjustType}). Reason: ${reason || 'Manual adjustment'}. Previous: ${currentWorking}min, New: ${newWorking}min`;
 
+        // Track cumulative manual adjustment
+        const previousAdjustment = record.manual_adjustment_minutes || 0;
+        const newAdjustmentTotal = previousAdjustment + adjustMinutes;
+
         // Update the record
         await pool.query(
             `UPDATE staff_attendance SET
@@ -2101,9 +2105,13 @@ router.post('/admin/adjust-time', requirePermission('attendance', 'manage'), asy
                 effective_working_minutes = ?,
                 overtime_minutes = ?,
                 is_overtime = ?,
+                manual_adjustment_minutes = ?,
+                adjusted_by = ?,
+                adjustment_reason = ?,
                 notes = CONCAT(COALESCE(notes, ''), ?)
              WHERE id = ?`,
-            [newWorking, newEffective, newOvertimeMinutes, isNowOvertime ? 1 : 0, adminNote, attendance_id]
+            [newWorking, newEffective, newOvertimeMinutes, isNowOvertime ? 1 : 0,
+             newAdjustmentTotal, adminId, reason || 'Manual adjustment', adminNote, attendance_id]
         );
 
         res.json({
