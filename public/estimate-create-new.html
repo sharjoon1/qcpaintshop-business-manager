@@ -117,6 +117,21 @@
         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
             <h2 class="text-lg font-bold text-gray-800 mb-4">Step 2: Add Products</h2>
 
+            <!-- Global Product Search -->
+            <div class="relative mb-4">
+                <div class="relative">
+                    <svg class="absolute left-3 top-3 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <input type="text" id="globalProductSearch" placeholder="Search products by name... (quick find)"
+                        class="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none text-sm"
+                        oninput="onGlobalSearch(this.value)" autocomplete="off">
+                </div>
+                <div id="globalSearchResults" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border-2 border-purple-300 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mb-3 -mt-2">Or browse by Brand &rarr; Category &rarr; Product below:</p>
+
             <!-- Brand → Category → Product Selection -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                 <div>
@@ -196,6 +211,19 @@
         <!-- Products Table -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
             <h2 class="text-lg font-bold text-gray-800 mb-4">Estimate Items</h2>
+
+            <!-- Column Toggle Pills -->
+            <div class="flex flex-wrap gap-2 mb-4" id="columnToggles">
+                <span class="text-xs text-gray-500 self-center mr-1">Columns:</span>
+                <button onclick="toggleEstCol('show_image')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_image">Image</button>
+                <button onclick="toggleEstCol('show_pack_size')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_pack_size">Pack Size</button>
+                <button onclick="toggleEstCol('show_qty')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_qty">Qty/Area</button>
+                <button onclick="toggleEstCol('show_mix')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_mix">Mix Info</button>
+                <button onclick="toggleEstCol('show_price')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_price">Unit Price</button>
+                <button onclick="toggleEstCol('show_breakdown')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_breakdown">Breakdown</button>
+                <button onclick="toggleEstCol('show_color')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_color">Color Cost</button>
+                <button onclick="toggleEstCol('show_total')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_total">Total</button>
+            </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -437,6 +465,12 @@
         let estimateItems = [];
         let itemIdCounter = 1;
 
+        // Column visibility defaults (loaded from localStorage)
+        let columnVisibility = JSON.parse(localStorage.getItem('estimate_column_prefs') || 'null') || {
+            show_image: true, show_pack_size: true, show_qty: true, show_mix: true,
+            show_price: true, show_breakdown: false, show_color: false, show_total: true
+        };
+
         // Dropdown instances
         let customerDD, brandDD, categoryDD, productDD;
 
@@ -471,6 +505,94 @@
                 onSelect: onProductSelected
             });
             document.getElementById('productDropdown')._sdInstance = productDD;
+        }
+
+        // ========================================
+        // GLOBAL PRODUCT SEARCH
+        // ========================================
+        function onGlobalSearch(query) {
+            const resultsPanel = document.getElementById('globalSearchResults');
+
+            if (!query || query.length < 2) {
+                resultsPanel.classList.add('hidden');
+                return;
+            }
+
+            const q = query.toLowerCase();
+            const matches = allProducts.filter(p =>
+                p.name.toLowerCase().includes(q) ||
+                (p.brand_name && p.brand_name.toLowerCase().includes(q))
+            ).slice(0, 10);
+
+            if (matches.length === 0) {
+                resultsPanel.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No products found</div>';
+                resultsPanel.classList.remove('hidden');
+                return;
+            }
+
+            resultsPanel.innerHTML = matches.map(p => {
+                const safeName = (p.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeBrand = (p.brand_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeCat = (p.category_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return `<div class="px-4 py-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-0"
+                     onclick="selectFromGlobalSearch(${p.id})">
+                    <div class="font-semibold text-sm text-gray-800">${safeName}</div>
+                    <div class="text-xs text-gray-500">${safeBrand}${safeCat ? ' / ' + safeCat : ''}</div>
+                </div>`;
+            }).join('');
+            resultsPanel.classList.remove('hidden');
+        }
+
+        function selectFromGlobalSearch(productId) {
+            const product = allProducts.find(p => p.id == productId);
+            if (!product) return;
+
+            // Close search
+            document.getElementById('globalProductSearch').value = product.name;
+            document.getElementById('globalSearchResults').classList.add('hidden');
+
+            // Set selected product and show type/size inputs
+            selectedProduct = product;
+            onProductSelected(product.id, product);
+        }
+
+        // Close search results when clicking outside
+        document.addEventListener('click', (e) => {
+            const searchContainer = document.getElementById('globalProductSearch')?.parentElement?.parentElement;
+            if (searchContainer && !searchContainer.contains(e.target)) {
+                document.getElementById('globalSearchResults')?.classList.add('hidden');
+            }
+        });
+
+        // ========================================
+        // COLUMN TOGGLE
+        // ========================================
+        function toggleEstCol(key) {
+            columnVisibility[key] = !columnVisibility[key];
+            localStorage.setItem('estimate_column_prefs', JSON.stringify(columnVisibility));
+            renderEstimateTable();
+            updateTogglePills();
+        }
+
+        function updateTogglePills() {
+            document.querySelectorAll('.col-pill').forEach(btn => {
+                const key = btn.dataset.col;
+                if (columnVisibility[key]) {
+                    btn.className = 'col-pill px-3 py-1 text-xs rounded-full border-2 transition bg-purple-600 text-white border-purple-600';
+                } else {
+                    btn.className = 'col-pill px-3 py-1 text-xs rounded-full border-2 transition bg-white text-gray-600 border-gray-300 hover:border-purple-300';
+                }
+            });
+        }
+
+        function extractPackSize(mixInfo) {
+            if (!mixInfo) return '-';
+            const match = mixInfo.match(/(\d+(?:\.\d+)?\s*(?:L|LTR?|Ltr|Litre|KG|Kg|M|PC))\b/i);
+            return match ? match[1] : '-';
+        }
+
+        function formatCurrency(num) {
+            return '\u20B9' + parseFloat(num || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         // ========================================
@@ -739,6 +861,7 @@
                 id: itemIdCounter++,
                 product_id: selectedProduct.id,
                 product_name: selectedProduct.name,
+                image_url: selectedProduct.image_url || null,
                 type: type
             };
 
@@ -776,6 +899,7 @@
 
             // Reset product selection
             productDD.reset();
+            document.getElementById('globalProductSearch').value = '';
             selectedProduct = null;
             document.getElementById('productTypeSection').classList.add('hidden');
             document.getElementById('unitTypeInputs').classList.add('hidden');
@@ -785,29 +909,57 @@
 
         function renderEstimateTable() {
             const tbody = document.getElementById('itemsTableBody');
+            const cv = columnVisibility;
 
             if (estimateItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">No items added yet</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-500">No items added yet</td></tr>';
                 updateTotals();
+                updateTogglePills();
                 return;
             }
 
-            tbody.innerHTML = estimateItems.map((item, idx) => `
-                <tr>
-                    <td class="px-4 py-3">${idx + 1}</td>
-                    <td class="px-4 py-3 font-semibold">${item.product_name}</td>
-                    <td class="px-4 py-3">${item.type === 'unit' ? 'Unit' : 'Area'}</td>
-                    <td class="px-4 py-3 text-sm">${item.details}</td>
-                    <td class="px-4 py-3 text-right">${item.quantity.toFixed(2)}</td>
-                    <td class="px-4 py-3 text-right">₹${item.unit_price.toFixed(2)}</td>
-                    <td class="px-4 py-3 text-right font-semibold">₹${item.total.toFixed(2)}</td>
-                    <td class="px-4 py-3 text-center">
-                        <button onclick="removeItem(${item.id})" class="text-red-600 hover:text-red-800">Remove</button>
-                    </td>
-                </tr>
-            `).join('');
+            // Build header dynamically
+            const thead = document.querySelector('#itemsTableBody').closest('table').querySelector('thead tr');
+            let headerHtml = '<th class="px-4 py-3 text-left">#</th>';
+            if (cv.show_image) headerHtml += '<th class="px-4 py-3 text-left">Image</th>';
+            headerHtml += '<th class="px-4 py-3 text-left">Product</th>';
+            if (cv.show_pack_size) headerHtml += '<th class="px-4 py-3 text-left">Pack Size</th>';
+            headerHtml += '<th class="px-4 py-3 text-left">Type</th>';
+            if (cv.show_qty) headerHtml += '<th class="px-4 py-3 text-right">Quantity</th>';
+            if (cv.show_mix) headerHtml += '<th class="px-4 py-3 text-left">Mix Info</th>';
+            if (cv.show_price) headerHtml += '<th class="px-4 py-3 text-right">Unit Price</th>';
+            if (cv.show_breakdown) headerHtml += '<th class="px-4 py-3 text-left">Breakdown</th>';
+            if (cv.show_color) headerHtml += '<th class="px-4 py-3 text-right">Color Cost</th>';
+            if (cv.show_total) headerHtml += '<th class="px-4 py-3 text-right">Total</th>';
+            headerHtml += '<th class="px-4 py-3 text-center">Action</th>';
+            thead.innerHTML = headerHtml;
+
+            // Build rows
+            const placeholderSvg = '<div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
+
+            tbody.innerHTML = estimateItems.map((item, idx) => {
+                let row = `<td class="px-4 py-3">${idx + 1}</td>`;
+                if (cv.show_image) {
+                    row += `<td class="px-4 py-3">${item.image_url
+                        ? `<img src="${item.image_url}" class="w-10 h-10 object-cover rounded" onerror="this.parentElement.innerHTML='${placeholderSvg.replace(/'/g, "\\'")}';">`
+                        : placeholderSvg
+                    }</td>`;
+                }
+                row += `<td class="px-4 py-3 font-semibold">${item.product_name}</td>`;
+                if (cv.show_pack_size) row += `<td class="px-4 py-3">${extractPackSize(item.details)}</td>`;
+                row += `<td class="px-4 py-3">${item.type === 'unit' ? 'Unit' : 'Area'}</td>`;
+                if (cv.show_qty) row += `<td class="px-4 py-3 text-right">${item.quantity.toFixed(2)}</td>`;
+                if (cv.show_mix) row += `<td class="px-4 py-3 text-sm">${item.details}</td>`;
+                if (cv.show_price) row += `<td class="px-4 py-3 text-right">${formatCurrency(item.unit_price)}</td>`;
+                if (cv.show_breakdown) row += `<td class="px-4 py-3">-</td>`;
+                if (cv.show_color) row += `<td class="px-4 py-3 text-right">${formatCurrency(0)}</td>`;
+                if (cv.show_total) row += `<td class="px-4 py-3 text-right font-semibold">${formatCurrency(item.total)}</td>`;
+                row += `<td class="px-4 py-3 text-center"><button onclick="removeItem(${item.id})" class="text-red-600 hover:text-red-800">Remove</button></td>`;
+                return `<tr>${row}</tr>`;
+            }).join('');
 
             updateTotals();
+            updateTogglePills();
         }
 
         function removeItem(itemId) {
@@ -845,6 +997,7 @@
 
             const apiItems = estimateItems.map((item, idx) => ({
                 product_id: item.product_id,
+                image_url: item.image_url || null,
                 item_description: item.product_name,
                 quantity: item.quantity,
                 area: item.type === 'area' ? item.quantity : null,
@@ -865,6 +1018,7 @@
                 gst_amount: gst,
                 grand_total: grandTotal,
                 show_gst_breakdown: true,
+                column_visibility: JSON.stringify(columnVisibility),
                 notes: '',
                 status: 'draft',
                 items: apiItems
@@ -886,8 +1040,13 @@
                         await markRequestAsConverted(requestId, result.id || result.estimate_id);
                     }
 
-                    alert('✅ Estimate created successfully! Estimate #' + (result.estimate_number || result.id));
-                    window.location.href = 'estimates.html';
+                    const estNum = result.estimate_number || result.id;
+                    const estId = result.id || result.estimate_id;
+                    if (confirm('Estimate #' + estNum + ' created! Open print preview?')) {
+                        window.location.href = 'estimate-print.html?id=' + estId;
+                    } else {
+                        window.location.href = 'estimates.html';
+                    }
                 } else {
                     const errorMsg = result.message || result.error || 'Unknown error occurred';
                     console.error('Save estimate error:', result);
@@ -1145,6 +1304,7 @@
         // ========================================
         async function init() {
             initDropdowns();
+            updateTogglePills();
             await loadInitialData();
             await prefillFromRequest();
 

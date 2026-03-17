@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estimate - Quality Colours</title>
+    <script src="/js/auth-helper.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5a67d8;
+            --accent: #764ba2;
+            --text-dark: #1a202c;
+            --text-mid: #4a5568;
+            --text-light: #718096;
+            --border: #e2e8f0;
+            --bg-stripe: #f7fafc;
+            --gold: #d69e2e;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            color: var(--text-dark);
+            background: #f0f2f5;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        @media print {
+            @page {
+                size: A4;
+                margin: 8mm 10mm;
+            }
+            body {
+                background: white;
+                margin: 0;
+                padding: 0;
+            }
+            .no-print { display: none !important; }
+            #printContent {
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+                box-shadow: none !important;
+            }
+            .estimate-card {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+            }
+            .estimate-header {
+                padding: 12px 20px !important;
+            }
+            .section-pad {
+                padding: 10px 20px !important;
+            }
+            table { font-size: 9px !important; }
+            table th { padding: 6px 8px !important; font-size: 8px !important; }
+            table td { padding: 5px 8px !important; }
+            .summary-section { padding: 10px 20px !important; }
+            .terms-section { padding: 8px 20px !important; font-size: 8px !important; }
+            .footer-section { padding: 6px 20px !important; font-size: 7px !important; }
+            .company-logo { max-height: 40px !important; }
+            h1.estimate-title { font-size: 28px !important; }
+            .bill-to-name { font-size: 14px !important; }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; }
+            .img-thumb { width: 28px !important; height: 28px !important; }
+        }
+
+        .company-logo {
+            max-height: 56px;
+            max-width: 180px;
+            object-fit: contain;
+        }
+
+        .estimate-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        .estimate-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            padding: 24px 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .estimate-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.06);
+            pointer-events: none;
+        }
+        .estimate-header::after {
+            content: '';
+            position: absolute;
+            bottom: -60%;
+            left: 20%;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.04);
+            pointer-events: none;
+        }
+
+        h1.estimate-title {
+            font-family: 'DM Serif Display', serif;
+            font-size: 36px;
+            letter-spacing: 2px;
+            color: white;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .meta-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: rgba(255,255,255,0.7);
+            font-weight: 600;
+        }
+        .meta-value {
+            font-size: 13px;
+            color: white;
+            font-weight: 600;
+        }
+
+        .divider-bar {
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--accent), var(--gold));
+        }
+
+        .bill-to-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-light);
+            font-weight: 700;
+        }
+        .bill-to-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        /* Table */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .items-table thead th {
+            background: var(--primary);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 10px 12px;
+            white-space: nowrap;
+        }
+        .items-table thead th:first-child {
+            border-radius: 6px 0 0 0;
+        }
+        .items-table thead th:last-child {
+            border-radius: 0 6px 0 0;
+        }
+        .items-table tbody td {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--text-dark);
+            border-bottom: 1px solid #edf2f7;
+        }
+        .items-table tbody tr:nth-child(even) {
+            background: var(--bg-stripe);
+        }
+        .items-table tbody tr:hover {
+            background: #eef2ff;
+        }
+
+        .img-thumb {
+            width: 36px;
+            height: 36px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .img-placeholder {
+            width: 36px;
+            height: 36px;
+            background: #edf2f7;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .img-placeholder svg {
+            width: 18px;
+            height: 18px;
+            color: #a0aec0;
+        }
+
+        .grand-total {
+            font-family: 'DM Serif Display', serif;
+            font-size: 28px;
+            color: var(--primary);
+        }
+
+        .toggle-pill {
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.15s;
+        }
+        .toggle-pill.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .toggle-pill:not(.active) {
+            background: white;
+            color: var(--text-mid);
+            border-color: #cbd5e0;
+        }
+        .toggle-pill:not(.active):hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Action Bar (hidden in PDF mode and print) -->
+    <div id="actionBar" class="no-print fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm shadow-md z-50 border-b border-gray-200">
+        <div class="max-w-5xl mx-auto px-4 py-3">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <!-- Back -->
+                <button onclick="history.back()" class="flex items-center text-gray-600 hover:text-gray-900 text-sm font-medium">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    Back
+                </button>
+
+                <!-- Column Toggles -->
+                <div class="flex flex-wrap gap-1.5" id="toggleContainer">
+                    <span class="text-xs text-gray-400 self-center mr-1">Columns:</span>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex gap-2">
+                    <button onclick="window.print()" class="px-4 py-2 text-sm font-semibold rounded-lg text-white" style="background: var(--primary);">
+                        Print
+                    </button>
+                    <button onclick="downloadPDF()" class="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700">
+                        PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingState" class="flex items-center justify-center min-h-screen">
+        <div class="text-center">
+            <svg class="inline w-10 h-10 animate-spin" style="color: var(--primary);" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-3 text-gray-500 text-sm">Loading estimate...</p>
+        </div>
+    </div>
+
+    <!-- Estimate Document -->
+    <div id="printContent" class="hidden max-w-4xl mx-auto mt-20 mb-8 p-4" style="print:mt-0;">
+        <div class="estimate-card">
+            <!-- Header -->
+            <div class="estimate-header">
+                <div class="flex items-start justify-between relative z-10">
+                    <!-- Company Info -->
+                    <div class="flex items-start gap-4">
+                        <img id="headerLogo" src="/logo.png" alt="QC" class="company-logo" style="filter: brightness(0) invert(1); opacity: 0.9;" onerror="this.style.display='none'">
+                        <div>
+                            <div class="text-white font-bold text-xl" style="font-family: 'DM Serif Display', serif;" id="companyName">Quality Colours</div>
+                            <div class="text-white/60 text-xs mt-1 leading-relaxed" id="companyDetails">
+                                Ramanathapuram<br>
+                                Phone: +91 7418831122 | Email: info@qcpaintshop.com<br>
+                                GST: 33EMXPS2411G1ZT
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Estimate Meta -->
+                    <div class="text-right flex-shrink-0">
+                        <h1 class="estimate-title">ESTIMATE</h1>
+                        <div class="mt-2 space-y-1">
+                            <div><span class="meta-label">Ref #</span> <span class="meta-value" id="estNumber"></span></div>
+                            <div><span class="meta-label">Date</span> <span class="meta-value" id="estDate"></span></div>
+                            <div id="validUntilRow" class="hidden"><span class="meta-label">Valid Until</span> <span class="meta-value" id="estValidUntil"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gradient Bar -->
+            <div class="divider-bar"></div>
+
+            <!-- Bill To -->
+            <div class="section-pad" style="padding: 20px 32px;">
+                <div class="bill-to-label mb-1">Bill To</div>
+                <div class="bill-to-name" id="custName"></div>
+                <div class="text-sm text-gray-500 mt-1" id="custPhone"></div>
+                <div class="text-sm text-gray-500" id="custAddress"></div>
+            </div>
+
+            <!-- Items Table -->
+            <div style="padding: 0 32px 16px;">
+                <div class="overflow-x-auto">
+                    <table class="items-table" id="itemsTable">
+                        <thead>
+                            <tr id="tableHead"></tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="10" class="text-center py-8 text-gray-400">Loading items...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="summary-section" style="padding: 16px 32px; background: var(--bg-stripe);">
+                <div class="flex justify-end">
+                    <div class="w-full" style="max-width: 320px;">
+                        <div id="gstBreakdownSection" class="hidden">
+                            <div class="flex justify-between py-1.5 text-sm">
+                                <span class="text-gray-500">Subtotal (excl. GST)</span>
+                                <span class="font-medium" id="subtotalVal"></span>
+                            </div>
+                            <div class="flex justify-between py-1.5 text-sm">
+                                <span class="text-gray-500">GST @18%</span>
+                                <span class="font-medium" id="gstVal"></span>
+                            </div>
+                            <div class="border-t border-gray-300 my-1"></div>
+                        </div>
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-sm font-bold text-gray-700 uppercase tracking-wide">Grand Total</span>
+                            <span class="grand-total" id="grandTotalVal"></span>
+                        </div>
+                        <div class="text-xs text-gray-400 text-right mt-1" id="amountWords"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div id="notesSection" class="hidden section-pad" style="padding: 12px 32px; border-top: 1px solid var(--border);">
+                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Notes</div>
+                <div class="text-sm text-gray-600" id="notesContent"></div>
+            </div>
+
+            <!-- Terms -->
+            <div class="terms-section" style="padding: 14px 32px; border-top: 1px solid var(--border); background: #fafbfc;">
+                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Terms & Conditions</div>
+                <div class="text-xs text-gray-500 leading-relaxed space-y-0.5">
+                    <div>1. All prices are inclusive of applicable GST.</div>
+                    <div>2. This estimate is valid for 30 days from the date of issue.</div>
+                    <div>3. Subject to stock availability at the time of order.</div>
+                    <div>4. Colours may vary slightly from shade cards due to screen/print differences.</div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer-section" style="padding: 12px 32px; background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);">
+                <div class="flex justify-between items-center">
+                    <div class="text-white/70 text-xs">Thank you for choosing Quality Colours!</div>
+                    <div class="text-white/50 text-xs">Generated by QC Business Manager</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // CONFIG
+        // ========================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const estimateId = urlParams.get('id');
+        const mode = urlParams.get('mode'); // 'pdf' hides action bar
+        const tokenOverride = urlParams.get('token'); // Puppeteer passes this
+
+        if (!estimateId) {
+            alert('No estimate ID provided');
+            window.location.href = 'estimates.html';
+        }
+
+        function getToken() {
+            return tokenOverride || localStorage.getItem('auth_token');
+        }
+
+        // Column toggle config
+        const COLUMNS = [
+            { key: 'show_image', label: 'Image', default: true },
+            { key: 'show_pack_size', label: 'Pack Size', default: true },
+            { key: 'show_qty', label: 'Qty/Area', default: true },
+            { key: 'show_mix', label: 'Mix Info', default: true },
+            { key: 'show_price', label: 'Price', default: true },
+            { key: 'show_breakdown', label: 'Breakdown', default: false },
+            { key: 'show_color', label: 'Color', default: false },
+            { key: 'show_total', label: 'Total', default: true }
+        ];
+
+        let colVis = JSON.parse(localStorage.getItem('estimate_column_prefs') || 'null') || {};
+        COLUMNS.forEach(c => { if (colVis[c.key] === undefined) colVis[c.key] = c.default; });
+
+        let estimateData = null;
+        let itemsData = [];
+
+        // ========================================
+        // INIT
+        // ========================================
+        if (mode === 'pdf') {
+            const bar = document.getElementById('actionBar');
+            if (bar) bar.style.display = 'none';
+            document.getElementById('printContent').style.marginTop = '0';
+        }
+
+        buildTogglePills();
+        loadEstimate();
+
+        // ========================================
+        // TOGGLE PILLS
+        // ========================================
+        function buildTogglePills() {
+            const container = document.getElementById('toggleContainer');
+            if (!container) return;
+            // Keep the label
+            const label = container.querySelector('span');
+            container.innerHTML = '';
+            if (label) container.appendChild(label);
+
+            COLUMNS.forEach(col => {
+                const pill = document.createElement('button');
+                pill.className = `toggle-pill px-2.5 py-1 text-xs rounded-full border font-medium ${colVis[col.key] ? 'active' : ''}`;
+                pill.textContent = col.label;
+                pill.onclick = () => {
+                    colVis[col.key] = !colVis[col.key];
+                    localStorage.setItem('estimate_column_prefs', JSON.stringify(colVis));
+                    pill.classList.toggle('active');
+                    renderTable();
+                };
+                container.appendChild(pill);
+            });
+        }
+
+        // ========================================
+        // LOAD ESTIMATE
+        // ========================================
+        async function loadEstimate() {
+            try {
+                const token = getToken();
+                const res = await fetch(`/api/estimates/${estimateId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load estimate');
+                estimateData = await res.json();
+
+                // Parse column visibility from saved estimate
+                if (estimateData.column_visibility) {
+                    try {
+                        const saved = JSON.parse(estimateData.column_visibility);
+                        Object.keys(saved).forEach(k => {
+                            if (colVis[k] !== undefined) colVis[k] = saved[k];
+                        });
+                        buildTogglePills();
+                    } catch {}
+                }
+
+                // Fill header
+                document.getElementById('estNumber').textContent = estimateData.estimate_number || '';
+                document.getElementById('estDate').textContent = formatDate(estimateData.estimate_date);
+                if (estimateData.valid_until) {
+                    document.getElementById('estValidUntil').textContent = formatDate(estimateData.valid_until);
+                    document.getElementById('validUntilRow').classList.remove('hidden');
+                }
+
+                // Customer
+                document.getElementById('custName').textContent = estimateData.customer_name || '';
+                document.getElementById('custPhone').textContent = estimateData.customer_phone || '';
+                document.getElementById('custAddress').textContent = estimateData.customer_address || '';
+
+                // Summary
+                const grandTotal = parseFloat(estimateData.grand_total) || 0;
+                document.getElementById('grandTotalVal').textContent = formatINR(grandTotal);
+                document.getElementById('amountWords').textContent = 'Rupees ' + Math.floor(grandTotal).toLocaleString('en-IN') + ' Only';
+
+                if (estimateData.show_gst_breakdown) {
+                    document.getElementById('subtotalVal').textContent = formatINR(parseFloat(estimateData.subtotal) || 0);
+                    document.getElementById('gstVal').textContent = formatINR(parseFloat(estimateData.gst_amount) || 0);
+                    document.getElementById('gstBreakdownSection').classList.remove('hidden');
+                }
+
+                // Notes
+                if (estimateData.notes && estimateData.notes.trim()) {
+                    document.getElementById('notesContent').textContent = estimateData.notes;
+                    document.getElementById('notesSection').classList.remove('hidden');
+                }
+
+                // Items
+                itemsData = estimateData.items || [];
+                if (itemsData.length === 0) {
+                    // Fetch items separately
+                    const itemsRes = await fetch(`/api/estimates/${estimateId}/items`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (itemsRes.ok) {
+                        itemsData = await itemsRes.json();
+                    }
+                }
+
+                renderTable();
+
+                // Load branding
+                loadBranding(token);
+
+                // Show content
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('printContent').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error loading estimate:', error);
+                document.getElementById('loadingState').innerHTML = `
+                    <div class="text-center">
+                        <div class="text-red-500 text-lg font-bold">Failed to load estimate</div>
+                        <div class="text-gray-500 text-sm mt-2">${error.message}</div>
+                        <button onclick="history.back()" class="mt-4 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm">Go Back</button>
+                    </div>`;
+            }
+        }
+
+        async function loadBranding(token) {
+            try {
+                const res = await fetch('/api/settings/branding', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const settings = await res.json();
+                const data = settings.data || settings;
+
+                if (data.business_name) {
+                    document.getElementById('companyName').textContent = data.business_name;
+                }
+                if (data.business_logo) {
+                    document.getElementById('headerLogo').src = '/uploads/logos/' + data.business_logo;
+                }
+                let details = [];
+                if (data.business_address) details.push(data.business_address);
+                let line2 = [];
+                if (data.business_phone) line2.push('Phone: ' + data.business_phone);
+                if (data.business_email) line2.push('Email: ' + data.business_email);
+                if (line2.length) details.push(line2.join(' | '));
+                if (data.business_gst) details.push('GST: ' + data.business_gst);
+                if (details.length) {
+                    document.getElementById('companyDetails').innerHTML = details.join('<br>');
+                }
+            } catch {}
+        }
+
+        // ========================================
+        // RENDER TABLE
+        // ========================================
+        function renderTable() {
+            const thead = document.getElementById('tableHead');
+            const tbody = document.getElementById('tableBody');
+
+            // Build header
+            let hdr = '<th style="text-align:left; width: 30px;">#</th>';
+            if (colVis.show_image) hdr += '<th style="text-align:left; width: 50px;">Image</th>';
+            hdr += '<th style="text-align:left;">Item Details</th>';
+            if (colVis.show_pack_size) hdr += '<th style="text-align:left; width: 80px;">Pack Size</th>';
+            if (colVis.show_qty) hdr += '<th style="text-align:right; width: 70px;">Qty</th>';
+            if (colVis.show_mix) hdr += '<th style="text-align:left; width: 100px;">Mix Info</th>';
+            if (colVis.show_price) hdr += '<th style="text-align:right; width: 80px;">Price</th>';
+            if (colVis.show_breakdown) hdr += '<th style="text-align:left; width: 80px;">Breakdown</th>';
+            if (colVis.show_color) hdr += '<th style="text-align:right; width: 70px;">Color</th>';
+            if (colVis.show_total) hdr += '<th style="text-align:right; width: 90px;">Total</th>';
+            thead.innerHTML = hdr;
+
+            if (!itemsData || itemsData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No items</td></tr>';
+                return;
+            }
+
+            const placeholderSvg = `<div class="img-placeholder"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
+
+            tbody.innerHTML = itemsData.map((item, i) => {
+                let r = `<td style="text-align:center; color: var(--text-light); font-weight: 600;">${i + 1}</td>`;
+
+                if (colVis.show_image) {
+                    r += `<td>${item.image_url
+                        ? `<img src="${item.image_url}" class="img-thumb" onerror="this.parentElement.innerHTML='${placeholderSvg.replace(/'/g, "\\'")}';">`
+                        : placeholderSvg}</td>`;
+                }
+
+                r += `<td><div style="font-weight: 600;">${item.item_description || item.product_name || ''}</div></td>`;
+
+                if (colVis.show_pack_size) {
+                    r += `<td>${extractPackSize(item.mix_info)}</td>`;
+                }
+                if (colVis.show_qty) {
+                    r += `<td style="text-align:right;">${item.quantity}${item.area ? ' (' + item.area + ' sqft)' : ''}</td>`;
+                }
+                if (colVis.show_mix) {
+                    r += `<td style="color: var(--text-light); font-size: 11px;">${item.mix_info || '-'}</td>`;
+                }
+                if (colVis.show_price) {
+                    r += `<td style="text-align:right;">${formatINR(item.unit_price)}</td>`;
+                }
+                if (colVis.show_breakdown) {
+                    r += `<td style="color: var(--text-light);">${item.breakdown_cost || '-'}</td>`;
+                }
+                if (colVis.show_color) {
+                    r += `<td style="text-align:right;">${formatINR(item.color_cost || 0)}</td>`;
+                }
+                if (colVis.show_total) {
+                    r += `<td style="text-align:right; font-weight: 700; color: var(--text-dark);">${formatINR(item.line_total)}</td>`;
+                }
+
+                return `<tr>${r}</tr>`;
+            }).join('');
+        }
+
+        // ========================================
+        // HELPERS
+        // ========================================
+        function formatINR(num) {
+            const n = parseFloat(num) || 0;
+            return '\u20B9' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function extractPackSize(mixInfo) {
+            if (!mixInfo) return '-';
+            const match = mixInfo.match(/(\d+(?:\.\d+)?\s*(?:L|LTR?|Ltr|Litre|KG|Kg|M|PC))\b/i);
+            return match ? match[1] : '-';
+        }
+
+        function downloadPDF() {
+            const token = getToken();
+            const ua = navigator.userAgent || '';
+            if (ua.includes('QCManagerApp')) {
+                window.location.href = `/api/estimates/${estimateId}/pdf?token=${token}`;
+            } else {
+                fetch(`/api/estimates/${estimateId}/pdf`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }).then(r => {
+                    if (!r.ok) throw new Error('PDF generation failed');
+                    return r.blob();
+                }).then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Estimate-${estimateId}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }).catch(err => {
+                    console.error('PDF error:', err);
+                    alert('Failed to download PDF. Try printing instead.');
+                });
+            }
+        }
+    </script>
+</body>
+</html>

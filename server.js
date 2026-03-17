@@ -3194,7 +3194,8 @@ app.post('/api/estimates', requirePermission('estimates', 'add'), async (req, re
 
         if (items && items.length > 0) {
             const itemValues = items.map(item => [
-                estimateId, item.product_id || null, item.item_description,
+                estimateId, item.product_id || null, item.image_url || null,
+                item.item_description,
                 item.quantity, item.area || null, item.mix_info || null,
                 item.unit_price, item.breakdown_cost || null, item.color_cost || 0,
                 item.line_total, item.display_order || 0
@@ -3202,7 +3203,7 @@ app.post('/api/estimates', requirePermission('estimates', 'add'), async (req, re
 
             await pool.query(
                 `INSERT INTO estimate_items (
-                    estimate_id, product_id, item_description, quantity, area, mix_info,
+                    estimate_id, product_id, image_url, item_description, quantity, area, mix_info,
                     unit_price, breakdown_cost, color_cost, line_total, display_order
                 ) VALUES ?`,
                 [itemValues]
@@ -3243,7 +3244,8 @@ app.put('/api/estimates/:id', requirePermission('estimates', 'edit'), async (req
 
         if (items && items.length > 0) {
             const itemValues = items.map(item => [
-                estimateId, item.product_id || null, item.item_description,
+                estimateId, item.product_id || null, item.image_url || null,
+                item.item_description,
                 item.quantity, item.area || null, item.mix_info || null,
                 item.unit_price, item.breakdown_cost || null, item.color_cost || 0,
                 item.line_total, item.display_order || 0
@@ -3251,7 +3253,7 @@ app.put('/api/estimates/:id', requirePermission('estimates', 'edit'), async (req
 
             await pool.query(
                 `INSERT INTO estimate_items (
-                    estimate_id, product_id, item_description, quantity, area, mix_info,
+                    estimate_id, product_id, image_url, item_description, quantity, area, mix_info,
                     unit_price, breakdown_cost, color_cost, line_total, display_order
                 ) VALUES ?`,
                 [itemValues]
