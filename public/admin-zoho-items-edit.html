@@ -839,21 +839,31 @@
         var displayVal = String(value).length > 20 ? String(value).substring(0, 20) + '...' : String(value);
         var targetItems;
         if (scope === 'selected') {
-            targetItems = getFilteredItems().filter(function(it) { return selectedItemIds.has(String(it.item_id || it.zoho_item_id)); });
+            targetItems = items.filter(function(it) { return selectedItemIds.has(String(it.item_id || it.zoho_item_id)); });
         } else {
             targetItems = getFilteredItems();
         }
         if (targetItems.length === 0) { showToast('No items to paste to', 'error'); return; }
-        if (!confirm("Apply '" + displayVal + "' to " + field.replace(/^zoho_/, '').replace(/_/g, ' ') + " for " + targetItems.length + " rows?")) return;
+        if (!confirm("Apply '" + displayVal + "' to " + field + " for " + targetItems.length + " rows?\n\nValue: " + String(value))) return;
         var count = 0;
+        var skipped = 0;
         targetItems.forEach(function(item) {
             var id = String(item.item_id || item.zoho_item_id);
-            setDirty(id, field, String(value));
+            var origVal = String(getOriginal(id, field) ?? '');
+            var newVal = String(value ?? '');
+            if (origVal === newVal) {
+                skipped++;
+            }
+            setDirty(id, field, newVal);
             count++;
         });
         removePasteDropdown();
         renderTable();
-        showToast('Updated ' + count + ' rows', 'success');
+        if (skipped > 0 && skipped === count) {
+            showToast('All ' + count + ' rows already have this value — no changes needed', 'info');
+        } else {
+            showToast('Updated ' + (count - skipped) + ' rows' + (skipped > 0 ? ' (' + skipped + ' already had this value)' : ''), 'success');
+        }
     }
 
     // ============ MOBILE CARDS ============
