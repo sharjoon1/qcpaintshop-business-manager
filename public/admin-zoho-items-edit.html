@@ -584,7 +584,6 @@
         if (totalItems > items.length && Object.keys(columnFilters).length > 0) {
             clearTimeout(colFilterTimeout);
             colFilterTimeout = setTimeout(function() {
-                // Temporarily load all items for filtering
                 var origLimit = PAGE_LIMIT;
                 PAGE_LIMIT = 10000;
                 currentPage = 1;
@@ -592,6 +591,7 @@
             }, 400);
         } else {
             renderTable();
+            renderPagination();
         }
     }
     function getFilteredItems() {
