@@ -642,7 +642,7 @@
             loadProducts();
         }
 
-        function onProductSelected(value, data) {
+        async function onProductSelected(value, data) {
             document.getElementById('productTypeSection').classList.add('hidden');
             document.getElementById('unitTypeInputs').classList.add('hidden');
             document.getElementById('areaTypeInputs').classList.add('hidden');
@@ -652,7 +652,21 @@
                 selectedProduct = null;
                 return;
             }
-            selectedProduct = data;
+
+            // Fetch full product details with pack sizes from API
+            try {
+                const res = await apiRequest(`/api/products/${data.id || value}`);
+                const fullProduct = await res.json();
+                if (fullProduct && fullProduct.id) {
+                    selectedProduct = fullProduct;
+                } else {
+                    selectedProduct = data;
+                }
+            } catch (e) {
+                console.warn('Could not load product details, using cached data:', e);
+                selectedProduct = data;
+            }
+
             loadProductDetails();
         }
 
@@ -775,17 +789,38 @@
 
         // Load pack sizes into regular select
         function loadPackSizes() {
-            if (!selectedProduct || !selectedProduct.available_sizes) return;
+            if (!selectedProduct) return;
 
-            try {
-                const packSizes = JSON.parse(selectedProduct.available_sizes);
-                document.getElementById('packSizeSelect').innerHTML = '<option value="">-- Select Pack Size --</option>' +
-                    packSizes.map((ps, idx) =>
-                        `<option value="${idx}" data-pack='${JSON.stringify(ps)}'>${ps.size}L - ₹${parseFloat(ps.price).toFixed(2)}</option>`
-                    ).join('');
-            } catch (e) {
-                console.error('Error parsing pack sizes:', e);
+            let packSizes = [];
+
+            // Try pack_sizes array from API (GET /api/products/:id)
+            if (selectedProduct.pack_sizes && selectedProduct.pack_sizes.length > 0) {
+                packSizes = selectedProduct.pack_sizes.map(ps => ({
+                    size: parseFloat(ps.size) || 0,
+                    unit: ps.unit || 'L',
+                    price: parseFloat(ps.base_price) || 0,
+                    zoho_item_id: ps.zoho_item_id || null
+                }));
             }
+            // Fallback to available_sizes JSON string
+            else if (selectedProduct.available_sizes) {
+                try {
+                    packSizes = JSON.parse(selectedProduct.available_sizes);
+                } catch (e) {
+                    console.error('Error parsing pack sizes:', e);
+                }
+            }
+
+            if (packSizes.length === 0) {
+                document.getElementById('packSizeSelect').innerHTML = '<option value="">No pack sizes available</option>';
+                return;
+            }
+
+            document.getElementById('packSizeSelect').innerHTML = '<option value="">-- Select Pack Size --</option>' +
+                packSizes.map((ps, idx) => {
+                    const unit = (ps.unit || 'L').toUpperCase();
+                    return `<option value="${idx}" data-pack='${JSON.stringify(ps)}'>${ps.size}${unit} - ₹${parseFloat(ps.price).toFixed(2)}</option>`;
+                }).join('');
         }
 
         // ========================================
