@@ -290,7 +290,19 @@
 
             <!-- Pagination -->
             <div class="mt-3 flex flex-col sm:flex-row items-center justify-between gap-3 pb-14">
-                <div class="text-xs text-gray-600" id="paginationInfo">Showing 0 items</div>
+                <div class="flex items-center gap-3">
+                    <div class="text-xs text-gray-600" id="paginationInfo">Showing 0 items</div>
+                    <div class="flex items-center gap-1.5">
+                        <label class="text-xs text-gray-500">Per page:</label>
+                        <select id="perPageSelect" onchange="changePerPage(this.value)" class="px-2 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none bg-white">
+                            <option value="100">100</option>
+                            <option value="200">200</option>
+                            <option value="300">300</option>
+                            <option value="500">500</option>
+                            <option value="10000">All</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="flex items-center gap-1" id="paginationControls"></div>
             </div>
         </div>
@@ -397,7 +409,10 @@
     <script>
     // ============ STATE ============
     var items = [];
-    var currentPage = 1, totalItems = 0, totalPages = 1, PAGE_LIMIT = 10000;
+    var currentPage = 1, totalItems = 0, totalPages = 1;
+    // Per-page: URL param > localStorage > default 100
+    var urlPerPage = new URLSearchParams(window.location.search).get('per_page');
+    var PAGE_LIMIT = parseInt(urlPerPage) || parseInt(localStorage.getItem('zoho_edit_per_page')) || 100;
     var searchTimeout = null;
     var selectedItemIds = new Set();
     var dirtyItems = new Map();   // { zoho_item_id: { field: newValue } }
@@ -887,18 +902,43 @@
     // ============ PAGINATION ============
     function renderPagination() {
         var info = document.getElementById('paginationInfo'), ctl = document.getElementById('paginationControls');
-        var s = (currentPage-1)*PAGE_LIMIT+1, e = Math.min(currentPage*PAGE_LIMIT, totalItems);
-        info.textContent = 'Showing '+s+'-'+e+' of '+totalItems;
+        var s = totalItems === 0 ? 0 : (currentPage-1)*PAGE_LIMIT+1, e = Math.min(currentPage*PAGE_LIMIT, totalItems);
+        info.textContent = totalItems === 0 ? 'No items' : 'Showing '+s+'-'+e+' of '+totalItems+' items';
+
+        // Sync per-page dropdown
+        var ppSel = document.getElementById('perPageSelect');
+        if (ppSel) ppSel.value = PAGE_LIMIT >= 10000 ? '10000' : String(PAGE_LIMIT);
+
+        if (totalPages <= 1) { ctl.innerHTML = ''; return; }
+
         var h = '';
+        // First + Prev
+        h += '<button onclick="goToPage(1)" '+(currentPage<=1?'disabled':'')+' class="px-2 py-1 rounded text-xs font-medium transition '+(currentPage<=1?'bg-gray-100 text-gray-400 cursor-not-allowed':'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')+'" title="First">&laquo;</button>';
         h += '<button onclick="goToPage('+(currentPage-1)+')" '+(currentPage<=1?'disabled':'')+' class="px-2.5 py-1 rounded text-xs font-medium transition '+(currentPage<=1?'bg-gray-100 text-gray-400 cursor-not-allowed':'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')+'">Prev</button>';
+
+        // Page numbers
         var sp = Math.max(1,currentPage-2), ep = Math.min(totalPages,currentPage+2);
         if (sp>1) { h+='<button onclick="goToPage(1)" class="px-2.5 py-1 rounded text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">1</button>'; if(sp>2) h+='<span class="px-1 text-gray-400 text-xs">...</span>'; }
         for (var i=sp;i<=ep;i++) { h+=i===currentPage?'<button class="px-2.5 py-1 rounded text-xs font-medium bg-indigo-600 text-white">'+i+'</button>':'<button onclick="goToPage('+i+')" class="px-2.5 py-1 rounded text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">'+i+'</button>'; }
         if (ep<totalPages) { if(ep<totalPages-1) h+='<span class="px-1 text-gray-400 text-xs">...</span>'; h+='<button onclick="goToPage('+totalPages+')" class="px-2.5 py-1 rounded text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">'+totalPages+'</button>'; }
+
+        // Next + Last
         h += '<button onclick="goToPage('+(currentPage+1)+')" '+(currentPage>=totalPages?'disabled':'')+' class="px-2.5 py-1 rounded text-xs font-medium transition '+(currentPage>=totalPages?'bg-gray-100 text-gray-400 cursor-not-allowed':'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')+'">Next</button>';
+        h += '<button onclick="goToPage('+totalPages+')" '+(currentPage>=totalPages?'disabled':'')+' class="px-2 py-1 rounded text-xs font-medium transition '+(currentPage>=totalPages?'bg-gray-100 text-gray-400 cursor-not-allowed':'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')+'" title="Last">&raquo;</button>';
+
+        // Jump to page
+        h += '<span class="ml-2 text-xs text-gray-500">Go to</span>';
+        h += '<input type="number" min="1" max="'+totalPages+'" value="'+currentPage+'" onkeydown="if(event.key===\'Enter\')goToPage(parseInt(this.value))" class="w-12 px-1.5 py-1 text-xs border border-gray-300 rounded text-center focus:border-purple-500 focus:outline-none ml-1">';
+
         ctl.innerHTML = h;
     }
     function goToPage(p) { if (p<1||p>totalPages) return; if (activeEditCell) commitEdit(activeEditCell); currentPage = p; loadItems(); document.getElementById('tableScroll').scrollTop = 0; }
+    function changePerPage(val) {
+        PAGE_LIMIT = parseInt(val) || 100;
+        localStorage.setItem('zoho_edit_per_page', String(PAGE_LIMIT));
+        currentPage = 1;
+        loadItems();
+    }
 
     // ============ SYNC ============
     async function syncItems() {
