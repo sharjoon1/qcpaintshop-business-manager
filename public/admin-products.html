@@ -194,8 +194,14 @@
                 </div>
             </div>
 
-            <!-- Sync Button Bar -->
-            <div class="flex items-center justify-end mb-3">
+            <!-- Toolbar -->
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-600">
+                        <input type="checkbox" id="zohoGroupToggle" checked onchange="loadZohoItems()" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                        Group by product
+                    </label>
+                </div>
                 <button onclick="syncZohoItems()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2" id="syncZohoItemsBtn">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     Sync from Zoho Books
@@ -1247,41 +1253,119 @@
                     document.getElementById('zohoItemsBody').innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No items found. Click "Sync from Zoho Books" to import.</td></tr>';
                 } else {
                     zohoCurrentItems = items;
-                    document.getElementById('zohoItemsBody').innerHTML = items.map(item => {
-                        const itemId = item.zoho_item_id || item.item_id;
-                        const isMapped = zohoMappedIds.has(itemId);
-                        const isSelected = zohoSelectedIds.has(itemId);
-                        return `
-                        <tr class="hover:bg-gray-50 border-b border-gray-100 ${isSelected ? 'bg-purple-50' : ''}">
-                            <td class="px-3 py-2 text-center">
-                                ${isMapped
-                                    ? `<button onclick="switchToProductsAndEdit(${zohoMappedInfo[itemId]?.product_id})" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-900 cursor-pointer border border-green-200 transition" title="Mapped to: ${escH(zohoMappedInfo[itemId]?.product_name || '')} — Click to edit grouping">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                                        Edit
-                                    </button>`
-                                    : `<input type="checkbox" value="${itemId}" ${isSelected ? 'checked' : ''} onchange="toggleZohoItemSelect('${itemId}', this.checked)" class="zoho-item-cb w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">`
-                                }
-                            </td>
-                            <td class="px-4 py-2 text-center">
-                                ${item.image_url
-                                    ? `<img src="${escH(item.image_url)}" class="w-12 h-12 object-cover rounded cursor-pointer border border-gray-200 hover:border-purple-400 transition" onclick="triggerImageUpload('${itemId}')" title="Click to change image">`
-                                    : `<div class="w-12 h-12 border-2 border-dashed border-gray-300 rounded flex items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition" onclick="triggerImageUpload('${itemId}')" title="Upload image">
-                                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                                       </div>`
-                                }
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="text-sm font-medium text-gray-900">${escH(item.name || item.item_name || '')}</div>
-                                ${isMapped && zohoMappedInfo[itemId]?.product_name ? `<div class="text-[11px] text-purple-600 mt-0.5">&#x2192; ${escH(zohoMappedInfo[itemId].product_name)}</div>` : ''}
-                            </td>
-                            <td class="px-4 py-3 text-xs text-gray-500 font-mono">${escH(item.sku || '-')}</td>
-                            <td class="px-4 py-3 text-sm text-gray-600">${escH(item.brand || '-')}</td>
-                            <td class="px-4 py-3 text-sm text-gray-600">${escH(item.category_name || '-')}</td>
-                            <td class="px-4 py-3 text-sm text-right font-semibold">${item.rate ? '₹' + parseFloat(item.rate).toFixed(2) : '-'}</td>
-                            <td class="px-4 py-3 text-sm text-right">${item.stock_on_hand != null ? parseFloat(item.stock_on_hand).toFixed(0) : '-'}</td>
-                            <td class="px-4 py-3 text-xs text-gray-500">${escH(item.hsn_or_sac || '-')}</td>
-                        </tr>`;
-                    }).join('');
+                    const isGrouped = document.getElementById('zohoGroupToggle')?.checked;
+
+                    if (isGrouped) {
+                        // Group items by extracted product name + brand + category
+                        const groupMap = {};
+                        for (const item of items) {
+                            const info = extractProductInfoJS(item.name || item.item_name, item.cf_product_name);
+                            const brand = (item.brand || '').trim();
+                            const cat = (item.category_name || '').trim();
+                            const key = `${info.productName}|||${brand}|||${cat}`;
+                            if (!groupMap[key]) {
+                                groupMap[key] = {
+                                    name: info.productName, brand, category: cat,
+                                    image_url: item.image_url || '',
+                                    items: [], allMapped: true, anySelected: false,
+                                    totalStock: 0, hsn: item.hsn_or_sac || ''
+                                };
+                            }
+                            const g = groupMap[key];
+                            g.items.push({ ...item, _sizeLabel: info.sizeLabel });
+                            if (!item.image_url && g.image_url === '') g.image_url = '';
+                            else if (item.image_url && !g.image_url) g.image_url = item.image_url;
+                            const itemId = item.zoho_item_id || item.item_id;
+                            if (!zohoMappedIds.has(itemId)) g.allMapped = false;
+                            if (zohoSelectedIds.has(itemId)) g.anySelected = true;
+                            if (item.stock_on_hand != null) g.totalStock += parseFloat(item.stock_on_hand) || 0;
+                        }
+                        const groups = Object.values(groupMap);
+
+                        document.getElementById('zohoItemsBody').innerHTML = groups.map(g => {
+                            const sizes = g.items.map(i => i._sizeLabel).filter(Boolean).sort((a,b) => {
+                                const na = parseFloat(a), nb = parseFloat(b);
+                                return (isNaN(na) || isNaN(nb)) ? a.localeCompare(b) : na - nb;
+                            });
+                            const rateRange = g.items.map(i => parseFloat(i.rate) || 0).filter(r => r > 0);
+                            const minRate = rateRange.length ? Math.min(...rateRange) : 0;
+                            const maxRate = rateRange.length ? Math.max(...rateRange) : 0;
+                            const rateStr = minRate === maxRate
+                                ? (minRate ? '₹' + minRate.toFixed(2) : '-')
+                                : '₹' + minRate.toFixed(0) + ' - ₹' + maxRate.toFixed(0);
+                            const itemIds = g.items.map(i => i.zoho_item_id || i.item_id);
+                            const allSelected = itemIds.every(id => zohoSelectedIds.has(id));
+                            const mappedProduct = g.allMapped ? zohoMappedInfo[itemIds[0]] : null;
+
+                            return `
+                            <tr class="hover:bg-gray-50 border-b border-gray-100 ${g.anySelected ? 'bg-purple-50' : ''}">
+                                <td class="px-3 py-2 text-center">
+                                    ${g.allMapped
+                                        ? `<button onclick="switchToProductsAndEdit(${mappedProduct?.product_id})" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 cursor-pointer border border-green-200 transition" title="Mapped to: ${escH(mappedProduct?.product_name || '')}">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                            Mapped
+                                        </button>`
+                                        : `<input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleZohoGroupSelect([${itemIds.map(id => '\'' + id + '\'').join(',')}], this.checked)" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">`
+                                    }
+                                </td>
+                                <td class="px-4 py-2 text-center">
+                                    ${g.image_url
+                                        ? `<img src="${escH(g.image_url)}" class="w-12 h-12 object-cover rounded border border-gray-200">`
+                                        : `<div class="w-12 h-12 border-2 border-dashed border-gray-300 rounded flex items-center justify-center">
+                                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                           </div>`
+                                    }
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="text-sm font-semibold text-gray-900">${escH(g.name)}</div>
+                                    <div class="text-[11px] text-gray-500 mt-0.5">${g.items.length} variant${g.items.length > 1 ? 's' : ''}${sizes.length ? ': ' + sizes.join(', ') : ''}</div>
+                                </td>
+                                <td class="px-4 py-3 text-xs text-gray-400">${g.items.length} items</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">${escH(g.brand || '-')}</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">${escH(g.category || '-')}</td>
+                                <td class="px-4 py-3 text-sm text-right font-semibold">${rateStr}</td>
+                                <td class="px-4 py-3 text-sm text-right">${g.totalStock > 0 ? g.totalStock.toFixed(0) : '-'}</td>
+                                <td class="px-4 py-3 text-xs text-gray-500">${escH(g.hsn || '-')}</td>
+                            </tr>`;
+                        }).join('');
+                    } else {
+                        // Flat view (individual items)
+                        document.getElementById('zohoItemsBody').innerHTML = items.map(item => {
+                            const itemId = item.zoho_item_id || item.item_id;
+                            const isMapped = zohoMappedIds.has(itemId);
+                            const isSelected = zohoSelectedIds.has(itemId);
+                            return `
+                            <tr class="hover:bg-gray-50 border-b border-gray-100 ${isSelected ? 'bg-purple-50' : ''}">
+                                <td class="px-3 py-2 text-center">
+                                    ${isMapped
+                                        ? `<button onclick="switchToProductsAndEdit(${zohoMappedInfo[itemId]?.product_id})" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-900 cursor-pointer border border-green-200 transition" title="Mapped to: ${escH(zohoMappedInfo[itemId]?.product_name || '')} — Click to edit grouping">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                            Edit
+                                        </button>`
+                                        : `<input type="checkbox" value="${itemId}" ${isSelected ? 'checked' : ''} onchange="toggleZohoItemSelect('${itemId}', this.checked)" class="zoho-item-cb w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">`
+                                    }
+                                </td>
+                                <td class="px-4 py-2 text-center">
+                                    ${item.image_url
+                                        ? `<img src="${escH(item.image_url)}" class="w-12 h-12 object-cover rounded cursor-pointer border border-gray-200 hover:border-purple-400 transition" onclick="triggerImageUpload('${itemId}')" title="Click to change image">`
+                                        : `<div class="w-12 h-12 border-2 border-dashed border-gray-300 rounded flex items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition" onclick="triggerImageUpload('${itemId}')" title="Upload image">
+                                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                           </div>`
+                                    }
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="text-sm font-medium text-gray-900">${escH(item.name || item.item_name || '')}</div>
+                                    ${isMapped && zohoMappedInfo[itemId]?.product_name ? `<div class="text-[11px] text-purple-600 mt-0.5">&#x2192; ${escH(zohoMappedInfo[itemId].product_name)}</div>` : ''}
+                                </td>
+                                <td class="px-4 py-3 text-xs text-gray-500 font-mono">${escH(item.sku || '-')}</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">${escH(item.brand || '-')}</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">${escH(item.category_name || '-')}</td>
+                                <td class="px-4 py-3 text-sm text-right font-semibold">${item.rate ? '₹' + parseFloat(item.rate).toFixed(2) : '-'}</td>
+                                <td class="px-4 py-3 text-sm text-right">${item.stock_on_hand != null ? parseFloat(item.stock_on_hand).toFixed(0) : '-'}</td>
+                                <td class="px-4 py-3 text-xs text-gray-500">${escH(item.hsn_or_sac || '-')}</td>
+                            </tr>`;
+                        }).join('');
+                    }
                     // Sync select-all checkbox state
                     const allCb = document.getElementById('zohoSelectAll');
                     const selectableItems = items.filter(i => !zohoMappedIds.has(i.zoho_item_id || i.item_id));
@@ -1642,6 +1726,16 @@
             if (checked) zohoSelectedIds.add(itemId);
             else zohoSelectedIds.delete(itemId);
             updateZohoSelectionUI();
+        }
+
+        function toggleZohoGroupSelect(itemIds, checked) {
+            itemIds.forEach(id => {
+                if (checked) zohoSelectedIds.add(id);
+                else zohoSelectedIds.delete(id);
+            });
+            updateZohoSelectionUI();
+            // Re-render to update group checkbox state
+            loadZohoItems();
         }
 
         function toggleZohoSelectAll(checked) {
