@@ -577,10 +577,22 @@
     }
 
     // ============ COLUMN FILTERS ============
-    // All column filters work client-side on loaded items (instant, no page reload)
+    var colFilterTimeout = null;
     function onColumnFilter(field, value) {
         if (value) { columnFilters[field] = value.toLowerCase(); } else { delete columnFilters[field]; }
-        renderTable();
+        // If not all items are loaded (paginated), reload all items for full filtering
+        if (totalItems > items.length && Object.keys(columnFilters).length > 0) {
+            clearTimeout(colFilterTimeout);
+            colFilterTimeout = setTimeout(function() {
+                // Temporarily load all items for filtering
+                var origLimit = PAGE_LIMIT;
+                PAGE_LIMIT = 10000;
+                currentPage = 1;
+                loadItems().then(function() { PAGE_LIMIT = origLimit; });
+            }, 400);
+        } else {
+            renderTable();
+        }
     }
     function getFilteredItems() {
         var keys = Object.keys(columnFilters);
@@ -601,9 +613,10 @@
     async function loadItems() {
         var search = document.getElementById('searchInput').value.trim();
         var showInactive = document.getElementById('showInactiveToggle') && document.getElementById('showInactiveToggle').checked;
-        // When searching, load ALL matching items (ignore per-page limit)
-        var effectiveLimit = search ? 10000 : PAGE_LIMIT;
-        var effectivePage = search ? 1 : currentPage;
+        // When searching or filtering, load ALL items (ignore per-page limit)
+        var hasColumnFilters = Object.keys(columnFilters).length > 0;
+        var effectiveLimit = (search || hasColumnFilters) ? 10000 : PAGE_LIMIT;
+        var effectivePage = (search || hasColumnFilters) ? 1 : currentPage;
         var url = '/api/zoho/items?page=' + effectivePage + '&limit=' + effectiveLimit;
         if (search) url += '&search=' + encodeURIComponent(search);
         if (showInactive) url += '&show_inactive=1';
@@ -919,11 +932,15 @@
     function renderPagination() {
         var info = document.getElementById('paginationInfo'), ctl = document.getElementById('paginationControls');
         var search = document.getElementById('searchInput').value.trim();
-        var s = totalItems === 0 ? 0 : (currentPage-1)*(search ? 10000 : PAGE_LIMIT)+1;
-        var e = Math.min(s + items.length - 1, totalItems);
+        var hasColFilters = Object.keys(columnFilters).length > 0;
+        var filtered = getFilteredItems();
         if (search) {
             info.textContent = totalItems === 0 ? 'No items match "'+search+'"' : 'Found '+totalItems+' items matching "'+search+'"';
+        } else if (hasColFilters) {
+            info.textContent = 'Showing '+filtered.length+' of '+totalItems+' items (filtered)';
         } else {
+            var s = totalItems === 0 ? 0 : (currentPage-1)*PAGE_LIMIT+1;
+            var e = Math.min(s + items.length - 1, totalItems);
             info.textContent = totalItems === 0 ? 'No items' : 'Showing '+s+'-'+e+' of '+totalItems+' items';
         }
 
@@ -931,10 +948,10 @@
         var ppSel = document.getElementById('perPageSelect');
         if (ppSel) {
             ppSel.value = PAGE_LIMIT >= 10000 ? '10000' : String(PAGE_LIMIT);
-            ppSel.parentElement.style.display = search ? 'none' : '';
+            ppSel.parentElement.style.display = (search || hasColFilters) ? 'none' : '';
         }
 
-        if (totalPages <= 1 || search) { ctl.innerHTML = ''; return; }
+        if (totalPages <= 1 || search || hasColFilters) { ctl.innerHTML = ''; return; }
 
         var h = '';
         // First + Prev
