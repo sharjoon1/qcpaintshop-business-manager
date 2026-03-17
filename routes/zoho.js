@@ -1969,10 +1969,46 @@ RULES:
             }
         }
 
+        // === QUICK STATS HANDLER ===
+        // Answer listing/counting questions instantly from loaded items
+        const isListQuestion = /\b(how\s+many|list\s+(all|out)|show\s+(all|me)|count|available|what.*categor|what.*brand|which.*categor|which.*brand)\b/i.test(command);
+        if (isListQuestion) {
+            const brands = {};
+            const categories = {};
+            allCompact.forEach(it => {
+                if (it.brand) brands[it.brand] = (brands[it.brand] || 0) + 1;
+                if (it.cat) categories[it.cat] = (categories[it.cat] || 0) + 1;
+            });
+            const sortedBrands = Object.entries(brands).sort((a, b) => b[1] - a[1]);
+            const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+
+            let reply = `**Item Statistics** (${allCompact.length} items loaded)\n\n`;
+            if (/brand/i.test(command) || !/categor/i.test(command)) {
+                reply += `**Brands (${sortedBrands.length}):**\n`;
+                reply += sortedBrands.map(([name, count]) => `- ${name}: ${count} items`).join('\n');
+                reply += '\n\n';
+            }
+            if (/categor/i.test(command) || !/brand/i.test(command)) {
+                reply += `**Categories (${sortedCats.length}):**\n`;
+                reply += sortedCats.map(([name, count]) => `- ${name}: ${count} items`).join('\n');
+            }
+
+            return res.json({
+                success: true,
+                edits: [],
+                summary: `${sortedBrands.length} brands, ${sortedCats.length} categories across ${allCompact.length} items`,
+                reply,
+                model: 'deterministic',
+                itemsProcessed: allCompact.length,
+                batchCount: 0
+            });
+        }
+
         // === DETERMINISTIC PAINT PRODUCT CATEGORIZER ===
         // When user asks to categorize/classify items, use keyword matching on product names.
         // This is instant, handles all items, and never misses any.
-        const isCategoryCommand = /\b(categor(y|ize|ise|ies)?|classify|classification)\b/i.test(command);
+        // Only trigger categorizer for ACTION commands, not questions about categories
+        const isCategoryCommand = /\b(categor(ize|ise)|classify|assign\s+categor|set\s+categor|bulk\s+categor|update\s+categor)\b/i.test(command);
         if (isCategoryCommand) {
             function categorizePaintItem(name, desc, brand) {
                 const text = `${name || ''} ${desc || ''}`.toUpperCase();
