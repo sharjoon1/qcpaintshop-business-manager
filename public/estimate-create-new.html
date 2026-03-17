@@ -811,6 +811,9 @@
                 }
             }
 
+            // Sort by size ascending (1L, 4L, 10L, 20L)
+            packSizes.sort((a, b) => (parseFloat(a.size) || 0) - (parseFloat(b.size) || 0));
+
             if (packSizes.length === 0) {
                 document.getElementById('packSizeSelect').innerHTML = '<option value="">No pack sizes available</option>';
                 return;
