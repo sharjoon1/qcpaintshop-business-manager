@@ -87,6 +87,13 @@
         .edit-card-field input, .edit-card-field select, .edit-card-field textarea { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.8125rem; outline: none; transition: border-color 0.15s; }
         .edit-card-field input:focus, .edit-card-field select:focus, .edit-card-field textarea:focus { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.15); }
         .edit-card-field .dirty-input { background: #fffbeb; border-color: #fbbf24; }
+        .paste-dropdown-trigger { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; background: #667eea; color: white; border: none; border-radius: 3px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; opacity: 0.85; transition: opacity 0.15s; }
+        .paste-dropdown-trigger:hover { opacity: 1; }
+        .paste-dropdown-menu { position: absolute; right: 0; top: 100%; margin-top: 2px; background: white; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 100; min-width: 180px; overflow: hidden; }
+        .paste-dropdown-menu button { display: block; width: 100%; text-align: left; padding: 8px 12px; font-size: 12px; color: #374151; border: none; background: white; cursor: pointer; }
+        .paste-dropdown-menu button:hover { background: #f3f4f6; }
+        .paste-dropdown-menu button:disabled { color: #9ca3af; cursor: not-allowed; }
+        .paste-dropdown-menu button:disabled:hover { background: white; }
         .slide-form-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
         .slide-form { background: white; border-radius: 16px 16px 0 0; width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto; padding: 1rem; animation: slideUp 0.25s ease; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -496,7 +503,8 @@
         if (scope === 'selected') {
             if (selectedItemIds.size === 0) { showToast('Select items first', 'error'); return; }
             targetItems = items.filter(function(it) { return selectedItemIds.has(String(it.item_id || it.zoho_item_id)); });
-        } else { targetItems = items; }
+        } else { targetItems = getFilteredItems(); }
+        if (!confirm('Apply ' + (pct > 0 ? '+' : '') + pct + '% to ' + field.replace('_', ' ') + ' for ' + targetItems.length + ' items?')) return;
         var count = 0;
         targetItems.forEach(function(item) {
             var id = String(item.item_id || item.zoho_item_id);
@@ -686,17 +694,17 @@
         activeEditCell = cell;
 
         if (col.type === 'select') {
-            var sh = '<select data-item-id="'+escapeHtml(itemId)+'" data-field="'+field+'" onchange="onCellChange(this)" onblur="commitEdit(this.parentNode)" onkeydown="onCellKeydown(event,this.parentNode)">';
+            var sh = '<select data-item-id="'+escapeHtml(itemId)+'" data-field="'+field+'" onchange="onCellChange(this)" onblur="commitEdit(this.parentNode,true)" onkeydown="onCellKeydown(event,this.parentNode)">';
             col.options.forEach(function(o) { sh += '<option value="'+escapeHtml(o)+'"'+(o===valStr?' selected':'')+'>'+escapeHtml(o||'(none)')+'</option>'; });
             sh += '</select>';
             cell.innerHTML = sh; cell.querySelector('select').focus();
         } else if (col.type === 'textarea') {
-            cell.innerHTML = '<textarea data-item-id="'+escapeHtml(itemId)+'" data-field="'+field+'" oninput="onCellChange(this)" onblur="commitEdit(this.parentNode)" onkeydown="onCellKeydown(event,this.parentNode)" rows="2">'+escapeHtml(valStr)+'</textarea>';
+            cell.innerHTML = '<textarea data-item-id="'+escapeHtml(itemId)+'" data-field="'+field+'" oninput="onCellChange(this)" onblur="commitEdit(this.parentNode,true)" onkeydown="onCellKeydown(event,this.parentNode)" rows="2">'+escapeHtml(valStr)+'</textarea>';
             cell.querySelector('textarea').focus();
         } else {
             var it = col.type === 'number' ? 'number' : 'text';
             var st = col.step ? ' step="'+col.step+'"' : '';
-            cell.innerHTML = '<input type="'+it+'"'+st+' data-item-id="'+escapeHtml(itemId)+'" data-field="'+field+'" value="'+escapeHtml(valStr)+'" oninput="onCellChange(this)" onblur="commitEdit(this.parentNode)" onkeydown="onCellKeydown(event,this.parentNode)">';
+            cell.innerHTML = '<input type="'+it+'"'+st+' data-item-id="'+escapeHtml(itemId)+'" data-field="'+field+'" value="'+escapeHtml(valStr)+'" oninput="onCellChange(this)" onblur="commitEdit(this.parentNode,true)" onkeydown="onCellKeydown(event,this.parentNode)">';
             var inp = cell.querySelector('input'); inp.focus(); inp.select();
         }
     }
@@ -725,7 +733,7 @@
             else { var nextTr = event.shiftKey ? tr.previousElementSibling : tr.nextElementSibling; if (nextTr) { var cells = Array.from(nextTr.querySelectorAll('.ecell')).filter(function(c){return !c.closest('td').classList.contains('col-hidden');}); var tc = event.shiftKey ? cells[cells.length-1] : cells[0]; if (tc) setTimeout(function(){startEdit(tc);},50); } }
         }
     }
-    function commitEdit(cell) {
+    function commitEdit(cell, fromBlur) {
         if (!cell || !cell.classList.contains('editing')) return;
         var itemId = cell.getAttribute('data-item-id'), field = cell.getAttribute('data-field');
         var val = getCurrentValue(itemId, field);
@@ -738,6 +746,84 @@
         // Update row dirty class
         var tr = cell.closest('tr');
         if (tr) tr.classList.toggle('row-dirty', dirtyItems.has(itemId));
+        // Show paste dropdown on blur-commit for dirty cells
+        if (fromBlur && isDirty(itemId, field)) {
+            showPasteDropdown(cell, itemId, field, val);
+        }
+    }
+
+    // ============ PASTE TO ALL ROWS ============
+    var pasteDropdownTimeout = null;
+    var activePasteDropdown = null;
+
+    function showPasteDropdown(cell, itemId, field, value) {
+        removePasteDropdown();
+        var readonlyFields = ['zoho_item_id', 'zoho_stock_on_hand', 'last_synced_at'];
+        if (readonlyFields.indexOf(field) !== -1) return;
+        cell.style.position = 'relative';
+        var trigger = document.createElement('button');
+        trigger.className = 'paste-dropdown-trigger';
+        trigger.innerHTML = '&#9662;';
+        trigger.title = 'Paste to multiple rows';
+        trigger.onclick = function(e) { e.stopPropagation(); togglePasteMenu(cell, field, value); };
+        cell.appendChild(trigger);
+        activePasteDropdown = { cell: cell, trigger: trigger, field: field, value: value };
+        pasteDropdownTimeout = setTimeout(removePasteDropdown, 4000);
+    }
+
+    function togglePasteMenu(cell, field, value) {
+        var existing = cell.querySelector('.paste-dropdown-menu');
+        if (existing) { existing.remove(); return; }
+        clearTimeout(pasteDropdownTimeout);
+        var menu = document.createElement('div');
+        menu.className = 'paste-dropdown-menu';
+        var filteredCount = getFilteredItems().length;
+        var selectedCount = selectedItemIds.size;
+        var btn1 = document.createElement('button');
+        btn1.textContent = 'Paste to all rows (' + filteredCount + ')';
+        btn1.onclick = function() { pasteToRows('filtered', field, value); menu.remove(); };
+        var btn2 = document.createElement('button');
+        btn2.textContent = 'Paste to selected (' + selectedCount + ')';
+        btn2.disabled = selectedCount === 0;
+        btn2.onclick = function() { pasteToRows('selected', field, value); menu.remove(); };
+        menu.appendChild(btn1);
+        menu.appendChild(btn2);
+        cell.appendChild(menu);
+        setTimeout(function() { document.addEventListener('click', closePasteMenu, { once: true }); }, 10);
+    }
+
+    function closePasteMenu() {
+        document.querySelectorAll('.paste-dropdown-menu').forEach(function(m) { m.remove(); });
+    }
+
+    function removePasteDropdown() {
+        clearTimeout(pasteDropdownTimeout);
+        if (activePasteDropdown) {
+            if (activePasteDropdown.trigger && activePasteDropdown.trigger.parentElement) activePasteDropdown.trigger.remove();
+            activePasteDropdown = null;
+        }
+        closePasteMenu();
+    }
+
+    function pasteToRows(scope, field, value) {
+        var displayVal = String(value).length > 20 ? String(value).substring(0, 20) + '...' : String(value);
+        var targetItems;
+        if (scope === 'selected') {
+            targetItems = getFilteredItems().filter(function(it) { return selectedItemIds.has(String(it.item_id || it.zoho_item_id)); });
+        } else {
+            targetItems = getFilteredItems();
+        }
+        if (targetItems.length === 0) { showToast('No items to paste to', 'error'); return; }
+        if (!confirm("Apply '" + displayVal + "' to " + field.replace(/^zoho_/, '').replace(/_/g, ' ') + " for " + targetItems.length + " rows?")) return;
+        var count = 0;
+        targetItems.forEach(function(item) {
+            var id = String(item.item_id || item.zoho_item_id);
+            setDirty(id, field, String(value));
+            count++;
+        });
+        removePasteDropdown();
+        renderTable();
+        showToast('Updated ' + count + ' rows', 'success');
     }
 
     // ============ MOBILE CARDS ============

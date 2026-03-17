@@ -1751,7 +1751,12 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
                 zim.last_synced_at as last_synced
             FROM zoho_items_map zim
             ${where}
-            ORDER BY zim.zoho_item_name ASC
+            ORDER BY ${(() => {
+                const SORT_WHITELIST = ['zoho_item_name','zoho_sku','zoho_brand','zoho_category_name','zoho_rate','zoho_stock_on_hand'];
+                const sortCol = SORT_WHITELIST.includes(req.query.sort) ? `zim.${req.query.sort}` : 'zim.zoho_item_name';
+                const sortOrder = req.query.order === 'desc' ? 'DESC' : 'ASC';
+                return `${sortCol} ${sortOrder}`;
+            })()}
             LIMIT ? OFFSET ?
         `, [...params, parseInt(limit), offset]);
 

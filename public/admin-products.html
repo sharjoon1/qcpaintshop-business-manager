@@ -39,38 +39,9 @@
     <div class="max-w-7xl mx-auto p-4 sm:p-6">
         <!-- Products Tab Content -->
         <div id="tab-products" class="tab-section">
-            <!-- Search & Filters -->
-            <div class="bg-white rounded-xl shadow-sm p-4 mb-4">
-                <div class="flex flex-col gap-3">
-                    <div class="relative">
-                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                        </svg>
-                        <input type="text" id="searchInput" placeholder="Search by product name..." class="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none text-sm" oninput="applyFilters()">
-                    </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <select id="filterBrand" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
-                            <option value="">All Brands</option>
-                        </select>
-                        <select id="filterCategory" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
-                            <option value="">All Categories</option>
-                        </select>
-                        <select id="filterType" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
-                            <option value="">All Types</option>
-                            <option value="unit_wise">Unit Wise</option>
-                            <option value="area_wise">Area Wise</option>
-                        </select>
-                        <select id="filterStatus" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-purple-500 focus:outline-none" onchange="applyFilters()">
-                            <option value="">All Status</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span id="resultsCount" class="text-xs text-gray-500"></span>
-                        <button onclick="clearFilters()" class="text-xs text-emerald-600 hover:text-emerald-800 font-semibold">Clear Filters</button>
-                    </div>
-                </div>
+            <!-- Results Count Bar -->
+            <div class="flex items-center justify-between px-4 py-2 mb-2">
+                <span id="resultsCount" class="text-xs text-gray-500"></span>
             </div>
 
             <!-- Products List -->
@@ -84,10 +55,27 @@
                 <div id="productsTable" class="hidden overflow-x-auto">
                     <table class="table">
                         <thead>
-                            <tr>
-                                <th class="w-10 text-center"><input type="checkbox" id="productSelectAll" onchange="toggleProductSelectAll(this.checked)" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"></th>
-                                <th class="w-14">Image</th><th>Name</th><th>Brand</th><th>Category</th><th>Type</th>
-                                <th class="text-right">Price</th><th>Status</th><th class="text-center">Actions</th>
+                            <tr class="bg-gray-800 text-white text-xs uppercase">
+                                <th class="w-10 text-center px-3 py-2"><input type="checkbox" id="productSelectAll" onchange="toggleProductSelectAll(this.checked)" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"></th>
+                                <th class="w-14 px-3 py-2">Image</th>
+                                <th class="px-3 py-2 text-left cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortProducts('name')">Name <span id="sort-name" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-left cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortProducts('brand_name')">Brand <span id="sort-brand_name" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-left cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortProducts('category_name')">Category <span id="sort-category_name" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-left cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortProducts('product_type')">Type <span id="sort-product_type" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-right cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortProducts('base_price')">Price <span id="sort-base_price" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-left cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortProducts('status')">Status <span id="sort-status" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-center">Actions</th>
+                            </tr>
+                            <tr class="bg-gray-100 border-b border-gray-200">
+                                <td class="px-1 py-1"></td>
+                                <td class="px-1 py-1"></td>
+                                <td class="px-1 py-1"><input type="text" id="filterName" placeholder="Search..." class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" oninput="applyFilters()"></td>
+                                <td class="px-1 py-1"><select id="filterBrand" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="applyFilters()"><option value="">All</option></select></td>
+                                <td class="px-1 py-1"><select id="filterCategory" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="applyFilters()"><option value="">All</option></select></td>
+                                <td class="px-1 py-1"><select id="filterType" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="applyFilters()"><option value="">All</option><option value="unit_wise">Unit</option><option value="area_wise">Area</option></select></td>
+                                <td class="px-1 py-1"></td>
+                                <td class="px-1 py-1"><select id="filterStatus" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="applyFilters()"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></td>
+                                <td class="px-1 py-1 text-center"><button onclick="clearFilters()" class="text-xs text-purple-600 hover:text-purple-800 font-semibold" title="Clear all filters">&#10005;</button></td>
                             </tr>
                         </thead>
                         <tbody id="productsBody"></tbody>
@@ -206,31 +194,12 @@
                 </div>
             </div>
 
-            <!-- Search & Sync Bar -->
-            <div class="bg-white rounded-xl shadow-sm p-4 mb-4">
-                <div class="flex flex-wrap gap-3 items-center">
-                    <div class="relative flex-1 min-w-[200px]">
-                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                        </svg>
-                        <input type="text" id="zohoSearchInput" placeholder="Search items by name or SKU..." class="w-full pl-9 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none text-sm" oninput="debounceZohoSearch()">
-                    </div>
-                    <select id="zohoFilterBrand" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="zohoCurrentPage=1; loadZohoItems()">
-                        <option value="">All Brands</option>
-                    </select>
-                    <select id="zohoFilterCategory" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="zohoCurrentPage=1; loadZohoItems()">
-                        <option value="">All Categories</option>
-                    </select>
-                    <select id="zohoFilterMapped" class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" onchange="zohoCurrentPage=1; loadZohoItems()">
-                        <option value="">All Items</option>
-                        <option value="unmapped">Unmapped Only</option>
-                        <option value="mapped">Already Imported</option>
-                    </select>
-                    <button onclick="syncZohoItems()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2" id="syncZohoItemsBtn">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        Sync from Zoho Books
-                    </button>
-                </div>
+            <!-- Sync Button Bar -->
+            <div class="flex items-center justify-end mb-3">
+                <button onclick="syncZohoItems()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-600 hover:to-purple-700 transition flex items-center gap-2" id="syncZohoItemsBtn">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    Sync from Zoho Books
+                </button>
             </div>
 
             <!-- Sync Status -->
@@ -246,16 +215,27 @@
                 <div class="overflow-x-auto">
                     <table class="table w-full">
                         <thead>
-                            <tr class="bg-gray-50">
-                                <th class="px-3 py-3 text-center w-10"><input type="checkbox" id="zohoSelectAll" onchange="toggleZohoSelectAll(this.checked)" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"></th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-16">Image</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Item Name</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SKU</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Brand</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Category</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Rate</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Stock</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">HSN</th>
+                            <tr class="bg-gray-800 text-white text-xs uppercase">
+                                <th class="px-3 py-2 text-center w-10"><input type="checkbox" id="zohoSelectAll" onchange="toggleZohoSelectAll(this.checked)" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"></th>
+                                <th class="px-3 py-2 text-center w-16">Image</th>
+                                <th class="px-3 py-2 text-left cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortZoho('zoho_item_name')">Item Name <span id="zsort-zoho_item_name" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-left cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortZoho('zoho_sku')">SKU <span id="zsort-zoho_sku" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-left cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortZoho('zoho_brand')">Brand <span id="zsort-zoho_brand" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-left cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortZoho('zoho_category_name')">Category <span id="zsort-zoho_category_name" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-right cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortZoho('zoho_rate')">Rate <span id="zsort-zoho_rate" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-right cursor-pointer select-none hover:bg-gray-700 transition" onclick="sortZoho('zoho_stock_on_hand')">Stock <span id="zsort-zoho_stock_on_hand" class="ml-1 text-gray-400">&#8693;</span></th>
+                                <th class="px-3 py-2 text-left">HSN</th>
+                            </tr>
+                            <tr class="bg-gray-100 border-b">
+                                <td class="px-1 py-1"></td>
+                                <td class="px-1 py-1"></td>
+                                <td class="px-1 py-1"><input type="text" id="zohoSearchInput" placeholder="Search..." class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" oninput="debounceZohoSearch()"></td>
+                                <td class="px-1 py-1"></td>
+                                <td class="px-1 py-1"><select id="zohoFilterBrand" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="zohoCurrentPage=1; loadZohoItems()"><option value="">All</option></select></td>
+                                <td class="px-1 py-1"><select id="zohoFilterCategory" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="zohoCurrentPage=1; loadZohoItems()"><option value="">All</option></select></td>
+                                <td class="px-1 py-1"></td>
+                                <td class="px-1 py-1"></td>
+                                <td class="px-1 py-1"><select id="zohoFilterMapped" class="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:border-purple-500 focus:outline-none" onchange="zohoCurrentPage=1; loadZohoItems()"><option value="">All</option><option value="unmapped">Unmapped</option><option value="mapped">Mapped</option></select></td>
                             </tr>
                         </thead>
                         <tbody id="zohoItemsBody">
@@ -506,6 +486,7 @@
                 } else {
                     document.getElementById('emptyState').classList.add('hidden');
                     document.getElementById('productsTable').classList.remove('hidden');
+                    updateSortArrows();
                     renderProducts();
                 }
                 
@@ -541,15 +522,48 @@
             });
         }
 
-        // Get filtered products based on search and filter inputs
-        function getFilteredProducts() {
-            const search = document.getElementById('searchInput').value.toLowerCase().trim();
-            const brandId = document.getElementById('filterBrand').value;
-            const categoryId = document.getElementById('filterCategory').value;
-            const type = document.getElementById('filterType').value;
-            const status = document.getElementById('filterStatus').value;
+        // Sort state
+        let productSortCol = sessionStorage.getItem('products_sort_col') || '';
+        let productSortDir = sessionStorage.getItem('products_sort_dir') || '';
 
-            return products.filter(product => {
+        function sortProducts(col) {
+            if (productSortCol === col) {
+                if (productSortDir === 'asc') productSortDir = 'desc';
+                else if (productSortDir === 'desc') { productSortDir = ''; productSortCol = ''; }
+                else productSortDir = 'asc';
+            } else {
+                productSortCol = col;
+                productSortDir = 'asc';
+            }
+            sessionStorage.setItem('products_sort_col', productSortCol);
+            sessionStorage.setItem('products_sort_dir', productSortDir);
+            updateSortArrows();
+            renderProducts();
+        }
+
+        function updateSortArrows() {
+            document.querySelectorAll('[id^="sort-"]').forEach(el => {
+                el.innerHTML = '&#8693;';
+                el.className = 'ml-1 text-gray-400';
+            });
+            if (productSortCol && productSortDir) {
+                const el = document.getElementById('sort-' + productSortCol);
+                if (el) {
+                    el.textContent = productSortDir === 'asc' ? '\u25B2' : '\u25BC';
+                    el.className = 'ml-1 text-yellow-300';
+                }
+            }
+        }
+
+        // Get filtered products based on column filter inputs
+        function getFilteredProducts() {
+            const search = (document.getElementById('filterName')?.value || '').toLowerCase().trim();
+            const brandId = document.getElementById('filterBrand')?.value || '';
+            const categoryId = document.getElementById('filterCategory')?.value || '';
+            const type = document.getElementById('filterType')?.value || '';
+            const status = document.getElementById('filterStatus')?.value || '';
+
+            let filtered = products.filter(product => {
                 if (search && !product.name.toLowerCase().includes(search) &&
                     !(product.brand_name || '').toLowerCase().includes(search) &&
                     !(product.category_name || '').toLowerCase().includes(search) &&
@@ -562,6 +576,25 @@
                 if (status && product.status !== status) return false;
                 return true;
             });
+
+            // Sort
+            if (productSortCol && productSortDir) {
+                filtered.sort((a, b) => {
+                    let va = a[productSortCol], vb = b[productSortCol];
+                    if (productSortCol === 'base_price') {
+                        va = parseFloat(va) || 0;
+                        vb = parseFloat(vb) || 0;
+                    } else {
+                        va = String(va || '').toLowerCase();
+                        vb = String(vb || '').toLowerCase();
+                    }
+                    if (va < vb) return productSortDir === 'asc' ? -1 : 1;
+                    if (va > vb) return productSortDir === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            return filtered;
         }
 
         // Apply filters and re-render
@@ -571,11 +604,17 @@
 
         // Clear all filters
         function clearFilters() {
-            document.getElementById('searchInput').value = '';
+            const nameInput = document.getElementById('filterName');
+            if (nameInput) nameInput.value = '';
             document.getElementById('filterBrand').value = '';
             document.getElementById('filterCategory').value = '';
             document.getElementById('filterType').value = '';
             document.getElementById('filterStatus').value = '';
+            productSortCol = '';
+            productSortDir = '';
+            sessionStorage.removeItem('products_sort_col');
+            sessionStorage.removeItem('products_sort_dir');
+            updateSortArrows();
             renderProducts();
         }
 
@@ -585,7 +624,7 @@
             const tbody = document.getElementById('productsBody');
 
             // Update results count
-            const isFiltered = document.getElementById('searchInput').value || document.getElementById('filterBrand').value || document.getElementById('filterCategory').value || document.getElementById('filterType').value || document.getElementById('filterStatus').value;
+            const isFiltered = document.getElementById('filterName')?.value || document.getElementById('filterBrand').value || document.getElementById('filterCategory').value || document.getElementById('filterType').value || document.getElementById('filterStatus').value;
             document.getElementById('resultsCount').textContent = isFiltered
                 ? `Showing ${filtered.length} of ${products.length} products`
                 : `${products.length} products`;
@@ -1095,6 +1134,37 @@
         let zohoMappedIds = new Set();
         let zohoCurrentItems = [];
 
+        let zohoSortCol = '';
+        let zohoSortDir = '';
+
+        function sortZoho(col) {
+            if (zohoSortCol === col) {
+                if (zohoSortDir === 'asc') zohoSortDir = 'desc';
+                else if (zohoSortDir === 'desc') { zohoSortDir = ''; zohoSortCol = ''; }
+                else zohoSortDir = 'asc';
+            } else {
+                zohoSortCol = col;
+                zohoSortDir = 'asc';
+            }
+            updateZohoSortArrows();
+            zohoCurrentPage = 1;
+            loadZohoItems();
+        }
+
+        function updateZohoSortArrows() {
+            document.querySelectorAll('[id^="zsort-"]').forEach(el => {
+                el.innerHTML = '&#8693;';
+                el.className = 'ml-1 text-gray-400';
+            });
+            if (zohoSortCol && zohoSortDir) {
+                const el = document.getElementById('zsort-' + zohoSortCol);
+                if (el) {
+                    el.textContent = zohoSortDir === 'asc' ? '\u25B2' : '\u25BC';
+                    el.className = 'ml-1 text-yellow-300';
+                }
+            }
+        }
+
         function debounceZohoSearch() {
             clearTimeout(zohoSearchTimer);
             zohoSearchTimer = setTimeout(() => { zohoCurrentPage = 1; loadZohoItems(); }, 400);
@@ -1145,6 +1215,8 @@
             if (search) params.set('search', search);
             if (brand) params.set('brand', brand);
             if (category) params.set('category', category);
+            if (zohoSortCol) params.set('sort', zohoSortCol);
+            if (zohoSortDir) params.set('order', zohoSortDir);
 
             try {
                 const res = await fetch(`/api/zoho/items?${params}`, { headers: getAuthHeaders() });
