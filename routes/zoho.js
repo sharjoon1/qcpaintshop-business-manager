@@ -2589,6 +2589,32 @@ router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req,
             `, [jobId, item.zoho_item_id, itemName, JSON.stringify(item.changes)]);
         }
 
+        // Also update local zoho_items_map so edits persist before Zoho sync
+        const FIELD_MAP = {
+            name: 'zoho_item_name', sku: 'zoho_sku', rate: 'zoho_rate',
+            purchase_rate: 'zoho_purchase_rate', cf_dpl: 'zoho_cf_dpl',
+            unit: 'zoho_unit', hsn_or_sac: 'zoho_hsn_or_sac',
+            tax_percentage: 'zoho_tax_percentage', brand: 'zoho_brand',
+            category_name: 'zoho_category_name', manufacturer: 'zoho_manufacturer',
+            reorder_level: 'zoho_reorder_level', description: 'zoho_description',
+            cf_product_name: 'zoho_cf_product_name', status: 'zoho_status'
+        };
+        for (const item of items) {
+            const sets = [];
+            const vals = [];
+            for (const [key, val] of Object.entries(item.changes)) {
+                const dbCol = FIELD_MAP[key];
+                if (dbCol) {
+                    sets.push(`${dbCol} = ?`);
+                    vals.push(val);
+                }
+            }
+            if (sets.length > 0) {
+                vals.push(item.zoho_item_id);
+                await pool.query(`UPDATE zoho_items_map SET ${sets.join(', ')} WHERE zoho_item_id = ?`, vals);
+            }
+        }
+
         res.json({
             success: true,
             data: { job_id: jobId, total_items: items.length },

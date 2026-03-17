@@ -993,20 +993,11 @@
             if(!resp.ok){var e=await resp.json().catch(function(){return{};}); throw new Error(e.message||'Push failed');}
             var data=await resp.json();
             showToast('Bulk job created'+(data.data?' (Job #'+data.data.job_id+')':'')+' - '+count+' items queued','success');
-            // Merge dirty values into originals and items so edits persist until next sync
-            dirtyItems.forEach(function(changes, itemId) {
-                var orig = originalValues.get(itemId);
-                var item = items.find(function(it) { return String(it.item_id || it.zoho_item_id) === itemId; });
-                Object.keys(changes).forEach(function(k) {
-                    if (k === '_itemName') return;
-                    if (orig) orig[k] = changes[k];
-                    if (item) item[k] = changes[k];
-                });
-            });
+            // Server now updates local DB too, so reload shows edited values
             dirtyItems.clear();
+            originalValues.clear();
             updateChangesUI();
-            renderTable();
-            renderCards();
+            loadItems();
         } catch(err){showToast('Push failed: '+err.message,'error');}
         finally{btn.disabled=false;spinner.classList.add('hidden');icon.classList.remove('hidden');text.textContent='Push Changes to Zoho';updateChangesUI();}
     }
