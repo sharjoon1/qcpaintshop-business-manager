@@ -412,7 +412,7 @@
     var currentPage = 1, totalItems = 0, totalPages = 1;
     // Per-page: URL param > localStorage > default 100
     var urlPerPage = new URLSearchParams(window.location.search).get('per_page');
-    var PAGE_LIMIT = parseInt(urlPerPage) || parseInt(localStorage.getItem('zoho_edit_per_page')) || 100;
+    var PAGE_LIMIT = parseInt(urlPerPage) || parseInt(localStorage.getItem('zoho_edit_per_page')) || 10000;
     var searchTimeout = null;
     var selectedItemIds = new Set();
     var dirtyItems = new Map();   // { zoho_item_id: { field: newValue } }
@@ -577,19 +577,10 @@
     }
 
     // ============ COLUMN FILTERS ============
-    // Server-filterable fields get sent to API; others filter client-side
-    var SERVER_FILTER_FIELDS = ['brand', 'category_name'];
-    var columnFilterTimeout = null;
-
+    // All column filters work client-side on loaded items (instant, no page reload)
     function onColumnFilter(field, value) {
         if (value) { columnFilters[field] = value.toLowerCase(); } else { delete columnFilters[field]; }
-        // If this is a server-filterable field, reload from API
-        if (SERVER_FILTER_FIELDS.indexOf(field) !== -1) {
-            clearTimeout(columnFilterTimeout);
-            columnFilterTimeout = setTimeout(function() { currentPage = 1; loadItems(); }, 400);
-        } else {
-            renderTable();
-        }
+        renderTable();
     }
     function getFilteredItems() {
         var keys = Object.keys(columnFilters);
@@ -613,9 +604,6 @@
         var url = '/api/zoho/items?page=' + currentPage + '&limit=' + PAGE_LIMIT;
         if (search) url += '&search=' + encodeURIComponent(search);
         if (showInactive) url += '&show_inactive=1';
-        // Send server-filterable column filters
-        if (columnFilters['brand']) url += '&brand=' + encodeURIComponent(columnFilters['brand']);
-        if (columnFilters['category_name']) url += '&category=' + encodeURIComponent(columnFilters['category_name']);
 
         document.getElementById('loadingState').classList.remove('hidden');
         document.getElementById('emptyState').classList.add('hidden');
