@@ -1709,12 +1709,12 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
             params.push(`%${search}%`, `%${search}%`);
         }
         if (brand) {
-            where += ' AND zim.zoho_brand = ?';
-            params.push(brand);
+            where += ' AND zim.zoho_brand LIKE ?';
+            params.push(`%${brand}%`);
         }
         if (category) {
-            where += ' AND zim.zoho_category_name = ?';
-            params.push(category);
+            where += ' AND zim.zoho_category_name LIKE ?';
+            params.push(`%${category}%`);
         }
 
         const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
