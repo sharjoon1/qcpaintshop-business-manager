@@ -912,10 +912,22 @@
                     return;
                 }
 
-                const packSizes = JSON.parse(selectedProduct.available_sizes);
+                let packSizes = [];
+                if (selectedProduct.pack_sizes && selectedProduct.pack_sizes.length > 0) {
+                    packSizes = selectedProduct.pack_sizes.map(ps => ({
+                        size: parseFloat(ps.size) || 0,
+                        unit: ps.unit || 'L',
+                        price: parseFloat(ps.base_price) || 0,
+                        zoho_item_id: ps.zoho_item_id || null
+                    })).sort((a, b) => a.size - b.size);
+                } else if (selectedProduct.available_sizes) {
+                    try { packSizes = JSON.parse(selectedProduct.available_sizes); } catch(e) {}
+                }
                 const pack = packSizes[packIdx];
+                if (!pack) { alert('Invalid pack size selection'); return; }
 
-                item.details = `${pack.size}L pack`;
+                const unit = (pack.unit || 'L').toUpperCase();
+                item.details = `${pack.size}${unit} pack`;
                 item.quantity = quantity;
                 item.unit_price = pack.price;
                 item.total = quantity * pack.price;
