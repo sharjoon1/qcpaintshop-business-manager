@@ -87,9 +87,9 @@
         .edit-card-field input, .edit-card-field select, .edit-card-field textarea { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.8125rem; outline: none; transition: border-color 0.15s; }
         .edit-card-field input:focus, .edit-card-field select:focus, .edit-card-field textarea:focus { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.15); }
         .edit-card-field .dirty-input { background: #fffbeb; border-color: #fbbf24; }
-        .paste-dropdown-trigger { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; background: #667eea; color: white; border: none; border-radius: 3px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; opacity: 0.85; transition: opacity 0.15s; }
-        .paste-dropdown-trigger:hover { opacity: 1; }
-        .paste-dropdown-menu { position: absolute; right: 0; top: 100%; margin-top: 2px; background: white; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 100; min-width: 180px; overflow: hidden; }
+        .paste-dropdown-trigger { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; background: #667eea; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 20; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: all 0.15s; }
+        .paste-dropdown-trigger:hover { background: #5a67d8; transform: translateY(-50%) scale(1.1); }
+        .paste-dropdown-menu { position: absolute; right: 0; top: 100%; margin-top: 4px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 100; min-width: 200px; overflow: hidden; }
         .paste-dropdown-menu button { display: block; width: 100%; text-align: left; padding: 8px 12px; font-size: 12px; color: #374151; border: none; background: white; cursor: pointer; }
         .paste-dropdown-menu button:hover { background: #f3f4f6; }
         .paste-dropdown-menu button:disabled { color: #9ca3af; cursor: not-allowed; }
@@ -774,9 +774,9 @@
         // Update row dirty class
         var tr = cell.closest('tr');
         if (tr) tr.classList.toggle('row-dirty', dirtyItems.has(itemId));
-        // Show paste dropdown on blur-commit for dirty cells
-        if (fromBlur && isDirty(itemId, field)) {
-            showPasteDropdown(cell, itemId, field, val);
+        // Show paste dropdown on blur-commit (always, so user can paste value to other rows)
+        if (fromBlur && displayVal) {
+            setTimeout(function() { showPasteDropdown(cell, itemId, field, val); }, 50);
         }
     }
 
@@ -786,16 +786,18 @@
 
     function showPasteDropdown(cell, itemId, field, value) {
         removePasteDropdown();
-        var readonlyFields = ['zoho_item_id', 'zoho_stock_on_hand', 'last_synced_at'];
+        var readonlyFields = ['zoho_item_id', 'stock_on_hand', 'last_synced', 'zoho_stock_on_hand', 'last_synced_at'];
         if (readonlyFields.indexOf(field) !== -1) return;
-        cell.style.position = 'relative';
+        // Append to parent td for reliable absolute positioning
+        var parentTd = cell.closest('td') || cell;
+        parentTd.style.position = 'relative';
         var trigger = document.createElement('button');
         trigger.className = 'paste-dropdown-trigger';
         trigger.innerHTML = '&#9662;';
-        trigger.title = 'Paste to multiple rows';
-        trigger.onclick = function(e) { e.stopPropagation(); togglePasteMenu(cell, field, value); };
-        cell.appendChild(trigger);
-        activePasteDropdown = { cell: cell, trigger: trigger, field: field, value: value };
+        trigger.title = 'Paste this value to multiple rows';
+        trigger.onclick = function(e) { e.stopPropagation(); e.preventDefault(); togglePasteMenu(parentTd, field, value); };
+        parentTd.appendChild(trigger);
+        activePasteDropdown = { cell: parentTd, trigger: trigger, field: field, value: value };
         pasteDropdownTimeout = setTimeout(removePasteDropdown, 4000);
     }
 
