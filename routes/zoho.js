@@ -1705,8 +1705,8 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
         const params = [];
 
         if (search) {
-            where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_sku LIKE ?)';
-            params.push(`%${search}%`, `%${search}%`);
+            where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_sku LIKE ? OR zim.zoho_brand LIKE ? OR zim.zoho_category_name LIKE ? OR zim.zoho_description LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
         }
         if (brand) {
             where += ' AND zim.zoho_brand LIKE ?';

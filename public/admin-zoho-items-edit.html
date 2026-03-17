@@ -601,7 +601,10 @@
     async function loadItems() {
         var search = document.getElementById('searchInput').value.trim();
         var showInactive = document.getElementById('showInactiveToggle') && document.getElementById('showInactiveToggle').checked;
-        var url = '/api/zoho/items?page=' + currentPage + '&limit=' + PAGE_LIMIT;
+        // When searching, load ALL matching items (ignore per-page limit)
+        var effectiveLimit = search ? 10000 : PAGE_LIMIT;
+        var effectivePage = search ? 1 : currentPage;
+        var url = '/api/zoho/items?page=' + effectivePage + '&limit=' + effectiveLimit;
         if (search) url += '&search=' + encodeURIComponent(search);
         if (showInactive) url += '&show_inactive=1';
 
@@ -915,14 +918,23 @@
     // ============ PAGINATION ============
     function renderPagination() {
         var info = document.getElementById('paginationInfo'), ctl = document.getElementById('paginationControls');
-        var s = totalItems === 0 ? 0 : (currentPage-1)*PAGE_LIMIT+1, e = Math.min(currentPage*PAGE_LIMIT, totalItems);
-        info.textContent = totalItems === 0 ? 'No items' : 'Showing '+s+'-'+e+' of '+totalItems+' items';
+        var search = document.getElementById('searchInput').value.trim();
+        var s = totalItems === 0 ? 0 : (currentPage-1)*(search ? 10000 : PAGE_LIMIT)+1;
+        var e = Math.min(s + items.length - 1, totalItems);
+        if (search) {
+            info.textContent = totalItems === 0 ? 'No items match "'+search+'"' : 'Found '+totalItems+' items matching "'+search+'"';
+        } else {
+            info.textContent = totalItems === 0 ? 'No items' : 'Showing '+s+'-'+e+' of '+totalItems+' items';
+        }
 
         // Sync per-page dropdown
         var ppSel = document.getElementById('perPageSelect');
-        if (ppSel) ppSel.value = PAGE_LIMIT >= 10000 ? '10000' : String(PAGE_LIMIT);
+        if (ppSel) {
+            ppSel.value = PAGE_LIMIT >= 10000 ? '10000' : String(PAGE_LIMIT);
+            ppSel.parentElement.style.display = search ? 'none' : '';
+        }
 
-        if (totalPages <= 1) { ctl.innerHTML = ''; return; }
+        if (totalPages <= 1 || search) { ctl.innerHTML = ''; return; }
 
         var h = '';
         // First + Prev
