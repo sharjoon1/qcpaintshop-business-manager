@@ -565,7 +565,8 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
                 auth: {
                     user: process.env.SMTP_USER,
                     pass: process.env.SMTP_PASSWORD
-                }
+                },
+                tls: { rejectUnauthorized: false }
             });
 
             await transporter.sendMail({
