@@ -927,7 +927,11 @@
                 if (!pack) { alert('Invalid pack size selection'); return; }
 
                 const unit = (pack.unit || 'L').toUpperCase();
-                item.details = `${pack.size}${unit} pack`;
+                const coverage = parseFloat(selectedProduct.area_coverage) || 0;
+                const totalLiters = pack.size * quantity;
+                const totalArea = coverage > 0 ? totalLiters * coverage : 0;
+                item.details = `${pack.size}${unit} x ${quantity}` + (totalArea > 0 ? ` = ${totalArea.toFixed(0)} sq.ft` : '');
+                item.area = totalArea > 0 ? totalArea : null;
                 item.quantity = quantity;
                 item.unit_price = pack.price;
                 item.total = quantity * pack.price;
