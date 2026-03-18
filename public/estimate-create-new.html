@@ -217,7 +217,8 @@
                 <span class="text-xs text-gray-500 self-center mr-1">Columns:</span>
                 <button onclick="toggleEstCol('show_image')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_image">Image</button>
                 <button onclick="toggleEstCol('show_pack_size')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_pack_size">Pack Size</button>
-                <button onclick="toggleEstCol('show_qty')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_qty">Qty/Area</button>
+                <button onclick="toggleEstCol('show_qty')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_qty">Quantity</button>
+                <button onclick="toggleEstCol('show_area')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_area">Area (sqft)</button>
                 <button onclick="toggleEstCol('show_mix')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_mix">Mix Info</button>
                 <button onclick="toggleEstCol('show_price')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_price">Unit Price</button>
                 <button onclick="toggleEstCol('show_price_sqft')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_price_sqft">Price/sqft</button>
@@ -471,7 +472,7 @@
 
         // Column visibility defaults (loaded from localStorage)
         let columnVisibility = JSON.parse(localStorage.getItem('estimate_column_prefs') || 'null') || {
-            show_image: true, show_pack_size: true, show_qty: true, show_mix: true,
+            show_image: true, show_pack_size: true, show_qty: true, show_area: true, show_mix: true,
             show_price: true, show_price_sqft: false, show_breakdown: false, show_color: false, show_total: true,
             show_subtotal: true, show_gst: true
         };
@@ -986,7 +987,8 @@
             headerHtml += '<th class="px-4 py-3 text-left">Product</th>';
             if (cv.show_pack_size) headerHtml += '<th class="px-4 py-3 text-left">Pack Size</th>';
             headerHtml += '<th class="px-4 py-3 text-left">Type</th>';
-            if (cv.show_qty) headerHtml += '<th class="px-4 py-3 text-right">Qty / Area</th>';
+            if (cv.show_qty) headerHtml += '<th class="px-4 py-3 text-right">Qty</th>';
+            if (cv.show_area) headerHtml += '<th class="px-4 py-3 text-right">Area (sqft)</th>';
             if (cv.show_mix) headerHtml += '<th class="px-4 py-3 text-left">Mix Info</th>';
             if (cv.show_price) headerHtml += '<th class="px-4 py-3 text-right">Unit Price</th>';
             if (cv.show_price_sqft) headerHtml += '<th class="px-4 py-3 text-right">Price/sqft</th>';
@@ -1010,11 +1012,8 @@
                 row += `<td class="px-4 py-3 font-semibold">${item.product_name}</td>`;
                 if (cv.show_pack_size) row += `<td class="px-4 py-3">${extractPackSize(item.details)}</td>`;
                 row += `<td class="px-4 py-3">${item.type === 'unit' ? 'Unit' : 'Area'}</td>`;
-                if (cv.show_qty) {
-                    const qtyText = item.quantity.toFixed(2);
-                    const areaText = item.area ? ` <div class="text-xs text-blue-600">${parseFloat(item.area).toFixed(0)} sq.ft</div>` : '';
-                    row += `<td class="px-4 py-3 text-right">${qtyText}${areaText}</td>`;
-                }
+                if (cv.show_qty) row += `<td class="px-4 py-3 text-right">${item.quantity.toFixed(2)}</td>`;
+                if (cv.show_area) row += `<td class="px-4 py-3 text-right">${item.area ? parseFloat(item.area).toFixed(0) : '-'}</td>`;
                 if (cv.show_mix) row += `<td class="px-4 py-3 text-sm">${item.details}</td>`;
                 if (cv.show_price) row += `<td class="px-4 py-3 text-right">${formatCurrency(item.unit_price)}</td>`;
                 if (cv.show_price_sqft) {
