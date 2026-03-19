@@ -42,6 +42,7 @@ const rateLimiter = require('./services/zoho-rate-limiter');
 const chatRoutes = require('./routes/chat');
 const notificationRoutes = require('./routes/notifications');
 const estimatePdfRoutes = require('./routes/estimate-pdf');
+const estimateRoutes = require('./routes/estimates');
 const shareRoutes = require('./routes/share');
 const notificationService = require('./services/notification-service');
 const autoClockout = require('./services/auto-clockout');
@@ -186,6 +187,7 @@ rateLimiter.setPool(pool); // Enable DB persistence for API call tracking
 chatRoutes.setPool(pool);
 notificationRoutes.setPool(pool);
 estimatePdfRoutes.setPool(pool);
+estimateRoutes.setPool(pool);
 shareRoutes.setPool(pool);
 notificationService.setPool(pool);
 autoClockout.setPool(pool);
@@ -273,6 +275,7 @@ app.use('/api/activity-tracker', activityTrackerRoutes.router);
 app.use('/api/chat', chatRoutes.router);
 app.use('/api/notifications', notificationRoutes.router);
 app.use('/api/estimates', estimatePdfRoutes.router);
+app.use('/api/estimates', requireAuth, estimateRoutes.router);
 app.use('/api/share', shareRoutes.router);
 app.use('/api/website', websiteRoutes.router);
 app.use('/api/guides', guidesRoutes.router);
@@ -3110,244 +3113,8 @@ app.delete('/api/customers/:id', requirePermission('customers', 'delete'), async
 });
 
 // ========================================
-// ESTIMATES
+// ESTIMATES — moved to routes/estimates.js
 // ========================================
-
-app.get('/api/estimates', requireAuth, async (req, res) => {
-    try {
-        const { status, search } = req.query;
-        let query = 'SELECT * FROM estimates WHERE 1=1';
-        const params = [];
-
-        if (status) { query += ' AND status = ?'; params.push(status); }
-        if (search) {
-            query += ' AND (estimate_number LIKE ? OR customer_name LIKE ? OR customer_phone LIKE ?)';
-            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-        }
-
-        query += ' ORDER BY estimate_date DESC, id DESC';
-        const [rows] = await pool.query(query, params);
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/api/estimates/:id', requirePermission('estimates', 'view'), async (req, res) => {
-    try {
-        const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
-        if (estimate.length === 0) {
-            return res.status(404).json({ error: 'Estimate not found' });
-        }
-
-        const [items] = await pool.query(`
-            SELECT ei.*, p.name as product_name, p.product_type
-            FROM estimate_items ei
-            LEFT JOIN products p ON ei.product_id = p.id
-            WHERE ei.estimate_id = ?
-            ORDER BY ei.display_order
-        `, [req.params.id]);
-
-        res.json({ ...estimate[0], items });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/estimates', requirePermission('estimates', 'add'), async (req, res) => {
-    try {
-        const {
-            customer_name, customer_phone, customer_address, estimate_date, valid_until,
-            subtotal, gst_amount, grand_total, show_gst_breakdown, column_visibility,
-            notes, status, items
-        } = req.body;
-
-        // Generate estimate number with locking
-        const datePrefix = new Date().toISOString().split('T')[0].replace(/-/g, '');
-        const [lastEstimate] = await pool.query(
-            'SELECT estimate_number FROM estimates WHERE estimate_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE',
-            [`EST${datePrefix}%`]
-        );
-
-        let estimateNumber;
-        if (lastEstimate.length > 0) {
-            const lastNum = parseInt(lastEstimate[0].estimate_number.slice(-4));
-            estimateNumber = `EST${datePrefix}${String(lastNum + 1).padStart(4, '0')}`;
-        } else {
-            estimateNumber = `EST${datePrefix}0001`;
-        }
-
-        const [result] = await pool.query(
-            `INSERT INTO estimates (
-                estimate_number, customer_name, customer_phone, customer_address,
-                estimate_date, valid_until, subtotal, gst_amount, grand_total,
-                show_gst_breakdown, column_visibility, notes, status, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                estimateNumber, customer_name, customer_phone, customer_address,
-                estimate_date, valid_until, subtotal, gst_amount, grand_total,
-                show_gst_breakdown ? 1 : 0, column_visibility, notes, status || 'draft',
-                req.user ? req.user.id : 1
-            ]
-        );
-
-        const estimateId = result.insertId;
-
-        if (items && items.length > 0) {
-            const itemValues = items.map(item => [
-                estimateId, item.product_id || null, item.image_url || null,
-                item.item_description,
-                item.quantity, item.area || null, item.mix_info || null,
-                item.unit_price, item.breakdown_cost || null, item.color_cost || 0,
-                item.line_total, item.display_order || 0
-            ]);
-
-            await pool.query(
-                `INSERT INTO estimate_items (
-                    estimate_id, product_id, image_url, item_description, quantity, area, mix_info,
-                    unit_price, breakdown_cost, color_cost, line_total, display_order
-                ) VALUES ?`,
-                [itemValues]
-            );
-        }
-
-        res.json({ success: true, id: estimateId, estimate_number: estimateNumber, message: 'Estimate created successfully' });
-    } catch (err) {
-        console.error('Create estimate error:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.put('/api/estimates/:id', requirePermission('estimates', 'edit'), async (req, res) => {
-    try {
-        const estimateId = req.params.id;
-        const {
-            customer_name, customer_phone, customer_address, estimate_date, valid_until,
-            subtotal, gst_amount, grand_total, show_gst_breakdown, column_visibility,
-            notes, items
-        } = req.body;
-
-        await pool.query(
-            `UPDATE estimates SET
-                customer_name = ?, customer_phone = ?, customer_address = ?,
-                estimate_date = ?, valid_until = ?, subtotal = ?, gst_amount = ?,
-                grand_total = ?, show_gst_breakdown = ?, column_visibility = ?, notes = ?,
-                last_updated_at = NOW()
-            WHERE id = ?`,
-            [
-                customer_name, customer_phone, customer_address || null,
-                estimate_date, valid_until, subtotal, gst_amount, grand_total,
-                show_gst_breakdown ? 1 : 0, column_visibility, notes || null, estimateId
-            ]
-        );
-
-        await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
-
-        if (items && items.length > 0) {
-            const itemValues = items.map(item => [
-                estimateId, item.product_id || null, item.image_url || null,
-                item.item_description,
-                item.quantity, item.area || null, item.mix_info || null,
-                item.unit_price, item.breakdown_cost || null, item.color_cost || 0,
-                item.line_total, item.display_order || 0
-            ]);
-
-            await pool.query(
-                `INSERT INTO estimate_items (
-                    estimate_id, product_id, image_url, item_description, quantity, area, mix_info,
-                    unit_price, breakdown_cost, color_cost, line_total, display_order
-                ) VALUES ?`,
-                [itemValues]
-            );
-        }
-
-        res.json({ success: true, message: 'Estimate updated successfully' });
-    } catch (err) {
-        console.error('Update estimate error:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/api/estimates/:id/items', requirePermission('estimates', 'view'), async (req, res) => {
-    try {
-        const [items] = await pool.query(
-            'SELECT * FROM estimate_items WHERE estimate_id = ? ORDER BY display_order',
-            [req.params.id]
-        );
-        res.json(items);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Update estimate status (FIXED: parameterized SET)
-app.patch('/api/estimates/:id/status', requirePermission('estimates', 'edit'), async (req, res) => {
-    try {
-        const { status, reason, notes } = req.body;
-        const estimateId = req.params.id;
-
-        const [current] = await pool.query('SELECT status FROM estimates WHERE id = ?', [estimateId]);
-        if (current.length === 0) {
-            return res.status(404).json({ error: 'Estimate not found' });
-        }
-
-        const oldStatus = current[0].status;
-
-        const setClauses = ['status = ?', 'last_updated_at = NOW()'];
-        const params = [status];
-
-        if (status === 'approved') {
-            setClauses.push('approved_by_admin_id = ?', 'approved_at = NOW()');
-            params.push(req.user.id);
-        }
-
-        params.push(estimateId);
-        await pool.query(`UPDATE estimates SET ${setClauses.join(', ')} WHERE id = ?`, params);
-
-        await pool.query(
-            'INSERT INTO estimate_status_history (estimate_id, old_status, new_status, changed_by_user_id, reason, notes) VALUES (?, ?, ?, ?, ?, ?)',
-            [estimateId, oldStatus, status, req.user.id, reason, notes]
-        );
-
-        res.json({ success: true, message: 'Status updated successfully' });
-    } catch (err) {
-        console.error('Update status error:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.delete('/api/estimates/:id', requirePermission('estimates', 'delete'), async (req, res) => {
-    try {
-        const estimateId = req.params.id;
-
-        const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
-        if (estimate.length === 0) {
-            return res.status(404).json({ error: 'Estimate not found' });
-        }
-
-        await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
-        await pool.query('DELETE FROM estimates WHERE id = ?', [estimateId]);
-
-        res.json({ success: true, message: 'Estimate deleted successfully' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/api/estimates/:id/history', requirePermission('estimates', 'view'), async (req, res) => {
-    try {
-        const [history] = await pool.query(`
-            SELECT h.*, u.full_name as changed_by_name
-            FROM estimate_status_history h
-            LEFT JOIN users u ON h.changed_by_user_id = u.id
-            WHERE h.estimate_id = ?
-            ORDER BY h.timestamp DESC
-        `, [req.params.id]);
-        res.json(history);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 // ========================================
 // CALCULATE ESTIMATE

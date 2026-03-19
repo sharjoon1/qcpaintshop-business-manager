@@ -232,6 +232,11 @@
                 <span class="text-gray-300 self-center">|</span>
                 <button onclick="toggleEstCol('show_subtotal')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_subtotal">Subtotal</button>
                 <button onclick="toggleEstCol('show_gst')" class="col-pill px-3 py-1 text-xs rounded-full border-2 transition" data-col="show_gst">GST</button>
+                <span class="text-gray-300 self-center">|</span>
+                <label class="flex items-center gap-1 text-xs cursor-pointer">
+                    <input type="checkbox" id="globalDescOnlyToggle" onchange="toggleGlobalDescOnly(this.checked)" class="w-3 h-3">
+                    <span class="text-gray-600 font-medium">Description Only</span>
+                </label>
             </div>
 
             <div class="overflow-x-auto">
@@ -274,6 +279,23 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Labor Charges -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-gray-800">Labor Charges</h2>
+                <button onclick="addLaborItem()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold">
+                    + Add Labor Item
+                </button>
+            </div>
+            <div id="laborItemsContainer">
+                <p id="noLaborMsg" class="text-center py-4 text-gray-500 text-sm">No labor charges added</p>
+            </div>
+            <div id="laborTotal" class="hidden mt-4 pt-3 border-t flex justify-between font-semibold">
+                <span>Labor Total:</span>
+                <span id="laborTotalAmount">&#8377;0.00</span>
             </div>
         </div>
 
@@ -473,6 +495,9 @@
         let selectedProduct = null;
         let estimateItems = [];
         let itemIdCounter = 1;
+        let laborItems = [];
+        let laborIdCounter = 1;
+        let globalShowDescOnly = false;
 
         // Column visibility defaults (loaded from localStorage)
         let columnVisibility = JSON.parse(localStorage.getItem('estimate_column_prefs') || 'null') || {
@@ -604,6 +629,50 @@
 
         function formatCurrency(num) {
             return '\u20B9' + parseFloat(num || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function escHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // ========================================
+        // MARKUP / DISCOUNT CALCULATION
+        // ========================================
+        function calcMarkup(basePrice, quantity, markupType, markupValue) {
+            if (!markupType || !markupValue) return 0;
+            const mv = parseFloat(markupValue) || 0;
+            switch (markupType) {
+                case 'price_pct': return basePrice * mv / 100;
+                case 'price_value': return mv;
+                case 'total_pct': return (basePrice * quantity) * mv / 100 / quantity;
+                case 'total_value': return mv / quantity;
+                default: return 0;
+            }
+        }
+
+        function calcDiscount(priceAfterMarkup, quantity, discountType, discountValue) {
+            if (!discountType || !discountValue) return 0;
+            const dv = parseFloat(discountValue) || 0;
+            switch (discountType) {
+                case 'price_pct': return priceAfterMarkup * dv / 100;
+                case 'price_value': return dv;
+                case 'total_pct': return (priceAfterMarkup * quantity) * dv / 100 / quantity;
+                case 'total_value': return dv / quantity;
+                default: return 0;
+            }
+        }
+
+        function recalcItem(item) {
+            const bp = parseFloat(item.base_price) || 0;
+            const qty = parseFloat(item.quantity) || 1;
+            item.markup_amount = calcMarkup(bp, qty, item.markup_type, item.markup_value);
+            item.price_after_markup = bp + item.markup_amount;
+            item.discount_amount = calcDiscount(item.price_after_markup, qty, item.discount_type, item.discount_value);
+            item.final_price = item.price_after_markup - item.discount_amount;
+            item.line_total = item.final_price * qty;
+            item.unit_price = item.final_price;
+            item.total = item.line_total;
         }
 
         // ========================================
@@ -914,7 +983,22 @@
                 product_id: selectedProduct.id,
                 product_name: selectedProduct.name,
                 image_url: selectedProduct.image_url || null,
-                type: type
+                type: type,
+                item_type: 'product',
+                brand: selectedProduct.brand_name || null,
+                category: selectedProduct.category_name || null,
+                base_price: 0,
+                markup_type: null,
+                markup_value: 0,
+                markup_amount: 0,
+                price_after_markup: 0,
+                discount_type: null,
+                discount_value: 0,
+                discount_amount: 0,
+                final_price: 0,
+                line_total: 0,
+                custom_description: '',
+                show_description_only: null
             };
 
             if (type === 'unit') {
@@ -948,9 +1032,16 @@
                 item.details = `${pack.size}${unit} x ${quantity}` + (coats > 1 ? ` (${coats} coats)` : '');
                 item.area = totalArea > 0 ? totalArea : null;
                 item.quantity = quantity;
+                item.pack_size = `${pack.size}${unit}`;
+                item.num_coats = coats;
+                item.zoho_item_id = pack.zoho_item_id || null;
+                item.base_price = pack.price;
                 item.unit_price = pack.price;
+                item.final_price = pack.price;
+                item.price_after_markup = pack.price;
                 item.price_per_sqft = totalArea > 0 ? (quantity * pack.price) / totalArea : null;
                 item.total = quantity * pack.price;
+                item.line_total = item.total;
             } else {
                 const squareFeet = parseFloat(document.getElementById('squareFeet').value);
                 const coats = parseFloat(document.getElementById('coatsNumber').value);
@@ -960,8 +1051,13 @@
 
                 item.details = `${squareFeet} sq.ft × ${coats} coats = ${totalLiters}L (${packCombo})`;
                 item.quantity = totalLiters;
-                item.unit_price = totalPrice / totalLiters;
+                item.num_coats = coats;
+                item.base_price = totalPrice / totalLiters;
+                item.unit_price = item.base_price;
+                item.final_price = item.base_price;
+                item.price_after_markup = item.base_price;
                 item.total = totalPrice;
+                item.line_total = totalPrice;
             }
 
             estimateItems.push(item);
@@ -979,60 +1075,95 @@
 
         function renderEstimateTable() {
             const tbody = document.getElementById('itemsTableBody');
-            const cv = columnVisibility;
 
             if (estimateItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-500">No items added yet</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-500">No items added yet</td></tr>';
+                const thead = tbody.closest('table').querySelector('thead tr');
+                thead.innerHTML = `
+                    <th class="px-4 py-3 text-left">#</th>
+                    <th class="px-4 py-3 text-left">Product</th>
+                    <th class="px-4 py-3 text-right">Base Price</th>
+                    <th class="px-4 py-3 text-center">Markup</th>
+                    <th class="px-4 py-3 text-center">Discount</th>
+                    <th class="px-4 py-3 text-right">Final Price</th>
+                    <th class="px-4 py-3 text-right">Qty</th>
+                    <th class="px-4 py-3 text-right">Line Total</th>
+                    <th class="px-4 py-3 text-center">Action</th>`;
                 updateTotals();
                 updateTogglePills();
                 return;
             }
 
-            // Build header dynamically
-            const thead = document.querySelector('#itemsTableBody').closest('table').querySelector('thead tr');
-            let headerHtml = '<th class="px-4 py-3 text-left">#</th>';
-            if (cv.show_image) headerHtml += '<th class="px-4 py-3 text-left">Image</th>';
-            headerHtml += '<th class="px-4 py-3 text-left">Product</th>';
-            if (cv.show_pack_size) headerHtml += '<th class="px-4 py-3 text-left">Pack Size</th>';
-            headerHtml += '<th class="px-4 py-3 text-left">Type</th>';
-            if (cv.show_qty) headerHtml += '<th class="px-4 py-3 text-right">Qty</th>';
-            if (cv.show_area) headerHtml += '<th class="px-4 py-3 text-right">Area (sqft)</th>';
-            if (cv.show_mix) headerHtml += '<th class="px-4 py-3 text-left">Mix Info</th>';
-            if (cv.show_price) headerHtml += '<th class="px-4 py-3 text-right">Unit Price</th>';
-            if (cv.show_price_sqft) headerHtml += '<th class="px-4 py-3 text-right">Price/sqft</th>';
-            if (cv.show_breakdown) headerHtml += '<th class="px-4 py-3 text-left">Breakdown</th>';
-            if (cv.show_color) headerHtml += '<th class="px-4 py-3 text-right">Color Cost</th>';
-            if (cv.show_total) headerHtml += '<th class="px-4 py-3 text-right">Total</th>';
-            headerHtml += '<th class="px-4 py-3 text-center">Action</th>';
-            thead.innerHTML = headerHtml;
-
-            // Build rows
-            const placeholderSvg = '<div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
+            const thead = tbody.closest('table').querySelector('thead tr');
+            thead.innerHTML = `
+                <th class="px-4 py-3 text-left">#</th>
+                <th class="px-4 py-3 text-left">Product</th>
+                <th class="px-4 py-3 text-right">Base Price</th>
+                <th class="px-4 py-3 text-center">Markup</th>
+                <th class="px-4 py-3 text-center">Discount</th>
+                <th class="px-4 py-3 text-right">Final Price</th>
+                <th class="px-4 py-3 text-right">Qty</th>
+                <th class="px-4 py-3 text-right">Line Total</th>
+                <th class="px-4 py-3 text-center">Action</th>`;
 
             tbody.innerHTML = estimateItems.map((item, idx) => {
-                let row = `<td class="px-4 py-3">${idx + 1}</td>`;
-                if (cv.show_image) {
-                    row += `<td class="px-4 py-3">${item.image_url
-                        ? `<img src="${item.image_url}" class="w-10 h-10 object-cover rounded" onerror="this.parentElement.innerHTML='${placeholderSvg.replace(/'/g, "\\'")}';">`
-                        : placeholderSvg
-                    }</td>`;
-                }
-                row += `<td class="px-4 py-3 font-semibold">${item.product_name}</td>`;
-                if (cv.show_pack_size) row += `<td class="px-4 py-3">${extractPackSize(item.details)}</td>`;
-                row += `<td class="px-4 py-3">${item.type === 'unit' ? 'Unit' : 'Area'}</td>`;
-                if (cv.show_qty) row += `<td class="px-4 py-3 text-right">${item.quantity.toFixed(2)}</td>`;
-                if (cv.show_area) row += `<td class="px-4 py-3 text-right">${item.area ? parseFloat(item.area).toFixed(0) : '-'}</td>`;
-                if (cv.show_mix) row += `<td class="px-4 py-3 text-sm">${item.details}</td>`;
-                if (cv.show_price) row += `<td class="px-4 py-3 text-right">${formatCurrency(item.unit_price)}</td>`;
-                if (cv.show_price_sqft) {
-                    const pps = item.price_per_sqft || (item.area ? item.total / item.area : null);
-                    row += `<td class="px-4 py-3 text-right">${pps ? formatCurrency(pps) : '-'}</td>`;
-                }
-                if (cv.show_breakdown) row += `<td class="px-4 py-3">-</td>`;
-                if (cv.show_color) row += `<td class="px-4 py-3 text-right">${formatCurrency(0)}</td>`;
-                if (cv.show_total) row += `<td class="px-4 py-3 text-right font-semibold">${formatCurrency(item.total)}</td>`;
-                row += `<td class="px-4 py-3 text-center"><button onclick="removeItem(${item.id})" class="text-red-600 hover:text-red-800">Remove</button></td>`;
-                return `<tr>${row}</tr>`;
+                const showDescOnly = item.show_description_only != null ? item.show_description_only : globalShowDescOnly;
+                const displayName = showDescOnly && item.custom_description ? escHtml(item.custom_description) : escHtml(item.product_name);
+
+                return `<tr class="border-b">
+                    <td class="px-4 py-3 align-top">${idx + 1}</td>
+                    <td class="px-4 py-3 align-top" style="min-width:200px">
+                        <div class="font-semibold text-sm" style="white-space:pre-line">${displayName}</div>
+                        ${item.custom_description && !showDescOnly ? `<div class="text-xs text-gray-500 mt-1" style="white-space:pre-line">${escHtml(item.custom_description)}</div>` : ''}
+                        <div class="flex items-center gap-2 mt-1">
+                            <button onclick="toggleDescEdit(${item.id})" class="text-xs text-purple-600 hover:underline">Edit Desc</button>
+                            <label class="text-xs text-gray-500 flex items-center gap-1">
+                                <input type="checkbox" ${showDescOnly ? 'checked' : ''} onchange="toggleItemDescOnly(${item.id}, this.checked)" class="w-3 h-3">
+                                Desc only
+                            </label>
+                        </div>
+                        <textarea id="desc_${item.id}" class="hidden w-full mt-1 p-2 border rounded text-xs" rows="2"
+                            placeholder="Custom description..." onblur="saveDesc(${item.id}, this.value)">${escHtml(item.custom_description || '')}</textarea>
+                        <div class="text-xs text-gray-400 mt-1">${escHtml(item.details || '')}</div>
+                    </td>
+                    <td class="px-4 py-3 text-right align-top">${formatCurrency(item.base_price)}</td>
+                    <td class="px-4 py-3 align-top" style="min-width:150px">
+                        <select onchange="onItemMarkupTypeChange(${item.id}, this.value)" class="w-full text-xs border rounded px-1 py-1 mb-1">
+                            <option value="" ${!item.markup_type ? 'selected' : ''}>None</option>
+                            <option value="price_pct" ${item.markup_type === 'price_pct' ? 'selected' : ''}>Price %</option>
+                            <option value="price_value" ${item.markup_type === 'price_value' ? 'selected' : ''}>Price &#8377;</option>
+                            <option value="total_pct" ${item.markup_type === 'total_pct' ? 'selected' : ''}>Total %</option>
+                            <option value="total_value" ${item.markup_type === 'total_value' ? 'selected' : ''}>Total &#8377;</option>
+                        </select>
+                        ${item.markup_type ? `
+                            <input type="number" value="${item.markup_value || ''}" min="0" step="0.01"
+                                onchange="onItemMarkupValueChange(${item.id}, this.value)"
+                                class="w-full text-xs border rounded px-2 py-1" placeholder="Value">
+                            <div class="text-xs text-green-600 mt-1">+${formatCurrency(item.markup_amount)}</div>
+                        ` : ''}
+                    </td>
+                    <td class="px-4 py-3 align-top" style="min-width:150px">
+                        <select onchange="onItemDiscountTypeChange(${item.id}, this.value)" class="w-full text-xs border rounded px-1 py-1 mb-1">
+                            <option value="" ${!item.discount_type ? 'selected' : ''}>None</option>
+                            <option value="price_pct" ${item.discount_type === 'price_pct' ? 'selected' : ''}>Price %</option>
+                            <option value="price_value" ${item.discount_type === 'price_value' ? 'selected' : ''}>Price &#8377;</option>
+                            <option value="total_pct" ${item.discount_type === 'total_pct' ? 'selected' : ''}>Total %</option>
+                            <option value="total_value" ${item.discount_type === 'total_value' ? 'selected' : ''}>Total &#8377;</option>
+                        </select>
+                        ${item.discount_type ? `
+                            <input type="number" value="${item.discount_value || ''}" min="0" step="0.01"
+                                onchange="onItemDiscountValueChange(${item.id}, this.value)"
+                                class="w-full text-xs border rounded px-2 py-1" placeholder="Value">
+                            <div class="text-xs text-red-600 mt-1">-${formatCurrency(item.discount_amount)}</div>
+                        ` : ''}
+                    </td>
+                    <td class="px-4 py-3 text-right align-top font-semibold">${formatCurrency(item.final_price)}</td>
+                    <td class="px-4 py-3 text-right align-top">${parseFloat(item.quantity).toFixed(2)}</td>
+                    <td class="px-4 py-3 text-right align-top font-bold">${formatCurrency(item.line_total)}</td>
+                    <td class="px-4 py-3 text-center align-top">
+                        <button onclick="removeItem(${item.id})" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
+                    </td>
+                </tr>`;
             }).join('');
 
             updateTotals();
@@ -1044,18 +1175,182 @@
             renderEstimateTable();
         }
 
+        // ========================================
+        // ITEM EVENT HANDLERS (markup/discount/desc)
+        // ========================================
+        function onItemMarkupTypeChange(itemId, type) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (!item) return;
+            item.markup_type = type || null;
+            if (!type) { item.markup_value = 0; item.markup_amount = 0; }
+            recalcItem(item);
+            renderEstimateTable();
+        }
+
+        function onItemMarkupValueChange(itemId, value) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (!item) return;
+            item.markup_value = parseFloat(value) || 0;
+            recalcItem(item);
+            renderEstimateTable();
+        }
+
+        function onItemDiscountTypeChange(itemId, type) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (!item) return;
+            item.discount_type = type || null;
+            if (!type) { item.discount_value = 0; item.discount_amount = 0; }
+            recalcItem(item);
+            renderEstimateTable();
+        }
+
+        function onItemDiscountValueChange(itemId, value) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (!item) return;
+            item.discount_value = parseFloat(value) || 0;
+            recalcItem(item);
+            renderEstimateTable();
+        }
+
+        function toggleDescEdit(itemId) {
+            const textarea = document.getElementById(`desc_${itemId}`);
+            if (textarea) {
+                textarea.classList.toggle('hidden');
+                if (!textarea.classList.contains('hidden')) textarea.focus();
+            }
+        }
+
+        function saveDesc(itemId, value) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (item) {
+                item.custom_description = value;
+                renderEstimateTable();
+            }
+        }
+
+        function toggleItemDescOnly(itemId, checked) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (item) {
+                item.show_description_only = checked ? 1 : 0;
+                renderEstimateTable();
+            }
+        }
+
+        function toggleGlobalDescOnly(checked) {
+            globalShowDescOnly = checked;
+            renderEstimateTable();
+        }
+
+        // ========================================
+        // LABOR CHARGES
+        // ========================================
+        function addLaborItem() {
+            laborItems.push({
+                id: laborIdCounter++,
+                item_type: 'labor',
+                labor_description: '',
+                base_price: 0,
+                quantity: 1,
+                labor_taxable: true,
+                line_total: 0
+            });
+            renderLaborItems();
+        }
+
+        function removeLaborItem(id) {
+            laborItems = laborItems.filter(l => l.id !== id);
+            renderLaborItems();
+            updateTotals();
+        }
+
+        function onLaborChange(id, field, value) {
+            const item = laborItems.find(l => l.id === id);
+            if (!item) return;
+
+            if (field === 'labor_description') item.labor_description = value;
+            else if (field === 'base_price') {
+                item.base_price = parseFloat(value) || 0;
+                item.line_total = item.base_price * item.quantity;
+            }
+            else if (field === 'quantity') {
+                item.quantity = parseFloat(value) || 1;
+                item.line_total = item.base_price * item.quantity;
+            }
+            else if (field === 'labor_taxable') item.labor_taxable = value;
+
+            renderLaborItems();
+            updateTotals();
+        }
+
+        function renderLaborItems() {
+            const container = document.getElementById('laborItemsContainer');
+            const totalDiv = document.getElementById('laborTotal');
+
+            if (laborItems.length === 0) {
+                container.innerHTML = '<p class="text-center py-4 text-gray-500 text-sm">No labor charges added</p>';
+                totalDiv.classList.add('hidden');
+                return;
+            }
+
+            container.innerHTML = laborItems.map((l, idx) => `
+                <div class="flex items-center gap-3 mb-2 p-3 bg-gray-50 rounded-lg">
+                    <span class="text-sm font-semibold text-gray-500 w-6">${idx + 1}.</span>
+                    <input type="text" value="${escHtml(l.labor_description)}" placeholder="Description (e.g. Installation)"
+                        onchange="onLaborChange(${l.id}, 'labor_description', this.value)"
+                        class="flex-1 px-3 py-2 border rounded-lg text-sm">
+                    <input type="number" value="${l.base_price || ''}" min="0" step="1" placeholder="Amount"
+                        onchange="onLaborChange(${l.id}, 'base_price', this.value)"
+                        class="w-28 px-3 py-2 border rounded-lg text-sm text-right">
+                    <label class="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
+                        <input type="checkbox" ${l.labor_taxable ? 'checked' : ''}
+                            onchange="onLaborChange(${l.id}, 'labor_taxable', this.checked)">
+                        Taxable
+                    </label>
+                    <button onclick="removeLaborItem(${l.id})" class="text-red-500 hover:text-red-700 text-lg font-bold">&times;</button>
+                </div>
+            `).join('');
+
+            const laborTotal = laborItems.reduce((sum, l) => sum + (l.line_total || 0), 0);
+            document.getElementById('laborTotalAmount').textContent = formatCurrency(laborTotal);
+            totalDiv.classList.remove('hidden');
+        }
+
         function updateTotals() {
-            const grandTotal = estimateItems.reduce((sum, item) => sum + item.total, 0);
-            const gst = grandTotal - (grandTotal / 1.18);
-            const subtotal = grandTotal - gst;
+            const productTotal = estimateItems.reduce((sum, item) => sum + (item.line_total || item.total || 0), 0);
+            const totalMarkup = estimateItems.reduce((sum, item) => sum + ((item.markup_amount || 0) * (item.quantity || 1)), 0);
+            const totalDiscount = estimateItems.reduce((sum, item) => sum + ((item.discount_amount || 0) * (item.quantity || 1)), 0);
+            const laborTotal = laborItems.reduce((sum, l) => sum + (l.line_total || 0), 0);
+            const grandTotal = productTotal + laborTotal;
 
-            document.getElementById('subtotal').textContent = formatCurrency(subtotal);
-            document.getElementById('gstAmount').textContent = formatCurrency(gst);
-            document.getElementById('grandTotal').textContent = formatCurrency(grandTotal);
-
-            // Toggle Subtotal/GST visibility
-            document.getElementById('subtotalRow').style.display = columnVisibility.show_subtotal ? 'flex' : 'none';
-            document.getElementById('gstRow').style.display = columnVisibility.show_gst ? 'flex' : 'none';
+            // Update the summary section with full breakdown
+            const totalSection = document.querySelector('.mt-6.border-t.pt-4 .flex.justify-end');
+            if (totalSection) {
+                totalSection.innerHTML = `
+                    <div class="w-80 space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Subtotal (products):</span>
+                            <span>${formatCurrency(productTotal)}</span>
+                        </div>
+                        ${totalMarkup > 0 ? `<div class="flex justify-between text-green-600">
+                            <span>Total Markup:</span>
+                            <span>+${formatCurrency(totalMarkup)}</span>
+                        </div>` : ''}
+                        ${totalDiscount > 0 ? `<div class="flex justify-between text-red-600">
+                            <span>Total Discount:</span>
+                            <span>-${formatCurrency(totalDiscount)}</span>
+                        </div>` : ''}
+                        ${laborTotal > 0 ? `<div class="flex justify-between text-blue-600">
+                            <span>Labor Charges:</span>
+                            <span>+${formatCurrency(laborTotal)}</span>
+                        </div>` : ''}
+                        <div class="flex justify-between text-lg font-bold border-t pt-2">
+                            <span>Grand Total:</span>
+                            <span>${formatCurrency(grandTotal)}</span>
+                        </div>
+                        <div class="text-xs text-gray-400 text-right">(Prices inclusive of GST)</div>
+                    </div>
+                `;
+            }
         }
 
         // ========================================
@@ -1063,43 +1358,65 @@
         // ========================================
         async function saveEstimate() {
             if (!selectedCustomer) {
-                alert('❌ Please select a customer');
+                alert('Please select a customer');
                 return;
             }
 
             if (estimateItems.length === 0) {
-                alert('❌ Please add at least one product');
+                alert('Please add at least one product');
                 return;
             }
 
-            const grandTotal = estimateItems.reduce((sum, item) => sum + item.total, 0);
-            const gst = grandTotal - (grandTotal / 1.18);
-            const subtotal = grandTotal - gst;
-
-            const apiItems = estimateItems.map((item, idx) => ({
-                product_id: item.product_id,
-                image_url: item.image_url || null,
-                item_description: item.product_name,
-                quantity: item.quantity,
-                area: item.type === 'area' ? item.quantity : null,
-                mix_info: item.details,
-                unit_price: item.unit_price,
-                price_breakdown: item.type,
-                color_cost: 0,
-                line_total: item.total,
-                display_order: idx + 1
-            }));
+            // Build API items — products + labor
+            const apiItems = [
+                ...estimateItems.map((item, idx) => ({
+                    item_type: 'product',
+                    product_id: item.product_id,
+                    zoho_item_id: item.zoho_item_id || null,
+                    item_name: item.product_name,
+                    image_url: item.image_url || null,
+                    item_description: item.product_name,
+                    brand: item.brand || null,
+                    category: item.category || null,
+                    pack_size: item.pack_size || null,
+                    product_type: item.type || 'unit',
+                    custom_description: item.custom_description || null,
+                    show_description_only: item.show_description_only,
+                    quantity: item.quantity,
+                    area: item.type === 'area' ? item.quantity : (item.area || null),
+                    mix_info: item.details,
+                    num_coats: item.num_coats || 1,
+                    base_price: item.base_price,
+                    unit_price: item.final_price || item.unit_price,
+                    markup_type: item.markup_type || null,
+                    markup_value: item.markup_value || 0,
+                    discount_type: item.discount_type || null,
+                    discount_value: item.discount_value || 0,
+                    breakdown_cost: null,
+                    color_cost: 0,
+                    line_total: item.line_total || item.total,
+                    display_order: idx + 1
+                })),
+                ...laborItems.map((l, idx) => ({
+                    item_type: 'labor',
+                    item_name: l.labor_description,
+                    labor_description: l.labor_description,
+                    base_price: l.base_price,
+                    quantity: l.quantity || 1,
+                    labor_taxable: l.labor_taxable,
+                    line_total: l.line_total,
+                    display_order: estimateItems.length + idx + 1
+                }))
+            ];
 
             const estimateData = {
                 customer_name: selectedCustomer.name,
                 customer_phone: selectedCustomer.phone,
                 customer_address: selectedCustomer.address,
                 estimate_date: new Date().toISOString().split('T')[0],
-                subtotal: subtotal,
-                gst_amount: gst,
-                grand_total: grandTotal,
-                show_gst_breakdown: true,
+                show_gst_breakdown: false,
                 column_visibility: JSON.stringify(columnVisibility),
+                show_description_only: globalShowDescOnly,
                 notes: '',
                 status: 'draft',
                 items: apiItems
@@ -1129,13 +1446,11 @@
                         window.location.href = 'estimates.html';
                     }
                 } else {
-                    const errorMsg = result.message || result.error || 'Unknown error occurred';
-                    console.error('Save estimate error:', result);
-                    alert(`❌ Failed to save estimate: ${errorMsg}`);
+                    alert('Failed to save estimate: ' + (result.message || result.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error saving estimate:', error);
-                alert(`❌ Error saving estimate: ${error.message}`);
+                alert('Error saving estimate: ' + error.message);
             }
         }
 

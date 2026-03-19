@@ -1,0 +1,414 @@
+// routes/estimates.js
+// Extracted + enhanced estimate CRUD routes with markup/discount/labor calculation engine
+const express = require('express');
+const router = express.Router();
+const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+
+let pool;
+
+function setPool(p) { pool = p; }
+
+// ========================================
+// CALCULATION ENGINE
+// ========================================
+function calculateItemPricing(item) {
+    const basePrice = parseFloat(item.base_price) || parseFloat(item.unit_price) || 0;
+    const quantity = parseFloat(item.quantity) || 1;
+    let markupAmount = 0;
+    let priceAfterMarkup = basePrice;
+    let discountAmount = 0;
+
+    // Apply markup
+    if (item.markup_type && parseFloat(item.markup_value) > 0) {
+        const mv = parseFloat(item.markup_value);
+        switch (item.markup_type) {
+            case 'price_pct':
+                markupAmount = basePrice * mv / 100;
+                break;
+            case 'price_value':
+                markupAmount = mv;
+                break;
+            case 'total_pct':
+                markupAmount = (basePrice * quantity) * mv / 100 / quantity;
+                break;
+            case 'total_value':
+                markupAmount = mv / quantity;
+                break;
+        }
+        priceAfterMarkup = basePrice + markupAmount;
+    }
+
+    // Apply discount on price_after_markup
+    let finalPrice = priceAfterMarkup;
+    if (item.discount_type && parseFloat(item.discount_value) > 0) {
+        const dv = parseFloat(item.discount_value);
+        switch (item.discount_type) {
+            case 'price_pct':
+                discountAmount = priceAfterMarkup * dv / 100;
+                break;
+            case 'price_value':
+                discountAmount = dv;
+                break;
+            case 'total_pct':
+                discountAmount = (priceAfterMarkup * quantity) * dv / 100 / quantity;
+                break;
+            case 'total_value':
+                discountAmount = dv / quantity;
+                break;
+        }
+        finalPrice = priceAfterMarkup - discountAmount;
+    }
+
+    const lineTotal = finalPrice * quantity;
+
+    return {
+        base_price: basePrice,
+        markup_amount: Math.round(markupAmount * 100) / 100,
+        price_after_markup: Math.round(priceAfterMarkup * 100) / 100,
+        discount_amount: Math.round(discountAmount * 100) / 100,
+        final_price: Math.round(finalPrice * 100) / 100,
+        unit_price: Math.round(finalPrice * 100) / 100,
+        line_total: Math.round(lineTotal * 100) / 100
+    };
+}
+
+function calculateEstimateTotals(items) {
+    let subtotal = 0, totalMarkup = 0, totalDiscount = 0, totalLabor = 0;
+
+    for (const item of items) {
+        if (item.item_type === 'labor') {
+            totalLabor += parseFloat(item.line_total) || 0;
+        } else {
+            subtotal += parseFloat(item.line_total) || 0;
+            totalMarkup += (parseFloat(item.markup_amount) || 0) * (parseFloat(item.quantity) || 1);
+            totalDiscount += (parseFloat(item.discount_amount) || 0) * (parseFloat(item.quantity) || 1);
+        }
+    }
+
+    return {
+        subtotal: Math.round(subtotal * 100) / 100,
+        total_markup: Math.round(totalMarkup * 100) / 100,
+        total_discount: Math.round(totalDiscount * 100) / 100,
+        total_labor: Math.round(totalLabor * 100) / 100,
+        gst_amount: 0,
+        grand_total: Math.round((subtotal + totalLabor) * 100) / 100
+    };
+}
+
+// Helper to build item values array for INSERT
+function buildItemValues(estimateId, items) {
+    return items.map(item => [
+        estimateId,
+        item.item_type || 'product',
+        item.product_id || null,
+        item.zoho_item_id || null,
+        item.item_name || item.item_description || null,
+        item.brand || null,
+        item.category || null,
+        item.image_url || null,
+        item.pack_size || null,
+        item.product_type || null,
+        item.custom_description || null,
+        item.show_description_only != null ? (item.show_description_only ? 1 : 0) : null,
+        item.item_description || item.item_name || null,
+        item.quantity || 1,
+        item.area || null,
+        item.mix_info || null,
+        item.num_coats || 1,
+        item.base_price || item.unit_price || 0,
+        item.markup_type || null,
+        item.markup_value || 0,
+        item.markup_amount || 0,
+        item.price_after_markup || item.unit_price || 0,
+        item.discount_type || null,
+        item.discount_value || 0,
+        item.discount_amount || 0,
+        item.final_price || item.unit_price || 0,
+        item.unit_price || 0,
+        item.breakdown_cost || null,
+        item.color_cost || 0,
+        item.line_total || 0,
+        item.display_order || 0,
+        item.labor_description || null,
+        item.labor_taxable != null ? (item.labor_taxable ? 1 : 0) : 1
+    ]);
+}
+
+const ITEM_INSERT_SQL = `INSERT INTO estimate_items (
+    estimate_id, item_type, product_id, zoho_item_id, item_name,
+    brand, category, image_url, pack_size, product_type,
+    custom_description, show_description_only,
+    item_description, quantity, area, mix_info, num_coats,
+    base_price, markup_type, markup_value, markup_amount, price_after_markup,
+    discount_type, discount_value, discount_amount, final_price,
+    unit_price, breakdown_cost, color_cost, line_total, display_order,
+    labor_description, labor_taxable
+) VALUES ?`;
+
+// Process items through calculation engine
+function processItems(items) {
+    return (items || []).map(item => {
+        if (item.item_type === 'labor') {
+            return {
+                ...item,
+                base_price: parseFloat(item.base_price) || 0,
+                unit_price: parseFloat(item.base_price) || 0,
+                line_total: (parseFloat(item.base_price) || 0) * (parseFloat(item.quantity) || 1),
+                final_price: parseFloat(item.base_price) || 0
+            };
+        }
+        const calc = calculateItemPricing(item);
+        return { ...item, ...calc };
+    });
+}
+
+// ========================================
+// LIST ESTIMATES
+// ========================================
+router.get('/', requirePermission('estimates', 'view'), async (req, res) => {
+    try {
+        const { status, search, branch_id } = req.query;
+        let query = 'SELECT * FROM estimates WHERE 1=1';
+        const params = [];
+
+        if (status) { query += ' AND status = ?'; params.push(status); }
+        if (branch_id) { query += ' AND branch_id = ?'; params.push(branch_id); }
+        if (search) {
+            query += ' AND (estimate_number LIKE ? OR customer_name LIKE ? OR customer_phone LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        query += ' ORDER BY estimate_date DESC, id DESC';
+        const [rows] = await pool.query(query, params);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// GET SINGLE ESTIMATE
+// ========================================
+router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
+    try {
+        const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
+        if (estimate.length === 0) {
+            return res.status(404).json({ error: 'Estimate not found' });
+        }
+
+        const [items] = await pool.query(`
+            SELECT ei.*, p.name as product_name, p.product_type as product_type
+            FROM estimate_items ei
+            LEFT JOIN products p ON ei.product_id = p.id
+            WHERE ei.estimate_id = ?
+            ORDER BY ei.display_order, ei.id
+        `, [req.params.id]);
+
+        res.json({ ...estimate[0], items });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// GET ESTIMATE ITEMS
+// ========================================
+router.get('/:id/items', requirePermission('estimates', 'view'), async (req, res) => {
+    try {
+        const [items] = await pool.query(
+            'SELECT * FROM estimate_items WHERE estimate_id = ? ORDER BY display_order',
+            [req.params.id]
+        );
+        res.json(items);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// CREATE ESTIMATE
+// ========================================
+router.post('/', requirePermission('estimates', 'add'), async (req, res) => {
+    try {
+        const {
+            customer_name, customer_phone, customer_address, estimate_date, valid_until,
+            show_gst_breakdown, column_visibility, show_description_only,
+            notes, admin_notes, status, branch_id, items
+        } = req.body;
+
+        // Generate estimate number
+        const datePrefix = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const [lastEstimate] = await pool.query(
+            'SELECT estimate_number FROM estimates WHERE estimate_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE',
+            [`EST${datePrefix}%`]
+        );
+
+        let estimateNumber;
+        if (lastEstimate.length > 0) {
+            const lastNum = parseInt(lastEstimate[0].estimate_number.slice(-4));
+            estimateNumber = `EST${datePrefix}${String(lastNum + 1).padStart(4, '0')}`;
+        } else {
+            estimateNumber = `EST${datePrefix}0001`;
+        }
+
+        // Calculate item pricing
+        const processedItems = processItems(items);
+        const totals = calculateEstimateTotals(processedItems);
+
+        // Insert estimate
+        const [result] = await pool.query(
+            `INSERT INTO estimates (
+                estimate_number, customer_name, customer_phone, customer_address,
+                estimate_date, valid_until, branch_id,
+                subtotal, gst_amount, grand_total,
+                total_markup, total_discount, total_labor,
+                show_gst_breakdown, column_visibility, show_description_only,
+                notes, admin_notes, status, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                estimateNumber, customer_name, customer_phone, customer_address,
+                estimate_date, valid_until || null, branch_id || null,
+                totals.subtotal, totals.gst_amount, totals.grand_total,
+                totals.total_markup, totals.total_discount, totals.total_labor,
+                show_gst_breakdown ? 1 : 0, column_visibility || null, show_description_only ? 1 : 0,
+                notes || null, admin_notes || null, status || 'draft',
+                req.user ? req.user.id : 1
+            ]
+        );
+
+        const estimateId = result.insertId;
+
+        // Insert items
+        if (processedItems.length > 0) {
+            await pool.query(ITEM_INSERT_SQL, [buildItemValues(estimateId, processedItems)]);
+        }
+
+        res.json({ success: true, id: estimateId, estimate_number: estimateNumber, message: 'Estimate created successfully' });
+    } catch (err) {
+        console.error('Create estimate error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// UPDATE ESTIMATE
+// ========================================
+router.put('/:id', requirePermission('estimates', 'edit'), async (req, res) => {
+    try {
+        const estimateId = req.params.id;
+        const {
+            customer_name, customer_phone, customer_address, estimate_date, valid_until,
+            show_gst_breakdown, column_visibility, show_description_only,
+            notes, admin_notes, branch_id, items
+        } = req.body;
+
+        // Calculate item pricing
+        const processedItems = processItems(items);
+        const totals = calculateEstimateTotals(processedItems);
+
+        await pool.query(
+            `UPDATE estimates SET
+                customer_name = ?, customer_phone = ?, customer_address = ?,
+                estimate_date = ?, valid_until = ?, branch_id = ?,
+                subtotal = ?, gst_amount = ?, grand_total = ?,
+                total_markup = ?, total_discount = ?, total_labor = ?,
+                show_gst_breakdown = ?, column_visibility = ?, show_description_only = ?,
+                notes = ?, admin_notes = ?,
+                last_updated_at = NOW()
+            WHERE id = ?`,
+            [
+                customer_name, customer_phone, customer_address || null,
+                estimate_date, valid_until || null, branch_id || null,
+                totals.subtotal, totals.gst_amount, totals.grand_total,
+                totals.total_markup, totals.total_discount, totals.total_labor,
+                show_gst_breakdown ? 1 : 0, column_visibility || null, show_description_only ? 1 : 0,
+                notes || null, admin_notes || null, estimateId
+            ]
+        );
+
+        // Replace items
+        await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
+
+        if (processedItems.length > 0) {
+            await pool.query(ITEM_INSERT_SQL, [buildItemValues(estimateId, processedItems)]);
+        }
+
+        res.json({ success: true, message: 'Estimate updated successfully' });
+    } catch (err) {
+        console.error('Update estimate error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// DELETE ESTIMATE (preserves existing behavior — no status guard)
+// ========================================
+router.delete('/:id', requirePermission('estimates', 'delete'), async (req, res) => {
+    try {
+        const estimateId = req.params.id;
+        const [estimate] = await pool.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
+        if (estimate.length === 0) return res.status(404).json({ error: 'Estimate not found' });
+
+        await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
+        await pool.query('DELETE FROM estimates WHERE id = ?', [estimateId]);
+        res.json({ success: true, message: 'Estimate deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// UPDATE STATUS (PATCH — preserves existing method + history logging)
+// ========================================
+router.patch('/:id/status', requirePermission('estimates', 'edit'), async (req, res) => {
+    try {
+        const { status, reason, notes } = req.body;
+        const estimateId = req.params.id;
+
+        const [current] = await pool.query('SELECT status FROM estimates WHERE id = ?', [estimateId]);
+        if (current.length === 0) return res.status(404).json({ error: 'Estimate not found' });
+
+        const oldStatus = current[0].status;
+
+        const setClauses = ['status = ?', 'last_updated_at = NOW()'];
+        const params = [status];
+
+        if (status === 'approved') {
+            setClauses.push('approved_by_admin_id = ?', 'approved_at = NOW()');
+            params.push(req.user.id);
+        }
+
+        params.push(estimateId);
+        await pool.query(`UPDATE estimates SET ${setClauses.join(', ')} WHERE id = ?`, params);
+
+        await pool.query(
+            'INSERT INTO estimate_status_history (estimate_id, old_status, new_status, changed_by_user_id, reason, notes) VALUES (?, ?, ?, ?, ?, ?)',
+            [estimateId, oldStatus, status, req.user.id, reason, notes]
+        );
+
+        res.json({ success: true, message: 'Status updated successfully' });
+    } catch (err) {
+        console.error('Update status error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// ESTIMATE HISTORY (uses estimate_status_history table)
+// ========================================
+router.get('/:id/history', requirePermission('estimates', 'view'), async (req, res) => {
+    try {
+        const [history] = await pool.query(`
+            SELECT h.*, u.full_name as changed_by_name
+            FROM estimate_status_history h
+            LEFT JOIN users u ON h.changed_by_user_id = u.id
+            WHERE h.estimate_id = ?
+            ORDER BY h.timestamp DESC
+        `, [req.params.id]);
+        res.json(history);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+module.exports = { router, setPool };
