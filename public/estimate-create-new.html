@@ -1110,16 +1110,13 @@
             const thead = document.getElementById('estimateTableHead');
             const cv = columnVisibility;
 
-            // Build dynamic header
+            // Build dynamic header — no separate Markup/Discount columns
             let hh = '<th class="px-4 py-3 text-left">#</th>';
             if (cv.show_image) hh += '<th class="px-4 py-3 text-left">Image</th>';
             hh += '<th class="px-4 py-3 text-left">Product</th>';
             if (cv.show_pack_size) hh += '<th class="px-4 py-3 text-left">Pack Size</th>';
-            hh += '<th class="px-4 py-3 text-right">Base Price</th>';
-            hh += '<th class="px-4 py-3 text-center">Markup</th>';
-            hh += '<th class="px-4 py-3 text-center">Discount</th>';
-            hh += '<th class="px-4 py-3 text-right">Final Price</th>';
-            if (cv.show_qty) hh += '<th class="px-4 py-3 text-right">Qty</th>';
+            hh += '<th class="px-4 py-3 text-right">Price</th>';
+            if (cv.show_qty) hh += '<th class="px-4 py-3 text-center">Qty</th>';
             if (cv.show_area) hh += '<th class="px-4 py-3 text-right">Area (sqft)</th>';
             if (cv.show_mix) hh += '<th class="px-4 py-3 text-left">Mix Info</th>';
             if (cv.show_price_sqft) hh += '<th class="px-4 py-3 text-right">Price/sqft</th>';
@@ -1171,48 +1168,32 @@
                 // Pack Size
                 if (cv.show_pack_size) row += `<td class="px-4 py-3 align-top">${item.pack_size || extractPackSize(item.details)}</td>`;
 
-                // Base Price
-                row += `<td class="px-4 py-3 text-right align-top">${formatCurrency(item.base_price)}</td>`;
-
-                // Markup
-                row += `<td class="px-4 py-3 align-top" style="min-width:140px">
-                    <select onchange="onItemMarkupTypeChange(${item.id}, this.value)" class="w-full text-xs border rounded px-1 py-1 mb-1">
-                        <option value="" ${!item.markup_type ? 'selected' : ''}>None</option>
-                        <option value="price_pct" ${item.markup_type === 'price_pct' ? 'selected' : ''}>Price %</option>
-                        <option value="price_value" ${item.markup_type === 'price_value' ? 'selected' : ''}>Price &#8377;</option>
-                        <option value="total_pct" ${item.markup_type === 'total_pct' ? 'selected' : ''}>Total %</option>
-                        <option value="total_value" ${item.markup_type === 'total_value' ? 'selected' : ''}>Total &#8377;</option>
-                    </select>
-                    ${item.markup_type ? `
-                        <input type="number" value="${item.markup_value || ''}" min="0" step="0.01"
+                // Price column — base price + markup controls underneath
+                row += `<td class="px-4 py-3 align-top text-right" style="min-width:140px">
+                    <div class="font-semibold">${formatCurrency(item.base_price)}</div>
+                    <div class="mt-1 flex items-center gap-1 justify-end">
+                        <select onchange="onItemMarkupTypeChange(${item.id}, this.value)" class="text-xs border rounded px-1 py-0.5" style="max-width:70px">
+                            <option value="" ${!item.markup_type ? 'selected' : ''}>--</option>
+                            <option value="price_pct" ${item.markup_type === 'price_pct' ? 'selected' : ''}>%</option>
+                            <option value="price_value" ${item.markup_type === 'price_value' ? 'selected' : ''}>&#8377;</option>
+                        </select>
+                        ${item.markup_type ? `<input type="number" value="${item.markup_value || ''}" min="0" step="0.01"
                             onchange="onItemMarkupValueChange(${item.id}, this.value)"
-                            class="w-full text-xs border rounded px-2 py-1" placeholder="Value">
-                        <div class="text-xs text-green-600 mt-1">+${formatCurrency(item.markup_amount)}</div>
-                    ` : ''}
+                            class="text-xs border rounded px-1 py-0.5 w-16 text-right" placeholder="0">` : ''}
+                    </div>
+                    ${item.markup_type && item.markup_amount > 0 ? `<div class="text-xs text-green-600 mt-0.5 text-right">+${formatCurrency(item.markup_amount)}</div>
+                    <div class="text-xs font-semibold text-purple-700 mt-0.5 text-right">${formatCurrency(item.final_price)}</div>` : ''}
                 </td>`;
 
-                // Discount
-                row += `<td class="px-4 py-3 align-top" style="min-width:140px">
-                    <select onchange="onItemDiscountTypeChange(${item.id}, this.value)" class="w-full text-xs border rounded px-1 py-1 mb-1">
-                        <option value="" ${!item.discount_type ? 'selected' : ''}>None</option>
-                        <option value="price_pct" ${item.discount_type === 'price_pct' ? 'selected' : ''}>Price %</option>
-                        <option value="price_value" ${item.discount_type === 'price_value' ? 'selected' : ''}>Price &#8377;</option>
-                        <option value="total_pct" ${item.discount_type === 'total_pct' ? 'selected' : ''}>Total %</option>
-                        <option value="total_value" ${item.discount_type === 'total_value' ? 'selected' : ''}>Total &#8377;</option>
-                    </select>
-                    ${item.discount_type ? `
-                        <input type="number" value="${item.discount_value || ''}" min="0" step="0.01"
-                            onchange="onItemDiscountValueChange(${item.id}, this.value)"
-                            class="w-full text-xs border rounded px-2 py-1" placeholder="Value">
-                        <div class="text-xs text-red-600 mt-1">-${formatCurrency(item.discount_amount)}</div>
-                    ` : ''}
-                </td>`;
+                // Qty — inline editable
+                if (cv.show_qty) {
+                    row += `<td class="px-4 py-3 align-top text-center">
+                        <input type="number" value="${parseFloat(item.quantity)}" min="0.01" step="0.01"
+                            onchange="onInlineQtyChange(${item.id}, this.value)"
+                            class="w-16 text-sm border rounded px-2 py-1 text-center">
+                    </td>`;
+                }
 
-                // Final Price
-                row += `<td class="px-4 py-3 text-right align-top font-semibold">${formatCurrency(item.final_price)}</td>`;
-
-                // Optional columns
-                if (cv.show_qty) row += `<td class="px-4 py-3 text-right align-top">${parseFloat(item.quantity).toFixed(2)}</td>`;
                 if (cv.show_area) row += `<td class="px-4 py-3 text-right align-top">${item.area ? parseFloat(item.area).toFixed(0) : '-'}</td>`;
                 if (cv.show_mix) row += `<td class="px-4 py-3 text-sm align-top">${escHtml(item.details || '')}</td>`;
                 if (cv.show_price_sqft) {
@@ -1224,7 +1205,6 @@
                 if (cv.show_total) row += `<td class="px-4 py-3 text-right align-top font-bold">${formatCurrency(item.line_total)}</td>`;
 
                 row += `<td class="px-4 py-3 text-center align-top">
-                    <button onclick="editItemQty(${item.id})" class="text-purple-600 hover:text-purple-800 text-sm mr-1">Edit</button>
                     <button onclick="removeItem(${item.id})" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
                 </td>`;
 
@@ -1233,6 +1213,30 @@
 
             updateTotals();
             updateTogglePills();
+        }
+
+        function onInlineQtyChange(itemId, value) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (!item) return;
+            const qty = parseFloat(value);
+            if (isNaN(qty) || qty <= 0) return;
+            item.quantity = qty;
+
+            // Recalculate area for unit products with coverage
+            const prodMatch = allProducts.find(p => p.id == item.product_id);
+            const cov = prodMatch ? (parseFloat(prodMatch.area_coverage) || 0) : 0;
+            if (cov > 0 && item.type === 'unit') {
+                const packMatch = (item.pack_size || '').match(/([\d.]+)/);
+                const packLiters = packMatch ? parseFloat(packMatch[1]) : 0;
+                if (packLiters > 0) {
+                    const coats = item.num_coats || 1;
+                    item.area = (packLiters * qty * cov) / coats;
+                    item.details = `${packLiters}L x ${qty}` + (coats > 1 ? ` (${coats} coats)` : '');
+                }
+            }
+
+            recalcItem(item);
+            renderEstimateTable();
         }
 
         function removeItem(itemId) {
