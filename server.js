@@ -2768,14 +2768,21 @@ app.get('/api/products/:id', requireAuth, async (req, res) => {
 
         // Get pack sizes with zoho item names
         const [packSizes] = await pool.query(
-            `SELECT ps.*, zim.zoho_item_name
+            `SELECT ps.*, zim.zoho_item_name, zim.zoho_description
              FROM pack_sizes ps
              LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
              WHERE ps.product_id = ? AND ps.is_active = 1 ORDER BY ps.size`,
             [req.params.id]
         );
 
-        res.json({ ...rows[0], pack_sizes: packSizes });
+        // Use first zoho_description as fallback if product.description is empty
+        const product = rows[0];
+        if (!product.description && packSizes.length > 0) {
+            const zohoDesc = packSizes.find(ps => ps.zoho_description);
+            if (zohoDesc) product.description = zohoDesc.zoho_description;
+        }
+
+        res.json({ ...product, pack_sizes: packSizes });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
