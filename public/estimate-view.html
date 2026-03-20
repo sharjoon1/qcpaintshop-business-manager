@@ -72,9 +72,13 @@
             </button>
             
             <div class="flex flex-wrap gap-2">
-                <button onclick="toggleColumn('qty')" id="btn-qty" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Qty/Area</button>
+                <button onclick="toggleColumn('qty')" id="btn-qty" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Qty</button>
+                <button onclick="toggleColumn('area')" id="btn-area" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Area</button>
                 <button onclick="toggleColumn('mix')" id="btn-mix" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Mix</button>
-                <button onclick="toggleColumn('price')" id="btn-price" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Price</button>
+                <button onclick="toggleColumn('price')" id="btn-price" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Base Price</button>
+                <button onclick="toggleColumn('markup')" id="btn-markup" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Markup</button>
+                <button onclick="toggleColumn('discount')" id="btn-discount" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Discount</button>
+                <button onclick="toggleColumn('final')" id="btn-final" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Final Price</button>
                 <button onclick="toggleColumn('breakdown')" id="btn-breakdown" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Breakdown</button>
                 <button onclick="toggleColumn('color')" id="btn-color" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Color</button>
                 <button onclick="toggleColumn('total')" id="btn-total" class="toggle-btn px-3 py-1 text-xs border-2 rounded-lg">Total</button>
@@ -150,20 +154,11 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm print:text-xs" id="itemsTable">
                     <thead class="bg-gray-800 text-white">
-                        <tr>
-                            <th class="px-3 py-2 print:px-2 print:py-1 text-left" style="width: 30px;">#</th>
-                            <th class="px-3 py-2 print:px-2 print:py-1 text-left">ITEM DETAILS</th>
-                            <th class="px-3 py-2 print:px-2 print:py-1 text-left col-qty" data-col="qty">QTY/AREA</th>
-                            <th class="px-3 py-2 print:px-2 print:py-1 text-left col-mix" data-col="mix">MIX INFO</th>
-                            <th class="px-3 py-2 print:px-2 print:py-1 text-right col-price" data-col="price">PRICE</th>
-                            <th class="px-3 py-2 print:px-2 print:py-1 text-left col-breakdown" data-col="breakdown">BREAKDOWN</th>
-                            <th class="px-3 py-2 print:px-2 print:py-1 text-right col-color" data-col="color">COLOR</th>
-                            <th class="px-3 py-2 print:px-2 print:py-1 text-right col-total" data-col="total">TOTAL</th>
-                        </tr>
+                        <tr id="tableHead"></tr>
                     </thead>
                     <tbody id="itemsBody" class="divide-y divide-gray-200">
                         <tr>
-                            <td colspan="8" class="text-center py-8 text-gray-500">Loading items...</td>
+                            <td colspan="10" class="text-center py-8 text-gray-500">Loading items...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -173,11 +168,12 @@
             <div id="summarySection" class="p-6 print:p-4 bg-gray-50 print:bg-white">
                 <div class="flex justify-end">
                     <div class="w-full max-w-sm">
+                        <div id="extraSummaryLines"></div>
                         <div class="flex justify-between py-2 border-b text-sm print:text-xs" id="gstBreakdown" style="display: none;">
                             <span class="font-semibold">Subtotal (excl. GST):</span>
                             <span id="subtotalAmount"></span>
                         </div>
-                        <div class="flex justify-between py-2 border-b text-sm print:text-xs" id="gstAmount" style="display: none;">
+                        <div class="flex justify-between py-2 border-b text-sm print:text-xs" id="gstAmountRow" style="display: none;">
                             <span class="font-semibold">GST @18%:</span>
                             <span id="gstValue"></span>
                         </div>
@@ -201,145 +197,73 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const estimateId = urlParams.get('id');
-        
-        let columnVisibility = {
-            qty: true,
-            mix: true,
-            price: true,
-            breakdown: true,
-            color: true,
-            total: true
-        };
 
+        let cv = { qty: true, area: false, mix: true, price: true, markup: false, discount: false, final: false, breakdown: false, color: false, total: true };
         let showSummarySection = true;
+        let estimateData = null;
 
-        if (!estimateId) {
-            alert('No estimate ID provided');
-            window.location.href = 'estimates.html';
-        }
+        if (!estimateId) { alert('No estimate ID provided'); window.location.href = 'estimates.html'; }
 
-        // Toggle column visibility
-        function toggleColumn(col) {
-            columnVisibility[col] = !columnVisibility[col];
-            applyColumnVisibility();
-            updateButtonStates();
-        }
+        function r10(n) { return Math.ceil(n / 10) * 10; }
+        function fmtINR(n) { return '\u20B9' + parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+        function toggleColumn(col) { cv[col] = !cv[col]; renderItems(); updateButtonStates(); }
         function toggleSummary() {
             showSummarySection = !showSummarySection;
             document.getElementById('summarySection').style.display = showSummarySection ? 'block' : 'none';
             updateButtonStates();
         }
 
-        function applyColumnVisibility() {
-            Object.keys(columnVisibility).forEach(col => {
-                const show = columnVisibility[col];
-                const elements = document.querySelectorAll(`.col-${col}, [data-col="${col}"]`);
-                elements.forEach(el => {
-                    el.style.display = show ? '' : 'none';
-                });
-            });
-        }
-
         function updateButtonStates() {
-            Object.keys(columnVisibility).forEach(col => {
+            Object.keys(cv).forEach(col => {
                 const btn = document.getElementById(`btn-${col}`);
                 if (btn) {
-                    if (columnVisibility[col]) {
-                        btn.classList.add('bg-green-100', 'border-green-500', 'text-green-800');
-                        btn.classList.remove('bg-gray-100', 'border-gray-300', 'text-gray-600');
-                    } else {
-                        btn.classList.remove('bg-green-100', 'border-green-500', 'text-green-800');
-                        btn.classList.add('bg-gray-100', 'border-gray-300', 'text-gray-600');
-                    }
+                    if (cv[col]) { btn.className = 'toggle-btn px-3 py-1 text-xs border-2 rounded-lg bg-green-100 border-green-500 text-green-800'; }
+                    else { btn.className = 'toggle-btn px-3 py-1 text-xs border-2 rounded-lg bg-gray-100 border-gray-300 text-gray-600'; }
                 }
             });
-
-            const summaryBtn = document.getElementById('btn-summary');
-            if (summaryBtn) {
-                if (showSummarySection) {
-                    summaryBtn.classList.add('bg-green-100', 'border-green-500', 'text-green-800');
-                    summaryBtn.classList.remove('bg-gray-100', 'border-gray-300', 'text-gray-600');
-                } else {
-                    summaryBtn.classList.remove('bg-green-100', 'border-green-500', 'text-green-800');
-                    summaryBtn.classList.add('bg-gray-100', 'border-gray-300', 'text-gray-600');
-                }
-            }
+            const sb = document.getElementById('btn-summary');
+            if (sb) sb.className = 'toggle-btn px-3 py-1 text-xs border-2 rounded-lg ' + (showSummarySection ? 'bg-green-100 border-green-500 text-green-800' : 'bg-gray-100 border-gray-300 text-gray-600');
         }
 
-        // Load estimate
         async function loadEstimate() {
             try {
                 const response = await apiRequest(`/api/estimates/${estimateId}`);
-                if (!response.ok) {
-                    const err = await response.json().catch(() => ({}));
-                    throw new Error(err.message || err.error || 'Estimate not found');
-                }
-                const data = await response.json();
+                if (!response.ok) throw new Error('Estimate not found');
+                estimateData = await response.json();
+                if (!estimateData || !estimateData.estimate_number) throw new Error('Estimate not found');
 
-                if (!data || !data.estimate_number) {
-                    throw new Error('Estimate not found');
-                }
-                
-                // Header info
-                document.getElementById('estimateNumber').textContent = data.estimate_number;
-                document.getElementById('estimateDate').textContent = formatDate(data.estimate_date);
-                document.getElementById('statusBadge').innerHTML = getStatusBadge(data.status);
-                
-                // Customer info
-                document.getElementById('customerName').textContent = data.customer_name || '';
-                document.getElementById('customerPhone').textContent = data.customer_phone || '';
-                document.getElementById('customerAddress').textContent = data.customer_address || '';
-                
-                // Grand total
-                document.getElementById('grandTotal').textContent = parseFloat(data.grand_total).toLocaleString('en-IN', {minimumFractionDigits: 2});
-                
-                // GST breakdown
-                if (data.show_gst_breakdown) {
-                    const subtotal = parseFloat(data.subtotal);
-                    const gst = parseFloat(data.gst_amount);
-                    
-                    document.getElementById('subtotalAmount').textContent = '₹' + subtotal.toLocaleString('en-IN', {minimumFractionDigits: 2});
-                    document.getElementById('gstValue').textContent = '₹' + gst.toLocaleString('en-IN', {minimumFractionDigits: 2});
-                    document.getElementById('gstBreakdown').style.display = 'flex';
-                    document.getElementById('gstAmount').style.display = 'flex';
-                }
-                
-                // Amount in words
-                document.getElementById('amountInWords').textContent = 'Amount in Words: Rupees ' + Math.floor(parseFloat(data.grand_total)).toLocaleString('en-IN') + ' Only';
-                
-                // Notes
-                if (data.notes && data.notes.trim()) {
-                    document.getElementById('notesContent').textContent = data.notes;
+                document.getElementById('estimateNumber').textContent = estimateData.estimate_number;
+                document.getElementById('estimateDate').textContent = formatDate(estimateData.estimate_date);
+                document.getElementById('statusBadge').innerHTML = getStatusBadge(estimateData.status);
+                document.getElementById('customerName').textContent = estimateData.customer_name || '';
+                document.getElementById('customerPhone').textContent = estimateData.customer_phone || '';
+                document.getElementById('customerAddress').textContent = estimateData.customer_address || '';
+
+                if (estimateData.notes && estimateData.notes.trim()) {
+                    document.getElementById('notesContent').textContent = estimateData.notes;
                     document.getElementById('notesSection').style.display = 'block';
                 }
 
-                // Load column visibility from database
-                if (data.column_visibility) {
+                // Load column visibility
+                if (estimateData.column_visibility) {
                     try {
-                        const savedSettings = JSON.parse(data.column_visibility);
-                        if (savedSettings.show_qty !== undefined) columnVisibility.qty = savedSettings.show_qty;
-                        if (savedSettings.show_mix !== undefined) columnVisibility.mix = savedSettings.show_mix;
-                        if (savedSettings.show_price !== undefined) columnVisibility.price = savedSettings.show_price;
-                        if (savedSettings.show_color !== undefined) columnVisibility.color = savedSettings.show_color;
-                        if (savedSettings.show_total !== undefined) columnVisibility.total = savedSettings.show_total;
-                        if (savedSettings.show_breakdown !== undefined) columnVisibility.breakdown = savedSettings.show_breakdown;
-                    } catch (e) {
-                        console.error('Error parsing column visibility:', e);
-                    }
+                        const s = JSON.parse(estimateData.column_visibility);
+                        if (s.show_qty !== undefined) cv.qty = s.show_qty;
+                        if (s.show_area !== undefined) cv.area = s.show_area;
+                        if (s.show_mix !== undefined) cv.mix = s.show_mix;
+                        if (s.show_price !== undefined) cv.price = s.show_price;
+                        if (s.show_color !== undefined) cv.color = s.show_color;
+                        if (s.show_total !== undefined) cv.total = s.show_total;
+                        if (s.show_breakdown !== undefined) cv.breakdown = s.show_breakdown;
+                    } catch (e) {}
                 }
-                
-                // Load items
-                await loadItems(data.items || []);
-                
-                // Apply visibility
-                applyColumnVisibility();
+
+                renderItems();
                 updateButtonStates();
-                
-                // Show content
+
                 document.getElementById('loadingState').classList.add('hidden');
                 document.getElementById('mainContent').classList.remove('hidden');
-                
             } catch (error) {
                 console.error('Error loading estimate:', error);
                 alert('Failed to load estimate: ' + error.message);
@@ -347,36 +271,113 @@
             }
         }
 
-        async function loadItems(items) {
+        function renderItems() {
+            const thead = document.getElementById('tableHead');
             const tbody = document.getElementById('itemsBody');
-            
-            if (!items || items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">No items found</td></tr>';
+            const items = estimateData.items || [];
+            const globalDescOnly = !!estimateData.show_description_only;
+
+            const products = items.filter(i => i.item_type !== 'labor');
+            const labor = items.filter(i => i.item_type === 'labor');
+
+            // Build header
+            let hh = '<th class="px-3 py-2 text-left" style="width:30px">#</th><th class="px-3 py-2 text-left">ITEM DETAILS</th>';
+            if (cv.qty) hh += '<th class="px-3 py-2 text-right">QTY</th>';
+            if (cv.area) hh += '<th class="px-3 py-2 text-right">AREA</th>';
+            if (cv.mix) hh += '<th class="px-3 py-2 text-left">MIX INFO</th>';
+            if (cv.price) hh += '<th class="px-3 py-2 text-right">BASE PRICE</th>';
+            if (cv.markup) hh += '<th class="px-3 py-2 text-right">MARKUP</th>';
+            if (cv.discount) hh += '<th class="px-3 py-2 text-right">DISCOUNT</th>';
+            if (cv.final) hh += '<th class="px-3 py-2 text-right">FINAL PRICE</th>';
+            if (cv.breakdown) hh += '<th class="px-3 py-2 text-left">BREAKDOWN</th>';
+            if (cv.color) hh += '<th class="px-3 py-2 text-right">COLOR</th>';
+            if (cv.total) hh += '<th class="px-3 py-2 text-right">TOTAL</th>';
+            thead.innerHTML = hh;
+            const colCount = thead.querySelectorAll('th').length;
+
+            if (products.length === 0 && labor.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-8 text-gray-500">No items</td></tr>`;
+                updateSummary(products, labor);
                 return;
             }
-            
-            tbody.innerHTML = items.map((item, index) => `
-                <tr class="print:text-xs">
-                    <td class="px-3 py-2 print:px-2 print:py-1 text-center">${index + 1}</td>
-                    <td class="px-3 py-2 print:px-2 print:py-1">
-                        <div class="font-semibold">${item.item_description || item.product_name || ''}</div>
-                    </td>
-                    <td class="px-3 py-2 print:px-2 print:py-1 col-qty" data-col="qty">
-                        ${item.quantity}${item.area ? ` (${item.area} sqft)` : ''}
-                    </td>
-                    <td class="px-3 py-2 print:px-2 print:py-1 col-mix" data-col="mix">${item.mix_info || '-'}</td>
-                    <td class="px-3 py-2 print:px-2 print:py-1 text-right col-price" data-col="price">
-                        ₹${parseFloat(item.unit_price).toFixed(2)}
-                    </td>
-                    <td class="px-3 py-2 print:px-2 print:py-1 col-breakdown" data-col="breakdown">${item.breakdown_cost || '-'}</td>
-                    <td class="px-3 py-2 print:px-2 print:py-1 text-right col-color" data-col="color">
-                        ₹${parseFloat(item.color_cost || 0).toFixed(2)}
-                    </td>
-                    <td class="px-3 py-2 print:px-2 print:py-1 text-right font-bold col-total" data-col="total">
-                        ₹${parseFloat(item.line_total).toLocaleString('en-IN', {minimumFractionDigits: 2})}
-                    </td>
-                </tr>
-            `).join('');
+
+            let rows = products.map((item, i) => {
+                const showDescOnly = item.show_description_only != null ? !!item.show_description_only : globalDescOnly;
+                const name = showDescOnly && item.custom_description ? item.custom_description : (item.item_description || item.product_name || item.item_name || '');
+                const descLine = (!showDescOnly && item.custom_description) ? `<div class="text-xs text-gray-400 mt-0.5" style="white-space:pre-line">${item.custom_description}</div>` : '';
+
+                let r = `<td class="px-3 py-2 text-center">${i + 1}</td>`;
+                r += `<td class="px-3 py-2"><div class="font-semibold" style="white-space:pre-line">${name}</div>${descLine}</td>`;
+                if (cv.qty) r += `<td class="px-3 py-2 text-right">${parseFloat(item.quantity || 0).toFixed(2)}</td>`;
+                if (cv.area) r += `<td class="px-3 py-2 text-right">${item.area ? parseFloat(item.area).toFixed(0) + ' sqft' : '-'}</td>`;
+                if (cv.mix) r += `<td class="px-3 py-2 text-xs text-gray-500">${item.mix_info || '-'}</td>`;
+                if (cv.price) r += `<td class="px-3 py-2 text-right">${fmtINR(r10(parseFloat(item.base_price || item.unit_price) || 0))}</td>`;
+                if (cv.markup) {
+                    if (item.markup_type && parseFloat(item.markup_amount) > 0) {
+                        const lbl = item.markup_type.includes('pct') ? item.markup_value + '%' : fmtINR(item.markup_value);
+                        r += `<td class="px-3 py-2 text-right text-green-600">+${lbl}</td>`;
+                    } else r += '<td class="px-3 py-2 text-right">-</td>';
+                }
+                if (cv.discount) {
+                    if (item.discount_type && parseFloat(item.discount_amount) > 0) {
+                        const lbl = item.discount_type.includes('pct') ? item.discount_value + '%' : fmtINR(item.discount_value);
+                        r += `<td class="px-3 py-2 text-right text-red-600">-${lbl}</td>`;
+                    } else r += '<td class="px-3 py-2 text-right">-</td>';
+                }
+                if (cv.final) r += `<td class="px-3 py-2 text-right font-semibold">${fmtINR(r10(parseFloat(item.final_price || item.unit_price) || 0))}</td>`;
+                if (cv.breakdown) r += `<td class="px-3 py-2">${item.breakdown_cost || '-'}</td>`;
+                if (cv.color) r += `<td class="px-3 py-2 text-right">${fmtINR(item.color_cost || 0)}</td>`;
+                if (cv.total) r += `<td class="px-3 py-2 text-right font-bold">${fmtINR(r10(parseFloat(item.line_total) || 0))}</td>`;
+                return `<tr class="print:text-xs">${r}</tr>`;
+            }).join('');
+
+            if (labor.length > 0) {
+                rows += `<tr class="bg-gray-100"><td colspan="${colCount}" class="px-3 py-2 font-bold text-sm border-t-2">Labor Charges</td></tr>`;
+                labor.forEach((l, i) => {
+                    let r = `<td class="px-3 py-2 text-center">${products.length + i + 1}</td>`;
+                    r += `<td class="px-3 py-2 font-semibold">${l.labor_description || l.item_name || 'Labor'}</td>`;
+                    const midCols = [cv.qty, cv.area, cv.mix, cv.price, cv.markup, cv.discount, cv.final, cv.breakdown, cv.color].filter(Boolean).length;
+                    for (let c = 0; c < midCols; c++) r += '<td></td>';
+                    if (cv.total) r += `<td class="px-3 py-2 text-right font-bold">${fmtINR(r10(parseFloat(l.line_total || l.base_price) || 0))}</td>`;
+                    rows += `<tr class="print:text-xs">${r}</tr>`;
+                });
+            }
+
+            tbody.innerHTML = rows;
+            updateSummary(products, labor);
+        }
+
+        function updateSummary(products, labor) {
+            let productTotal = 0, totalMarkup = 0, totalDiscount = 0, laborTotal = 0;
+            products.forEach(i => {
+                productTotal += r10(parseFloat(i.line_total) || 0);
+                totalMarkup += (parseFloat(i.markup_amount) || 0) * (parseFloat(i.quantity) || 1);
+                totalDiscount += (parseFloat(i.discount_amount) || 0) * (parseFloat(i.quantity) || 1);
+            });
+            if (parseFloat(estimateData.total_markup) > 0) totalMarkup = parseFloat(estimateData.total_markup);
+            if (parseFloat(estimateData.total_discount) > 0) totalDiscount = parseFloat(estimateData.total_discount);
+            labor.forEach(i => { laborTotal += r10(parseFloat(i.line_total || i.base_price) || 0); });
+            const grandTotal = r10(productTotal + laborTotal);
+
+            document.getElementById('grandTotal').textContent = parseFloat(grandTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            document.getElementById('amountInWords').textContent = 'Amount in Words: Rupees ' + Math.floor(grandTotal).toLocaleString('en-IN') + ' Only';
+
+            if (estimateData.show_gst_breakdown) {
+                document.getElementById('subtotalAmount').textContent = fmtINR(productTotal);
+                document.getElementById('gstValue').textContent = fmtINR(parseFloat(estimateData.gst_amount) || 0);
+                document.getElementById('gstBreakdown').style.display = 'flex';
+                document.getElementById('gstAmountRow').style.display = 'flex';
+            }
+
+            let html = '';
+            if (totalMarkup > 0 || totalDiscount > 0 || laborTotal > 0) {
+                html += `<div class="flex justify-between py-1 text-sm"><span class="text-gray-500">Subtotal (products):</span><span class="font-medium">${fmtINR(productTotal)}</span></div>`;
+            }
+            if (totalMarkup > 0) html += `<div class="flex justify-between py-1 text-sm text-green-600"><span>Total Markup:</span><span>+${fmtINR(r10(totalMarkup))}</span></div>`;
+            if (totalDiscount > 0) html += `<div class="flex justify-between py-1 text-sm text-red-600"><span>Total Discount:</span><span>-${fmtINR(r10(totalDiscount))}</span></div>`;
+            if (laborTotal > 0) html += `<div class="flex justify-between py-1 text-sm text-blue-600"><span>Labor Charges:</span><span>+${fmtINR(laborTotal)}</span></div>`;
+            if (html) html += '<div class="border-t border-gray-300 my-1"></div>';
+            document.getElementById('extraSummaryLines').innerHTML = html;
         }
 
         function getStatusBadge(status) {
