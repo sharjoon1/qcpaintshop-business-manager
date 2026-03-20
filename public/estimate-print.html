@@ -688,8 +688,9 @@
 
         function updatePrintSummary(products, labor) {
             const productTotal = products.reduce((s, i) => s + (parseFloat(i.line_total) || 0), 0);
-            const totalMarkup = parseFloat(estimateData.total_markup) || 0;
-            const totalDiscount = parseFloat(estimateData.total_discount) || 0;
+            // Calculate from items directly (fallback if estimate-level totals are 0)
+            const totalMarkup = parseFloat(estimateData.total_markup) || products.reduce((s, i) => s + ((parseFloat(i.markup_amount) || 0) * (parseFloat(i.quantity) || 1)), 0);
+            const totalDiscount = parseFloat(estimateData.total_discount) || products.reduce((s, i) => s + ((parseFloat(i.discount_amount) || 0) * (parseFloat(i.quantity) || 1)), 0);
             const laborTotal = labor.reduce((s, i) => s + (parseFloat(i.line_total) || parseFloat(i.base_price) || 0), 0);
             const grandTotal = parseFloat(estimateData.grand_total) || (productTotal + laborTotal);
 
@@ -709,22 +710,24 @@
                 if (gstSection) gstSection.classList.add('hidden');
             }
 
-            // Add markup/discount/labor summary lines if they exist
+            // Build summary breakdown lines
             let extraLines = '';
-            if (totalMarkup > 0) extraLines += `<div style="display:flex;justify-content:space-between;color:green;"><span>Total Markup:</span><span>+${formatINR(totalMarkup)}</span></div>`;
-            if (totalDiscount > 0) extraLines += `<div style="display:flex;justify-content:space-between;color:red;"><span>Total Discount:</span><span>-${formatINR(totalDiscount)}</span></div>`;
-            if (laborTotal > 0) extraLines += `<div style="display:flex;justify-content:space-between;color:#2563eb;"><span>Labor Charges:</span><span>+${formatINR(laborTotal)}</span></div>`;
+            if (totalMarkup > 0 || totalDiscount > 0 || laborTotal > 0) {
+                extraLines += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span style="color:#6b7280;">Subtotal (products):</span><span style="font-weight:500;">${formatINR(productTotal)}</span></div>`;
+            }
+            if (totalMarkup > 0) extraLines += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:green;"><span>Total Markup:</span><span>+${formatINR(totalMarkup)}</span></div>`;
+            if (totalDiscount > 0) extraLines += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:#dc2626;"><span>Total Discount:</span><span>-${formatINR(totalDiscount)}</span></div>`;
+            if (laborTotal > 0) extraLines += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:#2563eb;"><span>Labor Charges:</span><span>+${formatINR(laborTotal)}</span></div>`;
+            if (extraLines) extraLines += `<div style="border-top:1px solid #d1d5db;margin:4px 0;"></div>`;
 
             const extraContainer = document.getElementById('extraSummaryLines');
             if (extraContainer) {
                 extraContainer.innerHTML = extraLines;
             } else if (extraLines) {
-                // Insert before grand total
                 const grandTotalRow = document.getElementById('grandTotalVal')?.closest('div');
                 if (grandTotalRow) {
                     const div = document.createElement('div');
                     div.id = 'extraSummaryLines';
-                    div.style.cssText = 'font-size:12px; margin-bottom:6px;';
                     div.innerHTML = extraLines;
                     grandTotalRow.parentElement.insertBefore(div, grandTotalRow);
                 }
