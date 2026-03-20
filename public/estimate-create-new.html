@@ -1199,6 +1199,7 @@
                 if (cv.show_total) row += `<td class="px-4 py-3 text-right align-top font-bold">${formatCurrency(item.line_total)}</td>`;
 
                 row += `<td class="px-4 py-3 text-center align-top">
+                    <button onclick="editItemQty(${item.id})" class="text-purple-600 hover:text-purple-800 text-sm mr-1">Edit</button>
                     <button onclick="removeItem(${item.id})" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
                 </td>`;
 
@@ -1211,6 +1212,18 @@
 
         function removeItem(itemId) {
             estimateItems = estimateItems.filter(item => item.id !== itemId);
+            renderEstimateTable();
+        }
+
+        function editItemQty(itemId) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (!item) return;
+            const newQty = prompt('Enter new quantity:', item.quantity);
+            if (newQty === null) return;
+            const qty = parseFloat(newQty);
+            if (isNaN(qty) || qty <= 0) { alert('Invalid quantity'); return; }
+            item.quantity = qty;
+            recalcItem(item);
             renderEstimateTable();
         }
 
@@ -1494,27 +1507,35 @@
             };
 
             try {
-                const response = await apiRequest('/api/estimates', {
-                    method: 'POST',
+                const url = editMode ? `/api/estimates/${editEstimateId}` : '/api/estimates';
+                const method = editMode ? 'PUT' : 'POST';
+
+                const response = await apiRequest(url, {
+                    method: method,
                     body: JSON.stringify(estimateData)
                 });
 
                 const result = await response.json();
 
                 if (response.ok && result.success) {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const requestId = urlParams.get('from_request');
-
-                    if (requestId) {
-                        await markRequestAsConverted(requestId, result.id || result.estimate_id);
-                    }
-
-                    const estNum = result.estimate_number || result.id;
-                    const estId = result.id || result.estimate_id;
-                    if (confirm('Estimate #' + estNum + ' created! Open print preview?')) {
-                        window.location.href = 'estimate-print.html?id=' + estId;
-                    } else {
+                    if (editMode) {
+                        alert('Estimate updated successfully!');
                         window.location.href = 'estimates.html';
+                    } else {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const requestId = urlParams.get('from_request');
+
+                        if (requestId) {
+                            await markRequestAsConverted(requestId, result.id || result.estimate_id);
+                        }
+
+                        const estNum = result.estimate_number || result.id;
+                        const estId = result.id || result.estimate_id;
+                        if (confirm('Estimate #' + estNum + ' created! Open print preview?')) {
+                            window.location.href = 'estimate-print.html?id=' + estId;
+                        } else {
+                            window.location.href = 'estimates.html';
+                        }
                     }
                 } else {
                     alert('Failed to save estimate: ' + (result.message || result.error || 'Unknown error'));
@@ -1767,13 +1788,145 @@
         }
 
         // ========================================
+        // EDIT MODE — load existing estimate via ?id=X
+        // ========================================
+        let editMode = false;
+        let editEstimateId = null;
+
+        async function loadExistingEstimate() {
+            const urlParams = new URLSearchParams(window.location.search);
+            editEstimateId = urlParams.get('id');
+            if (!editEstimateId) return;
+
+            editMode = true;
+            document.title = 'Edit Estimate - Quality Colors';
+
+            try {
+                const res = await apiRequest(`/api/estimates/${editEstimateId}`);
+                if (!res.ok) throw new Error('Failed to load estimate');
+                const estimate = await res.json();
+
+                if (!estimate || !estimate.estimate_number) {
+                    alert('Estimate not found');
+                    return;
+                }
+
+                // Show edit header
+                const header = document.querySelector('h2');
+                if (header) header.textContent = `Editing: ${estimate.estimate_number}`;
+
+                // Change save button text
+                const saveBtn = document.querySelector('button[onclick="saveEstimate()"]');
+                if (saveBtn) saveBtn.textContent = 'Update Estimate';
+
+                // Set global settings
+                globalShowDescOnly = !!estimate.show_description_only;
+                const descToggle = document.getElementById('globalDescOnlyToggle');
+                if (descToggle) descToggle.checked = globalShowDescOnly;
+
+                if (estimate.column_visibility) {
+                    try {
+                        columnVisibility = JSON.parse(estimate.column_visibility);
+                        localStorage.setItem('estimate_column_prefs', estimate.column_visibility);
+                    } catch(e) {}
+                }
+
+                // Set customer
+                const custMatch = customers.find(c =>
+                    c.phone === estimate.customer_phone || c.name === estimate.customer_name
+                );
+                if (custMatch) {
+                    customerDD.setValue(String(custMatch.id));
+                } else {
+                    // Create a temporary customer option
+                    selectedCustomer = {
+                        name: estimate.customer_name,
+                        phone: estimate.customer_phone,
+                        address: estimate.customer_address
+                    };
+                    document.getElementById('custName').textContent = estimate.customer_name || '';
+                    document.getElementById('custPhone').textContent = estimate.customer_phone || '';
+                    document.getElementById('custEmail').textContent = '';
+                    document.getElementById('custAddress').textContent = estimate.customer_address || '';
+                    document.getElementById('customerDetails').classList.remove('hidden');
+                }
+
+                // Load items
+                if (estimate.items && estimate.items.length > 0) {
+                    estimateItems = [];
+                    laborItems = [];
+
+                    for (const item of estimate.items) {
+                        if (item.item_type === 'labor') {
+                            laborItems.push({
+                                id: laborIdCounter++,
+                                item_type: 'labor',
+                                labor_description: item.labor_description || item.item_name || '',
+                                base_price: parseFloat(item.base_price) || parseFloat(item.unit_price) || 0,
+                                quantity: parseFloat(item.quantity) || 1,
+                                labor_taxable: !!item.labor_taxable,
+                                line_total: parseFloat(item.line_total) || 0
+                            });
+                        } else {
+                            estimateItems.push({
+                                id: itemIdCounter++,
+                                product_id: item.product_id,
+                                product_name: item.product_name || item.item_name || item.item_description || '',
+                                image_url: item.image_url || null,
+                                type: item.product_type === 'area' ? 'area' : 'unit',
+                                item_type: 'product',
+                                brand: item.brand || null,
+                                category: item.category || null,
+                                pack_size: item.pack_size || '',
+                                details: item.mix_info || item.item_description || '',
+                                quantity: parseFloat(item.quantity) || 1,
+                                area: item.area ? parseFloat(item.area) : null,
+                                num_coats: item.num_coats || 1,
+                                zoho_item_id: item.zoho_item_id || null,
+                                base_price: parseFloat(item.base_price) || parseFloat(item.unit_price) || 0,
+                                unit_price: parseFloat(item.unit_price) || 0,
+                                markup_type: item.markup_type || null,
+                                markup_value: parseFloat(item.markup_value) || 0,
+                                markup_amount: parseFloat(item.markup_amount) || 0,
+                                price_after_markup: parseFloat(item.price_after_markup) || parseFloat(item.unit_price) || 0,
+                                discount_type: item.discount_type || null,
+                                discount_value: parseFloat(item.discount_value) || 0,
+                                discount_amount: parseFloat(item.discount_amount) || 0,
+                                final_price: parseFloat(item.final_price) || parseFloat(item.unit_price) || 0,
+                                line_total: parseFloat(item.line_total) || 0,
+                                total: parseFloat(item.line_total) || 0,
+                                custom_description: item.custom_description || '',
+                                show_description_only: item.show_description_only
+                            });
+                        }
+                    }
+
+                    renderEstimateTable();
+                    renderLaborItems();
+                }
+
+                console.log('Loaded estimate:', estimate.estimate_number, estimateItems.length, 'items', laborItems.length, 'labor');
+            } catch (error) {
+                console.error('Error loading estimate:', error);
+                alert('Failed to load estimate: ' + error.message);
+            }
+        }
+
+        // ========================================
         // INITIALIZE
         // ========================================
         async function init() {
             initDropdowns();
             updateTogglePills();
             await loadInitialData();
-            await prefillFromRequest();
+
+            // Check if editing existing estimate
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('id')) {
+                await loadExistingEstimate();
+            } else {
+                await prefillFromRequest();
+            }
 
             if (estimateItems.length > 0) {
                 renderEstimateTable();

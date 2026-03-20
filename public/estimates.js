@@ -322,7 +322,7 @@ function viewEstimate(id) {
 
 // Edit estimate
 function editEstimate(id) {
-    window.location.href = `/estimate-edit.html?id=${id}`;
+    window.location.href = `/estimate-create-new.html?id=${id}`;
 }
 
 // Create new estimate
