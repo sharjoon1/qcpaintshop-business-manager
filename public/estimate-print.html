@@ -404,12 +404,19 @@
         const COLUMNS = [
             { key: 'show_image', label: 'Image', default: true },
             { key: 'show_pack_size', label: 'Pack Size', default: true },
-            { key: 'show_qty', label: 'Qty/Area', default: true },
+            { key: 'show_qty', label: 'Quantity', default: true },
+            { key: 'show_area', label: 'Area (sqft)', default: true },
             { key: 'show_mix', label: 'Mix Info', default: true },
-            { key: 'show_price', label: 'Price', default: true },
+            { key: 'show_price', label: 'Base Price', default: true },
+            { key: 'show_markup', label: 'Markup', default: false },
+            { key: 'show_discount', label: 'Discount', default: false },
+            { key: 'show_final_price', label: 'Final Price', default: false },
+            { key: 'show_price_sqft', label: 'Price/sqft', default: false },
             { key: 'show_breakdown', label: 'Breakdown', default: false },
             { key: 'show_color', label: 'Color', default: false },
-            { key: 'show_total', label: 'Total', default: true }
+            { key: 'show_total', label: 'Total', default: true },
+            { key: 'show_subtotal', label: 'Subtotal', default: true },
+            { key: 'show_gst', label: 'GST', default: true }
         ];
 
         let colVis = JSON.parse(localStorage.getItem('estimate_column_prefs') || 'null') || {};
@@ -574,6 +581,11 @@
         function renderTable() {
             const thead = document.getElementById('tableHead');
             const tbody = document.getElementById('tableBody');
+            const globalDescOnly = !!estimateData.show_description_only;
+
+            // Separate products and labor
+            const productItems = itemsData.filter(i => i.item_type !== 'labor');
+            const laborItemsList = itemsData.filter(i => i.item_type === 'labor');
 
             // Build header
             let hdr = '<th style="text-align:left; width: 30px;">#</th>';
@@ -581,21 +593,34 @@
             hdr += '<th style="text-align:left;">Item Details</th>';
             if (colVis.show_pack_size) hdr += '<th style="text-align:left; width: 80px;">Pack Size</th>';
             if (colVis.show_qty) hdr += '<th style="text-align:right; width: 70px;">Qty</th>';
+            if (colVis.show_area) hdr += '<th style="text-align:right; width: 80px;">Area (sqft)</th>';
             if (colVis.show_mix) hdr += '<th style="text-align:left; width: 100px;">Mix Info</th>';
-            if (colVis.show_price) hdr += '<th style="text-align:right; width: 80px;">Price</th>';
+            if (colVis.show_price) hdr += '<th style="text-align:right; width: 80px;">Base Price</th>';
+            if (colVis.show_markup) hdr += '<th style="text-align:right; width: 80px;">Markup</th>';
+            if (colVis.show_discount) hdr += '<th style="text-align:right; width: 80px;">Discount</th>';
+            if (colVis.show_final_price) hdr += '<th style="text-align:right; width: 80px;">Final Price</th>';
+            if (colVis.show_price_sqft) hdr += '<th style="text-align:right; width: 80px;">Price/sqft</th>';
             if (colVis.show_breakdown) hdr += '<th style="text-align:left; width: 80px;">Breakdown</th>';
             if (colVis.show_color) hdr += '<th style="text-align:right; width: 70px;">Color</th>';
             if (colVis.show_total) hdr += '<th style="text-align:right; width: 90px;">Total</th>';
             thead.innerHTML = hdr;
 
-            if (!itemsData || itemsData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No items</td></tr>';
+            const colCount = thead.querySelectorAll('th').length;
+
+            if (productItems.length === 0 && laborItemsList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-8 text-gray-400">No items</td></tr>`;
                 return;
             }
 
             const placeholderSvg = `<div class="img-placeholder"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
 
-            tbody.innerHTML = itemsData.map((item, i) => {
+            let rows = productItems.map((item, i) => {
+                const showDescOnly = item.show_description_only != null ? !!item.show_description_only : globalDescOnly;
+                const displayName = showDescOnly && item.custom_description
+                    ? item.custom_description
+                    : (item.item_description || item.product_name || item.item_name || '');
+                const descLine = (!showDescOnly && item.custom_description) ? `<div style="font-size:10px; color:var(--text-light); margin-top:2px; white-space:pre-line;">${item.custom_description}</div>` : '';
+
                 let r = `<td style="text-align:center; color: var(--text-light); font-weight: 600;">${i + 1}</td>`;
 
                 if (colVis.show_image) {
@@ -604,32 +629,106 @@
                         : placeholderSvg}</td>`;
                 }
 
-                r += `<td><div style="font-weight: 600;">${item.item_description || item.product_name || ''}</div></td>`;
+                r += `<td><div style="font-weight: 600; white-space:pre-line;">${displayName}</div>${descLine}</td>`;
 
-                if (colVis.show_pack_size) {
-                    r += `<td>${extractPackSize(item.mix_info)}</td>`;
+                if (colVis.show_pack_size) r += `<td>${item.pack_size || extractPackSize(item.mix_info)}</td>`;
+                if (colVis.show_qty) r += `<td style="text-align:right;">${parseFloat(item.quantity || 0).toFixed(2)}</td>`;
+                if (colVis.show_area) r += `<td style="text-align:right;">${item.area ? parseFloat(item.area).toFixed(0) : '-'}</td>`;
+                if (colVis.show_mix) r += `<td style="color: var(--text-light); font-size: 11px;">${item.mix_info || '-'}</td>`;
+                if (colVis.show_price) r += `<td style="text-align:right;">${formatINR(item.base_price || item.unit_price)}</td>`;
+                if (colVis.show_markup) {
+                    if (item.markup_type && parseFloat(item.markup_amount) > 0) {
+                        const label = item.markup_type.includes('pct') ? item.markup_value + '%' : formatINR(item.markup_value);
+                        r += `<td style="text-align:right; color: green;">+${label}</td>`;
+                    } else {
+                        r += `<td style="text-align:right;">-</td>`;
+                    }
                 }
-                if (colVis.show_qty) {
-                    r += `<td style="text-align:right;">${item.quantity}${item.area ? ' (' + item.area + ' sqft)' : ''}</td>`;
+                if (colVis.show_discount) {
+                    if (item.discount_type && parseFloat(item.discount_amount) > 0) {
+                        const label = item.discount_type.includes('pct') ? item.discount_value + '%' : formatINR(item.discount_value);
+                        r += `<td style="text-align:right; color: red;">-${label}</td>`;
+                    } else {
+                        r += `<td style="text-align:right;">-</td>`;
+                    }
                 }
-                if (colVis.show_mix) {
-                    r += `<td style="color: var(--text-light); font-size: 11px;">${item.mix_info || '-'}</td>`;
+                if (colVis.show_final_price) r += `<td style="text-align:right;">${formatINR(item.final_price || item.unit_price)}</td>`;
+                if (colVis.show_price_sqft) {
+                    const area = parseFloat(item.area) || 0;
+                    const lt = parseFloat(item.line_total) || 0;
+                    r += `<td style="text-align:right;">${area > 0 ? formatINR(lt / area) : '-'}</td>`;
                 }
-                if (colVis.show_price) {
-                    r += `<td style="text-align:right;">${formatINR(item.unit_price)}</td>`;
-                }
-                if (colVis.show_breakdown) {
-                    r += `<td style="color: var(--text-light);">${item.breakdown_cost || '-'}</td>`;
-                }
-                if (colVis.show_color) {
-                    r += `<td style="text-align:right;">${formatINR(item.color_cost || 0)}</td>`;
-                }
-                if (colVis.show_total) {
-                    r += `<td style="text-align:right; font-weight: 700; color: var(--text-dark);">${formatINR(item.line_total)}</td>`;
-                }
+                if (colVis.show_breakdown) r += `<td style="color: var(--text-light);">${item.breakdown_cost || '-'}</td>`;
+                if (colVis.show_color) r += `<td style="text-align:right;">${formatINR(item.color_cost || 0)}</td>`;
+                if (colVis.show_total) r += `<td style="text-align:right; font-weight: 700; color: var(--text-dark);">${formatINR(item.line_total)}</td>`;
 
                 return `<tr>${r}</tr>`;
             }).join('');
+
+            // Labor items
+            if (laborItemsList.length > 0) {
+                rows += `<tr style="background:var(--bg-stripe);"><td colspan="${colCount}" style="font-weight:700; padding:8px 12px; border-top:2px solid var(--border);">Labor Charges</td></tr>`;
+                laborItemsList.forEach((l, i) => {
+                    let r = `<td style="text-align:center; color: var(--text-light);">${productItems.length + i + 1}</td>`;
+                    if (colVis.show_image) r += '<td></td>';
+                    r += `<td style="font-weight:600;">${l.labor_description || l.item_name || 'Labor'}</td>`;
+                    // Fill remaining columns with empty cells except total
+                    const middleCols = [colVis.show_pack_size, colVis.show_qty, colVis.show_area, colVis.show_mix, colVis.show_price, colVis.show_markup, colVis.show_discount, colVis.show_final_price, colVis.show_price_sqft, colVis.show_breakdown, colVis.show_color].filter(Boolean).length;
+                    for (let c = 0; c < middleCols; c++) r += '<td></td>';
+                    if (colVis.show_total) r += `<td style="text-align:right; font-weight:700;">${formatINR(l.line_total || l.base_price)}</td>`;
+                    rows += `<tr>${r}</tr>`;
+                });
+            }
+
+            tbody.innerHTML = rows;
+
+            // Update summary with markup/discount/labor breakdown
+            updatePrintSummary(productItems, laborItemsList);
+        }
+
+        function updatePrintSummary(products, labor) {
+            const productTotal = products.reduce((s, i) => s + (parseFloat(i.line_total) || 0), 0);
+            const totalMarkup = parseFloat(estimateData.total_markup) || 0;
+            const totalDiscount = parseFloat(estimateData.total_discount) || 0;
+            const laborTotal = labor.reduce((s, i) => s + (parseFloat(i.line_total) || parseFloat(i.base_price) || 0), 0);
+            const grandTotal = parseFloat(estimateData.grand_total) || (productTotal + laborTotal);
+
+            // Update grand total
+            document.getElementById('grandTotalVal').textContent = formatINR(grandTotal);
+            document.getElementById('amountWords').textContent = 'Rupees ' + Math.floor(grandTotal).toLocaleString('en-IN') + ' Only';
+
+            // Show/hide GST breakdown
+            const gstSection = document.getElementById('gstBreakdownSection');
+            if (colVis.show_subtotal || colVis.show_gst) {
+                if (gstSection) gstSection.classList.remove('hidden');
+                const subtotalEl = document.getElementById('subtotalVal');
+                const gstEl = document.getElementById('gstVal');
+                if (subtotalEl) subtotalEl.textContent = formatINR(productTotal);
+                if (gstEl) gstEl.textContent = formatINR(parseFloat(estimateData.gst_amount) || 0);
+            } else {
+                if (gstSection) gstSection.classList.add('hidden');
+            }
+
+            // Add markup/discount/labor summary lines if they exist
+            let extraLines = '';
+            if (totalMarkup > 0) extraLines += `<div style="display:flex;justify-content:space-between;color:green;"><span>Total Markup:</span><span>+${formatINR(totalMarkup)}</span></div>`;
+            if (totalDiscount > 0) extraLines += `<div style="display:flex;justify-content:space-between;color:red;"><span>Total Discount:</span><span>-${formatINR(totalDiscount)}</span></div>`;
+            if (laborTotal > 0) extraLines += `<div style="display:flex;justify-content:space-between;color:#2563eb;"><span>Labor Charges:</span><span>+${formatINR(laborTotal)}</span></div>`;
+
+            const extraContainer = document.getElementById('extraSummaryLines');
+            if (extraContainer) {
+                extraContainer.innerHTML = extraLines;
+            } else if (extraLines) {
+                // Insert before grand total
+                const grandTotalRow = document.getElementById('grandTotalVal')?.closest('div');
+                if (grandTotalRow) {
+                    const div = document.createElement('div');
+                    div.id = 'extraSummaryLines';
+                    div.style.cssText = 'font-size:12px; margin-bottom:6px;';
+                    div.innerHTML = extraLines;
+                    grandTotalRow.parentElement.insertBefore(div, grandTotalRow);
+                }
+            }
         }
 
         // ========================================

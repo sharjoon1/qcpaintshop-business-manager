@@ -680,6 +680,10 @@
             item.line_total = item.final_price * qty;
             item.unit_price = item.final_price;
             item.total = item.line_total;
+            // Update price per sqft based on final price
+            if (item.area && item.area > 0) {
+                item.price_per_sqft = item.line_total / item.area;
+            }
         }
 
         // ========================================
