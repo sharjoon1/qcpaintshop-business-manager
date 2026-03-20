@@ -682,14 +682,18 @@
             }
         }
 
+        function roundUpTo10(n) {
+            return Math.ceil(n / 10) * 10;
+        }
+
         function recalcItem(item) {
             const bp = parseFloat(item.base_price) || 0;
             const qty = parseFloat(item.quantity) || 1;
             item.markup_amount = calcMarkup(bp, qty, item.markup_type, item.markup_value);
             item.price_after_markup = bp + item.markup_amount;
             item.discount_amount = calcDiscount(item.price_after_markup, qty, item.discount_type, item.discount_value);
-            item.final_price = item.price_after_markup - item.discount_amount;
-            item.line_total = item.final_price * qty;
+            item.final_price = roundUpTo10(item.price_after_markup - item.discount_amount);
+            item.line_total = roundUpTo10(item.final_price * qty);
             item.unit_price = item.final_price;
             item.total = item.line_total;
             // Update price per sqft based on final price
@@ -1063,13 +1067,13 @@
                 if (pack.zoho_description) {
                     item.custom_description = pack.zoho_description;
                 }
-                item.base_price = pack.price;
-                item.unit_price = pack.price;
-                item.final_price = pack.price;
-                item.price_after_markup = pack.price;
-                item.price_per_sqft = totalArea > 0 ? (quantity * pack.price) / totalArea : null;
-                item.total = quantity * pack.price;
+                item.base_price = roundUpTo10(pack.price);
+                item.unit_price = item.base_price;
+                item.final_price = item.base_price;
+                item.price_after_markup = item.base_price;
+                item.total = roundUpTo10(item.base_price * quantity);
                 item.line_total = item.total;
+                item.price_per_sqft = totalArea > 0 ? item.total / totalArea : null;
             } else {
                 const squareFeet = parseFloat(document.getElementById('squareFeet').value);
                 const coats = parseFloat(document.getElementById('coatsNumber').value);
@@ -1080,12 +1084,12 @@
                 item.details = `${squareFeet} sq.ft × ${coats} coats = ${totalLiters}L (${packCombo})`;
                 item.quantity = totalLiters;
                 item.num_coats = coats;
-                item.base_price = totalPrice / totalLiters;
+                item.base_price = roundUpTo10(totalPrice / totalLiters);
                 item.unit_price = item.base_price;
                 item.final_price = item.base_price;
                 item.price_after_markup = item.base_price;
-                item.total = totalPrice;
-                item.line_total = totalPrice;
+                item.total = roundUpTo10(totalPrice);
+                item.line_total = item.total;
             }
 
             estimateItems.push(item);
