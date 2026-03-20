@@ -1115,7 +1115,7 @@
             if (cv.show_image) hh += '<th class="px-4 py-3 text-left">Image</th>';
             hh += '<th class="px-4 py-3 text-left">Product</th>';
             if (cv.show_pack_size) hh += '<th class="px-4 py-3 text-left">Pack Size</th>';
-            hh += '<th class="px-4 py-3 text-right">Price</th>';
+            if (cv.show_price) hh += '<th class="px-4 py-3 text-right">Unit Price</th>';
             if (cv.show_qty) hh += '<th class="px-4 py-3 text-center">Qty</th>';
             if (cv.show_area) hh += '<th class="px-4 py-3 text-right">Area (sqft)</th>';
             if (cv.show_mix) hh += '<th class="px-4 py-3 text-left">Mix Info</th>';
@@ -1168,22 +1168,24 @@
                 // Pack Size
                 if (cv.show_pack_size) row += `<td class="px-4 py-3 align-top">${item.pack_size || extractPackSize(item.details)}</td>`;
 
-                // Price column — base price + markup controls underneath
-                row += `<td class="px-4 py-3 align-top text-right" style="min-width:140px">
-                    <div class="font-semibold">${formatCurrency(item.base_price)}</div>
-                    <div class="mt-1 flex items-center gap-1 justify-end">
-                        <select onchange="onItemMarkupTypeChange(${item.id}, this.value)" class="text-xs border rounded px-1 py-0.5" style="max-width:70px">
-                            <option value="" ${!item.markup_type ? 'selected' : ''}>--</option>
-                            <option value="price_pct" ${item.markup_type === 'price_pct' ? 'selected' : ''}>%</option>
-                            <option value="price_value" ${item.markup_type === 'price_value' ? 'selected' : ''}>&#8377;</option>
-                        </select>
-                        ${item.markup_type ? `<input type="number" value="${item.markup_value || ''}" min="0" step="0.01"
-                            onchange="onItemMarkupValueChange(${item.id}, this.value)"
-                            class="text-xs border rounded px-1 py-0.5 w-16 text-right" placeholder="0">` : ''}
-                    </div>
-                    ${item.markup_type && item.markup_amount > 0 ? `<div class="text-xs text-green-600 mt-0.5 text-right">+${formatCurrency(item.markup_amount)}</div>
-                    <div class="text-xs font-semibold text-purple-700 mt-0.5 text-right">${formatCurrency(item.final_price)}</div>` : ''}
-                </td>`;
+                // Unit Price column — base price + markup controls underneath
+                if (cv.show_price) {
+                    row += `<td class="px-4 py-3 align-top text-right" style="min-width:140px">
+                        <div class="font-semibold">${formatCurrency(item.base_price)}</div>
+                        <div class="mt-1 flex items-center gap-1 justify-end">
+                            <select onchange="onItemMarkupTypeChange(${item.id}, this.value)" class="text-xs border rounded px-1 py-0.5" style="max-width:70px">
+                                <option value="" ${!item.markup_type ? 'selected' : ''}>--</option>
+                                <option value="price_pct" ${item.markup_type === 'price_pct' ? 'selected' : ''}>%</option>
+                                <option value="price_value" ${item.markup_type === 'price_value' ? 'selected' : ''}>&#8377;</option>
+                            </select>
+                            ${item.markup_type ? `<input type="number" value="${item.markup_value || ''}" min="0" step="0.01"
+                                onchange="onItemMarkupValueChange(${item.id}, this.value)"
+                                class="text-xs border rounded px-1 py-0.5 w-16 text-right" placeholder="0">` : ''}
+                        </div>
+                        ${item.markup_type && item.markup_amount > 0 ? `<div class="text-xs text-green-600 mt-0.5 text-right">+${formatCurrency(item.markup_amount)}</div>
+                        <div class="text-xs font-semibold text-purple-700 mt-0.5 text-right">${formatCurrency(item.final_price)}</div>` : ''}
+                    </td>`;
+                }
 
                 // Qty — inline editable
                 if (cv.show_qty) {
