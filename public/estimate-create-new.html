@@ -1244,36 +1244,61 @@
             const item = estimateItems.find(i => i.id === itemId);
             if (!item) return;
 
-            if (item.type === 'area' && item.area && item.area > 0) {
-                // Area-wise: edit coats and recalculate
+            const prodMatch = allProducts.find(p => p.id == item.product_id);
+            const cov = prodMatch ? (parseFloat(prodMatch.area_coverage) || 0) : 0;
+
+            if (item.type === 'area') {
+                // Area-wise: edit coats and area sq.ft
                 const newCoats = prompt('Enter number of coats:', item.num_coats || 2);
                 if (newCoats === null) return;
                 const coats = parseInt(newCoats);
                 if (isNaN(coats) || coats <= 0) { alert('Invalid coats'); return; }
 
-                const newArea = prompt('Enter area in sq.ft:', item.area);
+                const newArea = prompt('Enter area in sq.ft:', item.area || '');
                 if (newArea === null) return;
                 const area = parseFloat(newArea);
                 if (isNaN(area) || area <= 0) { alert('Invalid area'); return; }
 
-                // Find product coverage
-                const coverage = 120; // default, will be overridden if product found
-                const prodMatch = allProducts.find(p => p.id == item.product_id);
-                const cov = prodMatch ? (parseFloat(prodMatch.area_coverage) || 120) : 120;
-
-                const totalLiters = (area * coats) / cov;
+                const useCov = cov || 120;
+                const totalLiters = (area * coats) / useCov;
                 item.num_coats = coats;
                 item.area = area;
                 item.quantity = parseFloat(totalLiters.toFixed(2));
                 item.details = `${area} sq.ft × ${coats} coats = ${totalLiters.toFixed(2)}L`;
+                item.price_per_sqft = item.line_total ? item.line_total / area : null;
                 recalcItem(item);
             } else {
-                // Unit-wise: edit quantity
+                // Unit-wise: edit quantity + coats if product has area coverage
                 const newQty = prompt('Enter new quantity:', item.quantity);
                 if (newQty === null) return;
                 const qty = parseFloat(newQty);
                 if (isNaN(qty) || qty <= 0) { alert('Invalid quantity'); return; }
+
+                let coats = item.num_coats || 1;
+                if (cov > 0) {
+                    const newCoats = prompt('Enter number of coats:', coats);
+                    if (newCoats !== null) {
+                        const c = parseInt(newCoats);
+                        if (!isNaN(c) && c > 0) coats = c;
+                    }
+                }
+
                 item.quantity = qty;
+                item.num_coats = coats;
+
+                // Recalculate area coverage for unit products
+                if (cov > 0) {
+                    // Extract pack size in liters from pack_size string (e.g. "20L")
+                    const packMatch = (item.pack_size || '').match(/([\d.]+)/);
+                    const packLiters = packMatch ? parseFloat(packMatch[1]) : 0;
+                    if (packLiters > 0) {
+                        const totalLiters = packLiters * qty;
+                        const totalArea = (totalLiters * cov) / coats;
+                        item.area = totalArea > 0 ? totalArea : null;
+                        item.details = `${packLiters}L x ${qty}` + (coats > 1 ? ` (${coats} coats)` : '');
+                    }
+                }
+
                 recalcItem(item);
             }
 
