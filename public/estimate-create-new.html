@@ -1027,7 +1027,8 @@
                         size: parseFloat(ps.size) || 0,
                         unit: ps.unit || 'L',
                         price: parseFloat(ps.base_price) || 0,
-                        zoho_item_id: ps.zoho_item_id || null
+                        zoho_item_id: ps.zoho_item_id || null,
+                        zoho_description: ps.zoho_description || null
                     })).sort((a, b) => a.size - b.size);
                 } else if (selectedProduct.available_sizes) {
                     try { packSizes = JSON.parse(selectedProduct.available_sizes); } catch(e) {}
@@ -1046,6 +1047,10 @@
                 item.pack_size = `${pack.size}${unit}`;
                 item.num_coats = coats;
                 item.zoho_item_id = pack.zoho_item_id || null;
+                // Use selected pack's zoho_description, fallback to product description
+                if (pack.zoho_description) {
+                    item.custom_description = pack.zoho_description;
+                }
                 item.base_price = pack.price;
                 item.unit_price = pack.price;
                 item.final_price = pack.price;
