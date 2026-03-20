@@ -1788,7 +1788,7 @@
         let reviewImageTarget = null; // group index for image upload
 
         // Smart product info extraction (mirrors backend logic)
-        const UNIT_PATTERN = 'ltr?|litres?|liters?|kg|kgs?|ml|gm?|grams?|pc|pcs?|pieces?|m|meters?';
+        const UNIT_PATTERN = 'l|ltr?|litres?|liters?|kg|kgs?|ml|gm?|grams?|pc|pcs?|pieces?|m|meters?';
         function extractProductInfoJS(itemName, cfProductName) {
             const n = (itemName || '').trim();
             // 1. cf_product_name overrides

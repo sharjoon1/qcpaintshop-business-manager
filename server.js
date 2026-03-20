@@ -2584,8 +2584,8 @@ app.post('/api/products/import-from-zoho', requirePermission('products', 'add'),
         // Helper: map raw unit text to standard code
         function mapUnitCode(u) {
             if (!u) return 'L';
-            u = u.toLowerCase();
-            if (/^(ltr?|litres?|liters?)$/.test(u)) return 'L';
+            u = u.trim().toLowerCase();
+            if (/^(l|ltr?|litres?|liters?)$/.test(u)) return 'L';
             if (/^(kg|kgs?)$/.test(u)) return 'KG';
             if (/^ml$/.test(u)) return 'L';
             if (/^(gm?|grams?)$/.test(u)) return 'KG';
@@ -2629,7 +2629,8 @@ app.post('/api/products/import-from-zoho', requirePermission('products', 'add'),
                 const brand = (group.brand || '').trim();
                 const category = (group.category || '').trim();
                 const productType = group.product_type || 'unit_wise';
-                const areaCoverage = productType === 'area_wise' ? (parseFloat(group.area_coverage) || null) : null;
+                // Default coverage 120 sqft/L for area_wise if not specified
+                const areaCoverage = productType === 'area_wise' ? (parseFloat(group.area_coverage) || 120) : null;
 
                 // Filter out any remaining already-mapped items (if force was false)
                 const itemsToImport = group.items.filter(i => !mappedSet.has(i.zoho_item_id));
