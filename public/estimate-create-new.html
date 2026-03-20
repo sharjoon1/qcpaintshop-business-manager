@@ -240,18 +240,30 @@
             </div>
 
             <!-- Overall Markup/Discount -->
-            <div id="overallMarkupSection" class="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                <div class="flex flex-wrap items-center gap-4">
+            <div class="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <div class="flex flex-wrap items-center gap-4 mb-3">
                     <span class="text-sm font-semibold text-purple-800">Overall Markup:</span>
-                    <select id="overallMarkupType" onchange="applyOverallMarkup()" class="text-sm border rounded px-2 py-1">
+                    <select id="overallMarkupType" class="text-sm border rounded px-2 py-1">
                         <option value="">None</option>
                         <option value="price_pct">Price %</option>
                         <option value="price_value">Price &#8377;</option>
                     </select>
                     <input type="number" id="overallMarkupValue" min="0" step="0.01" placeholder="Value"
-                        onchange="applyOverallMarkup()" class="w-24 text-sm border rounded px-2 py-1">
-                    <button onclick="applyOverallMarkup()" class="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700">Apply to All</button>
-                    <button onclick="clearOverallMarkup()" class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300">Clear All</button>
+                        class="w-24 text-sm border rounded px-2 py-1">
+                    <button onclick="applyOverallMarkup()" class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">Apply</button>
+                    <button onclick="clearOverallMarkup()" class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300">Clear</button>
+                </div>
+                <div class="flex flex-wrap items-center gap-4">
+                    <span class="text-sm font-semibold text-red-700">Overall Discount:</span>
+                    <select id="overallDiscountType" class="text-sm border rounded px-2 py-1">
+                        <option value="">None</option>
+                        <option value="price_pct">Price %</option>
+                        <option value="price_value">Price &#8377;</option>
+                    </select>
+                    <input type="number" id="overallDiscountValue" min="0" step="0.01" placeholder="Value"
+                        class="w-24 text-sm border rounded px-2 py-1">
+                    <button onclick="applyOverallDiscount()" class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700">Apply</button>
+                    <button onclick="clearOverallDiscount()" class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300">Clear</button>
                 </div>
             </div>
 
@@ -1328,6 +1340,38 @@
                 item.markup_type = null;
                 item.markup_value = 0;
                 item.markup_amount = 0;
+                recalcItem(item);
+            });
+
+            renderEstimateTable();
+        }
+
+        // ========================================
+        // OVERALL DISCOUNT (apply to all products)
+        // ========================================
+        function applyOverallDiscount() {
+            const type = document.getElementById('overallDiscountType').value;
+            const value = parseFloat(document.getElementById('overallDiscountValue').value) || 0;
+
+            if (!type || value <= 0) return;
+
+            estimateItems.forEach(item => {
+                item.discount_type = type;
+                item.discount_value = value;
+                recalcItem(item);
+            });
+
+            renderEstimateTable();
+        }
+
+        function clearOverallDiscount() {
+            document.getElementById('overallDiscountType').value = '';
+            document.getElementById('overallDiscountValue').value = '';
+
+            estimateItems.forEach(item => {
+                item.discount_type = null;
+                item.discount_value = 0;
+                item.discount_amount = 0;
                 recalcItem(item);
             });
 
