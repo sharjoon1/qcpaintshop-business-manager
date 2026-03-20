@@ -636,9 +636,9 @@
                 if (colVis.show_qty) r += `<td style="text-align:right;">${parseFloat(item.quantity || 0).toFixed(2)}</td>`;
                 if (colVis.show_area) r += `<td style="text-align:right;">${item.area ? parseFloat(item.area).toFixed(0) : '-'}</td>`;
                 if (colVis.show_mix) r += `<td style="color: var(--text-light); font-size: 11px;">${item.mix_info || '-'}</td>`;
-                if (colVis.show_price) r += `<td style="text-align:right;">${formatINR(roundUp10(parseFloat(item.base_price || item.unit_price) || 0))}</td>`;
+                if (colVis.show_price) r += `<td style="text-align:right;">${item.hide_price ? '' : formatINR(roundUp10(parseFloat(item.base_price || item.unit_price) || 0))}</td>`;
                 if (colVis.show_markup) {
-                    if (item.markup_type && parseFloat(item.markup_amount) > 0) {
+                    if (!item.hide_price && item.markup_type && parseFloat(item.markup_amount) > 0) {
                         const label = item.markup_type.includes('pct') ? item.markup_value + '%' : formatINR(item.markup_value);
                         r += `<td style="text-align:right; color: green;">+${label}</td>`;
                     } else {
@@ -646,14 +646,14 @@
                     }
                 }
                 if (colVis.show_discount) {
-                    if (item.discount_type && parseFloat(item.discount_amount) > 0) {
+                    if (!item.hide_price && item.discount_type && parseFloat(item.discount_amount) > 0) {
                         const label = item.discount_type.includes('pct') ? item.discount_value + '%' : formatINR(item.discount_value);
                         r += `<td style="text-align:right; color: red;">-${label}</td>`;
                     } else {
                         r += `<td style="text-align:right;">-</td>`;
                     }
                 }
-                if (colVis.show_final_price) r += `<td style="text-align:right;">${formatINR(roundUp10(parseFloat(item.final_price || item.unit_price) || 0))}</td>`;
+                if (colVis.show_final_price) r += `<td style="text-align:right;">${item.hide_price ? '' : formatINR(roundUp10(parseFloat(item.final_price || item.unit_price) || 0))}</td>`;
                 if (colVis.show_price_sqft) {
                     const area = parseFloat(item.area) || 0;
                     const lt = parseFloat(item.line_total) || 0;

@@ -311,20 +311,20 @@
                 if (cv.qty) r += `<td class="px-3 py-2 text-right">${parseFloat(item.quantity || 0).toFixed(2)}</td>`;
                 if (cv.area) r += `<td class="px-3 py-2 text-right">${item.area ? parseFloat(item.area).toFixed(0) + ' sqft' : '-'}</td>`;
                 if (cv.mix) r += `<td class="px-3 py-2 text-xs text-gray-500">${item.mix_info || '-'}</td>`;
-                if (cv.price) r += `<td class="px-3 py-2 text-right">${fmtINR(r10(parseFloat(item.base_price || item.unit_price) || 0))}</td>`;
+                if (cv.price) r += `<td class="px-3 py-2 text-right">${item.hide_price ? '' : fmtINR(r10(parseFloat(item.base_price || item.unit_price) || 0))}</td>`;
                 if (cv.markup) {
-                    if (item.markup_type && parseFloat(item.markup_amount) > 0) {
+                    if (!item.hide_price && item.markup_type && parseFloat(item.markup_amount) > 0) {
                         const lbl = item.markup_type.includes('pct') ? item.markup_value + '%' : fmtINR(item.markup_value);
                         r += `<td class="px-3 py-2 text-right text-green-600">+${lbl}</td>`;
                     } else r += '<td class="px-3 py-2 text-right">-</td>';
                 }
                 if (cv.discount) {
-                    if (item.discount_type && parseFloat(item.discount_amount) > 0) {
+                    if (!item.hide_price && item.discount_type && parseFloat(item.discount_amount) > 0) {
                         const lbl = item.discount_type.includes('pct') ? item.discount_value + '%' : fmtINR(item.discount_value);
                         r += `<td class="px-3 py-2 text-right text-red-600">-${lbl}</td>`;
                     } else r += '<td class="px-3 py-2 text-right">-</td>';
                 }
-                if (cv.final) r += `<td class="px-3 py-2 text-right font-semibold">${fmtINR(r10(parseFloat(item.final_price || item.unit_price) || 0))}</td>`;
+                if (cv.final) r += `<td class="px-3 py-2 text-right font-semibold">${item.hide_price ? '' : fmtINR(r10(parseFloat(item.final_price || item.unit_price) || 0))}</td>`;
                 if (cv.breakdown) r += `<td class="px-3 py-2">${item.breakdown_cost || '-'}</td>`;
                 if (cv.color) r += `<td class="px-3 py-2 text-right">${fmtINR(item.color_cost || 0)}</td>`;
                 if (cv.total) r += `<td class="px-3 py-2 text-right font-bold">${fmtINR(r10(parseFloat(item.line_total) || 0))}</td>`;

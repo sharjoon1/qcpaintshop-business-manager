@@ -1645,6 +1645,7 @@
                     markup_value: item.markup_value || 0,
                     discount_type: item.discount_type || null,
                     discount_value: item.discount_value || 0,
+                    hide_price: item.hide_price ? true : false,
                     breakdown_cost: null,
                     color_cost: 0,
                     line_total: item.line_total || item.total,
@@ -2065,7 +2066,8 @@
                                 line_total: parseFloat(item.line_total) || 0,
                                 total: parseFloat(item.line_total) || 0,
                                 custom_description: item.custom_description || '',
-                                show_description_only: item.show_description_only
+                                show_description_only: item.show_description_only,
+                                hide_price: !!item.hide_price
                             });
                         }
                     }

@@ -133,7 +133,8 @@ function buildItemValues(estimateId, items) {
         item.line_total || 0,
         item.display_order || 0,
         item.labor_description || null,
-        item.labor_taxable != null ? (item.labor_taxable ? 1 : 0) : 1
+        item.labor_taxable != null ? (item.labor_taxable ? 1 : 0) : 1,
+        item.hide_price ? 1 : 0
     ]);
 }
 
@@ -145,7 +146,7 @@ const ITEM_INSERT_SQL = `INSERT INTO estimate_items (
     base_price, markup_type, markup_value, markup_amount, price_after_markup,
     discount_type, discount_value, discount_amount, final_price,
     unit_price, breakdown_cost, color_cost, line_total, display_order,
-    labor_description, labor_taxable
+    labor_description, labor_taxable, hide_price
 ) VALUES ?`;
 
 // Process items through calculation engine
