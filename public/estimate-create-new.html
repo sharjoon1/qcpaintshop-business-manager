@@ -1187,12 +1187,19 @@
                     </td>`;
                 }
 
-                // Qty — inline editable
+                // Qty — inline editable + coats for area products
                 if (cv.show_qty) {
+                    const hasCoats = item.area || item.type === 'area' || (item.num_coats && item.num_coats > 1);
                     row += `<td class="px-4 py-3 align-top text-center">
                         <input type="number" value="${parseFloat(item.quantity)}" min="0.01" step="0.01"
                             onchange="onInlineQtyChange(${item.id}, this.value)"
-                            class="w-16 text-sm border rounded px-2 py-1 text-center">
+                            class="w-16 text-sm border rounded px-2 py-1 text-center" title="Quantity">
+                        ${hasCoats ? `<div class="mt-1 flex items-center justify-center gap-1">
+                            <span class="text-xs text-gray-500">Coats:</span>
+                            <input type="number" value="${item.num_coats || 1}" min="1" step="1"
+                                onchange="onInlineCoatsChange(${item.id}, this.value)"
+                                class="w-12 text-xs border rounded px-1 py-0.5 text-center" title="Number of coats">
+                        </div>` : ''}
                     </td>`;
                 }
 
@@ -1234,6 +1241,37 @@
                     const coats = item.num_coats || 1;
                     item.area = (packLiters * qty * cov) / coats;
                     item.details = `${packLiters}L x ${qty}` + (coats > 1 ? ` (${coats} coats)` : '');
+                }
+            }
+
+            recalcItem(item);
+            renderEstimateTable();
+        }
+
+        function onInlineCoatsChange(itemId, value) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (!item) return;
+            const coats = parseInt(value);
+            if (isNaN(coats) || coats <= 0) return;
+            item.num_coats = coats;
+
+            const prodMatch = allProducts.find(p => p.id == item.product_id);
+            const cov = prodMatch ? (parseFloat(prodMatch.area_coverage) || 120) : 120;
+
+            if (item.type === 'area') {
+                // Area-wise: recalculate liters from area
+                const area = item.area || 0;
+                if (area > 0) {
+                    item.quantity = parseFloat(((area * coats) / cov).toFixed(2));
+                    item.details = `${area} sq.ft × ${coats} coats = ${item.quantity}L`;
+                }
+            } else {
+                // Unit-wise: recalculate area from pack size
+                const packMatch = (item.pack_size || '').match(/([\d.]+)/);
+                const packLiters = packMatch ? parseFloat(packMatch[1]) : 0;
+                if (packLiters > 0 && cov > 0) {
+                    item.area = (packLiters * item.quantity * cov) / coats;
+                    item.details = `${packLiters}L x ${item.quantity}` + (coats > 1 ? ` (${coats} coats)` : '');
                 }
             }
 
