@@ -59,16 +59,19 @@ function calculateItemPricing(item) {
         finalPrice = priceAfterMarkup - discountAmount;
     }
 
-    const lineTotal = finalPrice * quantity;
+    // Round up to nearest 10
+    const r10 = n => Math.ceil(n / 10) * 10;
+    finalPrice = r10(finalPrice);
+    const lineTotal = r10(finalPrice * quantity);
 
     return {
-        base_price: basePrice,
+        base_price: r10(basePrice),
         markup_amount: Math.round(markupAmount * 100) / 100,
         price_after_markup: Math.round(priceAfterMarkup * 100) / 100,
         discount_amount: Math.round(discountAmount * 100) / 100,
-        final_price: Math.round(finalPrice * 100) / 100,
-        unit_price: Math.round(finalPrice * 100) / 100,
-        line_total: Math.round(lineTotal * 100) / 100
+        final_price: finalPrice,
+        unit_price: finalPrice,
+        line_total: lineTotal
     };
 }
 

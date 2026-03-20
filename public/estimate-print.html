@@ -335,6 +335,7 @@
             <div class="summary-section" style="padding: 16px 32px; background: var(--bg-stripe);">
                 <div class="flex justify-end">
                     <div class="w-full" style="max-width: 320px;">
+                        <div id="extraSummaryLines"></div>
                         <div id="gstBreakdownSection" class="hidden">
                             <div class="flex justify-between py-1.5 text-sm">
                                 <span class="text-gray-500">Subtotal (excl. GST)</span>
@@ -635,7 +636,7 @@
                 if (colVis.show_qty) r += `<td style="text-align:right;">${parseFloat(item.quantity || 0).toFixed(2)}</td>`;
                 if (colVis.show_area) r += `<td style="text-align:right;">${item.area ? parseFloat(item.area).toFixed(0) : '-'}</td>`;
                 if (colVis.show_mix) r += `<td style="color: var(--text-light); font-size: 11px;">${item.mix_info || '-'}</td>`;
-                if (colVis.show_price) r += `<td style="text-align:right;">${formatINR(item.base_price || item.unit_price)}</td>`;
+                if (colVis.show_price) r += `<td style="text-align:right;">${formatINR(roundUp10(parseFloat(item.base_price || item.unit_price) || 0))}</td>`;
                 if (colVis.show_markup) {
                     if (item.markup_type && parseFloat(item.markup_amount) > 0) {
                         const label = item.markup_type.includes('pct') ? item.markup_value + '%' : formatINR(item.markup_value);
@@ -652,7 +653,7 @@
                         r += `<td style="text-align:right;">-</td>`;
                     }
                 }
-                if (colVis.show_final_price) r += `<td style="text-align:right;">${formatINR(item.final_price || item.unit_price)}</td>`;
+                if (colVis.show_final_price) r += `<td style="text-align:right;">${formatINR(roundUp10(parseFloat(item.final_price || item.unit_price) || 0))}</td>`;
                 if (colVis.show_price_sqft) {
                     const area = parseFloat(item.area) || 0;
                     const lt = parseFloat(item.line_total) || 0;
@@ -660,7 +661,7 @@
                 }
                 if (colVis.show_breakdown) r += `<td style="color: var(--text-light);">${item.breakdown_cost || '-'}</td>`;
                 if (colVis.show_color) r += `<td style="text-align:right;">${formatINR(item.color_cost || 0)}</td>`;
-                if (colVis.show_total) r += `<td style="text-align:right; font-weight: 700; color: var(--text-dark);">${formatINR(item.line_total)}</td>`;
+                if (colVis.show_total) r += `<td style="text-align:right; font-weight: 700; color: var(--text-dark);">${formatINR(roundUp10(parseFloat(item.line_total) || 0))}</td>`;
 
                 return `<tr>${r}</tr>`;
             }).join('');
@@ -675,7 +676,7 @@
                     // Fill remaining columns with empty cells except total
                     const middleCols = [colVis.show_pack_size, colVis.show_qty, colVis.show_area, colVis.show_mix, colVis.show_price, colVis.show_markup, colVis.show_discount, colVis.show_final_price, colVis.show_price_sqft, colVis.show_breakdown, colVis.show_color].filter(Boolean).length;
                     for (let c = 0; c < middleCols; c++) r += '<td></td>';
-                    if (colVis.show_total) r += `<td style="text-align:right; font-weight:700;">${formatINR(l.line_total || l.base_price)}</td>`;
+                    if (colVis.show_total) r += `<td style="text-align:right; font-weight:700;">${formatINR(roundUp10(parseFloat(l.line_total || l.base_price) || 0))}</td>`;
                     rows += `<tr>${r}</tr>`;
                 });
             }
@@ -686,13 +687,28 @@
             updatePrintSummary(productItems, laborItemsList);
         }
 
+        // Round up to nearest 10
+        function roundUp10(n) { return Math.ceil(n / 10) * 10; }
+
         function updatePrintSummary(products, labor) {
-            const productTotal = products.reduce((s, i) => s + (parseFloat(i.line_total) || 0), 0);
-            // Calculate from items directly (fallback if estimate-level totals are 0)
-            const totalMarkup = parseFloat(estimateData.total_markup) || products.reduce((s, i) => s + ((parseFloat(i.markup_amount) || 0) * (parseFloat(i.quantity) || 1)), 0);
-            const totalDiscount = parseFloat(estimateData.total_discount) || products.reduce((s, i) => s + ((parseFloat(i.discount_amount) || 0) * (parseFloat(i.quantity) || 1)), 0);
-            const laborTotal = labor.reduce((s, i) => s + (parseFloat(i.line_total) || parseFloat(i.base_price) || 0), 0);
-            const grandTotal = parseFloat(estimateData.grand_total) || (productTotal + laborTotal);
+            // Recalculate from items with rounding
+            let productTotal = 0;
+            let totalMarkup = 0;
+            let totalDiscount = 0;
+            products.forEach(i => {
+                const lineTotal = roundUp10(parseFloat(i.line_total) || 0);
+                productTotal += lineTotal;
+                totalMarkup += (parseFloat(i.markup_amount) || 0) * (parseFloat(i.quantity) || 1);
+                totalDiscount += (parseFloat(i.discount_amount) || 0) * (parseFloat(i.quantity) || 1);
+            });
+            // Use estimate-level totals if available and non-zero
+            if (parseFloat(estimateData.total_markup) > 0) totalMarkup = parseFloat(estimateData.total_markup);
+            if (parseFloat(estimateData.total_discount) > 0) totalDiscount = parseFloat(estimateData.total_discount);
+
+            let laborTotal = 0;
+            labor.forEach(i => { laborTotal += roundUp10(parseFloat(i.line_total) || parseFloat(i.base_price) || 0); });
+
+            const grandTotal = roundUp10(productTotal + laborTotal);
 
             // Update grand total
             document.getElementById('grandTotalVal').textContent = formatINR(grandTotal);
@@ -702,36 +718,34 @@
             const gstSection = document.getElementById('gstBreakdownSection');
             if (colVis.show_subtotal || colVis.show_gst) {
                 if (gstSection) gstSection.classList.remove('hidden');
-                const subtotalEl = document.getElementById('subtotalVal');
-                const gstEl = document.getElementById('gstVal');
-                if (subtotalEl) subtotalEl.textContent = formatINR(productTotal);
-                if (gstEl) gstEl.textContent = formatINR(parseFloat(estimateData.gst_amount) || 0);
+                document.getElementById('subtotalVal').textContent = formatINR(productTotal);
+                document.getElementById('gstVal').textContent = formatINR(parseFloat(estimateData.gst_amount) || 0);
             } else {
                 if (gstSection) gstSection.classList.add('hidden');
             }
 
             // Build summary breakdown lines
-            let extraLines = '';
+            let html = '';
             if (totalMarkup > 0 || totalDiscount > 0 || laborTotal > 0) {
-                extraLines += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span style="color:#6b7280;">Subtotal (products):</span><span style="font-weight:500;">${formatINR(productTotal)}</span></div>`;
+                html += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
+                    <span style="color:#6b7280;">Subtotal (products):</span>
+                    <span style="font-weight:500;">${formatINR(productTotal)}</span></div>`;
             }
-            if (totalMarkup > 0) extraLines += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:green;"><span>Total Markup:</span><span>+${formatINR(totalMarkup)}</span></div>`;
-            if (totalDiscount > 0) extraLines += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:#dc2626;"><span>Total Discount:</span><span>-${formatINR(totalDiscount)}</span></div>`;
-            if (laborTotal > 0) extraLines += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:#2563eb;"><span>Labor Charges:</span><span>+${formatINR(laborTotal)}</span></div>`;
-            if (extraLines) extraLines += `<div style="border-top:1px solid #d1d5db;margin:4px 0;"></div>`;
+            if (totalMarkup > 0) {
+                html += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:green;">
+                    <span>Total Markup:</span><span>+${formatINR(roundUp10(totalMarkup))}</span></div>`;
+            }
+            if (totalDiscount > 0) {
+                html += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:#dc2626;">
+                    <span>Total Discount:</span><span>-${formatINR(roundUp10(totalDiscount))}</span></div>`;
+            }
+            if (laborTotal > 0) {
+                html += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:#2563eb;">
+                    <span>Labor Charges:</span><span>+${formatINR(laborTotal)}</span></div>`;
+            }
+            if (html) html += `<div style="border-top:1px solid #d1d5db;margin:4px 0;"></div>`;
 
-            const extraContainer = document.getElementById('extraSummaryLines');
-            if (extraContainer) {
-                extraContainer.innerHTML = extraLines;
-            } else if (extraLines) {
-                const grandTotalRow = document.getElementById('grandTotalVal')?.closest('div');
-                if (grandTotalRow) {
-                    const div = document.createElement('div');
-                    div.id = 'extraSummaryLines';
-                    div.innerHTML = extraLines;
-                    grandTotalRow.parentElement.insertBefore(div, grandTotalRow);
-                }
-            }
+            document.getElementById('extraSummaryLines').innerHTML = html;
         }
 
         // ========================================
