@@ -2551,9 +2551,13 @@ Based on AI App Analyzer report, fixed critical production errors:
   - Push button: "Push X Discrepancies to Zoho" (only submitted items); refreshes panel after push instead of closing
   - Waiting state: shows "Waiting for staff to submit more items" when no submitted items left
 
-### Mar 11, 2026 — Bulk Zoho Product Import + Stock Check Warehouse Fix
+### Mar 11, 2026 — Bulk Zoho Product Import + Stock Check Warehouse Fix + Product Images + Emulsion Base Cleanup
 - **Bulk product import**: `scripts/import-all-zoho-products.js` — imports all 1848 active Zoho items as 995 grouped products with pack_sizes. Smart grouping by extracted product name + brand (strips SKU codes, extracts sizes). Primer/emulsion products (378) → `area_wise`, others (617) → `unit_wise`. ML→L and GM→KG conversion. All items mapped to local products.
 - **Stock check warehouse fix**: Updated `branches.zoho_location_id` from inactive warehouse locations to active branch locations. Updated 8 pending assignments (#79-86) and 7817 item `system_qty` values. Added auto-resolve fallback in `POST /api/stock-check/adjust/:id` — if assignment location is inactive, resolves to active location for same branch via `zoho_locations_map`.
+- **Product image matching**: `scripts/match-product-images.js` — keyword-based matching of 97 local product images to DB products (59 matched). Compresses with Sharp (800x800 JPEG 85%). Updates `products.image_url` and `zoho_items_map.image_url`. Added `image_url VARCHAR(500)` column to `products` table.
+- **Brand CDN image download**: `scripts/download-product-images.js` — downloads real product images from brand CDNs: Birla Opus (144/154, `assets.birlaopus.com`), Berger Paints (103/133, `images.bergerpaints.com`), Astral Paints (19/19, `admin.astralpaints.com`). Total 266 products got real brand images. Smart name-matching with category fallbacks (CST enamels→sparkle gloss, colorants→style color fresh, etc.). Sharp 800x800 JPEG 85% compression.
+- **Brand placeholder images**: `scripts/generate-brand-placeholders.js` — generates SVG→JPEG branded placeholders for remaining products without real images. Brand-specific colors (Asian Paints red, Berger blue, Birla Opus dark, etc.).
+- **Emulsion base cleanup**: `scripts/cleanup-emulsion-bases.js` — deactivated 123 extra color base products from 36 emulsion groups. Parses base codes (PB1/PB2/PB5/PBWT/CS/EW/NS/TL etc.), groups by core name + brand, keeps only first base (WT=0 priority, then lowest number). Renamed 179 products to remove base code prefix. Active products: 995→872, area_wise: 378→255.
 
 ### Mar 9, 2026 — Collections Enhancements + Product Grouping + Painter Points & Notifications
 - **Staff collections**: Gradient header with summary strip, sort pills for Customers/Invoices tabs, History tab with Calls/Promises sub-tabs
@@ -2710,6 +2714,36 @@ Loyalty program for painters who buy or recommend Quality Colours paint products
 - Subnav: 6 tabs mapped via `PAINTERS_SUBNAV_PATH` in `universal-nav-loader.js`
 - Painter pages (register, login, dashboard, estimate-create) excluded from admin nav loading
 
+### Staff Billing System
+Full billing module for staff to create estimates, direct invoices, collect payments, and push to Zoho Books — for both customers and painters.
+
+**Tables:** `billing_estimates`, `billing_estimate_items`, `billing_invoices`, `billing_invoice_items`, `billing_payments`
+
+**Routes:** `routes/billing.js` — mounted at `/api/billing`
+- Estimates: POST/GET/PUT/DELETE `/estimates`, POST `/estimates/:id/send`, POST `/estimates/:id/convert`
+- Invoices: POST/GET/PUT `/invoices`, POST `/invoices/:id/payment`, POST `/invoices/:id/push-zoho`
+- Payments: GET `/payments`
+- Products: GET `/products` (searches zoho_items_map)
+- Stats: GET `/stats` (dashboard aggregates)
+
+**Services:** `services/billing-zoho-service.js` — `resolveZohoContact()`, `pushInvoiceToZoho()` (contact resolution, credit check, Zoho invoice creation, painter points, payment sync)
+
+**Permissions:** `billing.estimate`, `billing.invoice`, `billing.payment`, `billing.zoho_push`. Staff gets estimate+invoice+payment; manager/admin gets zoho_push too.
+
+**Page:** `public/staff-billing.html` — 3 tabs (Estimates, Invoices, Payments), create/edit modal with product search, payment modal, branch-filtered
+
+**Flows:**
+- Estimate-first: Create estimate → Send → Convert to invoice → Collect payment → Push to Zoho
+- Direct invoice: Create invoice → Collect payment → Push to Zoho
+- Payment options: Full (cash sale), Partial (track balance), Credit (push without payment)
+- Painter billing: auto-awards points via painter-points-engine on Zoho push
+
+**Number format:** `BE-YYYYMMDD-001` (estimates), `BI-YYYYMMDD-001` (invoices)
+
+**Config keys:** `billing_enabled`, `billing_estimate_prefix`, `billing_invoice_prefix`, `billing_gst_inclusive` (in `ai_config`)
+
+**Migration:** `node migrations/migrate-billing.js`
+
 ### Painter Estimate System
 Painters create estimates for paint purchases; admin reviews, records payment, pushes to Zoho as invoice, and awards points.
 
@@ -2820,6 +2854,67 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 
 #### Migration
 - `node migrations/migrate-painter-premium.js` — creates `painter_visualization_requests` table, adds `card_generated_at` column
+
+### Painter Retention System (Mar 14, 2026)
+4-tier level system, daily streaks with milestone bonuses, morning briefing card, and daily bonus cap.
+
+#### Level System
+- **4 tiers**: Bronze (0pts, 1x), Silver (5K, 1.2x), Gold (25K, 1.5x), Diamond (100K, 2x)
+- Config stored in `painter_levels` table (seeded by migration)
+- Level multiplier applied via `addPointsWithMultiplier()` to: invoice points, attendance points, streak bonuses
+- NOT applied to: referral points (own tier scaling), slab bonuses, admin adjustments
+- Level-up auto-detected by `checkLevelUp()` inside `addPointsWithMultiplier()` — sends FCM notification, invalidates card cache
+- `painters` table columns: `current_level` (default 'bronze'), `level_updated_at`
+
+#### Streak System
+- **Daily check-in**: `PUT /me/daily-streak` — idempotent (INSERT IGNORE into `painter_daily_checkins`)
+- `painter_daily_checkins` table: composite PK (`painter_id` + `checkin_date`)
+- Streak calculated from consecutive days in `painter_daily_checkins` (walking backwards from today)
+- `painters` columns: `current_streak`, `longest_streak`, `last_checkin_date`
+- **Milestones**: 3 days (50 pts), 7 days (150 pts), 14 days (300 pts), 30 days (1000 pts) — awarded via `addPointsWithMultiplier()`
+- **Streak reset**: Cron at midnight IST resets `current_streak = 0` for painters who missed yesterday
+- **Streak reminder**: Cron at 8 PM IST sends FCM to painters with active streak who haven't checked in today (controlled by `painter_streak_reminder_enabled` config)
+- Frontend: `sessionStorage` guard prevents duplicate API calls; streak calendar bottom sheet shows monthly check-ins
+
+#### Morning Briefing Card
+- `GET /me/briefing` — returns earnings since `last_briefing_at`, estimate/withdrawal updates, daily bonus product info, level progress
+- Updates `painters.last_briefing_at` on each call
+- `painters` column: `last_briefing_at` (DATETIME)
+- Frontend: gradient-bordered card at top of dashboard with earned amount, daily bonus product countdown, progress bar to next level
+
+#### Daily Bonus Product
+- Rotation: Cron at 00:05 IST picks random active product, 50/50 chance of 2x or 3x multiplier
+- Push notification: Cron at 7 AM IST sends bonus product info to all painters
+- **Cap enforcement**: `painter_daily_bonus_cap` config (default 500 pts) — checked in `processInvoice()` against today's bonus earnings
+- Config keys: `painter_daily_bonus_product_id`, `painter_daily_bonus_multiplier`, `painter_daily_bonus_cap`
+
+#### Check-in History
+- `GET /me/checkin-history?month=YYYY-MM` — returns array of check-in dates for the given month
+- Used by streak calendar bottom sheet in painter dashboard
+
+#### Card Generator Updates
+- `levelBadge(x, y, level)` function renders SVG rect + circle + text (no emoji)
+- Both visiting card and ID card display current level badge
+- Level-up invalidates card cache (`card_generated_at = NULL`, `id_card_generated_at = NULL`)
+
+#### Scheduler Jobs (painter-scheduler.js)
+- `runStreakReset`: 00:00 IST — reset streaks for painters who missed yesterday
+- `runDailyBonusRotation`: 00:05 IST — pick random bonus product
+- `runDailyBonusPush`: 07:00 IST — send bonus product FCM notification
+- `runStreakReminder`: 20:00 IST — remind at-risk streaks (if `painter_streak_reminder_enabled`)
+
+#### Notification Types
+- `streak_milestone` — awarded at 3/7/14/30 day milestones (English + Tamil)
+- `streak_at_risk` — 8 PM reminder for unchecked painters with active streak
+- `level_up` — fired from `addPointsWithMultiplier()` on level change
+- `daily_bonus` — 7 AM product of the day notification
+
+#### Admin View
+- `admin-painters.html`: Level (color-coded badge) and Streak columns added to painter table
+- Detail view: Level and Streak stat cards replace Experience/Status cards
+
+#### Migration
+- `node migrations/migrate-painter-retention.js` — creates `painter_daily_checkins` table, `painter_levels` table (seeded), adds 5 columns to `painters`, expands `source` ENUM, seeds 4 `ai_config` keys, backfills levels
 
 ---
 
