@@ -343,7 +343,9 @@ router.get('/estimates',
     validateQuery(listQuerySchema),
     async (req, res) => {
         try {
-            const { page, limit, status, customer_type, search } = req.query;
+            const { status, customer_type, search } = req.query;
+            const page = Number(req.query.page) || 1;
+            const limit = Number(req.query.limit) || 20;
             const branchId = getBranchFilter(req);
             const offset = (page - 1) * limit;
 
@@ -695,7 +697,9 @@ router.get('/invoices',
     validateQuery(invoiceListQuerySchema),
     async (req, res) => {
         try {
-            const { page, limit, status, customer_type, search, payment_status, zoho_status } = req.query;
+            const { status, customer_type, search, payment_status, zoho_status } = req.query;
+            const page = Number(req.query.page) || 1;
+            const limit = Number(req.query.limit) || 20;
             const branchId = getBranchFilter(req);
             const offset = (page - 1) * limit;
 
@@ -925,7 +929,9 @@ router.get('/payments',
     validateQuery(listQuerySchema),
     async (req, res) => {
         try {
-            const { page, limit, search } = req.query;
+            const { search } = req.query;
+            const page = Number(req.query.page) || 1;
+            const limit = Number(req.query.limit) || 20;
             const branchId = getBranchFilter(req);
             const offset = (page - 1) * limit;
 
