@@ -162,7 +162,7 @@ router.get('/products',
             const params = [];
 
             if (search) {
-                where += ' AND (zim.zoho_item_name LIKE ? OR zim.sku LIKE ?)';
+                where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_item_id LIKE ?)';
                 const term = `%${search}%`;
                 params.push(term, term);
             }
@@ -173,7 +173,7 @@ router.get('/products',
 
             const [rows] = await pool.query(
                 `SELECT zim.id, zim.zoho_item_id, zim.zoho_item_name AS item_name,
-                        zim.sku, zim.rate, zim.brand, zim.category, zim.unit, zim.pack_size
+                        zim.rate, zim.brand, zim.category, zim.unit, zim.pack_size
                  FROM zoho_items_map zim
                  ${where}
                  ORDER BY zim.zoho_item_name
