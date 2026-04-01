@@ -29,7 +29,8 @@ const uploadDirs = [
     'public/uploads/training',
     'public/uploads/painter-attendance',
     'public/uploads/painter-cards',
-    'public/uploads/painter-visualizations'
+    'public/uploads/painter-visualizations',
+    'uploads/vendor-bills'
 ];
 
 function ensureUploadDirs() {
@@ -155,6 +156,19 @@ const uploadPriceList = multer({
     }
 });
 
+// Vendor bill photo upload (10MB, images + PDF)
+const uploadVendorBill = multer({
+    storage: createDiskStorage('uploads/vendor-bills/', 'bill'),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image and PDF files allowed'));
+        }
+    }
+});
+
 module.exports = {
     ensureUploadDirs,
     uploadLogo,
@@ -167,5 +181,6 @@ module.exports = {
     uploadPainterAttendance,
     uploadPainterVisualization,
     uploadActivity,
-    uploadPriceList
+    uploadPriceList,
+    uploadVendorBill
 };
