@@ -1,0 +1,1680 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1B5E3B">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <title>Vendors - QC Paint Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        /* Tab styles */
+        .tab-active { color: #1B5E3B; border-bottom: 3px solid #1B5E3B; font-weight: 600; }
+        .tab-inactive { color: #6b7280; border-bottom: 3px solid transparent; }
+        .tab-inactive:hover { color: #374151; border-bottom-color: #d1d5db; }
+
+        /* Status pills */
+        .status-pill { padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+        .status-draft { background: #f3f4f6; color: #374151; }
+        .status-sent { background: #dbeafe; color: #1d4ed8; }
+        .status-received { background: #d1fae5; color: #065f46; }
+        .status-cancelled { background: #fee2e2; color: #991b1b; }
+        .status-unpaid { background: #fee2e2; color: #991b1b; }
+        .status-partial { background: #fef3c7; color: #92400e; }
+        .status-paid { background: #d1fae5; color: #065f46; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-pushed { background: #d1fae5; color: #065f46; }
+        .status-verified { background: #d1fae5; color: #065f46; }
+        .status-mismatch { background: #fef3c7; color: #92400e; }
+
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 1rem; }
+        .modal-overlay.active { display: flex; align-items: flex-start; justify-content: center; }
+
+        /* Skeleton */
+        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* Toast */
+        .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.5rem; border-radius: 0.5rem; color: #fff; font-weight: 500; z-index: 2000; animation: toastIn 0.3s ease; }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+        /* Suggestion dropdown */
+        .suggestion-list { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: 0.5rem; max-height: 200px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .suggestion-item { padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.875rem; }
+        .suggestion-item:hover { background: #f0fdf4; }
+
+        /* Brand overrides */
+        .btn-green { background: #1B5E3B; color: #fff; }
+        .btn-green:hover { background: #154D31; }
+        .btn-green-outline { border: 1px solid #1B5E3B; color: #1B5E3B; }
+        .btn-green-outline:hover { background: #f0fdf4; }
+
+        /* Scroll hide */
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* AI badge */
+        .ai-badge { background: #ede9fe; color: #6d28d9; font-size: 0.65rem; padding: 1px 6px; border-radius: 9999px; font-weight: 600; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen" data-page="vendors">
+
+    <div id="mainContent" class="px-4 sm:px-6 lg:px-8 py-4 pb-6 max-w-6xl mx-auto">
+
+        <!-- Page Header -->
+        <div class="flex items-center justify-between mb-5">
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Vendors</h1>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+            <div class="bg-white rounded-xl shadow-sm border border-green-100 p-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                    <span class="text-xs text-gray-500">Total Vendors</span>
+                </div>
+                <div id="statTotalVendors" class="text-lg font-bold text-green-700">--</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-blue-100 p-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                    <span class="text-xs text-gray-500">Open Bills</span>
+                </div>
+                <div id="statOpenBills" class="text-lg font-bold text-blue-700">--</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-red-100 p-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    </div>
+                    <span class="text-xs text-gray-500">Outstanding</span>
+                </div>
+                <div id="statOutstanding" class="text-lg font-bold text-red-700">--</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-green-100 p-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    </div>
+                    <span class="text-xs text-gray-500">Purchase Orders</span>
+                </div>
+                <div id="statPurchaseOrders" class="text-lg font-bold text-green-700">--</div>
+            </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="flex border-b border-gray-200 mb-4 scroll-hide overflow-x-auto">
+            <button onclick="switchTab('vendors')" id="tabVendors" class="tab-active px-4 py-3 text-sm whitespace-nowrap transition-all">Vendors</button>
+            <button onclick="switchTab('bills')" id="tabBills" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Bills</button>
+            <button onclick="switchTab('purchaseOrders')" id="tabPurchaseOrders" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Purchase Orders</button>
+            <button onclick="switchTab('payments')" id="tabPayments" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Payments</button>
+        </div>
+
+        <!-- ==================== VENDORS TAB ==================== -->
+        <div id="panelVendors">
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <div class="flex-1">
+                    <input id="vendorSearch" type="text" placeholder="Search vendors..." class="qc-input w-full" oninput="debounceVendorSearch()">
+                </div>
+                <button onclick="syncVendorsFromZoho()" id="btnSyncZoho" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    Sync from Zoho
+                </button>
+                <button onclick="openVendorModal()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    New Vendor
+                </button>
+            </div>
+            <div id="vendorList" class="space-y-3">
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+            </div>
+            <div id="vendorPagination" class="flex justify-center gap-2 mt-4"></div>
+        </div>
+
+        <!-- ==================== BILLS TAB ==================== -->
+        <div id="panelBills" class="hidden">
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <div class="flex-1">
+                    <input id="billSearch" type="text" placeholder="Search bills..." class="qc-input w-full" oninput="debounceBillSearch()">
+                </div>
+                <select id="billVendorFilter" onchange="loadBills(1)" class="qc-input w-auto">
+                    <option value="">All Vendors</option>
+                </select>
+                <button onclick="openBillModal()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    New Bill
+                </button>
+            </div>
+            <div id="billList" class="space-y-3">
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+            </div>
+            <div id="billPagination" class="flex justify-center gap-2 mt-4"></div>
+        </div>
+
+        <!-- ==================== PURCHASE ORDERS TAB ==================== -->
+        <div id="panelPurchaseOrders" class="hidden">
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <div class="flex-1">
+                    <input id="poSearch" type="text" placeholder="Search purchase orders..." class="qc-input w-full" oninput="debouncePoSearch()">
+                </div>
+                <button onclick="openPoModal()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    New PO
+                </button>
+            </div>
+            <div id="poList" class="space-y-3">
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+            </div>
+            <div id="poPagination" class="flex justify-center gap-2 mt-4"></div>
+        </div>
+
+        <!-- ==================== PAYMENTS TAB ==================== -->
+        <div id="panelPayments" class="hidden">
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <div class="flex-1"></div>
+                <button onclick="openPaymentModal()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Record Payment
+                </button>
+            </div>
+            <div id="paymentList" class="space-y-3">
+                <div class="skeleton h-16 w-full"></div>
+                <div class="skeleton h-16 w-full"></div>
+                <div class="skeleton h-16 w-full"></div>
+            </div>
+            <div id="paymentPagination" class="flex justify-center gap-2 mt-4"></div>
+        </div>
+    </div>
+
+    <!-- ==================== VENDOR DETAIL MODAL ==================== -->
+    <div id="vendorDetailModal" class="modal-overlay" onclick="if(event.target===this)closeModal('vendorDetailModal')">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b">
+                <h3 id="vendorDetailTitle" class="text-lg font-bold text-gray-800">Vendor Details</h3>
+                <button onclick="closeModal('vendorDetailModal')" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="vendorDetailBody" class="p-5 max-h-[70vh] overflow-y-auto"></div>
+            <div id="vendorDetailActions" class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2"></div>
+        </div>
+    </div>
+
+    <!-- ==================== VENDOR CREATE/EDIT MODAL ==================== -->
+    <div id="vendorFormModal" class="modal-overlay" onclick="if(event.target===this)closeModal('vendorFormModal')">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mt-8 mb-8 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b">
+                <h3 id="vendorFormTitle" class="text-lg font-bold text-gray-800">New Vendor</h3>
+                <button onclick="closeModal('vendorFormModal')" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form id="vendorForm" onsubmit="handleVendorSubmit(event)" class="p-5 space-y-4 max-h-[70vh] overflow-y-auto" style="min-height:0;">
+                <input type="hidden" id="vendorEditId">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="sm:col-span-2">
+                        <label class="qc-label block mb-1">Vendor Name *</label>
+                        <input type="text" id="vfName" class="qc-input w-full" required>
+                    </div>
+                    <div>
+                        <label class="qc-label block mb-1">Contact Person</label>
+                        <input type="text" id="vfContact" class="qc-input w-full">
+                    </div>
+                    <div>
+                        <label class="qc-label block mb-1">Phone</label>
+                        <input type="text" id="vfPhone" class="qc-input w-full">
+                    </div>
+                    <div>
+                        <label class="qc-label block mb-1">Email</label>
+                        <input type="email" id="vfEmail" class="qc-input w-full">
+                    </div>
+                    <div>
+                        <label class="qc-label block mb-1">GST Number</label>
+                        <input type="text" id="vfGst" class="qc-input w-full">
+                    </div>
+                    <div>
+                        <label class="qc-label block mb-1">Payment Terms (days)</label>
+                        <input type="number" id="vfTerms" class="qc-input w-full" value="30" min="0">
+                    </div>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Address</label>
+                    <textarea id="vfAddress" class="qc-input w-full" rows="2"></textarea>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Notes</label>
+                    <textarea id="vfNotes" class="qc-input w-full" rows="2"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('vendorFormModal')" class="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+                    <button type="submit" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Save Vendor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== BILL DETAIL MODAL ==================== -->
+    <div id="billDetailModal" class="modal-overlay" onclick="if(event.target===this)closeModal('billDetailModal')">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b">
+                <h3 id="billDetailTitle" class="text-lg font-bold text-gray-800">Bill Details</h3>
+                <button onclick="closeModal('billDetailModal')" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="billDetailBody" class="p-5 max-h-[70vh] overflow-y-auto"></div>
+            <div id="billDetailActions" class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2"></div>
+        </div>
+    </div>
+
+    <!-- ==================== BILL CREATE MODAL ==================== -->
+    <div id="billFormModal" class="modal-overlay" onclick="if(event.target===this)closeModal('billFormModal')">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b">
+                <h3 class="text-lg font-bold text-gray-800">New Bill</h3>
+                <button onclick="closeModal('billFormModal')" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form id="billForm" onsubmit="event.preventDefault()" class="p-5 space-y-4 max-h-[70vh] overflow-y-auto" style="min-height:0;">
+                <!-- Vendor Select -->
+                <div>
+                    <label class="qc-label block mb-1">Vendor *</label>
+                    <select id="bfVendor" class="qc-input w-full" required>
+                        <option value="">Select vendor...</option>
+                    </select>
+                </div>
+
+                <!-- Bill Number & Dates -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="qc-label block mb-1">Bill Number</label>
+                        <input type="text" id="bfBillNumber" class="qc-input w-full" placeholder="Auto-generated">
+                    </div>
+                    <div>
+                        <label class="qc-label block mb-1">Bill Date</label>
+                        <input type="date" id="bfBillDate" class="qc-input w-full">
+                    </div>
+                    <div>
+                        <label class="qc-label block mb-1">Due Date</label>
+                        <input type="date" id="bfDueDate" class="qc-input w-full">
+                    </div>
+                </div>
+
+                <!-- AI Bill Scan Section -->
+                <div class="border border-dashed border-gray-300 rounded-xl p-4 bg-gray-50">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <span class="text-sm font-medium text-gray-700">Upload Bill Photo (Optional)</span>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input type="file" id="bfBillImage" accept="image/*" class="qc-input flex-1 text-sm">
+                        <button type="button" onclick="scanBillWithAI()" id="btnScanAI" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center whitespace-nowrap">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            Scan with AI
+                        </button>
+                    </div>
+                    <div id="aiScanStatus" class="hidden mt-3 flex items-center gap-2 text-sm">
+                        <svg class="w-4 h-4 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span class="text-gray-600">AI reading bill...</span>
+                    </div>
+                    <div id="aiScanResult" class="hidden mt-3 p-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800"></div>
+                </div>
+
+                <!-- Items Table -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="qc-label">Items</label>
+                        <button type="button" onclick="addBillItemRow()" class="text-xs font-medium text-green-700 hover:text-green-900 flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Add Item
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="bg-gray-50 text-left">
+                                    <th class="px-2 py-2 font-medium text-gray-600">Item Name</th>
+                                    <th class="px-2 py-2 font-medium text-gray-600 w-16">Qty</th>
+                                    <th class="px-2 py-2 font-medium text-gray-600 w-24">Rate</th>
+                                    <th class="px-2 py-2 font-medium text-gray-600 w-24 text-right">Total</th>
+                                    <th class="px-2 py-2 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="billItemsBody">
+                                <tr id="noBillItemsRow"><td colspan="5" class="text-center py-6 text-gray-400 text-sm">No items added. Upload a bill or add manually.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Totals -->
+                <div class="border-t pt-3 space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Subtotal</span>
+                        <span id="bfSubtotal" class="font-medium">0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <label class="text-gray-500">Tax</label>
+                        <input type="number" id="bfTax" class="qc-input w-24 text-right" value="0" min="0" step="0.01" oninput="recalcBillTotals()">
+                    </div>
+                    <div class="flex justify-between text-base font-bold border-t pt-2">
+                        <span>Grand Total</span>
+                        <span id="bfGrandTotal">0.00</span>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="qc-label block mb-1">Notes</label>
+                    <textarea id="bfNotes" class="qc-input w-full" rows="2" placeholder="Optional notes..."></textarea>
+                </div>
+            </form>
+            <div class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2 justify-end">
+                <button type="button" onclick="closeModal('billFormModal')" class="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+                <button type="button" onclick="verifyBill()" id="btnVerifyBill" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium hidden">Verify</button>
+                <button type="button" onclick="submitBill()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Submit Bill</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PO CREATE/EDIT MODAL ==================== -->
+    <div id="poFormModal" class="modal-overlay" onclick="if(event.target===this)closeModal('poFormModal')">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b">
+                <h3 id="poFormTitle" class="text-lg font-bold text-gray-800">New Purchase Order</h3>
+                <button onclick="closeModal('poFormModal')" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form id="poForm" onsubmit="event.preventDefault()" class="p-5 space-y-4 max-h-[70vh] overflow-y-auto" style="min-height:0;">
+                <input type="hidden" id="poEditId">
+                <!-- Vendor Select -->
+                <div>
+                    <label class="qc-label block mb-1">Vendor *</label>
+                    <select id="pfVendor" class="qc-input w-full" required>
+                        <option value="">Select vendor...</option>
+                    </select>
+                </div>
+
+                <!-- Expected Date + Notes -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="qc-label block mb-1">Expected Date</label>
+                        <input type="date" id="pfExpectedDate" class="qc-input w-full">
+                    </div>
+                    <div>
+                        <label class="qc-label block mb-1">Tax Amount</label>
+                        <input type="number" id="pfTax" class="qc-input w-full" value="0" min="0" step="0.01" oninput="recalcPoTotals()">
+                    </div>
+                </div>
+
+                <!-- Product Search -->
+                <div>
+                    <label class="qc-label block mb-1">Add Products</label>
+                    <div class="relative">
+                        <input type="text" id="poProductSearch" class="qc-input w-full" placeholder="Search products..." oninput="debouncePoProductSearch()">
+                        <div id="poProductSuggestions" class="suggestion-list hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Items Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-left">
+                                <th class="px-2 py-2 font-medium text-gray-600">Product</th>
+                                <th class="px-2 py-2 font-medium text-gray-600 w-16">Qty</th>
+                                <th class="px-2 py-2 font-medium text-gray-600 w-24">Rate</th>
+                                <th class="px-2 py-2 font-medium text-gray-600 w-24 text-right">Total</th>
+                                <th class="px-2 py-2 w-10"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="poItemsBody">
+                            <tr id="noPoItemsRow"><td colspan="5" class="text-center py-6 text-gray-400 text-sm">No items added</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Totals -->
+                <div class="border-t pt-3 space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Subtotal</span>
+                        <span id="pfSubtotal" class="font-medium">0.00</span>
+                    </div>
+                    <div class="flex justify-between text-base font-bold border-t pt-2">
+                        <span>Grand Total</span>
+                        <span id="pfGrandTotal">0.00</span>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="qc-label block mb-1">Notes</label>
+                    <textarea id="pfNotes" class="qc-input w-full" rows="2" placeholder="Optional notes..."></textarea>
+                </div>
+            </form>
+            <div class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2 justify-end">
+                <button type="button" onclick="closeModal('poFormModal')" class="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+                <button type="button" onclick="submitPo()" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Save PO</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PAYMENT MODAL ==================== -->
+    <div id="paymentFormModal" class="modal-overlay" onclick="if(event.target===this)closeModal('paymentFormModal')">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mt-16 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b">
+                <h3 class="text-lg font-bold text-gray-800">Record Payment</h3>
+                <button onclick="closeModal('paymentFormModal')" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form id="paymentForm" onsubmit="handlePaymentSubmit(event)" class="p-5 space-y-4">
+                <div>
+                    <label class="qc-label block mb-1">Vendor *</label>
+                    <select id="pmVendor" class="qc-input w-full" required onchange="loadVendorBillsForPayment()">
+                        <option value="">Select vendor...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Bill (optional)</label>
+                    <select id="pmBill" class="qc-input w-full">
+                        <option value="">No specific bill</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Amount *</label>
+                    <input type="number" id="pmAmount" class="qc-input w-full" step="0.01" min="0.01" required>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Payment Method *</label>
+                    <select id="pmMethod" class="qc-input w-full" required>
+                        <option value="cash">Cash</option>
+                        <option value="upi">UPI</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="cheque">Cheque</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Payment Date *</label>
+                    <input type="date" id="pmDate" class="qc-input w-full" required>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Reference</label>
+                    <input type="text" id="pmReference" class="qc-input w-full" placeholder="Transaction ID, cheque no...">
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Notes</label>
+                    <textarea id="pmNotes" class="qc-input w-full" rows="2"></textarea>
+                </div>
+                <button type="submit" class="btn-green w-full py-2.5 rounded-lg text-sm font-medium">Record Payment</button>
+            </form>
+        </div>
+    </div>
+
+<script>
+// =============================================
+// CONFIG
+// =============================================
+const API = '/api/vendors';
+const token = localStorage.getItem('auth_token');
+const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+let currentTab = 'vendors';
+let vendorPage = 1, billPage = 1, poPage = 1, paymentPage = 1;
+let billItems = [];
+let poItems = [];
+let allVendors = []; // cached for dropdowns
+let createdBillId = null; // used for verify flow
+let billImagePath = null;
+let aiExtractedData = null;
+
+let vendorSearchTimer = null;
+let billSearchTimer = null;
+let poSearchTimer = null;
+let poProductSearchTimer = null;
+
+// =============================================
+// INIT
+// =============================================
+document.addEventListener('DOMContentLoaded', () => {
+    loadStats();
+    loadVendors(1);
+    loadAllVendorsForDropdowns();
+
+    // Set default payment date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('pmDate').value = today;
+    document.getElementById('bfBillDate').value = today;
+});
+
+// =============================================
+// TABS
+// =============================================
+function switchTab(tab) {
+    currentTab = tab;
+    const tabs = ['vendors', 'bills', 'purchaseOrders', 'payments'];
+    tabs.forEach(t => {
+        const tabBtn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const panel = document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (tabBtn) tabBtn.className = t === tab ? 'tab-active px-4 py-3 text-sm whitespace-nowrap transition-all' : 'tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all';
+        if (panel) panel.classList.toggle('hidden', t !== tab);
+    });
+
+    if (tab === 'vendors') loadVendors(vendorPage);
+    else if (tab === 'bills') loadBills(billPage);
+    else if (tab === 'purchaseOrders') loadPurchaseOrders(poPage);
+    else if (tab === 'payments') loadPayments(paymentPage);
+}
+
+// =============================================
+// STATS
+// =============================================
+async function loadStats() {
+    try {
+        // Load vendor count
+        const vRes = await fetch(`${API}?page=1&limit=1`, { headers });
+        const vData = await vRes.json();
+        if (vData.success) {
+            document.getElementById('statTotalVendors').textContent = vData.pagination?.total || 0;
+        }
+
+        // Load open bills
+        const bRes = await fetch(`${API}/bills?page=1&limit=1&payment_status=unpaid`, { headers });
+        const bData = await bRes.json();
+        if (bData.success) {
+            document.getElementById('statOpenBills').textContent = bData.pagination?.total || 0;
+        }
+
+        // Load outstanding from vendor list
+        if (vData.success && vData.vendors) {
+            let totalOutstanding = 0;
+            // Fetch all vendors to sum outstanding
+            const allRes = await fetch(`${API}?page=1&limit=999`, { headers });
+            const allData = await allRes.json();
+            if (allData.success) {
+                totalOutstanding = allData.vendors.reduce((sum, v) => sum + (parseFloat(v.outstanding) || 0), 0);
+            }
+            document.getElementById('statOutstanding').textContent = formatCurrency(totalOutstanding);
+        }
+
+        // Load PO count
+        const poRes = await fetch(`${API}/purchase-orders?page=1&limit=1`, { headers });
+        const poData = await poRes.json();
+        if (poData.success) {
+            document.getElementById('statPurchaseOrders').textContent = poData.pagination?.total || 0;
+        }
+    } catch (e) {
+        console.error('Stats error:', e);
+    }
+}
+
+// =============================================
+// LOAD ALL VENDORS FOR DROPDOWNS
+// =============================================
+async function loadAllVendorsForDropdowns() {
+    try {
+        const res = await fetch(`${API}?page=1&limit=999`, { headers });
+        const data = await res.json();
+        if (data.success) {
+            allVendors = data.vendors || [];
+            populateVendorDropdowns();
+        }
+    } catch (e) {
+        console.error('Load vendors for dropdown error:', e);
+    }
+}
+
+function populateVendorDropdowns() {
+    const opts = allVendors.map(v => `<option value="${v.id}">${esc(v.vendor_name)}</option>`).join('');
+    // Bill vendor filter
+    document.getElementById('billVendorFilter').innerHTML = '<option value="">All Vendors</option>' + opts;
+    // Bill form vendor
+    document.getElementById('bfVendor').innerHTML = '<option value="">Select vendor...</option>' + opts;
+    // PO form vendor
+    document.getElementById('pfVendor').innerHTML = '<option value="">Select vendor...</option>' + opts;
+    // Payment vendor
+    document.getElementById('pmVendor').innerHTML = '<option value="">Select vendor...</option>' + opts;
+}
+
+// =============================================
+// VENDORS TAB
+// =============================================
+async function loadVendors(page = 1) {
+    vendorPage = page;
+    const search = document.getElementById('vendorSearch')?.value || '';
+    const container = document.getElementById('vendorList');
+    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+
+    try {
+        const params = new URLSearchParams({ page, limit: 20 });
+        if (search) params.set('search', search);
+        const res = await fetch(`${API}?${params}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        if (!data.vendors.length) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No vendors found</div>';
+            document.getElementById('vendorPagination').innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = data.vendors.map(v => `
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="viewVendor(${v.id})">
+                <div class="flex items-start justify-between mb-2">
+                    <div>
+                        <span class="font-semibold text-gray-800 text-sm">${esc(v.vendor_name)}</span>
+                        ${v.gst_number ? `<span class="text-xs text-gray-400 ml-2">GST: ${esc(v.gst_number)}</span>` : ''}
+                    </div>
+                    <span class="text-sm font-bold ${parseFloat(v.outstanding) > 0 ? 'text-red-600' : 'text-gray-800'}">${formatCurrency(v.outstanding)}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <div>
+                        ${v.phone ? `<span>${esc(v.phone)}</span>` : ''}
+                        ${v.contact_person ? `<span class="mx-1">&middot;</span><span>${esc(v.contact_person)}</span>` : ''}
+                    </div>
+                    <span>${v.bill_count || 0} bills</span>
+                </div>
+            </div>
+        `).join('');
+
+        renderPagination('vendorPagination', data.pagination, loadVendors);
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+async function viewVendor(id) {
+    try {
+        const res = await fetch(`${API}/${id}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        const v = data.vendor;
+        const bills = data.recent_bills || [];
+        const payments = data.recent_payments || [];
+
+        document.getElementById('vendorDetailTitle').textContent = v.vendor_name;
+        document.getElementById('vendorDetailBody').innerHTML = `
+            <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
+                ${v.contact_person ? `<div><span class="text-gray-500">Contact:</span> <span class="font-medium">${esc(v.contact_person)}</span></div>` : ''}
+                ${v.phone ? `<div><span class="text-gray-500">Phone:</span> ${esc(v.phone)}</div>` : ''}
+                ${v.email ? `<div><span class="text-gray-500">Email:</span> ${esc(v.email)}</div>` : ''}
+                ${v.address ? `<div><span class="text-gray-500">Address:</span> ${esc(v.address)}</div>` : ''}
+                ${v.gst_number ? `<div><span class="text-gray-500">GST:</span> ${esc(v.gst_number)}</div>` : ''}
+                <div><span class="text-gray-500">Payment Terms:</span> ${v.payment_terms || 30} days</div>
+                ${v.notes ? `<div><span class="text-gray-500">Notes:</span> ${esc(v.notes)}</div>` : ''}
+            </div>
+
+            ${bills.length ? `
+            <h4 class="font-semibold text-gray-700 text-sm mb-2">Recent Bills</h4>
+            <div class="space-y-2 mb-4">
+                ${bills.map(b => `
+                    <div class="flex items-center justify-between p-2 bg-white border border-gray-100 rounded-lg text-sm">
+                        <div>
+                            <span class="font-medium">${esc(b.bill_number)}</span>
+                            <span class="status-pill status-${b.payment_status} ml-2">${b.payment_status}</span>
+                        </div>
+                        <span class="font-bold">${formatCurrency(b.grand_total)}</span>
+                    </div>
+                `).join('')}
+            </div>` : ''}
+
+            ${payments.length ? `
+            <h4 class="font-semibold text-gray-700 text-sm mb-2">Recent Payments</h4>
+            <div class="space-y-2">
+                ${payments.map(p => `
+                    <div class="flex items-center justify-between p-2 bg-white border border-gray-100 rounded-lg text-sm">
+                        <div>
+                            <span class="font-bold text-green-700">${formatCurrency(p.amount)}</span>
+                            <span class="text-xs text-gray-400 ml-2">${esc(p.payment_method)}</span>
+                        </div>
+                        <span class="text-xs text-gray-500">${formatDate(p.payment_date)}</span>
+                    </div>
+                `).join('')}
+            </div>` : ''}
+        `;
+
+        document.getElementById('vendorDetailActions').innerHTML = `
+            <button onclick="closeModal('vendorDetailModal'); openVendorModal(${v.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>
+        `;
+
+        openModal('vendorDetailModal');
+    } catch (e) {
+        showToast(e.message || 'Failed to load vendor', 'error');
+    }
+}
+
+function openVendorModal(editId = null) {
+    document.getElementById('vendorEditId').value = editId || '';
+    document.getElementById('vendorFormTitle').textContent = editId ? 'Edit Vendor' : 'New Vendor';
+    document.getElementById('vfName').value = '';
+    document.getElementById('vfContact').value = '';
+    document.getElementById('vfPhone').value = '';
+    document.getElementById('vfEmail').value = '';
+    document.getElementById('vfGst').value = '';
+    document.getElementById('vfTerms').value = '30';
+    document.getElementById('vfAddress').value = '';
+    document.getElementById('vfNotes').value = '';
+
+    if (editId) {
+        // Fetch and prefill
+        fetch(`${API}/${editId}`, { headers })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const v = data.vendor;
+                    document.getElementById('vfName').value = v.vendor_name || '';
+                    document.getElementById('vfContact').value = v.contact_person || '';
+                    document.getElementById('vfPhone').value = v.phone || '';
+                    document.getElementById('vfEmail').value = v.email || '';
+                    document.getElementById('vfGst').value = v.gst_number || '';
+                    document.getElementById('vfTerms').value = v.payment_terms || 30;
+                    document.getElementById('vfAddress').value = v.address || '';
+                    document.getElementById('vfNotes').value = v.notes || '';
+                }
+            });
+    }
+
+    openModal('vendorFormModal');
+}
+
+async function handleVendorSubmit(e) {
+    e.preventDefault();
+    const editId = document.getElementById('vendorEditId').value;
+    const payload = {
+        vendor_name: document.getElementById('vfName').value.trim(),
+        contact_person: document.getElementById('vfContact').value.trim(),
+        phone: document.getElementById('vfPhone').value.trim(),
+        email: document.getElementById('vfEmail').value.trim(),
+        address: document.getElementById('vfAddress').value.trim(),
+        gst_number: document.getElementById('vfGst').value.trim(),
+        payment_terms: Number(document.getElementById('vfTerms').value) || 30,
+        notes: document.getElementById('vfNotes').value.trim()
+    };
+
+    try {
+        const url = editId ? `${API}/${editId}` : API;
+        const method = editId ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast(data.message || 'Vendor saved', 'success');
+        closeModal('vendorFormModal');
+        loadVendors(vendorPage);
+        loadAllVendorsForDropdowns();
+        loadStats();
+    } catch (e) {
+        showToast(e.message || 'Failed to save vendor', 'error');
+    }
+}
+
+async function syncVendorsFromZoho() {
+    const btn = document.getElementById('btnSyncZoho');
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+
+    try {
+        const res = await fetch(`${API}/sync-zoho`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast(data.message || 'Sync complete', 'success');
+        loadVendors(1);
+        loadAllVendorsForDropdowns();
+        loadStats();
+    } catch (e) {
+        showToast(e.message || 'Sync failed', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sync from Zoho`;
+    }
+}
+
+// =============================================
+// BILLS TAB
+// =============================================
+async function loadBills(page = 1) {
+    billPage = page;
+    const search = document.getElementById('billSearch')?.value || '';
+    const vendorId = document.getElementById('billVendorFilter')?.value || '';
+    const container = document.getElementById('billList');
+    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+
+    try {
+        const params = new URLSearchParams({ page, limit: 20 });
+        if (search) params.set('search', search);
+        if (vendorId) params.set('vendor_id', vendorId);
+        const res = await fetch(`${API}/bills?${params}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        if (!data.bills.length) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No bills found</div>';
+            document.getElementById('billPagination').innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = data.bills.map(b => `
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="viewBill(${b.id})">
+                <div class="flex items-start justify-between mb-2">
+                    <div>
+                        <span class="font-semibold text-gray-800 text-sm">${esc(b.bill_number)}</span>
+                        <span class="status-pill status-${b.payment_status} ml-2">${b.payment_status}</span>
+                        ${b.ai_verification_status ? `<span class="status-pill status-${b.ai_verification_status === 'verified' ? 'verified' : 'mismatch'} ml-1">${b.ai_verification_status}</span>` : ''}
+                    </div>
+                    <span class="text-sm font-bold text-gray-800">${formatCurrency(b.grand_total)}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span class="font-medium text-gray-700">${esc(b.vendor_name)}</span>
+                    <div class="flex items-center gap-2">
+                        ${parseFloat(b.balance_due) > 0 ? `<span class="text-red-600 font-semibold">Due: ${formatCurrency(b.balance_due)}</span>` : ''}
+                        <span>${formatDate(b.created_at)}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        renderPagination('billPagination', data.pagination, loadBills);
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+async function viewBill(id) {
+    try {
+        const res = await fetch(`${API}/bills/${id}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        const bill = data.bill;
+        const items = data.items || [];
+        const payments = data.payments || [];
+
+        document.getElementById('billDetailTitle').textContent = `Bill ${bill.bill_number}`;
+        document.getElementById('billDetailBody').innerHTML = `
+            <div class="flex items-center gap-2 mb-4 flex-wrap">
+                <span class="status-pill status-${bill.payment_status}">${bill.payment_status}</span>
+                ${bill.ai_verification_status ? `<span class="status-pill status-${bill.ai_verification_status === 'verified' ? 'verified' : 'mismatch'}">${bill.ai_verification_status}</span>` : ''}
+                ${bill.zoho_status ? `<span class="status-pill status-${bill.zoho_status === 'pushed' ? 'pushed' : 'pending'}">${bill.zoho_status}</span>` : ''}
+                <span class="text-sm text-gray-500">${formatDate(bill.bill_date || bill.created_at)}</span>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
+                <div><span class="text-gray-500">Vendor:</span> <span class="font-medium">${esc(bill.vendor_name)}</span></div>
+                ${bill.due_date ? `<div><span class="text-gray-500">Due Date:</span> ${formatDate(bill.due_date)}</div>` : ''}
+            </div>
+
+            <table class="w-full text-sm mb-4">
+                <thead><tr class="border-b text-left text-gray-500">
+                    <th class="py-2 font-medium">Item</th>
+                    <th class="py-2 font-medium w-16 text-right">Qty</th>
+                    <th class="py-2 font-medium w-20 text-right">Rate</th>
+                    <th class="py-2 font-medium w-24 text-right">Total</th>
+                </tr></thead>
+                <tbody>
+                    ${items.map(i => `<tr class="border-b border-gray-50">
+                        <td class="py-2">
+                            ${esc(i.item_name)}
+                            ${i.ai_matched ? `<span class="ai-badge ml-1">AI ${Math.round((i.ai_confidence || 0) * 100)}%</span>` : ''}
+                        </td>
+                        <td class="py-2 text-right">${i.quantity}</td>
+                        <td class="py-2 text-right">${formatCurrency(i.unit_price)}</td>
+                        <td class="py-2 text-right font-medium">${formatCurrency(i.amount)}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+
+            <div class="space-y-1 text-sm">
+                <div class="flex justify-between"><span class="text-gray-500">Subtotal</span><span>${formatCurrency(bill.subtotal)}</span></div>
+                ${parseFloat(bill.tax_amount) > 0 ? `<div class="flex justify-between"><span class="text-gray-500">Tax</span><span>${formatCurrency(bill.tax_amount)}</span></div>` : ''}
+                <div class="flex justify-between font-bold border-t pt-1"><span>Grand Total</span><span>${formatCurrency(bill.grand_total)}</span></div>
+                ${parseFloat(bill.balance_due) > 0 ? `<div class="flex justify-between text-red-600 font-semibold"><span>Balance Due</span><span>${formatCurrency(bill.balance_due)}</span></div>` : ''}
+            </div>
+
+            ${payments.length ? `
+            <h4 class="font-semibold text-gray-700 text-sm mt-4 mb-2">Payments</h4>
+            <div class="space-y-2">
+                ${payments.map(p => `
+                    <div class="flex items-center justify-between p-2 bg-green-50 border border-green-100 rounded-lg text-sm">
+                        <div>
+                            <span class="font-bold text-green-700">${formatCurrency(p.amount)}</span>
+                            <span class="text-xs text-gray-400 ml-2">${esc(p.payment_method)}</span>
+                            ${p.paid_by_name ? `<span class="text-xs text-gray-400 ml-1">by ${esc(p.paid_by_name)}</span>` : ''}
+                        </div>
+                        <span class="text-xs text-gray-500">${formatDate(p.payment_date)}</span>
+                    </div>
+                `).join('')}
+            </div>` : ''}
+
+            ${bill.notes ? `<div class="mt-3 p-2 bg-yellow-50 rounded text-xs text-gray-600">${esc(bill.notes)}</div>` : ''}
+        `;
+
+        // Actions
+        let actionsHtml = '';
+        if (bill.zoho_status !== 'pushed') {
+            actionsHtml += `<button onclick="pushBillToZoho(${bill.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
+        }
+        document.getElementById('billDetailActions').innerHTML = actionsHtml;
+
+        openModal('billDetailModal');
+    } catch (e) {
+        showToast(e.message || 'Failed to load bill', 'error');
+    }
+}
+
+function openBillModal() {
+    billItems = [];
+    createdBillId = null;
+    billImagePath = null;
+    aiExtractedData = null;
+    document.getElementById('bfVendor').value = '';
+    document.getElementById('bfBillNumber').value = '';
+    document.getElementById('bfBillDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('bfDueDate').value = '';
+    document.getElementById('bfTax').value = '0';
+    document.getElementById('bfNotes').value = '';
+    document.getElementById('bfBillImage').value = '';
+    document.getElementById('aiScanStatus').classList.add('hidden');
+    document.getElementById('aiScanResult').classList.add('hidden');
+    document.getElementById('btnVerifyBill').classList.add('hidden');
+    renderBillItems();
+    recalcBillTotals();
+    openModal('billFormModal');
+}
+
+async function scanBillWithAI() {
+    const fileInput = document.getElementById('bfBillImage');
+    const vendorId = document.getElementById('bfVendor').value;
+
+    if (!fileInput.files.length) {
+        showToast('Please select a bill image first', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btnScanAI');
+    btn.disabled = true;
+    document.getElementById('aiScanStatus').classList.remove('hidden');
+    document.getElementById('aiScanResult').classList.add('hidden');
+
+    try {
+        const formData = new FormData();
+        formData.append('bill_image', fileInput.files[0]);
+        if (vendorId) formData.append('vendor_id', vendorId);
+
+        const res = await fetch(`${API}/bills/scan`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        // Store AI data
+        billImagePath = data.image_path || null;
+        aiExtractedData = data.scan_result || null;
+
+        // Populate items from AI
+        const aiItems = data.scan_result?.items || [];
+        billItems = aiItems.map(it => ({
+            item_name: it.item_name || it.name || '',
+            quantity: it.quantity || 1,
+            unit_price: it.unit_price || it.rate || 0,
+            zoho_item_id: it.zoho_item_id || null,
+            ai_matched: it.ai_matched || false,
+            ai_confidence: it.ai_confidence || 0
+        }));
+
+        renderBillItems();
+        recalcBillTotals();
+
+        document.getElementById('aiScanResult').textContent = `AI found ${aiItems.length} item(s). Review and edit below.`;
+        document.getElementById('aiScanResult').classList.remove('hidden');
+        document.getElementById('btnVerifyBill').classList.remove('hidden');
+    } catch (e) {
+        showToast(e.message || 'AI scan failed', 'error');
+    } finally {
+        btn.disabled = false;
+        document.getElementById('aiScanStatus').classList.add('hidden');
+    }
+}
+
+function addBillItemRow() {
+    billItems.push({ item_name: '', quantity: 1, unit_price: 0, zoho_item_id: null, ai_matched: false, ai_confidence: 0 });
+    renderBillItems();
+}
+
+function removeBillItem(idx) {
+    billItems.splice(idx, 1);
+    renderBillItems();
+    recalcBillTotals();
+}
+
+function updateBillItemField(idx, field, value) {
+    if (field === 'item_name') {
+        billItems[idx][field] = value;
+    } else {
+        billItems[idx][field] = Number(value) || 0;
+    }
+    recalcBillTotals();
+    const row = document.querySelector(`#billItemRow${idx} .line-total`);
+    if (row) row.textContent = formatCurrency(billItems[idx].quantity * billItems[idx].unit_price);
+}
+
+function renderBillItems() {
+    const tbody = document.getElementById('billItemsBody');
+    if (!billItems.length) {
+        tbody.innerHTML = '<tr id="noBillItemsRow"><td colspan="5" class="text-center py-6 text-gray-400 text-sm">No items added. Upload a bill or add manually.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = billItems.map((item, idx) => `
+        <tr id="billItemRow${idx}" class="border-b border-gray-50">
+            <td class="px-2 py-2">
+                <input type="text" value="${esc(item.item_name)}" class="qc-input w-full text-sm" placeholder="Item name" onchange="updateBillItemField(${idx},'item_name',this.value)">
+                ${item.ai_matched ? `<span class="ai-badge mt-1 inline-block">AI ${Math.round((item.ai_confidence || 0) * 100)}%</span>` : ''}
+            </td>
+            <td class="px-2 py-2"><input type="number" value="${item.quantity}" min="1" step="1" class="qc-input w-full text-center text-sm" onchange="updateBillItemField(${idx},'quantity',this.value)"></td>
+            <td class="px-2 py-2"><input type="number" value="${item.unit_price}" min="0" step="0.01" class="qc-input w-full text-right text-sm" onchange="updateBillItemField(${idx},'unit_price',this.value)"></td>
+            <td class="px-2 py-2 text-right text-sm font-medium line-total">${formatCurrency(item.quantity * item.unit_price)}</td>
+            <td class="px-2 py-2 text-center">
+                <button type="button" onclick="removeBillItem(${idx})" class="text-red-400 hover:text-red-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function recalcBillTotals() {
+    const subtotal = billItems.reduce((s, i) => s + (i.quantity * i.unit_price), 0);
+    const tax = Number(document.getElementById('bfTax').value) || 0;
+    document.getElementById('bfSubtotal').textContent = formatCurrency(subtotal);
+    document.getElementById('bfGrandTotal').textContent = formatCurrency(subtotal + tax);
+}
+
+async function verifyBill() {
+    if (!createdBillId) {
+        showToast('Submit the bill first, then verify', 'error');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API}/bills/${createdBillId}/verify`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        const v = data.verification;
+        if (v.status === 'verified') {
+            showToast('Bill verified - all items match!', 'success');
+        } else {
+            const diffCount = v.differences?.length || 0;
+            showToast(`${diffCount} difference(s) found. Review the bill.`, 'error');
+        }
+    } catch (e) {
+        showToast(e.message || 'Verification failed', 'error');
+    }
+}
+
+async function submitBill() {
+    const vendorId = document.getElementById('bfVendor').value;
+    if (!vendorId) { showToast('Select a vendor', 'error'); return; }
+    if (!billItems.length) { showToast('Add at least one item', 'error'); return; }
+    // Validate all items have names
+    for (const item of billItems) {
+        if (!item.item_name.trim()) { showToast('All items must have a name', 'error'); return; }
+    }
+
+    const payload = {
+        vendor_id: Number(vendorId),
+        bill_number: document.getElementById('bfBillNumber').value.trim() || '',
+        bill_date: document.getElementById('bfBillDate').value || null,
+        due_date: document.getElementById('bfDueDate').value || null,
+        items: billItems.map(i => ({
+            zoho_item_id: i.zoho_item_id || null,
+            item_name: i.item_name,
+            quantity: Number(i.quantity) || 1,
+            unit_price: Number(i.unit_price) || 0,
+            ai_matched: i.ai_matched || false,
+            ai_confidence: i.ai_confidence || 0
+        })),
+        tax_amount: Number(document.getElementById('bfTax').value) || 0,
+        notes: document.getElementById('bfNotes').value.trim(),
+        bill_image: billImagePath || null,
+        ai_extracted_data: aiExtractedData || null
+    };
+
+    try {
+        const res = await fetch(`${API}/bills`, { method: 'POST', headers, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        createdBillId = data.bill_id;
+        showToast(`Bill ${data.bill_number} created`, 'success');
+
+        // If AI scanned, show verify button
+        if (aiExtractedData) {
+            document.getElementById('btnVerifyBill').classList.remove('hidden');
+            showToast('Bill created. You can now verify with AI.', 'success');
+        } else {
+            closeModal('billFormModal');
+        }
+
+        loadBills(billPage);
+        loadStats();
+    } catch (e) {
+        showToast(e.message || 'Failed to create bill', 'error');
+    }
+}
+
+async function pushBillToZoho(billId) {
+    if (!confirm('Push this bill to Zoho?')) return;
+    try {
+        const res = await fetch(`${API}/bills/${billId}/push-zoho`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast(data.message || 'Bill pushed to Zoho', 'success');
+        closeModal('billDetailModal');
+        loadBills(billPage);
+    } catch (e) {
+        showToast(e.message || 'Push failed', 'error');
+    }
+}
+
+// =============================================
+// PURCHASE ORDERS TAB
+// =============================================
+async function loadPurchaseOrders(page = 1) {
+    poPage = page;
+    const search = document.getElementById('poSearch')?.value || '';
+    const container = document.getElementById('poList');
+    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+
+    try {
+        const params = new URLSearchParams({ page, limit: 20 });
+        if (search) params.set('search', search);
+        const res = await fetch(`${API}/purchase-orders?${params}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        if (!data.purchase_orders.length) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No purchase orders found</div>';
+            document.getElementById('poPagination').innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = data.purchase_orders.map(po => `
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="viewPo(${po.id})">
+                <div class="flex items-start justify-between mb-2">
+                    <div>
+                        <span class="font-semibold text-gray-800 text-sm">${esc(po.po_number)}</span>
+                        <span class="status-pill status-${po.status} ml-2">${po.status}</span>
+                        ${po.zoho_status ? `<span class="status-pill status-${po.zoho_status === 'pushed' ? 'pushed' : 'pending'} ml-1">${po.zoho_status}</span>` : ''}
+                    </div>
+                    <span class="text-sm font-bold text-gray-800">${formatCurrency(po.grand_total)}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span class="font-medium text-gray-700">${esc(po.vendor_name)}</span>
+                    <div class="flex items-center gap-2">
+                        ${po.expected_date ? `<span>ETA: ${formatDate(po.expected_date)}</span>` : ''}
+                        <span>${formatDate(po.created_at)}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        renderPagination('poPagination', data.pagination, loadPurchaseOrders);
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+async function viewPo(id) {
+    // Re-use bill detail modal for PO detail
+    try {
+        // Fetch PO detail by loading the list and finding the item (no dedicated detail endpoint in current routes)
+        // Actually we need to check if there's a detail route - there isn't one for POs, so we'll show from the list data
+        showToast('Loading PO details...', 'success');
+
+        // The route doesn't have a dedicated GET /purchase-orders/:id, so let's display minimal info
+        // We can still edit draft POs
+        const res = await fetch(`${API}/purchase-orders?page=1&limit=999`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        const po = data.purchase_orders.find(p => p.id === id);
+        if (!po) throw new Error('PO not found');
+
+        document.getElementById('billDetailTitle').textContent = `PO ${po.po_number}`;
+        document.getElementById('billDetailBody').innerHTML = `
+            <div class="flex items-center gap-2 mb-4 flex-wrap">
+                <span class="status-pill status-${po.status}">${po.status}</span>
+                ${po.zoho_status ? `<span class="status-pill status-${po.zoho_status === 'pushed' ? 'pushed' : 'pending'}">${po.zoho_status}</span>` : ''}
+                <span class="text-sm text-gray-500">${formatDate(po.created_at)}</span>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
+                <div><span class="text-gray-500">Vendor:</span> <span class="font-medium">${esc(po.vendor_name)}</span></div>
+                ${po.expected_date ? `<div><span class="text-gray-500">Expected Date:</span> ${formatDate(po.expected_date)}</div>` : ''}
+                ${po.created_by_name ? `<div><span class="text-gray-500">Created By:</span> ${esc(po.created_by_name)}</div>` : ''}
+            </div>
+            <div class="space-y-1 text-sm">
+                <div class="flex justify-between"><span class="text-gray-500">Subtotal</span><span>${formatCurrency(po.subtotal)}</span></div>
+                ${parseFloat(po.tax_amount) > 0 ? `<div class="flex justify-between"><span class="text-gray-500">Tax</span><span>${formatCurrency(po.tax_amount)}</span></div>` : ''}
+                <div class="flex justify-between font-bold border-t pt-1"><span>Grand Total</span><span>${formatCurrency(po.grand_total)}</span></div>
+            </div>
+            ${po.notes ? `<div class="mt-3 p-2 bg-yellow-50 rounded text-xs text-gray-600">${esc(po.notes)}</div>` : ''}
+        `;
+
+        let actionsHtml = '';
+        if (po.status === 'draft') {
+            actionsHtml += `<button onclick="closeModal('billDetailModal'); editPo(${po.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
+            actionsHtml += `<button onclick="sendPo(${po.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Mark as Sent</button>`;
+        }
+        if (po.zoho_status !== 'pushed') {
+            actionsHtml += `<button onclick="pushPoToZoho(${po.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Push to Zoho</button>`;
+        }
+        document.getElementById('billDetailActions').innerHTML = actionsHtml;
+
+        openModal('billDetailModal');
+    } catch (e) {
+        showToast(e.message || 'Failed to load PO', 'error');
+    }
+}
+
+function openPoModal(editData = null) {
+    poItems = [];
+    document.getElementById('poEditId').value = '';
+    document.getElementById('poFormTitle').textContent = 'New Purchase Order';
+    document.getElementById('pfVendor').value = '';
+    document.getElementById('pfExpectedDate').value = '';
+    document.getElementById('pfTax').value = '0';
+    document.getElementById('pfNotes').value = '';
+    document.getElementById('poProductSearch').value = '';
+
+    if (editData) {
+        document.getElementById('poEditId').value = editData.id;
+        document.getElementById('poFormTitle').textContent = 'Edit Purchase Order';
+        document.getElementById('pfVendor').value = editData.vendor_id;
+        document.getElementById('pfExpectedDate').value = editData.expected_date ? editData.expected_date.split('T')[0] : '';
+        document.getElementById('pfTax').value = editData.tax_amount || 0;
+        document.getElementById('pfNotes').value = editData.notes || '';
+    }
+
+    renderPoItems();
+    recalcPoTotals();
+    openModal('poFormModal');
+}
+
+function editPo(id) {
+    // Find the PO from cached list or refetch
+    fetch(`${API}/purchase-orders?page=1&limit=999`, { headers })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return showToast('Failed to load PO', 'error');
+            const po = data.purchase_orders.find(p => p.id === id);
+            if (po) openPoModal(po);
+        });
+}
+
+function addPoProduct(product) {
+    poItems.push({
+        zoho_item_id: product.zoho_item_id || '',
+        item_name: product.item_name,
+        quantity: 1,
+        unit_price: product.rate || 0
+    });
+    renderPoItems();
+    recalcPoTotals();
+    document.getElementById('poProductSearch').value = '';
+    document.getElementById('poProductSuggestions').classList.add('hidden');
+}
+
+function removePoItem(idx) {
+    poItems.splice(idx, 1);
+    renderPoItems();
+    recalcPoTotals();
+}
+
+function updatePoItemField(idx, field, value) {
+    poItems[idx][field] = Number(value) || 0;
+    recalcPoTotals();
+    const row = document.querySelector(`#poItemRow${idx} .line-total`);
+    if (row) row.textContent = formatCurrency(poItems[idx].quantity * poItems[idx].unit_price);
+}
+
+function renderPoItems() {
+    const tbody = document.getElementById('poItemsBody');
+    if (!poItems.length) {
+        tbody.innerHTML = '<tr id="noPoItemsRow"><td colspan="5" class="text-center py-6 text-gray-400 text-sm">No items added</td></tr>';
+        return;
+    }
+    tbody.innerHTML = poItems.map((item, idx) => `
+        <tr id="poItemRow${idx}" class="border-b border-gray-50">
+            <td class="px-2 py-2">
+                <div class="text-sm font-medium text-gray-800">${esc(item.item_name)}</div>
+            </td>
+            <td class="px-2 py-2"><input type="number" value="${item.quantity}" min="1" step="1" class="qc-input w-full text-center text-sm" onchange="updatePoItemField(${idx},'quantity',this.value)"></td>
+            <td class="px-2 py-2"><input type="number" value="${item.unit_price}" min="0" step="0.01" class="qc-input w-full text-right text-sm" onchange="updatePoItemField(${idx},'unit_price',this.value)"></td>
+            <td class="px-2 py-2 text-right text-sm font-medium line-total">${formatCurrency(item.quantity * item.unit_price)}</td>
+            <td class="px-2 py-2 text-center">
+                <button type="button" onclick="removePoItem(${idx})" class="text-red-400 hover:text-red-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function recalcPoTotals() {
+    const subtotal = poItems.reduce((s, i) => s + (i.quantity * i.unit_price), 0);
+    const tax = Number(document.getElementById('pfTax').value) || 0;
+    document.getElementById('pfSubtotal').textContent = formatCurrency(subtotal);
+    document.getElementById('pfGrandTotal').textContent = formatCurrency(subtotal + tax);
+}
+
+async function submitPo() {
+    const vendorId = document.getElementById('pfVendor').value;
+    if (!vendorId) { showToast('Select a vendor', 'error'); return; }
+    if (!poItems.length) { showToast('Add at least one item', 'error'); return; }
+
+    const editId = document.getElementById('poEditId').value;
+    const payload = {
+        vendor_id: Number(vendorId),
+        items: poItems.map(i => ({
+            zoho_item_id: i.zoho_item_id || '',
+            item_name: i.item_name,
+            quantity: Number(i.quantity) || 1,
+            unit_price: Number(i.unit_price) || 0
+        })),
+        tax_amount: Number(document.getElementById('pfTax').value) || 0,
+        expected_date: document.getElementById('pfExpectedDate').value || null,
+        notes: document.getElementById('pfNotes').value.trim()
+    };
+
+    try {
+        const url = editId ? `${API}/purchase-orders/${editId}` : `${API}/purchase-orders`;
+        const method = editId ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast(data.message || 'PO saved', 'success');
+        closeModal('poFormModal');
+        loadPurchaseOrders(poPage);
+        loadStats();
+    } catch (e) {
+        showToast(e.message || 'Failed to save PO', 'error');
+    }
+}
+
+async function sendPo(poId) {
+    if (!confirm('Mark this PO as sent?')) return;
+    try {
+        const res = await fetch(`${API}/purchase-orders/${poId}/send`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast(data.message || 'PO sent', 'success');
+        closeModal('billDetailModal');
+        loadPurchaseOrders(poPage);
+    } catch (e) {
+        showToast(e.message || 'Failed to send PO', 'error');
+    }
+}
+
+async function pushPoToZoho(poId) {
+    if (!confirm('Push this PO to Zoho?')) return;
+    try {
+        const res = await fetch(`${API}/purchase-orders/${poId}/push-zoho`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast(data.message || 'PO pushed to Zoho', 'success');
+        closeModal('billDetailModal');
+        loadPurchaseOrders(poPage);
+    } catch (e) {
+        showToast(e.message || 'Push failed', 'error');
+    }
+}
+
+// =============================================
+// PAYMENTS TAB
+// =============================================
+async function loadPayments(page = 1) {
+    paymentPage = page;
+    const container = document.getElementById('paymentList');
+    container.innerHTML = '<div class="skeleton h-16 w-full"></div>'.repeat(3);
+
+    try {
+        const params = new URLSearchParams({ page, limit: 20 });
+        const res = await fetch(`${API}/payments?${params}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        if (!data.payments.length) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No payments found</div>';
+            document.getElementById('paymentPagination').innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = data.payments.map(p => `
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-green-700">${formatCurrency(p.amount)}</span>
+                        <span class="text-xs text-gray-400 px-2 py-0.5 bg-gray-100 rounded-full">${esc(p.payment_method)}</span>
+                    </div>
+                    <span class="text-xs text-gray-400">${formatDate(p.payment_date)}</span>
+                </div>
+                <div class="text-xs text-gray-500">
+                    <span class="font-medium text-gray-700">${esc(p.vendor_name)}</span>
+                    ${p.bill_number ? `<span class="mx-1">&middot;</span><span>${esc(p.bill_number)}</span>` : ''}
+                    ${p.paid_by_name ? `<span class="mx-1">&middot;</span><span>${esc(p.paid_by_name)}</span>` : ''}
+                    ${p.payment_reference ? `<span class="mx-1">&middot;</span><span class="text-gray-400">#${esc(p.payment_reference)}</span>` : ''}
+                </div>
+            </div>
+        `).join('');
+
+        renderPagination('paymentPagination', data.pagination, loadPayments);
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+function openPaymentModal() {
+    document.getElementById('pmVendor').value = '';
+    document.getElementById('pmBill').innerHTML = '<option value="">No specific bill</option>';
+    document.getElementById('pmAmount').value = '';
+    document.getElementById('pmMethod').value = 'cash';
+    document.getElementById('pmDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('pmReference').value = '';
+    document.getElementById('pmNotes').value = '';
+    openModal('paymentFormModal');
+}
+
+async function loadVendorBillsForPayment() {
+    const vendorId = document.getElementById('pmVendor').value;
+    const billSelect = document.getElementById('pmBill');
+    billSelect.innerHTML = '<option value="">No specific bill</option>';
+
+    if (!vendorId) return;
+
+    try {
+        const res = await fetch(`${API}/bills?vendor_id=${vendorId}&payment_status=unpaid&limit=50`, { headers });
+        const data = await res.json();
+        if (data.success && data.bills.length) {
+            data.bills.forEach(b => {
+                billSelect.innerHTML += `<option value="${b.id}">${esc(b.bill_number)} - Due: ${formatCurrency(b.balance_due)}</option>`;
+            });
+            // Also add partial bills
+            const res2 = await fetch(`${API}/bills?vendor_id=${vendorId}&payment_status=partial&limit=50`, { headers });
+            const data2 = await res2.json();
+            if (data2.success && data2.bills.length) {
+                data2.bills.forEach(b => {
+                    billSelect.innerHTML += `<option value="${b.id}">${esc(b.bill_number)} - Due: ${formatCurrency(b.balance_due)}</option>`;
+                });
+            }
+        }
+    } catch (e) {
+        console.error('Load vendor bills error:', e);
+    }
+}
+
+async function handlePaymentSubmit(e) {
+    e.preventDefault();
+    const vendorId = document.getElementById('pmVendor').value;
+    if (!vendorId) { showToast('Select a vendor', 'error'); return; }
+
+    const payload = {
+        vendor_id: Number(vendorId),
+        bill_id: Number(document.getElementById('pmBill').value) || null,
+        amount: Number(document.getElementById('pmAmount').value),
+        payment_method: document.getElementById('pmMethod').value,
+        payment_date: document.getElementById('pmDate').value,
+        payment_reference: document.getElementById('pmReference').value.trim(),
+        notes: document.getElementById('pmNotes').value.trim()
+    };
+
+    try {
+        const res = await fetch(`${API}/payments`, { method: 'POST', headers, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast(data.message || 'Payment recorded', 'success');
+        closeModal('paymentFormModal');
+        loadPayments(paymentPage);
+        loadStats();
+    } catch (e) {
+        showToast(e.message || 'Failed to record payment', 'error');
+    }
+}
+
+// =============================================
+// PO PRODUCT SEARCH
+// =============================================
+function debouncePoProductSearch() {
+    clearTimeout(poProductSearchTimer);
+    poProductSearchTimer = setTimeout(searchPoProducts, 300);
+}
+
+async function searchPoProducts() {
+    const term = document.getElementById('poProductSearch').value.trim();
+    const el = document.getElementById('poProductSuggestions');
+    if (term.length < 2) { el.classList.add('hidden'); return; }
+
+    try {
+        const res = await fetch(`/api/billing/products?search=${encodeURIComponent(term)}`, { headers });
+        const data = await res.json();
+        if (!data.success || !data.products.length) { el.classList.add('hidden'); return; }
+
+        el.innerHTML = data.products.map(p => `
+            <div class="suggestion-item" onclick="addPoProduct(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                <div class="font-medium text-gray-800">${esc(p.item_name)}</div>
+                <div class="text-xs text-gray-400">${esc(p.sku || '')} ${p.pack_size ? '&middot; ' + esc(p.pack_size) : ''} &middot; ${formatCurrency(p.rate)}</div>
+            </div>
+        `).join('');
+        el.classList.remove('hidden');
+    } catch (e) {
+        el.classList.add('hidden');
+    }
+}
+
+// =============================================
+// DEBOUNCE SEARCH
+// =============================================
+function debounceVendorSearch() {
+    clearTimeout(vendorSearchTimer);
+    vendorSearchTimer = setTimeout(() => loadVendors(1), 300);
+}
+
+function debounceBillSearch() {
+    clearTimeout(billSearchTimer);
+    billSearchTimer = setTimeout(() => loadBills(1), 300);
+}
+
+function debouncePoSearch() {
+    clearTimeout(poSearchTimer);
+    poSearchTimer = setTimeout(() => loadPurchaseOrders(1), 300);
+}
+
+// =============================================
+// MODALS
+// =============================================
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// =============================================
+// PAGINATION
+// =============================================
+function renderPagination(containerId, pagination, onClick) {
+    const el = document.getElementById(containerId);
+    if (!pagination || pagination.pages <= 1) { el.innerHTML = ''; return; }
+
+    const { page, pages } = pagination;
+    let html = '';
+
+    if (page > 1) {
+        html += `<button onclick="(${onClick.name})(${page - 1})" class="px-3 py-1 rounded-lg border text-sm hover:bg-gray-50">&laquo;</button>`;
+    }
+
+    const start = Math.max(1, page - 2);
+    const end = Math.min(pages, page + 2);
+    for (let i = start; i <= end; i++) {
+        html += `<button onclick="(${onClick.name})(${i})" class="px-3 py-1 rounded-lg text-sm ${i === page ? 'btn-green font-bold' : 'border hover:bg-gray-50'}">${i}</button>`;
+    }
+
+    if (page < pages) {
+        html += `<button onclick="(${onClick.name})(${page + 1})" class="px-3 py-1 rounded-lg border text-sm hover:bg-gray-50">&raquo;</button>`;
+    }
+
+    el.innerHTML = html;
+}
+
+// =============================================
+// UTILITIES
+// =============================================
+function formatCurrency(val) {
+    const num = Number(val) || 0;
+    return '\u20B9' + num.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function formatDate(d) {
+    if (!d) return '';
+    const dt = new Date(d);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${dt.getDate()} ${months[dt.getMonth()]} ${String(dt.getFullYear()).slice(2)}`;
+}
+
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function showToast(msg, type = 'success') {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+
+</body>
+</html>
