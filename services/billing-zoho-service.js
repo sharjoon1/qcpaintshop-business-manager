@@ -134,14 +134,13 @@ async function pushInvoiceToZoho(invoiceId, userId) {
     }
 
     // 5. Create Zoho invoice
-    const invoiceDate = invoice.invoice_date
-        ? new Date(invoice.invoice_date).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const invoiceDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const lineItems = items.map(item => ({
-        item_id: item.zoho_item_id || item.item_id,
-        quantity: item.quantity,
-        rate: item.rate
+        item_id: item.zoho_item_id,
+        quantity: parseFloat(item.quantity),
+        rate: parseFloat(item.unit_price)
     }));
 
     const zohoResult = await zohoAPI.createInvoice({
@@ -166,11 +165,11 @@ async function pushInvoiceToZoho(invoiceId, userId) {
                 invoice_id: zohoInvoiceId,
                 invoice_number: zohoInvoiceNumber,
                 date: invoiceDate,
-                total: invoice.grand_total,
+                total: parseFloat(invoice.grand_total),
                 line_items: items.map(item => ({
-                    item_id: item.zoho_item_id || item.item_id,
-                    quantity: item.quantity,
-                    item_total: item.item_total || (item.quantity * item.rate)
+                    item_id: item.zoho_item_id,
+                    quantity: parseFloat(item.quantity),
+                    item_total: parseFloat(item.line_total)
                 }))
             };
             pointsResult = await pointsEngine.processInvoice(

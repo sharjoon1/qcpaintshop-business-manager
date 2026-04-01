@@ -218,6 +218,7 @@ aiScheduler.setPool(pool);
 paintersRoutes.setPool(pool);
 paintersRoutes.setSessionManager(whatsappSessionManager);
 billingRoutes.setPool(pool);
+billingRoutes.setPointsEngine(require('./services/painter-points-engine'));
 painterScheduler.setPool(pool);
 leadAutoAssignScheduler.setPool(pool);
 leadReminderScheduler.init(pool, notificationService);

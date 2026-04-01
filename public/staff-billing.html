@@ -100,14 +100,14 @@
                 </div>
                 <div id="statOutstanding" class="text-lg font-bold text-red-700">--</div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm border border-purple-100 p-4">
+            <div class="bg-white rounded-xl shadow-sm border border-green-100 p-4">
                 <div class="flex items-center gap-2 mb-1">
-                    <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                     </div>
                     <span class="text-xs text-gray-500">Estimates</span>
                 </div>
-                <div id="statEstimateTotal" class="text-lg font-bold text-purple-700">--</div>
+                <div id="statEstimateTotal" class="text-lg font-bold text-green-700">--</div>
             </div>
         </div>
 
@@ -688,7 +688,7 @@ async function viewInvoice(id) {
         if (inv.payment_status !== 'paid' && inv.zoho_status !== 'pushed') {
             actions.innerHTML += `<button onclick="closeDetailModal(); editInvoice(${inv.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
         }
-        if (inv.payment_status === 'paid' && inv.zoho_status !== 'pushed') {
+        if (inv.zoho_status !== 'pushed') {
             actions.innerHTML += `<button onclick="closeDetailModal(); pushToZoho(${inv.id})" class="px-4 py-2 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-50 border border-blue-200">Push to Zoho</button>`;
         }
 

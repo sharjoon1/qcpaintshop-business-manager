@@ -253,7 +253,7 @@ router.post('/estimates',
     async (req, res) => {
         try {
             const data = req.body;
-            const estimateNumber = await generateNumber('EST', 'billing_estimates', 'estimate_number');
+            const estimateNumber = await generateNumber('BE', 'billing_estimates', 'estimate_number');
 
             const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
             const grandTotal = Math.max(0, subtotal - data.discount_amount);
@@ -543,7 +543,7 @@ router.post('/estimates/:id/convert',
                 return res.status(400).json({ success: false, message: 'Estimate already converted' });
             }
 
-            const invoiceNumber = await generateNumber('INV', 'billing_invoices', 'invoice_number');
+            const invoiceNumber = await generateNumber('BI', 'billing_invoices', 'invoice_number');
 
             const [invResult] = await pool.query(
                 `INSERT INTO billing_invoices
@@ -608,7 +608,7 @@ router.post('/invoices',
     async (req, res) => {
         try {
             const data = req.body;
-            const invoiceNumber = await generateNumber('INV', 'billing_invoices', 'invoice_number');
+            const invoiceNumber = await generateNumber('BI', 'billing_invoices', 'invoice_number');
 
             const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
             const grandTotal = Math.max(0, subtotal - data.discount_amount);
@@ -851,13 +851,11 @@ router.post('/invoices/:id/payment',
                 });
             }
 
-            const paymentNumber = await generateNumber('PAY', 'billing_payments', 'payment_number');
-
             await pool.query(
                 `INSERT INTO billing_payments
-                 (payment_number, invoice_id, amount, payment_method, payment_reference, notes, received_by)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [paymentNumber, id, data.amount, data.payment_method, data.payment_reference, data.notes, req.user.id]
+                 (invoice_id, amount, payment_method, payment_reference, notes, received_by)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [id, data.amount, data.payment_method, data.payment_reference, data.notes, req.user.id]
             );
 
             // Recalculate from all payments to avoid floating point drift
