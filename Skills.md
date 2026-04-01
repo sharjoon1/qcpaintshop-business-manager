@@ -2744,6 +2744,32 @@ Full billing module for staff to create estimates, direct invoices, collect paym
 
 **Migration:** `node migrations/migrate-billing.js`
 
+### Vendor Management System
+Full vendor management module — vendor CRUD, purchase bills with AI verification, purchase orders, vendor payments, Zoho integration.
+
+**Tables:** `vendors`, `vendor_bills`, `vendor_bill_items`, `vendor_purchase_orders`, `vendor_po_items`, `vendor_payments`
+
+**Routes:** `routes/vendors.js` — mounted at `/api/vendors`
+- Vendors: GET/POST/PUT `/`, GET `/:id`, POST `/sync-zoho`
+- Bills: POST `/bills/scan` (AI), GET/POST `/bills`, GET `/bills/:id`, PUT `/bills/:id/items`, POST `/bills/:id/verify`, POST `/bills/:id/submit`, POST `/bills/:id/push-zoho`
+- POs: GET/POST `/purchase-orders`, PUT `/purchase-orders/:id`, POST `/purchase-orders/:id/send`, POST `/purchase-orders/:id/push-zoho`
+- Payments: GET/POST `/payments`
+
+**Services:**
+- `services/vendor-bill-ai-service.js` — `scanBillImage()` (OCR via KAI/Clawdbot with base64 image), `matchProductsToZoho()` (fuzzy product matching with vendor history priority), `verifyBillItems()` (staff vs AI comparison)
+
+**Permissions:** `vendors.view`, `vendors.manage`, `vendors.purchase_orders`. Staff gets view only; manager/admin gets all.
+
+**Page:** `public/staff-vendors.html` — 4 tabs (Vendors, Bills, Purchase Orders, Payments)
+
+**AI Bill Flow:** Upload photo → KAI OCR extract → fuzzy match to zoho_items_map (vendor history priority) → staff edits → AI verify (compare entry vs scan) → submit
+
+**Zoho API:** `zoho-api.js` exports `createBill()`, `getBills()`, `createPurchaseOrder()`, `getPurchaseOrders()` for vendor integration
+
+**Config keys:** `vendor_management_enabled`, `vendor_ai_scan_enabled`, `vendor_po_prefix` (in `ai_config`)
+
+**Migration:** `node migrations/migrate-vendors.js`
+
 ### Painter Estimate System
 Painters create estimates for paint purchases; admin reviews, records payment, pushes to Zoho as invoice, and awards points.
 
