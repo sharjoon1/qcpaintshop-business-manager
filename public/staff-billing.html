@@ -215,6 +215,21 @@
 
                 <!-- Customer Section -->
                 <div id="customerSection">
+                    <div class="mb-3">
+                        <label class="qc-label block mb-1">Search Customer *</label>
+                        <div class="relative">
+                            <input type="text" id="custSearch" class="qc-input w-full" placeholder="Type customer name or phone..." oninput="debounceCustomerSearch()">
+                            <div id="customerSuggestions" class="suggestion-list hidden"></div>
+                        </div>
+                        <input type="hidden" id="custId">
+                        <div id="selectedCustomer" class="hidden mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm flex items-center justify-between">
+                            <div>
+                                <span id="selectedCustName" class="font-medium"></span>
+                                <span id="selectedCustPhone" class="text-gray-500 ml-2 text-xs"></span>
+                            </div>
+                            <button type="button" onclick="clearCustomer()" class="text-red-500 hover:text-red-700 text-xs font-medium">Change</button>
+                        </div>
+                    </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="qc-label block mb-1">Name *</label>
@@ -361,6 +376,7 @@ let estimateSearchTimer = null;
 let invoiceSearchTimer = null;
 let productSearchTimer = null;
 let painterSearchTimer = null;
+let customerSearchTimer = null;
 
 // ═══════════════════════════════════════════
 // INIT
@@ -780,6 +796,10 @@ function openCreateModal(mode, editData = null, editItems = null) {
         : (mode === 'estimate' ? 'New Estimate' : 'New Invoice');
 
     // Reset form
+    document.getElementById('custSearch').value = '';
+    document.getElementById('custSearch').classList.remove('hidden');
+    document.getElementById('custId').value = '';
+    document.getElementById('selectedCustomer').classList.add('hidden');
     document.getElementById('custName').value = '';
     document.getElementById('custPhone').value = '';
     document.getElementById('custAddress').value = '';
@@ -804,6 +824,13 @@ function openCreateModal(mode, editData = null, editItems = null) {
             document.getElementById('custName').value = editData.customer_name || '';
             document.getElementById('custPhone').value = editData.customer_phone || '';
             document.getElementById('custAddress').value = editData.customer_address || '';
+            document.getElementById('custId').value = editData.customer_id || '';
+            if (editData.customer_name) {
+                document.getElementById('selectedCustName').textContent = editData.customer_name;
+                document.getElementById('selectedCustPhone').textContent = editData.customer_phone || '';
+                document.getElementById('selectedCustomer').classList.remove('hidden');
+                document.getElementById('custSearch').classList.add('hidden');
+            }
         }
         document.getElementById('formDiscount').value = editData.discount_amount || 0;
         document.getElementById('formNotes').value = editData.notes || '';
@@ -876,9 +903,10 @@ function submitForm(action) {
         customerName = document.getElementById('selectedPainterName').textContent;
     }
 
+    const custIdVal = document.getElementById('custId').value;
     const payload = {
         customer_type: custType,
-        customer_id: null,
+        customer_id: custType === 'customer' && custIdVal ? Number(custIdVal) : null,
         painter_id: custType === 'painter' ? Number(document.getElementById('painterId').value) : null,
         customer_name: customerName,
         customer_phone: custType === 'customer' ? document.getElementById('custPhone').value.trim() : '',
@@ -1054,6 +1082,73 @@ function recalcTotals() {
 }
 
 // ═══════════════════════════════════════════
+// CUSTOMER SEARCH
+// ═══════════════════════════════════════════
+function debounceCustomerSearch() {
+    clearTimeout(customerSearchTimer);
+    customerSearchTimer = setTimeout(searchCustomers, 300);
+}
+
+async function searchCustomers() {
+    const term = document.getElementById('custSearch').value.trim();
+    const el = document.getElementById('customerSuggestions');
+    if (term.length < 2) { el.classList.add('hidden'); return; }
+
+    try {
+        const res = await fetch(`${API}/customers?search=${encodeURIComponent(term)}`, { headers });
+        const data = await res.json();
+        const customers = data.customers || [];
+
+        let html = customers.map(c => `
+            <div class="suggestion-item" onclick="selectCustomer(${c.id}, '${esc(c.zoho_contact_name)}', '${esc(c.zoho_phone || '')}')">
+                <span class="font-medium">${esc(c.zoho_contact_name)}</span>
+                <span class="text-xs text-gray-400 ml-2">${esc(c.zoho_phone || '')}</span>
+            </div>
+        `).join('');
+
+        // Always show "Add new" option at bottom
+        html += `<div class="suggestion-item border-t border-gray-100 text-green-700 font-medium" onclick="useNewCustomer()">+ Add as new customer: "${esc(term)}"</div>`;
+
+        el.innerHTML = html;
+        el.classList.remove('hidden');
+    } catch (e) {
+        el.classList.add('hidden');
+    }
+}
+
+function selectCustomer(id, name, phone) {
+    document.getElementById('custId').value = id;
+    document.getElementById('selectedCustName').textContent = name;
+    document.getElementById('selectedCustPhone').textContent = phone;
+    document.getElementById('selectedCustomer').classList.remove('hidden');
+    document.getElementById('custSearch').classList.add('hidden');
+    document.getElementById('customerSuggestions').classList.add('hidden');
+    document.getElementById('custName').value = name;
+    document.getElementById('custPhone').value = phone;
+}
+
+function clearCustomer() {
+    document.getElementById('custId').value = '';
+    document.getElementById('selectedCustomer').classList.add('hidden');
+    document.getElementById('custSearch').value = '';
+    document.getElementById('custSearch').classList.remove('hidden');
+    document.getElementById('custName').value = '';
+    document.getElementById('custPhone').value = '';
+    document.getElementById('custAddress').value = '';
+}
+
+function useNewCustomer() {
+    const term = document.getElementById('custSearch').value.trim();
+    document.getElementById('custId').value = '';
+    document.getElementById('custName').value = term;
+    document.getElementById('selectedCustName').textContent = term + ' (new)';
+    document.getElementById('selectedCustPhone').textContent = '';
+    document.getElementById('selectedCustomer').classList.remove('hidden');
+    document.getElementById('custSearch').classList.add('hidden');
+    document.getElementById('customerSuggestions').classList.add('hidden');
+}
+
+// ═══════════════════════════════════════════
 // PAINTER SEARCH
 // ═══════════════════════════════════════════
 function debouncePainterSearch() {
@@ -1178,6 +1273,9 @@ document.addEventListener('click', (e) => {
     }
     if (!e.target.closest('#painterSearch') && !e.target.closest('#painterSuggestions')) {
         document.getElementById('painterSuggestions')?.classList.add('hidden');
+    }
+    if (!e.target.closest('#custSearch') && !e.target.closest('#customerSuggestions')) {
+        document.getElementById('customerSuggestions')?.classList.add('hidden');
     }
 });
 </script>

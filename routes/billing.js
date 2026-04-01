@@ -126,6 +126,31 @@ const recordPaymentSchema = z.object({
 // PRODUCT SEARCH
 // ═══════════════════════════════════════════
 
+// Customer search (from zoho_customers_map)
+router.get('/customers',
+    requirePermission('billing', 'estimate'),
+    async (req, res) => {
+        try {
+            const search = req.query.search || '';
+            if (search.length < 2) return res.json({ success: true, customers: [] });
+
+            const [customers] = await pool.query(
+                `SELECT id, zoho_contact_id, zoho_contact_name, zoho_phone, zoho_email
+                 FROM zoho_customers_map
+                 WHERE zoho_contact_name LIKE ? OR zoho_phone LIKE ?
+                 ORDER BY zoho_contact_name
+                 LIMIT 20`,
+                [`%${search}%`, `%${search}%`]
+            );
+
+            res.json({ success: true, customers });
+        } catch (error) {
+            console.error('Customer search error:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
+);
+
 router.get('/products',
     requirePermission('billing', 'estimate'),
     async (req, res) => {
