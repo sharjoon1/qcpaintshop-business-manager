@@ -95,7 +95,7 @@ async function matchProductsToZoho(extractedItems, vendorId) {
 
     // Load all active Zoho items
     const [zohoItems] = await pool.query(
-        `SELECT zoho_item_id, zoho_item_name, sku, brand, rate FROM zoho_items_map WHERE status = 'active'`
+        `SELECT zoho_item_id, zoho_item_name, zoho_sku AS sku, zoho_brand AS brand, zoho_rate AS rate FROM zoho_items_map WHERE zoho_status = 'active'`
     );
 
     // Load vendor history if vendorId provided

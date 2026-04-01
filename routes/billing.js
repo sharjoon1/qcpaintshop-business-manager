@@ -158,22 +158,23 @@ router.get('/products',
             const search = req.query.search || '';
             const brand = req.query.brand || '';
 
-            let where = "WHERE zim.status = 'active'";
+            let where = "WHERE zim.zoho_status = 'active'";
             const params = [];
 
             if (search) {
-                where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_item_id LIKE ?)';
+                where += ' AND (zim.zoho_item_name LIKE ? OR zim.zoho_sku LIKE ?)';
                 const term = `%${search}%`;
                 params.push(term, term);
             }
             if (brand) {
-                where += ' AND zim.brand = ?';
+                where += ' AND zim.zoho_brand = ?';
                 params.push(brand);
             }
 
             const [rows] = await pool.query(
                 `SELECT zim.id, zim.zoho_item_id, zim.zoho_item_name AS item_name,
-                        zim.rate, zim.brand, zim.category, zim.unit, zim.pack_size
+                        zim.zoho_sku AS sku, zim.zoho_rate AS rate, zim.zoho_brand AS brand,
+                        zim.zoho_category_name AS category, zim.zoho_unit AS unit
                  FROM zoho_items_map zim
                  ${where}
                  ORDER BY zim.zoho_item_name
