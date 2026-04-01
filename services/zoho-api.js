@@ -2231,6 +2231,30 @@ async function createTransferOrder(transferData) {
     });
 }
 
+// ========================================
+// VENDOR BILLS & PURCHASE ORDERS
+// ========================================
+
+async function getBills(params = {}) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiGet('/bills', { organization_id: orgId, ...params });
+}
+
+async function createBill(billData) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/bills?organization_id=${orgId}`, billData);
+}
+
+async function getPurchaseOrders(params = {}) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiGet('/purchaseorders', { organization_id: orgId, ...params });
+}
+
+async function createPurchaseOrder(poData) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiPost(`/purchaseorders?organization_id=${orgId}`, poData);
+}
+
 module.exports = {
     setPool,
     // Invoices
@@ -2297,5 +2321,10 @@ module.exports = {
     createInventoryAdjustment,
     getInventoryAdjustments,
     // Transfer Orders (Zoho Inventory API)
-    createTransferOrder
+    createTransferOrder,
+    // Vendor Bills & Purchase Orders
+    getBills,
+    createBill,
+    getPurchaseOrders,
+    createPurchaseOrder
 };
