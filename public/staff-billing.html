@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1B5E3B">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <title>Billing - QC Paint Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
+    <style>
+        /* Tab styles */
+        .tab-active { color: #1B5E3B; border-bottom: 3px solid #1B5E3B; font-weight: 600; }
+        .tab-inactive { color: #6b7280; border-bottom: 3px solid transparent; }
+        .tab-inactive:hover { color: #374151; border-bottom-color: #d1d5db; }
+
+        /* Status pills */
+        .status-pill { padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+        .status-draft { background: #f3f4f6; color: #374151; }
+        .status-sent { background: #dbeafe; color: #1d4ed8; }
+        .status-approved { background: #d1fae5; color: #065f46; }
+        .status-converted { background: #ede9fe; color: #5b21b6; }
+        .status-cancelled { background: #fee2e2; color: #991b1b; }
+        .status-unpaid { background: #fee2e2; color: #991b1b; }
+        .status-partial { background: #fef3c7; color: #92400e; }
+        .status-paid { background: #d1fae5; color: #065f46; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-pushed { background: #d1fae5; color: #065f46; }
+
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 1rem; }
+        .modal-overlay.active { display: flex; align-items: flex-start; justify-content: center; }
+
+        /* Skeleton */
+        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* Toast */
+        .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.5rem; border-radius: 0.5rem; color: #fff; font-weight: 500; z-index: 2000; animation: toastIn 0.3s ease; }
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+        /* Suggestion dropdown */
+        .suggestion-list { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: 0.5rem; max-height: 200px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .suggestion-item { padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.875rem; }
+        .suggestion-item:hover { background: #f0fdf4; }
+
+        /* Brand overrides */
+        .btn-green { background: #1B5E3B; color: #fff; }
+        .btn-green:hover { background: #154D31; }
+        .btn-green-outline { border: 1px solid #1B5E3B; color: #1B5E3B; }
+        .btn-green-outline:hover { background: #f0fdf4; }
+
+        /* Scroll hide */
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen" data-page="billing">
+
+    <div id="mainContent" class="px-4 sm:px-6 lg:px-8 py-4 pb-6 max-w-6xl mx-auto">
+
+        <!-- Page Header -->
+        <div class="flex items-center justify-between mb-5">
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Billing</h1>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+            <div class="bg-white rounded-xl shadow-sm border border-green-100 p-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
+                    </div>
+                    <span class="text-xs text-gray-500">Today Collection</span>
+                </div>
+                <div id="statTodayCollected" class="text-lg font-bold text-green-700">--</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-blue-100 p-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                    <span class="text-xs text-gray-500">Invoices</span>
+                </div>
+                <div id="statInvoiceTotal" class="text-lg font-bold text-blue-700">--</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-red-100 p-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    </div>
+                    <span class="text-xs text-gray-500">Outstanding</span>
+                </div>
+                <div id="statOutstanding" class="text-lg font-bold text-red-700">--</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-purple-100 p-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    </div>
+                    <span class="text-xs text-gray-500">Estimates</span>
+                </div>
+                <div id="statEstimateTotal" class="text-lg font-bold text-purple-700">--</div>
+            </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="flex border-b border-gray-200 mb-4 scroll-hide overflow-x-auto">
+            <button onclick="switchTab('estimates')" id="tabEstimates" class="tab-active px-4 py-3 text-sm whitespace-nowrap transition-all">Estimates</button>
+            <button onclick="switchTab('invoices')" id="tabInvoices" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Invoices</button>
+            <button onclick="switchTab('payments')" id="tabPayments" class="tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all">Payments</button>
+        </div>
+
+        <!-- ==================== ESTIMATES TAB ==================== -->
+        <div id="panelEstimates">
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <div class="flex-1">
+                    <input id="estimateSearch" type="text" placeholder="Search estimates..." class="qc-input w-full" oninput="debounceEstimateSearch()">
+                </div>
+                <button onclick="openCreateModal('estimate')" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    New Estimate
+                </button>
+            </div>
+            <div id="estimateList" class="space-y-3">
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+            </div>
+            <div id="estimatePagination" class="flex justify-center gap-2 mt-4"></div>
+        </div>
+
+        <!-- ==================== INVOICES TAB ==================== -->
+        <div id="panelInvoices" class="hidden">
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <div class="flex-1">
+                    <input id="invoiceSearch" type="text" placeholder="Search invoices..." class="qc-input w-full" oninput="debounceInvoiceSearch()">
+                </div>
+                <select id="invoiceStatusFilter" onchange="loadInvoices(1)" class="qc-input w-auto">
+                    <option value="">All Status</option>
+                    <option value="unpaid">Unpaid</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                </select>
+                <button onclick="openCreateModal('invoice')" class="btn-green px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    New Invoice
+                </button>
+            </div>
+            <div id="invoiceList" class="space-y-3">
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+                <div class="skeleton h-20 w-full"></div>
+            </div>
+            <div id="invoicePagination" class="flex justify-center gap-2 mt-4"></div>
+        </div>
+
+        <!-- ==================== PAYMENTS TAB ==================== -->
+        <div id="panelPayments" class="hidden">
+            <div id="paymentList" class="space-y-3">
+                <div class="skeleton h-16 w-full"></div>
+                <div class="skeleton h-16 w-full"></div>
+                <div class="skeleton h-16 w-full"></div>
+            </div>
+            <div id="paymentPagination" class="flex justify-center gap-2 mt-4"></div>
+        </div>
+    </div>
+
+    <!-- ==================== DETAIL MODAL ==================== -->
+    <div id="detailModal" class="modal-overlay" onclick="if(event.target===this)closeDetailModal()">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b">
+                <h3 id="detailTitle" class="text-lg font-bold text-gray-800">Details</h3>
+                <button onclick="closeDetailModal()" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="detailBody" class="p-5 max-h-[70vh] overflow-y-auto"></div>
+            <div id="detailActions" class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2"></div>
+        </div>
+    </div>
+
+    <!-- ==================== CREATE/EDIT MODAL ==================== -->
+    <div id="createModal" class="modal-overlay" onclick="if(event.target===this)closeCreateModal()">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mt-8 mb-8 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b">
+                <h3 id="createTitle" class="text-lg font-bold text-gray-800">New Estimate</h3>
+                <button onclick="closeCreateModal()" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form id="createForm" onsubmit="handleFormSubmit(event)" class="p-5 max-h-[70vh] overflow-y-auto space-y-4" style="min-height:0;">
+
+                <!-- Customer Type -->
+                <div>
+                    <label class="qc-label block mb-1">Customer Type</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="customer_type" value="customer" checked onchange="toggleCustomerType()">
+                            <span class="text-sm">Customer</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="customer_type" value="painter" onchange="toggleCustomerType()">
+                            <span class="text-sm">Painter</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Customer Section -->
+                <div id="customerSection">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="qc-label block mb-1">Name *</label>
+                            <input type="text" id="custName" class="qc-input w-full" required>
+                        </div>
+                        <div>
+                            <label class="qc-label block mb-1">Phone</label>
+                            <input type="text" id="custPhone" class="qc-input w-full">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="qc-label block mb-1">Address</label>
+                        <input type="text" id="custAddress" class="qc-input w-full">
+                    </div>
+                </div>
+
+                <!-- Painter Section -->
+                <div id="painterSection" class="hidden">
+                    <label class="qc-label block mb-1">Search Painter</label>
+                    <div class="relative">
+                        <input type="text" id="painterSearch" class="qc-input w-full" placeholder="Type painter name..." oninput="debouncePainterSearch()">
+                        <div id="painterSuggestions" class="suggestion-list hidden"></div>
+                    </div>
+                    <input type="hidden" id="painterId">
+                    <div id="selectedPainter" class="hidden mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm flex items-center justify-between">
+                        <span id="selectedPainterName"></span>
+                        <button type="button" onclick="clearPainter()" class="text-red-500 hover:text-red-700 text-xs font-medium">Remove</button>
+                    </div>
+                </div>
+
+                <!-- Product Search -->
+                <div>
+                    <label class="qc-label block mb-1">Add Products</label>
+                    <div class="relative">
+                        <input type="text" id="productSearch" class="qc-input w-full" placeholder="Search products..." oninput="debounceProductSearch()">
+                        <div id="productSuggestions" class="suggestion-list hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Items Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-left">
+                                <th class="px-2 py-2 font-medium text-gray-600">Product</th>
+                                <th class="px-2 py-2 font-medium text-gray-600 w-20">Qty</th>
+                                <th class="px-2 py-2 font-medium text-gray-600 w-24">Rate</th>
+                                <th class="px-2 py-2 font-medium text-gray-600 w-24 text-right">Total</th>
+                                <th class="px-2 py-2 w-10"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsTableBody">
+                            <tr id="noItemsRow"><td colspan="5" class="text-center py-6 text-gray-400 text-sm">No items added</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Totals -->
+                <div class="border-t pt-3 space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Subtotal</span>
+                        <span id="formSubtotal" class="font-medium">0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <label class="text-gray-500">Discount</label>
+                        <input type="number" id="formDiscount" class="qc-input w-24 text-right" value="0" min="0" step="0.01" oninput="recalcTotals()">
+                    </div>
+                    <div class="flex justify-between text-base font-bold border-t pt-2">
+                        <span>Grand Total</span>
+                        <span id="formGrandTotal">0.00</span>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="qc-label block mb-1">Notes</label>
+                    <textarea id="formNotes" class="qc-input w-full" rows="2" placeholder="Optional notes..."></textarea>
+                </div>
+            </form>
+            <div id="createActions" class="px-5 py-3 border-t bg-gray-50 flex flex-wrap gap-2 justify-end"></div>
+        </div>
+    </div>
+
+    <!-- ==================== PAYMENT MODAL ==================== -->
+    <div id="paymentModal" class="modal-overlay" onclick="if(event.target===this)closePaymentModal()">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mt-16 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b">
+                <h3 class="text-lg font-bold text-gray-800">Record Payment</h3>
+                <button onclick="closePaymentModal()" class="p-1 hover:bg-gray-100 rounded-full">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form id="paymentForm" onsubmit="handlePaymentSubmit(event)" class="p-5 space-y-4">
+                <input type="hidden" id="payInvoiceId">
+                <div class="flex justify-between text-sm bg-gray-50 rounded-lg p-3">
+                    <span class="text-gray-500">Invoice</span>
+                    <span id="payInvoiceNum" class="font-medium"></span>
+                </div>
+                <div class="flex justify-between text-sm bg-red-50 rounded-lg p-3">
+                    <span class="text-red-600">Balance Due</span>
+                    <span id="payBalanceDue" class="font-bold text-red-700"></span>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Amount *</label>
+                    <input type="number" id="payAmount" class="qc-input w-full" step="0.01" min="0.01" required>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Payment Method *</label>
+                    <select id="payMethod" class="qc-input w-full" required>
+                        <option value="cash">Cash</option>
+                        <option value="upi">UPI</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="cheque">Cheque</option>
+                        <option value="credit">Credit</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="qc-label block mb-1">Reference</label>
+                    <input type="text" id="payReference" class="qc-input w-full" placeholder="Transaction ID, cheque number, etc.">
+                </div>
+                <button type="submit" class="btn-green w-full py-2.5 rounded-lg text-sm font-medium">Record Payment</button>
+            </form>
+        </div>
+    </div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+const API = '/api/billing';
+const token = localStorage.getItem('auth_token');
+const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+let currentTab = 'estimates';
+let currentItems = [];
+let createMode = 'estimate'; // 'estimate' or 'invoice'
+let editingId = null;
+
+let estimatePage = 1;
+let invoicePage = 1;
+let paymentPage = 1;
+
+let estimateSearchTimer = null;
+let invoiceSearchTimer = null;
+let productSearchTimer = null;
+let painterSearchTimer = null;
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    loadStats();
+    loadEstimates(1);
+});
+
+// ═══════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════
+function switchTab(tab) {
+    currentTab = tab;
+    ['estimates', 'invoices', 'payments'].forEach(t => {
+        document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className =
+            t === tab ? 'tab-active px-4 py-3 text-sm whitespace-nowrap transition-all' : 'tab-inactive px-4 py-3 text-sm whitespace-nowrap transition-all';
+        document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
+    });
+
+    if (tab === 'estimates') loadEstimates(estimatePage);
+    else if (tab === 'invoices') loadInvoices(invoicePage);
+    else if (tab === 'payments') loadPayments(paymentPage);
+}
+
+// ═══════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════
+async function loadStats() {
+    try {
+        const res = await fetch(`${API}/stats`, { headers });
+        const data = await res.json();
+        if (!data.success) return;
+
+        document.getElementById('statTodayCollected').textContent = formatCurrency(data.today_collected);
+
+        const invTotal = data.invoices?.total_invoices || 0;
+        document.getElementById('statInvoiceTotal').textContent = invTotal;
+
+        const outstanding = data.invoices?.total_outstanding || 0;
+        document.getElementById('statOutstanding').textContent = formatCurrency(outstanding);
+
+        // Sum all estimate statuses
+        const estTotal = Object.values(data.estimates || {}).reduce((a, b) => a + b, 0);
+        document.getElementById('statEstimateTotal').textContent = estTotal;
+    } catch (e) {
+        console.error('Stats error:', e);
+    }
+}
+
+// ═══════════════════════════════════════════
+// ESTIMATES
+// ═══════════════════════════════════════════
+async function loadEstimates(page = 1) {
+    estimatePage = page;
+    const search = document.getElementById('estimateSearch')?.value || '';
+    const container = document.getElementById('estimateList');
+    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+
+    try {
+        const params = new URLSearchParams({ page, limit: 20 });
+        if (search) params.set('search', search);
+        const res = await fetch(`${API}/estimates?${params}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        if (!data.estimates.length) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No estimates found</div>';
+            document.getElementById('estimatePagination').innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = data.estimates.map(est => `
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="viewEstimate(${est.id})">
+                <div class="flex items-start justify-between mb-2">
+                    <div>
+                        <span class="font-semibold text-gray-800 text-sm">${esc(est.estimate_number)}</span>
+                        <span class="status-pill status-${est.status} ml-2">${est.status}</span>
+                    </div>
+                    <span class="text-sm font-bold text-gray-800">${formatCurrency(est.grand_total)}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <div>
+                        <span class="font-medium text-gray-700">${esc(est.customer_name)}</span>
+                        ${est.created_by_name ? ` &middot; ${esc(est.created_by_name)}` : ''}
+                    </div>
+                    <span>${formatDate(est.created_at)}</span>
+                </div>
+                ${['draft', 'sent'].includes(est.status) ? `
+                <div class="mt-2 pt-2 border-t border-gray-50">
+                    <button onclick="event.stopPropagation(); convertEstimate(${est.id})" class="text-xs font-medium text-green-700 hover:text-green-900">Convert to Invoice &rarr;</button>
+                </div>` : ''}
+            </div>
+        `).join('');
+
+        renderPagination('estimatePagination', data.pagination, loadEstimates);
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+async function viewEstimate(id) {
+    try {
+        const res = await fetch(`${API}/estimates/${id}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        const est = data.estimate;
+        const items = data.items;
+
+        document.getElementById('detailTitle').textContent = `Estimate ${est.estimate_number}`;
+        document.getElementById('detailBody').innerHTML = `
+            <div class="flex items-center gap-2 mb-4">
+                <span class="status-pill status-${est.status}">${est.status}</span>
+                <span class="text-sm text-gray-500">${formatDate(est.created_at)}</span>
+                ${est.created_by_name ? `<span class="text-sm text-gray-400">&middot; ${esc(est.created_by_name)}</span>` : ''}
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
+                <div><span class="text-gray-500">Customer:</span> <span class="font-medium">${esc(est.customer_name)}</span></div>
+                ${est.customer_phone ? `<div><span class="text-gray-500">Phone:</span> ${esc(est.customer_phone)}</div>` : ''}
+                ${est.customer_address ? `<div><span class="text-gray-500">Address:</span> ${esc(est.customer_address)}</div>` : ''}
+                <div><span class="text-gray-500">Type:</span> ${est.customer_type}</div>
+            </div>
+            <table class="w-full text-sm mb-4">
+                <thead><tr class="border-b text-left text-gray-500">
+                    <th class="py-2 font-medium">Product</th>
+                    <th class="py-2 font-medium w-16 text-right">Qty</th>
+                    <th class="py-2 font-medium w-20 text-right">Rate</th>
+                    <th class="py-2 font-medium w-24 text-right">Total</th>
+                </tr></thead>
+                <tbody>
+                    ${items.map(i => `<tr class="border-b border-gray-50">
+                        <td class="py-2">${esc(i.item_name)}${i.pack_size ? ` <span class="text-gray-400 text-xs">(${esc(i.pack_size)})</span>` : ''}</td>
+                        <td class="py-2 text-right">${i.quantity}</td>
+                        <td class="py-2 text-right">${formatCurrency(i.unit_price)}</td>
+                        <td class="py-2 text-right font-medium">${formatCurrency(i.line_total)}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+            <div class="space-y-1 text-sm">
+                <div class="flex justify-between"><span class="text-gray-500">Subtotal</span><span>${formatCurrency(est.subtotal)}</span></div>
+                ${est.discount_amount > 0 ? `<div class="flex justify-between"><span class="text-gray-500">Discount</span><span class="text-red-600">-${formatCurrency(est.discount_amount)}</span></div>` : ''}
+                <div class="flex justify-between font-bold border-t pt-1"><span>Grand Total</span><span>${formatCurrency(est.grand_total)}</span></div>
+            </div>
+            ${est.notes ? `<div class="mt-3 p-2 bg-yellow-50 rounded text-xs text-gray-600">${esc(est.notes)}</div>` : ''}
+        `;
+
+        // Actions
+        const actions = document.getElementById('detailActions');
+        actions.innerHTML = '';
+
+        if (['draft', 'sent'].includes(est.status)) {
+            actions.innerHTML += `<button onclick="closeDetailModal(); editEstimate(${est.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
+            actions.innerHTML += `<button onclick="closeDetailModal(); convertEstimate(${est.id})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Convert to Invoice</button>`;
+        }
+        if (est.status !== 'cancelled' && !est.converted_to_invoice_id) {
+            actions.innerHTML += `<button onclick="closeDetailModal(); cancelEstimate(${est.id})" class="px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 border border-red-200">Cancel</button>`;
+        }
+
+        document.getElementById('detailModal').classList.add('active');
+    } catch (e) {
+        showToast(e.message || 'Failed to load estimate', 'error');
+    }
+}
+
+async function convertEstimate(id) {
+    if (!confirm('Convert this estimate to an invoice?')) return;
+    try {
+        const res = await fetch(`${API}/estimates/${id}/convert`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast(`Invoice ${data.invoice_number} created`, 'success');
+        loadStats();
+        loadEstimates(estimatePage);
+    } catch (e) {
+        showToast(e.message || 'Conversion failed', 'error');
+    }
+}
+
+async function cancelEstimate(id) {
+    if (!confirm('Cancel this estimate? This cannot be undone.')) return;
+    try {
+        const res = await fetch(`${API}/estimates/${id}`, { method: 'DELETE', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast('Estimate cancelled', 'success');
+        loadStats();
+        loadEstimates(estimatePage);
+    } catch (e) {
+        showToast(e.message || 'Cancel failed', 'error');
+    }
+}
+
+async function editEstimate(id) {
+    try {
+        const res = await fetch(`${API}/estimates/${id}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        openCreateModal('estimate', data.estimate, data.items);
+    } catch (e) {
+        showToast(e.message || 'Failed to load estimate', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════
+// INVOICES
+// ═══════════════════════════════════════════
+async function loadInvoices(page = 1) {
+    invoicePage = page;
+    const search = document.getElementById('invoiceSearch')?.value || '';
+    const paymentStatus = document.getElementById('invoiceStatusFilter')?.value || '';
+    const container = document.getElementById('invoiceList');
+    container.innerHTML = '<div class="skeleton h-20 w-full"></div>'.repeat(3);
+
+    try {
+        const params = new URLSearchParams({ page, limit: 20 });
+        if (search) params.set('search', search);
+        if (paymentStatus) params.set('payment_status', paymentStatus);
+        const res = await fetch(`${API}/invoices?${params}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        if (!data.invoices.length) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No invoices found</div>';
+            document.getElementById('invoicePagination').innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = data.invoices.map(inv => `
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="viewInvoice(${inv.id})">
+                <div class="flex items-start justify-between mb-2">
+                    <div>
+                        <span class="font-semibold text-gray-800 text-sm">${esc(inv.invoice_number)}</span>
+                        <span class="status-pill status-${inv.payment_status} ml-2">${inv.payment_status}</span>
+                        ${inv.zoho_status ? `<span class="status-pill status-${inv.zoho_status === 'pushed' ? 'pushed' : 'pending'} ml-1">${inv.zoho_status}</span>` : ''}
+                    </div>
+                    <span class="text-sm font-bold text-gray-800">${formatCurrency(inv.grand_total)}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span class="font-medium text-gray-700">${esc(inv.customer_name)}</span>
+                    <div class="flex items-center gap-2">
+                        ${inv.balance_due > 0 ? `<span class="text-red-600 font-semibold">Due: ${formatCurrency(inv.balance_due)}</span>` : ''}
+                        <span>${formatDate(inv.created_at)}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        renderPagination('invoicePagination', data.pagination, loadInvoices);
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+async function viewInvoice(id) {
+    try {
+        const res = await fetch(`${API}/invoices/${id}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        const inv = data.invoice;
+        const items = data.items;
+        const payments = data.payments || [];
+
+        document.getElementById('detailTitle').textContent = `Invoice ${inv.invoice_number}`;
+        document.getElementById('detailBody').innerHTML = `
+            <div class="flex items-center gap-2 mb-4">
+                <span class="status-pill status-${inv.payment_status}">${inv.payment_status}</span>
+                ${inv.zoho_status ? `<span class="status-pill status-${inv.zoho_status === 'pushed' ? 'pushed' : 'pending'}">${inv.zoho_status}</span>` : ''}
+                <span class="text-sm text-gray-500">${formatDate(inv.created_at)}</span>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
+                <div><span class="text-gray-500">Customer:</span> <span class="font-medium">${esc(inv.customer_name)}</span></div>
+                ${inv.customer_phone ? `<div><span class="text-gray-500">Phone:</span> ${esc(inv.customer_phone)}</div>` : ''}
+                ${inv.customer_address ? `<div><span class="text-gray-500">Address:</span> ${esc(inv.customer_address)}</div>` : ''}
+                <div><span class="text-gray-500">Type:</span> ${inv.customer_type}</div>
+            </div>
+            <table class="w-full text-sm mb-4">
+                <thead><tr class="border-b text-left text-gray-500">
+                    <th class="py-2 font-medium">Product</th>
+                    <th class="py-2 font-medium w-16 text-right">Qty</th>
+                    <th class="py-2 font-medium w-20 text-right">Rate</th>
+                    <th class="py-2 font-medium w-24 text-right">Total</th>
+                </tr></thead>
+                <tbody>
+                    ${items.map(i => `<tr class="border-b border-gray-50">
+                        <td class="py-2">${esc(i.item_name)}${i.pack_size ? ` <span class="text-gray-400 text-xs">(${esc(i.pack_size)})</span>` : ''}</td>
+                        <td class="py-2 text-right">${i.quantity}</td>
+                        <td class="py-2 text-right">${formatCurrency(i.unit_price)}</td>
+                        <td class="py-2 text-right font-medium">${formatCurrency(i.line_total)}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+            <div class="space-y-1 text-sm mb-4">
+                <div class="flex justify-between"><span class="text-gray-500">Subtotal</span><span>${formatCurrency(inv.subtotal)}</span></div>
+                ${inv.discount_amount > 0 ? `<div class="flex justify-between"><span class="text-gray-500">Discount</span><span class="text-red-600">-${formatCurrency(inv.discount_amount)}</span></div>` : ''}
+                <div class="flex justify-between font-bold border-t pt-1"><span>Grand Total</span><span>${formatCurrency(inv.grand_total)}</span></div>
+                <div class="flex justify-between text-green-700"><span>Paid</span><span>${formatCurrency(inv.amount_paid)}</span></div>
+                ${inv.balance_due > 0 ? `<div class="flex justify-between text-red-700 font-bold"><span>Balance Due</span><span>${formatCurrency(inv.balance_due)}</span></div>` : ''}
+            </div>
+            ${payments.length ? `
+            <div class="mb-3">
+                <h4 class="text-sm font-semibold text-gray-700 mb-2">Payment History</h4>
+                <div class="space-y-2">
+                    ${payments.map(p => `
+                    <div class="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2 text-sm">
+                        <div>
+                            <span class="font-medium text-green-800">${formatCurrency(p.amount)}</span>
+                            <span class="text-gray-500 ml-2">${p.payment_method}</span>
+                            ${p.payment_reference ? `<span class="text-gray-400 ml-1">#${esc(p.payment_reference)}</span>` : ''}
+                        </div>
+                        <span class="text-gray-400 text-xs">${formatDate(p.created_at)}</span>
+                    </div>`).join('')}
+                </div>
+            </div>` : ''}
+            ${inv.notes ? `<div class="p-2 bg-yellow-50 rounded text-xs text-gray-600">${esc(inv.notes)}</div>` : ''}
+        `;
+
+        const actions = document.getElementById('detailActions');
+        actions.innerHTML = '';
+
+        if (inv.balance_due > 0) {
+            actions.innerHTML += `<button onclick="closeDetailModal(); openPaymentModal(${inv.id}, '${esc(inv.invoice_number)}', ${inv.balance_due})" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Record Payment</button>`;
+        }
+        if (inv.payment_status !== 'paid' && inv.zoho_status !== 'pushed') {
+            actions.innerHTML += `<button onclick="closeDetailModal(); editInvoice(${inv.id})" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Edit</button>`;
+        }
+        if (inv.payment_status === 'paid' && inv.zoho_status !== 'pushed') {
+            actions.innerHTML += `<button onclick="closeDetailModal(); pushToZoho(${inv.id})" class="px-4 py-2 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-50 border border-blue-200">Push to Zoho</button>`;
+        }
+
+        document.getElementById('detailModal').classList.add('active');
+    } catch (e) {
+        showToast(e.message || 'Failed to load invoice', 'error');
+    }
+}
+
+async function editInvoice(id) {
+    try {
+        const res = await fetch(`${API}/invoices/${id}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        openCreateModal('invoice', data.invoice, data.items);
+    } catch (e) {
+        showToast(e.message || 'Failed to load invoice', 'error');
+    }
+}
+
+async function pushToZoho(invoiceId) {
+    if (!confirm('Push this invoice to Zoho? This will create a Zoho invoice.')) return;
+    try {
+        const res = await fetch(`${API}/invoices/${invoiceId}/push-zoho`, { method: 'POST', headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast('Invoice pushed to Zoho', 'success');
+        loadInvoices(invoicePage);
+    } catch (e) {
+        showToast(e.message || 'Push to Zoho failed', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════
+// PAYMENTS
+// ═══════════════════════════════════════════
+async function loadPayments(page = 1) {
+    paymentPage = page;
+    const container = document.getElementById('paymentList');
+    container.innerHTML = '<div class="skeleton h-16 w-full"></div>'.repeat(3);
+
+    try {
+        const params = new URLSearchParams({ page, limit: 20 });
+        const res = await fetch(`${API}/payments?${params}`, { headers });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        if (!data.payments.length) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No payments recorded yet</div>';
+            document.getElementById('paymentPagination').innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = data.payments.map(p => `
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <span class="text-lg font-bold text-green-700">${formatCurrency(p.amount)}</span>
+                        <span class="text-xs text-gray-400 ml-2 px-2 py-0.5 bg-gray-100 rounded-full">${p.payment_method}</span>
+                    </div>
+                    <span class="text-xs text-gray-400">${formatDate(p.created_at)}</span>
+                </div>
+                <div class="mt-1 text-xs text-gray-500">
+                    <span class="font-medium text-gray-700">${esc(p.invoice_number || '')}</span>
+                    <span class="mx-1">&middot;</span>
+                    <span>${esc(p.customer_name || '')}</span>
+                    ${p.received_by_name ? `<span class="mx-1">&middot;</span><span>${esc(p.received_by_name)}</span>` : ''}
+                    ${p.payment_reference ? `<span class="mx-1">&middot;</span><span class="text-gray-400">#${esc(p.payment_reference)}</span>` : ''}
+                </div>
+            </div>
+        `).join('');
+
+        renderPagination('paymentPagination', data.pagination, loadPayments);
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-8 text-red-500">${esc(e.message)}</div>`;
+    }
+}
+
+// ═══════════════════════════════════════════
+// CREATE / EDIT MODAL
+// ═══════════════════════════════════════════
+function openCreateModal(mode, editData = null, editItems = null) {
+    createMode = mode;
+    editingId = editData?.id || null;
+    currentItems = [];
+
+    document.getElementById('createTitle').textContent = editingId
+        ? (mode === 'estimate' ? 'Edit Estimate' : 'Edit Invoice')
+        : (mode === 'estimate' ? 'New Estimate' : 'New Invoice');
+
+    // Reset form
+    document.getElementById('custName').value = '';
+    document.getElementById('custPhone').value = '';
+    document.getElementById('custAddress').value = '';
+    document.getElementById('painterId').value = '';
+    document.getElementById('painterSearch').value = '';
+    document.getElementById('selectedPainter').classList.add('hidden');
+    document.getElementById('productSearch').value = '';
+    document.getElementById('formDiscount').value = '0';
+    document.getElementById('formNotes').value = '';
+    document.querySelector('input[name="customer_type"][value="customer"]').checked = true;
+    toggleCustomerType();
+
+    // Pre-fill if editing
+    if (editData) {
+        if (editData.customer_type === 'painter') {
+            document.querySelector('input[name="customer_type"][value="painter"]').checked = true;
+            toggleCustomerType();
+            document.getElementById('painterId').value = editData.painter_id || '';
+            document.getElementById('selectedPainterName').textContent = editData.customer_name;
+            document.getElementById('selectedPainter').classList.remove('hidden');
+        } else {
+            document.getElementById('custName').value = editData.customer_name || '';
+            document.getElementById('custPhone').value = editData.customer_phone || '';
+            document.getElementById('custAddress').value = editData.customer_address || '';
+        }
+        document.getElementById('formDiscount').value = editData.discount_amount || 0;
+        document.getElementById('formNotes').value = editData.notes || '';
+    }
+
+    // Pre-fill items
+    if (editItems && editItems.length) {
+        currentItems = editItems.map(i => ({
+            zoho_item_id: i.zoho_item_id,
+            item_name: i.item_name,
+            pack_size: i.pack_size || '',
+            quantity: i.quantity,
+            unit_price: i.unit_price
+        }));
+    }
+
+    renderItems();
+    recalcTotals();
+
+    // Action buttons
+    const actionsEl = document.getElementById('createActions');
+    actionsEl.innerHTML = '';
+
+    if (mode === 'estimate') {
+        actionsEl.innerHTML = `
+            <button type="button" onclick="closeCreateModal()" class="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+            <button type="button" onclick="submitForm('draft')" class="btn-green-outline px-4 py-2 rounded-lg text-sm font-medium">Save Draft</button>
+            <button type="button" onclick="submitForm('sent')" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Send Estimate</button>
+        `;
+    } else {
+        actionsEl.innerHTML = `
+            <button type="button" onclick="closeCreateModal()" class="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+            <button type="button" onclick="submitForm('invoice')" class="btn-green px-4 py-2 rounded-lg text-sm font-medium">Create Invoice</button>
+        `;
+    }
+
+    document.getElementById('createModal').classList.add('active');
+}
+
+function closeCreateModal() { document.getElementById('createModal').classList.remove('active'); }
+function closeDetailModal() { document.getElementById('detailModal').classList.remove('active'); }
+function closePaymentModal() { document.getElementById('paymentModal').classList.remove('active'); }
+
+function toggleCustomerType() {
+    const type = document.querySelector('input[name="customer_type"]:checked').value;
+    document.getElementById('customerSection').classList.toggle('hidden', type === 'painter');
+    document.getElementById('painterSection').classList.toggle('hidden', type === 'customer');
+    // Toggle required
+    document.getElementById('custName').required = (type === 'customer');
+}
+
+// ═══════════════════════════════════════════
+// FORM SUBMIT
+// ═══════════════════════════════════════════
+function submitForm(action) {
+    if (currentItems.length === 0) {
+        showToast('Add at least one product', 'error');
+        return;
+    }
+
+    const custType = document.querySelector('input[name="customer_type"]:checked').value;
+    let customerName = '';
+
+    if (custType === 'customer') {
+        customerName = document.getElementById('custName').value.trim();
+        if (!customerName) { showToast('Customer name is required', 'error'); return; }
+    } else {
+        const pid = document.getElementById('painterId').value;
+        if (!pid) { showToast('Select a painter', 'error'); return; }
+        customerName = document.getElementById('selectedPainterName').textContent;
+    }
+
+    const payload = {
+        customer_type: custType,
+        customer_id: null,
+        painter_id: custType === 'painter' ? Number(document.getElementById('painterId').value) : null,
+        customer_name: customerName,
+        customer_phone: custType === 'customer' ? document.getElementById('custPhone').value.trim() : '',
+        customer_address: custType === 'customer' ? document.getElementById('custAddress').value.trim() : '',
+        items: currentItems.map(i => ({
+            zoho_item_id: i.zoho_item_id,
+            item_name: i.item_name,
+            pack_size: i.pack_size || '',
+            quantity: Number(i.quantity),
+            unit_price: Number(i.unit_price)
+        })),
+        discount_amount: Number(document.getElementById('formDiscount').value) || 0,
+        notes: document.getElementById('formNotes').value.trim()
+    };
+
+    if (createMode === 'estimate') {
+        payload.status = (action === 'draft') ? 'draft' : 'sent';
+        if (editingId) {
+            submitAPI(`${API}/estimates/${editingId}`, 'PUT', payload);
+        } else {
+            submitAPI(`${API}/estimates`, 'POST', payload);
+        }
+    } else {
+        if (editingId) {
+            submitAPI(`${API}/invoices/${editingId}`, 'PUT', payload);
+        } else {
+            submitAPI(`${API}/invoices`, 'POST', payload);
+        }
+    }
+}
+
+async function submitAPI(url, method, payload) {
+    try {
+        const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast(data.message || 'Saved successfully', 'success');
+        closeCreateModal();
+        loadStats();
+        if (createMode === 'estimate') loadEstimates(estimatePage);
+        else loadInvoices(invoicePage);
+    } catch (e) {
+        showToast(e.message || 'Save failed', 'error');
+    }
+}
+
+function handleFormSubmit(e) { e.preventDefault(); }
+
+// ═══════════════════════════════════════════
+// PAYMENT MODAL
+// ═══════════════════════════════════════════
+function openPaymentModal(invoiceId, invoiceNum, balanceDue) {
+    document.getElementById('payInvoiceId').value = invoiceId;
+    document.getElementById('payInvoiceNum').textContent = invoiceNum;
+    document.getElementById('payBalanceDue').textContent = formatCurrency(balanceDue);
+    document.getElementById('payAmount').value = balanceDue;
+    document.getElementById('payAmount').max = balanceDue;
+    document.getElementById('payMethod').value = 'cash';
+    document.getElementById('payReference').value = '';
+    document.getElementById('paymentModal').classList.add('active');
+}
+
+async function handlePaymentSubmit(e) {
+    e.preventDefault();
+    const invoiceId = document.getElementById('payInvoiceId').value;
+    const payload = {
+        amount: Number(document.getElementById('payAmount').value),
+        payment_method: document.getElementById('payMethod').value,
+        payment_reference: document.getElementById('payReference').value.trim(),
+        notes: ''
+    };
+    try {
+        const res = await fetch(`${API}/invoices/${invoiceId}/payment`, { method: 'POST', headers, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        showToast('Payment recorded', 'success');
+        closePaymentModal();
+        loadStats();
+        loadInvoices(invoicePage);
+    } catch (e) {
+        showToast(e.message || 'Payment failed', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════
+// PRODUCT SEARCH
+// ═══════════════════════════════════════════
+function debounceProductSearch() {
+    clearTimeout(productSearchTimer);
+    productSearchTimer = setTimeout(searchProducts, 300);
+}
+
+async function searchProducts() {
+    const term = document.getElementById('productSearch').value.trim();
+    const el = document.getElementById('productSuggestions');
+    if (term.length < 2) { el.classList.add('hidden'); return; }
+
+    try {
+        const res = await fetch(`${API}/products?search=${encodeURIComponent(term)}`, { headers });
+        const data = await res.json();
+        if (!data.success || !data.products.length) { el.classList.add('hidden'); return; }
+
+        el.innerHTML = data.products.map(p => `
+            <div class="suggestion-item" onclick="addProduct(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                <div class="font-medium text-gray-800">${esc(p.item_name)}</div>
+                <div class="text-xs text-gray-400">${esc(p.sku || '')} ${p.pack_size ? '&middot; ' + esc(p.pack_size) : ''} &middot; ${formatCurrency(p.rate)}</div>
+            </div>
+        `).join('');
+        el.classList.remove('hidden');
+    } catch (e) {
+        el.classList.add('hidden');
+    }
+}
+
+function addProduct(product) {
+    currentItems.push({
+        zoho_item_id: product.zoho_item_id,
+        item_name: product.item_name,
+        pack_size: product.pack_size || '',
+        quantity: 1,
+        unit_price: product.rate || 0
+    });
+    renderItems();
+    recalcTotals();
+    document.getElementById('productSearch').value = '';
+    document.getElementById('productSuggestions').classList.add('hidden');
+}
+
+function removeItem(idx) {
+    currentItems.splice(idx, 1);
+    renderItems();
+    recalcTotals();
+}
+
+function updateItemField(idx, field, value) {
+    currentItems[idx][field] = Number(value) || 0;
+    recalcTotals();
+    // Update line total display
+    const row = document.querySelector(`#itemRow${idx} .line-total`);
+    if (row) row.textContent = formatCurrency(currentItems[idx].quantity * currentItems[idx].unit_price);
+}
+
+function renderItems() {
+    const tbody = document.getElementById('itemsTableBody');
+    if (!currentItems.length) {
+        tbody.innerHTML = '<tr id="noItemsRow"><td colspan="5" class="text-center py-6 text-gray-400 text-sm">No items added</td></tr>';
+        return;
+    }
+    tbody.innerHTML = currentItems.map((item, idx) => `
+        <tr id="itemRow${idx}" class="border-b border-gray-50">
+            <td class="px-2 py-2">
+                <div class="text-sm font-medium text-gray-800">${esc(item.item_name)}</div>
+                ${item.pack_size ? `<div class="text-xs text-gray-400">${esc(item.pack_size)}</div>` : ''}
+            </td>
+            <td class="px-2 py-2"><input type="number" value="${item.quantity}" min="1" step="1" class="qc-input w-full text-center text-sm" onchange="updateItemField(${idx},'quantity',this.value)"></td>
+            <td class="px-2 py-2"><input type="number" value="${item.unit_price}" min="0" step="0.01" class="qc-input w-full text-right text-sm" onchange="updateItemField(${idx},'unit_price',this.value)"></td>
+            <td class="px-2 py-2 text-right text-sm font-medium line-total">${formatCurrency(item.quantity * item.unit_price)}</td>
+            <td class="px-2 py-2 text-center">
+                <button type="button" onclick="removeItem(${idx})" class="text-red-400 hover:text-red-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function recalcTotals() {
+    const subtotal = currentItems.reduce((s, i) => s + (i.quantity * i.unit_price), 0);
+    const discount = Number(document.getElementById('formDiscount').value) || 0;
+    const grand = Math.max(0, subtotal - discount);
+    document.getElementById('formSubtotal').textContent = formatCurrency(subtotal);
+    document.getElementById('formGrandTotal').textContent = formatCurrency(grand);
+}
+
+// ═══════════════════════════════════════════
+// PAINTER SEARCH
+// ═══════════════════════════════════════════
+function debouncePainterSearch() {
+    clearTimeout(painterSearchTimer);
+    painterSearchTimer = setTimeout(searchPainters, 300);
+}
+
+async function searchPainters() {
+    const term = document.getElementById('painterSearch').value.trim();
+    const el = document.getElementById('painterSuggestions');
+    if (term.length < 2) { el.classList.add('hidden'); return; }
+
+    try {
+        const res = await fetch(`/api/painters?search=${encodeURIComponent(term)}&status=approved&limit=20`, { headers });
+        const data = await res.json();
+        const painters = data.painters || data.data || [];
+        if (!painters.length) { el.classList.add('hidden'); return; }
+
+        el.innerHTML = painters.map(p => `
+            <div class="suggestion-item" onclick="selectPainter(${p.id}, '${esc(p.full_name || p.name)}')">
+                <span class="font-medium">${esc(p.full_name || p.name)}</span>
+                <span class="text-xs text-gray-400 ml-2">${esc(p.phone || '')}</span>
+            </div>
+        `).join('');
+        el.classList.remove('hidden');
+    } catch (e) {
+        el.classList.add('hidden');
+    }
+}
+
+function selectPainter(id, name) {
+    document.getElementById('painterId').value = id;
+    document.getElementById('selectedPainterName').textContent = name;
+    document.getElementById('selectedPainter').classList.remove('hidden');
+    document.getElementById('painterSearch').value = '';
+    document.getElementById('painterSuggestions').classList.add('hidden');
+}
+
+function clearPainter() {
+    document.getElementById('painterId').value = '';
+    document.getElementById('selectedPainter').classList.add('hidden');
+    document.getElementById('painterSearch').value = '';
+}
+
+// ═══════════════════════════════════════════
+// DEBOUNCE SEARCH
+// ═══════════════════════════════════════════
+function debounceEstimateSearch() {
+    clearTimeout(estimateSearchTimer);
+    estimateSearchTimer = setTimeout(() => loadEstimates(1), 300);
+}
+
+function debounceInvoiceSearch() {
+    clearTimeout(invoiceSearchTimer);
+    invoiceSearchTimer = setTimeout(() => loadInvoices(1), 300);
+}
+
+// ═══════════════════════════════════════════
+// PAGINATION
+// ═══════════════════════════════════════════
+function renderPagination(containerId, pagination, onClick) {
+    const el = document.getElementById(containerId);
+    if (!pagination || pagination.pages <= 1) { el.innerHTML = ''; return; }
+
+    const { page, pages } = pagination;
+    let html = '';
+
+    if (page > 1) {
+        html += `<button onclick="(${onClick.name})(${page - 1})" class="px-3 py-1 rounded-lg border text-sm hover:bg-gray-50">&laquo;</button>`;
+    }
+
+    const start = Math.max(1, page - 2);
+    const end = Math.min(pages, page + 2);
+    for (let i = start; i <= end; i++) {
+        html += `<button onclick="(${onClick.name})(${i})" class="px-3 py-1 rounded-lg text-sm ${i === page ? 'btn-green font-bold' : 'border hover:bg-gray-50'}">${i}</button>`;
+    }
+
+    if (page < pages) {
+        html += `<button onclick="(${onClick.name})(${page + 1})" class="px-3 py-1 rounded-lg border text-sm hover:bg-gray-50">&raquo;</button>`;
+    }
+
+    el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════
+function formatCurrency(val) {
+    const num = Number(val) || 0;
+    return '\u20B9' + num.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function formatDate(d) {
+    if (!d) return '';
+    const dt = new Date(d);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${dt.getDate()} ${months[dt.getMonth()]} ${String(dt.getFullYear()).slice(2)}`;
+}
+
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function showToast(msg, type = 'success') {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+
+// Close suggestions on outside click
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#productSearch') && !e.target.closest('#productSuggestions')) {
+        document.getElementById('productSuggestions')?.classList.add('hidden');
+    }
+    if (!e.target.closest('#painterSearch') && !e.target.closest('#painterSuggestions')) {
+        document.getElementById('painterSuggestions')?.classList.add('hidden');
+    }
+});
+</script>
+</body>
+</html>
