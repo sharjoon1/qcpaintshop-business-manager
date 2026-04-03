@@ -19,7 +19,7 @@
     <script>requireAdminOrRedirect();</script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/socket-helper.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <style>
         .wa-card {
             background: #fff;
@@ -524,13 +524,31 @@
             statusText.textContent = 'Scan QR Code';
             statusSub.textContent = 'Waiting for WhatsApp scan';
 
-            QRCode.toCanvas(canvas, qrString, {
-                width: 280,
-                margin: 2,
-                color: { dark: '#1e293b', light: '#ffffff' }
-            }, (err) => {
-                if (err) console.error('QR render error:', err);
-            });
+            try {
+                const qr = qrcode(0, 'M');
+                qr.addData(qrString);
+                qr.make();
+
+                const size = 280;
+                const cellSize = size / qr.getModuleCount();
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, size, size);
+
+                ctx.fillStyle = '#1e293b';
+                for (let row = 0; row < qr.getModuleCount(); row++) {
+                    for (let col = 0; col < qr.getModuleCount(); col++) {
+                        if (qr.isDark(row, col)) {
+                            ctx.fillRect(col * cellSize, row * cellSize, cellSize + 0.5, cellSize + 0.5);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('QR render error:', err);
+            }
         }
 
         // ========================================
