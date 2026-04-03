@@ -2,548 +2,1446 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
-    <title>Collections - Quality Colours Admin</title>
-    <script src="/js/auth-helper.js"></script>
-    <script>requireAdminOrRedirect();</script>
-    <script src="/js/wa-quick-send.js"></script>
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Collections - Quality Colours Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script src="/js/wa-quick-send.js"></script>
+    <script>requireAdminOrRedirect();</script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-
-        /* Branch pills */
-        .branch-bar { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 0 16px 12px; -webkit-overflow-scrolling: touch; position: relative; z-index: 1; }
-        .branch-bar::-webkit-scrollbar { display: none; }
-        .branch-pill { padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); font-size: 0.7rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.2s; }
-        .branch-pill.active { background: rgba(255,255,255,0.95); color: #667eea; border-color: transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-
-        /* Sort bar */
-        .sort-bar { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 4px; -webkit-overflow-scrolling: touch; }
-        .sort-bar::-webkit-scrollbar { display: none; }
-        .sort-label { font-size: 0.7rem; color: #94a3b8; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
-        .sort-pill { padding: 6px 12px; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: 0.7rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.2s; }
-        .sort-pill.active { background: #667eea; color: #fff; border-color: #667eea; }
-
-        .container { max-width: 800px; margin: 0 auto; padding: 0 16px 24px; }
-
-        .card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        body { background: #f9fafb; }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         /* Tabs */
-        .tabs { display: flex; background: rgba(255,255,255,0.15); border-radius: 12px; padding: 4px; margin-bottom: 16px; gap: 4px; }
-        .tab-btn { flex: 1; padding: 10px 8px; border: none; background: transparent; color: rgba(255,255,255,0.7); font-size: 0.8125rem; font-weight: 600; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
-        .tab-btn.active { background: white; color: #667eea; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .cc-tab { padding: 8px 18px; border-radius: 8px 8px 0 0; font-size: 0.8125rem; font-weight: 500; color: #64748b; cursor: pointer; border: 1px solid transparent; border-bottom: none; transition: all 0.2s; background: none; }
+        .cc-tab:hover { background: #f1f5f9; color: #334155; }
+        .cc-tab.active { background: white; color: #667eea; font-weight: 600; border-color: #e2e8f0; box-shadow: 0 -2px 4px rgba(0,0,0,0.03); }
 
-        /* Stat mini cards */
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-        @media (min-width: 640px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
-        .stat-mini { background: white; border-radius: 12px; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-        .stat-mini .label { font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
-        .stat-mini .val { font-size: 1.25rem; font-weight: 700; color: #1e293b; margin-top: 2px; }
-        .stat-mini .sub { font-size: 0.65rem; color: #94a3b8; margin-top: 1px; }
+        /* Table */
+        .cc-table { font-size: 0.8125rem; width: 100%; border-collapse: collapse; }
+        .cc-table thead th { background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 8px 10px; font-weight: 600; color: #475569; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 5; }
+        .cc-table tbody td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .cc-table tbody tr:hover { background: #f0f4ff; }
 
-        /* List items */
-        .list-item { padding: 14px 0; border-bottom: 1px solid #f1f5f9; }
-        .list-item:last-child { border-bottom: none; }
-        .list-item .name { font-weight: 600; font-size: 0.875rem; color: #1e293b; }
-        .list-item .meta { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
-        .list-item .amount { font-weight: 700; font-size: 0.9375rem; color: #1e293b; }
-        .list-item .overdue { color: #dc2626; font-weight: 600; font-size: 0.7rem; }
+        /* Status badges */
+        .status-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; text-transform: capitalize; }
+        .status-overdue { background: #fee2e2; color: #991b1b; }
+        .status-sent { background: #dbeafe; color: #1e40af; }
+        .status-partially_paid { background: #fef3c7; color: #92400e; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-kept { background: #d1fae5; color: #065f46; }
+        .status-broken { background: #fee2e2; color: #991b1b; }
+        .status-partial { background: #e0e7ff; color: #3730a3; }
+        .status-whatsapp { background: #d1fae5; color: #065f46; }
+        .status-call { background: #dbeafe; color: #1e40af; }
+        .status-visit { background: #ede9fe; color: #5b21b6; }
+        .status-email { background: #fce7f3; color: #9d174d; }
 
-        .action-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; }
-        .btn-remind { background: #d1fae5; color: #065f46; }
-        .btn-remind:hover { background: #a7f3d0; }
-        .btn-call { background: #dbeafe; color: #1e40af; }
-        .btn-call:hover { background: #bfdbfe; }
-        .btn-phone { background: #d1fae5; color: #065f46; text-decoration: none; }
-        .btn-phone:hover { background: #a7f3d0; }
-        .btn-promise { background: #fef3c7; color: #92400e; }
-        .btn-promise:hover { background: #fde68a; }
+        /* Overdue coloring */
+        .overdue-mild { color: #d97706; font-weight: 600; }
+        .overdue-bad { color: #ea580c; font-weight: 600; }
+        .overdue-severe { color: #dc2626; font-weight: 700; }
 
-        .search-input { width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.8125rem; outline: none; margin-bottom: 12px; }
-        .search-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
-
-        .badge { display: inline-block; font-size: 0.625rem; font-weight: 600; padding: 2px 6px; border-radius: 999px; }
-        .badge-overdue { background: #fee2e2; color: #991b1b; }
-        .badge-ok { background: #d1fae5; color: #065f46; }
-
-        .load-more { text-align: center; padding: 12px; }
-        .load-more button { background: rgba(102,126,234,0.1); color: #667eea; border: none; padding: 8px 24px; border-radius: 10px; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
-
-        .empty-state { text-align: center; padding: 40px 0; color: #94a3b8; }
-        .empty-state .icon { font-size: 2rem; margin-bottom: 8px; }
+        /* Stat cards */
+        .stat-card { background: white; border-radius: 10px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .stat-card .label { font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .stat-card .value { font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 2px; }
+        .stat-card .sub { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
 
         /* Modal */
-        .modal-bg { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.5); z-index: 9999; }
-        .modal-bg.show { display: flex; align-items: flex-end; justify-content: center; }
-        .modal-sheet { background: white; border-radius: 20px 20px 0 0; width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; padding: 20px; animation: slideUp 0.3s ease; }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .modal-handle { width: 36px; height: 4px; background: #e2e8f0; border-radius: 2px; margin: 0 auto 16px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.4); z-index: 9997; }
+        .modal-overlay.show { display: flex; align-items: center; justify-content: center; }
+        .modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 520px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
 
-        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 10px 20px; border-radius: 10px; font-size: 0.8125rem; font-weight: 500; z-index: 99999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
-        #toast.show { opacity: 1; }
-        #toast.error { background: #dc2626; }
+        /* Checkbox */
+        .row-check { width: 16px; height: 16px; cursor: pointer; accent-color: #667eea; }
+
+        /* Pagination */
+        .pag-btn { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; border: 1px solid #e2e8f0; background: white; cursor: pointer; color: #475569; }
+        .pag-btn:hover:not(:disabled) { background: #f1f5f9; }
+        .pag-btn:disabled { opacity: 0.5; cursor: default; }
+        .pag-btn.active { background: #667eea; color: white; border-color: #667eea; }
+
+        @media (max-width: 767px) {
+            .cc-table { font-size: 0.75rem; }
+            .cc-table thead th, .cc-table tbody td { padding: 5px 6px; }
+            .stat-card .value { font-size: 1.2rem; }
+        }
     </style>
 </head>
-<body data-page="zoho-collections">
+<body data-page="zoho-collections" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
 
-<!-- Header Banner -->
-<div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; position: relative; overflow: hidden;">
-    <div style="position: absolute; top: -30px; right: -30px; width: 100px; height: 100px; background: rgba(255,255,255,0.06); border-radius: 50%;"></div>
-    <div style="position: absolute; bottom: -20px; left: -20px; width: 80px; height: 80px; background: rgba(255,255,255,0.04); border-radius: 50%;"></div>
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; position: relative; z-index: 1;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <a href="/admin-zoho-dashboard.html" style="width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; text-decoration: none;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-            </a>
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
             <div>
-                <h1 style="font-size: 1.25rem; font-weight: 700; margin: 0;">Collections</h1>
-                <p style="font-size: 0.75rem; opacity: 0.8; margin: 2px 0 0;">Outstanding invoices & payment tracking</p>
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800">Collections</h2>
+                <p class="text-gray-500 mt-0.5 text-xs">Manage outstanding invoices, send payment reminders, and track collection efforts.</p>
+            </div>
+            <!-- Branch filter (admin only) -->
+            <div id="branchFilterWrap" style="display:none">
+                <select id="branchFilter" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onchange="onBranchFilterChange()">
+                    <option value="">All Branches</option>
+                </select>
             </div>
         </div>
-        <button onclick="exportCSV()" style="padding:6px 14px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);font-size:0.75rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export
-        </button>
-    </div>
-    <!-- Summary strip -->
-    <div id="headerStrip" style="display: flex; gap: 0; padding: 0 16px 14px; position: relative; z-index: 1;">
-        <div style="flex: 1; text-align: center; padding: 10px 0; background: rgba(255,255,255,0.1); border-radius: 10px 0 0 10px;">
-            <div style="font-size: 0.65rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Outstanding</div>
-            <div style="font-size: 1rem; font-weight: 700; margin-top: 2px;" id="hOutstanding">--</div>
-        </div>
-        <div style="flex: 1; text-align: center; padding: 10px 0; background: rgba(255,255,255,0.08); border-left: 1px solid rgba(255,255,255,0.1);">
-            <div style="font-size: 0.65rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Overdue</div>
-            <div style="font-size: 1rem; font-weight: 700; margin-top: 2px; color: #fca5a5;" id="hOverdue">--</div>
-        </div>
-        <div style="flex: 1; text-align: center; padding: 10px 0; background: rgba(255,255,255,0.06); border-left: 1px solid rgba(255,255,255,0.1);">
-            <div style="font-size: 0.65rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Collected 30d</div>
-            <div style="font-size: 1rem; font-weight: 700; margin-top: 2px; color: #86efac;" id="hCollected">--</div>
-        </div>
-        <div style="flex: 1; text-align: center; padding: 10px 0; background: rgba(255,255,255,0.04); border-left: 1px solid rgba(255,255,255,0.1); border-radius: 0 10px 10px 0;">
-            <div style="font-size: 0.65rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px;">Invoices</div>
-            <div style="font-size: 1rem; font-weight: 700; margin-top: 2px;" id="hCustCount">--</div>
-        </div>
-    </div>
-    <!-- Branch pills -->
-    <div class="branch-bar" id="branchBar">
-        <button class="branch-pill active" data-branch="" onclick="selectBranch(this, '')">All Branches</button>
-    </div>
-</div>
 
-<div class="container">
-    <!-- Tabs -->
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('summary', this)">Summary</button>
-        <button class="tab-btn" onclick="switchTab('customers', this)">Customers</button>
-        <button class="tab-btn" onclick="switchTab('invoices', this)">Invoices</button>
-        <button class="tab-btn" onclick="switchTab('history', this)">History</button>
+        <!-- Tabs -->
+        <div class="flex gap-1 border-b border-gray-200 mb-4 overflow-x-auto">
+            <button class="cc-tab active" onclick="switchTab('summary')">Summary</button>
+            <button class="cc-tab" onclick="switchTab('customers')">Customers</button>
+            <button class="cc-tab" onclick="switchTab('invoices')">Invoices</button>
+            <button class="cc-tab" onclick="switchTab('reminders')">Reminders</button>
+            <button class="cc-tab" onclick="switchTab('promises')">Promises</button>
+        </div>
+
+        <!-- ==================== SUMMARY TAB ==================== -->
+        <div id="tab-summary">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <div class="stat-card">
+                    <div class="label">Total Outstanding</div>
+                    <div class="value" id="statOutstanding">--</div>
+                    <div class="sub"><span id="statOutstandingCount">0</span> invoices</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Overdue Amount</div>
+                    <div class="value text-red-600" id="statOverdue">--</div>
+                    <div class="sub"><span id="statOverdueCount">0</span> invoices overdue</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Collection Rate (30d)</div>
+                    <div class="value text-green-600" id="statCollectionRate">--</div>
+                    <div class="sub"><span id="statCollected30d">--</span> collected</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Avg Days Overdue</div>
+                    <div class="value text-orange-600" id="statAvgDays">--</div>
+                    <div class="sub">across overdue invoices</div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                <div class="stat-card">
+                    <div class="label">Reminders Today</div>
+                    <div class="value" id="statRemindersToday">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Pending Promises</div>
+                    <div class="value" id="statPendingPromises">--</div>
+                    <div class="sub" id="statPendingPromisesAmt">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Broken Promises</div>
+                    <div class="value text-red-600" id="statBrokenPromises">--</div>
+                    <div class="sub">past due, unfulfilled</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== CUSTOMERS TAB ==================== -->
+        <div id="tab-customers" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <!-- Search & Sort -->
+                <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                    <input type="text" id="custSearch" placeholder="Search customer or phone..." class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onkeydown="if(event.key==='Enter')loadCustomers()">
+                    <select id="custSort" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadCustomers()">
+                        <option value="total_outstanding">Sort: Outstanding (High)</option>
+                        <option value="overdue_amount">Sort: Overdue Amount</option>
+                        <option value="customer_name">Sort: Name</option>
+                        <option value="invoice_count">Sort: Invoice Count</option>
+                        <option value="oldest_due_date">Sort: Oldest Due</option>
+                    </select>
+                    <button onclick="loadCustomers()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600">Search</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th class="branch-col">Branch</th>
+                                <th>Outstanding</th>
+                                <th>Credit</th>
+                                <th>Overdue</th>
+                                <th>Invoices</th>
+                                <th>Oldest Due</th>
+                                <th>Last Reminder</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="custBody"></tbody>
+                    </table>
+                </div>
+                <div id="custPagination" class="flex items-center justify-between mt-3 text-xs text-gray-500"></div>
+            </div>
+        </div>
+
+        <!-- ==================== INVOICES TAB ==================== -->
+        <div id="tab-invoices" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <!-- Filters -->
+                <div class="flex flex-col sm:flex-row gap-2 mb-3 flex-wrap">
+                    <input type="text" id="invSearch" placeholder="Search invoice # or customer..." class="flex-1 min-w-[180px] px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onkeydown="if(event.key==='Enter')loadInvoices()">
+                    <select id="invStatus" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadInvoices()">
+                        <option value="">All Statuses</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="not_overdue">Not Overdue</option>
+                        <option value="sent">Sent</option>
+                        <option value="partially_paid">Partially Paid</option>
+                    </select>
+                    <select id="invSort" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadInvoices()">
+                        <option value="balance">Sort: Balance (High)</option>
+                        <option value="days_overdue">Sort: Days Overdue</option>
+                        <option value="due_date">Sort: Due Date</option>
+                        <option value="customer_name">Sort: Customer</option>
+                    </select>
+                    <button onclick="loadInvoices()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600">Search</button>
+                </div>
+                <!-- Bulk actions -->
+                <div id="bulkBar" class="hidden flex items-center gap-2 mb-3 p-2 bg-indigo-50 rounded-lg text-sm">
+                    <span id="bulkCount" class="font-semibold text-indigo-700">0 selected</span>
+                    <button onclick="bulkRemind()" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700">Send Reminders</button>
+                    <button onclick="clearSelection()" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-300">Clear</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" class="row-check" onchange="toggleAllInvoices(this.checked)"></th>
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Total</th>
+                                <th>Balance</th>
+                                <th>Due Date</th>
+                                <th>Days Overdue</th>
+                                <th>Status</th>
+                                <th>Reminders</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invBody"></tbody>
+                    </table>
+                </div>
+                <div class="flex items-center justify-between mt-3 text-xs text-gray-500">
+                    <div id="invPagination"></div>
+                    <button onclick="exportCSV()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-xs hover:bg-gray-50">Export CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== REMINDERS TAB ==================== -->
+        <div id="tab-reminders" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex flex-col sm:flex-row gap-2 mb-3 flex-wrap">
+                    <select id="remType" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadReminders()">
+                        <option value="">All Types</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="call">Call</option>
+                        <option value="visit">Visit</option>
+                        <option value="email">Email</option>
+                    </select>
+                    <input type="date" id="remFrom" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadReminders()">
+                    <input type="date" id="remTo" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadReminders()">
+                    <button onclick="showLogReminderModal()" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 ml-auto">Log Call/Visit</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Invoice</th>
+                                <th>Type</th>
+                                <th>Message / Notes</th>
+                                <th>Status</th>
+                                <th>Sent By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="remBody"></tbody>
+                    </table>
+                </div>
+                <div id="remPagination" class="flex items-center justify-between mt-3 text-xs text-gray-500"></div>
+            </div>
+        </div>
+
+        <!-- ==================== PROMISES TAB ==================== -->
+        <div id="tab-promises" style="display:none">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex flex-col sm:flex-row gap-2 mb-3 flex-wrap">
+                    <select id="promStatus" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadPromises()">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="kept">Kept</option>
+                        <option value="broken">Broken</option>
+                        <option value="partial">Partial</option>
+                        <option value="broken_auto">Auto-Broken (Past Due)</option>
+                    </select>
+                    <input type="date" id="promFrom" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadPromises()">
+                    <input type="date" id="promTo" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" onchange="loadPromises()">
+                    <button onclick="showPromiseModal()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600 ml-auto">Add Promise</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Invoice</th>
+                                <th>Promise Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Actual</th>
+                                <th>Follow-up</th>
+                                <th>Notes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="promBody"></tbody>
+                    </table>
+                </div>
+                <div id="promPagination" class="flex items-center justify-between mt-3 text-xs text-gray-500"></div>
+            </div>
+        </div>
     </div>
 
-    <!-- SUMMARY TAB -->
-    <div id="tab-summary">
-        <div class="stat-grid">
-            <div class="stat-mini"><div class="label">Outstanding</div><div class="val" id="sOutstanding">--</div><div class="sub"><span id="sOutCount">0</span> invoices</div></div>
-            <div class="stat-mini"><div class="label">Overdue</div><div class="val" style="color:#dc2626" id="sOverdue">--</div><div class="sub"><span id="sOverCount">0</span> overdue</div></div>
-            <div class="stat-mini"><div class="label">Collection Rate</div><div class="val" style="color:#667eea" id="sRate">--</div><div class="sub">last 30 days</div></div>
-            <div class="stat-mini"><div class="label">Collected (30d)</div><div class="val" style="color:#059669" id="sCollected">--</div><div class="sub">payments received</div></div>
-            <div class="stat-mini"><div class="label">Avg Days Overdue</div><div class="val" style="color:#ea580c" id="sAvgDays">--</div><div class="sub">across overdue</div></div>
-            <div class="stat-mini"><div class="label">Pending Promises</div><div class="val" id="sPromises">--</div><div class="sub" id="sPromiseAmt"></div></div>
+    <!-- ==================== REMINDER PREVIEW MODAL ==================== -->
+    <div id="reminderModal" class="modal-overlay" onclick="if(event.target===this)closeReminderModal()">
+        <div class="modal-box">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">Send Payment Reminder</h3>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Customer</label>
+                <div id="rmCustomerName" class="text-sm font-medium text-gray-800">--</div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Phone</label>
+                <div id="rmPhone" class="text-sm text-gray-700">--</div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Invoice</label>
+                <div id="rmInvoice" class="text-sm text-gray-700">--</div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Send via</label>
+                <select id="rmWhatsappAccount" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <option value="general" selected>General WhatsApp (Company)</option>
+                    <option value="auto">Auto (Branch / General fallback)</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Template</label>
+                <select id="rmTemplate" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onchange="applyReminderTemplate()">
+                    <option value="en_polite">English - Polite Reminder</option>
+                    <option value="en_overdue">English - Overdue Notice</option>
+                    <option value="en_urgent">English - Urgent Final Notice</option>
+                    <option value="ta_polite">Tamil - Polite Reminder</option>
+                    <option value="ta_overdue">Tamil - Overdue Notice</option>
+                    <option value="ta_urgent">Tamil - Urgent Final Notice</option>
+                    <option value="custom">Custom Message</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Message (editable)</label>
+                <textarea id="rmMessage" rows="5" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
+            </div>
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeReminderModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+                <button onclick="sendReminder()" id="rmSendBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 font-semibold">Send via WhatsApp</button>
+            </div>
         </div>
-        <div class="stat-grid">
-            <div class="stat-mini"><div class="label">Reminders Today</div><div class="val" id="sRemToday">--</div></div>
-            <div class="stat-mini"><div class="label">Broken Promises</div><div class="val" style="color:#dc2626" id="sBroken">--</div></div>
+    </div>
+
+    <!-- ==================== LOG REMINDER MODAL ==================== -->
+    <div id="logReminderModal" class="modal-overlay" onclick="if(event.target===this)closeLogModal()">
+        <div class="modal-box">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">Log Call / Visit / Email</h3>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Customer *</label>
+                <input type="text" id="lrSearch" placeholder="Search customer..." class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" oninput="searchCustomersForLog()">
+                <div id="lrResults" class="border border-gray-200 rounded-lg mt-1 max-h-32 overflow-y-auto text-sm" style="display:none"></div>
+                <input type="hidden" id="lrCustomerId">
+                <input type="hidden" id="lrCustomerName">
+                <input type="hidden" id="lrPhone">
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Type *</label>
+                <select id="lrType" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                    <option value="call">Phone Call</option>
+                    <option value="visit">In-person Visit</option>
+                    <option value="email">Email</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Notes</label>
+                <textarea id="lrNotes" rows="3" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="What was discussed..."></textarea>
+            </div>
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeLogModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+                <button onclick="submitLogReminder()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-semibold">Log Reminder</button>
+            </div>
         </div>
     </div>
 
-    <!-- CUSTOMERS TAB -->
-    <div id="tab-customers" style="display:none">
-        <input type="text" class="search-input" id="custSearchInput" placeholder="Search customer or phone..." onkeydown="if(event.key==='Enter')loadCustomers()">
-        <div class="sort-bar" id="custSortBar">
-            <span class="sort-label">Sort:</span>
-            <button class="sort-pill active" data-sort="total_outstanding" data-order="desc" onclick="setCustSort(this)">Amount ↓</button>
-            <button class="sort-pill" data-sort="oldest_due_date" data-order="asc" onclick="setCustSort(this)">Oldest Due</button>
-            <button class="sort-pill" data-sort="overdue_amount" data-order="desc" onclick="setCustSort(this)">Overdue ↓</button>
-            <button class="sort-pill" data-sort="customer_name" data-order="asc" onclick="setCustSort(this)">Name A-Z</button>
-        </div>
-        <div class="card" id="custList"><div class="empty-state"><div class="icon">👥</div>Loading...</div></div>
-        <div class="load-more" id="custMore" style="display:none"><button onclick="loadCustomers(custPage+1, true)">Load More</button></div>
-    </div>
-
-    <!-- INVOICES TAB -->
-    <div id="tab-invoices" style="display:none">
-        <input type="text" class="search-input" id="invSearchInput" placeholder="Search invoice # or customer..." onkeydown="if(event.key==='Enter')loadInvoices()">
-        <div class="sort-bar" id="invSortBar">
-            <span class="sort-label">Sort:</span>
-            <button class="sort-pill active" data-sort="balance" data-order="desc" onclick="setInvSort(this)">Amount ↓</button>
-            <button class="sort-pill" data-sort="days_overdue" data-order="desc" onclick="setInvSort(this)">Most Overdue</button>
-            <button class="sort-pill" data-sort="due_date" data-order="asc" onclick="setInvSort(this)">Due Date</button>
-            <button class="sort-pill" data-sort="invoice_date" data-order="desc" onclick="setInvSort(this)">Newest</button>
-            <button class="sort-pill" data-sort="customer_name" data-order="asc" onclick="setInvSort(this)">Name A-Z</button>
-        </div>
-        <div class="card" id="invList"><div class="empty-state"><div class="icon">📄</div>Loading...</div></div>
-        <div class="load-more" id="invMore" style="display:none"><button onclick="loadInvoices(invPage+1, true)">Load More</button></div>
-    </div>
-
-    <!-- HISTORY TAB -->
-    <div id="tab-history" style="display:none">
-        <div style="display:flex;gap:6px;margin-bottom:10px;">
-            <button class="sort-pill active" id="histSubCalls" onclick="switchHistSub('calls')">Calls / Visits</button>
-            <button class="sort-pill" id="histSubPromises" onclick="switchHistSub('promises')">Promises</button>
-        </div>
-        <div id="histCalls"><div class="card" id="callsList"><div class="empty-state"><div class="icon">📞</div>Loading...</div></div><div class="load-more" id="callsMore" style="display:none"><button onclick="loadCalls(callsPage+1, true)">Load More</button></div></div>
-        <div id="histPromises" style="display:none"><div class="card" id="promisesList"><div class="empty-state"><div class="icon">🤝</div>Loading...</div></div><div class="load-more" id="promisesMore" style="display:none"><button onclick="loadPromises(promisesPage+1, true)">Load More</button></div></div>
-    </div>
-</div>
-
-<!-- Reminder Modal -->
-<div class="modal-bg" id="reminderModal" onclick="if(event.target===this)closeModal('reminderModal')">
-    <div class="modal-sheet"><div class="modal-handle"></div>
-        <h3 style="font-size:1rem;font-weight:700;margin-bottom:12px">Send Reminder</h3>
-        <input type="hidden" id="rmCustId"><input type="hidden" id="rmInvId">
-        <div style="margin-bottom:8px"><div style="font-size:0.7rem;color:#94a3b8;font-weight:600">Customer</div><div style="font-size:0.875rem;font-weight:600" id="rmName">--</div></div>
-        <div style="margin-bottom:8px"><div style="font-size:0.7rem;color:#94a3b8;font-weight:600">Phone</div><div style="font-size:0.875rem" id="rmPhone">--</div></div>
-        <div style="margin-bottom:12px"><div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Message</div><textarea id="rmMsg" rows="4" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem;outline:none"></textarea></div>
-        <div style="display:flex;gap:8px">
-            <button onclick="closeModal('reminderModal')" style="flex:1;padding:12px;background:#f1f5f9;border:none;border-radius:10px;font-weight:600;cursor:pointer">Cancel</button>
-            <button onclick="sendReminder()" id="rmSendBtn" style="flex:1;padding:12px;background:#22c55e;color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer">Send WhatsApp</button>
-        </div>
-    </div>
-</div>
-
-<!-- Log Call/Visit Modal -->
-<div class="modal-bg" id="logModal" onclick="if(event.target===this)closeModal('logModal')">
-    <div class="modal-sheet"><div class="modal-handle"></div>
-        <h3 style="font-size:1rem;font-weight:700;margin-bottom:12px">Log Call / Visit</h3>
-        <input type="hidden" id="lgCustId"><input type="hidden" id="lgCustName"><input type="hidden" id="lgPhone">
-        <div style="margin-bottom:10px"><div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Type</div><select id="lgType" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem"><option value="call">Phone Call</option><option value="visit">In-person Visit</option><option value="email">Email</option></select></div>
-        <div style="margin-bottom:12px"><div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Notes</div><textarea id="lgNotes" rows="3" placeholder="What was discussed..." style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem;outline:none"></textarea></div>
-        <div style="display:flex;gap:8px">
-            <button onclick="closeModal('logModal')" style="flex:1;padding:12px;background:#f1f5f9;border:none;border-radius:10px;font-weight:600;cursor:pointer">Cancel</button>
-            <button onclick="submitLog()" style="flex:1;padding:12px;background:#3b82f6;color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer">Log</button>
+    <!-- ==================== PROMISE MODAL ==================== -->
+    <div id="promiseModal" class="modal-overlay" onclick="if(event.target===this)closePromiseModal()">
+        <div class="modal-box">
+            <h3 class="text-lg font-bold text-gray-800 mb-3" id="pmTitle">Add Promise to Pay</h3>
+            <input type="hidden" id="pmId">
+            <input type="hidden" id="pmMode" value="create">
+            <div class="mb-3" id="pmCustSearchWrap">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Customer *</label>
+                <input type="text" id="pmCustSearch" placeholder="Search customer..." class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" oninput="searchCustomersForPromise()">
+                <div id="pmCustResults" class="border border-gray-200 rounded-lg mt-1 max-h-32 overflow-y-auto text-sm" style="display:none"></div>
+                <input type="hidden" id="pmCustomerId">
+                <input type="hidden" id="pmCustomerName">
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Promise Date *</label>
+                    <input type="date" id="pmDate" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Amount *</label>
+                    <input type="number" id="pmAmount" step="0.01" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="0.00">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Follow-up Date</label>
+                <input type="date" id="pmFollowUp" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Notes</label>
+                <textarea id="pmNotes" rows="2" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Any notes..."></textarea>
+            </div>
+            <!-- Update fields (hidden for create) -->
+            <div id="pmUpdateFields" style="display:none">
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Status</label>
+                    <select id="pmStatus" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                        <option value="pending">Pending</option>
+                        <option value="kept">Kept</option>
+                        <option value="broken">Broken</option>
+                        <option value="partial">Partial</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Actual Payment Date</label>
+                        <input type="date" id="pmActualDate" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Actual Amount</label>
+                        <input type="number" id="pmActualAmount" step="0.01" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2 justify-end">
+                <button onclick="closePromiseModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+                <button onclick="submitPromise()" id="pmSubmitBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 font-semibold">Save Promise</button>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Promise Modal -->
-<div class="modal-bg" id="promiseModal" onclick="if(event.target===this)closeModal('promiseModal')">
-    <div class="modal-sheet"><div class="modal-handle"></div>
-        <h3 style="font-size:1rem;font-weight:700;margin-bottom:12px">Add Promise to Pay</h3>
-        <input type="hidden" id="prCustId"><input type="hidden" id="prCustName">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-            <div><div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Promise Date</div><input type="date" id="prDate" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem"></div>
-            <div><div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Amount</div><input type="number" id="prAmount" step="0.01" placeholder="0.00" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem"></div>
-        </div>
-        <div style="margin-bottom:12px"><div style="font-size:0.7rem;color:#94a3b8;font-weight:600;margin-bottom:4px">Notes</div><textarea id="prNotes" rows="2" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:0.8125rem;outline:none"></textarea></div>
-        <div style="display:flex;gap:8px">
-            <button onclick="closeModal('promiseModal')" style="flex:1;padding:12px;background:#f1f5f9;border:none;border-radius:10px;font-weight:600;cursor:pointer">Cancel</button>
-            <button onclick="submitPromise()" style="flex:1;padding:12px;background:#667eea;color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer">Save Promise</button>
-        </div>
-    </div>
-</div>
-
-<div id="toast"></div>
-
-<script src="/universal-nav-loader.js"></script>
 <script>
-const API = '/api/zoho/collections';
-let selectedBranch = '';
-let custPage = 1, invPage = 1, callsPage = 1, promisesPage = 1;
-let custData = [], invData = [], callsData = [], promisesData = [];
-let custSort = 'total_outstanding', custOrder = 'desc';
-let invSort = 'balance', invOrder = 'desc';
+    const API = '/api/zoho/collections';
+    let currentTab = 'summary';
+    let selectedInvoices = [];
+    let invoicesData = [];
+    let custPage = 1, invPage = 1, remPage = 1, promPage = 1;
+    let branchesLoaded = [];
+    let isAdmin = false;
+    let selectedBranchId = '';
 
-// ── Branches ──
-async function loadBranches() {
-    try {
-        const resp = await fetch('/api/branches', { headers: getAuthHeaders() });
-        const data = await resp.json();
-        const branches = data.success ? data.data : data;
-        const bar = document.getElementById('branchBar');
-        branches.forEach(b => {
-            const pill = document.createElement('button');
-            pill.className = 'branch-pill';
-            pill.dataset.branch = b.id;
-            pill.textContent = b.name;
-            pill.onclick = function() { selectBranch(this, b.id); };
-            bar.appendChild(pill);
+    // Get branch_id query param for all API calls
+    function branchParam() {
+        return selectedBranchId ? '&branch_id=' + selectedBranchId : '';
+    }
+    function branchParamFirst() {
+        return selectedBranchId ? '?branch_id=' + selectedBranchId : '';
+    }
+
+    // ========================================
+    // HELPERS
+    // ========================================
+
+    function formatCurrency(amount) {
+        const num = parseFloat(amount || 0);
+        if (num >= 10000000) return '\u20B9' + (num / 10000000).toFixed(2) + 'Cr';
+        if (num >= 100000) return '\u20B9' + (num / 100000).toFixed(2) + 'L';
+        if (num >= 1000) return '\u20B9' + (num / 1000).toFixed(1) + 'K';
+        return '\u20B9' + num.toFixed(0);
+    }
+
+    function formatCurrencyFull(amount) {
+        const num = parseFloat(amount || 0);
+        return 'Rs.' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '--';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function formatDateTime(dateStr) {
+        if (!dateStr) return '--';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function overdueClass(days) {
+        if (days <= 0) return '';
+        if (days <= 15) return 'overdue-mild';
+        if (days <= 45) return 'overdue-bad';
+        return 'overdue-severe';
+    }
+
+    function creditBadge(limit, utilization) {
+        limit = Number(limit) || 0;
+        utilization = Number(utilization) || 0;
+        if (limit === 0) return '<span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">No limit</span>';
+        let bg, fg;
+        if (utilization > 100) { bg = '#fecaca'; fg = '#991b1b'; }
+        else if (utilization > 80) { bg = '#fee2e2'; fg = '#dc2626'; }
+        else if (utilization > 50) { bg = '#fef3c7'; fg = '#92400e'; }
+        else { bg = '#d1fae5'; fg = '#065f46'; }
+        return `<span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold" style="background:${bg};color:${fg}" title="Limit: ₹${limit.toLocaleString('en-IN')}">${utilization}%</span>`;
+    }
+
+    function showToast(msg, type = 'success') {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast show ' + (type === 'error' ? 'error' : '');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    async function apiFetch(url, opts = {}) {
+        const headers = getAuthHeaders();
+        if (opts.body && typeof opts.body === 'object') {
+            headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(opts.body);
+        }
+        const resp = await fetch(url, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({ message: 'Request failed' }));
+            throw new Error(err.message || 'Request failed');
+        }
+        return resp;
+    }
+
+    async function apiJson(url, opts = {}) {
+        const resp = await apiFetch(url, opts);
+        return resp.json();
+    }
+
+    function buildPagination(containerId, page, limit, total, loadFn) {
+        const el = document.getElementById(containerId);
+        const totalPages = Math.ceil(total / limit) || 1;
+        const from = ((page - 1) * limit) + 1;
+        const to = Math.min(page * limit, total);
+        let html = `<span>Showing ${from}-${to} of ${total}</span><div class="flex gap-1">`;
+        html += `<button class="pag-btn" onclick="${loadFn}(${page - 1})" ${page <= 1 ? 'disabled' : ''}>&laquo; Prev</button>`;
+        // Show up to 5 page buttons
+        const start = Math.max(1, page - 2);
+        const end = Math.min(totalPages, start + 4);
+        for (let i = start; i <= end; i++) {
+            html += `<button class="pag-btn ${i === page ? 'active' : ''}" onclick="${loadFn}(${i})">${i}</button>`;
+        }
+        html += `<button class="pag-btn" onclick="${loadFn}(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>Next &raquo;</button>`;
+        html += '</div>';
+        el.innerHTML = html;
+    }
+
+    // ========================================
+    // TAB SWITCHING
+    // ========================================
+
+    function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+        document.getElementById('tab-' + tab).style.display = '';
+        document.querySelectorAll('.cc-tab').forEach(el => el.classList.remove('active'));
+        event.target.classList.add('active');
+        localStorage.setItem('cc_tab', tab);
+
+        if (tab === 'summary') loadSummary();
+        else if (tab === 'customers') loadCustomers();
+        else if (tab === 'invoices') loadInvoices();
+        else if (tab === 'reminders') loadReminders();
+        else if (tab === 'promises') loadPromises();
+    }
+
+    // ========================================
+    // SUMMARY
+    // ========================================
+
+    async function loadSummary() {
+        try {
+            const { data } = await apiJson(API + '/summary' + branchParamFirst());
+            document.getElementById('statOutstanding').textContent = formatCurrency(data.total_outstanding);
+            document.getElementById('statOutstandingCount').textContent = data.outstanding_count;
+            document.getElementById('statOverdue').textContent = formatCurrency(data.overdue_amount);
+            document.getElementById('statOverdueCount').textContent = data.overdue_count;
+            document.getElementById('statCollectionRate').textContent = data.collection_rate_30d + '%';
+            document.getElementById('statCollected30d').textContent = formatCurrency(data.collected_30d) + ' collected';
+            document.getElementById('statAvgDays').textContent = data.avg_days_overdue + ' days';
+            document.getElementById('statRemindersToday').textContent = data.reminders_today;
+            document.getElementById('statPendingPromises').textContent = data.pending_promises;
+            document.getElementById('statPendingPromisesAmt').textContent = formatCurrency(data.pending_promises_amount) + ' promised';
+            document.getElementById('statBrokenPromises').textContent = data.broken_promises;
+        } catch (err) {
+            showToast('Failed to load summary: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // CUSTOMERS
+    // ========================================
+
+    async function loadCustomers(page) {
+        custPage = page || 1;
+        const search = document.getElementById('custSearch').value;
+        const sort = document.getElementById('custSort').value;
+        const params = new URLSearchParams({ search, sort, order: 'desc', page: custPage, limit: 25 });
+        if (selectedBranchId) params.set('branch_id', selectedBranchId);
+
+        try {
+            const { data, pagination } = await apiJson(API + '/customers?' + params);
+            const tbody = document.getElementById('custBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No customers with outstanding balance</td></tr>';
+                document.getElementById('custPagination').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = data.map(c => {
+                const branchName = c.branch_id ? getBranchName(c.branch_id) : '';
+                return `
+                <tr>
+                    <td class="font-medium">${esc(c.customer_name || 'Unknown')}</td>
+                    <td>${esc(c.phone || '--')}</td>
+                    <td class="branch-col">${isAdmin ? buildBranchSelect(c.zoho_customer_id, c.branch_id) : esc(branchName || '--')}</td>
+                    <td class="font-semibold">${formatCurrencyFull(c.total_outstanding)}</td>
+                    <td>${creditBadge(c.credit_limit, c.credit_utilization)}</td>
+                    <td><span class="${c.overdue_amount > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}">${formatCurrencyFull(c.overdue_amount)}</span></td>
+                    <td>${c.invoice_count}${c.overdue_count > 0 ? ` <span class="text-red-500 text-xs">(${c.overdue_count} overdue)</span>` : ''}</td>
+                    <td>${formatDate(c.oldest_due_date)}</td>
+                    <td>${c.last_reminder ? formatDateTime(c.last_reminder) : '<span class="text-gray-400">Never</span>'}</td>
+                    <td class="flex gap-1 flex-wrap">
+                        ${c.phone ? `<button onclick="waQuickCust('${esc(c.customer_name)}','${esc(c.phone)}','${formatCurrencyFull(c.total_outstanding)}','${c.overdue_count||0}')" class="px-1 py-1 rounded hover:bg-green-50 inline-flex items-center" title="Send WhatsApp"><svg width="18" height="18" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.654-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg></button>` : ''}
+                        ${c.phone ? `<a href="tel:${esc(c.phone)}" class="px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 inline-flex items-center gap-1" title="Call ${esc(c.phone)}">📞 Call</a>` : ''}
+                        <button onclick="viewCustomerInvoices('${c.zoho_customer_id}')" class="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100" title="View Invoices">Invoices</button>
+                        ${c.phone ? `<button onclick="sendCustomerReminder('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone)}',${c.total_outstanding})" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100" title="Send Reminder">Remind</button>` : ''}
+                        <button onclick="openPromiseForCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}')" class="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100" title="Add Promise">Promise</button>
+                    </td>
+                </tr>
+            `}).join('');
+
+            buildPagination('custPagination', pagination.page, pagination.limit, pagination.total, 'loadCustomers');
+        } catch (err) {
+            showToast('Failed to load customers: ' + err.message, 'error');
+        }
+    }
+
+    function viewCustomerInvoices(customerId) {
+        // Switch to invoices tab filtered by customer
+        document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+        document.getElementById('tab-invoices').style.display = '';
+        document.querySelectorAll('.cc-tab').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.cc-tab')[2].classList.add('active');
+        currentTab = 'invoices';
+        window._filterCustomerId = customerId;
+        loadInvoices();
+    }
+
+    // ========================================
+    // INVOICES
+    // ========================================
+
+    async function loadInvoices(page) {
+        invPage = page || 1;
+        const search = document.getElementById('invSearch').value;
+        const status = document.getElementById('invStatus').value;
+        const sort = document.getElementById('invSort').value;
+        const params = new URLSearchParams({ search, status, sort, order: 'desc', page: invPage, limit: 25 });
+        if (selectedBranchId) params.set('branch_id', selectedBranchId);
+
+        if (window._filterCustomerId) {
+            params.set('customer_id', window._filterCustomerId);
+            window._filterCustomerId = null;
+        }
+
+        try {
+            const { data, pagination } = await apiJson(API + '/invoices?' + params);
+            invoicesData = data;
+            selectedInvoices = [];
+            updateBulkBar();
+
+            const tbody = document.getElementById('invBody');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No outstanding invoices found</td></tr>';
+                document.getElementById('invPagination').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = data.map((inv, idx) => `
+                <tr>
+                    <td><input type="checkbox" class="row-check" data-idx="${idx}" onchange="toggleInvoiceSelect(${idx}, this.checked)"></td>
+                    <td class="font-medium">${esc(inv.invoice_number || '--')}</td>
+                    <td>${esc(inv.customer_name || 'Unknown')}</td>
+                    <td>${formatCurrencyFull(inv.total)}</td>
+                    <td class="font-semibold">${formatCurrencyFull(inv.balance)}</td>
+                    <td>${formatDate(inv.due_date)}</td>
+                    <td><span class="${overdueClass(inv.days_overdue)}">${inv.days_overdue > 0 ? inv.days_overdue + 'd' : '--'}</span></td>
+                    <td><span class="status-badge status-${inv.days_overdue > 0 ? 'overdue' : inv.status}">${inv.days_overdue > 0 ? 'Overdue' : inv.status}</span></td>
+                    <td>${inv.reminder_count > 0 ? `<span class="text-xs text-gray-500">${inv.reminder_count}x</span>` : '--'}</td>
+                    <td class="flex gap-1">
+                        ${inv.phone ? `<button onclick="waQuickInv(${idx})" class="px-1 py-1 rounded hover:bg-green-50 inline-flex items-center" title="Send WhatsApp"><svg width="18" height="18" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.654-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg></button>` : ''}
+                        ${inv.phone ? `<a href="tel:${esc(inv.phone)}" class="px-2 py-1 text-xs bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 inline-flex items-center gap-1" title="Call">📞</a>` : ''}
+                        ${inv.phone ? `<button onclick="openReminderModal(${idx})" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">Remind</button>` : '<span class="text-xs text-gray-400">No phone</span>'}
+                        <button onclick="openPromiseForInvoice(${idx})" class="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100">Promise</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            buildPagination('invPagination', pagination.page, pagination.limit, pagination.total, 'loadInvoices');
+        } catch (err) {
+            showToast('Failed to load invoices: ' + err.message, 'error');
+        }
+    }
+
+    function toggleInvoiceSelect(idx, checked) {
+        if (checked) {
+            if (!selectedInvoices.includes(idx)) selectedInvoices.push(idx);
+        } else {
+            selectedInvoices = selectedInvoices.filter(i => i !== idx);
+        }
+        updateBulkBar();
+    }
+
+    function toggleAllInvoices(checked) {
+        selectedInvoices = checked ? invoicesData.map((_, i) => i) : [];
+        document.querySelectorAll('#invBody .row-check').forEach(cb => cb.checked = checked);
+        updateBulkBar();
+    }
+
+    function clearSelection() {
+        selectedInvoices = [];
+        document.querySelectorAll('#invBody .row-check').forEach(cb => cb.checked = false);
+        document.querySelector('#tab-invoices thead .row-check').checked = false;
+        updateBulkBar();
+    }
+
+    function updateBulkBar() {
+        const bar = document.getElementById('bulkBar');
+        if (selectedInvoices.length > 0) {
+            bar.classList.remove('hidden');
+            document.getElementById('bulkCount').textContent = selectedInvoices.length + ' selected';
+        } else {
+            bar.classList.add('hidden');
+        }
+    }
+
+    // ========================================
+    // REMINDER MODAL (WhatsApp)
+    // ========================================
+
+    let reminderTarget = null;
+
+    // Payment reminder templates — English & Tamil
+    const reminderTemplates = {
+        en_polite: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const dueDate = formatDate(inv.due_date);
+            return `Dear ${name},\n\nThis is a friendly reminder that your ${invNum ? 'invoice #' + invNum + ' for ' : 'outstanding balance of '}${balance} is pending.${dueDate ? '\nDue date: ' + dueDate : ''}\n\nPlease arrange the payment at your earliest convenience.\n\nThank you,\nQuality Colours`;
+        },
+        en_overdue: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const days = parseInt(inv.days_overdue) || 0;
+            return `Dear ${name},\n\nYour ${invNum ? 'invoice #' + invNum + ' for ' : 'outstanding amount of '}${balance} is overdue${days > 0 ? ' by ' + days + ' days' : ''}.\n\nPlease settle this amount immediately to avoid further action.\n\nRegards,\nQuality Colours`;
+        },
+        en_urgent: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const days = parseInt(inv.days_overdue) || 0;
+            return `URGENT NOTICE\n\nDear ${name},\n\nDespite our previous reminders, your ${invNum ? 'invoice #' + invNum + ' for ' : 'payment of '}${balance} remains unpaid${days > 0 ? ' (' + days + ' days overdue)' : ''}.\n\nThis is a final notice. Please make the payment within 3 days to avoid further collection action.\n\nQuality Colours`;
+        },
+        ta_polite: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const dueDate = formatDate(inv.due_date);
+            return `அன்புள்ள ${name},\n\nஉங்கள் ${invNum ? 'இன்வாய்ஸ் #' + invNum + ' தொகை ' : 'நிலுவைத் தொகை '}${balance} நிலுவையில் உள்ளது என்பதை அன்புடன் நினைவூட்டுகிறோம்.${dueDate ? '\nநிலுவை தேதி: ' + dueDate : ''}\n\nதயவுசெய்து உங்கள் வசதிக்கேற்ப பணம் செலுத்தவும்.\n\nநன்றி,\nQuality Colours`;
+        },
+        ta_overdue: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const days = parseInt(inv.days_overdue) || 0;
+            return `அன்புள்ள ${name},\n\nஉங்கள் ${invNum ? 'இன்வாய்ஸ் #' + invNum + ' தொகை ' : 'நிலுவைத் தொகை '}${balance} ${days > 0 ? days + ' நாட்கள் ' : ''}தாமதமாகியுள்ளது.\n\nதயவுசெய்து உடனடியாக பணம் செலுத்தவும்.\n\nநன்றி,\nQuality Colours`;
+        },
+        ta_urgent: (inv) => {
+            const name = inv.customer_name || 'Customer';
+            const balance = formatCurrencyFull(inv.balance);
+            const invNum = inv.invoice_number || '';
+            const days = parseInt(inv.days_overdue) || 0;
+            return `அவசர அறிவிப்பு\n\nஅன்புள்ள ${name},\n\nஎங்கள் முந்தைய நினைவூட்டல்களுக்குப் பிறகும், உங்கள் ${invNum ? 'இன்வாய்ஸ் #' + invNum + ' தொகை ' : 'பணம் '}${balance} செலுத்தப்படாமல் உள்ளது${days > 0 ? ' (' + days + ' நாட்கள் தாமதம்)' : ''}.\n\nஇது இறுதி அறிவிப்பு. 3 நாட்களுக்குள் பணம் செலுத்தவும்.\n\nQuality Colours`;
+        }
+    };
+
+    function buildReminderMessage(inv, templateKey) {
+        const key = templateKey || document.getElementById('rmTemplate')?.value || 'en_polite';
+        if (key === 'custom') return document.getElementById('rmMessage')?.value || '';
+        const fn = reminderTemplates[key];
+        return fn ? fn(inv) : reminderTemplates.en_polite(inv);
+    }
+
+    function applyReminderTemplate() {
+        if (!reminderTarget) return;
+        const key = document.getElementById('rmTemplate').value;
+        if (key === 'custom') return; // Don't overwrite custom text
+        document.getElementById('rmMessage').value = buildReminderMessage(reminderTarget, key);
+    }
+
+    function openReminderModal(idx) {
+        const inv = invoicesData[idx];
+        reminderTarget = inv;
+        document.getElementById('rmCustomerName').textContent = inv.customer_name || 'Unknown';
+        document.getElementById('rmPhone').textContent = inv.phone || '--';
+        document.getElementById('rmInvoice').textContent = `${inv.invoice_number} - ${formatCurrencyFull(inv.balance)}`;
+        // Auto-select template based on overdue status
+        const days = parseInt(inv.days_overdue) || 0;
+        document.getElementById('rmTemplate').value = days > 30 ? 'en_urgent' : days > 0 ? 'en_overdue' : 'en_polite';
+        document.getElementById('rmMessage').value = buildReminderMessage(inv);
+        document.getElementById('reminderModal').classList.add('show');
+    }
+
+    function closeReminderModal() {
+        document.getElementById('reminderModal').classList.remove('show');
+        reminderTarget = null;
+    }
+
+    async function sendReminder() {
+        if (!reminderTarget) return;
+        const btn = document.getElementById('rmSendBtn');
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+
+        try {
+            const msg = document.getElementById('rmMessage').value.trim();
+            if (!msg) throw new Error('Message cannot be empty');
+            const sessionType = document.getElementById('rmWhatsappAccount').value;
+
+            await apiJson(API + '/remind', {
+                method: 'POST',
+                body: {
+                    reminders: [{
+                        zoho_invoice_id: reminderTarget.zoho_invoice_id,
+                        zoho_customer_id: reminderTarget.zoho_customer_id,
+                        customer_name: reminderTarget.customer_name,
+                        phone: reminderTarget.phone,
+                        message_body: msg,
+                        balance: reminderTarget.balance,
+                        session_type: sessionType
+                    }]
+                }
+            });
+
+            showToast('Reminder sent successfully');
+            closeReminderModal();
+            loadInvoices(invPage);
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Send via WhatsApp';
+        }
+    }
+
+    function sendCustomerReminder(customerId, name, phone, amount) {
+        // Build a generic customer-level reminder
+        reminderTarget = {
+            zoho_invoice_id: '',
+            zoho_customer_id: customerId,
+            customer_name: name,
+            phone: phone,
+            balance: amount,
+            invoice_number: '',
+            due_date: null,
+            days_overdue: 0
+        };
+        document.getElementById('rmCustomerName').textContent = name;
+        document.getElementById('rmPhone').textContent = phone;
+        document.getElementById('rmInvoice').textContent = `Total outstanding: ${formatCurrencyFull(amount)}`;
+        document.getElementById('rmTemplate').value = 'en_polite';
+        document.getElementById('rmMessage').value = buildReminderMessage(reminderTarget, 'en_polite');
+        document.getElementById('reminderModal').classList.add('show');
+    }
+
+    async function bulkRemind() {
+        const eligible = selectedInvoices.filter(idx => invoicesData[idx].phone);
+        if (eligible.length === 0) {
+            showToast('No selected invoices have phone numbers', 'error');
+            return;
+        }
+
+        if (!confirm(`Send WhatsApp reminders for ${eligible.length} invoices?`)) return;
+
+        try {
+            const sessionType = document.getElementById('rmWhatsappAccount').value;
+            const templateKey = document.getElementById('rmTemplate').value;
+            const reminders = eligible.map(idx => {
+                const inv = invoicesData[idx];
+                return {
+                    zoho_invoice_id: inv.zoho_invoice_id,
+                    zoho_customer_id: inv.zoho_customer_id,
+                    customer_name: inv.customer_name,
+                    phone: inv.phone,
+                    message_body: buildReminderMessage(inv, templateKey),
+                    balance: inv.balance,
+                    session_type: sessionType
+                };
+            });
+
+            const result = await apiJson(API + '/remind', {
+                method: 'POST',
+                body: { reminders }
+            });
+
+            showToast(result.message);
+            clearSelection();
+            loadInvoices(invPage);
+        } catch (err) {
+            showToast('Bulk remind failed: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // LOG REMINDER (Call/Visit)
+    // ========================================
+
+    function showLogReminderModal() {
+        document.getElementById('lrSearch').value = '';
+        document.getElementById('lrCustomerId').value = '';
+        document.getElementById('lrCustomerName').value = '';
+        document.getElementById('lrPhone').value = '';
+        document.getElementById('lrNotes').value = '';
+        document.getElementById('lrResults').style.display = 'none';
+        document.getElementById('logReminderModal').classList.add('show');
+    }
+
+    function closeLogModal() {
+        document.getElementById('logReminderModal').classList.remove('show');
+    }
+
+    let logSearchTimer;
+    async function searchCustomersForLog() {
+        clearTimeout(logSearchTimer);
+        const q = document.getElementById('lrSearch').value.trim();
+        if (q.length < 2) { document.getElementById('lrResults').style.display = 'none'; return; }
+
+        logSearchTimer = setTimeout(async () => {
+            try {
+                const { data } = await apiJson(API + '/customers?search=' + encodeURIComponent(q) + '&limit=10');
+                const div = document.getElementById('lrResults');
+                if (data.length === 0) {
+                    div.innerHTML = '<div class="p-2 text-gray-400">No customers found</div>';
+                } else {
+                    div.innerHTML = data.map(c => `
+                        <div class="p-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100" onclick="selectLogCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}','${esc(c.phone || '')}')">
+                            <div class="font-medium">${esc(c.customer_name)}</div>
+                            <div class="text-xs text-gray-500">${esc(c.phone || 'No phone')} - ${formatCurrencyFull(c.total_outstanding)} outstanding</div>
+                        </div>
+                    `).join('');
+                }
+                div.style.display = '';
+            } catch (err) { /* ignore */ }
+        }, 300);
+    }
+
+    function selectLogCustomer(id, name, phone) {
+        document.getElementById('lrCustomerId').value = id;
+        document.getElementById('lrCustomerName').value = name;
+        document.getElementById('lrPhone').value = phone;
+        document.getElementById('lrSearch').value = name;
+        document.getElementById('lrResults').style.display = 'none';
+    }
+
+    async function submitLogReminder() {
+        const customerId = document.getElementById('lrCustomerId').value;
+        const customerName = document.getElementById('lrCustomerName').value;
+        const phone = document.getElementById('lrPhone').value;
+        const type = document.getElementById('lrType').value;
+        const notes = document.getElementById('lrNotes').value;
+
+        if (!customerId) { showToast('Please select a customer', 'error'); return; }
+
+        try {
+            await apiJson(API + '/remind/log', {
+                method: 'POST',
+                body: {
+                    zoho_customer_id: customerId,
+                    customer_name: customerName,
+                    phone: phone,
+                    reminder_type: type,
+                    notes: notes
+                }
+            });
+            showToast(type + ' logged successfully');
+            closeLogModal();
+            loadReminders(remPage);
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // REMINDERS LIST
+    // ========================================
+
+    async function loadReminders(page) {
+        remPage = page || 1;
+        const type = document.getElementById('remType').value;
+        const from = document.getElementById('remFrom').value;
+        const to = document.getElementById('remTo').value;
+        const params = new URLSearchParams({ page: remPage, limit: 25 });
+        if (type) params.set('type', type);
+        if (from) params.set('from_date', from);
+        if (to) params.set('to_date', to);
+        if (selectedBranchId) params.set('branch_id', selectedBranchId);
+
+        try {
+            const { data, pagination } = await apiJson(API + '/reminders?' + params);
+            const tbody = document.getElementById('remBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400">No reminders found</td></tr>';
+                document.getElementById('remPagination').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = data.map(r => `
+                <tr>
+                    <td>${formatDateTime(r.created_at)}</td>
+                    <td class="font-medium">${esc(r.customer_name || 'Unknown')}</td>
+                    <td>${esc(r.zoho_invoice_id ? r.zoho_invoice_id.substring(0, 12) + '...' : '--')}</td>
+                    <td><span class="status-badge status-${r.reminder_type}">${r.reminder_type}</span></td>
+                    <td class="max-w-[200px] truncate" title="${esc(r.message_content || r.notes || '')}">${esc(r.message_content || r.notes || '--')}</td>
+                    <td><span class="status-badge status-${r.status}">${r.status}</span></td>
+                    <td>${esc(r.sent_by_name || '--')}</td>
+                </tr>
+            `).join('');
+
+            buildPagination('remPagination', pagination.page, pagination.limit, pagination.total, 'loadReminders');
+        } catch (err) {
+            showToast('Failed to load reminders: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // PROMISES
+    // ========================================
+
+    async function loadPromises(page) {
+        promPage = page || 1;
+        const status = document.getElementById('promStatus').value;
+        const from = document.getElementById('promFrom').value;
+        const to = document.getElementById('promTo').value;
+        const params = new URLSearchParams({ page: promPage, limit: 25 });
+        if (status) params.set('status', status);
+        if (from) params.set('from_date', from);
+        if (to) params.set('to_date', to);
+        if (selectedBranchId) params.set('branch_id', selectedBranchId);
+
+        try {
+            const { data, pagination } = await apiJson(API + '/promises?' + params);
+            const tbody = document.getElementById('promBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-400">No promises found</td></tr>';
+                document.getElementById('promPagination').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = data.map(p => {
+                const isBroken = p.is_broken == 1;
+                const effectiveStatus = isBroken ? 'broken' : p.status;
+                return `
+                <tr class="${isBroken ? 'bg-red-50' : ''}">
+                    <td class="font-medium">${esc(p.customer_name || 'Unknown')}</td>
+                    <td>${p.zoho_invoice_id ? esc(p.zoho_invoice_id.substring(0, 12)) + '...' : '<span class="text-gray-400">Customer-level</span>'}</td>
+                    <td>${formatDate(p.promise_date)}</td>
+                    <td class="font-semibold">${formatCurrencyFull(p.promise_amount)}</td>
+                    <td><span class="status-badge status-${effectiveStatus}">${isBroken ? 'BROKEN' : p.status}</span></td>
+                    <td>${p.actual_amount ? formatCurrencyFull(p.actual_amount) + (p.actual_payment_date ? ' on ' + formatDate(p.actual_payment_date) : '') : '--'}</td>
+                    <td>${p.follow_up_date ? formatDate(p.follow_up_date) : '--'}</td>
+                    <td class="max-w-[150px] truncate" title="${esc(p.notes || '')}">${esc(p.notes || '--')}</td>
+                    <td class="flex gap-1">
+                        <button onclick="editPromise(${p.id})" class="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100">Edit</button>
+                        ${p.status === 'pending' ? `
+                            <button onclick="quickUpdatePromise(${p.id},'kept')" class="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">Kept</button>
+                            <button onclick="quickUpdatePromise(${p.id},'broken')" class="px-2 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100">Broken</button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `}).join('');
+
+            buildPagination('promPagination', pagination.page, pagination.limit, pagination.total, 'loadPromises');
+        } catch (err) {
+            showToast('Failed to load promises: ' + err.message, 'error');
+        }
+    }
+
+    function showPromiseModal() {
+        document.getElementById('pmMode').value = 'create';
+        document.getElementById('pmId').value = '';
+        document.getElementById('pmTitle').textContent = 'Add Promise to Pay';
+        document.getElementById('pmCustSearchWrap').style.display = '';
+        document.getElementById('pmCustSearch').value = '';
+        document.getElementById('pmCustomerId').value = '';
+        document.getElementById('pmCustomerName').value = '';
+        document.getElementById('pmDate').value = '';
+        document.getElementById('pmAmount').value = '';
+        document.getElementById('pmFollowUp').value = '';
+        document.getElementById('pmNotes').value = '';
+        document.getElementById('pmUpdateFields').style.display = 'none';
+        document.getElementById('pmSubmitBtn').textContent = 'Save Promise';
+        document.getElementById('pmCustResults').style.display = 'none';
+        document.getElementById('promiseModal').classList.add('show');
+    }
+
+    function closePromiseModal() {
+        document.getElementById('promiseModal').classList.remove('show');
+    }
+
+    function openPromiseForCustomer(customerId, customerName) {
+        showPromiseModal();
+        document.getElementById('pmCustomerId').value = customerId;
+        document.getElementById('pmCustomerName').value = customerName;
+        document.getElementById('pmCustSearch').value = customerName;
+    }
+
+    function openPromiseForInvoice(idx) {
+        const inv = invoicesData[idx];
+        showPromiseModal();
+        document.getElementById('pmCustomerId').value = inv.zoho_customer_id;
+        document.getElementById('pmCustomerName').value = inv.customer_name;
+        document.getElementById('pmCustSearch').value = inv.customer_name;
+        document.getElementById('pmAmount').value = inv.balance;
+    }
+
+    let promSearchTimer;
+    async function searchCustomersForPromise() {
+        clearTimeout(promSearchTimer);
+        const q = document.getElementById('pmCustSearch').value.trim();
+        if (q.length < 2) { document.getElementById('pmCustResults').style.display = 'none'; return; }
+
+        promSearchTimer = setTimeout(async () => {
+            try {
+                const { data } = await apiJson(API + '/customers?search=' + encodeURIComponent(q) + '&limit=10');
+                const div = document.getElementById('pmCustResults');
+                if (data.length === 0) {
+                    div.innerHTML = '<div class="p-2 text-gray-400">No customers found</div>';
+                } else {
+                    div.innerHTML = data.map(c => `
+                        <div class="p-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100" onclick="selectPromiseCustomer('${esc(c.zoho_customer_id)}','${esc(c.customer_name)}')">
+                            <div class="font-medium">${esc(c.customer_name)}</div>
+                            <div class="text-xs text-gray-500">${formatCurrencyFull(c.total_outstanding)} outstanding</div>
+                        </div>
+                    `).join('');
+                }
+                div.style.display = '';
+            } catch (err) { /* ignore */ }
+        }, 300);
+    }
+
+    function selectPromiseCustomer(id, name) {
+        document.getElementById('pmCustomerId').value = id;
+        document.getElementById('pmCustomerName').value = name;
+        document.getElementById('pmCustSearch').value = name;
+        document.getElementById('pmCustResults').style.display = 'none';
+    }
+
+    async function submitPromise() {
+        const mode = document.getElementById('pmMode').value;
+        const customerId = document.getElementById('pmCustomerId').value;
+        const customerName = document.getElementById('pmCustomerName').value;
+
+        if (mode === 'create') {
+            if (!customerId) { showToast('Please select a customer', 'error'); return; }
+            const date = document.getElementById('pmDate').value;
+            const amount = document.getElementById('pmAmount').value;
+            if (!date || !amount) { showToast('Date and amount are required', 'error'); return; }
+
+            try {
+                await apiJson(API + '/promises', {
+                    method: 'POST',
+                    body: {
+                        zoho_customer_id: customerId,
+                        customer_name: customerName,
+                        promise_date: date,
+                        promise_amount: parseFloat(amount),
+                        follow_up_date: document.getElementById('pmFollowUp').value || null,
+                        notes: document.getElementById('pmNotes').value || null
+                    }
+                });
+                showToast('Promise recorded');
+                closePromiseModal();
+                loadPromises(promPage);
+            } catch (err) {
+                showToast('Failed: ' + err.message, 'error');
+            }
+        } else {
+            // Update mode
+            const id = document.getElementById('pmId').value;
+            try {
+                await apiJson(API + '/promises/' + id, {
+                    method: 'PUT',
+                    body: {
+                        status: document.getElementById('pmStatus').value,
+                        actual_payment_date: document.getElementById('pmActualDate').value || null,
+                        actual_amount: document.getElementById('pmActualAmount').value ? parseFloat(document.getElementById('pmActualAmount').value) : null,
+                        follow_up_date: document.getElementById('pmFollowUp').value || null,
+                        notes: document.getElementById('pmNotes').value || null
+                    }
+                });
+                showToast('Promise updated');
+                closePromiseModal();
+                loadPromises(promPage);
+            } catch (err) {
+                showToast('Failed: ' + err.message, 'error');
+            }
+        }
+    }
+
+    async function editPromise(id) {
+        // Fetch current data from the table (already loaded)
+        try {
+            const { data } = await apiJson(API + '/promises?limit=100');
+            const p = data.find(x => x.id === id);
+            if (!p) { showToast('Promise not found', 'error'); return; }
+
+            document.getElementById('pmMode').value = 'edit';
+            document.getElementById('pmId').value = id;
+            document.getElementById('pmTitle').textContent = 'Edit Promise';
+            document.getElementById('pmCustSearchWrap').style.display = 'none';
+            document.getElementById('pmCustomerId').value = p.zoho_customer_id;
+            document.getElementById('pmCustomerName').value = p.customer_name;
+            document.getElementById('pmDate').value = p.promise_date ? p.promise_date.substring(0, 10) : '';
+            document.getElementById('pmAmount').value = p.promise_amount;
+            document.getElementById('pmFollowUp').value = p.follow_up_date ? p.follow_up_date.substring(0, 10) : '';
+            document.getElementById('pmNotes').value = p.notes || '';
+            document.getElementById('pmUpdateFields').style.display = '';
+            document.getElementById('pmStatus').value = p.status;
+            document.getElementById('pmActualDate').value = p.actual_payment_date ? p.actual_payment_date.substring(0, 10) : '';
+            document.getElementById('pmActualAmount').value = p.actual_amount || '';
+            document.getElementById('pmSubmitBtn').textContent = 'Update Promise';
+            document.getElementById('promiseModal').classList.add('show');
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        }
+    }
+
+    async function quickUpdatePromise(id, status) {
+        if (!confirm(`Mark this promise as "${status}"?`)) return;
+        try {
+            await apiJson(API + '/promises/' + id, {
+                method: 'PUT',
+                body: { status }
+            });
+            showToast('Promise marked as ' + status);
+            loadPromises(promPage);
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // EXPORT
+    // ========================================
+
+    async function exportCSV() {
+        try {
+            const status = document.getElementById('invStatus').value;
+            const params = new URLSearchParams();
+            if (status === 'overdue') params.set('status', 'overdue');
+            if (selectedBranchId) params.set('branch_id', selectedBranchId);
+
+            const resp = await apiFetch(API + '/export?' + params);
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `collections-${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV exported');
+        } catch (err) {
+            showToast('Export failed: ' + err.message, 'error');
+        }
+    }
+
+    // ========================================
+    // ESCAPE HTML
+    // ========================================
+
+    function esc(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+    }
+
+    // ========================================
+    // BRANCH HELPERS
+    // ========================================
+
+    function getBranchName(branchId) {
+        const b = branchesLoaded.find(x => x.id === branchId);
+        return b ? b.name : 'Branch ' + branchId;
+    }
+
+    function buildBranchSelect(customerId, currentBranchId) {
+        let html = `<select class="px-1 py-0.5 border border-gray-200 rounded text-xs" onchange="assignCustomerBranch('${esc(customerId)}', this.value)">`;
+        html += `<option value="">Unassigned</option>`;
+        for (const b of branchesLoaded) {
+            html += `<option value="${b.id}" ${b.id === currentBranchId ? 'selected' : ''}>${esc(b.name)}</option>`;
+        }
+        html += `</select>`;
+        return html;
+    }
+
+    async function assignCustomerBranch(customerId, branchId) {
+        try {
+            await apiJson(API + '/customers/' + customerId + '/branch', {
+                method: 'PUT',
+                body: { branch_id: branchId ? parseInt(branchId) : null }
+            });
+            showToast('Customer branch updated');
+        } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+            loadCustomers(custPage); // revert UI
+        }
+    }
+
+    function onBranchFilterChange() {
+        selectedBranchId = document.getElementById('branchFilter').value;
+        // Reload current tab
+        if (currentTab === 'summary') loadSummary();
+        else if (currentTab === 'customers') loadCustomers();
+        else if (currentTab === 'invoices') loadInvoices();
+        else if (currentTab === 'reminders') loadReminders();
+        else if (currentTab === 'promises') loadPromises();
+    }
+
+    async function loadBranches() {
+        try {
+            const resp = await apiFetch('/api/branches');
+            if (!resp) return;
+            const data = await resp.json();
+            if (data.success && data.data) {
+                branchesLoaded = data.data;
+                const sel = document.getElementById('branchFilter');
+                branchesLoaded.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    opt.textContent = b.name;
+                    sel.appendChild(opt);
+                });
+            }
+        } catch (err) {
+            console.error('Failed to load branches:', err);
+        }
+    }
+
+    // ========================================
+    // INIT
+    // ========================================
+
+    (async function init() {
+        // Detect admin role
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        isAdmin = user.role === 'admin';
+
+        if (isAdmin) {
+            document.getElementById('branchFilterWrap').style.display = '';
+            await loadBranches();
+        }
+
+        const saved = localStorage.getItem('cc_tab');
+        if (saved && document.getElementById('tab-' + saved)) {
+            const tabs = document.querySelectorAll('.cc-tab');
+            const tabNames = ['summary', 'customers', 'invoices', 'reminders', 'promises'];
+            const idx = tabNames.indexOf(saved);
+            if (idx >= 0) {
+                document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+                document.getElementById('tab-' + saved).style.display = '';
+                tabs.forEach(t => t.classList.remove('active'));
+                tabs[idx].classList.add('active');
+                currentTab = saved;
+            }
+        }
+        loadSummary();
+        if (currentTab !== 'summary') {
+            if (currentTab === 'customers') loadCustomers();
+            else if (currentTab === 'invoices') loadInvoices();
+            else if (currentTab === 'reminders') loadReminders();
+            else if (currentTab === 'promises') loadPromises();
+        }
+    })();
+
+    // WhatsApp Quick Send helpers
+    function waQuickCust(customerName, phone, outstanding, overdueCount) {
+        if (!window.WaQuickSend) return;
+        WaQuickSend.open({
+            to: phone,
+            toName: customerName,
+            message: WaQuickSend.fillTemplate('collections_customer_staff', {
+                staffName: '',
+                customerName: customerName,
+                outstanding: outstanding.replace('₹','').trim(),
+                overdueCount: overdueCount
+            }),
+            context: 'collections',
+            recipientType: null
         });
-    } catch (e) { console.error('Failed to load branches:', e); }
-}
+    }
 
-function selectBranch(el, branchId) {
-    selectedBranch = branchId;
-    document.querySelectorAll('.branch-pill').forEach(p => p.classList.remove('active'));
-    el.classList.add('active');
-    reloadCurrentTab();
-}
-
-function bp() { return selectedBranch ? 'branch_id=' + selectedBranch : ''; }
-
-function reloadCurrentTab() {
-    const a = document.querySelector('.tab-btn.active');
-    if (!a) return;
-    const t = a.textContent.trim().toLowerCase();
-    if (t === 'summary') loadSummary();
-    else if (t === 'customers') loadCustomers();
-    else if (t === 'invoices') loadInvoices();
-    else if (t === 'history') loadCalls();
-}
-
-// ── Helpers ──
-function fmt(n) { n = parseFloat(n||0); if(n>=1e7) return '\u20B9'+(n/1e7).toFixed(2)+'Cr'; if(n>=1e5) return '\u20B9'+(n/1e5).toFixed(2)+'L'; if(n>=1e3) return '\u20B9'+(n/1e3).toFixed(1)+'K'; return '\u20B9'+n.toFixed(0); }
-function fmtFull(n) { return '\u20B9'+parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '--'; }
-function fmtDateTime(d) { if(!d) return '--'; const dt=new Date(d); return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+' '+dt.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}); }
-function esc(s) { if(!s) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
-function escA(s) { return esc(s).replace(/'/g,'&#39;'); }
-function showToast(m,t) { const el=document.getElementById('toast'); el.textContent=m; el.className='show'+(t==='error'?' error':''); setTimeout(()=>el.className='',3000); }
-function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-
-async function apiJson(url, opts={}) {
-    const h = getAuthHeaders();
-    if(opts.body && typeof opts.body==='object') { h['Content-Type']='application/json'; opts.body=JSON.stringify(opts.body); }
-    const r = await fetch(url, {...opts, headers:{...h,...(opts.headers||{})}});
-    if(!r.ok) { const e = await r.json().catch(()=>({message:'Request failed'})); throw new Error(e.message||'Request failed'); }
-    return r.json();
-}
-
-// ── Sort ──
-function setCustSort(b) { custSort=b.dataset.sort; custOrder=b.dataset.order; document.querySelectorAll('#custSortBar .sort-pill').forEach(p=>p.classList.remove('active')); b.classList.add('active'); loadCustomers(); }
-function setInvSort(b) { invSort=b.dataset.sort; invOrder=b.dataset.order; document.querySelectorAll('#invSortBar .sort-pill').forEach(p=>p.classList.remove('active')); b.classList.add('active'); loadInvoices(); }
-
-// ── Tabs ──
-function switchTab(tab, btn) {
-    document.querySelectorAll('[id^="tab-"]').forEach(el=>el.style.display='none');
-    document.getElementById('tab-'+tab).style.display='';
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    if(tab==='summary') loadSummary(); else if(tab==='customers') loadCustomers(); else if(tab==='invoices') loadInvoices(); else if(tab==='history') loadCalls();
-}
-
-// ── Summary ──
-async function loadSummary() {
-    try {
-        const {data:d} = await apiJson(API+'/summary?'+bp());
-        document.getElementById('sOutstanding').textContent=fmt(d.total_outstanding);
-        document.getElementById('sOutCount').textContent=d.outstanding_count;
-        document.getElementById('sOverdue').textContent=fmt(d.overdue_amount);
-        document.getElementById('sOverCount').textContent=d.overdue_count;
-        document.getElementById('sRate').textContent=d.collection_rate_30d+'%';
-        document.getElementById('sCollected').textContent=fmt(d.collected_30d);
-        document.getElementById('sAvgDays').textContent=d.avg_days_overdue+'d';
-        document.getElementById('sRemToday').textContent=d.reminders_today;
-        document.getElementById('sPromises').textContent=d.pending_promises;
-        document.getElementById('sPromiseAmt').textContent=d.pending_promises_amount>0?fmtFull(d.pending_promises_amount):'';
-        document.getElementById('sBroken').textContent=d.broken_promises;
-        document.getElementById('hOutstanding').textContent=fmt(d.total_outstanding);
-        document.getElementById('hOverdue').textContent=fmt(d.overdue_amount);
-        document.getElementById('hCollected').textContent=fmt(d.collected_30d);
-        document.getElementById('hCustCount').textContent=d.outstanding_count;
-    } catch(e) { showToast('Failed to load summary','error'); }
-}
-
-// ── Customers ──
-async function loadCustomers(page, append) {
-    custPage=page||1;
-    const p=new URLSearchParams({search:document.getElementById('custSearchInput').value,sort:custSort,order:custOrder,page:custPage,limit:20});
-    if(selectedBranch) p.set('branch_id',selectedBranch);
-    try {
-        const {data,pagination}=await apiJson(API+'/customers?'+p);
-        if(!append) custData=data; else custData=custData.concat(data);
-        const list=document.getElementById('custList');
-        if(!custData.length) { list.innerHTML='<div class="empty-state"><div class="icon">👥</div>No customers with outstanding balance</div>'; document.getElementById('custMore').style.display='none'; return; }
-        list.innerHTML=custData.map(c=>{
-            const uc=parseFloat(c.unused_credits||0);
-            return `<div class="list-item">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                    <div style="flex:1;min-width:0">
-                        <div class="name" style="display:flex;align-items:center;gap:6px">${esc(c.customer_name||'Unknown')}${c.phone?`<svg onclick="event.stopPropagation();waQuickCust('${escA(c.customer_name)}','${escA(c.phone)}','${fmtFull(c.total_outstanding).replace(/'/g,"\\'")}',${c.overdue_count||0})" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" style="cursor:pointer;flex-shrink:0" title="WhatsApp Quick Send"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.654-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>`:''}</div>
-                        <div class="meta">${esc(c.phone||'No phone')} · ${c.invoice_count} inv${c.branch_name?' · '+esc(c.branch_name):''}</div>
-                        ${c.overdue_count>0?`<div class="overdue">${c.overdue_count} overdue · ${fmtFull(c.overdue_amount)}</div>`:''}
-                        ${uc>0?`<div style="font-size:0.7rem;color:#0891b2;font-weight:600;margin-top:2px">Credit: ${fmtFull(uc)}</div>`:''}
-                    </div>
-                    <div style="text-align:right;flex-shrink:0;margin-left:12px">
-                        <div class="amount">${fmtFull(c.total_outstanding)}</div>
-                        ${uc>0?`<div style="font-size:0.65rem;color:#0891b2;margin-top:2px">Net: ${fmtFull(c.total_outstanding-uc)}</div>`:''}
-                        ${c.overdue_amount>0?'<span class="badge badge-overdue">Overdue</span>':'<span class="badge badge-ok">Current</span>'}
-                    </div>
-                </div>
-                <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-                    ${c.phone?`<a href="tel:${esc(c.phone)}" class="action-btn btn-phone">📞 Call</a>`:''}
-                    ${c.phone?`<button class="action-btn btn-remind" onclick="openRemindCust('${escA(c.zoho_customer_id)}','${escA(c.customer_name)}','${escA(c.phone)}',${c.total_outstanding})">WhatsApp</button>`:''}
-                    <button class="action-btn btn-call" onclick="openLogModal('${escA(c.zoho_customer_id)}','${escA(c.customer_name)}','${escA(c.phone||'')}')">Log Call</button>
-                    <button class="action-btn btn-promise" onclick="openPromiseModal('${escA(c.zoho_customer_id)}','${escA(c.customer_name)}',${c.total_outstanding})">Promise</button>
-                </div>
-            </div>`;
-        }).join('');
-        document.getElementById('custMore').style.display=(pagination.page*pagination.limit<pagination.total)?'':'none';
-    } catch(e) { showToast('Failed to load customers','error'); }
-}
-
-// ── Invoices ──
-async function loadInvoices(page, append) {
-    invPage=page||1;
-    const p=new URLSearchParams({search:document.getElementById('invSearchInput').value,sort:invSort,order:invOrder,page:invPage,limit:20});
-    if(selectedBranch) p.set('branch_id',selectedBranch);
-    try {
-        const {data,pagination}=await apiJson(API+'/invoices?'+p);
-        if(!append) invData=data; else invData=invData.concat(data);
-        const list=document.getElementById('invList');
-        if(!invData.length) { list.innerHTML='<div class="empty-state"><div class="icon">📄</div>No outstanding invoices</div>'; document.getElementById('invMore').style.display='none'; return; }
-        list.innerHTML=invData.map((inv,idx)=>`
-            <div class="list-item">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                    <div style="flex:1;min-width:0">
-                        <div class="name" style="display:flex;align-items:center;gap:6px">${esc(inv.invoice_number||'N/A')}${inv.phone?`<svg onclick="event.stopPropagation();waQuickInv(${idx})" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" style="cursor:pointer;flex-shrink:0" title="WhatsApp Quick Send"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.654-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>`:''}</div>
-                        <div class="meta">${esc(inv.customer_name||'Unknown')} · Due ${fmtDate(inv.due_date)}${inv.branch_name?' · '+esc(inv.branch_name):''}</div>
-                        ${inv.days_overdue>0?`<div class="overdue">${inv.days_overdue} days overdue</div>`:''}
-                    </div>
-                    <div style="text-align:right;flex-shrink:0;margin-left:12px">
-                        <div class="amount">${fmtFull(inv.balance)}</div>
-                        ${inv.days_overdue>0?'<span class="badge badge-overdue">Overdue</span>':'<span class="badge badge-ok">'+esc(inv.status)+'</span>'}
-                    </div>
-                </div>
-                <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-                    ${inv.phone?`<a href="tel:${esc(inv.phone)}" class="action-btn btn-phone">📞 Call</a>`:''}
-                    ${inv.phone?`<button class="action-btn btn-remind" onclick="openRemindInv(${idx})">WhatsApp</button>`:''}
-                    <button class="action-btn btn-call" onclick="openLogModal('${escA(inv.zoho_customer_id)}','${escA(inv.customer_name)}','${escA(inv.phone||'')}')">Log Call</button>
-                    <button class="action-btn btn-promise" onclick="openPromiseModal('${escA(inv.zoho_customer_id)}','${escA(inv.customer_name)}',${inv.balance})">Promise</button>
-                </div>
-            </div>
-        `).join('');
-        document.getElementById('invMore').style.display=(pagination.page*pagination.limit<pagination.total)?'':'none';
-    } catch(e) { showToast('Failed to load invoices','error'); }
-}
-
-// ── Reminder ──
-function openRemindCust(custId,name,phone,amount) {
-    document.getElementById('rmCustId').value=custId; document.getElementById('rmInvId').value='';
-    document.getElementById('rmName').textContent=name; document.getElementById('rmPhone').textContent=phone;
-    document.getElementById('rmMsg').value=`Dear ${name}, you have an outstanding balance of ${fmtFull(amount)} with Quality Colours. Please make the payment at your earliest convenience. - Quality Colours`;
-    document.getElementById('reminderModal').classList.add('show');
-}
-function openRemindInv(idx) {
-    const inv=invData[idx];
-    document.getElementById('rmCustId').value=inv.zoho_customer_id; document.getElementById('rmInvId').value=inv.zoho_invoice_id;
-    document.getElementById('rmName').textContent=inv.customer_name; document.getElementById('rmPhone').textContent=inv.phone;
-    document.getElementById('rmMsg').value=inv.days_overdue>0
-        ?`Dear ${inv.customer_name}, your invoice #${inv.invoice_number} for ${fmtFull(inv.balance)} is overdue by ${inv.days_overdue} days. Kindly settle the payment immediately. - Quality Colours`
-        :`Dear ${inv.customer_name}, this is a reminder about invoice #${inv.invoice_number} for ${fmtFull(inv.balance)}. Due date: ${fmtDate(inv.due_date)}. - Quality Colours`;
-    document.getElementById('reminderModal').classList.add('show');
-}
-async function sendReminder() {
-    const btn=document.getElementById('rmSendBtn'); btn.disabled=true; btn.textContent='Sending...';
-    try {
-        const msg=document.getElementById('rmMsg').value.trim(); if(!msg) throw new Error('Message is empty');
-        await apiJson(API+'/remind',{method:'POST',body:{reminders:[{zoho_invoice_id:document.getElementById('rmInvId').value||null,zoho_customer_id:document.getElementById('rmCustId').value,customer_name:document.getElementById('rmName').textContent,phone:document.getElementById('rmPhone').textContent,message_body:msg,balance:0}]}});
-        showToast('Reminder sent!'); closeModal('reminderModal');
-    } catch(e) { showToast('Failed: '+e.message,'error'); }
-    finally { btn.disabled=false; btn.textContent='Send WhatsApp'; }
-}
-
-// ── Log Call ──
-function openLogModal(custId,name,phone) { document.getElementById('lgCustId').value=custId; document.getElementById('lgCustName').value=name; document.getElementById('lgPhone').value=phone; document.getElementById('lgNotes').value=''; document.getElementById('logModal').classList.add('show'); }
-async function submitLog() {
-    try { await apiJson(API+'/remind/log',{method:'POST',body:{zoho_customer_id:document.getElementById('lgCustId').value,customer_name:document.getElementById('lgCustName').value,phone:document.getElementById('lgPhone').value,reminder_type:document.getElementById('lgType').value,notes:document.getElementById('lgNotes').value}}); showToast('Logged successfully'); closeModal('logModal'); }
-    catch(e) { showToast('Failed: '+e.message,'error'); }
-}
-
-// ── Promise ──
-function openPromiseModal(custId,name,amount) { document.getElementById('prCustId').value=custId; document.getElementById('prCustName').value=name; document.getElementById('prDate').value=''; document.getElementById('prAmount').value=amount||''; document.getElementById('prNotes').value=''; document.getElementById('promiseModal').classList.add('show'); }
-async function submitPromise() {
-    try { const date=document.getElementById('prDate').value,amount=document.getElementById('prAmount').value; if(!date||!amount) throw new Error('Date and amount required');
-        await apiJson(API+'/promises',{method:'POST',body:{zoho_customer_id:document.getElementById('prCustId').value,customer_name:document.getElementById('prCustName').value,promise_date:date,promise_amount:parseFloat(amount),notes:document.getElementById('prNotes').value||null}});
-        showToast('Promise recorded'); closeModal('promiseModal');
-    } catch(e) { showToast('Failed: '+e.message,'error'); }
-}
-
-// ── History ──
-function switchHistSub(sub) {
-    document.getElementById('histCalls').style.display=sub==='calls'?'':'none';
-    document.getElementById('histPromises').style.display=sub==='promises'?'':'none';
-    document.getElementById('histSubCalls').classList.toggle('active',sub==='calls');
-    document.getElementById('histSubPromises').classList.toggle('active',sub==='promises');
-    if(sub==='calls') loadCalls(); else loadPromises();
-}
-
-async function loadCalls(page, append) {
-    callsPage=page||1;
-    try {
-        const {data,pagination}=await apiJson(API+'/reminders?page='+callsPage+'&limit=20'+(selectedBranch?'&branch_id='+selectedBranch:''));
-        if(!append) callsData=data; else callsData=callsData.concat(data);
-        const list=document.getElementById('callsList');
-        if(!callsData.length) { list.innerHTML='<div class="empty-state"><div class="icon">📞</div>No calls or visits logged yet</div>'; document.getElementById('callsMore').style.display='none'; return; }
-        const icons={call:'📞',visit:'🏪',email:'📧',whatsapp:'💬'};
-        list.innerHTML=callsData.map(r=>`<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="name">${icons[r.reminder_type]||'📋'} ${esc(r.customer_name||'Unknown')}</div><div class="meta">${esc(r.reminder_type)} · by ${esc(r.sent_by_name||'--')} · ${fmtDateTime(r.created_at)}</div>${r.notes?`<div style="font-size:0.75rem;color:#64748b;margin-top:4px;white-space:pre-line">${esc(r.notes)}</div>`:''}</div><span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:0.65rem">${esc(r.reminder_type)}</span></div></div>`).join('');
-        document.getElementById('callsMore').style.display=(pagination.page*pagination.limit<pagination.total)?'':'none';
-    } catch(e) { showToast('Failed to load call history','error'); }
-}
-
-async function loadPromises(page, append) {
-    promisesPage=page||1;
-    try {
-        const {data,pagination}=await apiJson(API+'/promises?page='+promisesPage+'&limit=20'+(selectedBranch?'&branch_id='+selectedBranch:''));
-        if(!append) promisesData=data; else promisesData=promisesData.concat(data);
-        const list=document.getElementById('promisesList');
-        if(!promisesData.length) { list.innerHTML='<div class="empty-state"><div class="icon">🤝</div>No promises recorded yet</div>'; document.getElementById('promisesMore').style.display='none'; return; }
-        list.innerHTML=promisesData.map(p=>{
-            const broken=p.is_broken||(p.status==='pending'&&new Date(p.promise_date)<new Date());
-            const sb=p.status==='fulfilled'?'<span class="badge badge-ok">Fulfilled</span>':broken?'<span class="badge badge-overdue">Broken</span>':'<span class="badge" style="background:#fef3c7;color:#92400e;font-size:0.65rem">Pending</span>';
-            return `<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="name">${esc(p.customer_name||'Unknown')}</div><div class="meta">Promise: ${fmtDate(p.promise_date)} · by ${esc(p.created_by_name||'--')}</div>${p.notes?`<div style="font-size:0.75rem;color:#64748b;margin-top:4px">${esc(p.notes)}</div>`:''}</div><div style="text-align:right"><div class="amount">${fmtFull(p.promise_amount)}</div>${sb}</div></div></div>`;
-        }).join('');
-        document.getElementById('promisesMore').style.display=(pagination.page*pagination.limit<pagination.total)?'':'none';
-    } catch(e) { showToast('Failed to load promises','error'); }
-}
-
-// ── WhatsApp Quick Send ──
-function waQuickCust(customerName, phone, outstanding, overdueCount) {
-    if (typeof WaQuickSend === 'undefined') return showToast('WhatsApp component not loaded','error');
-    WaQuickSend.open({
-        to: phone,
-        toName: customerName,
-        message: WaQuickSend.fillTemplate('collections_customer_staff', {
-            staffName: '',
-            customerName: customerName,
-            outstanding: outstanding.replace(/^\u20b9/,''),
-            overdueCount: String(overdueCount)
-        }),
-        context: 'collections',
-        recipientType: null
-    });
-}
-function waQuickInv(idx) {
-    var inv = invData[idx];
-    if (!inv) return;
-    if (typeof WaQuickSend === 'undefined') return showToast('WhatsApp component not loaded','error');
-    WaQuickSend.open({
-        to: inv.phone,
-        toName: inv.customer_name,
-        message: WaQuickSend.fillTemplate('collections_invoice_staff', {
-            staffName: '',
-            invoiceNo: inv.invoice_number,
-            customerName: inv.customer_name,
-            balance: fmtFull(inv.balance).replace(/^\u20b9/,''),
-            date: fmtDate(inv.due_date)
-        }),
-        context: 'collections',
-        recipientType: null
-    });
-}
-
-// ── Export ──
-function exportCSV() { window.open(API+'/export'+(selectedBranch?'?branch_id='+selectedBranch:''),'_blank'); }
-
-// ── Init ──
-loadBranches();
-loadSummary();
+    function waQuickInv(idx) {
+        if (!window.WaQuickSend || !invoicesData || !invoicesData[idx]) return;
+        var inv = invoicesData[idx];
+        WaQuickSend.open({
+            to: inv.phone || '',
+            toName: inv.customer_name || '',
+            message: WaQuickSend.fillTemplate('collections_invoice_staff', {
+                staffName: '',
+                invoiceNo: inv.invoice_number || '',
+                customerName: inv.customer_name || '',
+                balance: formatCurrencyFull(inv.balance).replace('₹','').trim(),
+                date: formatDate(inv.due_date)
+            }),
+            context: 'collections',
+            recipientType: null
+        });
+    }
 </script>
 </body>
 </html>
