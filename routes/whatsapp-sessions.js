@@ -138,6 +138,86 @@ router.get('/', perm, async (req, res) => {
 });
 
 // ========================================
+// ADMIN SESSION ROUTES (named, before :branchId params)
+// ========================================
+
+const ADMIN_BRANCH_ID = -1;
+
+router.get('/admin/status', perm, async (req, res) => {
+    try {
+        if (!sessionManager) {
+            return res.json({ success: true, data: { status: 'disconnected', phone_number: null, has_qr: false } });
+        }
+        const status = sessionManager.getBranchStatus(ADMIN_BRANCH_ID);
+        res.json({ success: true, data: status });
+    } catch (error) {
+        console.error('[WhatsApp Sessions] Admin status error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/admin/connect', perm, async (req, res) => {
+    try {
+        if (!sessionManager) {
+            return res.status(503).json({ success: false, message: 'WhatsApp session manager not available' });
+        }
+        const result = await sessionManager.connectBranch(ADMIN_BRANCH_ID, req.user.id);
+        res.json(result);
+    } catch (error) {
+        console.error('[WhatsApp Sessions] Admin connect error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/admin/disconnect', perm, async (req, res) => {
+    try {
+        if (!sessionManager) {
+            return res.status(503).json({ success: false, message: 'WhatsApp session manager not available' });
+        }
+        const result = await sessionManager.disconnectBranch(ADMIN_BRANCH_ID);
+        res.json(result);
+    } catch (error) {
+        console.error('[WhatsApp Sessions] Admin disconnect error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.get('/admin/qr', perm, async (req, res) => {
+    try {
+        if (!sessionManager) {
+            return res.json({ success: true, data: { qr: null } });
+        }
+        const qr = sessionManager.getQRForBranch(ADMIN_BRANCH_ID);
+        res.json({ success: true, data: { qr } });
+    } catch (error) {
+        console.error('[WhatsApp Sessions] Admin QR error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/admin/test', perm, async (req, res) => {
+    try {
+        if (!sessionManager) {
+            return res.status(503).json({ success: false, message: 'WhatsApp session manager not available' });
+        }
+        const { phone, message } = req.body;
+        if (!phone) {
+            return res.status(400).json({ success: false, message: 'phone is required' });
+        }
+        const testMsg = message || 'Test message from QC Paint Shop Admin WhatsApp';
+        const sent = await sessionManager.sendMessage(ADMIN_BRANCH_ID, phone, testMsg);
+        if (sent) {
+            res.json({ success: true, message: `Test message sent to ${phone}` });
+        } else {
+            res.status(400).json({ success: false, message: 'Admin session is not connected' });
+        }
+    } catch (error) {
+        console.error('[WhatsApp Sessions] Admin test error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ========================================
 // CONNECT
 // ========================================
 

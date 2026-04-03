@@ -14,7 +14,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
     <link rel="stylesheet" href="/css/zoho-common.css">
-    <script src="/universal-nav-loader.js"></script>
+    <script src="/universal-nav-loader.js?v=4.0"></script>
     <script src="/js/auth-helper.js"></script>
     <script>requireAdminOrRedirect();</script>
     <script src="/socket.io/socket.io.js"></script>
@@ -249,6 +249,7 @@
 
     <script>
         const ADMIN_BRANCH_ID = -1;
+        const API_BASE = '/api/zoho/whatsapp-sessions/admin';
         const token = localStorage.getItem('auth_token');
         let qrPollInterval = null;
         let statusPollInterval = null;
@@ -296,7 +297,7 @@
         // ========================================
         async function loadStatus() {
             try {
-                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/status`, {
+                const res = await fetch(`${API_BASE}/status`, {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 const json = await res.json();
@@ -313,7 +314,7 @@
 
         async function fetchQR() {
             try {
-                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/qr`, {
+                const res = await fetch(`${API_BASE}/qr`, {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 const json = await res.json();
@@ -331,7 +332,7 @@
             btn.innerHTML = '<span class="spinner"></span> Connecting...';
 
             try {
-                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/connect`, {
+                const res = await fetch(`${API_BASE}/connect`, {
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
@@ -355,7 +356,7 @@
             if (!confirm('Disconnect Admin WhatsApp? You will need to scan the QR code again to reconnect.')) return;
 
             try {
-                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/disconnect`, {
+                const res = await fetch(`${API_BASE}/disconnect`, {
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
@@ -379,7 +380,7 @@
             }
 
             try {
-                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/test`, {
+                const res = await fetch(`${API_BASE}/test`, {
                     method: 'POST',
                     headers: {
                         'Authorization': 'Bearer ' + token,
