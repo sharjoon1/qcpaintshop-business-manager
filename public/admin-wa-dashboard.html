@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>WhatsApp Dashboard - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+
+        .stat-card {
+            background: #fff; border-radius: 12px; padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #f1f5f9;
+            display: flex; align-items: flex-start; gap: 1rem;
+        }
+        .stat-icon {
+            width: 44px; height: 44px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            font-size: 1.25rem;
+        }
+        .stat-value { font-size: 1.75rem; font-weight: 700; color: #1e293b; line-height: 1; }
+        .stat-label { font-size: 0.75rem; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+        .stat-sub { font-size: 0.6875rem; color: #94a3b8; margin-top: 2px; }
+
+        .section-card {
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #f1f5f9;
+            overflow: hidden;
+        }
+        .section-header {
+            padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .section-header h3 { font-size: 0.9375rem; font-weight: 700; color: #1e293b; }
+        .section-body { padding: 1.25rem; }
+
+        .session-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
+        .session-item {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid #f1f5f9;
+            background: #fafbfc; transition: all 0.15s;
+        }
+        .session-item:hover { border-color: #e2e8f0; }
+        .session-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .session-dot.connected { background: #25D366; box-shadow: 0 0 6px rgba(37,211,102,0.4); }
+        .session-dot.disconnected { background: #ef4444; }
+        .session-name { font-size: 0.8125rem; font-weight: 600; color: #334155; }
+        .session-phone { font-size: 0.6875rem; color: #94a3b8; }
+
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+        .data-table th { background: #f8fafc; padding: 10px 14px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+        .data-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        .data-table tr:hover { background: #f8fafc; }
+
+        .dir-badge {
+            display: inline-flex; align-items: center; padding: 2px 8px;
+            border-radius: 9999px; font-size: 0.6875rem; font-weight: 600;
+        }
+        .dir-in { background: #dcfce7; color: #16a34a; }
+        .dir-out { background: #dbeafe; color: #2563eb; }
+
+        .wa-accent { color: #25D366; }
+
+        .toast {
+            position: fixed; top: 1rem; right: 1rem; z-index: 9999;
+            padding: 0.75rem 1.25rem; border-radius: 10px; font-size: 0.8125rem; font-weight: 500;
+            color: #fff; background: #ef4444; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateX(120%); transition: transform 0.3s;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: #16a34a; }
+
+        .loading-spinner {
+            display: inline-block; width: 18px; height: 18px;
+            border: 2px solid #e2e8f0; border-top-color: #667eea;
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 6px;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    </style>
+</head>
+<body data-page="wa-dashboard" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
+
+    <div class="container mx-auto p-4 md:p-6">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+            <div>
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800">WhatsApp Dashboard</h2>
+                <p class="text-gray-500 mt-0.5 text-xs">Overview of messaging, sessions, and campaigns</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="lastUpdated" class="text-xs text-gray-400"></span>
+                <button onclick="refreshAll()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5" id="kpiRow">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #f0fdf4;">
+                    <svg class="w-5 h-5 wa-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <div>
+                    <div class="stat-label">Total Contacts</div>
+                    <div class="stat-value" id="kpiContacts">--</div>
+                    <div class="stat-sub" id="kpiUnread"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #eff6ff;">
+                    <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                </div>
+                <div>
+                    <div class="stat-label">Messages Today</div>
+                    <div class="stat-value" id="kpiMsgToday">--</div>
+                    <div class="stat-sub" id="kpiMsgBreakdown"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #fef3c7;">
+                    <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+                </div>
+                <div>
+                    <div class="stat-label">Active Campaigns</div>
+                    <div class="stat-value" id="kpiCampaigns">--</div>
+                    <div class="stat-sub" id="kpiCampaignsSub"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #f0fdf4;">
+                    <svg class="w-5 h-5 wa-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div>
+                    <div class="stat-label">Connected Sessions</div>
+                    <div class="stat-value" id="kpiSessions">--</div>
+                    <div class="stat-sub" id="kpiSessionsSub"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Two-column layout: Sessions + Chart -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+            <!-- Session Status -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Session Status</h3>
+                    <a href="/admin-whatsapp-sessions.html" class="text-xs font-medium" style="color: #667eea;">Manage &rarr;</a>
+                </div>
+                <div class="section-body">
+                    <div class="session-grid" id="sessionGrid">
+                        <div class="skeleton" style="height: 52px;"></div>
+                        <div class="skeleton" style="height: 52px;"></div>
+                        <div class="skeleton" style="height: 52px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Campaign Performance Chart -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Sending Stats (Last 7 Days)</h3>
+                    <a href="/admin-wa-marketing.html" class="text-xs font-medium" style="color: #667eea;">Campaigns &rarr;</a>
+                </div>
+                <div class="section-body" style="height: 260px;">
+                    <canvas id="sendingChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Conversations -->
+        <div class="section-card">
+            <div class="section-header">
+                <h3>Recent Conversations</h3>
+                <a href="/admin-whatsapp-chat.html" class="text-xs font-medium" style="color: #667eea;">View All &rarr;</a>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="data-table" id="recentTable">
+                    <thead>
+                        <tr>
+                            <th>Contact</th>
+                            <th>Branch</th>
+                            <th>Direction</th>
+                            <th>Last Message</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentBody">
+                        <tr><td colspan="5" class="text-center text-gray-400 py-8">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const token = localStorage.getItem('auth_token');
+    const headers = { 'Authorization': 'Bearer ' + token };
+    let sendingChart = null;
+
+    // ========== TOAST ==========
+    function showToast(msg, type = 'error') {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast ' + (type === 'success' ? 'success' : '');
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ========== FETCH HELPER ==========
+    async function apiFetch(url) {
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    }
+
+    // ========== LOAD KPI STATS ==========
+    async function loadChatStats() {
+        try {
+            const data = await apiFetch('/api/whatsapp-chat/stats');
+            document.getElementById('kpiContacts').textContent = (data.total_conversations || 0).toLocaleString();
+            document.getElementById('kpiUnread').textContent = (data.unread_count || 0) + ' unread';
+            document.getElementById('kpiMsgToday').textContent = (data.messages_today || 0).toLocaleString();
+            const inCount = data.incoming_today || 0;
+            const outCount = (data.messages_today || 0) - inCount;
+            document.getElementById('kpiMsgBreakdown').textContent = inCount + ' in / ' + outCount + ' out';
+        } catch (err) {
+            console.error('Chat stats error:', err);
+            showToast('Failed to load chat stats');
+        }
+    }
+
+    async function loadCampaignStats() {
+        try {
+            const data = await apiFetch('/api/wa-marketing/dashboard');
+            const c = data.campaigns || {};
+            const running = c.running || 0;
+            const scheduled = c.scheduled || 0;
+            document.getElementById('kpiCampaigns').textContent = running + scheduled;
+            const parts = [];
+            if (running) parts.push(running + ' running');
+            if (scheduled) parts.push(scheduled + ' scheduled');
+            if (c.drafts) parts.push(c.drafts + ' drafts');
+            document.getElementById('kpiCampaignsSub').textContent = parts.join(', ') || 'No active campaigns';
+        } catch (err) {
+            console.error('Campaign stats error:', err);
+            showToast('Failed to load campaign stats');
+        }
+    }
+
+    // ========== LOAD SESSIONS ==========
+    async function loadSessions() {
+        try {
+            const data = await apiFetch('/api/zoho/whatsapp-sessions/');
+            const sessions = data.data || [];
+            const general = data.general;
+            const all = general ? [general, ...sessions] : sessions;
+
+            let connected = 0;
+            let total = all.length;
+            let html = '';
+
+            all.forEach(s => {
+                const isConn = s.status === 'connected';
+                if (isConn) connected++;
+                html += `
+                    <div class="session-item">
+                        <div class="session-dot ${isConn ? 'connected' : 'disconnected'}"></div>
+                        <div>
+                            <div class="session-name">${escHtml(s.branch_name)}</div>
+                            <div class="session-phone">${s.phone_number || s.live_phone || 'Not connected'}</div>
+                        </div>
+                    </div>`;
+            });
+
+            document.getElementById('sessionGrid').innerHTML = html || '<p class="text-gray-400 text-sm">No sessions configured</p>';
+            document.getElementById('kpiSessions').textContent = connected + ' / ' + total;
+            document.getElementById('kpiSessionsSub').textContent = connected === total ? 'All connected' : (total - connected) + ' disconnected';
+        } catch (err) {
+            console.error('Sessions error:', err);
+            document.getElementById('sessionGrid').innerHTML = '<p class="text-red-400 text-sm">Failed to load sessions</p>';
+            showToast('Failed to load sessions');
+        }
+    }
+
+    // ========== LOAD SENDING CHART ==========
+    async function loadSendingChart() {
+        try {
+            const data = await apiFetch('/api/wa-marketing/dashboard/sending-stats?days=7');
+            const daily = data.daily || [];
+
+            const labels = daily.map(d => {
+                const dt = new Date(d.stat_date);
+                return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+            });
+            const sent = daily.map(d => d.sent || 0);
+            const failed = daily.map(d => d.failed || 0);
+
+            if (sendingChart) sendingChart.destroy();
+
+            const ctx = document.getElementById('sendingChart').getContext('2d');
+            sendingChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Sent',
+                            data: sent,
+                            backgroundColor: '#25D366',
+                            borderRadius: 4,
+                            barPercentage: 0.7
+                        },
+                        {
+                            label: 'Failed',
+                            data: failed,
+                            backgroundColor: '#ef4444',
+                            borderRadius: 4,
+                            barPercentage: 0.7
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { font: { size: 11, weight: '500' }, boxWidth: 12, padding: 12 }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { font: { size: 11 }, stepSize: 1 },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        x: {
+                            ticks: { font: { size: 11 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        } catch (err) {
+            console.error('Sending chart error:', err);
+        }
+    }
+
+    // ========== LOAD RECENT CONVERSATIONS ==========
+    async function loadRecentConversations() {
+        try {
+            const data = await apiFetch('/api/whatsapp-chat/conversations?limit=20');
+            const rows = data.conversations || [];
+            const tbody = document.getElementById('recentBody');
+
+            if (rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-400 py-6">No conversations yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = rows.map(r => {
+                const name = r.saved_name || r.pushname || r.phone_number;
+                const dir = r.last_direction || 'out';
+                const body = r.last_message || '';
+                const preview = body.length > 60 ? body.substring(0, 60) + '...' : body;
+                const time = r.last_message_at ? formatTime(r.last_message_at) : '--';
+                const unread = r.unread_count > 0 ? `<span class="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold" style="background:#25D366;">${r.unread_count}</span>` : '';
+
+                return `<tr>
+                    <td class="font-medium">${escHtml(name)}${unread}</td>
+                    <td class="text-gray-500">${escHtml(r.branch_name || '--')}</td>
+                    <td><span class="dir-badge dir-${dir}">${dir === 'in' ? 'Received' : 'Sent'}</span></td>
+                    <td class="text-gray-500" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(preview) || '<span class="text-gray-300 italic">Media</span>'}</td>
+                    <td class="text-gray-400 whitespace-nowrap">${time}</td>
+                </tr>`;
+            }).join('');
+        } catch (err) {
+            console.error('Recent conversations error:', err);
+            document.getElementById('recentBody').innerHTML = '<tr><td colspan="5" class="text-center text-red-400 py-6">Failed to load conversations</td></tr>';
+        }
+    }
+
+    // ========== HELPERS ==========
+    function escHtml(str) {
+        if (!str) return '';
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function formatTime(ts) {
+        const d = new Date(ts);
+        const now = new Date();
+        const isToday = d.toDateString() === now.toDateString();
+        if (isToday) {
+            return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        }
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        if (d.toDateString() === yesterday.toDateString()) {
+            return 'Yesterday ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        }
+        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ' ' +
+               d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ========== REFRESH ALL ==========
+    async function refreshAll() {
+        document.getElementById('lastUpdated').textContent = 'Refreshing...';
+        await Promise.allSettled([
+            loadChatStats(),
+            loadCampaignStats(),
+            loadSessions(),
+            loadSendingChart(),
+            loadRecentConversations()
+        ]);
+        const now = new Date();
+        document.getElementById('lastUpdated').textContent = 'Updated ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ========== INIT ==========
+    refreshAll();
+
+    // Auto-refresh every 60s
+    setInterval(refreshAll, 60000);
+    </script>
+</body>
+</html>
