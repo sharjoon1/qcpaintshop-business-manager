@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>WhatsApp Contacts - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 0 16px 24px; }
+
+        /* Tabs */
+        .tabs { display: flex; background: rgba(255,255,255,0.15); border-radius: 12px; padding: 4px; margin-bottom: 16px; gap: 4px; }
+        .tab-btn { flex: 1; padding: 10px 8px; border: none; background: transparent; color: rgba(255,255,255,0.7); font-size: 0.8125rem; font-weight: 600; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { background: white; color: #667eea; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+
+        .card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .search-input { width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.8125rem; outline: none; }
+        .search-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+
+        .action-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-secondary { background: #f1f5f9; color: #475569; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .btn-danger { background: #fee2e2; color: #991b1b; }
+        .btn-danger:hover { background: #fecaca; }
+        .btn-success { background: #d1fae5; color: #065f46; }
+        .btn-success:hover { background: #a7f3d0; }
+
+        .badge { display: inline-block; font-size: 0.625rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #ede9fe; color: #6366F1; margin: 1px 2px; }
+
+        /* Table */
+        .contact-table { width: 100%; border-collapse: collapse; }
+        .contact-table th { font-size: 0.7rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+        .contact-table td { font-size: 0.8125rem; color: #1e293b; padding: 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .contact-table tr:hover { background: #f8fafc; }
+
+        /* Group cards */
+        .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+        .group-card { background: white; border-radius: 14px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+        .group-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.12); transform: translateY(-1px); }
+        .group-card.selected { border-color: #667eea; }
+        .group-card .color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .group-card .g-name { font-weight: 700; font-size: 0.9375rem; color: #1e293b; }
+        .group-card .g-desc { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+        .group-card .g-count { font-size: 0.75rem; color: #667eea; font-weight: 600; margin-top: 8px; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-box { background: white; border-radius: 16px; padding: 24px; width: 90%; max-width: 480px; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .modal-box h3 { font-size: 1.1rem; font-weight: 700; color: #1e293b; margin-bottom: 16px; }
+        .modal-box label { font-size: 0.75rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 4px; margin-top: 12px; }
+        .modal-box input, .modal-box select, .modal-box textarea { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.8125rem; outline: none; }
+        .modal-box input:focus, .modal-box select:focus { border-color: #667eea; }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+        /* Pagination */
+        .pagination { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0; }
+        .pagination button { padding: 6px 14px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; font-size: 0.75rem; font-weight: 600; cursor: pointer; color: #475569; }
+        .pagination button:disabled { opacity: 0.4; cursor: default; }
+        .pagination button.active { background: #667eea; color: white; border-color: #667eea; }
+        .pagination .page-info { font-size: 0.75rem; color: #94a3b8; }
+
+        /* Checkbox */
+        .cb { width: 16px; height: 16px; accent-color: #667eea; cursor: pointer; }
+
+        /* Detail panel (for group detail) */
+        .detail-panel { background: white; border-radius: 16px; padding: 16px; }
+        .detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+
+        .empty-state { text-align: center; padding: 40px 0; color: #94a3b8; }
+        .empty-state .icon { font-size: 2rem; margin-bottom: 8px; }
+
+        /* Top bar */
+        .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    </style>
+</head>
+<body data-page="wa-contacts">
+    <div id="nav-container"></div>
+
+    <div class="container" style="padding-top: 16px;">
+        <!-- Header -->
+        <div style="margin-bottom: 16px;">
+            <h1 style="font-size: 1.25rem; font-weight: 700; color: white;">WhatsApp Contacts</h1>
+            <p style="font-size: 0.75rem; color: rgba(255,255,255,0.7);">Manage contacts and groups</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('contacts')">All Contacts</button>
+            <button class="tab-btn" onclick="switchTab('groups')">Groups</button>
+        </div>
+
+        <!-- TAB 1: ALL CONTACTS -->
+        <div id="tab-contacts">
+            <div class="card">
+                <div class="top-bar">
+                    <div style="display: flex; gap: 8px; flex: 1; min-width: 200px;">
+                        <input type="text" id="contactSearch" class="search-input" placeholder="Search name or phone..." oninput="debounceSearch()">
+                        <select id="groupFilter" onchange="loadContacts(1)" style="padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.8125rem; min-width: 120px;">
+                            <option value="">All Groups</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="action-btn btn-success" onclick="showImportModal()">Import</button>
+                        <button class="action-btn btn-primary" onclick="showAddContactModal()">+ Add</button>
+                    </div>
+                </div>
+
+                <!-- Bulk actions -->
+                <div id="bulkBar" style="display: none; padding: 8px 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 8px;">
+                    <span id="selectedCount" style="font-size: 0.75rem; font-weight: 600; color: #667eea;">0 selected</span>
+                    <select id="bulkGroupSelect" style="margin-left: 8px; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.75rem;">
+                        <option value="">Add to group...</option>
+                    </select>
+                    <button class="action-btn btn-primary" style="margin-left: 6px; padding: 4px 10px;" onclick="bulkAddToGroup()">Add</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="contact-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" class="cb" id="selectAll" onchange="toggleSelectAll()"></th>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Groups</th>
+                                <th>Last Message</th>
+                                <th>Unread</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contactsBody">
+                            <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination" id="pagination"></div>
+            </div>
+        </div>
+
+        <!-- TAB 2: GROUPS -->
+        <div id="tab-groups" style="display: none;">
+            <!-- Group list view -->
+            <div id="groupListView">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                    <button class="action-btn btn-primary" onclick="showCreateGroupModal()">+ Create Group</button>
+                </div>
+                <div class="group-grid" id="groupGrid">
+                    <div class="empty-state">Loading groups...</div>
+                </div>
+            </div>
+
+            <!-- Group detail view -->
+            <div id="groupDetailView" style="display: none;">
+                <div class="detail-panel">
+                    <div class="detail-header">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <button class="action-btn btn-secondary" onclick="backToGroupList()" style="padding: 6px 10px;">&#8592; Back</button>
+                            <span id="detailGroupColor" class="color-dot"></span>
+                            <div>
+                                <div id="detailGroupName" style="font-weight: 700; font-size: 1rem; color: #1e293b;"></div>
+                                <div id="detailGroupDesc" style="font-size: 0.75rem; color: #94a3b8;"></div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="action-btn btn-secondary" onclick="showEditGroupModal()">Edit</button>
+                            <button class="action-btn btn-danger" onclick="deleteCurrentGroup()">Delete</button>
+                        </div>
+                    </div>
+
+                    <!-- Add members -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                        <input type="text" id="memberSearch" class="search-input" placeholder="Search contacts to add..." style="flex: 1;" oninput="searchContactsToAdd()">
+                    </div>
+                    <div id="addMemberResults" style="display: none; margin-bottom: 12px; max-height: 150px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;"></div>
+
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #94a3b8; margin-bottom: 8px;">
+                        Members (<span id="detailMemberCount">0</span>)
+                    </div>
+                    <table class="contact-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Added</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="membersBody">
+                            <tr><td colspan="4" class="empty-state">No members yet</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Contact Modal -->
+    <div class="modal-overlay" id="addContactModal">
+        <div class="modal-box">
+            <h3>Add Contact</h3>
+            <label>Phone Number *</label>
+            <input type="text" id="newPhone" placeholder="e.g. 919876543210">
+            <label>Name</label>
+            <input type="text" id="newName" placeholder="Contact name">
+            <label>Branch</label>
+            <select id="newBranch">
+                <option value="1">Main Branch</option>
+            </select>
+            <div class="modal-actions">
+                <button class="action-btn btn-secondary" onclick="closeModal('addContactModal')">Cancel</button>
+                <button class="action-btn btn-primary" onclick="createContact()">Add Contact</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Contact Modal -->
+    <div class="modal-overlay" id="editContactModal">
+        <div class="modal-box">
+            <h3>Edit Contact</h3>
+            <input type="hidden" id="editPhone">
+            <label>Name</label>
+            <input type="text" id="editName" placeholder="Contact name">
+            <div class="modal-actions">
+                <button class="action-btn btn-secondary" onclick="closeModal('editContactModal')">Cancel</button>
+                <button class="action-btn btn-primary" onclick="updateContact()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal-box">
+            <h3>Import Contacts</h3>
+            <label>Source</label>
+            <select id="importSource">
+                <option value="leads">Leads</option>
+                <option value="customers">Zoho Customers</option>
+            </select>
+            <label>Branch (optional)</label>
+            <select id="importBranch">
+                <option value="">All Branches</option>
+            </select>
+            <div class="modal-actions">
+                <button class="action-btn btn-secondary" onclick="closeModal('importModal')">Cancel</button>
+                <button class="action-btn btn-success" onclick="importContacts()">Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Group Modal -->
+    <div class="modal-overlay" id="groupModal">
+        <div class="modal-box">
+            <h3 id="groupModalTitle">Create Group</h3>
+            <input type="hidden" id="groupEditId">
+            <label>Group Name *</label>
+            <input type="text" id="groupName" placeholder="e.g. VIP Customers">
+            <label>Description</label>
+            <textarea id="groupDesc" rows="2" placeholder="Optional description"></textarea>
+            <label>Color</label>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+                <input type="color" id="groupColor" value="#6366F1" style="width: 40px; height: 32px; border: none; border-radius: 6px; cursor: pointer;">
+                <span id="groupColorHex" style="font-size: 0.8125rem; color: #64748b; line-height: 32px;">#6366F1</span>
+            </div>
+            <div class="modal-actions">
+                <button class="action-btn btn-secondary" onclick="closeModal('groupModal')">Cancel</button>
+                <button class="action-btn btn-primary" id="groupModalSaveBtn" onclick="saveGroup()">Create</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+const token = localStorage.getItem('auth_token');
+const API = '/api/wa-contacts';
+const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+let currentPage = 1;
+let allGroups = [];
+let selectedPhones = new Set();
+let currentGroupId = null;
+let searchTimeout = null;
+
+// ─── TAB SWITCHING ──────────────────────────────────────────────────
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', (tab === 'contacts' && i === 0) || (tab === 'groups' && i === 1));
+    });
+    document.getElementById('tab-contacts').style.display = tab === 'contacts' ? 'block' : 'none';
+    document.getElementById('tab-groups').style.display = tab === 'groups' ? 'block' : 'none';
+    if (tab === 'contacts') loadContacts(1);
+    if (tab === 'groups') { loadGroups(); backToGroupList(); }
+}
+
+// ─── CONTACTS ───────────────────────────────────────────────────────
+function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => loadContacts(1), 300);
+}
+
+async function loadContacts(page) {
+    currentPage = page;
+    selectedPhones.clear();
+    updateBulkBar();
+    const search = document.getElementById('contactSearch').value;
+    const groupId = document.getElementById('groupFilter').value;
+    let url = `${API}?page=${page}&limit=25`;
+    if (search) url += '&search=' + encodeURIComponent(search);
+    if (groupId) url += '&group_id=' + groupId;
+
+    try {
+        const res = await fetch(url, { headers });
+        const data = await res.json();
+        renderContacts(data);
+    } catch (err) {
+        document.getElementById('contactsBody').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load contacts</td></tr>';
+    }
+}
+
+function renderContacts(data) {
+    const tbody = document.getElementById('contactsBody');
+    if (!data.contacts || data.contacts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="icon">&#128100;</div>No contacts found</td></tr>';
+        document.getElementById('pagination').innerHTML = '';
+        return;
+    }
+    tbody.innerHTML = data.contacts.map(c => {
+        const name = c.saved_name || c.pushname || '-';
+        const groups = c.group_names ? c.group_names.split(', ').map(g => `<span class="badge">${escHtml(g)}</span>`).join('') : '';
+        const lastMsg = c.last_message_at ? new Date(c.last_message_at).toLocaleDateString() : '-';
+        const unread = c.unread_count > 0 ? `<span style="background:#667eea;color:white;padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;">${c.unread_count}</span>` : '0';
+        return `<tr>
+            <td><input type="checkbox" class="cb contact-cb" data-phone="${escAttr(c.phone_number)}" onchange="toggleSelect(this)"></td>
+            <td style="font-weight:600;">${escHtml(name)}</td>
+            <td style="font-family:monospace;font-size:0.75rem;">${escHtml(c.phone_number)}</td>
+            <td>${groups || '<span style="color:#cbd5e1;">None</span>'}</td>
+            <td style="font-size:0.75rem;color:#94a3b8;">${lastMsg}</td>
+            <td>${unread}</td>
+            <td>
+                <button class="action-btn btn-secondary" style="padding:3px 8px;" onclick="showEditContactModal('${escAttr(c.phone_number)}','${escAttr(c.saved_name || '')}')">Edit</button>
+                <button class="action-btn btn-danger" style="padding:3px 8px;" onclick="deleteContact('${escAttr(c.phone_number)}')">Del</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    // Pagination
+    const totalPages = Math.ceil(data.total / data.limit);
+    let pgHtml = '';
+    pgHtml += `<button ${data.page <= 1 ? 'disabled' : ''} onclick="loadContacts(${data.page - 1})">Prev</button>`;
+    pgHtml += `<span class="page-info">Page ${data.page} of ${totalPages} (${data.total} contacts)</span>`;
+    pgHtml += `<button ${data.page >= totalPages ? 'disabled' : ''} onclick="loadContacts(${data.page + 1})">Next</button>`;
+    document.getElementById('pagination').innerHTML = pgHtml;
+}
+
+// ─── SELECT / BULK ──────────────────────────────────────────────────
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.contact-cb').forEach(cb => {
+        cb.checked = checked;
+        const phone = cb.dataset.phone;
+        if (checked) selectedPhones.add(phone); else selectedPhones.delete(phone);
+    });
+    updateBulkBar();
+}
+
+function toggleSelect(cb) {
+    if (cb.checked) selectedPhones.add(cb.dataset.phone);
+    else selectedPhones.delete(cb.dataset.phone);
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const bar = document.getElementById('bulkBar');
+    bar.style.display = selectedPhones.size > 0 ? 'block' : 'none';
+    document.getElementById('selectedCount').textContent = selectedPhones.size + ' selected';
+}
+
+async function bulkAddToGroup() {
+    const groupId = document.getElementById('bulkGroupSelect').value;
+    if (!groupId) return alert('Select a group');
+    if (selectedPhones.size === 0) return;
+
+    try {
+        const res = await fetch(`${API}/groups/${groupId}/members`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ phones: Array.from(selectedPhones) })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert(`Added ${data.added} contacts to group`);
+            selectedPhones.clear();
+            updateBulkBar();
+            loadContacts(currentPage);
+            loadGroups();
+        }
+    } catch (err) { alert('Failed to add to group'); }
+}
+
+// ─── CONTACT CRUD ───────────────────────────────────────────────────
+function showAddContactModal() { openModal('addContactModal'); }
+
+async function createContact() {
+    const phone = document.getElementById('newPhone').value.trim();
+    const name = document.getElementById('newName').value.trim();
+    const branch_id = Number(document.getElementById('newBranch').value);
+    if (!phone) return alert('Phone is required');
+
+    try {
+        const res = await fetch(API, {
+            method: 'POST', headers,
+            body: JSON.stringify({ phone, name, branch_id })
+        });
+        const data = await res.json();
+        if (data.error) return alert(data.error);
+        closeModal('addContactModal');
+        document.getElementById('newPhone').value = '';
+        document.getElementById('newName').value = '';
+        loadContacts(currentPage);
+    } catch (err) { alert('Failed to create contact'); }
+}
+
+function showEditContactModal(phone, name) {
+    document.getElementById('editPhone').value = phone;
+    document.getElementById('editName').value = name;
+    openModal('editContactModal');
+}
+
+async function updateContact() {
+    const phone = document.getElementById('editPhone').value;
+    const saved_name = document.getElementById('editName').value.trim();
+
+    try {
+        await fetch(`${API}/${encodeURIComponent(phone)}`, {
+            method: 'PUT', headers,
+            body: JSON.stringify({ saved_name })
+        });
+        closeModal('editContactModal');
+        loadContacts(currentPage);
+    } catch (err) { alert('Failed to update contact'); }
+}
+
+async function deleteContact(phone) {
+    if (!confirm('Delete this contact?')) return;
+    try {
+        await fetch(`${API}/${encodeURIComponent(phone)}`, { method: 'DELETE', headers });
+        loadContacts(currentPage);
+    } catch (err) { alert('Failed to delete'); }
+}
+
+// ─── IMPORT ─────────────────────────────────────────────────────────
+function showImportModal() { openModal('importModal'); }
+
+async function importContacts() {
+    const source = document.getElementById('importSource').value;
+    const branch_id = document.getElementById('importBranch').value || undefined;
+
+    try {
+        const res = await fetch(`${API}/import`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ source, branch_id })
+        });
+        const data = await res.json();
+        if (data.error) return alert(data.error);
+        alert(`Imported ${data.imported} contacts (${data.skipped} skipped/duplicates)`);
+        closeModal('importModal');
+        loadContacts(1);
+    } catch (err) { alert('Import failed'); }
+}
+
+// ─── GROUPS ─────────────────────────────────────────────────────────
+async function loadGroups() {
+    try {
+        const res = await fetch(`${API}/groups`, { headers });
+        const data = await res.json();
+        allGroups = data.groups || [];
+        renderGroupGrid();
+        populateGroupDropdowns();
+    } catch (err) {
+        document.getElementById('groupGrid').innerHTML = '<div class="empty-state">Failed to load groups</div>';
+    }
+}
+
+function renderGroupGrid() {
+    const grid = document.getElementById('groupGrid');
+    if (allGroups.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><div class="icon">&#128193;</div>No groups yet. Create one!</div>';
+        return;
+    }
+    grid.innerHTML = allGroups.map(g => `
+        <div class="group-card" onclick="openGroupDetail(${g.id})">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span class="color-dot" style="background:${escAttr(g.color || '#6366F1')};"></span>
+                <span class="g-name">${escHtml(g.name)}</span>
+            </div>
+            <div class="g-desc">${escHtml(g.description || 'No description')}</div>
+            <div class="g-count">${g.member_count} member${g.member_count !== 1 ? 's' : ''}</div>
+        </div>
+    `).join('');
+}
+
+function populateGroupDropdowns() {
+    const opts = allGroups.map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('');
+    document.getElementById('groupFilter').innerHTML = '<option value="">All Groups</option>' + opts;
+    document.getElementById('bulkGroupSelect').innerHTML = '<option value="">Add to group...</option>' + opts;
+}
+
+function showCreateGroupModal() {
+    document.getElementById('groupModalTitle').textContent = 'Create Group';
+    document.getElementById('groupModalSaveBtn').textContent = 'Create';
+    document.getElementById('groupEditId').value = '';
+    document.getElementById('groupName').value = '';
+    document.getElementById('groupDesc').value = '';
+    document.getElementById('groupColor').value = '#6366F1';
+    document.getElementById('groupColorHex').textContent = '#6366F1';
+    openModal('groupModal');
+}
+
+function showEditGroupModal() {
+    const g = allGroups.find(x => x.id === currentGroupId);
+    if (!g) return;
+    document.getElementById('groupModalTitle').textContent = 'Edit Group';
+    document.getElementById('groupModalSaveBtn').textContent = 'Save';
+    document.getElementById('groupEditId').value = g.id;
+    document.getElementById('groupName').value = g.name;
+    document.getElementById('groupDesc').value = g.description || '';
+    document.getElementById('groupColor').value = g.color || '#6366F1';
+    document.getElementById('groupColorHex').textContent = g.color || '#6366F1';
+    openModal('groupModal');
+}
+
+async function saveGroup() {
+    const id = document.getElementById('groupEditId').value;
+    const name = document.getElementById('groupName').value.trim();
+    const description = document.getElementById('groupDesc').value.trim();
+    const color = document.getElementById('groupColor').value;
+    if (!name) return alert('Group name is required');
+
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `${API}/groups/${id}` : `${API}/groups`;
+
+    try {
+        const res = await fetch(url, { method, headers, body: JSON.stringify({ name, description, color }) });
+        const data = await res.json();
+        if (data.error) return alert(data.error);
+        closeModal('groupModal');
+        await loadGroups();
+        if (id && currentGroupId === Number(id)) {
+            openGroupDetail(Number(id));
+        }
+    } catch (err) { alert('Failed to save group'); }
+}
+
+async function deleteCurrentGroup() {
+    if (!currentGroupId) return;
+    if (!confirm('Delete this group? All members will be removed.')) return;
+    try {
+        await fetch(`${API}/groups/${currentGroupId}`, { method: 'DELETE', headers });
+        backToGroupList();
+        loadGroups();
+    } catch (err) { alert('Failed to delete group'); }
+}
+
+// ─── GROUP DETAIL ───────────────────────────────────────────────────
+async function openGroupDetail(id) {
+    currentGroupId = id;
+    const g = allGroups.find(x => x.id === id);
+    if (!g) return;
+
+    document.getElementById('groupListView').style.display = 'none';
+    document.getElementById('groupDetailView').style.display = 'block';
+    document.getElementById('detailGroupName').textContent = g.name;
+    document.getElementById('detailGroupDesc').textContent = g.description || '';
+    document.getElementById('detailGroupColor').style.background = g.color || '#6366F1';
+
+    loadGroupMembers(id);
+}
+
+function backToGroupList() {
+    currentGroupId = null;
+    document.getElementById('groupListView').style.display = 'block';
+    document.getElementById('groupDetailView').style.display = 'none';
+    document.getElementById('addMemberResults').style.display = 'none';
+    document.getElementById('memberSearch').value = '';
+}
+
+async function loadGroupMembers(id) {
+    try {
+        const res = await fetch(`${API}/groups/${id}/members`, { headers });
+        const data = await res.json();
+        const members = data.members || [];
+        document.getElementById('detailMemberCount').textContent = members.length;
+        const tbody = document.getElementById('membersBody');
+        if (members.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No members. Use the search above to add contacts.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = members.map(m => {
+            const name = m.saved_name || m.pushname || '-';
+            const added = new Date(m.added_at).toLocaleDateString();
+            return `<tr>
+                <td style="font-weight:600;">${escHtml(name)}</td>
+                <td style="font-family:monospace;font-size:0.75rem;">${escHtml(m.phone)}</td>
+                <td style="font-size:0.75rem;color:#94a3b8;">${added}</td>
+                <td><button class="action-btn btn-danger" style="padding:3px 8px;" onclick="removeMember('${escAttr(m.phone)}')">Remove</button></td>
+            </tr>`;
+        }).join('');
+    } catch (err) {
+        document.getElementById('membersBody').innerHTML = '<tr><td colspan="4" class="empty-state">Failed to load members</td></tr>';
+    }
+}
+
+// Search contacts to add to group
+let memberSearchTimeout = null;
+function searchContactsToAdd() {
+    clearTimeout(memberSearchTimeout);
+    memberSearchTimeout = setTimeout(doMemberSearch, 300);
+}
+
+async function doMemberSearch() {
+    const q = document.getElementById('memberSearch').value.trim();
+    const resultsDiv = document.getElementById('addMemberResults');
+    if (!q) { resultsDiv.style.display = 'none'; return; }
+
+    try {
+        const res = await fetch(`${API}?search=${encodeURIComponent(q)}&limit=10`, { headers });
+        const data = await res.json();
+        if (!data.contacts || data.contacts.length === 0) {
+            resultsDiv.innerHTML = '<div style="padding:10px;font-size:0.75rem;color:#94a3b8;">No contacts found</div>';
+            resultsDiv.style.display = 'block';
+            return;
+        }
+        resultsDiv.innerHTML = data.contacts.map(c => {
+            const name = c.saved_name || c.pushname || c.phone_number;
+            return `<div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:0.8125rem;font-weight:600;">${escHtml(name)}</div>
+                    <div style="font-size:0.7rem;color:#94a3b8;font-family:monospace;">${escHtml(c.phone_number)}</div>
+                </div>
+                <button class="action-btn btn-primary" style="padding:3px 10px;font-size:0.7rem;" onclick="addMemberToGroup('${escAttr(c.phone_number)}')">Add</button>
+            </div>`;
+        }).join('');
+        resultsDiv.style.display = 'block';
+    } catch (err) { resultsDiv.style.display = 'none'; }
+}
+
+async function addMemberToGroup(phone) {
+    if (!currentGroupId) return;
+    try {
+        await fetch(`${API}/groups/${currentGroupId}/members`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ phones: [phone] })
+        });
+        loadGroupMembers(currentGroupId);
+        loadGroups();
+    } catch (err) { alert('Failed to add member'); }
+}
+
+async function removeMember(phone) {
+    if (!currentGroupId) return;
+    if (!confirm('Remove this member?')) return;
+    try {
+        await fetch(`${API}/groups/${currentGroupId}/members`, {
+            method: 'DELETE', headers,
+            body: JSON.stringify({ phones: [phone] })
+        });
+        loadGroupMembers(currentGroupId);
+        loadGroups();
+    } catch (err) { alert('Failed to remove member'); }
+}
+
+// ─── MODAL HELPERS ──────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+});
+
+// Color picker sync
+document.getElementById('groupColor').addEventListener('input', e => {
+    document.getElementById('groupColorHex').textContent = e.target.value;
+});
+
+// ─── UTILS ──────────────────────────────────────────────────────────
+function escHtml(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { if (!s) return ''; return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+// ─── INIT ───────────────────────────────────────────────────────────
+async function init() {
+    await loadGroups();
+    loadContacts(1);
+
+    // Load branches for dropdowns
+    try {
+        const res = await fetch('/api/branches', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        if (data.branches) {
+            const branchOpts = data.branches.map(b => `<option value="${b.id}">${escHtml(b.name)}</option>`).join('');
+            document.getElementById('newBranch').innerHTML = branchOpts;
+            document.getElementById('importBranch').innerHTML = '<option value="">All Branches</option>' + branchOpts;
+        }
+    } catch (err) { /* branches optional */ }
+}
+
+init();
+</script>
+</body>
+</html>
