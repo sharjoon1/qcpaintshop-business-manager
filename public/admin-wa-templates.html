@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>WhatsApp Templates - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+        }
+
+        .page-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 16px 24px;
+            color: white;
+        }
+        .page-header h1 { font-size: 1.35rem; font-weight: 700; }
+        .page-header .subtitle { font-size: 0.75rem; opacity: 0.85; margin-top: 2px; }
+
+        .btn-create {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35);
+            color: white; padding: 8px 16px; border-radius: 10px;
+            font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; backdrop-filter: blur(4px);
+        }
+        .btn-create:hover { background: rgba(255,255,255,0.3); }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 0 16px 24px; }
+
+        /* Filter bar */
+        .filter-bar {
+            display: flex; align-items: center; gap: 6px; overflow-x: auto;
+            padding: 12px 0; -webkit-overflow-scrolling: touch;
+        }
+        .filter-bar::-webkit-scrollbar { display: none; }
+        .filter-pill {
+            padding: 6px 14px; border-radius: 20px; border: 1px solid #e2e8f0;
+            background: #f8fafc; color: #64748b; font-size: 0.72rem; font-weight: 600;
+            cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.2s;
+        }
+        .filter-pill.active { background: #667eea; color: #fff; border-color: #667eea; }
+        .filter-pill:hover:not(.active) { border-color: #667eea; color: #667eea; }
+
+        .search-input {
+            width: 100%; padding: 10px 14px 10px 36px; border: 1px solid #e2e8f0;
+            border-radius: 10px; font-size: 0.8125rem; outline: none; background: white;
+        }
+        .search-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+        .search-wrap { position: relative; margin-bottom: 8px; }
+        .search-wrap svg {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            width: 16px; height: 16px; color: #94a3b8;
+        }
+
+        /* Template cards */
+        .cards-grid {
+            display: grid; gap: 12px;
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 640px) { .cards-grid { grid-template-columns: 1fr 1fr; } }
+
+        .tpl-card {
+            background: white; border-radius: 12px; border: 1px solid #f1f5f9;
+            padding: 16px; transition: box-shadow 0.2s;
+        }
+        .tpl-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+        .tpl-card .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .tpl-card .tpl-name { font-weight: 700; font-size: 0.875rem; color: #1e293b; }
+        .tpl-card .tpl-preview {
+            font-size: 0.78rem; color: #64748b; line-height: 1.45;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden; margin-bottom: 10px; min-height: 2.2em;
+        }
+        .tpl-card .card-footer { display: flex; justify-content: space-between; align-items: center; }
+        .tpl-card .card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+        .cat-badge {
+            display: inline-block; font-size: 0.625rem; font-weight: 600;
+            padding: 2px 8px; border-radius: 999px; text-transform: capitalize;
+        }
+        .cat-greeting    { background: #dcfce7; color: #16a34a; }
+        .cat-promotion   { background: #dbeafe; color: #2563eb; }
+        .cat-followup    { background: #fef3c7; color: #d97706; }
+        .cat-announcement{ background: #e0e7ff; color: #4f46e5; }
+        .cat-festival    { background: #fce7f3; color: #db2777; }
+        .cat-custom      { background: #f1f5f9; color: #64748b; }
+
+        .type-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            font-size: 0.625rem; font-weight: 600; color: #94a3b8;
+        }
+        .type-badge svg { width: 12px; height: 12px; }
+
+        .usage-badge {
+            font-size: 0.65rem; color: #94a3b8; font-weight: 500;
+        }
+
+        .card-actions { display: flex; gap: 4px; }
+        .card-actions button {
+            width: 30px; height: 30px; border-radius: 8px; border: 1px solid #e2e8f0;
+            background: white; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; transition: all 0.2s; color: #64748b;
+        }
+        .card-actions button:hover { border-color: #667eea; color: #667eea; }
+        .card-actions button.btn-del:hover { border-color: #ef4444; color: #ef4444; }
+        .card-actions button svg { width: 14px; height: 14px; }
+
+        /* Toggle */
+        .toggle { position: relative; width: 36px; height: 20px; cursor: pointer; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle .slider {
+            position: absolute; inset: 0; background: #cbd5e1; border-radius: 20px;
+            transition: 0.2s;
+        }
+        .toggle .slider::before {
+            content: ''; position: absolute; height: 16px; width: 16px;
+            left: 2px; bottom: 2px; background: white; border-radius: 50%;
+            transition: 0.2s;
+        }
+        .toggle input:checked + .slider { background: #667eea; }
+        .toggle input:checked + .slider::before { transform: translateX(16px); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            display: none; align-items: flex-end; justify-content: center;
+            z-index: 1000; padding: 16px;
+        }
+        .modal-overlay.open { display: flex; }
+        @media (min-width: 640px) { .modal-overlay { align-items: center; } }
+
+        .modal-content {
+            background: white; border-radius: 16px; width: 100%; max-width: 600px;
+            max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 20px; border-bottom: 1px solid #f1f5f9;
+        }
+        .modal-header h2 { font-size: 1rem; font-weight: 700; color: #1e293b; }
+        .modal-close {
+            width: 32px; height: 32px; border-radius: 8px; border: none;
+            background: #f1f5f9; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; color: #64748b;
+        }
+        .modal-body { padding: 20px; }
+        .modal-footer {
+            padding: 16px 20px; border-top: 1px solid #f1f5f9;
+            display: flex; justify-content: flex-end; gap: 8px;
+        }
+
+        .form-label { display: block; font-size: 0.75rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
+        .form-group { margin-bottom: 14px; }
+        .form-input {
+            width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+            font-size: 0.8125rem; outline: none; transition: border-color 0.2s;
+        }
+        .form-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .form-textarea { min-height: 100px; resize: vertical; font-family: inherit; }
+        .form-select {
+            width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+            font-size: 0.8125rem; outline: none; background: white; cursor: pointer;
+        }
+
+        /* Radio group */
+        .radio-group { display: flex; gap: 8px; }
+        .radio-opt {
+            flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+            text-align: center; font-size: 0.75rem; font-weight: 600; color: #64748b;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .radio-opt.active { border-color: #667eea; background: rgba(102,126,234,0.08); color: #667eea; }
+
+        /* Variable pills */
+        .var-pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+        .var-pill {
+            padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600;
+            cursor: pointer; transition: all 0.15s; border: none;
+        }
+        .var-pill:hover { transform: translateY(-1px); }
+        .var-pill.variable { background: #f1f5f9; color: #667eea; }
+        .var-pill.variable:hover { background: #e0e7ff; }
+        .var-pill.spin { background: #fef3c7; color: #d97706; }
+        .var-pill.spin:hover { background: #fde68a; }
+
+        /* Preview panel */
+        .preview-panel {
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 14px; margin-top: 10px;
+        }
+        .preview-label { font-size: 0.68rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px; }
+        .preview-text { font-size: 0.8125rem; color: #1e293b; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+
+        /* Buttons */
+        .btn-primary {
+            padding: 9px 20px; border-radius: 8px; border: none; font-size: 0.8125rem;
+            font-weight: 600; cursor: pointer; transition: all 0.2s; color: white;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary {
+            padding: 9px 20px; border-radius: 8px; border: 1px solid #e2e8f0;
+            background: white; font-size: 0.8125rem; font-weight: 600;
+            color: #64748b; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-secondary:hover { background: #f8fafc; }
+
+        .btn-danger {
+            padding: 9px 20px; border-radius: 8px; border: none; font-size: 0.8125rem;
+            font-weight: 600; cursor: pointer; background: #ef4444; color: white;
+        }
+        .btn-danger:hover { background: #dc2626; }
+
+        .empty-state { text-align: center; padding: 48px 16px; color: #94a3b8; }
+        .empty-state svg { width: 48px; height: 48px; margin: 0 auto 12px; opacity: 0.4; }
+        .empty-state .title { font-size: 0.9rem; font-weight: 600; color: #64748b; margin-bottom: 4px; }
+        .empty-state .desc { font-size: 0.78rem; }
+
+        .loading { text-align: center; padding: 40px; color: #94a3b8; font-size: 0.8125rem; }
+
+        .toast {
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: white; padding: 10px 20px; border-radius: 10px;
+            font-size: 0.8125rem; font-weight: 600; z-index: 2000;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body data-page="wa-templates">
+
+<!-- Header -->
+<div class="page-header">
+    <div style="max-width:900px; margin:0 auto; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <h1>Message Templates</h1>
+            <div class="subtitle">Manage WhatsApp message templates</div>
+        </div>
+        <button class="btn-create" onclick="openCreateModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Create Template
+        </button>
+    </div>
+</div>
+
+<!-- Content -->
+<div class="container" style="margin-top: -8px;">
+    <!-- Search -->
+    <div class="search-wrap" style="margin-top: 12px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search templates...">
+    </div>
+
+    <!-- Category filter pills -->
+    <div class="filter-bar" id="filterBar">
+        <button class="filter-pill active" data-category="">All</button>
+        <button class="filter-pill" data-category="greeting">Greeting</button>
+        <button class="filter-pill" data-category="promotion">Promotion</button>
+        <button class="filter-pill" data-category="followup">Followup</button>
+        <button class="filter-pill" data-category="announcement">Announcement</button>
+        <button class="filter-pill" data-category="festival">Festival</button>
+        <button class="filter-pill" data-category="custom">Custom</button>
+    </div>
+
+    <!-- Cards grid -->
+    <div id="templatesContainer">
+        <div class="loading">Loading templates...</div>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div class="modal-overlay" id="templateModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">Create Template</h2>
+            <button class="modal-close" onclick="closeModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editId">
+
+            <div class="form-group">
+                <label class="form-label">Template Name</label>
+                <input type="text" class="form-input" id="tplName" placeholder="e.g. Welcome Greeting">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select class="form-select" id="tplCategory">
+                    <option value="greeting">Greeting</option>
+                    <option value="promotion">Promotion</option>
+                    <option value="followup">Followup</option>
+                    <option value="announcement">Announcement</option>
+                    <option value="festival">Festival</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Message Type</label>
+                <div class="radio-group" id="typeGroup">
+                    <div class="radio-opt active" data-type="text" onclick="setType('text')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        Text
+                    </div>
+                    <div class="radio-opt" data-type="image" onclick="setType('image')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        Image
+                    </div>
+                    <div class="radio-opt" data-type="document" onclick="setType('document')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Document
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Message Body</label>
+                <textarea class="form-input form-textarea" id="tplBody" placeholder="Type your message here. Use variables like {name} for personalization."></textarea>
+
+                <div style="margin-top: 8px;">
+                    <div style="font-size:0.68rem; font-weight:600; color:#94a3b8; margin-bottom:4px;">INSERT VARIABLE</div>
+                    <div class="var-pills">
+                        <button class="var-pill variable" onclick="insertVar('{name}')">{name}</button>
+                        <button class="var-pill variable" onclick="insertVar('{company}')">{company}</button>
+                        <button class="var-pill variable" onclick="insertVar('{city}')">{city}</button>
+                        <button class="var-pill variable" onclick="insertVar('{phone}')">{phone}</button>
+                        <button class="var-pill variable" onclick="insertVar('{source}')">{source}</button>
+                        <button class="var-pill variable" onclick="insertVar('{status}')">{status}</button>
+                        <button class="var-pill variable" onclick="insertVar('{email}')">{email}</button>
+                        <button class="var-pill variable" onclick="insertVar('{branch}')">{branch}</button>
+                    </div>
+                </div>
+                <div style="margin-top: 6px;">
+                    <div style="font-size:0.68rem; font-weight:600; color:#94a3b8; margin-bottom:4px;">SPIN TEXT</div>
+                    <div class="var-pills">
+                        <button class="var-pill spin" onclick="insertVar('[Hi|Hello|Hey]')">[Hi|Hello|Hey]</button>
+                        <button class="var-pill spin" onclick="insertVar('[Dear|Respected]')">[Dear|Respected]</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group" id="mediaUrlGroup" style="display:none;">
+                <label class="form-label">Media URL</label>
+                <input type="text" class="form-input" id="tplMediaUrl" placeholder="https://...">
+            </div>
+
+            <div class="form-group" id="mediaCaptionGroup" style="display:none;">
+                <label class="form-label">Media Caption</label>
+                <input type="text" class="form-input" id="tplMediaCaption" placeholder="Caption for the image">
+            </div>
+
+            <!-- Preview -->
+            <div class="preview-panel">
+                <div class="preview-label">Preview</div>
+                <div class="preview-text" id="previewText">Start typing to see preview...</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn-primary" id="btnSave" onclick="saveTemplate()">Create Template</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2>Delete Template</h2>
+            <button class="modal-close" onclick="closeDeleteModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:0.85rem; color:#475569; line-height:1.5;">Are you sure you want to delete "<strong id="deleteTemplateName"></strong>"? This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn-danger" id="btnDelete" onclick="confirmDelete()">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API_BASE = '/api/wa-marketing';
+const token = localStorage.getItem('auth_token');
+const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+const SAMPLE_DATA = {
+    '{name}': 'Rahul Kumar',
+    '{company}': 'ABC Enterprises',
+    '{city}': 'Chennai',
+    '{phone}': '9876543210',
+    '{source}': 'Website',
+    '{status}': 'Active',
+    '{email}': 'rahul@example.com',
+    '{branch}': 'Main Branch'
+};
+
+let templates = [];
+let activeCategory = '';
+let searchQuery = '';
+let currentMessageType = 'text';
+let deleteTargetId = null;
+
+// Fetch and render
+async function loadTemplates() {
+    try {
+        const params = new URLSearchParams();
+        if (activeCategory) params.set('category', activeCategory);
+        if (searchQuery) params.set('search', searchQuery);
+
+        const res = await fetch(`${API_BASE}/templates?${params}`, { headers });
+        if (!res.ok) throw new Error('Failed to load');
+        const data = await res.json();
+        templates = data.templates || [];
+        renderTemplates();
+    } catch (err) {
+        document.getElementById('templatesContainer').innerHTML =
+            '<div class="empty-state"><div class="title">Failed to load templates</div><div class="desc">' + err.message + '</div></div>';
+    }
+}
+
+function renderTemplates() {
+    const container = document.getElementById('templatesContainer');
+    if (!templates.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <div class="title">No templates found</div>
+                <div class="desc">Create your first template to get started</div>
+            </div>`;
+        return;
+    }
+
+    const html = '<div class="cards-grid">' + templates.map(t => renderCard(t)).join('') + '</div>';
+    container.innerHTML = html;
+}
+
+function renderCard(t) {
+    const typeIcons = {
+        text: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+        image: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+        document: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    };
+
+    const catClass = 'cat-' + (t.category || 'custom');
+    const msgType = t.message_type || 'text';
+    const preview = (t.message_body || '').length > 120 ? t.message_body.substring(0, 120) + '...' : (t.message_body || '');
+
+    return `
+    <div class="tpl-card">
+        <div class="card-top">
+            <div>
+                <div class="tpl-name">${escHtml(t.name)}</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+                    <span class="cat-badge ${catClass}">${t.category || 'custom'}</span>
+                    <span class="type-badge">${typeIcons[msgType] || typeIcons.text} ${msgType}</span>
+                </div>
+            </div>
+            <div class="card-actions">
+                <button title="Edit" onclick="openEditModal(${t.id})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="btn-del" title="Delete" onclick="openDeleteModal(${t.id}, '${escAttr(t.name)}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="tpl-preview">${escHtml(preview)}</div>
+        <div class="card-footer">
+            <div class="card-meta">
+                <span class="usage-badge">Used ${t.usage_count || 0} times</span>
+                <label class="toggle" title="${t.is_active ? 'Active' : 'Inactive'}">
+                    <input type="checkbox" ${t.is_active ? 'checked' : ''} onchange="toggleActive(${t.id}, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>`;
+}
+
+// Helpers
+function escHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+    if (!s) return '';
+    return s.replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Filter pills
+document.getElementById('filterBar').addEventListener('click', e => {
+    const pill = e.target.closest('.filter-pill');
+    if (!pill) return;
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    activeCategory = pill.dataset.category;
+    loadTemplates();
+});
+
+// Search
+let searchTimer;
+document.getElementById('searchInput').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        searchQuery = e.target.value.trim();
+        loadTemplates();
+    }, 300);
+});
+
+// Message type toggle
+function setType(type) {
+    currentMessageType = type;
+    document.querySelectorAll('#typeGroup .radio-opt').forEach(o => {
+        o.classList.toggle('active', o.dataset.type === type);
+    });
+    document.getElementById('mediaUrlGroup').style.display = (type === 'image' || type === 'document') ? '' : 'none';
+    document.getElementById('mediaCaptionGroup').style.display = (type === 'image') ? '' : 'none';
+}
+
+// Insert variable at cursor
+function insertVar(text) {
+    const ta = document.getElementById('tplBody');
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const val = ta.value;
+    ta.value = val.substring(0, start) + text + val.substring(end);
+    ta.selectionStart = ta.selectionEnd = start + text.length;
+    ta.focus();
+    updatePreview();
+}
+
+// Live preview
+function updatePreview() {
+    const body = document.getElementById('tplBody').value;
+    if (!body.trim()) {
+        document.getElementById('previewText').textContent = 'Start typing to see preview...';
+        return;
+    }
+    let preview = body;
+    // Replace variables with sample data
+    for (const [k, v] of Object.entries(SAMPLE_DATA)) {
+        preview = preview.split(k).join(v);
+    }
+    // Resolve spin text: pick first option
+    preview = preview.replace(/\[([^\]]+)\]/g, (_, opts) => {
+        const parts = opts.split('|');
+        return parts[0] || opts;
+    });
+    document.getElementById('previewText').textContent = preview;
+}
+document.getElementById('tplBody').addEventListener('input', updatePreview);
+
+// Extract used variables from body
+function extractVariables(body) {
+    const vars = [];
+    const matches = body.match(/\{(name|company|city|phone|source|status|email|branch)\}/g);
+    if (matches) {
+        const unique = [...new Set(matches)];
+        unique.forEach(m => vars.push(m));
+    }
+    return vars.length ? JSON.stringify(vars) : null;
+}
+
+// Modal open/close
+function openCreateModal() {
+    document.getElementById('editId').value = '';
+    document.getElementById('tplName').value = '';
+    document.getElementById('tplCategory').value = 'greeting';
+    document.getElementById('tplBody').value = '';
+    document.getElementById('tplMediaUrl').value = '';
+    document.getElementById('tplMediaCaption').value = '';
+    setType('text');
+    updatePreview();
+    document.getElementById('modalTitle').textContent = 'Create Template';
+    document.getElementById('btnSave').textContent = 'Create Template';
+    document.getElementById('templateModal').classList.add('open');
+}
+
+function openEditModal(id) {
+    const t = templates.find(x => x.id === id);
+    if (!t) return;
+    document.getElementById('editId').value = t.id;
+    document.getElementById('tplName').value = t.name || '';
+    document.getElementById('tplCategory').value = t.category || 'custom';
+    document.getElementById('tplBody').value = t.message_body || '';
+    document.getElementById('tplMediaUrl').value = t.media_url || '';
+    document.getElementById('tplMediaCaption').value = t.media_caption || '';
+    setType(t.message_type || 'text');
+    updatePreview();
+    document.getElementById('modalTitle').textContent = 'Edit Template';
+    document.getElementById('btnSave').textContent = 'Save Changes';
+    document.getElementById('templateModal').classList.add('open');
+}
+
+function closeModal() {
+    document.getElementById('templateModal').classList.remove('open');
+}
+
+// Save (create or update)
+async function saveTemplate() {
+    const id = document.getElementById('editId').value;
+    const name = document.getElementById('tplName').value.trim();
+    const category = document.getElementById('tplCategory').value;
+    const message_body = document.getElementById('tplBody').value.trim();
+    const media_url = document.getElementById('tplMediaUrl').value.trim() || null;
+    const media_caption = document.getElementById('tplMediaCaption').value.trim() || null;
+
+    if (!name) return showToast('Template name is required');
+    if (!message_body) return showToast('Message body is required');
+
+    const variables_used = extractVariables(message_body);
+
+    const payload = {
+        name, category, message_type: currentMessageType,
+        message_body, media_url, media_caption, variables_used
+    };
+
+    const btn = document.getElementById('btnSave');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        const url = id ? `${API_BASE}/templates/${id}` : `${API_BASE}/templates`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to save');
+        showToast(id ? 'Template updated' : 'Template created');
+        closeModal();
+        loadTemplates();
+    } catch (err) {
+        showToast(err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = id ? 'Save Changes' : 'Create Template';
+    }
+}
+
+// Toggle active
+async function toggleActive(id, active) {
+    try {
+        const res = await fetch(`${API_BASE}/templates/${id}`, {
+            method: 'PUT', headers,
+            body: JSON.stringify({ is_active: active ? 1 : 0 })
+        });
+        if (!res.ok) throw new Error('Failed to update');
+        showToast(active ? 'Template activated' : 'Template deactivated');
+        // Reload since inactive templates may disappear from the filtered list
+        loadTemplates();
+    } catch (err) {
+        showToast(err.message);
+        loadTemplates(); // revert UI
+    }
+}
+
+// Delete
+function openDeleteModal(id, name) {
+    deleteTargetId = id;
+    document.getElementById('deleteTemplateName').textContent = name;
+    document.getElementById('deleteModal').classList.add('open');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('open');
+    deleteTargetId = null;
+}
+
+async function confirmDelete() {
+    if (!deleteTargetId) return;
+    const btn = document.getElementById('btnDelete');
+    btn.disabled = true;
+    btn.textContent = 'Deleting...';
+    try {
+        const res = await fetch(`${API_BASE}/templates/${deleteTargetId}`, { method: 'DELETE', headers });
+        if (!res.ok) throw new Error('Failed to delete');
+        showToast('Template deleted');
+        closeDeleteModal();
+        loadTemplates();
+    } catch (err) {
+        showToast(err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+    }
+}
+
+// Close modals on overlay click
+document.getElementById('templateModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+});
+document.getElementById('deleteModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeDeleteModal();
+});
+
+// Init
+loadTemplates();
+</script>
+</body>
+</html>
