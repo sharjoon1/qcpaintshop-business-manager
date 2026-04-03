@@ -96,7 +96,41 @@ router.get('/', perm, async (req, res) => {
             };
         }
 
-        res.json({ success: true, data: result, general });
+        // Also get Admin WhatsApp session (branch_id = -1)
+        let admin = null;
+        const [adminRows] = await pool.query(`
+            SELECT ws.*, u.full_name as created_by_name
+            FROM whatsapp_sessions ws
+            LEFT JOIN users u ON ws.created_by = u.id
+            WHERE ws.branch_id = -1
+        `);
+        if (adminRows.length > 0) {
+            const a = adminRows[0];
+            const live = liveMap[-1];
+            admin = {
+                branch_id: -1,
+                branch_name: 'Admin WhatsApp',
+                status: live?.status || a.status || 'disconnected',
+                phone_number: live?.phone_number || a.phone_number,
+                connected_at: a.connected_at,
+                disconnected_at: a.disconnected_at,
+                last_error: a.last_error,
+                has_qr: live?.has_qr || false,
+                created_at: a.created_at,
+                created_by_name: a.created_by_name
+            };
+        } else {
+            const live = liveMap[-1];
+            admin = {
+                branch_id: -1,
+                branch_name: 'Admin WhatsApp',
+                status: live?.status || 'disconnected',
+                phone_number: live?.phone_number || null,
+                has_qr: live?.has_qr || false
+            };
+        }
+
+        res.json({ success: true, data: result, general, admin });
     } catch (error) {
         console.error('[WhatsApp Sessions] List error:', error.message);
         res.status(500).json({ success: false, message: error.message });

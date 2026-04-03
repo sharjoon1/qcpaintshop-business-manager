@@ -27,6 +27,7 @@ try {
 }
 
 const GENERAL_ID = 0; // Sentinel value for company-wide General WhatsApp
+const ADMIN_SESSION_ID = -1; // Sentinel value for admin's personal WhatsApp
 
 /**
  * Sanitize phone number: strip all non-numeric chars except leading +
@@ -77,8 +78,11 @@ async function connectBranch(branchId, userId) {
     sessions.set(branchId, sessionEntry);
 
     try {
+        // Use 'admin' as folder/client name for admin session (-1), otherwise branch_N
+        const sessionLabel = branchId === ADMIN_SESSION_ID ? 'admin' : `branch_${branchId}`;
+
         // Clean stale Chromium lock files (left behind after PM2 restart / SIGKILL)
-        const sessionDir = path.join(process.cwd(), 'whatsapp-sessions', `session-branch_${branchId}`);
+        const sessionDir = path.join(process.cwd(), 'whatsapp-sessions', `session-${sessionLabel}`);
         for (const lockFile of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
             const lockPath = path.join(sessionDir, lockFile);
             try { fs.unlinkSync(lockPath); } catch {}
@@ -86,7 +90,7 @@ async function connectBranch(branchId, userId) {
 
         const client = new Client({
             authStrategy: new LocalAuth({
-                clientId: `branch_${branchId}`,
+                clientId: sessionLabel,
                 dataPath: path.join(process.cwd(), 'whatsapp-sessions')
             }),
             puppeteer: {
@@ -563,7 +567,11 @@ async function initializeSessions() {
     try {
         const [rows] = await pool.query(
             `SELECT ws.branch_id, ws.created_by,
-                    CASE WHEN ws.branch_id = 0 THEN 'General' ELSE b.name END as branch_name
+                    CASE
+                        WHEN ws.branch_id = -1 THEN 'Admin'
+                        WHEN ws.branch_id = 0 THEN 'General'
+                        ELSE b.name
+                    END as branch_name
              FROM whatsapp_sessions ws
              LEFT JOIN branches b ON ws.branch_id = b.id
              WHERE ws.status = 'connected'`
@@ -714,6 +722,7 @@ function getClient(branchId) {
 
 module.exports = {
     GENERAL_ID,
+    ADMIN_SESSION_ID,
     setPool,
     setIO,
     connectBranch,

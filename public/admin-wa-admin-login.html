@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Admin WhatsApp Login - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/socket-helper.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        .wa-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            max-width: 480px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        .wa-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            padding: 2rem 2rem 1.5rem;
+            text-align: center;
+            color: #fff;
+        }
+        .wa-header .wa-icon {
+            width: 64px; height: 64px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            margin-bottom: 0.75rem;
+        }
+        .wa-header .wa-icon svg { width: 36px; height: 36px; fill: #fff; }
+        .wa-header h1 { font-size: 1.375rem; font-weight: 700; margin: 0; }
+        .wa-header p { font-size: 0.8125rem; opacity: 0.85; margin-top: 0.25rem; }
+
+        .wa-body { padding: 1.5rem 2rem 2rem; }
+
+        .status-row {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.875rem 1rem; border-radius: 10px;
+            margin-bottom: 1.25rem;
+        }
+        .status-row.connected { background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .status-row.disconnected { background: #f8fafc; border: 1px solid #e2e8f0; }
+        .status-row.connecting { background: #eff6ff; border: 1px solid #bfdbfe; }
+        .status-row.qr_pending { background: #eff6ff; border: 1px solid #bfdbfe; }
+        .status-row.failed { background: #fef2f2; border: 1px solid #fecaca; }
+
+        .status-dot {
+            width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+        }
+        .status-dot.connected { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+        .status-dot.disconnected { background: #94a3b8; }
+        .status-dot.connecting, .status-dot.qr_pending {
+            background: #3b82f6;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+        .status-dot.failed { background: #ef4444; }
+
+        @keyframes pulse-dot {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
+            50% { box-shadow: 0 0 0 6px rgba(59,130,246,0); }
+        }
+
+        .status-text { font-size: 0.875rem; font-weight: 600; color: #334155; }
+        .status-sub { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+        .qr-area {
+            text-align: center; padding: 1.5rem 0;
+        }
+        .qr-area canvas {
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+            padding: 12px;
+            background: #fff;
+        }
+        .qr-hint {
+            font-size: 0.8125rem; color: #64748b; margin-top: 0.75rem;
+            line-height: 1.5;
+        }
+
+        .btn-connect {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 10px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .btn-connect.primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+        }
+        .btn-connect.primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-connect.primary:disabled {
+            opacity: 0.5; cursor: not-allowed; transform: none;
+        }
+        .btn-connect.danger {
+            background: #fff;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        .btn-connect.danger:hover { background: #fef2f2; }
+        .btn-connect.success {
+            background: #25D366;
+            color: #fff;
+        }
+        .btn-connect.success:hover { opacity: 0.9; }
+
+        .test-section {
+            margin-top: 1.25rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid #f1f5f9;
+        }
+        .test-section label {
+            font-size: 0.8125rem; font-weight: 600; color: #475569;
+            display: block; margin-bottom: 0.375rem;
+        }
+        .test-input {
+            width: 100%; padding: 0.625rem 0.75rem;
+            border: 1px solid #e2e8f0; border-radius: 8px;
+            font-size: 0.875rem; color: #334155;
+            outline: none; transition: border-color 0.2s;
+        }
+        .test-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+
+        .test-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+        .test-row .test-input { flex: 1; }
+
+        .info-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.5rem 0;
+            font-size: 0.8125rem;
+        }
+        .info-label { color: #64748b; }
+        .info-value { color: #334155; font-weight: 600; }
+
+        .spinner {
+            display: inline-block; width: 20px; height: 20px;
+            border: 2.5px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .toast {
+            position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+            padding: 0.75rem 1.25rem; border-radius: 10px;
+            font-size: 0.8125rem; font-weight: 500;
+            color: #fff; z-index: 9999;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #22c55e; }
+        .toast.error { background: #ef4444; }
+    </style>
+</head>
+<body data-page="wa-admin-login">
+    <div id="nav-placeholder"></div>
+
+    <main style="padding: 1.5rem; min-height: 100vh; background: #f8fafc;">
+        <div class="wa-card">
+            <!-- Header -->
+            <div class="wa-header">
+                <div class="wa-icon">
+                    <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                </div>
+                <h1>Admin WhatsApp</h1>
+                <p>Personal WhatsApp connection for admin</p>
+            </div>
+
+            <!-- Body -->
+            <div class="wa-body">
+                <!-- Status Row -->
+                <div id="statusRow" class="status-row disconnected">
+                    <div id="statusDot" class="status-dot disconnected"></div>
+                    <div>
+                        <div id="statusText" class="status-text">Disconnected</div>
+                        <div id="statusSub" class="status-sub">Not connected</div>
+                    </div>
+                </div>
+
+                <!-- Connected Info (hidden by default) -->
+                <div id="connectedInfo" style="display:none; margin-bottom: 1.25rem;">
+                    <div class="info-row">
+                        <span class="info-label">Phone Number</span>
+                        <span id="phoneNumber" class="info-value">--</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Connected Since</span>
+                        <span id="connectedSince" class="info-value">--</span>
+                    </div>
+                </div>
+
+                <!-- QR Area (hidden by default) -->
+                <div id="qrArea" class="qr-area" style="display:none;">
+                    <canvas id="qrCanvas"></canvas>
+                    <p class="qr-hint">Open WhatsApp on your phone, go to<br><strong>Settings > Linked Devices > Link a Device</strong><br>and scan this QR code</p>
+                </div>
+
+                <!-- Loading spinner for connecting state -->
+                <div id="connectingArea" style="display:none; text-align:center; padding: 2rem 0;">
+                    <div class="spinner" style="width:36px; height:36px; border-width:3px; border-color:rgba(102,126,234,0.2); border-top-color:#667eea;"></div>
+                    <p style="font-size: 0.8125rem; color: #64748b; margin-top: 0.75rem;">Initializing WhatsApp session...</p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div id="actionArea">
+                    <button id="btnConnect" class="btn-connect primary" onclick="connectAdmin()">
+                        Connect WhatsApp
+                    </button>
+                    <button id="btnDisconnect" class="btn-connect danger" style="display:none;" onclick="disconnectAdmin()">
+                        Disconnect
+                    </button>
+                </div>
+
+                <!-- Test Message (visible when connected) -->
+                <div id="testSection" class="test-section" style="display:none;">
+                    <label>Send Test Message</label>
+                    <div class="test-row">
+                        <input id="testPhone" class="test-input" type="tel" placeholder="Phone number (e.g. 9876543210)">
+                        <button class="btn-connect success" style="width:auto; padding:0.625rem 1.25rem; font-size:0.8125rem;" onclick="sendTest()">
+                            Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const ADMIN_BRANCH_ID = -1;
+        const token = localStorage.getItem('auth_token');
+        let qrPollInterval = null;
+        let statusPollInterval = null;
+
+        // ========================================
+        // INIT
+        // ========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStatus();
+            // Poll status every 10s as backup
+            statusPollInterval = setInterval(loadStatus, 10000);
+            setupSocket();
+        });
+
+        // ========================================
+        // SOCKET.IO
+        // ========================================
+        function setupSocket() {
+            const checkSocket = setInterval(() => {
+                if (window.qcSocket) {
+                    clearInterval(checkSocket);
+                    const socket = window.qcSocket;
+                    socket.emit('join_room', 'whatsapp_admin');
+
+                    socket.on('whatsapp_qr', (data) => {
+                        if (data.branch_id === ADMIN_BRANCH_ID && data.qr) {
+                            renderQR(data.qr);
+                        }
+                    });
+
+                    socket.on('whatsapp_status', (data) => {
+                        if (data.branch_id === ADMIN_BRANCH_ID) {
+                            updateUI(data.status, data.phone_number || null);
+                            if (data.status === 'connected') {
+                                stopQRPoll();
+                            }
+                        }
+                    });
+                }
+            }, 500);
+        }
+
+        // ========================================
+        // API CALLS
+        // ========================================
+        async function loadStatus() {
+            try {
+                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/status`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const json = await res.json();
+                if (json.success) {
+                    updateUI(json.data.status, json.data.phone_number);
+                    if (json.data.has_qr && (json.data.status === 'qr_pending')) {
+                        fetchQR();
+                    }
+                }
+            } catch (e) {
+                console.error('Status load error:', e);
+            }
+        }
+
+        async function fetchQR() {
+            try {
+                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/qr`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const json = await res.json();
+                if (json.success && json.data.qr) {
+                    renderQR(json.data.qr);
+                }
+            } catch (e) {
+                console.error('QR fetch error:', e);
+            }
+        }
+
+        async function connectAdmin() {
+            const btn = document.getElementById('btnConnect');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Connecting...';
+
+            try {
+                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/connect`, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const json = await res.json();
+                if (json.success) {
+                    updateUI('connecting');
+                    startQRPoll();
+                } else {
+                    showToast(json.message || 'Failed to connect', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Connect WhatsApp';
+                }
+            } catch (e) {
+                showToast('Connection error', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Connect WhatsApp';
+            }
+        }
+
+        async function disconnectAdmin() {
+            if (!confirm('Disconnect Admin WhatsApp? You will need to scan the QR code again to reconnect.')) return;
+
+            try {
+                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/disconnect`, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const json = await res.json();
+                if (json.success) {
+                    updateUI('disconnected');
+                    showToast('Disconnected', 'success');
+                } else {
+                    showToast(json.message || 'Failed to disconnect', 'error');
+                }
+            } catch (e) {
+                showToast('Disconnect error', 'error');
+            }
+        }
+
+        async function sendTest() {
+            const phone = document.getElementById('testPhone').value.trim();
+            if (!phone) {
+                showToast('Enter a phone number', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/zoho/whatsapp-sessions/${ADMIN_BRANCH_ID}/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phone })
+                });
+                const json = await res.json();
+                if (json.success) {
+                    showToast('Test message sent!', 'success');
+                } else {
+                    showToast(json.message || 'Send failed', 'error');
+                }
+            } catch (e) {
+                showToast('Send error', 'error');
+            }
+        }
+
+        // ========================================
+        // QR POLLING
+        // ========================================
+        function startQRPoll() {
+            stopQRPoll();
+            fetchQR();
+            qrPollInterval = setInterval(fetchQR, 15000);
+        }
+
+        function stopQRPoll() {
+            if (qrPollInterval) {
+                clearInterval(qrPollInterval);
+                qrPollInterval = null;
+            }
+        }
+
+        // ========================================
+        // UI UPDATE
+        // ========================================
+        function updateUI(status, phoneNumber) {
+            const statusRow = document.getElementById('statusRow');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const statusSub = document.getElementById('statusSub');
+            const connectedInfo = document.getElementById('connectedInfo');
+            const qrArea = document.getElementById('qrArea');
+            const connectingArea = document.getElementById('connectingArea');
+            const btnConnect = document.getElementById('btnConnect');
+            const btnDisconnect = document.getElementById('btnDisconnect');
+            const testSection = document.getElementById('testSection');
+
+            // Reset classes
+            statusRow.className = 'status-row ' + status;
+            statusDot.className = 'status-dot ' + status;
+
+            switch (status) {
+                case 'connected':
+                    statusText.textContent = 'Connected';
+                    statusSub.textContent = phoneNumber ? 'Phone: +' + phoneNumber : 'WhatsApp is connected';
+                    connectedInfo.style.display = 'block';
+                    qrArea.style.display = 'none';
+                    connectingArea.style.display = 'none';
+                    btnConnect.style.display = 'none';
+                    btnDisconnect.style.display = 'block';
+                    testSection.style.display = 'block';
+                    if (phoneNumber) {
+                        document.getElementById('phoneNumber').textContent = '+' + phoneNumber;
+                    }
+                    document.getElementById('connectedSince').textContent = new Date().toLocaleString('en-IN');
+                    stopQRPoll();
+                    break;
+
+                case 'connecting':
+                    statusText.textContent = 'Connecting...';
+                    statusSub.textContent = 'Initializing session';
+                    connectedInfo.style.display = 'none';
+                    qrArea.style.display = 'none';
+                    connectingArea.style.display = 'block';
+                    btnConnect.style.display = 'none';
+                    btnDisconnect.style.display = 'none';
+                    testSection.style.display = 'none';
+                    break;
+
+                case 'qr_pending':
+                    statusText.textContent = 'Scan QR Code';
+                    statusSub.textContent = 'Waiting for WhatsApp scan';
+                    connectedInfo.style.display = 'none';
+                    qrArea.style.display = 'block';
+                    connectingArea.style.display = 'none';
+                    btnConnect.style.display = 'none';
+                    btnDisconnect.style.display = 'none';
+                    testSection.style.display = 'none';
+                    break;
+
+                case 'failed':
+                    statusText.textContent = 'Connection Failed';
+                    statusSub.textContent = 'Try connecting again';
+                    connectedInfo.style.display = 'none';
+                    qrArea.style.display = 'none';
+                    connectingArea.style.display = 'none';
+                    btnConnect.style.display = 'block';
+                    btnConnect.disabled = false;
+                    btnConnect.textContent = 'Retry Connection';
+                    btnDisconnect.style.display = 'none';
+                    testSection.style.display = 'none';
+                    stopQRPoll();
+                    break;
+
+                default: // disconnected
+                    statusText.textContent = 'Disconnected';
+                    statusSub.textContent = 'Not connected';
+                    connectedInfo.style.display = 'none';
+                    qrArea.style.display = 'none';
+                    connectingArea.style.display = 'none';
+                    btnConnect.style.display = 'block';
+                    btnConnect.disabled = false;
+                    btnConnect.textContent = 'Connect WhatsApp';
+                    btnDisconnect.style.display = 'none';
+                    testSection.style.display = 'none';
+                    stopQRPoll();
+                    break;
+            }
+        }
+
+        // ========================================
+        // QR RENDER
+        // ========================================
+        function renderQR(qrString) {
+            const canvas = document.getElementById('qrCanvas');
+            const qrArea = document.getElementById('qrArea');
+            const connectingArea = document.getElementById('connectingArea');
+
+            qrArea.style.display = 'block';
+            connectingArea.style.display = 'none';
+
+            // Update status to qr_pending visuals
+            const statusRow = document.getElementById('statusRow');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const statusSub = document.getElementById('statusSub');
+            statusRow.className = 'status-row qr_pending';
+            statusDot.className = 'status-dot qr_pending';
+            statusText.textContent = 'Scan QR Code';
+            statusSub.textContent = 'Waiting for WhatsApp scan';
+
+            QRCode.toCanvas(canvas, qrString, {
+                width: 280,
+                margin: 2,
+                color: { dark: '#1e293b', light: '#ffffff' }
+            }, (err) => {
+                if (err) console.error('QR render error:', err);
+            });
+        }
+
+        // ========================================
+        // TOAST
+        // ========================================
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => { toast.className = 'toast'; }, 3000);
+        }
+    </script>
+</body>
+</html>
