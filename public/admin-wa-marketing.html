@@ -437,6 +437,15 @@
                             <select id="wizBranch"><option value="">Select Branch</option></select>
                         </div>
                         <div class="form-group">
+                            <label>Send from</label>
+                            <select id="wizSendFrom">
+                                <option value="0">General WhatsApp</option>
+                                <option value="-1">Admin WhatsApp</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="form-group">
                             <label>Message Type</label>
                             <select id="wizMsgType" onchange="toggleMediaFields()">
                                 <option value="text">Text</option>
@@ -1130,6 +1139,7 @@ function openCampaignWizard() {
     document.getElementById('wizName').value = '';
     document.getElementById('wizDesc').value = '';
     document.getElementById('wizBranch').value = '';
+    document.getElementById('wizSendFrom').value = '0';
     document.getElementById('wizMsgType').value = 'text';
     document.getElementById('wizMsgBody').value = '';
     document.getElementById('wizMediaCaption').value = '';
@@ -1384,6 +1394,8 @@ function buildReviewSummary() {
     const name = document.getElementById('wizName').value;
     const branch = document.getElementById('wizBranch');
     const branchName = branch.options[branch.selectedIndex]?.text || '-';
+    const sendFrom = document.getElementById('wizSendFrom');
+    const sendFromName = sendFrom.options[sendFrom.selectedIndex]?.text || '-';
     const msgType = document.getElementById('wizMsgType').value;
     const msgBody = document.getElementById('wizMsgBody').value;
     const warmUp = document.getElementById('wizWarmUp').checked;
@@ -1394,6 +1406,7 @@ function buildReviewSummary() {
             <h4 class="font-semibold text-sm text-gray-700 mb-2">Campaign</h4>
             <p class="text-sm"><strong>Name:</strong> ${esc(name)}</p>
             <p class="text-sm"><strong>Branch:</strong> ${esc(branchName)}</p>
+            <p class="text-sm"><strong>Send from:</strong> ${esc(sendFromName)}</p>
             <p class="text-sm"><strong>Type:</strong> ${msgType}</p>
             ${warmUp ? '<p class="text-sm text-amber-600"><strong>Warm-Up:</strong> Enabled</p>' : ''}
         </div>
@@ -1419,6 +1432,7 @@ async function createAndStartCampaign() {
             name: document.getElementById('wizName').value.trim(),
             description: document.getElementById('wizDesc').value.trim() || null,
             branch_id: document.getElementById('wizBranch').value,
+            send_from_branch_id: parseInt(document.getElementById('wizSendFrom').value),
             message_type: document.getElementById('wizMsgType').value,
             message_body: document.getElementById('wizMsgBody').value,
             media_url: uploadedMediaUrl || null,

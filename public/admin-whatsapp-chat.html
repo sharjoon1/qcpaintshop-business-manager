@@ -425,6 +425,10 @@
             background: #f1f5f9;
             color: #64748b;
         }
+        .conv-account.admin {
+            background: #fef3c7;
+            color: #92400e;
+        }
         .chat-header-account {
             font-size: 0.7rem;
             color: #15803d;
@@ -455,6 +459,7 @@
                     <select id="branchFilter" onchange="loadConversations()">
                         <option value="">All Accounts</option>
                         <option value="0">General WhatsApp</option>
+                        <option value="-1">Admin WhatsApp</option>
                     </select>
                     <input type="text" id="searchInput" placeholder="Search..." oninput="debounceSearch()">
                 </div>
@@ -599,7 +604,10 @@ function renderConversations() {
         if (c.last_direction === 'out') preview = '<span class="direction-icon">↩</span> ' + preview;
         const pin = c.is_pinned ? '<span class="pin-icon">📌</span>' : '';
         const isGeneral = c.branch_id == 0;
-        const accountBadge = isGeneral
+        const isAdmin = c.branch_id == -1;
+        const accountBadge = isAdmin
+            ? '<span class="conv-account admin">Admin</span>'
+            : isGeneral
             ? '<span class="conv-account general">General</span>'
             : (c.branch_name ? `<span class="conv-account branch">${escHtml(c.branch_name)}</span>` : '');
 
@@ -636,7 +644,7 @@ async function openChat(phone, branchId) {
 
     // Update header
     const name = currentContact.saved_name || currentContact.pushname || formatPhone(phone);
-    const accountLabel = branchId == 0 ? 'General WhatsApp' : (currentContact.branch_name || '');
+    const accountLabel = branchId == -1 ? 'Admin WhatsApp' : branchId == 0 ? 'General WhatsApp' : (currentContact.branch_name || '');
     document.getElementById('chatAvatar').textContent = (name[0] || '?').toUpperCase();
     document.getElementById('chatName').textContent = name;
     document.getElementById('chatPhone').innerHTML = '+' + phone + (accountLabel ? ` · <span class="chat-header-account">via ${escHtml(accountLabel)}</span>` : '');
