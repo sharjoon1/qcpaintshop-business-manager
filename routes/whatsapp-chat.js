@@ -3,6 +3,7 @@
  * Chat history viewer with conversations and messages
  *
  * Endpoints:
+ *   POST   /api/whatsapp-chat/quick-send                  - Quick send message (Admin/-1 then General/0)
  *   GET    /api/whatsapp-chat/conversations              - List conversations
  *   GET    /api/whatsapp-chat/conversations/:phone/messages - Get messages for a conversation
  *   POST   /api/whatsapp-chat/conversations/:phone/send   - Send text reply
@@ -42,6 +43,48 @@ const upload = multer({
     limits: { fileSize: 16 * 1024 * 1024 }, // 16MB
     fileFilter: (req, file, cb) => {
         cb(null, true); // Allow all file types for WhatsApp
+    }
+});
+
+// ========================================
+// QUICK SEND (must be before /:phone routes)
+// ========================================
+router.post('/quick-send', perm, async (req, res) => {
+    try {
+        const { phone, message, context } = req.body;
+        if (!phone || !message) {
+            return res.status(400).json({ success: false, message: 'phone and message are required' });
+        }
+
+        // Try Admin session first (branch_id = -1), fall back to General (branch_id = 0)
+        const ADMIN_BRANCH = -1;
+        const GENERAL_BRANCH = 0;
+
+        let sent = false;
+        let usedBranch = ADMIN_BRANCH;
+
+        if (sessionManager) {
+            sent = await sessionManager.sendMessage(ADMIN_BRANCH, phone, message);
+            if (!sent) {
+                sent = await sessionManager.sendMessage(GENERAL_BRANCH, phone, message);
+                usedBranch = GENERAL_BRANCH;
+            }
+        }
+
+        if (!sent) {
+            return res.status(400).json({ success: false, message: 'No WhatsApp session connected. Connect Admin or General WhatsApp first.' });
+        }
+
+        // Log message
+        await pool.query(`
+            INSERT INTO whatsapp_messages (branch_id, phone_number, direction, message_type, body, status, source, sent_by, timestamp)
+            VALUES (?, ?, 'out', 'text', ?, 'sent', 'admin_quick_send', ?, NOW())
+        `, [usedBranch, phone, message, req.user.id]);
+
+        res.json({ success: true, message: 'Message sent via ' + (usedBranch === -1 ? 'Admin' : 'General') + ' WhatsApp' });
+    } catch (error) {
+        console.error('[WhatsApp Chat] Quick send error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
