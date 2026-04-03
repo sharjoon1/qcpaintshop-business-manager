@@ -28,6 +28,7 @@
         PRODUCTS_SUBNAV_PATH: '/components/products-subnav.html',
         SYSTEM_SUBNAV_PATH: '/components/system-subnav.html',
         MARKETING_SUBNAV_PATH: '/components/marketing-subnav.html',
+        WHATSAPP_SUBNAV_PATH: '/components/whatsapp-subnav.html',
         PAINTERS_SUBNAV_PATH: '/components/painters-subnav.html',
         STAFF_WORK_SUBNAV_PATH: '/components/staff-work-subnav.html',
         RETRY_ATTEMPTS: 3,
@@ -83,6 +84,15 @@
         'anomalies': CONFIG.SYSTEM_SUBNAV_PATH,
         'monitoring': CONFIG.SYSTEM_SUBNAV_PATH,
         'photos': CONFIG.SYSTEM_SUBNAV_PATH,
+        // WhatsApp
+        'wa-dashboard': CONFIG.WHATSAPP_SUBNAV_PATH,
+        'whatsapp-chat': CONFIG.WHATSAPP_SUBNAV_PATH,
+        'wa-contacts': CONFIG.WHATSAPP_SUBNAV_PATH,
+        'wa-marketing': CONFIG.WHATSAPP_SUBNAV_PATH,
+        'wa-templates': CONFIG.WHATSAPP_SUBNAV_PATH,
+        'whatsapp-sessions': CONFIG.WHATSAPP_SUBNAV_PATH,
+        'wa-admin-login': CONFIG.WHATSAPP_SUBNAV_PATH,
+        'wa-settings': CONFIG.WHATSAPP_SUBNAV_PATH,
         // Painters
         'painters': CONFIG.PAINTERS_SUBNAV_PATH,
         'painter-points': CONFIG.PAINTERS_SUBNAV_PATH,
@@ -253,6 +263,9 @@
                     } else if (dataPage.startsWith('marketing-')) {
                         subnavPath = CONFIG.MARKETING_SUBNAV_PATH;
                         subnavName = 'Marketing';
+                    } else if (dataPage.startsWith('wa-') || dataPage.startsWith('whatsapp-')) {
+                        subnavPath = CONFIG.WHATSAPP_SUBNAV_PATH;
+                        subnavName = 'WhatsApp';
                     } else if (SUBNAV_MAP[dataPage]) {
                         // Fallback to explicit mapping
                         subnavPath = SUBNAV_MAP[dataPage];
