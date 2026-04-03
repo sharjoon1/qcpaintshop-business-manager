@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>WhatsApp Settings - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <link rel="stylesheet" href="/css/zoho-common.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        .setting-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+            margin-bottom: 1.25rem;
+        }
+        .setting-card h3 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+        .setting-card .desc {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 1.25rem;
+        }
+        .field-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 0.35rem;
+        }
+        .field-input {
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #1e293b;
+            background: #f8fafc;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .field-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+            background: #fff;
+        }
+        .field-hint {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-top: 0.2rem;
+        }
+        .toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: #cbd5e1;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            top: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background: #667eea;
+        }
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(20px);
+        }
+        .save-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .save-btn:hover { opacity: 0.92; }
+        .save-btn:active { transform: scale(0.98); }
+        .save-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 9999;
+            transition: transform 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.success { background: #22c55e; }
+        .toast.error { background: #ef4444; }
+        .warmup-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.75rem;
+        }
+        @media (max-width: 640px) {
+            .warmup-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 3rem;
+        }
+        .loading-spinner::after {
+            content: '';
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50" data-page="wa-settings">
+
+<div class="max-w-3xl mx-auto p-4 sm:p-6 pb-24">
+
+    <div class="mb-6">
+        <h1 style="font-size:1.5rem; font-weight:800; color:#1e293b;">WhatsApp Settings</h1>
+        <p style="font-size:0.85rem; color:#64748b; margin-top:0.25rem;">Configure message delivery, rate limits, and safety features</p>
+    </div>
+
+    <div id="loadingState" class="loading-spinner"></div>
+
+    <div id="settingsContent" style="display:none;">
+
+        <!-- Message Delays -->
+        <div class="setting-card">
+            <h3>Message Delays</h3>
+            <p class="desc">Random delay between consecutive messages to avoid detection</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="field-label" for="min_delay">Minimum Delay (seconds)</label>
+                    <input type="number" id="min_delay" class="field-input" min="1" max="300">
+                    <p class="field-hint">Default: 15 seconds</p>
+                </div>
+                <div>
+                    <label class="field-label" for="max_delay">Maximum Delay (seconds)</label>
+                    <input type="number" id="max_delay" class="field-input" min="1" max="600">
+                    <p class="field-hint">Default: 45 seconds</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rate Limits -->
+        <div class="setting-card">
+            <h3>Rate Limits</h3>
+            <p class="desc">Maximum messages per hour and per day</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="field-label" for="hourly_limit">Hourly Limit</label>
+                    <input type="number" id="hourly_limit" class="field-input" min="1" max="500">
+                    <p class="field-hint">Default: 30 messages/hour</p>
+                </div>
+                <div>
+                    <label class="field-label" for="daily_limit">Daily Limit</label>
+                    <input type="number" id="daily_limit" class="field-input" min="1" max="5000">
+                    <p class="field-hint">Default: 200 messages/day</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Typing Simulation -->
+        <div class="setting-card">
+            <h3>Typing Simulation</h3>
+            <p class="desc">Simulate human-like typing and message reading delays</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="field-label" for="typing_delay_min">Typing Delay Min (ms)</label>
+                    <input type="number" id="typing_delay_min" class="field-input" min="0" max="10000">
+                    <p class="field-hint">Default: 1000 ms</p>
+                </div>
+                <div>
+                    <label class="field-label" for="typing_delay_max">Typing Delay Max (ms)</label>
+                    <input type="number" id="typing_delay_max" class="field-input" min="0" max="10000">
+                    <p class="field-hint">Default: 3000 ms</p>
+                </div>
+                <div>
+                    <label class="field-label" for="seen_delay_min">Seen Delay Min (ms)</label>
+                    <input type="number" id="seen_delay_min" class="field-input" min="0" max="10000">
+                    <p class="field-hint">Default: 500 ms</p>
+                </div>
+                <div>
+                    <label class="field-label" for="seen_delay_max">Seen Delay Max (ms)</label>
+                    <input type="number" id="seen_delay_max" class="field-input" min="0" max="10000">
+                    <p class="field-hint">Default: 2000 ms</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Warm-up Schedule -->
+        <div class="setting-card">
+            <h3>Warm-up Schedule</h3>
+            <p class="desc">Gradually increase daily sending limits for new numbers</p>
+            <div class="warmup-grid">
+                <div>
+                    <label class="field-label" for="warmup_day1">Day 1</label>
+                    <input type="number" id="warmup_day1" class="field-input" min="1" max="1000">
+                    <p class="field-hint">Default: 10</p>
+                </div>
+                <div>
+                    <label class="field-label" for="warmup_day2">Day 2</label>
+                    <input type="number" id="warmup_day2" class="field-input" min="1" max="1000">
+                    <p class="field-hint">Default: 25</p>
+                </div>
+                <div>
+                    <label class="field-label" for="warmup_day3">Day 3</label>
+                    <input type="number" id="warmup_day3" class="field-input" min="1" max="1000">
+                    <p class="field-hint">Default: 50</p>
+                </div>
+                <div>
+                    <label class="field-label" for="warmup_day4">Day 4</label>
+                    <input type="number" id="warmup_day4" class="field-input" min="1" max="1000">
+                    <p class="field-hint">Default: 100</p>
+                </div>
+                <div>
+                    <label class="field-label" for="warmup_day5">Day 5</label>
+                    <input type="number" id="warmup_day5" class="field-input" min="1" max="1000">
+                    <p class="field-hint">Default: 150</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Safety -->
+        <div class="setting-card">
+            <h3>Safety</h3>
+            <p class="desc">Auto-pause and anti-detection settings</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="field-label" for="max_consecutive_failures">Max Consecutive Failures</label>
+                    <input type="number" id="max_consecutive_failures" class="field-input" min="1" max="50">
+                    <p class="field-hint">Auto-pause after this many failures. Default: 5</p>
+                </div>
+                <div>
+                    <label class="field-label" for="engine_poll_interval">Engine Poll Interval (ms)</label>
+                    <input type="number" id="engine_poll_interval" class="field-input" min="5000" max="300000" step="1000">
+                    <p class="field-hint">Default: 30000 ms (30 seconds)</p>
+                </div>
+            </div>
+            <div style="margin-top:1rem;">
+                <div class="toggle-wrap">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="invisible_markers_enabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <div>
+                        <span class="field-label" style="margin-bottom:0;">Invisible Markers</span>
+                        <p class="field-hint" style="margin-top:0.1rem;">Add invisible Unicode markers to make each message unique</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Button -->
+        <div style="text-align:center; margin-top:1.5rem;">
+            <button class="save-btn" id="saveBtn" onclick="saveAll()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save All Settings
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+const token = localStorage.getItem('auth_token');
+
+const SETTING_KEYS = [
+    'min_delay', 'max_delay',
+    'hourly_limit', 'daily_limit',
+    'typing_delay_min', 'typing_delay_max',
+    'seen_delay_min', 'seen_delay_max',
+    'warmup_day1', 'warmup_day2', 'warmup_day3', 'warmup_day4', 'warmup_day5',
+    'max_consecutive_failures', 'engine_poll_interval',
+    'invisible_markers_enabled'
+];
+
+async function loadSettings() {
+    try {
+        const res = await fetch('/api/wa-marketing/settings', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Failed to load settings');
+        const data = await res.json();
+        const settings = data.settings || data;
+
+        // Populate fields
+        SETTING_KEYS.forEach(key => {
+            const el = document.getElementById(key);
+            if (!el) return;
+            const val = settings[key];
+            if (val === undefined || val === null) return;
+            if (key === 'invisible_markers_enabled') {
+                el.checked = Number(val) === 1;
+            } else {
+                el.value = val;
+            }
+        });
+
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('settingsContent').style.display = 'block';
+    } catch (err) {
+        document.getElementById('loadingState').innerHTML =
+            '<p style="color:#ef4444; font-size:0.9rem;">Failed to load settings. Please refresh.</p>';
+        console.error(err);
+    }
+}
+
+async function saveAll() {
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        const body = {};
+        SETTING_KEYS.forEach(key => {
+            const el = document.getElementById(key);
+            if (!el) return;
+            if (key === 'invisible_markers_enabled') {
+                body[key] = el.checked ? 1 : 0;
+            } else {
+                body[key] = Number(el.value);
+            }
+        });
+
+        // Basic validation
+        if (body.min_delay >= body.max_delay) {
+            showToast('Min delay must be less than max delay', 'error');
+            return;
+        }
+        if (body.typing_delay_min >= body.typing_delay_max) {
+            showToast('Typing delay min must be less than max', 'error');
+            return;
+        }
+        if (body.seen_delay_min >= body.seen_delay_max) {
+            showToast('Seen delay min must be less than max', 'error');
+            return;
+        }
+        if (body.hourly_limit > body.daily_limit) {
+            showToast('Hourly limit cannot exceed daily limit', 'error');
+            return;
+        }
+
+        const res = await fetch('/api/wa-marketing/settings', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'Save failed');
+        }
+
+        showToast('Settings saved successfully', 'success');
+    } catch (err) {
+        showToast(err.message || 'Failed to save settings', 'error');
+        console.error(err);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save All Settings';
+    }
+}
+
+function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type;
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+loadSettings();
+</script>
+</body>
+</html>
