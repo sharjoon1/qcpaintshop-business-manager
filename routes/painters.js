@@ -3786,6 +3786,839 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
 });
 
 // ═══════════════════════════════════════════════════════════════
+// QUOTATIONS CRUD (painter self)
+// ═══════════════════════════════════════════════════════════════
+
+// Create quotation
+router.post('/me/quotations', requirePainterAuth, async (req, res) => {
+    try {
+        const {
+            quotation_type, customer_name, customer_phone, customer_address,
+            rooms_data, labour_rate, labour_rate_type, material_cost_per_sqft,
+            total_sqft, labour_total, material_total, grand_total,
+            terms_conditions, validity_days, language, items
+        } = req.body;
+
+        if (!customer_name) return res.status(400).json({ success: false, message: 'Customer name is required' });
+
+        // Auto-generate quotation number: QT-YYYY-NNNN
+        const year = new Date().getFullYear();
+        const [countRows] = await pool.query('SELECT COUNT(*) as cnt FROM painter_quotations WHERE painter_id = ?', [req.painter.id]);
+        const seq = (countRows[0].cnt + 1).toString().padStart(4, '0');
+        const quotation_number = `QT-${year}-${seq}`;
+
+        const [result] = await pool.query(
+            `INSERT INTO painter_quotations (painter_id, quotation_number, quotation_type, customer_name, customer_phone, customer_address,
+             rooms_data, labour_rate, labour_rate_type, material_cost_per_sqft, total_sqft, labour_total, material_total, grand_total,
+             terms_conditions, validity_days, language, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())`,
+            [req.painter.id, quotation_number, quotation_type || 'room_based', customer_name, customer_phone || null, customer_address || null,
+             rooms_data ? JSON.stringify(rooms_data) : null, labour_rate || 0, labour_rate_type || 'per_sqft', material_cost_per_sqft || 0,
+             total_sqft || 0, labour_total || 0, material_total || 0, grand_total || 0,
+             terms_conditions || null, validity_days || 15, language || 'en']
+        );
+
+        const quotationId = result.insertId;
+
+        // Insert items if provided (itemized type)
+        if (items && Array.isArray(items) && items.length > 0) {
+            const itemValues = items.map(item => [
+                quotationId, item.description || '', item.area_sqft || 0, item.rate || 0,
+                item.amount || 0, item.paint_type || null, item.coats || 1, item.note || null
+            ]);
+            await pool.query(
+                `INSERT INTO painter_quotation_items (quotation_id, description, area_sqft, rate, amount, paint_type, coats, note)
+                 VALUES ?`,
+                [itemValues]
+            );
+        }
+
+        res.json({ success: true, message: 'Quotation created', quotation_id: quotationId, quotation_number });
+    } catch (error) {
+        console.error('Create quotation error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create quotation' });
+    }
+});
+
+// List quotations
+router.get('/me/quotations', requirePainterAuth, async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const pg = Number(page);
+        const lim = Number(limit);
+        let query = 'SELECT q.*, (SELECT COUNT(*) FROM painter_quotation_items WHERE quotation_id = q.id) as item_count FROM painter_quotations q WHERE q.painter_id = ?';
+        const params = [req.painter.id];
+
+        if (status) { query += ' AND q.status = ?'; params.push(status); }
+
+        const countQuery = `SELECT COUNT(*) as total FROM painter_quotations WHERE painter_id = ?${status ? ' AND status = ?' : ''}`;
+        const countParams = status ? [req.painter.id, status] : [req.painter.id];
+        const [countResult] = await pool.query(countQuery, countParams);
+        const total = countResult[0].total;
+
+        query += ' ORDER BY q.created_at DESC LIMIT ? OFFSET ?';
+        params.push(lim, (pg - 1) * lim);
+
+        const [quotations] = await pool.query(query, params);
+        res.json({ success: true, quotations, total, page: pg, pages: Math.ceil(total / lim) });
+    } catch (error) {
+        console.error('List quotations error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list quotations' });
+    }
+});
+
+// Get quotation detail with items
+router.get('/me/quotations/:id', requirePainterAuth, async (req, res) => {
+    try {
+        const [quotations] = await pool.query('SELECT * FROM painter_quotations WHERE id = ? AND painter_id = ?', [req.params.id, req.painter.id]);
+        if (!quotations.length) return res.status(404).json({ success: false, message: 'Quotation not found' });
+
+        const [items] = await pool.query('SELECT * FROM painter_quotation_items WHERE quotation_id = ? ORDER BY id', [req.params.id]);
+        const quotation = quotations[0];
+        if (quotation.rooms_data && typeof quotation.rooms_data === 'string') {
+            try { quotation.rooms_data = JSON.parse(quotation.rooms_data); } catch (e) {}
+        }
+
+        res.json({ success: true, quotation, items });
+    } catch (error) {
+        console.error('Get quotation error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get quotation' });
+    }
+});
+
+// Update quotation (only if draft)
+router.put('/me/quotations/:id', requirePainterAuth, async (req, res) => {
+    try {
+        const [existing] = await pool.query('SELECT id, status FROM painter_quotations WHERE id = ? AND painter_id = ?', [req.params.id, req.painter.id]);
+        if (!existing.length) return res.status(404).json({ success: false, message: 'Quotation not found' });
+        if (existing[0].status !== 'draft') return res.status(400).json({ success: false, message: 'Can only edit draft quotations' });
+
+        const {
+            quotation_type, customer_name, customer_phone, customer_address,
+            rooms_data, labour_rate, labour_rate_type, material_cost_per_sqft,
+            total_sqft, labour_total, material_total, grand_total,
+            terms_conditions, validity_days, language, items
+        } = req.body;
+
+        await pool.query(
+            `UPDATE painter_quotations SET quotation_type = COALESCE(?, quotation_type), customer_name = COALESCE(?, customer_name),
+             customer_phone = COALESCE(?, customer_phone), customer_address = COALESCE(?, customer_address),
+             rooms_data = COALESCE(?, rooms_data), labour_rate = COALESCE(?, labour_rate), labour_rate_type = COALESCE(?, labour_rate_type),
+             material_cost_per_sqft = COALESCE(?, material_cost_per_sqft), total_sqft = COALESCE(?, total_sqft),
+             labour_total = COALESCE(?, labour_total), material_total = COALESCE(?, material_total), grand_total = COALESCE(?, grand_total),
+             terms_conditions = COALESCE(?, terms_conditions), validity_days = COALESCE(?, validity_days), language = COALESCE(?, language),
+             updated_at = NOW() WHERE id = ?`,
+            [quotation_type, customer_name, customer_phone, customer_address,
+             rooms_data ? JSON.stringify(rooms_data) : null, labour_rate, labour_rate_type,
+             material_cost_per_sqft, total_sqft, labour_total, material_total, grand_total,
+             terms_conditions, validity_days, language, req.params.id]
+        );
+
+        // Replace items if provided
+        if (items && Array.isArray(items)) {
+            await pool.query('DELETE FROM painter_quotation_items WHERE quotation_id = ?', [req.params.id]);
+            if (items.length > 0) {
+                const itemValues = items.map(item => [
+                    req.params.id, item.description || '', item.area_sqft || 0, item.rate || 0,
+                    item.amount || 0, item.paint_type || null, item.coats || 1, item.note || null
+                ]);
+                await pool.query(
+                    `INSERT INTO painter_quotation_items (quotation_id, description, area_sqft, rate, amount, paint_type, coats, note)
+                     VALUES ?`,
+                    [itemValues]
+                );
+            }
+        }
+
+        res.json({ success: true, message: 'Quotation updated' });
+    } catch (error) {
+        console.error('Update quotation error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update quotation' });
+    }
+});
+
+// Delete quotation (only if draft)
+router.delete('/me/quotations/:id', requirePainterAuth, async (req, res) => {
+    try {
+        const [existing] = await pool.query('SELECT id, status FROM painter_quotations WHERE id = ? AND painter_id = ?', [req.params.id, req.painter.id]);
+        if (!existing.length) return res.status(404).json({ success: false, message: 'Quotation not found' });
+        if (existing[0].status !== 'draft') return res.status(400).json({ success: false, message: 'Can only delete draft quotations' });
+
+        await pool.query('DELETE FROM painter_quotation_items WHERE quotation_id = ?', [req.params.id]);
+        await pool.query('DELETE FROM painter_quotations WHERE id = ?', [req.params.id]);
+
+        res.json({ success: true, message: 'Quotation deleted' });
+    } catch (error) {
+        console.error('Delete quotation error:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete quotation' });
+    }
+});
+
+// Send quotation (draft -> sent)
+router.put('/me/quotations/:id/send', requirePainterAuth, async (req, res) => {
+    try {
+        const [existing] = await pool.query('SELECT id, status FROM painter_quotations WHERE id = ? AND painter_id = ?', [req.params.id, req.painter.id]);
+        if (!existing.length) return res.status(404).json({ success: false, message: 'Quotation not found' });
+        if (existing[0].status !== 'draft') return res.status(400).json({ success: false, message: 'Can only send draft quotations' });
+
+        await pool.query('UPDATE painter_quotations SET status = ?, sent_at = NOW(), updated_at = NOW() WHERE id = ?', ['sent', req.params.id]);
+        res.json({ success: true, message: 'Quotation sent' });
+    } catch (error) {
+        console.error('Send quotation error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send quotation' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PRICE MATCH REPORTS (painter self)
+// ═══════════════════════════════════════════════════════════════
+
+// Submit price report
+router.post('/me/price-reports', requirePainterAuth, uploadProfile.single('proof_photo'), async (req, res) => {
+    try {
+        const { zoho_item_id, product_name, our_price, reported_price, shop_name, shop_location, note } = req.body;
+
+        if (!product_name || !reported_price) {
+            return res.status(400).json({ success: false, message: 'Product name and reported price are required' });
+        }
+
+        let proof_photo_url = null;
+        if (req.file) {
+            const filename = `price-report-${req.painter.id}-${Date.now()}.jpg`;
+            const outputPath = `public/uploads/profiles/${filename}`;
+            await sharp(req.file.buffer)
+                .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+                .jpeg({ quality: 85 })
+                .toFile(outputPath);
+            proof_photo_url = `/uploads/profiles/${filename}`;
+        }
+
+        const [result] = await pool.query(
+            `INSERT INTO painter_price_reports (painter_id, zoho_item_id, product_name, our_price, reported_price,
+             shop_name, shop_location, proof_photo_url, note, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
+            [req.painter.id, zoho_item_id || null, product_name, our_price || 0, reported_price,
+             shop_name || null, shop_location || null, proof_photo_url, note || null]
+        );
+
+        // Notify admins about price report
+        try {
+            const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+            for (const admin of admins) {
+                await notificationService.send(admin.id, {
+                    type: 'painter_price_report',
+                    title: 'New Price Report',
+                    body: `${req.painter.name} reported price for ${product_name}: ₹${reported_price} (ours: ₹${our_price || 'N/A'})`,
+                    data: { page: 'painters', tab: 'price-reports' }
+                });
+            }
+        } catch (nErr) { console.error('Price report notification error:', nErr.message); }
+
+        res.json({ success: true, message: 'Price report submitted', id: result.insertId });
+    } catch (error) {
+        console.error('Submit price report error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit price report' });
+    }
+});
+
+// List my price reports
+router.get('/me/price-reports', requirePainterAuth, async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const pg = Number(page);
+        const lim = Number(limit);
+        let query = 'SELECT * FROM painter_price_reports WHERE painter_id = ?';
+        const params = [req.painter.id];
+
+        if (status) { query += ' AND status = ?'; params.push(status); }
+
+        const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+        const [countResult] = await pool.query(countQuery, params);
+        const total = countResult[0].total;
+
+        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+        params.push(lim, (pg - 1) * lim);
+
+        const [reports] = await pool.query(query, params);
+        res.json({ success: true, reports, total, page: pg, pages: Math.ceil(total / lim) });
+    } catch (error) {
+        console.error('List price reports error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list price reports' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PRODUCT REQUESTS (painter self)
+// ═══════════════════════════════════════════════════════════════
+
+// Request new product
+router.post('/me/product-requests', requirePainterAuth, async (req, res) => {
+    try {
+        const { product_name, brand, size_needed, note } = req.body;
+
+        if (!product_name) return res.status(400).json({ success: false, message: 'Product name is required' });
+
+        const [result] = await pool.query(
+            `INSERT INTO painter_product_requests (painter_id, product_name, brand, size_needed, note, status, created_at)
+             VALUES (?, ?, ?, ?, ?, 'pending', NOW())`,
+            [req.painter.id, product_name, brand || null, size_needed || null, note || null]
+        );
+
+        res.json({ success: true, message: 'Product request submitted', id: result.insertId });
+    } catch (error) {
+        console.error('Submit product request error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit product request' });
+    }
+});
+
+// List my product requests
+router.get('/me/product-requests', requirePainterAuth, async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const pg = Number(page);
+        const lim = Number(limit);
+        let query = 'SELECT * FROM painter_product_requests WHERE painter_id = ?';
+        const params = [req.painter.id];
+
+        if (status) { query += ' AND status = ?'; params.push(status); }
+
+        const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+        const [countResult] = await pool.query(countQuery, params);
+        const total = countResult[0].total;
+
+        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+        params.push(lim, (pg - 1) * lim);
+
+        const [requests] = await pool.query(query, params);
+        res.json({ success: true, requests, total, page: pg, pages: Math.ceil(total / lim) });
+    } catch (error) {
+        console.error('List product requests error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list product requests' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GAMIFICATION (painter self)
+// ═══════════════════════════════════════════════════════════════
+
+// Get level, badges, active challenges with progress
+router.get('/me/gamification', requirePainterAuth, async (req, res) => {
+    try {
+        // Get painter's lifetime points for level calculation
+        const [painter] = await pool.query('SELECT total_lifetime_points FROM painters WHERE id = ?', [req.painter.id]);
+        const lifetimePoints = painter.length ? (painter[0].total_lifetime_points || 0) : 0;
+
+        let level = 'bronze';
+        if (lifetimePoints > 5000) level = 'diamond';
+        else if (lifetimePoints > 2000) level = 'gold';
+        else if (lifetimePoints > 500) level = 'silver';
+
+        const levelThresholds = { bronze: 0, silver: 501, gold: 2001, diamond: 5001 };
+        const nextLevel = level === 'diamond' ? null : { bronze: 'silver', silver: 'gold', gold: 'diamond' }[level];
+        const nextThreshold = nextLevel ? levelThresholds[nextLevel] : null;
+
+        // Get earned badges
+        const [badges] = await pool.query(
+            `SELECT b.*, eb.earned_at FROM painter_earned_badges eb
+             JOIN painter_badges b ON eb.badge_id = b.id
+             WHERE eb.painter_id = ? ORDER BY eb.earned_at DESC`,
+            [req.painter.id]
+        );
+
+        // Get active challenges with progress
+        const [challenges] = await pool.query(
+            `SELECT c.*, cp.current_value, cp.completed, cp.claimed, cp.claimed_at
+             FROM painter_challenges c
+             LEFT JOIN painter_challenge_progress cp ON cp.challenge_id = c.id AND cp.painter_id = ?
+             WHERE c.is_active = 1 AND c.end_date >= CURDATE()
+             ORDER BY c.end_date ASC`,
+            [req.painter.id]
+        );
+
+        res.json({
+            success: true,
+            level,
+            lifetime_points: lifetimePoints,
+            next_level: nextLevel,
+            next_threshold: nextThreshold,
+            badges,
+            challenges: challenges.map(c => ({
+                ...c,
+                current_value: c.current_value || 0,
+                completed: c.completed || 0,
+                claimed: c.claimed || 0,
+                progress_pct: c.target_value > 0 ? Math.min(100, Math.round(((c.current_value || 0) / c.target_value) * 100)) : 0
+            }))
+        });
+    } catch (error) {
+        console.error('Get gamification error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get gamification data' });
+    }
+});
+
+// Monthly leaderboard
+router.get('/me/leaderboard', requirePainterAuth, async (req, res) => {
+    try {
+        const { scope = 'overall', month } = req.query;
+        const targetMonth = month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+        const monthStart = `${targetMonth}-01`;
+        const monthEnd = `${targetMonth}-31`;
+
+        let branchFilter = '';
+        const params = [monthStart, monthEnd];
+
+        if (scope === 'branch') {
+            const [painterRow] = await pool.query('SELECT branch_id FROM painters WHERE id = ?', [req.painter.id]);
+            const branchId = painterRow.length ? painterRow[0].branch_id : null;
+            if (branchId) {
+                branchFilter = ' AND p.branch_id = ?';
+                params.push(branchId);
+            }
+        }
+
+        const [leaderboard] = await pool.query(
+            `SELECT p.id, p.full_name, p.profile_photo, p.total_lifetime_points,
+                    COALESCE(SUM(pt.points), 0) as month_points
+             FROM painters p
+             LEFT JOIN painter_point_transactions pt ON pt.painter_id = p.id
+                AND pt.created_at >= ? AND pt.created_at <= ?
+             WHERE p.status = 'approved'${branchFilter}
+             GROUP BY p.id
+             ORDER BY month_points DESC
+             LIMIT 20`,
+            params
+        );
+
+        // Calculate levels and ranks
+        const ranked = leaderboard.map((entry, idx) => {
+            const lp = entry.total_lifetime_points || 0;
+            let lvl = 'bronze';
+            if (lp > 5000) lvl = 'diamond';
+            else if (lp > 2000) lvl = 'gold';
+            else if (lp > 500) lvl = 'silver';
+            return { ...entry, rank: idx + 1, level: lvl };
+        });
+
+        // Find current painter's rank
+        let myRank = ranked.find(r => r.id === req.painter.id);
+        if (!myRank) {
+            // Painter not in top 20, calculate their rank
+            const [myPoints] = await pool.query(
+                `SELECT COALESCE(SUM(points), 0) as month_points FROM painter_point_transactions
+                 WHERE painter_id = ? AND created_at >= ? AND created_at <= ?`,
+                [req.painter.id, monthStart, monthEnd]
+            );
+            const mp = myPoints[0].month_points;
+            const [rankResult] = await pool.query(
+                `SELECT COUNT(*) + 1 as rank FROM (
+                    SELECT painter_id, SUM(points) as total
+                    FROM painter_point_transactions
+                    WHERE created_at >= ? AND created_at <= ?
+                    GROUP BY painter_id
+                    HAVING total > ?
+                ) ranked`,
+                [monthStart, monthEnd, mp]
+            );
+            myRank = { id: req.painter.id, rank: rankResult[0].rank, month_points: mp };
+        }
+
+        res.json({ success: true, leaderboard: ranked, my_rank: myRank, month: targetMonth, scope });
+    } catch (error) {
+        console.error('Leaderboard error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get leaderboard' });
+    }
+});
+
+// Claim challenge reward
+router.post('/me/challenges/:id/claim', requirePainterAuth, async (req, res) => {
+    try {
+        const challengeId = req.params.id;
+
+        // Verify challenge exists and is active
+        const [challenges] = await pool.query(
+            'SELECT * FROM painter_challenges WHERE id = ? AND is_active = 1',
+            [challengeId]
+        );
+        if (!challenges.length) return res.status(404).json({ success: false, message: 'Challenge not found or inactive' });
+
+        const challenge = challenges[0];
+
+        // Check progress
+        const [progress] = await pool.query(
+            'SELECT * FROM painter_challenge_progress WHERE challenge_id = ? AND painter_id = ?',
+            [challengeId, req.painter.id]
+        );
+        if (!progress.length || !progress[0].completed) {
+            return res.status(400).json({ success: false, message: 'Challenge not completed yet' });
+        }
+        if (progress[0].claimed) {
+            return res.status(400).json({ success: false, message: 'Reward already claimed' });
+        }
+
+        // Award points to regular pool
+        await pool.query(
+            `INSERT INTO painter_point_transactions (painter_id, points, pool, type, description, reference_id, created_at)
+             VALUES (?, ?, 'regular', 'challenge_reward', ?, ?, NOW())`,
+            [req.painter.id, challenge.reward_points, `Challenge reward: ${challenge.title}`, `challenge-${challengeId}`]
+        );
+
+        // Update regular balance
+        await pool.query(
+            'UPDATE painters SET regular_points = regular_points + ? WHERE id = ?',
+            [challenge.reward_points, req.painter.id]
+        );
+
+        // Mark as claimed
+        await pool.query(
+            'UPDATE painter_challenge_progress SET claimed = 1, claimed_at = NOW() WHERE challenge_id = ? AND painter_id = ?',
+            [challengeId, req.painter.id]
+        );
+
+        res.json({ success: true, message: `Claimed ${challenge.reward_points} points!`, points: challenge.reward_points });
+    } catch (error) {
+        console.error('Claim challenge error:', error);
+        res.status(500).json({ success: false, message: 'Failed to claim challenge reward' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GALLERY (painter self)
+// ═══════════════════════════════════════════════════════════════
+
+// Upload work photo
+router.post('/me/gallery', requirePainterAuth, uploadProfile.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'Photo is required' });
+
+        const { category, description, is_before, pair_id } = req.body;
+
+        const filename = `gallery-${req.painter.id}-${Date.now()}.jpg`;
+        const outputPath = `public/uploads/profiles/${filename}`;
+        await sharp(req.file.buffer)
+            .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 85 })
+            .toFile(outputPath);
+        const photo_url = `/uploads/profiles/${filename}`;
+
+        const [result] = await pool.query(
+            `INSERT INTO painter_gallery (painter_id, photo_url, category, description, is_before, pair_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+            [req.painter.id, photo_url, category || 'other', description || null, is_before ? 1 : 0, pair_id || null]
+        );
+
+        res.json({ success: true, message: 'Photo uploaded', id: result.insertId, photo_url });
+    } catch (error) {
+        console.error('Upload gallery photo error:', error);
+        res.status(500).json({ success: false, message: 'Failed to upload photo' });
+    }
+});
+
+// List gallery photos
+router.get('/me/gallery', requirePainterAuth, async (req, res) => {
+    try {
+        const { category, page = 1, limit = 20 } = req.query;
+        const pg = Number(page);
+        const lim = Number(limit);
+        let query = 'SELECT * FROM painter_gallery WHERE painter_id = ?';
+        const params = [req.painter.id];
+
+        if (category) { query += ' AND category = ?'; params.push(category); }
+
+        const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+        const [countResult] = await pool.query(countQuery, params);
+        const total = countResult[0].total;
+
+        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+        params.push(lim, (pg - 1) * lim);
+
+        const [photos] = await pool.query(query, params);
+        res.json({ success: true, photos, total, page: pg, pages: Math.ceil(total / lim) });
+    } catch (error) {
+        console.error('List gallery error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list gallery' });
+    }
+});
+
+// Delete gallery photo
+router.delete('/me/gallery/:id', requirePainterAuth, async (req, res) => {
+    try {
+        const [existing] = await pool.query('SELECT id FROM painter_gallery WHERE id = ? AND painter_id = ?', [req.params.id, req.painter.id]);
+        if (!existing.length) return res.status(404).json({ success: false, message: 'Photo not found' });
+
+        await pool.query('DELETE FROM painter_gallery WHERE id = ?', [req.params.id]);
+        res.json({ success: true, message: 'Photo deleted' });
+    } catch (error) {
+        console.error('Delete gallery photo error:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete photo' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// CALCULATOR (painter self)
+// ═══════════════════════════════════════════════════════════════
+
+// Save calculation
+router.post('/me/calculations', requirePainterAuth, async (req, res) => {
+    try {
+        const { calculation_data, total_sqft, total_paint_liters, estimated_cost } = req.body;
+
+        if (!calculation_data) return res.status(400).json({ success: false, message: 'Calculation data is required' });
+
+        const [result] = await pool.query(
+            `INSERT INTO painter_calculations (painter_id, calculation_data, total_sqft, total_paint_liters, estimated_cost, created_at)
+             VALUES (?, ?, ?, ?, ?, NOW())`,
+            [req.painter.id, JSON.stringify(calculation_data), total_sqft || 0, total_paint_liters || 0, estimated_cost || 0]
+        );
+
+        res.json({ success: true, message: 'Calculation saved', id: result.insertId });
+    } catch (error) {
+        console.error('Save calculation error:', error);
+        res.status(500).json({ success: false, message: 'Failed to save calculation' });
+    }
+});
+
+// List saved calculations
+router.get('/me/calculations', requirePainterAuth, async (req, res) => {
+    try {
+        const { page = 1, limit = 20 } = req.query;
+        const pg = Number(page);
+        const lim = Number(limit);
+
+        const [countResult] = await pool.query('SELECT COUNT(*) as total FROM painter_calculations WHERE painter_id = ?', [req.painter.id]);
+        const total = countResult[0].total;
+
+        const [calculations] = await pool.query(
+            'SELECT * FROM painter_calculations WHERE painter_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            [req.painter.id, lim, (pg - 1) * lim]
+        );
+
+        // Parse calculation_data JSON
+        for (const calc of calculations) {
+            if (calc.calculation_data && typeof calc.calculation_data === 'string') {
+                try { calc.calculation_data = JSON.parse(calc.calculation_data); } catch (e) {}
+            }
+        }
+
+        res.json({ success: true, calculations, total, page: pg, pages: Math.ceil(total / lim) });
+    } catch (error) {
+        console.error('List calculations error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list calculations' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PAINT COVERAGE CONFIG (no auth needed)
+// ═══════════════════════════════════════════════════════════════
+
+router.get('/config/coverage-rates', async (req, res) => {
+    try {
+        const [rows] = await pool.query("SELECT config_key, config_value FROM ai_config WHERE config_key LIKE 'paint_coverage_%'");
+
+        const defaults = {
+            primer: 110,
+            putty: 30,
+            interior_emulsion: 110,
+            exterior_emulsion: 90,
+            texture: 30,
+            waterproofing: 55
+        };
+
+        if (rows.length === 0) {
+            return res.json({ success: true, coverage_rates: defaults, source: 'defaults' });
+        }
+
+        const rates = { ...defaults };
+        for (const row of rows) {
+            const key = row.config_key.replace('paint_coverage_', '');
+            rates[key] = parseFloat(row.config_value) || defaults[key] || 0;
+        }
+
+        res.json({ success: true, coverage_rates: rates, source: 'config' });
+    } catch (error) {
+        console.error('Get coverage rates error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get coverage rates' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN ENDPOINTS FOR NEW FEATURES
+// ═══════════════════════════════════════════════════════════════
+
+// List all price reports (admin)
+router.get('/admin/price-reports', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const pg = Number(page);
+        const lim = Number(limit);
+        let query = `SELECT pr.*, p.full_name as painter_name, p.phone as painter_phone
+                     FROM painter_price_reports pr
+                     JOIN painters p ON pr.painter_id = p.id WHERE 1=1`;
+        const params = [];
+
+        if (status) { query += ' AND pr.status = ?'; params.push(status); }
+
+        const countQuery = query.replace(/SELECT pr\.\*, .*? FROM/, 'SELECT COUNT(*) as total FROM');
+        const [countResult] = await pool.query(countQuery, params);
+        const total = countResult[0].total;
+
+        query += ' ORDER BY pr.created_at DESC LIMIT ? OFFSET ?';
+        params.push(lim, (pg - 1) * lim);
+
+        const [reports] = await pool.query(query, params);
+        res.json({ success: true, reports, total, page: pg, pages: Math.ceil(total / lim) });
+    } catch (error) {
+        console.error('Admin list price reports error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list price reports' });
+    }
+});
+
+// Review price report (admin)
+router.put('/admin/price-reports/:id', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { status, admin_response, matched_price } = req.body;
+        if (!status) return res.status(400).json({ success: false, message: 'Status is required' });
+
+        await pool.query(
+            `UPDATE painter_price_reports SET status = ?, admin_response = ?, matched_price = ?, reviewed_by = ?, reviewed_at = NOW()
+             WHERE id = ?`,
+            [status, admin_response || null, matched_price || null, req.user.id, req.params.id]
+        );
+
+        // Notify painter
+        try {
+            const [report] = await pool.query('SELECT painter_id, product_name FROM painter_price_reports WHERE id = ?', [req.params.id]);
+            if (report.length) {
+                await painterNotificationService.sendToPainter(report[0].painter_id, {
+                    type: 'price_report_reviewed',
+                    title: 'Price Report Reviewed',
+                    body: `Your price report for "${report[0].product_name}" has been ${status}.${admin_response ? ' ' + admin_response : ''}`,
+                    data: { page: 'price-reports' }
+                });
+            }
+        } catch (nErr) { console.error('Price report review notification error:', nErr.message); }
+
+        res.json({ success: true, message: 'Price report updated' });
+    } catch (error) {
+        console.error('Review price report error:', error);
+        res.status(500).json({ success: false, message: 'Failed to review price report' });
+    }
+});
+
+// List all product requests (admin)
+router.get('/admin/product-requests', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query;
+        const pg = Number(page);
+        const lim = Number(limit);
+        let query = `SELECT pr.*, p.full_name as painter_name, p.phone as painter_phone
+                     FROM painter_product_requests pr
+                     JOIN painters p ON pr.painter_id = p.id WHERE 1=1`;
+        const params = [];
+
+        if (status) { query += ' AND pr.status = ?'; params.push(status); }
+
+        const countQuery = query.replace(/SELECT pr\.\*, .*? FROM/, 'SELECT COUNT(*) as total FROM');
+        const [countResult] = await pool.query(countQuery, params);
+        const total = countResult[0].total;
+
+        query += ' ORDER BY pr.created_at DESC LIMIT ? OFFSET ?';
+        params.push(lim, (pg - 1) * lim);
+
+        const [requests] = await pool.query(query, params);
+        res.json({ success: true, requests, total, page: pg, pages: Math.ceil(total / lim) });
+    } catch (error) {
+        console.error('Admin list product requests error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list product requests' });
+    }
+});
+
+// Review product request (admin)
+router.put('/admin/product-requests/:id', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { status, added_product_id } = req.body;
+        if (!status) return res.status(400).json({ success: false, message: 'Status is required' });
+
+        await pool.query(
+            `UPDATE painter_product_requests SET status = ?, added_product_id = ?, reviewed_by = ?, reviewed_at = NOW()
+             WHERE id = ?`,
+            [status, added_product_id || null, req.user.id, req.params.id]
+        );
+
+        // Notify painter
+        try {
+            const [request] = await pool.query('SELECT painter_id, product_name FROM painter_product_requests WHERE id = ?', [req.params.id]);
+            if (request.length) {
+                await painterNotificationService.sendToPainter(request[0].painter_id, {
+                    type: 'product_request_reviewed',
+                    title: 'Product Request Update',
+                    body: `Your request for "${request[0].product_name}" has been ${status}.`,
+                    data: { page: 'product-requests' }
+                });
+            }
+        } catch (nErr) { console.error('Product request review notification error:', nErr.message); }
+
+        res.json({ success: true, message: 'Product request updated' });
+    } catch (error) {
+        console.error('Review product request error:', error);
+        res.status(500).json({ success: false, message: 'Failed to review product request' });
+    }
+});
+
+// Create weekly challenge (admin)
+router.post('/admin/challenges', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { title, description, challenge_type, target_value, reward_points, start_date, end_date, icon } = req.body;
+
+        if (!title || !target_value || !reward_points) {
+            return res.status(400).json({ success: false, message: 'Title, target value, and reward points are required' });
+        }
+
+        const [result] = await pool.query(
+            `INSERT INTO painter_challenges (title, description, challenge_type, target_value, reward_points,
+             start_date, end_date, icon, is_active, created_by, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, NOW())`,
+            [title, description || null, challenge_type || 'general', target_value, reward_points,
+             start_date || new Date().toISOString().split('T')[0], end_date || null, icon || null, req.user.id]
+        );
+
+        res.json({ success: true, message: 'Challenge created', id: result.insertId });
+    } catch (error) {
+        console.error('Create challenge error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create challenge' });
+    }
+});
+
+// Update challenge (admin)
+router.put('/admin/challenges/:id', requireAuth, requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { title, description, challenge_type, target_value, reward_points, start_date, end_date, icon, is_active } = req.body;
+
+        const updates = [];
+        const params = [];
+
+        if (title !== undefined) { updates.push('title = ?'); params.push(title); }
+        if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+        if (challenge_type !== undefined) { updates.push('challenge_type = ?'); params.push(challenge_type); }
+        if (target_value !== undefined) { updates.push('target_value = ?'); params.push(target_value); }
+        if (reward_points !== undefined) { updates.push('reward_points = ?'); params.push(reward_points); }
+        if (start_date !== undefined) { updates.push('start_date = ?'); params.push(start_date); }
+        if (end_date !== undefined) { updates.push('end_date = ?'); params.push(end_date); }
+        if (icon !== undefined) { updates.push('icon = ?'); params.push(icon); }
+        if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active ? 1 : 0); }
+
+        if (updates.length === 0) return res.status(400).json({ success: false, message: 'Nothing to update' });
+
+        params.push(req.params.id);
+        await pool.query(`UPDATE painter_challenges SET ${updates.join(', ')} WHERE id = ?`, params);
+
+        res.json({ success: true, message: 'Challenge updated' });
+    } catch (error) {
+        console.error('Update challenge error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update challenge' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // ADMIN PARAMETERIZED ROUTES (/:id) — MUST be AFTER named routes
 // ═══════════════════════════════════════════════════════════════
 
