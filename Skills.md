@@ -2992,5 +2992,24 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 - **Notification deep links**: Added `incentive_earned/approved/rejected/request` types to `header-v2.html`, `sw.js`, and Android `QCFirebaseMessagingService.kt`
 - **Android FCM**: Already green-themed (`#1B5E3B`), FCM working (server logs confirm delivery). Token refreshes on app open.
 
+### Painter Native Android App v2.0.0 (Apr 5, 2026)
+- **Full native rewrite**: Jetpack Compose + Material 3, replacing WebView wrapper
+- **Architecture**: Hilt DI, Retrofit + OkHttp, Room DB, DataStore, MVVM, Compose Navigation
+- **Navigation**: 5-tab bottom nav (Home | Work | +New FAB | Catalog | Me)
+- **Screens**: Login/Register (OTP), Dashboard, Estimates/Quotations, Catalog, Profile, Calculator
+- **New features**:
+  - **Contract Quotation System**: 4 types (Labour-Salary, Labour-Sqft, L+Material-Sqft, L+Material-Itemized), room-wise breakdown, PDF with painter branding
+  - **Paint Calculator**: Multi-room, 6 paint types, coverage rates, convert-to-quotation
+  - **Gamification**: Levels (Bronze→Diamond), 10 badges, weekly challenges, monthly leaderboard
+  - **Price Match Reports**: Competitor price reporting with bill proof photo
+  - **Product Requests**: Request out-of-catalog products, notification on availability
+  - **Work Gallery**: Before/after work photos with categories
+  - **Voice Search**: Tamil/English via Android SpeechRecognizer
+- **Design**: Modern card-based (PhonePe/GPay style), QCGreen #1B5E3B + QCGold #D4A24E
+- **Language**: Bilingual Tamil/English with in-app toggle (130+ strings)
+- **Backend**: 25 new API endpoints, 10 new database tables, 3 migrations
+- **Tables**: `painter_quotations`, `painter_quotation_items`, `painter_badges`, `painter_earned_badges`, `painter_challenges`, `painter_challenge_progress`, `painter_price_reports`, `painter_product_requests`, `painter_gallery`, `painter_calculations`
+- **APK**: `app/build/outputs/apk/painter/release/app-painter-release.apk` (7.7MB)
+
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-03-06 | Version: 3.3.5 (Staff/Customer), 1.2.0 (Painter) | Maintained by: Development Team*
+*Last Updated: 2026-04-05 | Version: 3.3.9 (Staff/Customer), 2.0.0 (Painter) | Maintained by: Development Team*
