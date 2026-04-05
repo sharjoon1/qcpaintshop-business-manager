@@ -232,7 +232,7 @@ router.post('/verify-otp', async (req, res) => {
         if (!phone || !otp) return res.status(400).json({ success: false, message: 'Phone and OTP are required' });
 
         const [sessions] = await pool.query(
-            `SELECT ps.id, ps.token, ps.painter_id, p.status, p.full_name, p.referral_code
+            `SELECT ps.id, ps.token, ps.painter_id, p.status, p.full_name, p.phone, p.profile_photo, p.level, p.referral_code
              FROM painter_sessions ps JOIN painters p ON ps.painter_id = p.id
              WHERE p.phone = ? AND ps.otp = ? AND ps.otp_expires_at > NOW()
              ORDER BY ps.id DESC LIMIT 1`,
@@ -246,7 +246,15 @@ router.post('/verify-otp', async (req, res) => {
 
         res.json({
             success: true, token: session.token,
-            painter: { id: session.painter_id, name: session.full_name, status: session.status, referralCode: session.referral_code }
+            painter: {
+                id: session.painter_id,
+                full_name: session.full_name,
+                phone: session.phone,
+                profile_photo: session.profile_photo || null,
+                level: session.level || null,
+                status: session.status,
+                referral_code: session.referral_code
+            }
         });
     } catch (error) {
         console.error('Verify OTP error:', error);
