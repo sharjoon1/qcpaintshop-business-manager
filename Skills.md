@@ -2996,7 +2996,8 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 - **Full native rewrite**: Jetpack Compose + Material 3, replacing WebView wrapper
 - **Architecture**: Hilt DI, Retrofit + OkHttp, Room DB, DataStore, MVVM, Compose Navigation
 - **Navigation**: 5-tab bottom nav (Home | Work | +New FAB | Catalog | Me)
-- **Screens**: Login/Register (OTP), Dashboard, Estimates/Quotations, Catalog, Profile, Calculator
+- **12 Working Screens**: Login/Register (OTP), Dashboard, Work (Estimates+Quotations), Estimate Create (multi-step), Quotation Create (5-step), Catalog, Profile, Check-in (GPS), Calculator, Leaderboard, Achievements, Settings
+- **5 Placeholder Screens**: Edit Profile, Gallery, Referrals, Points History, Training
 - **New features**:
   - **Contract Quotation System**: 4 types (Labour-Salary, Labour-Sqft, L+Material-Sqft, L+Material-Itemized), room-wise breakdown, PDF with painter branding
   - **Paint Calculator**: Multi-room, 6 paint types, coverage rates, convert-to-quotation
@@ -3012,4 +3013,4 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 - **APK**: `app/build/outputs/apk/painter/release/app-painter-release.apk` (7.7MB)
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-04-05 | Version: 3.3.9 (Staff/Customer), 2.0.0 (Painter) | Maintained by: Development Team*
+*Last Updated: 2026-04-06 | Version: 3.3.9 (Staff/Customer), 2.0.0 (Painter) | Maintained by: Development Team*
