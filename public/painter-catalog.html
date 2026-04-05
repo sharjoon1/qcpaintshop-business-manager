@@ -488,7 +488,8 @@
             const container = document.getElementById('brandChips');
             let html = `<button class="chip ${!currentBrand ? 'active' : ''}" data-brand="" onclick="filterBrand('')" data-i18n="catalog.all_brands">All Brands</button>`;
             (brands || []).forEach(b => {
-                html += `<button class="chip ${currentBrand === b ? 'active' : ''}" data-brand="${esc(b)}" onclick="filterBrand('${esc(b)}')">${esc(b)}</button>`;
+                const safe = esc(b).replace(/'/g, '&#39;');
+                html += `<button class="chip ${currentBrand === b ? 'active' : ''}" data-brand="${safe}" onclick="filterBrand('${safe}')">${esc(b)}</button>`;
             });
             container.innerHTML = html;
         }
@@ -498,7 +499,8 @@
             const container = document.getElementById('categoryChips');
             let html = `<button class="chip ${!currentCategory ? 'active' : ''}" data-category="" onclick="filterCategory('')" data-i18n="catalog.all_categories">All Categories</button>`;
             (categories || []).forEach(c => {
-                html += `<button class="chip ${currentCategory === c ? 'active' : ''}" data-category="${esc(c)}" onclick="filterCategory('${esc(c)}')">${esc(c)}</button>`;
+                const safe = esc(c).replace(/'/g, '&#39;');
+                html += `<button class="chip ${currentCategory === c ? 'active' : ''}" data-category="${safe}" onclick="filterCategory('${safe}')">${esc(c)}</button>`;
             });
             container.innerHTML = html;
         }

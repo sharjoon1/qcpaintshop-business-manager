@@ -66,7 +66,7 @@
     }
 
     async function loadEstimate() {
-        const pathParts = window.location.pathname.split('/');
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
         const token = pathParts[pathParts.length - 1];
         if (!token) {
             document.getElementById('content').innerHTML = '<div class="error">Invalid link</div>';
@@ -90,8 +90,8 @@
                     <td>${esc(i.item_name)}</td>
                     <td class="text-xs" style="color:#64748b">${esc(i.brand || '')}</td>
                     <td class="text-right">${i.quantity}</td>
-                    <td class="text-right">₹${i.unit_price.toLocaleString('en-IN')}</td>
-                    <td class="text-right" style="font-weight:500">₹${i.line_total.toLocaleString('en-IN')}</td>
+                    <td class="text-right">₹${(i.unit_price || 0).toLocaleString('en-IN')}</td>
+                    <td class="text-right" style="font-weight:500">₹${(i.line_total || 0).toLocaleString('en-IN')}</td>
                 </tr>
             `).join('');
 
@@ -115,7 +115,7 @@
                         </table>
                     </div>
                     <div class="totals">
-                        <div class="total-row grand"><span>Total</span><span>₹${est.grand_total.toLocaleString('en-IN')}</span></div>
+                        <div class="total-row grand"><span>Total</span><span>₹${(est.grand_total || 0).toLocaleString('en-IN')}</span></div>
                         <div style="text-align:right;font-size:0.7rem;color:#94a3b8;margin-top:2px">* Prices inclusive of GST</div>
                     </div>
                 </div>

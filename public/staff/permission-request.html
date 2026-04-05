@@ -268,6 +268,8 @@
 
 
     <script>
+        function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
         let requests = [];
         let currentTab = 'new';
 
@@ -516,7 +518,7 @@
                             <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">
                                 Reviewed by ${req.reviewed_by_name || 'Admin'} on ${reviewedAt}
                             </div>
-                            ${req.review_notes ? `<div style="font-size: 13px; color: #1f2937; font-style: italic;">"${req.review_notes}"</div>` : ''}
+                            ${req.review_notes ? `<div style="font-size: 13px; color: #1f2937; font-style: italic;">"${esc(req.review_notes)}"</div>` : ''}
                         </div>
                     `;
                 }
@@ -539,7 +541,7 @@
 
                         <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 8px;">
                             <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Reason:</div>
-                            <div style="font-size: 13px; color: #1f2937;">${req.reason}</div>
+                            <div style="font-size: 13px; color: #1f2937;">${esc(req.reason)}</div>
                         </div>
 
                         <div style="font-size: 11px; color: #9ca3af;">

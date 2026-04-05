@@ -128,10 +128,13 @@ JSON format (ONLY return valid JSON, no other text):
 }`;
 
     try {
-        const result = await aiEngine.generate(prompt, {
+        const messages = [
+            { role: 'system', content: 'You are a Tamil-speaking AI business manager for a paint retail company. Always respond in Tamil. Return ONLY valid JSON.' },
+            { role: 'user', content: prompt }
+        ];
+        const result = await aiEngine.generate(messages, {
             maxTokens: 2048,
-            temperature: 0.6,
-            systemPrompt: 'You are a Tamil-speaking AI business manager for a paint retail company. Always respond in Tamil. Return ONLY valid JSON.'
+            temperature: 0.6
         });
 
         // Parse JSON from response

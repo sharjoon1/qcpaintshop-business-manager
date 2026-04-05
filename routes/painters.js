@@ -777,7 +777,8 @@ router.get('/me/briefing', requirePainterAuth, async (req, res) => {
         let dailyBonus = null;
         if (cfg.painter_daily_bonus_product_id) {
             const [product] = await pool.query(
-                'SELECT id, name, brand, category, image_url FROM products WHERE id = ?',
+                `SELECT p.id, p.name, b.name as brand, c.name as category, p.image_url
+                 FROM products p LEFT JOIN brands b ON p.brand_id = b.id LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?`,
                 [cfg.painter_daily_bonus_product_id]
             );
             if (product.length) {
@@ -1179,8 +1180,9 @@ router.put('/me/estimates/:estimateId', requirePainterAuth, async (req, res) => 
                 );
             }
 
-            const gstAmount = subtotal * (gstPct / 100);
-            const grandTotal = subtotal + gstAmount;
+            // Zoho prices already include GST — no separate calculation needed
+            const gstAmount = 0;
+            const grandTotal = subtotal;
             await pool.query(
                 `UPDATE painter_estimates SET billing_type = ?, customer_name = ?, customer_phone = ?,
                  customer_address = ?, subtotal = ?, gst_amount = ?, grand_total = ?, notes = ? WHERE id = ?`,
@@ -2971,9 +2973,9 @@ router.get('/estimates/products', requireAuth, async (req, res) => {
 
         const [products] = await pool.query(
             `SELECT zim.zoho_item_id, zim.zoho_item_name, zim.zoho_description, zim.zoho_rate,
-                    zim.brand, zim.category, zim.image_url
+                    zim.zoho_brand, zim.zoho_category_name, zim.image_url
              FROM zoho_items_map zim
-             WHERE (zim.zoho_item_name LIKE ? OR zim.zoho_description LIKE ? OR zim.brand LIKE ?)
+             WHERE (zim.zoho_item_name LIKE ? OR zim.zoho_description LIKE ? OR zim.zoho_brand LIKE ?)
              AND zim.zoho_rate > 0
              ORDER BY zim.zoho_item_name
              LIMIT 20`,
@@ -3036,7 +3038,7 @@ router.put('/estimates/:estimateId/items', requirePermission('painters', 'estima
         // Fetch prices from zoho_items_map for all requested items
         const itemIds = items.map(i => i.item_id);
         const [zohoItems] = await pool.query(
-            `SELECT zoho_item_id, zoho_item_name, zoho_description, zoho_rate, brand, category
+            `SELECT zoho_item_id, zoho_item_name, zoho_description, zoho_rate, zoho_brand, zoho_category_name
              FROM zoho_items_map WHERE zoho_item_id IN (?)`,
             [itemIds]
         );
@@ -3061,7 +3063,7 @@ router.put('/estimates/:estimateId/items', requirePermission('painters', 'estima
             await pool.query(
                 `INSERT INTO painter_estimate_items (estimate_id, zoho_item_id, item_name, brand, category, quantity, unit_price, line_total, display_order)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [estimate.id, reqItem.item_id, zoho.zoho_item_name, zoho.brand, zoho.category, qty, unitPrice, lineTotal, i + 1]
+                [estimate.id, reqItem.item_id, zoho.zoho_item_name, zoho.zoho_brand, zoho.zoho_category_name, qty, unitPrice, lineTotal, i + 1]
             );
         }
 
@@ -4014,7 +4016,7 @@ router.put('/admin/visualizations/:id', requirePermission('painters', 'manage'),
             const [req_rows] = await pool.query('SELECT painter_id FROM painter_visualization_requests WHERE id = ?', [req.params.id]);
             if (req_rows.length) {
                 try {
-                    await painterNotificationService.send(pool, req_rows[0].painter_id, {
+                    await painterNotificationService.sendToPainter(req_rows[0].painter_id, {
                         title: status === 'completed' ? 'Visualization Ready!' : 'Visualization Update',
                         body: status === 'completed'
                             ? 'Your color visualization is ready. Open the app to view and share it.'
@@ -4053,7 +4055,7 @@ router.post('/admin/visualizations/:id/upload-result', requirePermission('painte
         const [req_rows] = await pool.query('SELECT painter_id FROM painter_visualization_requests WHERE id = ?', [req.params.id]);
         if (req_rows.length) {
             try {
-                await painterNotificationService.send(pool, req_rows[0].painter_id, {
+                await painterNotificationService.sendToPainter(req_rows[0].painter_id, {
                     title: 'Visualization Ready!',
                     body: 'Your color visualization is ready. Open the app to view and share it.',
                     type: 'visualization_completed'

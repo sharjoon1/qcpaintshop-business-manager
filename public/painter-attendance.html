@@ -156,7 +156,7 @@
                     <h1 class="text-lg font-bold" data-i18n="attendance.title">Shop Attendance</h1>
                 </div>
                 <div class="flex items-center gap-2">
-                    <a href="/painter-notifications.html" class="p-2 rounded-lg hover:bg-white/10 relative" id="notifBtn">
+                    <a href="/painter-dashboard.html" class="p-2 rounded-lg hover:bg-white/10 relative" id="notifBtn">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
                         <span class="absolute top-1 right-1 w-2 h-2 bg-red-400 rounded-full hidden" id="notifDot"></span>
                     </a>
@@ -693,9 +693,10 @@
         // Build set of visited dates
         const visitedDates = new Set();
         visits.forEach(v => {
-            // v.date could be "2026-02-27" or a Date object
-            const d = new Date(v.date);
-            visitedDates.add(d.getDate());
+            // Parse date string directly to avoid timezone issues
+            const dateStr = typeof v.date === 'string' ? v.date : v.date.toISOString();
+            const day = parseInt(dateStr.split('-')[2]);
+            if (!isNaN(day)) visitedDates.add(day);
         });
 
         let html = '';

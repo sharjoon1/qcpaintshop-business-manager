@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ta">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1100,7 +1100,7 @@ async function searchCustomers() {
         const customers = data.customers || [];
 
         let html = customers.map(c => `
-            <div class="suggestion-item" onclick="selectCustomer(${c.id}, '${esc(c.zoho_contact_name)}', '${esc(c.zoho_phone || '')}')">
+            <div class="suggestion-item" onclick="selectCustomer(${c.id}, '${esc(c.zoho_contact_name).replace(/'/g, '&#39;')}', '${esc(c.zoho_phone || '').replace(/'/g, '&#39;')}')">
                 <span class="font-medium">${esc(c.zoho_contact_name)}</span>
                 <span class="text-xs text-gray-400 ml-2">${esc(c.zoho_phone || '')}</span>
             </div>
@@ -1168,7 +1168,7 @@ async function searchPainters() {
         if (!painters.length) { el.classList.add('hidden'); return; }
 
         el.innerHTML = painters.map(p => `
-            <div class="suggestion-item" onclick="selectPainter(${p.id}, '${esc(p.full_name || p.name)}')">
+            <div class="suggestion-item" onclick="selectPainter(${p.id}, '${esc(p.full_name || p.name).replace(/'/g, '&#39;')}')">
                 <span class="font-medium">${esc(p.full_name || p.name)}</span>
                 <span class="text-xs text-gray-400 ml-2">${esc(p.phone || '')}</span>
             </div>

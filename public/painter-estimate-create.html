@@ -41,6 +41,11 @@
         .floating-cart { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e8ecf1; padding: 0.75rem 1rem; box-shadow: 0 -4px 12px rgba(0,0,0,0.08); z-index: 50; }
         .type-tab { padding: 0.375rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 600; border: 1px solid #d1d5db; background: #fff; color: #6b7280; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
         .type-tab.active { background: #1B5E3B; color: #fff; border-color: #1B5E3B; }
+        .product-img { width: 100px; min-height: 100px; object-fit: cover; border-radius: 12px; border: 1px solid #e5e7eb; flex-shrink: 0; align-self: stretch; background: #f3f4f6; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top-color: #1B5E3B; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .field-error { border-color: #ef4444 !important; }
+        .error-text { color: #ef4444; font-size: 0.75rem; margin-top: 2px; display: none; }
     </style>
 </head>
 <body>
@@ -54,11 +59,7 @@
                     </a>
                     <div>
                         <h1 class="text-lg font-bold">Create Estimate</h1>
-                        <div class="stepper mt-1" id="stepper">
-                            <div class="stepper-dot active" data-step="1"></div>
-                            <div class="stepper-dot" data-step="2"></div>
-                            <div class="stepper-dot" data-step="3"></div>
-                        </div>
+                        <div class="stepper mt-1" id="stepper"></div>
                     </div>
                 </div>
             </div>
@@ -98,10 +99,12 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Customer Name *</label>
                     <input type="text" id="customerName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Full name">
+                    <div class="error-text" id="nameError"></div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                    <input type="tel" id="customerPhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="10-digit number">
+                    <input type="tel" id="customerPhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="10-digit number" maxlength="10" inputmode="numeric">
+                    <div class="error-text" id="phoneError"></div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
@@ -188,10 +191,12 @@
     <script>
     const API = '/api/painters';
     let billingType = '';
-    let cart = {}; // { "productId_packSizeId": { ...details, quantity } }
+    let cart = {};
     let selectedType = '';
     let allProducts = [];
     let searchTimer;
+    let filtersLoaded = false;
+    let isSubmitting = false;
 
     function painterHeaders() {
         return {
@@ -211,18 +216,29 @@
         return d.innerHTML;
     }
 
+    function fmtPrice(n) {
+        return n != null ? '₹' + Number(n).toLocaleString('en-IN') : '';
+    }
+
+    // Dynamic stepper based on billing type
+    function buildStepper() {
+        const stepper = document.getElementById('stepper');
+        if (billingType === 'customer') {
+            stepper.innerHTML = '<div class="stepper-dot" data-step="1"></div><div class="stepper-dot" data-step="2"></div><div class="stepper-dot" data-step="3"></div>';
+        } else {
+            stepper.innerHTML = '<div class="stepper-dot" data-step="1"></div><div class="stepper-dot" data-step="3"></div>';
+        }
+    }
+
     // Step navigation
     function goToStep(step) {
-        // Validate step 2 if going forward from customer details
         if (step === 3 && billingType === 'customer') {
-            const name = document.getElementById('customerName').value.trim();
-            if (!name) { alert('Customer name is required'); return; }
+            if (!validateCustomerForm()) return;
         }
 
         document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
         document.getElementById('step' + step).classList.add('active');
 
-        // Update stepper
         document.querySelectorAll('.stepper-dot').forEach(dot => {
             const s = parseInt(dot.dataset.step);
             dot.className = 'stepper-dot' + (s === step ? ' active' : s < step ? ' done' : '');
@@ -232,17 +248,44 @@
         window.scrollTo(0, 0);
     }
 
+    function validateCustomerForm() {
+        let valid = true;
+        const name = document.getElementById('customerName');
+        const phone = document.getElementById('customerPhone');
+        const nameErr = document.getElementById('nameError');
+        const phoneErr = document.getElementById('phoneError');
+
+        name.classList.remove('field-error');
+        phone.classList.remove('field-error');
+        nameErr.style.display = 'none';
+        phoneErr.style.display = 'none';
+
+        if (!name.value.trim()) {
+            name.classList.add('field-error');
+            nameErr.textContent = 'Customer name is required';
+            nameErr.style.display = 'block';
+            valid = false;
+        }
+
+        const phoneVal = phone.value.trim();
+        if (phoneVal && !/^\d{10}$/.test(phoneVal)) {
+            phone.classList.add('field-error');
+            phoneErr.textContent = 'Enter a valid 10-digit number';
+            phoneErr.style.display = 'block';
+            valid = false;
+        }
+
+        return valid;
+    }
+
     function selectBillingType(type, el) {
         billingType = type;
         document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
         if (el) el.classList.add('selected');
+        buildStepper();
 
         setTimeout(() => {
-            if (type === 'customer') {
-                goToStep(2);
-            } else {
-                goToStep(3);
-            }
+            goToStep(type === 'customer' ? 2 : 3);
         }, 200);
     }
 
@@ -263,6 +306,9 @@
         const search = document.getElementById('productSearch').value;
         const brand = document.getElementById('brandFilter').value;
         const category = document.getElementById('categoryFilter').value;
+        const container = document.getElementById('productList');
+
+        container.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm"><span class="loading-spinner"></span><span class="ml-2">Loading products...</span></div>';
 
         try {
             const params = new URLSearchParams({ billing_type: billingType });
@@ -278,28 +324,34 @@
 
             allProducts = data.products;
 
-            const brandSelect = document.getElementById('brandFilter');
-            if (brandSelect.options.length <= 1 && data.brands && data.brands.length) {
+            // Populate filters only once
+            if (!filtersLoaded && data.brands && data.categories) {
+                const brandSelect = document.getElementById('brandFilter');
                 data.brands.forEach(b => {
                     const opt = document.createElement('option');
                     opt.value = b.id; opt.textContent = b.name;
                     brandSelect.appendChild(opt);
                 });
-            }
-            const catSelect = document.getElementById('categoryFilter');
-            if (catSelect.options.length <= 1 && data.categories && data.categories.length) {
+                const catSelect = document.getElementById('categoryFilter');
                 data.categories.forEach(c => {
                     const opt = document.createElement('option');
                     opt.value = c.id; opt.textContent = c.name;
                     catSelect.appendChild(opt);
                 });
+                filtersLoaded = true;
             }
 
             renderProducts(data.products);
         } catch (err) {
             console.error('Load products error:', err);
-            document.getElementById('productList').innerHTML = '<div class="text-center py-4 text-red-500 text-sm">Failed to load products</div>';
+            container.innerHTML = '<div class="text-center py-4 text-red-500 text-sm">Failed to load products. <button class="underline text-red-600" onclick="loadProducts()">Retry</button></div>';
         }
+    }
+
+    function stockBadge(stock) {
+        if (stock > 10) return '<span class="badge badge-stock">In Stock</span>';
+        if (stock > 0) return '<span class="badge badge-low">Low: ' + Math.floor(stock) + '</span>';
+        return '<span class="badge badge-out">Out of Stock</span>';
     }
 
     function renderProducts(products) {
@@ -314,9 +366,9 @@
             const typeBg = p.product_type === 'area_wise' ? 'background:#dbeafe;color:#1d4ed8' : 'background:#d1fae5;color:#065f46';
 
             return `
-            <div class="product-card" style="flex-direction:column;align-items:stretch;gap:0.5rem;">
-                <div class="flex items-start justify-between gap-2">
-                    <div class="flex-1 min-w-0">
+            <div class="product-card flex-row items-stretch gap-3">
+                <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+                    <div>
                         <div class="text-sm font-semibold text-gray-800">${esc(p.name)}</div>
                         <div class="flex items-center gap-2 mt-0.5 flex-wrap">
                             ${p.brand ? '<span class="text-xs text-gray-500">' + esc(p.brand) + '</span>' : ''}
@@ -324,27 +376,32 @@
                             ${p.area_coverage ? '<span class="text-xs text-gray-400">' + p.area_coverage + ' sq ft/L</span>' : ''}
                         </div>
                     </div>
-                </div>
-                <div class="flex flex-wrap gap-1.5">
+                    <div class="flex flex-wrap gap-1.5 mt-auto">
                     ${p.pack_sizes.map(ps => {
                         const key = p.id + '_' + ps.pack_size_id;
                         const inCart = cart[key];
                         if (inCart) {
                             return '<div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1">' +
-                                '<button class="qty-btn" style="width:24px;height:24px;font-size:0.875rem;" onclick="updateQty(\'' + key + '\', -1)">−</button>' +
+                                '<button class="qty-btn" style="width:24px;height:24px;font-size:0.875rem;" onclick="updateQty(\'' + key + '\', -1)">&#8722;</button>' +
                                 '<span class="text-xs font-semibold w-5 text-center">' + inCart.quantity + '</span>' +
                                 '<button class="qty-btn" style="width:24px;height:24px;font-size:0.875rem;" onclick="updateQty(\'' + key + '\', 1)">+</button>' +
                                 '<span class="text-xs font-medium text-emerald-700 ml-1">' + ps.size + ps.unit + '</span>' +
-                                (ps.rate !== null ? '<span class="text-xs text-gray-500">₹' + ps.rate.toLocaleString('en-IN') + '</span>' : '') +
+                                (ps.rate != null ? '<span class="text-xs text-gray-500">' + fmtPrice(ps.rate) + '</span>' : '') +
                                 '</div>';
                         }
                         return '<button onclick="addToCart(\'' + key + '\', ' + p.id + ', ' + ps.pack_size_id + ')"' +
                             ' class="px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ' +
                             (ps.stock > 0 ? 'text-emerald-700 border-emerald-200 hover:bg-emerald-50' : 'text-gray-400 border-gray-200') + '">' +
-                            ps.size + ps.unit + (ps.rate !== null ? ' • ₹' + ps.rate.toLocaleString('en-IN') : '') +
+                            ps.size + ps.unit + (ps.rate != null ? ' &bull; ' + fmtPrice(ps.rate) : '') +
                             '</button>';
                     }).join('')}
+                    </div>
+                    <div class="flex flex-wrap gap-1 mt-0.5">${p.pack_sizes.map(ps => stockBadge(ps.stock)).filter((v,i,a) => a.indexOf(v) === i).join('')}</div>
                 </div>
+                ${p.image_url
+                    ? '<img src="' + p.image_url + '" class="product-img" onerror="this.style.display=\'none\'">'
+                    : ''
+                }
             </div>`;
         }).join('');
     }
@@ -378,7 +435,14 @@
         updateCartUI();
     }
 
+    function removeFromCart(key) {
+        delete cart[key];
+        renderProducts(allProducts);
+        updateCartUI();
+    }
+
     function clearCart() {
+        if (!confirm('Remove all items from cart?')) return;
         cart = {};
         renderProducts(allProducts);
         updateCartUI();
@@ -401,28 +465,29 @@
         document.getElementById('floatingCart').style.display = 'block';
         document.getElementById('cartSection').style.display = 'block';
 
-        document.getElementById('cartItems').innerHTML = items.map(i =>
-            '<div class="cart-item">' +
+        document.getElementById('cartItems').innerHTML = items.map(i => {
+            const key = i.product_id + '_' + i.pack_size_id;
+            return '<div class="cart-item">' +
                 '<div class="flex-1 min-w-0">' +
                     '<div class="text-sm font-medium truncate">' + esc(i.name) + ' — ' + i.size + i.unit + '</div>' +
-                    '<div class="text-xs text-gray-400">' + esc(i.brand || '') + ' • Qty: ' + i.quantity + '</div>' +
+                    '<div class="text-xs text-gray-400">' + esc(i.brand || '') + ' &bull; Qty: ' + i.quantity + '</div>' +
                 '</div>' +
                 '<div class="text-right flex-shrink-0">' +
-                    (i.rate !== null ? '<div class="text-sm font-semibold">₹' + (i.rate * i.quantity).toLocaleString('en-IN') + '</div>' : '<div class="text-xs text-gray-400">Price by admin</div>') +
+                    (i.rate != null ? '<div class="text-sm font-semibold">' + fmtPrice(i.rate * i.quantity) + '</div>' : '<div class="text-xs text-gray-400">Price by admin</div>') +
                 '</div>' +
-                '<button class="ml-2 text-gray-400 hover:text-red-500" onclick="delete cart[\'' + i.product_id + '_' + i.pack_size_id + '\'];renderProducts(allProducts);updateCartUI();">' +
+                '<button class="ml-2 text-gray-400 hover:text-red-500" onclick="removeFromCart(\'' + key + '\')">' +
                     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
-            '</div>'
-        ).join('');
+            '</div>';
+        }).join('');
 
         if (billingType === 'self') {
             const total = items.reduce((s, i) => s + (i.rate || 0) * i.quantity, 0);
             document.getElementById('cartTotals').innerHTML =
-                '<div class="flex justify-between text-sm text-gray-600 mb-1"><span>Items (' + items.length + ')</span><span>₹' + total.toLocaleString('en-IN') + '</span></div>' +
+                '<div class="flex justify-between text-sm text-gray-600 mb-1"><span>Items (' + items.length + ')</span><span>' + fmtPrice(total) + '</span></div>' +
                 '<div class="text-[0.65rem] text-gray-400 mb-1">* Prices include GST</div>' +
-                '<div class="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200"><span>Total</span><span>₹' + total.toLocaleString('en-IN') + '</span></div>';
-            document.getElementById('floatingCartTotal').textContent = '₹' + total.toLocaleString('en-IN');
+                '<div class="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200"><span>Total</span><span>' + fmtPrice(total) + '</span></div>';
+            document.getElementById('floatingCartTotal').textContent = fmtPrice(total);
         } else {
             document.getElementById('cartTotals').innerHTML = '<div class="text-sm text-gray-500 text-center">Prices will be set by admin after review</div>';
             document.getElementById('floatingCartTotal').textContent = '';
@@ -432,7 +497,9 @@
     async function submitEstimate() {
         const items = Object.values(cart);
         if (!items.length) { alert('Add at least one product'); return; }
+        if (isSubmitting) return;
 
+        isSubmitting = true;
         const btn = document.getElementById('submitBtn');
         btn.disabled = true;
         btn.textContent = 'Submitting...';
@@ -460,14 +527,19 @@
             const data = await res.json();
             if (!data.success) throw new Error(data.message);
 
-            alert(`Estimate ${data.estimateNumber} submitted successfully! Our team will review it shortly.`);
+            alert('Estimate ' + data.estimateNumber + ' submitted successfully! Our team will review it shortly.');
             window.location.href = '/painter-dashboard.html';
         } catch (err) {
             alert('Error: ' + err.message);
             btn.disabled = false;
             btn.textContent = 'Submit Estimate';
+            isSubmitting = false;
         }
     }
+
+    // Initialize stepper for step 1
+    buildStepper();
+    document.querySelector('.stepper-dot[data-step="1"]').classList.add('active');
     </script>
 </body>
 </html>

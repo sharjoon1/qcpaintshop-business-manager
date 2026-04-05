@@ -124,7 +124,7 @@ async function detectRevenueAnomalies(config) {
                     type: 'revenue',
                     severity,
                     title: `Revenue ${direction} detected${branchId !== 'all' ? ' (Branch)' : ''}`,
-                    description: `Daily revenue of ₹${latest.revenue.toLocaleString('en-IN')} is ${Math.abs(deviationPct)}% ${direction === 'drop' ? 'below' : 'above'} the 30-day average of ₹${stats.mean.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, ',')}. Z-score: ${zScore.toFixed(2)}.`,
+                    description: `Daily revenue of ₹${latest.revenue.toLocaleString('en-IN')} is ${Math.abs(deviationPct)}% ${direction === 'drop' ? 'below' : 'above'} the 30-day average of ₹${Number(stats.mean.toFixed(0)).toLocaleString('en-IN')}. Z-score: ${zScore.toFixed(2)}.`,
                     entityType: 'branch',
                     entityId: branchId === 'all' ? null : String(branchId),
                     metricName: 'daily_revenue',

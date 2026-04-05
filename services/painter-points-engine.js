@@ -198,7 +198,9 @@ async function processInvoice(painterId, invoice, billingType, createdBy) {
                 if (mapped.length) {
                     const bonusExtra = Math.round(totalRegularPoints * (bonusMultiplier - 1) * 100) / 100;
                     // Check how much bonus already earned today
-                    const todayStr = new Date().toISOString().slice(0, 10);
+                    // Use IST date to match server-stored dates
+                    const now = new Date();
+                    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
                     const [todayBonus] = await pool.query(
                         `SELECT COALESCE(SUM(amount), 0) as total FROM painter_point_transactions
                          WHERE painter_id = ? AND source = 'daily_bonus' AND DATE(created_at) = ?`,

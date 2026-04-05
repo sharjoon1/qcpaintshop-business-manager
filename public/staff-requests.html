@@ -147,8 +147,31 @@
 
     <script>
         const API_BASE = '/api';
-        const STAFF_ID = 1; // TODO: Get from session
+        let STAFF_ID = null;
         let currentRequest = null;
+
+        // Get staff ID from session
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            STAFF_ID = user.id;
+        } catch (e) {}
+        if (!STAFF_ID) {
+            window.location.href = '/index.html';
+        }
+
+        function getAuthHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '')
+            };
+        }
+
+        function esc(s) {
+            if (!s) return '';
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
             loadRequests();
@@ -177,7 +200,8 @@
                 if (status) url += `&status=${status}`;
                 if (search) url += `&search=${search}`;
 
-                const response = await fetch(url);
+                const response = await fetch(url, { headers: getAuthHeaders() });
+                if (response.status === 401) { window.location.href = '/index.html'; return; }
                 const result = await response.json();
 
                 // Update stats
@@ -263,7 +287,7 @@
 
         async function viewRequest(id) {
             try {
-                const response = await fetch(`${API_BASE}/estimate-requests/${id}`);
+                const response = await fetch(`${API_BASE}/estimate-requests/${id}`, { headers: getAuthHeaders() });
                 const result = await response.json();
                 
                 if (!result.success) {
@@ -354,8 +378,8 @@
             try {
                 const response = await fetch(`${API_BASE}/estimate-requests/${currentRequest.id}/status`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus, user_id: STAFF_ID })
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ status: newStatus })
                 });
 
                 const result = await response.json();

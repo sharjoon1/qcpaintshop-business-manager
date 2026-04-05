@@ -435,11 +435,13 @@ function getMetricsHistory() {
     return state.metrics;
 }
 
+let lagInterval = null;
+
 function start() {
     if (monitorInterval) return;
 
     // Event loop lag timer
-    setInterval(measureEventLoopLag, 1000);
+    lagInterval = setInterval(measureEventLoopLag, 1000);
 
     // Main health check loop
     monitorInterval = setInterval(runCheck, DEFAULTS.checkIntervalMs);
@@ -456,6 +458,7 @@ function start() {
 function stop() {
     if (monitorInterval) { clearInterval(monitorInterval); monitorInterval = null; }
     if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
+    if (lagInterval) { clearInterval(lagInterval); lagInterval = null; }
 }
 
 module.exports = {

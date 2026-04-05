@@ -585,6 +585,9 @@ async function forceClockoutAll() {
     }
 }
 
+let otInterval = null;
+let geoInterval = null;
+
 /**
  * Start the overtime and auto clock-out schedulers
  */
@@ -598,12 +601,12 @@ function start() {
 
     // Check overtime prompts every 5 minutes
     checkOvertimePrompts();
-    setInterval(checkOvertimePrompts, 5 * 60 * 1000);
+    otInterval = setInterval(checkOvertimePrompts, 5 * 60 * 1000);
     console.log('[Auto-clockout] Overtime check started (every 5 min)');
 
     // Check geo-fence warnings every 5 minutes (server-side enforcement)
     checkGeoWarnings();
-    setInterval(checkGeoWarnings, 5 * 60 * 1000);
+    geoInterval = setInterval(checkGeoWarnings, 5 * 60 * 1000);
     console.log('[Auto-clockout] Geo-fence enforcement started (every 5 min)');
 
     // Force clock-out at 10 PM IST (21:59 to run just before reports at 22:00)

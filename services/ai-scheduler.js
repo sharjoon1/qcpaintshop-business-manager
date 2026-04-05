@@ -242,11 +242,11 @@ function start() {
         registry.register('ai-staff-daily-tasks', { name: 'Staff Tamil Tasks', service: 'ai-scheduler', schedule: '9:00 AM IST', description: 'Generate personalized Tamil daily tasks for staff via Clawdbot' });
     }
 
-    // Daily Zoho analysis — 9:00 PM IST (15:30 UTC)
-    jobs.zohoDaily = cron.schedule('30 15 * * *', runZohoDaily, { timezone: 'Asia/Kolkata' });
+    // Daily Zoho analysis — 9:00 PM IST
+    jobs.zohoDaily = cron.schedule('0 21 * * *', runZohoDaily, { timezone: 'Asia/Kolkata' });
 
-    // Daily Staff analysis — 10:30 PM IST (17:00 UTC)
-    jobs.staffDaily = cron.schedule('0 17 * * *', runStaffDaily, { timezone: 'Asia/Kolkata' });
+    // Daily Staff analysis — 10:30 PM IST
+    jobs.staffDaily = cron.schedule('30 22 * * *', runStaffDaily, { timezone: 'Asia/Kolkata' });
 
     // Lead scoring — every 6 hours
     jobs.leadScoring = cron.schedule('0 */6 * * *', runLeadScoring, { timezone: 'Asia/Kolkata' });

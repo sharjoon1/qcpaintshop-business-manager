@@ -159,6 +159,8 @@
     </div>
 
     <script>
+        function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
         let customers = [];
         let branches = [];
         let customerTypes = [];
@@ -246,7 +248,8 @@
 
         // Filter by branch
         function filterByBranch() {
-            currentBranchFilter = document.getElementById('branchFilter').value;
+            const branchEl = document.getElementById('branchFilter');
+            currentBranchFilter = branchEl ? branchEl.value : '';
             renderCustomers();
             updateStats();
         }
@@ -281,14 +284,14 @@
             tbody.innerHTML = filtered.map(customer => `
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 text-sm font-semibold text-gray-900">${customer.id}</td>
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">${customer.name}</td>
-                    <td class="px-6 py-4 text-sm text-gray-700">${customer.phone || '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-700">${customer.email || '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-700">${customer.city || '-'}</td>
+                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">${esc(customer.name)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${esc(customer.phone) || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${esc(customer.email) || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${esc(customer.city) || '-'}</td>
                     <td class="px-6 py-4 text-sm">
-                        <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">${customer.branch_name}</span>
+                        <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">${esc(customer.branch_name)}</span>
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-700">${customer.gst_number || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${esc(customer.gst_number) || '-'}</td>
                     <td class="px-6 py-4">
                         <span class="badge ${
                             customer.status === 'approved' ? 'badge-success' :

@@ -764,8 +764,8 @@
                 if (pan) {
                     if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
                         showToast('Invalid PAN format (e.g. ABCDE1234F)', 'error');
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = originalText;
+                        btn.disabled = false;
+                        btn.textContent = 'Submit Registration';
                         return;
                     }
                     formData.append('pan_number', pan);

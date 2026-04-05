@@ -201,6 +201,7 @@
     </div>
 
     <script>
+        function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
         let allStaff = [];
         let branches = [];
         let roles = [];
@@ -308,16 +309,16 @@
                                     : `<div class="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold shrink-0">${(staff.full_name || '?').charAt(0).toUpperCase()}</div>`
                                 }
                                 <div>
-                                    <div class="font-semibold text-gray-900">${staff.full_name || 'N/A'}</div>
-                                    <div class="text-xs text-gray-500">${staff.email}</div>
+                                    <div class="font-semibold text-gray-900">${esc(staff.full_name) || 'N/A'}</div>
+                                    <div class="text-xs text-gray-500">${esc(staff.email)}</div>
                                 </div>
                             </div>
                         </td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-0.5 text-xs rounded-full ${getKycClass(staff.kyc_status)}">${getKycText(staff.kyc_status)}</span>
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-700">${staff.username}</td>
-                        <td class="px-4 py-3 text-sm text-gray-700">${staff.phone || '-'}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${esc(staff.username)}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${esc(staff.phone) || '-'}</td>
                         <td class="px-4 py-3 text-sm text-gray-700">${branchDisplay}</td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-0.5 text-xs rounded-full ${geoEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">

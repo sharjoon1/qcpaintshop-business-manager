@@ -161,6 +161,8 @@
 
     <script src="/components/logo-loader.js"></script>
     <script>
+        function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
         function showToast(message, type = 'success') {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
@@ -199,9 +201,9 @@
                                 <span style="font-size: 18px; font-weight: 700; color: #1f2937;">${formatCurrency(a.amount)}</span>
                                 ${statusBadge(a.status)}
                             </div>
-                            ${a.reason ? `<div style="font-size: 13px; color: #6b7280; margin-bottom: 4px;">${a.reason}</div>` : ''}
+                            ${a.reason ? `<div style="font-size: 13px; color: #6b7280; margin-bottom: 4px;">${esc(a.reason)}</div>` : ''}
                             <div style="font-size: 12px; color: #9ca3af;">${new Date(a.created_at).toLocaleDateString()}</div>
-                            ${a.rejection_reason ? `<div style="margin-top: 6px; font-size: 13px; color: #991b1b; background: #fee2e2; padding: 8px; border-radius: 8px;">Reason: ${a.rejection_reason}</div>` : ''}
+                            ${a.rejection_reason ? `<div style="margin-top: 6px; font-size: 13px; color: #991b1b; background: #fee2e2; padding: 8px; border-radius: 8px;">Reason: ${esc(a.rejection_reason)}</div>` : ''}
                             ${a.payment_date ? `<div style="margin-top: 4px; font-size: 12px; color: #065f46;">Paid on ${new Date(a.payment_date).toLocaleDateString()}</div>` : ''}
                         </div>
                     `).join('');

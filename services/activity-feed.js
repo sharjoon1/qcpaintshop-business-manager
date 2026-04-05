@@ -171,8 +171,7 @@ async function cleanupOldFeed() {
 
 // Schedule daily cleanup at 00:05 IST
 const cron = require('node-cron');
-cron.schedule('35 18 * * *', () => {
-    // 18:35 UTC = 00:05 IST
+cron.schedule('5 0 * * *', () => {
     cleanupOldFeed();
 }, { timezone: 'Asia/Kolkata' });
 

@@ -109,9 +109,10 @@ async function loadSharedDesignRequest() {
             let photoArr = [];
             try { photoArr = typeof photos === 'string' ? JSON.parse(photos) : photos; } catch {}
             if (photoArr.length > 0) {
-                document.getElementById('photosGrid').innerHTML = photoArr.map(url =>
-                    `<img src="${url}" class="w-full h-40 object-cover rounded-lg shadow" onclick="window.open('${url}', '_blank')" style="cursor: pointer;">`
-                ).join('');
+                document.getElementById('photosGrid').innerHTML = photoArr.map(url => {
+                    const safeUrl = url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    return `<img src="${safeUrl}" class="w-full h-40 object-cover rounded-lg shadow" onclick="window.open('${safeUrl}', '_blank')" style="cursor: pointer;">`;
+                }).join('');
                 document.getElementById('photosSection').style.display = 'block';
             }
         }

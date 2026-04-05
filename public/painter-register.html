@@ -63,7 +63,7 @@
 
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                <input type="tel" id="regPhone" class="input-field" placeholder="Enter your phone number" maxlength="15">
+                <input type="tel" id="regPhone" class="input-field" placeholder="Enter 10-digit phone number" maxlength="10" inputmode="numeric">
                 <div id="phoneError" class="error-msg" style="display:none"></div>
             </div>
 
@@ -204,6 +204,7 @@
     async function sendOtp() {
         const phone = document.getElementById('regPhone').value.trim();
         if (!phone) { showError('phoneError', 'Phone number required'); return; }
+        if (!/^\d{10}$/.test(phone)) { showError('phoneError', 'Enter a valid 10-digit phone number'); return; }
 
         document.getElementById('sendOtpBtn').disabled = true;
         document.getElementById('sendOtpBtn').textContent = 'Sending...';

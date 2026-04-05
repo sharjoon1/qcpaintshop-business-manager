@@ -1282,7 +1282,7 @@ async function loadSettings() {
         const stats = await statsResp.json();
 
         document.getElementById('statRuns').textContent = stats.analysis?.total_runs || 0;
-        document.getElementById('statTokens').textContent = formatNumber(stats.analysis?.total_tokens + stats.chat?.chat_tokens || 0);
+        document.getElementById('statTokens').textContent = formatNumber((stats.analysis?.total_tokens || 0) + (stats.chat?.chat_tokens || 0));
         document.getElementById('statInsights').textContent = stats.insights?.total_insights || 0;
         document.getElementById('statMessages').textContent = stats.chat?.total_messages || 0;
         document.getElementById('statCost').textContent = '$' + (stats.estimated_cost_usd || '0.00');
