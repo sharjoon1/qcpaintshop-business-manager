@@ -947,12 +947,15 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
                    b.name as brand, b.id as brand_id,
                    c.name as category, c.id as category_id,
                    ps.id as pack_size_id, ps.size, ps.unit, ps.base_price, ps.zoho_item_id,
-                   zim.zoho_rate, zim.zoho_stock_on_hand as stock
+                   zim.zoho_rate, zim.zoho_stock_on_hand as stock,
+                   pprs.regular_points_per_unit as regular_points,
+                   pprs.annual_eligible, pprs.annual_pct
             FROM products p
             LEFT JOIN brands b ON p.brand_id = b.id
             LEFT JOIN categories c ON p.category_id = c.id
             INNER JOIN pack_sizes ps ON ps.product_id = p.id
             LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+            LEFT JOIN painter_product_point_rates pprs ON pprs.item_id = ps.zoho_item_id COLLATE utf8mb4_unicode_ci
             ${hasPointsJoin}
             ${where}
             ORDER BY b.name, p.name, ps.size
@@ -977,13 +980,17 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
                 };
             }
             const showPrices = billing_type === 'self';
+            const regularPts = row.regular_points ? parseFloat(row.regular_points) : null;
+            const annualPts = (regularPts && row.annual_eligible && row.annual_pct) ? Math.round(regularPts * parseFloat(row.annual_pct) / 100 * 100) / 100 : null;
             productMap[row.id].pack_sizes.push({
                 pack_size_id: row.pack_size_id,
                 size: String(parseFloat(row.size) || row.size || ''),
                 unit: row.unit,
                 rate: showPrices ? parseFloat(row.zoho_rate || row.base_price || 0) : null,
                 zoho_item_id: row.zoho_item_id,
-                stock: parseFloat(row.stock || 0)
+                stock: parseFloat(row.stock || 0),
+                regular_points: regularPts,
+                annual_points: annualPts
             });
         }
 
