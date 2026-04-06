@@ -1553,7 +1553,7 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
             LEFT JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
             WHERE ps.product_id = ? AND ps.is_active = 1
-            ORDER BY CAST(zim.zoho_rate AS DECIMAL(10,2)) ASC
+            ORDER BY CAST(ps.size AS DECIMAL(10,2)) ASC
         `, [productId]);
 
         if (!variants.length) {
@@ -1575,12 +1575,20 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
             min_rate: Math.min(...variants.map(v => parseFloat(v.rate || 0))),
             max_rate: Math.max(...variants.map(v => parseFloat(v.rate || 0))),
             total_stock: variants.reduce((s, v) => s + parseFloat(v.stock || 0), 0),
-            variants: variants.map(v => ({
-                ...v,
-                rate: parseFloat(v.rate || 0),
-                stock: parseFloat(v.stock || 0),
-                points_per_unit: v.points_per_unit ? parseFloat(v.points_per_unit) : null
-            }))
+            variants: variants.map(v => {
+                const regularPts = v.points_per_unit ? parseFloat(v.points_per_unit) : 0;
+                const annualPts = (regularPts && v.annual_eligible && v.annual_pct) ? Math.round(regularPts * parseFloat(v.annual_pct) / 100 * 100) / 100 : 0;
+                return {
+                    id: v.item_id,
+                    size: String(parseFloat(v.pack_size) || v.pack_size || ''),
+                    unit: v.pack_unit || '',
+                    rate: parseFloat(v.rate || 0),
+                    stock: parseFloat(v.stock || 0),
+                    regular_points: regularPts,
+                    annual_points: annualPts,
+                    image_url: v.image_url || null,
+                };
+            })
         };
 
         // Matching offers
