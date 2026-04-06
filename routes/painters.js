@@ -913,7 +913,9 @@ async function generateEstimateNumber() {
 // Product list for estimate builder
 router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
     try {
-        const { billing_type, search, brand, category, product_type } = req.query;
+        const { billing_type, search, brand, category, product_type, hasPoints } = req.query;
+
+        const filterHasPoints = hasPoints === 'true' || hasPoints === '1';
 
         let where = "WHERE p.status = 'active' AND ps.is_active = 1 AND ps.zoho_item_id IS NOT NULL";
         const params = [];
@@ -935,6 +937,10 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             params.push(product_type);
         }
 
+        const hasPointsJoin = filterHasPoints
+            ? `INNER JOIN painter_product_point_rates ppr ON ppr.item_id = ps.zoho_item_id COLLATE utf8mb4_unicode_ci AND ppr.regular_points_per_unit > 0`
+            : '';
+
         const [rows] = await pool.query(`
             SELECT p.id, p.name, p.product_type, p.area_coverage, p.gst_percentage, p.image_url,
                    b.name as brand, b.id as brand_id,
@@ -946,6 +952,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             LEFT JOIN categories c ON p.category_id = c.id
             INNER JOIN pack_sizes ps ON ps.product_id = p.id
             LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+            ${hasPointsJoin}
             ${where}
             ORDER BY b.name, p.name, ps.size
         `, params);
@@ -971,7 +978,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             const showPrices = billing_type === 'self';
             productMap[row.id].pack_sizes.push({
                 pack_size_id: row.pack_size_id,
-                size: parseFloat(row.size),
+                size: String(parseFloat(row.size) || row.size || ''),
                 unit: row.unit,
                 rate: showPrices ? parseFloat(row.zoho_rate || row.base_price || 0) : null,
                 zoho_item_id: row.zoho_item_id,
@@ -1348,7 +1355,7 @@ router.get('/me/estimates/:estimateId/pdf', requirePainterAuth, async (req, res)
 // Browse product catalog — grouped by product (not individual pack sizes)
 router.get('/me/catalog', requirePainterAuth, async (req, res) => {
     try {
-        const { search, brand, category, page = 1, limit = 50 } = req.query;
+        const { search, brand, category, hasPoints, inStock, page = 1, limit = 50 } = req.query;
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const offset = (pageNum - 1) * limitNum;
@@ -1375,10 +1382,37 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
             params.push(category);
         }
 
+        // hasPoints: only products that have painter point rates configured
+        const filterHasPoints = hasPoints === 'true' || hasPoints === '1';
+        // inStock: only products with stock > 0 (applied as HAVING after aggregation)
+        const filterInStock = inStock === 'true' || inStock === '1';
+
         // Count grouped products
-        const [countResult] = await pool.query(
-            `SELECT COUNT(DISTINCT p.id) as total ${joins} ${where}`, params
-        );
+        let countSql = `SELECT COUNT(DISTINCT p.id) as total ${joins}`;
+        if (filterHasPoints) {
+            countSql += ` INNER JOIN painter_product_point_rates ppr_f
+                ON ppr_f.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+                AND ppr_f.regular_points_per_unit > 0`;
+        }
+        countSql += ` ${where}`;
+        if (filterInStock) {
+            // Wrap in subquery to filter by stock
+            countSql = `SELECT COUNT(*) as total FROM (
+                SELECT p.id
+                ${joins}
+                ${filterHasPoints ? `INNER JOIN painter_product_point_rates ppr_f
+                    ON ppr_f.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+                    AND ppr_f.regular_points_per_unit > 0` : ''}
+                ${where}
+                GROUP BY p.id
+                HAVING (SELECT COALESCE(SUM(zls.stock_on_hand), 0) FROM zoho_location_stock zls
+                    WHERE zls.zoho_item_id IN (
+                        SELECT ps3.zoho_item_id FROM pack_sizes ps3
+                        WHERE ps3.product_id = p.id AND ps3.is_active = 1
+                    )) > 0
+            ) as stock_filtered`;
+        }
+        const [countResult] = await pool.query(countSql, params);
         const total = countResult[0].total;
 
         // Grouped products: one row per product with aggregated info
@@ -1403,10 +1437,16 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                    MAX(ppr.annual_eligible) as annual_eligible,
                    MAX(ppr.annual_pct) as annual_pct
             ${joins}
-            LEFT JOIN painter_product_point_rates ppr
+            ${filterHasPoints ? 'INNER' : 'LEFT'} JOIN painter_product_point_rates ppr
                 ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+                ${filterHasPoints ? 'AND ppr.regular_points_per_unit > 0' : ''}
             ${where}
             GROUP BY p.id, p.name, p.product_type
+            ${filterInStock ? `HAVING (SELECT COALESCE(SUM(zls.stock_on_hand), 0) FROM zoho_location_stock zls
+                WHERE zls.zoho_item_id IN (
+                    SELECT ps3.zoho_item_id FROM pack_sizes ps3
+                    WHERE ps3.product_id = p.id AND ps3.is_active = 1
+                )) > 0` : ''}
             ORDER BY p.name
             LIMIT ? OFFSET ?
         `, [...params, limitNum, offset]);
@@ -4117,11 +4157,11 @@ router.get('/me/gamification', requirePainterAuth, async (req, res) => {
         const lifetimePoints = painter.length ? (painter[0].total_lifetime_points || 0) : 0;
 
         let level = 'bronze';
-        if (lifetimePoints > 5000) level = 'diamond';
-        else if (lifetimePoints > 2000) level = 'gold';
-        else if (lifetimePoints > 500) level = 'silver';
+        if (lifetimePoints >= 10000) level = 'diamond';
+        else if (lifetimePoints >= 5000) level = 'gold';
+        else if (lifetimePoints >= 3000) level = 'silver';
 
-        const levelThresholds = { bronze: 0, silver: 501, gold: 2001, diamond: 5001 };
+        const levelThresholds = { bronze: 0, silver: 3000, gold: 5000, diamond: 10000 };
         const nextLevel = level === 'diamond' ? null : { bronze: 'silver', silver: 'gold', gold: 'diamond' }[level];
         const nextThreshold = nextLevel ? levelThresholds[nextLevel] : null;
 
@@ -4201,9 +4241,9 @@ router.get('/me/leaderboard', requirePainterAuth, async (req, res) => {
         const ranked = leaderboard.map((entry, idx) => {
             const lp = entry.total_lifetime_points || 0;
             let lvl = 'bronze';
-            if (lp > 5000) lvl = 'diamond';
-            else if (lp > 2000) lvl = 'gold';
-            else if (lp > 500) lvl = 'silver';
+            if (lp >= 10000) lvl = 'diamond';
+            else if (lp >= 5000) lvl = 'gold';
+            else if (lp >= 3000) lvl = 'silver';
             return { ...entry, rank: idx + 1, level: lvl };
         });
 

@@ -2997,7 +2997,6 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 - **Architecture**: Hilt DI, Retrofit + OkHttp, Room DB, DataStore, MVVM, Compose Navigation
 - **Navigation**: 5-tab bottom nav (Home | Work | +New FAB | Catalog | Me)
 - **12 Working Screens**: Login/Register (OTP), Dashboard, Work (Estimates+Quotations), Estimate Create (multi-step), Quotation Create (5-step), Catalog, Profile, Check-in (GPS), Calculator, Leaderboard, Achievements, Settings
-- **5 Placeholder Screens**: Edit Profile, Gallery, Referrals, Points History, Training
 - **New features**:
   - **Contract Quotation System**: 4 types (Labour-Salary, Labour-Sqft, L+Material-Sqft, L+Material-Itemized), room-wise breakdown, PDF with painter branding
   - **Paint Calculator**: Multi-room, 6 paint types, coverage rates, convert-to-quotation
@@ -3009,8 +3008,50 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 - **Design**: Modern card-based (PhonePe/GPay style), QCGreen #1B5E3B + QCGold #D4A24E
 - **Language**: Bilingual Tamil/English with in-app toggle (130+ strings)
 - **Backend**: 25 new API endpoints, 10 new database tables, 3 migrations
-- **Tables**: `painter_quotations`, `painter_quotation_items`, `painter_badges`, `painter_earned_badges`, `painter_challenges`, `painter_challenge_progress`, `painter_price_reports`, `painter_product_requests`, `painter_gallery`, `painter_calculations`
-- **APK**: `app/build/outputs/apk/painter/release/app-painter-release.apk` (7.7MB)
+
+### Painter Native Android App v2.1.0 (Apr 6, 2026) — Full Web Parity
+- **Upgrade**: All 5 placeholder screens implemented + 10 new screens + major upgrades to Catalog & Dashboard
+- **22+ Working Screens**: 0 placeholders remaining
+- **Catalog upgrade**:
+  - Filter bottom sheet: Brand dropdown, Category dropdown, "Points products only" toggle, "In stock only" toggle
+  - Filter count badge on filter icon
+  - Product family grouping (one card per product family, expandable for pack size variants)
+  - Offer banners horizontal carousel (4 gradient styles)
+  - Product detail bottom sheet with variant earnings breakdown (size, rate, regular pts, annual pts)
+- **Dashboard upgrade (12 new sections)**:
+  - Balance cards (2x2: Regular Points, Annual Points, Total Earned, Referrals)
+  - Offer products carousel (brand tabs + HorizontalPager auto-scroll + dot indicators)
+  - My Cards section (visiting + ID card thumbnails + share)
+  - Quick actions row (Estimate, Withdraw, Card, Refer, Visualize)
+  - Referral code section (dashed border + share via native intent)
+  - Recent estimates list (last 10, tap → detail)
+  - Recent transactions list (source, amount, pool badge)
+  - Visualization gallery + pending list + request button
+  - Withdrawal bottom sheet (pool dropdown, amount input, balance display)
+  - Streak calendar bottom sheet (monthly grid, green dots, month nav)
+  - Level panel (Bronze/Silver/Gold/Diamond expandable)
+- **New profile screens**:
+  - **Points History**: Regular/Annual tab toggle, balance card, filter chips (All/Earned/Spent/Withdrawn), infinite scroll
+  - **Cards**: Visiting + ID card images (Coil), Share (native intent) + Download (MediaStore gallery)
+  - **Visualizations**: Completed gallery (2-col grid) + pending list + request form (camera+gallery, brand, color name, hex picker, notes)
+  - **Referrals**: Code display + share + stats + referral list with status badges
+  - **Gallery**: 3-column grid of visualization images + fullscreen viewer
+  - **Training**: Generic list (title, type badge Video/Article, duration) + detail screen (WebView/external)
+  - **Attendance Calendar**: Streak count, monthly stats, calendar grid (green=checked in, blue border=today), check-in button
+  - **Edit Profile**: Circular photo picker (camera+gallery), name/city fields, save → multipart upload
+- **Detail screens**:
+  - **Estimate Detail**: Items table, totals (subtotal/markup/discount/grand total/payment/balance), status-based actions (Request Discount, Submit Payment, Download PDF)
+  - **Quotation Detail**: Room breakdown with dimensions, items, labour/material totals, terms
+  - **Product Detail**: Full screen with image, offers, variant list
+- **Notifications + FCM**:
+  - Notification list screen (read/unread styling, type-based emoji icons, time ago, pull-to-refresh)
+  - FCM push → native deep link routing: estimate→detail, points→history, offer→catalog, viz→gallery, training→list
+  - Token registration on OTP verify (AuthViewModel → NotificationApi.registerFcmToken)
+  - Deep link handling via MainViewModel.pendingDeepLink + PainterMainActivity.onNewIntent
+- **Backend**: Added `hasPoints` and `inStock` query params to `GET /api/painters/me/catalog`
+- **DI**: 17 API interfaces (added PointsApi, CardsApi, VisualizationApi, ReferralApi, NotificationApi, ProfileApi)
+- **Key new files**: `ui/catalog/FilterBottomSheet.kt`, `ui/catalog/ProductDetailSheet.kt`, `ui/home/components/` (11 files), `ui/profile/` (16 new files), `ui/work/estimates/EstimateDetailScreen.kt`, `ui/work/quotations/QuotationDetailScreen.kt`, `ui/notifications/NotificationsScreen.kt`, `utils/TimeUtils.kt`, `utils/NotificationBadge.kt`
+- **APK**: `app/build/outputs/apk/painter/release/app-painter-release.apk` (8.3MB)
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-04-06 | Version: 3.3.9 (Staff/Customer), 2.0.0 (Painter) | Maintained by: Development Team*
+*Last Updated: 2026-04-06 | Version: 3.3.9 (Staff/Customer), 2.1.0 (Painter) | Maintained by: Development Team*
