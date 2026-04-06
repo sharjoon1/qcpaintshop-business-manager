@@ -577,7 +577,7 @@ router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
             pool.query('SELECT COUNT(*) as count FROM painter_referrals WHERE referrer_id = ?', [req.painter.id]),
             pool.query('SELECT * FROM painter_point_transactions WHERE painter_id = ? ORDER BY created_at DESC LIMIT 10', [req.painter.id]),
             pool.query('SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM painter_withdrawals WHERE painter_id = ? AND status = "pending"', [req.painter.id]),
-            pool.query('SELECT referral_code, profile_photo, full_name FROM painters WHERE id = ?', [req.painter.id]),
+            pool.query('SELECT referral_code, profile_photo, full_name, city FROM painters WHERE id = ?', [req.painter.id]),
             pool.query("SELECT setting_value FROM settings WHERE setting_key = 'business_logo' LIMIT 1"),
             pool.query('SELECT current_level, current_streak, longest_streak FROM painters WHERE id = ?', [req.painter.id])
         ]);
@@ -606,6 +606,7 @@ router.get('/me/dashboard', requirePainterAuth, async (req, res) => {
                 referralCode: painter[0]?.referral_code,
                 profilePhoto: painter[0]?.profile_photo,
                 painterName: painter[0]?.full_name,
+                painterCity: painter[0]?.city || '',
                 referralCount: referralCount[0].count,
                 recentTransactions: recentTxns,
                 pendingWithdrawals: { count: pendingWithdrawals[0].count, total: parseFloat(pendingWithdrawals[0].total) },
