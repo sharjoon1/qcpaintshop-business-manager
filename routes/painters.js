@@ -958,7 +958,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             LEFT JOIN painter_product_point_rates pprs ON pprs.item_id = ps.zoho_item_id COLLATE utf8mb4_unicode_ci
             ${hasPointsJoin}
             ${where}
-            ORDER BY b.name, p.name, ps.size
+            ORDER BY b.name, p.name, CAST(ps.size AS DECIMAL(10,2))
         `, params);
 
         // Group by product
