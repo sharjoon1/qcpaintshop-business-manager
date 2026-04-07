@@ -323,15 +323,69 @@
 
         <!-- Tab 4: Price History -->
         <div id="tab-history" class="tab-content hidden">
-            <div class="flex items-center justify-center min-h-[400px] text-gray-400">
-                <p class="text-lg">Price History &mdash; Coming Soon</p>
+            <!-- Filter Bar -->
+            <div class="bg-white rounded-b-xl shadow-sm p-4 mb-4">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <select id="historyBrand" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none min-w-[120px]">
+                        <option value="">All Brands</option>
+                    </select>
+                    <input type="date" id="historyStartDate" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none" title="Start date">
+                    <input type="date" id="historyEndDate" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none" title="End date">
+                    <div class="flex-1 min-w-[160px]">
+                        <input type="text" id="historySearch" placeholder="Search item name..." class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <button onclick="historyFilters.page=1; loadPriceHistory();" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">Search</button>
+                    <button onclick="downloadHistoryCsv()" class="px-3 py-1.5 border border-indigo-400 text-indigo-600 text-xs font-semibold rounded-lg hover:bg-indigo-50">Download CSV</button>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="historyLoading" class="hidden flex justify-center py-12">
+                <svg class="spinner w-8 h-8 text-indigo-500" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="31" stroke-linecap="round"/></svg>
+            </div>
+
+            <!-- Empty State -->
+            <div id="historyEmpty" class="hidden text-center py-12 text-gray-400">
+                <p class="text-sm">No price history found. Adjust filters and search.</p>
+            </div>
+
+            <!-- Timeline Cards -->
+            <div id="historyTimeline"></div>
+
+            <!-- Pagination -->
+            <div id="historyPaginationBar" class="hidden bg-white rounded-xl shadow-sm p-3 mt-3 flex items-center justify-between">
+                <span id="historyPaginationInfo" class="text-xs text-gray-500"></span>
+                <div id="historyPaginationButtons" class="flex items-center gap-1"></div>
             </div>
         </div>
 
         <!-- Tab 5: Health Check -->
         <div id="tab-health" class="tab-content hidden">
-            <div class="flex items-center justify-center min-h-[400px] text-gray-400">
-                <p class="text-lg">Health Check &mdash; Coming Soon</p>
+            <!-- Action Bar -->
+            <div class="bg-white rounded-b-xl shadow-sm p-4 mb-4">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <button onclick="runHealthCheck()" id="btnRunHealth" class="px-4 py-1.5 text-white text-xs font-semibold rounded-lg flex items-center gap-2" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                        <svg id="healthSpinner" class="hidden spinner w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="31" stroke-linecap="round"/></svg>
+                        <span id="healthBtnText">Run Health Check</span>
+                    </button>
+                    <button onclick="bulkFixNameFormat()" id="btnFixNames" disabled class="px-3 py-1.5 border border-blue-400 text-blue-600 text-xs font-semibold rounded-lg hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed">Auto-fix Name Format</button>
+                    <button onclick="bulkSyncPurchase()" id="btnSyncPurchase" disabled class="px-3 py-1.5 border border-green-400 text-green-600 text-xs font-semibold rounded-lg hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed">Sync Purchase = DPL</button>
+                    <button onclick="bulkRecalcSales()" id="btnRecalcSales" disabled class="px-3 py-1.5 border border-purple-400 text-purple-600 text-xs font-semibold rounded-lg hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed">Recalculate Sales Prices</button>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="healthResults" class="hidden">
+                <!-- Summary Strip -->
+                <div id="healthSummary" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4"></div>
+
+                <!-- Issue Sections -->
+                <div id="healthSections" class="space-y-3"></div>
+            </div>
+
+            <!-- Empty state before scan -->
+            <div id="healthEmpty" class="text-center py-12 text-gray-400">
+                <p class="text-sm">Click "Run Health Check" to scan all items for issues.</p>
             </div>
         </div>
     </div>
@@ -619,6 +673,10 @@
         }
         if (tabName === 'price-calc') {
             populatePriceCalcBrandDropdown();
+        }
+        if (tabName === 'history' && !historyLoaded) {
+            populateHistoryBrandDropdown();
+            historyLoaded = true;
         }
     }
 
@@ -1644,6 +1702,536 @@
         } finally {
             btn.disabled = false;
             btn.innerHTML = 'Apply &amp; Sync to Zoho';
+        }
+    }
+
+    // ============ TAB 4: PRICE HISTORY ============
+    var historyFilters = { brand: '', start_date: '', end_date: '', search: '', page: 1 };
+    var historyData = [];
+    var historyLoaded = false;
+    var HISTORY_PER_PAGE = 50;
+
+    function populateHistoryBrandDropdown() {
+        var brands = filterOptions.brands || [];
+        var html = '<option value="">All Brands</option>';
+        brands.forEach(function(b) { html += '<option value="' + esc(b) + '">' + esc(b) + '</option>'; });
+        var el = document.getElementById('historyBrand');
+        if (el) el.innerHTML = html;
+    }
+
+    async function loadPriceHistory() {
+        var loading = document.getElementById('historyLoading');
+        var timeline = document.getElementById('historyTimeline');
+        var empty = document.getElementById('historyEmpty');
+        var pagination = document.getElementById('historyPaginationBar');
+
+        // Read filter values
+        historyFilters.brand = document.getElementById('historyBrand').value;
+        historyFilters.start_date = document.getElementById('historyStartDate').value;
+        historyFilters.end_date = document.getElementById('historyEndDate').value;
+        historyFilters.search = document.getElementById('historySearch').value.trim();
+
+        loading.classList.remove('hidden');
+        timeline.innerHTML = '';
+        empty.classList.add('hidden');
+        pagination.classList.add('hidden');
+
+        try {
+            var params = new URLSearchParams({
+                page: historyFilters.page,
+                limit: HISTORY_PER_PAGE
+            });
+            if (historyFilters.brand) params.set('brand', historyFilters.brand);
+            if (historyFilters.start_date) params.set('start_date', historyFilters.start_date);
+            if (historyFilters.end_date) params.set('end_date', historyFilters.end_date);
+            if (historyFilters.search) params.set('search', historyFilters.search);
+
+            var resp = await fetch('/api/item-master/price-history?' + params.toString(), { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Failed to load price history');
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Error');
+
+            historyData = data.data.history || [];
+            loading.classList.add('hidden');
+
+            if (historyData.length === 0) {
+                empty.classList.remove('hidden');
+                empty.querySelector('p').textContent = 'No price history found. Adjust filters and search.';
+                return;
+            }
+
+            renderHistoryTimeline(historyData);
+            if (data.data.pagination) {
+                renderHistoryPagination(data.data.pagination);
+            }
+        } catch (err) {
+            loading.classList.add('hidden');
+            empty.classList.remove('hidden');
+            showToast('Error loading history: ' + err.message, 'error');
+        }
+    }
+
+    function groupHistoryByVersion(history) {
+        var groups = {};
+        history.forEach(function(h) {
+            var key = h.dpl_version_id ? ('v_' + h.dpl_version_id) : ('d_' + (h.changed_at || '').substring(0, 10));
+            if (!groups[key]) {
+                groups[key] = {
+                    key: key,
+                    version_label: h.version_label || '',
+                    brand: h.brand || '',
+                    changed_at: h.changed_at || '',
+                    dpl_version_id: h.dpl_version_id,
+                    items: [],
+                    totalPctChange: 0
+                };
+            }
+            groups[key].items.push(h);
+            if (h.old_dpl && h.old_dpl > 0 && h.new_dpl) {
+                groups[key].totalPctChange += ((h.new_dpl - h.old_dpl) / h.old_dpl * 100);
+            }
+        });
+        return Object.values(groups).sort(function(a, b) {
+            return new Date(b.changed_at) - new Date(a.changed_at);
+        });
+    }
+
+    function renderHistoryTimeline(history) {
+        var groups = groupHistoryByVersion(history);
+        var timeline = document.getElementById('historyTimeline');
+        var html = '';
+
+        groups.forEach(function(group, gIdx) {
+            var avgPct = group.items.length > 0 ? (group.totalPctChange / group.items.length) : 0;
+            var avgPctStr = avgPct.toFixed(1);
+            var pctColor = avgPct >= 0 ? 'text-green-600' : 'text-red-600';
+            var pctSign = avgPct >= 0 ? '+' : '';
+            var dateStr = group.changed_at ? new Date(group.changed_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+            var label = group.version_label || group.brand || 'Price Update';
+
+            html += '<div class="bg-white rounded-lg border p-4 mb-3">';
+            html += '<div class="flex justify-between items-center cursor-pointer" onclick="toggleHistoryGroup(' + gIdx + ')">';
+            html += '<div>';
+            html += '<span class="font-bold text-sm text-gray-800">' + esc(label) + '</span>';
+            html += '<span class="text-xs text-gray-500 ml-2">Applied: ' + esc(dateStr) + '</span>';
+            html += '</div>';
+            html += '<div class="flex items-center gap-2">';
+            html += '<span class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-medium">' + group.items.length + ' items</span>';
+            html += '<span class="' + pctColor + ' text-xs font-bold">Avg ' + pctSign + avgPctStr + '%</span>';
+            html += '<svg class="w-4 h-4 text-gray-400 transition-transform" id="historyChevron' + gIdx + '" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>';
+            html += '</div>';
+            html += '</div>';
+
+            // Expandable item table
+            html += '<div class="mt-3 hidden" id="historyGroupBody' + gIdx + '">';
+            html += '<div class="overflow-x-auto"><table class="w-full text-xs">';
+            html += '<thead><tr class="bg-gray-50 text-gray-500 text-[10px] uppercase">';
+            html += '<th class="text-left p-2">Item Name</th><th class="text-left p-2">SKU</th>';
+            html += '<th class="text-right p-2">Old DPL</th><th class="text-right p-2">New DPL</th>';
+            html += '<th class="text-right p-2">Old Sales</th><th class="text-right p-2">New Sales</th>';
+            html += '<th class="text-right p-2">Change</th>';
+            html += '</tr></thead><tbody>';
+
+            group.items.forEach(function(item) {
+                var pct = item.old_dpl && item.old_dpl > 0 ? ((item.new_dpl - item.old_dpl) / item.old_dpl * 100).toFixed(1) : 'New';
+                var pctCls = pct === 'New' ? 'text-blue-600' : (parseFloat(pct) >= 0 ? 'text-green-600' : 'text-red-600');
+                var pctPrefix = pct !== 'New' && parseFloat(pct) >= 0 ? '+' : '';
+                html += '<tr class="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onclick="event.stopPropagation(); loadItemTimeline(\'' + esc(item.zoho_item_id) + '\', this)">';
+                html += '<td class="p-2 font-medium" style="max-width:200px"><div class="truncate" title="' + esc(item.item_name) + '">' + esc(item.item_name) + '</div></td>';
+                html += '<td class="p-2"><span class="font-mono text-blue-600 text-[10px]">' + esc(item.sku || '-') + '</span></td>';
+                html += '<td class="p-2 text-right text-gray-500">' + formatINR(item.old_dpl) + '</td>';
+                html += '<td class="p-2 text-right font-semibold">' + formatINR(item.new_dpl) + '</td>';
+                html += '<td class="p-2 text-right text-gray-500">' + formatINR(item.old_sales_rate) + '</td>';
+                html += '<td class="p-2 text-right font-semibold">' + formatINR(item.new_sales_rate) + '</td>';
+                html += '<td class="p-2 text-right font-bold ' + pctCls + '">' + pctPrefix + pct + (pct !== 'New' ? '%' : '') + '</td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            html += '</div></div>';
+        });
+
+        timeline.innerHTML = html;
+    }
+
+    function toggleHistoryGroup(idx) {
+        var body = document.getElementById('historyGroupBody' + idx);
+        var chevron = document.getElementById('historyChevron' + idx);
+        if (body) {
+            body.classList.toggle('hidden');
+            if (chevron) chevron.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+        }
+    }
+
+    async function loadItemTimeline(itemId, rowEl) {
+        // If already expanded, collapse
+        var existingDetail = rowEl.nextElementSibling;
+        if (existingDetail && existingDetail.classList.contains('item-timeline-row')) {
+            existingDetail.remove();
+            return;
+        }
+
+        try {
+            var resp = await fetch('/api/item-master/price-history/' + encodeURIComponent(itemId), { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Failed');
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Error');
+
+            var history = data.data.history || [];
+            if (history.length === 0) { showToast('No history for this item', 'info'); return; }
+
+            var html = '<tr class="item-timeline-row"><td colspan="7" class="p-0">';
+            html += '<div class="bg-indigo-50 p-3 mx-2 my-1 rounded-lg">';
+            html += '<div class="text-[10px] font-semibold text-indigo-600 uppercase mb-2">Full Price History for ' + esc(history[0].item_name || 'Item') + '</div>';
+            html += '<div class="space-y-1">';
+            history.forEach(function(h) {
+                var dateStr = h.changed_at ? new Date(h.changed_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+                html += '<div class="flex items-center justify-between text-xs py-1 border-b border-indigo-100">';
+                html += '<span class="text-gray-500">' + esc(dateStr) + '</span>';
+                html += '<span class="text-gray-600">DPL: ' + formatINR(h.old_dpl) + ' &rarr; <span class="font-semibold text-gray-800">' + formatINR(h.new_dpl) + '</span></span>';
+                html += '<span class="text-gray-600">Sales: ' + formatINR(h.old_sales_rate) + ' &rarr; <span class="font-semibold text-gray-800">' + formatINR(h.new_sales_rate) + '</span></span>';
+                html += '<span class="text-gray-400 text-[10px]">' + esc(h.version_label || '') + '</span>';
+                html += '</div>';
+            });
+            html += '</div></div></td></tr>';
+
+            rowEl.insertAdjacentHTML('afterend', html);
+        } catch (err) {
+            showToast('Error loading item history: ' + err.message, 'error');
+        }
+    }
+
+    function renderHistoryPagination(pag) {
+        var bar = document.getElementById('historyPaginationBar');
+        var info = document.getElementById('historyPaginationInfo');
+        var btns = document.getElementById('historyPaginationButtons');
+
+        var total = pag.total || 0;
+        var page = pag.page || 1;
+        var totalPages = pag.totalPages || 1;
+        var start = (page - 1) * HISTORY_PER_PAGE + 1;
+        var end = Math.min(page * HISTORY_PER_PAGE, total);
+
+        info.textContent = 'Showing ' + start + '-' + end + ' of ' + total.toLocaleString() + ' changes';
+
+        var html = '';
+        if (page > 1) {
+            html += '<button onclick="historyGoToPage(' + (page - 1) + ')" class="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">&laquo; Prev</button>';
+        }
+        var startPage = Math.max(1, page - 2);
+        var endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+        for (var i = startPage; i <= endPage; i++) {
+            var activeClass = i === page ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 hover:bg-gray-50';
+            html += '<button onclick="historyGoToPage(' + i + ')" class="px-2.5 py-1 border rounded text-xs font-medium ' + activeClass + '">' + i + '</button>';
+        }
+        if (page < totalPages) {
+            html += '<button onclick="historyGoToPage(' + (page + 1) + ')" class="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">Next &raquo;</button>';
+        }
+        btns.innerHTML = html;
+        bar.classList.remove('hidden');
+    }
+
+    function historyGoToPage(p) {
+        historyFilters.page = p;
+        loadPriceHistory();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function downloadHistoryCsv() {
+        if (!historyData || historyData.length === 0) {
+            showToast('No history data to download. Run a search first.', 'info');
+            return;
+        }
+
+        var rows = [['Date', 'Item Name', 'SKU', 'Brand', 'Old DPL', 'New DPL', 'Old Purchase', 'New Purchase', 'Old Sales', 'New Sales']];
+        historyData.forEach(function(h) {
+            var dateStr = h.changed_at ? new Date(h.changed_at).toLocaleDateString('en-IN') : '';
+            rows.push([
+                dateStr,
+                '"' + (h.item_name || '').replace(/"/g, '""') + '"',
+                h.sku || '',
+                h.brand || '',
+                h.old_dpl || 0,
+                h.new_dpl || 0,
+                h.old_purchase_rate || 0,
+                h.new_purchase_rate || 0,
+                h.old_sales_rate || 0,
+                h.new_sales_rate || 0
+            ]);
+        });
+
+        var csv = rows.map(function(r) { return r.join(','); }).join('\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        var today = new Date().toISOString().substring(0, 10);
+        a.href = url;
+        a.download = 'price-history-' + today + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('CSV downloaded', 'success');
+    }
+
+    // ============ TAB 5: HEALTH CHECK ============
+    var healthResults = null;
+
+    var healthIssueConfig = {
+        missing_sku: { label: 'Missing SKU', badgeClass: 'bg-red-100 text-red-700', order: 0 },
+        bad_name_format: { label: 'Non-standard Name', badgeClass: 'bg-yellow-100 text-yellow-700', order: 1 },
+        missing_dpl: { label: 'Missing DPL', badgeClass: 'bg-yellow-100 text-yellow-700', order: 2 },
+        missing_brand_category: { label: 'Missing Brand/Category', badgeClass: 'bg-red-100 text-red-700', order: 3 },
+        dpl_purchase_mismatch: { label: 'DPL \u2260 Purchase', badgeClass: 'bg-orange-100 text-orange-700', order: 4 },
+        sales_price_mismatch: { label: 'Sales Price Wrong', badgeClass: 'bg-orange-100 text-orange-700', order: 5 }
+    };
+
+    async function runHealthCheck() {
+        var btn = document.getElementById('btnRunHealth');
+        var spinner = document.getElementById('healthSpinner');
+        var btnText = document.getElementById('healthBtnText');
+        var results = document.getElementById('healthResults');
+        var empty = document.getElementById('healthEmpty');
+
+        btn.disabled = true;
+        spinner.classList.remove('hidden');
+        btnText.textContent = 'Scanning...';
+        results.classList.add('hidden');
+        empty.classList.add('hidden');
+
+        try {
+            var resp = await fetch('/api/item-master/health-check', { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Health check failed');
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Error');
+
+            healthResults = data.data;
+            renderHealthResults(healthResults);
+            results.classList.remove('hidden');
+
+            // Enable bulk fix buttons based on results
+            var issues = healthResults.issues || {};
+            document.getElementById('btnFixNames').disabled = !(issues.bad_name_format && issues.bad_name_format.length > 0);
+            document.getElementById('btnSyncPurchase').disabled = !(issues.dpl_purchase_mismatch && issues.dpl_purchase_mismatch.length > 0);
+            document.getElementById('btnRecalcSales').disabled = !(issues.sales_price_mismatch && issues.sales_price_mismatch.length > 0);
+
+            showToast('Health check complete', 'success');
+        } catch (err) {
+            empty.classList.remove('hidden');
+            showToast('Health check error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('hidden');
+            btnText.textContent = 'Run Health Check';
+        }
+    }
+
+    function renderHealthResults(data) {
+        var summary = data.summary || {};
+        var issues = data.issues || {};
+
+        // Summary strip
+        var totalIssues = summary.total_issues || 0;
+        var totalScanned = summary.total_scanned || 0;
+        var healthy = totalScanned - totalIssues;
+        if (healthy < 0) healthy = 0;
+
+        var summaryHtml = '';
+        summaryHtml += '<div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center">';
+        summaryHtml += '<div class="text-2xl font-bold text-green-700">' + healthy.toLocaleString() + '</div>';
+        summaryHtml += '<div class="text-xs text-green-600">Healthy Items</div></div>';
+        summaryHtml += '<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-center">';
+        summaryHtml += '<div class="text-2xl font-bold text-red-700">' + totalIssues.toLocaleString() + '</div>';
+        summaryHtml += '<div class="text-xs text-red-600">Items with Issues</div></div>';
+        summaryHtml += '<div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">';
+        summaryHtml += '<div class="text-2xl font-bold text-gray-700">' + totalScanned.toLocaleString() + '</div>';
+        summaryHtml += '<div class="text-xs text-gray-600">Total Scanned</div></div>';
+        document.getElementById('healthSummary').innerHTML = summaryHtml;
+
+        // Issue sections
+        var sectionsHtml = '';
+        var issueTypes = Object.keys(healthIssueConfig).sort(function(a, b) {
+            return healthIssueConfig[a].order - healthIssueConfig[b].order;
+        });
+
+        issueTypes.forEach(function(type) {
+            var cfg = healthIssueConfig[type];
+            var items = issues[type] || [];
+            var count = items.length;
+
+            sectionsHtml += '<div class="bg-white rounded-lg border shadow-sm">';
+            sectionsHtml += '<div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" onclick="toggleHealthSection(\'' + type + '\')">';
+            sectionsHtml += '<div class="flex items-center gap-3">';
+            sectionsHtml += '<span class="text-sm font-semibold text-gray-800">' + esc(cfg.label) + '</span>';
+            sectionsHtml += '<span class="px-2 py-0.5 rounded-full text-xs font-bold ' + cfg.badgeClass + '">' + count + '</span>';
+            sectionsHtml += '</div>';
+            sectionsHtml += '<svg class="w-5 h-5 text-gray-400 transition-transform" id="healthChevron_' + type + '" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>';
+            sectionsHtml += '</div>';
+
+            // Collapsible body
+            sectionsHtml += '<div class="hidden border-t" id="healthBody_' + type + '">';
+            if (count === 0) {
+                sectionsHtml += '<div class="p-4 text-center text-gray-400 text-xs">No issues found</div>';
+            } else {
+                sectionsHtml += '<div class="overflow-x-auto"><table class="w-full text-xs">';
+                sectionsHtml += '<thead><tr class="bg-gray-50 text-gray-500 text-[10px] uppercase">';
+                sectionsHtml += '<th class="text-left p-2">Item Name</th><th class="text-left p-2">SKU</th>';
+                sectionsHtml += '<th class="text-left p-2">Current Value</th><th class="text-left p-2">Expected Value</th>';
+                sectionsHtml += '<th class="text-center p-2">Action</th>';
+                sectionsHtml += '</tr></thead><tbody>';
+
+                var displayItems = items.slice(0, 100); // Show max 100 per section
+                displayItems.forEach(function(item) {
+                    sectionsHtml += '<tr class="border-b border-gray-100 hover:bg-gray-50">';
+                    sectionsHtml += '<td class="p-2 font-medium" style="max-width:200px"><div class="truncate" title="' + esc(item.item_name) + '">' + esc(item.item_name) + '</div></td>';
+                    sectionsHtml += '<td class="p-2"><span class="font-mono text-blue-600 text-[10px]">' + esc(item.sku || '-') + '</span></td>';
+                    sectionsHtml += '<td class="p-2 text-gray-600">' + esc(item.current_value != null ? item.current_value : '-') + '</td>';
+                    sectionsHtml += '<td class="p-2 text-green-700 font-medium">' + esc(item.expected_value != null ? item.expected_value : '-') + '</td>';
+                    sectionsHtml += '<td class="p-2 text-center"><button onclick="fixHealthItem(\'' + esc(item.zoho_item_id) + '\')" class="px-2 py-0.5 text-[10px] font-semibold rounded border border-indigo-300 text-indigo-600 hover:bg-indigo-50">Fix</button></td>';
+                    sectionsHtml += '</tr>';
+                });
+                if (items.length > 100) {
+                    sectionsHtml += '<tr><td colspan="5" class="p-3 text-center text-gray-400 text-xs">... and ' + (items.length - 100) + ' more items</td></tr>';
+                }
+
+                sectionsHtml += '</tbody></table></div>';
+            }
+            sectionsHtml += '</div></div>';
+        });
+
+        document.getElementById('healthSections').innerHTML = sectionsHtml;
+    }
+
+    function toggleHealthSection(type) {
+        var body = document.getElementById('healthBody_' + type);
+        var chevron = document.getElementById('healthChevron_' + type);
+        if (body) {
+            body.classList.toggle('hidden');
+            if (chevron) chevron.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+        }
+    }
+
+    function fixHealthItem(zohoItemId) {
+        // Find the item in healthResults to populate edit panel
+        var item = null;
+        if (healthResults && healthResults.issues) {
+            var allIssueItems = [];
+            Object.values(healthResults.issues).forEach(function(arr) { allIssueItems = allIssueItems.concat(arr); });
+            item = allIssueItems.find(function(i) { return i.zoho_item_id === zohoItemId; });
+        }
+
+        // Switch to items tab
+        switchTab('items');
+
+        if (item) {
+            // Create a temporary row element to pass to openEditPanel
+            var tempRow = document.createElement('tr');
+            tempRow.setAttribute('data-item', JSON.stringify(item));
+            openEditPanel(tempRow);
+        }
+    }
+
+    async function bulkFixNameFormat() {
+        if (!healthResults || !healthResults.issues || !healthResults.issues.bad_name_format) return;
+        var items = healthResults.issues.bad_name_format;
+        if (items.length === 0) { showToast('No name format issues to fix', 'info'); return; }
+
+        var ids = items.map(function(i) { return i.zoho_item_id; });
+        var btn = document.getElementById('btnFixNames');
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+
+        try {
+            // Step 1: Generate names
+            var resp = await fetch('/api/item-master/generate-names', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ zoho_item_ids: ids })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Generate failed');
+
+            generatedNames = data.data.results || [];
+            if (generatedNames.length === 0) { showToast('No names generated', 'info'); return; }
+
+            // Show preview modal (reuse existing)
+            showNamePreview();
+
+            // Override the confirm button to re-run health check after
+            var origConfirm = confirmGeneratedNames;
+            confirmGeneratedNames = async function() {
+                await origConfirm();
+                confirmGeneratedNames = origConfirm; // restore original
+                await runHealthCheck(); // re-run scan
+            };
+        } catch (err) {
+            showToast('Name fix error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Auto-fix Name Format';
+        }
+    }
+
+    async function bulkSyncPurchase() {
+        if (!healthResults || !healthResults.issues || !healthResults.issues.dpl_purchase_mismatch) return;
+        var items = healthResults.issues.dpl_purchase_mismatch;
+        if (items.length === 0) { showToast('No purchase mismatches to fix', 'info'); return; }
+
+        var btn = document.getElementById('btnSyncPurchase');
+        btn.disabled = true;
+        btn.textContent = 'Syncing...';
+
+        try {
+            var dplItems = items.map(function(i) {
+                return { zoho_item_id: i.zoho_item_id, new_dpl: parseFloat(i.expected_value) || parseFloat(i.dpl) || 0 };
+            });
+
+            var resp = await fetch('/api/item-master/dpl-apply', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ items: dplItems })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Sync failed');
+
+            showToast('Synced purchase prices for ' + items.length + ' items', 'success');
+            await runHealthCheck();
+        } catch (err) {
+            showToast('Sync error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Sync Purchase = DPL';
+        }
+    }
+
+    async function bulkRecalcSales() {
+        if (!healthResults || !healthResults.issues || !healthResults.issues.sales_price_mismatch) return;
+        var items = healthResults.issues.sales_price_mismatch;
+        if (items.length === 0) { showToast('No sales mismatches to fix', 'info'); return; }
+
+        var btn = document.getElementById('btnRecalcSales');
+        btn.disabled = true;
+        btn.textContent = 'Recalculating...';
+
+        try {
+            var dplItems = items.map(function(i) {
+                return { zoho_item_id: i.zoho_item_id, new_dpl: parseFloat(i.dpl) || 0 };
+            });
+
+            var resp = await fetch('/api/item-master/dpl-apply', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ items: dplItems })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Recalc failed');
+
+            showToast('Recalculated sales prices for ' + items.length + ' items', 'success');
+            await runHealthCheck();
+        } catch (err) {
+            showToast('Recalc error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Recalculate Sales Prices';
         }
     }
 
