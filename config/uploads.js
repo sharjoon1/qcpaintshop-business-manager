@@ -30,7 +30,8 @@ const uploadDirs = [
     'public/uploads/painter-attendance',
     'public/uploads/painter-cards',
     'public/uploads/painter-visualizations',
-    'uploads/vendor-bills'
+    'uploads/vendor-bills',
+    'uploads/dpl-pdfs'
 ];
 
 function ensureUploadDirs() {
@@ -169,6 +170,30 @@ const uploadVendorBill = multer({
     }
 });
 
+// DPL PDF upload (15MB, PDF only, stored per brand)
+const uploadDplPdf = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+            const brand = (req.body.brand || 'unknown').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+            const dir = `uploads/dpl-pdfs/${brand}`;
+            fs.mkdirSync(dir, { recursive: true });
+            cb(null, dir);
+        },
+        filename: (req, file, cb) => {
+            const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '-');
+            cb(null, `${Date.now()}-${safeName}`);
+        }
+    }),
+    limits: { fileSize: 15 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF files allowed'));
+        }
+    }
+});
+
 module.exports = {
     ensureUploadDirs,
     uploadLogo,
@@ -182,5 +207,6 @@ module.exports = {
     uploadPainterVisualization,
     uploadActivity,
     uploadPriceList,
-    uploadVendorBill
+    uploadVendorBill,
+    uploadDplPdf
 };

@@ -87,6 +87,7 @@ const activityFeedRoutes = require('./routes/activity-feed');
 const activityFeed = require('./services/activity-feed');
 const activityTrackerService = require('./services/activity-tracker-service');
 const activityTrackerRoutes = require('./routes/activity-tracker');
+const itemMasterRoutes = require('./routes/item-master');
 const fcmAdmin = require('./services/fcm-admin');
 const monitoringRoutes = require('./routes/monitoring');
 const photosRoutes = require('./routes/photos');
@@ -250,6 +251,7 @@ activityTrackerRoutes.setNotificationService(notificationService);
 activityTrackerRoutes.setReportService(attendanceReport);
 monitoringRoutes.setPool(pool);
 photosRoutes.setPool(pool);
+if (itemMasterRoutes.setPool) itemMasterRoutes.setPool(pool);
 monitoringRoutes.setAutomationRegistry(automationRegistry);
 monitoringRoutes.setResponseTracker(responseTracker);
 monitoringRoutes.setProductionMonitor(productionMonitor);
@@ -305,6 +307,7 @@ app.use('/api/staff/daily-work', staffDailyWorkRoutes.router);
 app.use('/api/activity-feed', activityFeedRoutes.router);
 app.use('/api/monitoring', monitoringRoutes.router);
 app.use('/api/photos', photosRoutes.router);
+app.use('/api/item-master', itemMasterRoutes.router);
 
 // Share page routes (serve HTML for public share links)
 app.get('/share/estimate/:token', (req, res) => {
