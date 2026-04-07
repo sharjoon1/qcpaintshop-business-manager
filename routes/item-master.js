@@ -239,13 +239,23 @@ router.get('/items', requireAuth, validateQuery(itemsQuerySchema), async (req, r
             [...params, limit, offset]
         );
 
+        const [brandRows] = await pool.query('SELECT DISTINCT zoho_brand FROM zoho_items_map WHERE zoho_brand IS NOT NULL ORDER BY zoho_brand');
+        const [categoryRows] = await pool.query('SELECT DISTINCT zoho_category_name FROM zoho_items_map WHERE zoho_category_name IS NOT NULL ORDER BY zoho_category_name');
+
         res.json({
-            items,
-            pagination: {
-                page,
-                limit,
-                total: countRows[0].total,
-                pages: Math.ceil(countRows[0].total / limit)
+            success: true,
+            data: {
+                items,
+                pagination: {
+                    page,
+                    limit,
+                    total: countRows[0].total,
+                    pages: Math.ceil(countRows[0].total / limit)
+                },
+                filterOptions: {
+                    brands: brandRows.map(r => r.zoho_brand),
+                    categories: categoryRows.map(r => r.zoho_category_name)
+                }
             }
         });
     } catch (err) {
@@ -262,7 +272,7 @@ router.get('/items/:id', requireAuth, async (req, res) => {
             [req.params.id]
         );
         if (!rows.length) return res.status(404).json({ error: 'Item not found' });
-        res.json(rows[0]);
+        res.json({ success: true, data: rows[0] });
     } catch (err) {
         console.error('Item detail error:', err);
         res.status(500).json({ error: 'Failed to load item' });
@@ -279,11 +289,14 @@ router.get('/summary', requireAuth, async (req, res) => {
         const [brandRows] = await pool.query('SELECT DISTINCT zoho_brand FROM zoho_items_map WHERE zoho_brand IS NOT NULL ORDER BY zoho_brand');
 
         res.json({
-            total: totalRows[0].count,
-            dpl_set: dplSetRows[0].count,
-            missing_dpl: missingDplRows[0].count,
-            no_sku: noSkuRows[0].count,
-            brands: brandRows.map(r => r.zoho_brand)
+            success: true,
+            data: {
+                total: totalRows[0].count,
+                dplSet: dplSetRows[0].count,
+                missingDpl: missingDplRows[0].count,
+                noSku: noSkuRows[0].count,
+                brands: brandRows.map(r => r.zoho_brand)
+            }
         });
     } catch (err) {
         console.error('Item summary error:', err);
@@ -335,7 +348,7 @@ router.get('/naming-rules', requireAuth, async (req, res) => {
         const [rules] = await pool.query(
             'SELECT * FROM item_naming_rules ORDER BY brand, product_name'
         );
-        res.json(rules);
+        res.json({ success: true, data: rules });
     } catch (err) {
         console.error('Naming rules list error:', err);
         res.status(500).json({ error: 'Failed to load naming rules' });
@@ -446,7 +459,7 @@ router.get('/dpl-versions', requireAuth, async (req, res) => {
         const [versions] = await pool.query(
             'SELECT * FROM dpl_versions ORDER BY created_at DESC'
         );
-        res.json(versions);
+        res.json({ success: true, data: versions });
     } catch (err) {
         console.error('DPL versions list error:', err);
         res.status(500).json({ error: 'Failed to load DPL versions' });
@@ -456,18 +469,21 @@ router.get('/dpl-versions', requireAuth, async (req, res) => {
 // POST /dpl-versions — Create a new DPL version (with optional PDF upload)
 router.post('/dpl-versions', requireAuth, uploadDplPdf.single('file'), async (req, res) => {
     try {
-        const { brand, effective_date, notes } = req.body;
-        if (!brand) return res.status(400).json({ error: 'Brand is required' });
+        const { brand, effective_date, version_label, notebooklm_notebook_id } = req.body;
+        if (!brand) return res.status(400).json({ success: false, error: 'Brand is required' });
 
         const filePath = req.file ? req.file.path.replace(/\\/g, '/') : null;
 
+        // Archive previous active version for this brand
+        await pool.query("UPDATE dpl_versions SET status = 'archived' WHERE brand = ? AND status = 'active'", [brand]);
+
         const [result] = await pool.query(
-            `INSERT INTO dpl_versions (brand, effective_date, notes, file_path, uploaded_by)
-             VALUES (?, ?, ?, ?, ?)`,
-            [brand, effective_date || new Date(), notes || null, filePath, req.user.id]
+            `INSERT INTO dpl_versions (brand, effective_date, version_label, pdf_path, notebooklm_notebook_id, status)
+             VALUES (?, ?, ?, ?, ?, 'active')`,
+            [brand, effective_date || new Date().toISOString().split('T')[0], version_label || null, filePath, notebooklm_notebook_id || null]
         );
 
-        res.json({ success: true, id: result.insertId, file_path: filePath });
+        res.json({ success: true, id: result.insertId, pdf_path: filePath });
     } catch (err) {
         console.error('DPL version create error:', err);
         res.status(500).json({ error: 'Failed to create DPL version' });
@@ -655,12 +671,15 @@ router.get('/price-history', requireAuth, validateQuery(priceHistoryQuerySchema)
         );
 
         res.json({
-            history: rows,
-            pagination: {
-                page,
-                limit,
-                total: countRows[0].total,
-                pages: Math.ceil(countRows[0].total / limit)
+            success: true,
+            data: {
+                history: rows,
+                pagination: {
+                    page,
+                    limit,
+                    total: countRows[0].total,
+                    pages: Math.ceil(countRows[0].total / limit)
+                }
             }
         });
     } catch (err) {
@@ -680,7 +699,7 @@ router.get('/price-history/:itemId', requireAuth, async (req, res) => {
              ORDER BY dph.created_at DESC`,
             [req.params.itemId]
         );
-        res.json(rows);
+        res.json({ success: true, data: rows });
     } catch (err) {
         console.error('Item price history error:', err);
         res.status(500).json({ error: 'Failed to load item price history' });
@@ -721,10 +740,13 @@ router.get('/health-check', requireAuth, async (req, res) => {
         }
 
         res.json({
-            total_items: items.length,
-            items_with_issues: itemsWithIssues.length,
-            issues_by_type: issuesByType,
-            items: itemsWithIssues
+            success: true,
+            data: {
+                totalItems: items.length,
+                itemsWithIssues: itemsWithIssues.length,
+                issuesByType: issuesByType,
+                items: itemsWithIssues
+            }
         });
     } catch (err) {
         console.error('Health check error:', err);
