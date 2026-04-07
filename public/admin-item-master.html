@@ -162,15 +162,162 @@
 
         <!-- Tab 2: DPL Import -->
         <div id="tab-dpl" class="tab-content hidden">
-            <div class="flex items-center justify-center min-h-[400px] text-gray-400">
-                <p class="text-lg">DPL Import &mdash; Coming Soon</p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Left Column: Brand DPL Library -->
+                <div>
+                    <h3 class="text-sm font-bold text-gray-800 mb-3">Brand DPL Library</h3>
+                    <div id="dplVersionsLoading" class="text-center py-8">
+                        <svg class="inline w-6 h-6 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <p class="text-xs text-gray-400 mt-2">Loading DPL versions...</p>
+                    </div>
+                    <div id="dplVersionsGrid" class="space-y-3"></div>
+                    <!-- Upload New Brand DPL -->
+                    <div onclick="openDplUploadModal()" class="mt-3 border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition">
+                        <svg class="mx-auto w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        <p class="text-xs font-semibold text-gray-500">Upload New Brand DPL PDF</p>
+                    </div>
+                </div>
+
+                <!-- Right Column: Import Actions -->
+                <div>
+                    <h3 class="text-sm font-bold text-gray-800 mb-3">Import Actions</h3>
+
+                    <!-- PDF Upload Drop Zone -->
+                    <div id="dplDropZone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center mb-3 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition" onclick="document.getElementById('dplFileInput').click();" ondragover="event.preventDefault(); this.classList.add('border-indigo-400','bg-indigo-50');" ondragleave="this.classList.remove('border-indigo-400','bg-indigo-50');" ondrop="event.preventDefault(); this.classList.remove('border-indigo-400','bg-indigo-50'); handleDplFileDrop(event);">
+                        <svg class="mx-auto w-10 h-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        <p class="text-sm font-semibold text-gray-600">Drop PDF or Click to Upload</p>
+                        <p class="text-xs text-gray-400 mt-1">DPL price list PDF for parsing</p>
+                        <input type="file" id="dplFileInput" accept=".pdf" class="hidden" onchange="handleDplFileSelect(this)">
+                    </div>
+                    <div id="dplSelectedFile" class="hidden mb-3 flex items-center gap-2 bg-indigo-50 rounded-lg px-3 py-2">
+                        <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
+                        <span id="dplFileName" class="text-xs font-medium text-indigo-700 truncate flex-1"></span>
+                        <button onclick="clearDplFile()" class="text-indigo-400 hover:text-indigo-600 text-sm">&times;</button>
+                    </div>
+
+                    <!-- Brand selector for parse -->
+                    <div class="mb-3">
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Brand (for matching)</label>
+                        <select id="dplParseBrand" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                            <option value="">-- Select Brand --</option>
+                        </select>
+                    </div>
+
+                    <div class="flex gap-2 mb-4">
+                        <button onclick="parseDplPdfAction()" id="btnParseDpl" class="flex-1 px-3 py-2 text-white text-xs font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                            Parse PDF &amp; Auto-Match Items
+                        </button>
+                        <button onclick="openNotebookLmModal()" class="flex-1 px-3 py-2 border border-indigo-300 text-indigo-600 text-xs font-semibold rounded-lg hover:bg-indigo-50 transition">
+                            Query NotebookLM for Prices
+                        </button>
+                    </div>
+
+                    <!-- Match Results -->
+                    <div id="dplMatchResults" class="hidden">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-bold text-gray-700">Match Results</h4>
+                            <div class="flex items-center gap-2">
+                                <span id="dplMatchSummary" class="text-[10px] text-gray-500"></span>
+                                <button onclick="applyMatchedToPriceCalc()" class="px-3 py-1 text-white text-[10px] font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                                    Apply Selected to Price Calculator
+                                </button>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                            <div class="overflow-x-auto max-h-[400px] overflow-y-auto">
+                                <table class="w-full item-table">
+                                    <thead>
+                                        <tr class="text-left text-[10px] uppercase text-gray-500 font-semibold">
+                                            <th class="w-8 text-center"><input type="checkbox" id="dplSelectAll" onchange="toggleDplSelectAll()" class="rounded"></th>
+                                            <th class="min-w-[160px]">PDF Product</th>
+                                            <th class="min-w-[160px]">Matched Zoho Item</th>
+                                            <th>Pack Size</th>
+                                            <th class="text-right">New DPL</th>
+                                            <th class="text-right">Current DPL</th>
+                                            <th class="text-right">Change %</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dplMatchBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Unmatched Section -->
+                        <div id="dplUnmatchedSection" class="hidden mt-3">
+                            <button onclick="toggleUnmatched()" class="flex items-center gap-1 text-xs font-semibold text-gray-600 hover:text-gray-800 mb-2">
+                                <svg id="unmatchedChevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                <span id="unmatchedCount">0</span> Unmatched Items
+                            </button>
+                            <div id="unmatchedContent" class="hidden bg-white rounded-xl shadow-sm overflow-hidden">
+                                <div class="overflow-x-auto max-h-[300px] overflow-y-auto">
+                                    <table class="w-full item-table">
+                                        <thead>
+                                            <tr class="text-left text-[10px] uppercase text-gray-500 font-semibold">
+                                                <th class="min-w-[160px]">PDF Product</th>
+                                                <th>Size</th>
+                                                <th class="text-right">DPL</th>
+                                                <th class="min-w-[200px]">Manual Match</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="dplUnmatchedBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Tab 3: Price Calculator -->
         <div id="tab-price-calc" class="tab-content hidden">
-            <div class="flex items-center justify-center min-h-[400px] text-gray-400">
-                <p class="text-lg">Price Calculator &mdash; Coming Soon</p>
+            <!-- Formula Banner -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm">
+                <strong>Formula:</strong> Purchase Cost = DPL | Sales Price = ceil(DPL &times; 1.18 &times; 1.10) = ceil(DPL &times; 1.298)
+            </div>
+
+            <!-- Brand Filter + Actions -->
+            <div class="bg-white rounded-xl shadow-sm p-4 mb-4">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <select id="priceCalcBrand" onchange="loadPriceCalcItems(this.value)" class="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none min-w-[160px]">
+                        <option value="">-- Select Brand --</option>
+                    </select>
+                    <div class="flex-1"></div>
+                    <button onclick="previewPriceChanges()" class="px-3 py-1.5 border border-gray-300 text-xs font-semibold rounded-lg text-gray-700 hover:bg-gray-50">
+                        Preview All Changes
+                    </button>
+                    <button onclick="applyPriceChanges()" id="btnApplyPrices" class="px-4 py-1.5 text-white text-xs font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                        Apply &amp; Sync to Zoho
+                    </button>
+                </div>
+            </div>
+
+            <!-- Price Table -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div id="priceCalcLoading" class="hidden text-center py-12">
+                    <svg class="inline w-8 h-8 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <p class="text-xs text-gray-400 mt-2">Loading items...</p>
+                </div>
+                <div id="priceCalcTableWrap" class="hidden overflow-x-auto">
+                    <table class="w-full item-table">
+                        <thead>
+                            <tr class="text-left text-[10px] uppercase text-gray-500 font-semibold">
+                                <th class="w-8 text-center"><input type="checkbox" id="priceSelectAll" onchange="togglePriceSelectAll()" class="rounded"></th>
+                                <th class="min-w-[200px]">Item Name</th>
+                                <th class="min-w-[80px]">SKU</th>
+                                <th class="text-right min-w-[80px]">Current DPL</th>
+                                <th class="text-right min-w-[100px]">New DPL</th>
+                                <th class="text-right min-w-[70px]">% Change</th>
+                                <th class="text-right min-w-[90px]">Calc Purchase</th>
+                                <th class="text-right min-w-[90px]">Calc Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="priceCalcBody"></tbody>
+                    </table>
+                </div>
+                <div id="priceCalcEmpty" class="text-center py-12">
+                    <p class="text-sm text-gray-400">Select a brand to load items, or use "Apply Selected" from DPL Import tab</p>
+                </div>
             </div>
         </div>
 
@@ -325,6 +472,96 @@
         </div>
     </div>
 
+    <!-- DPL Upload Modal -->
+    <div id="dplUploadModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/30" onclick="closeDplUploadModal()"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-full max-w-md p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-gray-800">Upload Brand DPL PDF</h3>
+                <button onclick="closeDplUploadModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <form id="dplUploadForm" onsubmit="event.preventDefault(); submitDplUpload();">
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Brand</label>
+                        <select id="dplUploadBrand" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                            <option value="">-- Select Brand --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Version Label</label>
+                        <input type="text" id="dplUploadVersion" required placeholder="e.g. Feb 2025" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Effective Date</label>
+                        <input type="date" id="dplUploadDate" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">NotebookLM Notebook ID (optional)</label>
+                        <input type="text" id="dplUploadNotebookId" placeholder="e.g. 42c8513c" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">PDF File</label>
+                        <input type="file" id="dplUploadFile" accept=".pdf" required class="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100">
+                    </div>
+                    <button type="submit" id="dplUploadBtn" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                        Upload DPL
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- NotebookLM Query Modal -->
+    <div id="notebookLmModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/30" onclick="closeNotebookLmModal()"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-full max-w-lg p-5 max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-gray-800">Query NotebookLM for Prices</h3>
+                <button onclick="closeNotebookLmModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Brand / Notebook</label>
+                    <select id="notebookLmBrand" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                        <option value="">-- Select Brand --</option>
+                        <option value="42c8513c" data-brand="Asian Paints">Asian Paints (42c8513c)</option>
+                        <option value="344d312a" data-brand="Berger">Berger (344d312a)</option>
+                        <option value="3a7fc9da" data-brand="Birla Opus">Birla Opus (3a7fc9da)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Query</label>
+                    <textarea id="notebookLmQuery" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none resize-none">List all products with DPL prices. Format: product_name | pack_size | dpl_price</textarea>
+                </div>
+                <button onclick="submitNotebookLmQuery()" id="btnNotebookLm" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    Query NotebookLM
+                </button>
+            </div>
+            <div id="notebookLmResult" class="hidden mt-3 flex-1 min-h-0 overflow-y-auto">
+                <div class="bg-gray-50 rounded-lg p-3 text-xs whitespace-pre-wrap font-mono" id="notebookLmResultText"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Price Preview Modal -->
+    <div id="pricePreviewModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/30" onclick="closePricePreview()"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-full max-w-md p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-gray-800">Price Change Preview</h3>
+                <button onclick="closePricePreview()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <div id="pricePreviewContent" class="space-y-3"></div>
+            <div class="flex justify-end gap-2 mt-4 pt-3 border-t">
+                <button onclick="closePricePreview()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">Close</button>
+                <button onclick="closePricePreview(); applyPriceChanges();" class="px-4 py-2 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    Confirm &amp; Apply
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
     // ============ STATE ============
     var currentFilters = { brand: '', category: '', status: 'all', search: '', page: 1 };
@@ -374,6 +611,15 @@
         if (tabEl) tabEl.classList.remove('hidden');
         var tabBtn = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
         if (tabBtn) tabBtn.classList.add('active');
+
+        // Lazy-load tab data
+        if (tabName === 'dpl' && !dplVersionsLoaded) {
+            loadDplVersions();
+            populateDplBrandDropdowns();
+        }
+        if (tabName === 'price-calc') {
+            populatePriceCalcBrandDropdown();
+        }
     }
 
     // ============ FILTERS ============
@@ -802,6 +1048,602 @@
         } finally {
             btn.disabled = false;
             btn.textContent = 'Apply Names';
+        }
+    }
+
+    // ============ TAB 2: DPL IMPORT ============
+    var dplFile = null;
+    var dplMatchData = []; // {matched: [...], unmatched: [...]}
+    var dplVersionsLoaded = false;
+    var allZohoItemsForManualMatch = [];
+
+    function populateDplBrandDropdowns() {
+        var brands = filterOptions.brands || [];
+        var html = '<option value="">-- Select Brand --</option>';
+        brands.forEach(function(b) { html += '<option value="' + esc(b) + '">' + esc(b) + '</option>'; });
+        ['dplParseBrand', 'dplUploadBrand'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.innerHTML = html;
+        });
+    }
+
+    async function loadDplVersions() {
+        var loading = document.getElementById('dplVersionsLoading');
+        var grid = document.getElementById('dplVersionsGrid');
+        loading.classList.remove('hidden');
+        try {
+            var resp = await fetch('/api/item-master/dpl-versions', { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Failed to load');
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Error');
+            var versions = data.data || [];
+            loading.classList.add('hidden');
+            if (versions.length === 0) {
+                grid.innerHTML = '<div class="text-center py-6 text-gray-400 text-xs">No DPL versions uploaded yet</div>';
+                return;
+            }
+            // Group by brand
+            var byBrand = {};
+            versions.forEach(function(v) {
+                if (!byBrand[v.brand]) byBrand[v.brand] = [];
+                byBrand[v.brand].push(v);
+            });
+            var html = '';
+            Object.keys(byBrand).sort().forEach(function(brand) {
+                var items = byBrand[brand];
+                var latest = items[0]; // assume sorted by effective_date desc
+                html += '<div class="bg-white rounded-xl shadow-sm p-4 border-l-4" style="border-left-color: #667eea;">';
+                html += '<div class="flex items-start justify-between">';
+                html += '<div>';
+                html += '<h4 class="text-sm font-bold text-gray-800">' + esc(brand) + '</h4>';
+                html += '<p class="text-xs text-gray-500 mt-0.5">' + esc(latest.version_label || 'v1') + ' &middot; Effective: ' + esc(latest.effective_date ? latest.effective_date.substring(0, 10) : '-') + '</p>';
+                html += '<p class="text-[10px] text-gray-400 mt-0.5">' + (latest.total_items || 0) + ' items &middot; ' + (latest.matched_items || 0) + ' matched</p>';
+                html += '</div>';
+                html += '<div class="text-right">';
+                if (latest.notebooklm_notebook_id) {
+                    html += '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">NotebookLM Linked</span>';
+                } else {
+                    html += '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">Not Linked</span>';
+                }
+                html += '<p class="text-[10px] text-gray-400 mt-1">' + items.length + ' version' + (items.length > 1 ? 's' : '') + '</p>';
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
+            });
+            grid.innerHTML = html;
+        } catch (err) {
+            loading.classList.add('hidden');
+            grid.innerHTML = '<div class="text-center py-6 text-red-400 text-xs">Error: ' + esc(err.message) + '</div>';
+        }
+        dplVersionsLoaded = true;
+    }
+
+    function openDplUploadModal() {
+        document.getElementById('dplUploadForm').reset();
+        document.getElementById('dplUploadModal').classList.remove('hidden');
+    }
+
+    function closeDplUploadModal() {
+        document.getElementById('dplUploadModal').classList.add('hidden');
+    }
+
+    async function submitDplUpload() {
+        var brand = document.getElementById('dplUploadBrand').value;
+        var versionLabel = document.getElementById('dplUploadVersion').value.trim();
+        var effectiveDate = document.getElementById('dplUploadDate').value;
+        var notebookId = document.getElementById('dplUploadNotebookId').value.trim();
+        var fileInput = document.getElementById('dplUploadFile');
+
+        if (!brand || !versionLabel || !effectiveDate || !fileInput.files[0]) {
+            showToast('Please fill all required fields', 'error');
+            return;
+        }
+
+        var fd = new FormData();
+        fd.append('brand', brand);
+        fd.append('version_label', versionLabel);
+        fd.append('effective_date', effectiveDate);
+        if (notebookId) fd.append('notebooklm_notebook_id', notebookId);
+        fd.append('file', fileInput.files[0]);
+
+        var btn = document.getElementById('dplUploadBtn');
+        btn.disabled = true;
+        btn.textContent = 'Uploading...';
+
+        try {
+            var resp = await fetch('/api/item-master/dpl-versions', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') },
+                body: fd
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Upload failed');
+            showToast('DPL version uploaded successfully', 'success');
+            closeDplUploadModal();
+            loadDplVersions();
+        } catch (err) {
+            showToast('Upload error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Upload DPL';
+        }
+    }
+
+    function handleDplFileDrop(event) {
+        var files = event.dataTransfer.files;
+        if (files.length > 0 && files[0].type === 'application/pdf') {
+            setDplFile(files[0]);
+        } else {
+            showToast('Please drop a PDF file', 'error');
+        }
+    }
+
+    function handleDplFileSelect(input) {
+        if (input.files.length > 0) {
+            setDplFile(input.files[0]);
+        }
+    }
+
+    function setDplFile(file) {
+        dplFile = file;
+        document.getElementById('dplSelectedFile').classList.remove('hidden');
+        document.getElementById('dplFileName').textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+    }
+
+    function clearDplFile() {
+        dplFile = null;
+        document.getElementById('dplFileInput').value = '';
+        document.getElementById('dplSelectedFile').classList.add('hidden');
+    }
+
+    async function parseDplPdfAction() {
+        if (!dplFile) { showToast('Please select a PDF file first', 'error'); return; }
+        var brand = document.getElementById('dplParseBrand').value;
+        if (!brand) { showToast('Please select a brand for matching', 'error'); return; }
+
+        var btn = document.getElementById('btnParseDpl');
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="inline w-4 h-4 spinner mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Parsing...';
+
+        try {
+            // Step 1: Parse PDF
+            var fd = new FormData();
+            fd.append('file', dplFile);
+            fd.append('brand', brand);
+            var parseResp = await fetch('/api/item-master/dpl-parse', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') },
+                body: fd
+            });
+            var parseData = await parseResp.json();
+            if (!parseResp.ok || !parseData.success) throw new Error(parseData.message || 'Parse failed');
+
+            var parsedItems = parseData.data.items || [];
+            if (parsedItems.length === 0) { showToast('No items found in PDF', 'info'); return; }
+
+            showToast('Parsed ' + parsedItems.length + ' items. Matching...', 'info');
+
+            // Step 2: Match items
+            var matchResp = await fetch('/api/item-master/dpl-match', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ items: parsedItems, brand: brand })
+            });
+            var matchData = await matchResp.json();
+            if (!matchResp.ok || !matchData.success) throw new Error(matchData.message || 'Match failed');
+
+            dplMatchData = matchData.data || { matched: [], unmatched: [] };
+            renderDplMatchResults();
+            showToast('Matched ' + (dplMatchData.matched || []).length + ' items, ' + (dplMatchData.unmatched || []).length + ' unmatched', 'success');
+        } catch (err) {
+            showToast('Parse error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Parse PDF &amp; Auto-Match Items';
+        }
+    }
+
+    function renderDplMatchResults() {
+        var container = document.getElementById('dplMatchResults');
+        container.classList.remove('hidden');
+
+        var matched = dplMatchData.matched || [];
+        var unmatched = dplMatchData.unmatched || [];
+
+        document.getElementById('dplMatchSummary').textContent = matched.length + ' matched, ' + unmatched.length + ' unmatched';
+
+        // Render matched table
+        var html = '';
+        matched.forEach(function(m, idx) {
+            var currentDpl = parseFloat(m.current_dpl) || 0;
+            var newDpl = parseFloat(m.new_dpl) || 0;
+            var pctChange = currentDpl > 0 ? ((newDpl - currentDpl) / currentDpl * 100).toFixed(1) : 'N/A';
+            var changed = Math.abs(newDpl - currentDpl) > 0.01;
+            var rowBg = changed ? 'background: #f0fdf4;' : '';
+            html += '<tr style="' + rowBg + '">';
+            html += '<td class="text-center"><input type="checkbox" class="dpl-match-cb rounded" data-idx="' + idx + '" checked></td>';
+            html += '<td class="text-xs">' + esc(m.pdf_product_name || m.product_name || '-') + '</td>';
+            html += '<td class="text-xs font-medium">' + esc(m.zoho_item_name || '-') + '</td>';
+            html += '<td class="text-xs">' + esc(m.pack_size || m.size || '-') + '</td>';
+            html += '<td class="text-right font-semibold text-xs">' + formatINR(newDpl) + '</td>';
+            html += '<td class="text-right text-xs text-gray-500">' + formatINR(currentDpl) + '</td>';
+            html += '<td class="text-right text-xs ' + (changed ? 'text-green-700 font-bold' : 'text-gray-400') + '">' + (pctChange === 'N/A' ? 'New' : (pctChange > 0 ? '+' : '') + pctChange + '%') + '</td>';
+            html += '</tr>';
+        });
+        if (matched.length === 0) {
+            html = '<tr><td colspan="7" class="text-center py-6 text-gray-400 text-xs">No matches found</td></tr>';
+        }
+        document.getElementById('dplMatchBody').innerHTML = html;
+
+        // Render unmatched section
+        var unmatchedSection = document.getElementById('dplUnmatchedSection');
+        if (unmatched.length > 0) {
+            unmatchedSection.classList.remove('hidden');
+            document.getElementById('unmatchedCount').textContent = unmatched.length;
+            var uHtml = '';
+            unmatched.forEach(function(u, idx) {
+                uHtml += '<tr>';
+                uHtml += '<td class="text-xs">' + esc(u.product_name || u.pdf_product_name || '-') + '</td>';
+                uHtml += '<td class="text-xs">' + esc(u.pack_size || u.size || '-') + '</td>';
+                uHtml += '<td class="text-right text-xs font-semibold">' + formatINR(u.dpl || u.new_dpl) + '</td>';
+                uHtml += '<td><select class="unmatched-manual-select w-full px-2 py-1 border border-gray-300 rounded text-[10px]" data-idx="' + idx + '"><option value="">-- Select Zoho Item --</option></select></td>';
+                uHtml += '</tr>';
+            });
+            document.getElementById('dplUnmatchedBody').innerHTML = uHtml;
+            // Load zoho items for manual matching if needed
+            loadZohoItemsForManualMatch();
+        } else {
+            unmatchedSection.classList.add('hidden');
+        }
+    }
+
+    async function loadZohoItemsForManualMatch() {
+        if (allZohoItemsForManualMatch.length > 0) {
+            populateManualMatchDropdowns();
+            return;
+        }
+        try {
+            var resp = await fetch('/api/item-master/items?limit=2000&status=all', { headers: getAuthHeaders() });
+            var data = await resp.json();
+            if (data.success && data.data.items) {
+                allZohoItemsForManualMatch = data.data.items;
+                populateManualMatchDropdowns();
+            }
+        } catch (err) { console.error('Load zoho items error:', err); }
+    }
+
+    function populateManualMatchDropdowns() {
+        document.querySelectorAll('.unmatched-manual-select').forEach(function(sel) {
+            var html = '<option value="">-- Select Zoho Item --</option>';
+            allZohoItemsForManualMatch.forEach(function(item) {
+                html += '<option value="' + esc(item.zoho_item_id) + '">' + esc(item.item_name) + ' (' + esc(item.sku || 'no sku') + ')</option>';
+            });
+            sel.innerHTML = html;
+        });
+    }
+
+    function toggleDplSelectAll() {
+        var checked = document.getElementById('dplSelectAll').checked;
+        document.querySelectorAll('.dpl-match-cb').forEach(function(cb) { cb.checked = checked; });
+    }
+
+    function toggleUnmatched() {
+        var content = document.getElementById('unmatchedContent');
+        var chevron = document.getElementById('unmatchedChevron');
+        if (content.classList.contains('hidden')) {
+            content.classList.remove('hidden');
+            chevron.style.transform = 'rotate(90deg)';
+        } else {
+            content.classList.add('hidden');
+            chevron.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    function applyMatchedToPriceCalc() {
+        var matched = dplMatchData.matched || [];
+        var selected = [];
+        document.querySelectorAll('.dpl-match-cb:checked').forEach(function(cb) {
+            var idx = parseInt(cb.getAttribute('data-idx'));
+            if (matched[idx]) selected.push(matched[idx]);
+        });
+        if (selected.length === 0) { showToast('No items selected', 'error'); return; }
+
+        // Pre-populate price calc items
+        priceCalcItems = selected.map(function(m) {
+            return {
+                zoho_item_id: m.zoho_item_id,
+                item_name: m.zoho_item_name || m.product_name || '-',
+                sku: m.sku || '',
+                dpl: parseFloat(m.current_dpl) || 0,
+                new_dpl: parseFloat(m.new_dpl) || 0,
+                purchase_rate: parseFloat(m.new_dpl) || 0,
+                sales_rate: Math.ceil((parseFloat(m.new_dpl) || 0) * 1.298)
+            };
+        });
+
+        switchTab('price-calc');
+        renderPriceTable();
+        showToast('Loaded ' + selected.length + ' items into Price Calculator', 'success');
+    }
+
+    // NotebookLM
+    function openNotebookLmModal() {
+        document.getElementById('notebookLmResult').classList.add('hidden');
+        document.getElementById('notebookLmModal').classList.remove('hidden');
+    }
+
+    function closeNotebookLmModal() {
+        document.getElementById('notebookLmModal').classList.add('hidden');
+    }
+
+    async function submitNotebookLmQuery() {
+        var sel = document.getElementById('notebookLmBrand');
+        var notebookId = sel.value;
+        var brand = sel.options[sel.selectedIndex].getAttribute('data-brand') || '';
+        var query = document.getElementById('notebookLmQuery').value.trim();
+
+        if (!notebookId) { showToast('Please select a brand/notebook', 'error'); return; }
+        if (!query) { showToast('Please enter a query', 'error'); return; }
+
+        var btn = document.getElementById('btnNotebookLm');
+        btn.disabled = true;
+        btn.textContent = 'Querying...';
+
+        try {
+            var resp = await fetch('/api/item-master/dpl-notebooklm', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ brand: brand, notebook_id: notebookId, query: query })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Query failed');
+
+            var resultDiv = document.getElementById('notebookLmResult');
+            var resultText = document.getElementById('notebookLmResultText');
+            resultText.textContent = data.data.response || data.data.text || JSON.stringify(data.data, null, 2);
+            resultDiv.classList.remove('hidden');
+
+            // If there are parsed items from the response, offer to match them
+            if (data.data.items && data.data.items.length > 0) {
+                showToast('Got ' + data.data.items.length + ' items. Running auto-match...', 'info');
+                var matchResp = await fetch('/api/item-master/dpl-match', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ items: data.data.items, brand: brand })
+                });
+                var matchData = await matchResp.json();
+                if (matchData.success) {
+                    dplMatchData = matchData.data || { matched: [], unmatched: [] };
+                    renderDplMatchResults();
+                    showToast('Matched ' + (dplMatchData.matched || []).length + ' items', 'success');
+                }
+            }
+        } catch (err) {
+            showToast('NotebookLM error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Query NotebookLM';
+        }
+    }
+
+    // ============ TAB 3: PRICE CALCULATOR ============
+    var priceCalcItems = [];
+    var priceCalcDplVersionId = null;
+
+    function populatePriceCalcBrandDropdown() {
+        var brands = filterOptions.brands || [];
+        var html = '<option value="">-- Select Brand --</option>';
+        brands.forEach(function(b) { html += '<option value="' + esc(b) + '">' + esc(b) + '</option>'; });
+        var el = document.getElementById('priceCalcBrand');
+        if (el) el.innerHTML = html;
+    }
+
+    async function loadPriceCalcItems(brand) {
+        if (!brand) {
+            priceCalcItems = [];
+            document.getElementById('priceCalcTableWrap').classList.add('hidden');
+            document.getElementById('priceCalcEmpty').classList.remove('hidden');
+            return;
+        }
+
+        var loading = document.getElementById('priceCalcLoading');
+        var tableWrap = document.getElementById('priceCalcTableWrap');
+        var empty = document.getElementById('priceCalcEmpty');
+
+        loading.classList.remove('hidden');
+        tableWrap.classList.add('hidden');
+        empty.classList.add('hidden');
+
+        try {
+            var resp = await fetch('/api/item-master/items?brand=' + encodeURIComponent(brand) + '&status=complete&limit=500', { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Failed to load items');
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Error');
+
+            priceCalcItems = (data.data.items || []).map(function(item) {
+                return {
+                    zoho_item_id: item.zoho_item_id,
+                    item_name: item.item_name,
+                    sku: item.sku || '',
+                    dpl: parseFloat(item.dpl) || 0,
+                    new_dpl: parseFloat(item.dpl) || 0,
+                    purchase_rate: parseFloat(item.purchase_rate) || 0,
+                    sales_rate: parseFloat(item.sales_rate) || 0
+                };
+            });
+
+            loading.classList.add('hidden');
+            if (priceCalcItems.length === 0) {
+                empty.classList.remove('hidden');
+                empty.querySelector('p').textContent = 'No complete items found for ' + brand;
+                return;
+            }
+
+            renderPriceTable();
+            tableWrap.classList.remove('hidden');
+        } catch (err) {
+            loading.classList.add('hidden');
+            empty.classList.remove('hidden');
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+
+    function renderPriceTable() {
+        var html = '';
+        priceCalcItems.forEach(function(item, idx) {
+            var changed = Math.abs(item.new_dpl - item.dpl) > 0.01;
+            var pctChange = item.dpl > 0 ? ((item.new_dpl - item.dpl) / item.dpl * 100).toFixed(1) : (item.new_dpl > 0 ? 'New' : '0.0');
+            var calcPurchase = item.new_dpl;
+            var calcSales = Math.ceil(item.new_dpl * 1.298);
+            var rowBg = changed ? 'background: #f0fdf4;' : '';
+
+            html += '<tr style="' + rowBg + '">';
+            html += '<td class="text-center"><input type="checkbox" class="price-cb rounded" data-idx="' + idx + '" ' + (changed ? 'checked' : '') + '></td>';
+            html += '<td class="text-xs font-medium" style="max-width:200px"><div class="truncate" title="' + esc(item.item_name) + '">' + esc(item.item_name) + '</div></td>';
+            html += '<td><span class="font-mono text-blue-600 text-[10px]">' + esc(item.sku || '-') + '</span></td>';
+            html += '<td class="text-right text-xs text-gray-500">' + formatINR(item.dpl) + '</td>';
+            html += '<td class="text-right"><input type="number" step="0.01" min="0" value="' + (item.new_dpl || '') + '" onchange="onDplInputChange(' + idx + ', this.value)" oninput="onDplInputChange(' + idx + ', this.value)" class="w-20 px-2 py-1 border border-gray-300 rounded text-xs text-right focus:border-indigo-500 focus:outline-none"></td>';
+            html += '<td class="text-right text-xs ' + (changed ? 'text-green-700 font-bold' : 'text-gray-400') + '">' + (pctChange === 'New' ? 'New' : (parseFloat(pctChange) > 0 ? '+' : '') + pctChange + '%') + '</td>';
+            html += '<td class="text-right text-xs font-medium">' + formatINR(calcPurchase) + '</td>';
+            html += '<td class="text-right text-xs font-semibold text-green-700">' + formatINR(calcSales) + '</td>';
+            html += '</tr>';
+        });
+        if (priceCalcItems.length === 0) {
+            html = '<tr><td colspan="8" class="text-center py-8 text-gray-400 text-xs">No items loaded</td></tr>';
+        }
+        document.getElementById('priceCalcBody').innerHTML = html;
+        document.getElementById('priceCalcTableWrap').classList.remove('hidden');
+        document.getElementById('priceCalcEmpty').classList.add('hidden');
+    }
+
+    function onDplInputChange(idx, value) {
+        var newDpl = parseFloat(value) || 0;
+        priceCalcItems[idx].new_dpl = newDpl;
+
+        // Update the row inline
+        var row = document.getElementById('priceCalcBody').children[idx];
+        if (!row) return;
+
+        var item = priceCalcItems[idx];
+        var changed = Math.abs(newDpl - item.dpl) > 0.01;
+        var pctChange = item.dpl > 0 ? ((newDpl - item.dpl) / item.dpl * 100).toFixed(1) : (newDpl > 0 ? 'New' : '0.0');
+        var calcPurchase = newDpl;
+        var calcSales = Math.ceil(newDpl * 1.298);
+
+        row.style.background = changed ? '#f0fdf4' : '';
+        // Update checkbox
+        var cb = row.querySelector('.price-cb');
+        if (cb && changed) cb.checked = true;
+        // Update % change cell (index 5)
+        var cells = row.children;
+        cells[5].innerHTML = '<span class="text-xs ' + (changed ? 'text-green-700 font-bold' : 'text-gray-400') + '">' + (pctChange === 'New' ? 'New' : (parseFloat(pctChange) > 0 ? '+' : '') + pctChange + '%') + '</span>';
+        cells[6].innerHTML = '<span class="text-xs font-medium">' + formatINR(calcPurchase) + '</span>';
+        cells[7].innerHTML = '<span class="text-xs font-semibold text-green-700">' + formatINR(calcSales) + '</span>';
+    }
+
+    function togglePriceSelectAll() {
+        var checked = document.getElementById('priceSelectAll').checked;
+        document.querySelectorAll('.price-cb').forEach(function(cb) { cb.checked = checked; });
+    }
+
+    function previewPriceChanges() {
+        var changes = [];
+        document.querySelectorAll('.price-cb:checked').forEach(function(cb) {
+            var idx = parseInt(cb.getAttribute('data-idx'));
+            var item = priceCalcItems[idx];
+            if (item && Math.abs(item.new_dpl - item.dpl) > 0.01) {
+                changes.push(item);
+            }
+        });
+
+        if (changes.length === 0) {
+            showToast('No price changes to preview', 'info');
+            return;
+        }
+
+        var totalPct = 0;
+        var minPct = Infinity;
+        var maxPct = -Infinity;
+        changes.forEach(function(item) {
+            var pct = item.dpl > 0 ? ((item.new_dpl - item.dpl) / item.dpl * 100) : 0;
+            totalPct += pct;
+            if (pct < minPct) minPct = pct;
+            if (pct > maxPct) maxPct = pct;
+        });
+        var avgPct = (totalPct / changes.length).toFixed(1);
+        if (minPct === Infinity) minPct = 0;
+        if (maxPct === -Infinity) maxPct = 0;
+
+        var html = '';
+        html += '<div class="bg-indigo-50 rounded-lg p-4 text-center">';
+        html += '<div class="text-3xl font-bold" style="color: #667eea;">' + changes.length + '</div>';
+        html += '<div class="text-xs text-gray-500 font-medium">Items to Update</div>';
+        html += '</div>';
+        html += '<div class="grid grid-cols-3 gap-3">';
+        html += '<div class="bg-gray-50 rounded-lg p-3 text-center"><div class="text-sm font-bold text-gray-800">' + (avgPct > 0 ? '+' : '') + avgPct + '%</div><div class="text-[10px] text-gray-500">Avg Change</div></div>';
+        html += '<div class="bg-gray-50 rounded-lg p-3 text-center"><div class="text-sm font-bold text-gray-800">' + (minPct > 0 ? '+' : '') + minPct.toFixed(1) + '%</div><div class="text-[10px] text-gray-500">Min Change</div></div>';
+        html += '<div class="bg-gray-50 rounded-lg p-3 text-center"><div class="text-sm font-bold text-gray-800">' + (maxPct > 0 ? '+' : '') + maxPct.toFixed(1) + '%</div><div class="text-[10px] text-gray-500">Max Change</div></div>';
+        html += '</div>';
+
+        document.getElementById('pricePreviewContent').innerHTML = html;
+        document.getElementById('pricePreviewModal').classList.remove('hidden');
+    }
+
+    function closePricePreview() {
+        document.getElementById('pricePreviewModal').classList.add('hidden');
+    }
+
+    async function applyPriceChanges() {
+        var items = [];
+        document.querySelectorAll('.price-cb:checked').forEach(function(cb) {
+            var idx = parseInt(cb.getAttribute('data-idx'));
+            var item = priceCalcItems[idx];
+            if (item && Math.abs(item.new_dpl - item.dpl) > 0.01) {
+                items.push({ zoho_item_id: item.zoho_item_id, new_dpl: item.new_dpl });
+            }
+        });
+
+        if (items.length === 0) {
+            showToast('No changed items selected to apply', 'info');
+            return;
+        }
+
+        var btn = document.getElementById('btnApplyPrices');
+        btn.disabled = true;
+        btn.textContent = 'Applying...';
+
+        try {
+            var body = { items: items };
+            if (priceCalcDplVersionId) body.dpl_version_id = priceCalcDplVersionId;
+
+            var resp = await fetch('/api/item-master/dpl-apply', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(body)
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Apply failed');
+
+            showToast('Updated DPL for ' + items.length + ' items', 'success');
+
+            // Reload table
+            var brand = document.getElementById('priceCalcBrand').value;
+            if (brand) {
+                await loadPriceCalcItems(brand);
+            } else {
+                // Reload from current data
+                items.forEach(function(upd) {
+                    var found = priceCalcItems.find(function(p) { return p.zoho_item_id === upd.zoho_item_id; });
+                    if (found) { found.dpl = upd.new_dpl; found.new_dpl = upd.new_dpl; }
+                });
+                renderPriceTable();
+            }
+            loadSummary();
+        } catch (err) {
+            showToast('Apply error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Apply &amp; Sync to Zoho';
         }
     }
 
