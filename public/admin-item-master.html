@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Item Master - Quality Colours Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>requireAdminOrRedirect();</script>
+    <style>
+        body { background: #f9fafb; }
+        .tab-btn { padding: 10px 16px; font-size: 0.8rem; cursor: pointer; border-bottom: 3px solid transparent; color: #64748b; font-weight: 500; white-space: nowrap; transition: all 0.15s; }
+        .tab-btn:hover { color: #667eea; }
+        .tab-btn.active { border-bottom: 3px solid #667eea; color: #667eea; font-weight: 700; }
+        .toast { position: fixed; bottom: 20px; right: 20px; z-index: 9999; padding: 10px 20px; border-radius: 8px; font-size: 0.8rem; font-weight: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        .toast.show { opacity: 1; pointer-events: auto; }
+        .toast-success { background: #10b981; color: white; }
+        .toast-error { background: #ef4444; color: white; }
+        .toast-info { background: #667eea; color: white; }
+        .item-table { font-size: 0.75rem; }
+        .item-table th { position: sticky; top: 0; z-index: 5; background: #f8fafc; }
+        .item-table td, .item-table th { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; }
+        .item-table tr:hover { background: #f0f4ff; cursor: pointer; }
+        .item-table tr.row-missing-dpl { background: #fffbeb; }
+        .item-table tr.row-missing-dpl:hover { background: #fef3c7; }
+        .item-table tr.row-no-sku { background: #fef2f2; }
+        .item-table tr.row-no-sku:hover { background: #fee2e2; }
+        .item-table tr.row-bad-name { background: #fef2f2; }
+        .item-table tr.row-bad-name:hover { background: #fee2e2; }
+        .slide-panel { position: fixed; top: 0; right: -420px; width: 400px; height: 100vh; background: white; box-shadow: -4px 0 20px rgba(0,0,0,0.15); z-index: 60; transition: right 0.25s ease; overflow-y: auto; }
+        .slide-panel.open { right: 0; }
+        .panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 55; display: none; }
+        .panel-overlay.open { display: block; }
+        .bulk-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; background: white; border-top: 2px solid #667eea; box-shadow: 0 -4px 12px rgba(0,0,0,0.1); padding: 12px 24px; display: none; }
+        .bulk-bar.show { display: flex; }
+        .summary-card { transition: all 0.2s; cursor: pointer; }
+        .summary-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body data-page="item-master" class="bg-gray-50">
+    <div id="toast" class="toast"></div>
+
+    <div class="container mx-auto p-4 md:p-6 max-w-7xl">
+        <!-- Page Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+            <div>
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800">Item Master</h2>
+                <p class="text-xs text-gray-500 mt-1">Manage Zoho Books items: names, DPL, pricing, and health</p>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="bg-white rounded-t-xl shadow-sm border-b border-gray-200 flex overflow-x-auto mb-0">
+            <button class="tab-btn active" data-tab="items" onclick="switchTab('items')">Items List</button>
+            <button class="tab-btn" data-tab="dpl" onclick="switchTab('dpl')">DPL Import</button>
+            <button class="tab-btn" data-tab="price-calc" onclick="switchTab('price-calc')">Price Calculator</button>
+            <button class="tab-btn" data-tab="history" onclick="switchTab('history')">Price History</button>
+            <button class="tab-btn" data-tab="health" onclick="switchTab('health')">Health Check</button>
+        </div>
+
+        <!-- Tab Content -->
+        <!-- Tab 1: Items List -->
+        <div id="tab-items" class="tab-content">
+            <!-- Filter Bar -->
+            <div class="bg-white rounded-b-xl shadow-sm p-4 mb-4">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <select id="filterBrand" onchange="applyFilter('brand', this.value)" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none min-w-[120px]">
+                        <option value="">All Brands</option>
+                    </select>
+                    <select id="filterCategory" onchange="applyFilter('category', this.value)" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none min-w-[120px]">
+                        <option value="">All Categories</option>
+                    </select>
+                    <select id="filterStatus" onchange="applyFilter('status', this.value)" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none min-w-[110px]">
+                        <option value="all">All Status</option>
+                        <option value="complete">Complete</option>
+                        <option value="missing_dpl">Missing DPL</option>
+                        <option value="no_sku">No SKU</option>
+                        <option value="bad_name">Bad Name</option>
+                    </select>
+                    <div class="flex-1 min-w-[180px]">
+                        <input type="text" id="filterSearch" placeholder="Search item name, SKU..." oninput="debounceSearch()" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <button onclick="generateNamesSelected()" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">Auto-Generate Names</button>
+                    <button onclick="openBulkEditModal()" class="px-3 py-1.5 border border-gray-300 text-xs font-semibold rounded-lg text-gray-700 hover:bg-gray-50">Bulk Edit</button>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+                <div class="summary-card bg-white rounded-lg shadow-sm p-3 text-center border-l-4" style="border-left-color: #667eea;" onclick="applyFilter('status','all')">
+                    <div class="text-2xl font-bold" style="color: #667eea;" id="statTotal">-</div>
+                    <div class="text-[10px] text-gray-500 font-medium">Total Items</div>
+                </div>
+                <div class="summary-card rounded-lg shadow-sm p-3 text-center border-l-4 border-green-400" style="background: #f0fdf4;" onclick="applyFilter('status','complete')">
+                    <div class="text-2xl font-bold text-green-700" id="statDplSet">-</div>
+                    <div class="text-[10px] text-gray-500 font-medium">DPL Set</div>
+                </div>
+                <div class="summary-card rounded-lg shadow-sm p-3 text-center border-l-4 border-yellow-400" style="background: #fef3c7;" onclick="applyFilter('status','missing_dpl')">
+                    <div class="text-2xl font-bold text-yellow-700" id="statMissingDpl">-</div>
+                    <div class="text-[10px] text-gray-500 font-medium">Missing DPL</div>
+                </div>
+                <div class="summary-card rounded-lg shadow-sm p-3 text-center border-l-4 border-red-400" style="background: #fef2f2;" onclick="applyFilter('status','no_sku')">
+                    <div class="text-2xl font-bold text-red-600" id="statNoSku">-</div>
+                    <div class="text-[10px] text-gray-500 font-medium">No SKU</div>
+                </div>
+                <div class="summary-card rounded-lg shadow-sm p-3 text-center border-l-4 border-blue-400" style="background: #eff6ff;" onclick="applyFilter('status','all')">
+                    <div class="text-2xl font-bold text-blue-700" id="statBrands">-</div>
+                    <div class="text-[10px] text-gray-500 font-medium">Brands</div>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div id="itemsLoading" class="text-center py-12">
+                    <svg class="inline w-8 h-8 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="text-xs text-gray-400 mt-2">Loading items...</p>
+                </div>
+                <div id="itemsTableWrap" class="hidden overflow-x-auto">
+                    <table class="w-full item-table">
+                        <thead>
+                            <tr class="text-left text-[10px] uppercase text-gray-500 font-semibold">
+                                <th class="w-8 text-center"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded"></th>
+                                <th class="min-w-[200px]">Item Name</th>
+                                <th class="min-w-[90px]">SKU</th>
+                                <th>Brand</th>
+                                <th>Category</th>
+                                <th>Base</th>
+                                <th>Size</th>
+                                <th class="text-right">DPL</th>
+                                <th class="text-right">Purchase</th>
+                                <th class="text-right">Sales</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody"></tbody>
+                    </table>
+                </div>
+                <div id="itemsEmpty" class="hidden text-center py-12">
+                    <p class="text-sm text-gray-400">No items found matching your filters</p>
+                </div>
+                <!-- Pagination -->
+                <div id="paginationBar" class="hidden flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                    <span id="paginationInfo" class="text-xs text-gray-500"></span>
+                    <div id="paginationButtons" class="flex gap-1"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: DPL Import -->
+        <div id="tab-dpl" class="tab-content hidden">
+            <div class="flex items-center justify-center min-h-[400px] text-gray-400">
+                <p class="text-lg">DPL Import &mdash; Coming Soon</p>
+            </div>
+        </div>
+
+        <!-- Tab 3: Price Calculator -->
+        <div id="tab-price-calc" class="tab-content hidden">
+            <div class="flex items-center justify-center min-h-[400px] text-gray-400">
+                <p class="text-lg">Price Calculator &mdash; Coming Soon</p>
+            </div>
+        </div>
+
+        <!-- Tab 4: Price History -->
+        <div id="tab-history" class="tab-content hidden">
+            <div class="flex items-center justify-center min-h-[400px] text-gray-400">
+                <p class="text-lg">Price History &mdash; Coming Soon</p>
+            </div>
+        </div>
+
+        <!-- Tab 5: Health Check -->
+        <div id="tab-health" class="tab-content hidden">
+            <div class="flex items-center justify-center min-h-[400px] text-gray-400">
+                <p class="text-lg">Health Check &mdash; Coming Soon</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide-out Edit Panel -->
+    <div id="panelOverlay" class="panel-overlay" onclick="closeEditPanel()"></div>
+    <div id="editPanel" class="slide-panel">
+        <div class="p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-gray-800">Edit Item</h3>
+                <button onclick="closeEditPanel()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <form id="editForm" onsubmit="event.preventDefault(); saveEditPanel();">
+                <input type="hidden" id="editZohoItemId">
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Item Name</label>
+                        <textarea id="editItemName" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none resize-none"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Description</label>
+                        <textarea id="editDescription" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none resize-none"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">SKU</label>
+                            <input type="text" id="editSku" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Base</label>
+                            <input type="text" id="editBase" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Brand</label>
+                            <select id="editBrand" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                                <option value="">-- Select --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Category</label>
+                            <select id="editCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                                <option value="">-- Select --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">DPL (Dealer Price List)</label>
+                        <input type="number" id="editDpl" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none" oninput="updatePriceCalc()">
+                    </div>
+                    <!-- Live price calculation -->
+                    <div id="priceCalcBox" class="hidden bg-indigo-50 rounded-lg p-3">
+                        <div class="text-[10px] font-semibold text-indigo-600 uppercase mb-2">Calculated Prices</div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-600">Purchase Price:</span>
+                            <span class="font-bold text-gray-800" id="calcPurchase">-</span>
+                        </div>
+                        <div class="flex justify-between text-xs mt-1">
+                            <span class="text-gray-600">Sales Price (DPL x 1.298):</span>
+                            <span class="font-bold text-green-700" id="calcSales">-</span>
+                        </div>
+                    </div>
+                    <button type="submit" id="editSaveBtn" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Edit Modal -->
+    <div id="bulkEditModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/30" onclick="closeBulkEditModal()"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-full max-w-md p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-gray-800">Bulk Edit Items</h3>
+                <button onclick="closeBulkEditModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <p class="text-xs text-gray-500 mb-3"><span id="bulkEditCount">0</span> items selected. Set values below (leave blank to skip).</p>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Brand</label>
+                    <select id="bulkBrand" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                        <option value="">-- No change --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Category</label>
+                    <select id="bulkCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:border-indigo-500 focus:outline-none">
+                        <option value="">-- No change --</option>
+                    </select>
+                </div>
+                <button onclick="applyBulkEdit()" class="w-full py-2 text-white text-sm font-semibold rounded-lg transition" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    Apply to Selected
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Name Preview Modal -->
+    <div id="namePreviewModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/30" onclick="closeNamePreview()"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-full max-w-2xl p-5 max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-gray-800">Generated Name Preview</h3>
+                <button onclick="closeNamePreview()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <div class="flex-1 overflow-y-auto min-h-0">
+                <table class="w-full text-xs">
+                    <thead class="sticky top-0 bg-gray-50">
+                        <tr>
+                            <th class="text-left p-2">Current Name</th>
+                            <th class="text-left p-2">Generated Name</th>
+                        </tr>
+                    </thead>
+                    <tbody id="namePreviewBody"></tbody>
+                </table>
+            </div>
+            <div class="flex justify-end gap-2 mt-4 pt-3 border-t">
+                <button onclick="closeNamePreview()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+                <button onclick="confirmGeneratedNames()" id="confirmNamesBtn" class="px-4 py-2 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    Apply Names
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Bar -->
+    <div id="bulkBar" class="bulk-bar items-center justify-between">
+        <div class="flex items-center gap-3">
+            <span class="text-sm font-semibold text-gray-800"><span id="bulkCount">0</span> items selected</span>
+            <button onclick="document.getElementById('selectAll').checked=false; toggleSelectAll(); updateBulkBar();" class="text-xs text-gray-500 hover:text-gray-700 underline">Deselect all</button>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="generateNamesSelected()" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg" style="background: linear-gradient(135deg, #667eea, #764ba2);">Auto-Generate Names</button>
+            <button onclick="openBulkEditModal()" class="px-3 py-1.5 border border-gray-300 text-xs font-semibold rounded-lg text-gray-700 hover:bg-gray-50">Bulk Edit</button>
+        </div>
+    </div>
+
+    <script>
+    // ============ STATE ============
+    var currentFilters = { brand: '', category: '', status: 'all', search: '', page: 1 };
+    var allItems = [];
+    var summaryData = {};
+    var filterOptions = { brands: [], categories: [] };
+    var generatedNames = []; // for name preview modal
+    var searchTimer = null;
+    var ITEMS_PER_PAGE = 50;
+
+    // ============ HELPERS ============
+    function getAuthHeaders() {
+        return { 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || ''), 'Content-Type': 'application/json' };
+    }
+
+    function showToast(msg, type) {
+        var t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast toast-' + (type || 'info');
+        t.classList.add('show');
+        setTimeout(function() { t.classList.remove('show'); }, 3500);
+    }
+
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatINR(a) {
+        var v = parseFloat(a || 0);
+        if (v === 0) return '-';
+        return '\u20B9' + v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function debounceSearch() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function() {
+            applyFilter('search', document.getElementById('filterSearch').value);
+        }, 300);
+    }
+
+    // ============ TABS ============
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.add('hidden'); });
+        document.querySelectorAll('.tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
+        var tabEl = document.getElementById('tab-' + tabName);
+        if (tabEl) tabEl.classList.remove('hidden');
+        var tabBtn = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+        if (tabBtn) tabBtn.classList.add('active');
+    }
+
+    // ============ FILTERS ============
+    function applyFilter(key, value) {
+        currentFilters[key] = value;
+        currentFilters.page = 1;
+        // Sync dropdown UI if status changed via card click
+        if (key === 'status') {
+            document.getElementById('filterStatus').value = value;
+        }
+        loadItems();
+    }
+
+    // ============ API CALLS ============
+    async function loadSummary() {
+        try {
+            var resp = await fetch('/api/item-master/summary', { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Failed to load summary');
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Error');
+            summaryData = data.data;
+            document.getElementById('statTotal').textContent = (summaryData.total || 0).toLocaleString();
+            document.getElementById('statDplSet').textContent = (summaryData.dplSet || 0).toLocaleString();
+            document.getElementById('statMissingDpl').textContent = (summaryData.missingDpl || 0).toLocaleString();
+            document.getElementById('statNoSku').textContent = (summaryData.noSku || 0).toLocaleString();
+            document.getElementById('statBrands').textContent = (summaryData.brands || 0).toLocaleString();
+        } catch (err) {
+            console.error('loadSummary error:', err);
+        }
+    }
+
+    async function loadFilterOptions() {
+        try {
+            var resp = await fetch('/api/item-master/items?page=1&limit=1', { headers: getAuthHeaders() });
+            if (!resp.ok) return;
+            var data = await resp.json();
+            if (data.success && data.data && data.data.filterOptions) {
+                filterOptions = data.data.filterOptions;
+                populateDropdowns();
+            }
+        } catch (err) {
+            console.error('loadFilterOptions error:', err);
+        }
+    }
+
+    function populateDropdowns() {
+        var brandSelect = document.getElementById('filterBrand');
+        var categorySelect = document.getElementById('filterCategory');
+        var editBrand = document.getElementById('editBrand');
+        var editCategory = document.getElementById('editCategory');
+        var bulkBrand = document.getElementById('bulkBrand');
+        var bulkCategory = document.getElementById('bulkCategory');
+
+        // Brand
+        var brandHtml = '<option value="">All Brands</option>';
+        var editBrandHtml = '<option value="">-- Select --</option>';
+        var bulkBrandHtml = '<option value="">-- No change --</option>';
+        (filterOptions.brands || []).forEach(function(b) {
+            brandHtml += '<option value="' + esc(b) + '">' + esc(b) + '</option>';
+            editBrandHtml += '<option value="' + esc(b) + '">' + esc(b) + '</option>';
+            bulkBrandHtml += '<option value="' + esc(b) + '">' + esc(b) + '</option>';
+        });
+        brandSelect.innerHTML = brandHtml;
+        editBrand.innerHTML = editBrandHtml;
+        bulkBrand.innerHTML = bulkBrandHtml;
+
+        // Category
+        var catHtml = '<option value="">All Categories</option>';
+        var editCatHtml = '<option value="">-- Select --</option>';
+        var bulkCatHtml = '<option value="">-- No change --</option>';
+        (filterOptions.categories || []).forEach(function(c) {
+            catHtml += '<option value="' + esc(c) + '">' + esc(c) + '</option>';
+            editCatHtml += '<option value="' + esc(c) + '">' + esc(c) + '</option>';
+            bulkCatHtml += '<option value="' + esc(c) + '">' + esc(c) + '</option>';
+        });
+        categorySelect.innerHTML = catHtml;
+        editCategory.innerHTML = editCatHtml;
+        bulkCategory.innerHTML = bulkCatHtml;
+    }
+
+    async function loadItems() {
+        var loading = document.getElementById('itemsLoading');
+        var tableWrap = document.getElementById('itemsTableWrap');
+        var empty = document.getElementById('itemsEmpty');
+        var pagination = document.getElementById('paginationBar');
+
+        loading.classList.remove('hidden');
+        tableWrap.classList.add('hidden');
+        empty.classList.add('hidden');
+        pagination.classList.add('hidden');
+
+        try {
+            var params = new URLSearchParams({
+                page: currentFilters.page,
+                limit: ITEMS_PER_PAGE,
+                brand: currentFilters.brand,
+                category: currentFilters.category,
+                status: currentFilters.status,
+                search: currentFilters.search
+            });
+            var resp = await fetch('/api/item-master/items?' + params.toString(), { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error('Failed to load items');
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Error');
+
+            allItems = data.data.items || [];
+
+            // Update filter options if provided
+            if (data.data.filterOptions && (!filterOptions.brands || filterOptions.brands.length === 0)) {
+                filterOptions = data.data.filterOptions;
+                populateDropdowns();
+            }
+
+            loading.classList.add('hidden');
+
+            if (allItems.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            renderTable();
+            tableWrap.classList.remove('hidden');
+            renderPagination(data.data.pagination || { page: 1, totalPages: 1, total: allItems.length });
+        } catch (err) {
+            loading.classList.add('hidden');
+            empty.classList.remove('hidden');
+            showToast('Error loading items: ' + err.message, 'error');
+        }
+    }
+
+    function renderTable() {
+        var html = '';
+        allItems.forEach(function(item) {
+            var statusInfo = getItemStatus(item);
+            var rowClass = statusInfo.rowClass;
+            html += '<tr class="' + rowClass + '" onclick="openEditPanel(this)" data-item=\'' + esc(JSON.stringify(item)).replace(/'/g, '&#39;') + '\'>';
+            html += '<td class="text-center" onclick="event.stopPropagation()"><input type="checkbox" class="item-cb rounded" value="' + esc(item.zoho_item_id) + '" onchange="updateBulkBar()"></td>';
+            html += '<td class="font-medium" style="max-width:220px"><div class="truncate" title="' + esc(item.item_name) + '">' + esc(item.item_name) + '</div></td>';
+            html += '<td><span class="font-mono text-blue-600 text-[10px]">' + esc(item.sku || '-') + '</span></td>';
+            html += '<td>' + renderBrandBadge(item.brand) + '</td>';
+            html += '<td class="text-gray-600">' + esc(item.category || '-') + '</td>';
+            html += '<td class="text-gray-500">' + esc(item.base || '-') + '</td>';
+            html += '<td class="text-gray-500">' + esc(item.size || '-') + '</td>';
+            html += '<td class="text-right font-semibold">' + formatINR(item.dpl) + '</td>';
+            html += '<td class="text-right text-gray-500">' + formatINR(item.purchase_rate) + '</td>';
+            html += '<td class="text-right text-gray-500">' + formatINR(item.sales_rate) + '</td>';
+            html += '<td class="text-center">' + statusInfo.badge + '</td>';
+            html += '</tr>';
+        });
+        document.getElementById('itemsBody').innerHTML = html;
+        document.getElementById('selectAll').checked = false;
+    }
+
+    function getItemStatus(item) {
+        if (!item.sku) return { rowClass: 'row-no-sku', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">No SKU</span>' };
+        if (item.bad_name) return { rowClass: 'row-bad-name', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Bad Name</span>' };
+        if (!item.dpl || parseFloat(item.dpl) === 0) return { rowClass: 'row-missing-dpl', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700">No DPL</span>' };
+        return { rowClass: '', badge: '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Complete</span>' };
+    }
+
+    function renderBrandBadge(brand) {
+        if (!brand) return '<span class="text-gray-300">-</span>';
+        var colors = ['bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-teal-100 text-teal-700', 'bg-pink-100 text-pink-700', 'bg-orange-100 text-orange-700', 'bg-cyan-100 text-cyan-700'];
+        var hash = 0;
+        for (var i = 0; i < brand.length; i++) hash = brand.charCodeAt(i) + ((hash << 5) - hash);
+        var colorClass = colors[Math.abs(hash) % colors.length];
+        return '<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold ' + colorClass + '">' + esc(brand) + '</span>';
+    }
+
+    function renderPagination(pag) {
+        var bar = document.getElementById('paginationBar');
+        var info = document.getElementById('paginationInfo');
+        var btns = document.getElementById('paginationButtons');
+
+        var total = pag.total || 0;
+        var page = pag.page || 1;
+        var totalPages = pag.totalPages || 1;
+        var start = (page - 1) * ITEMS_PER_PAGE + 1;
+        var end = Math.min(page * ITEMS_PER_PAGE, total);
+
+        info.textContent = 'Showing ' + start + '-' + end + ' of ' + total.toLocaleString() + ' items';
+
+        var html = '';
+        if (page > 1) {
+            html += '<button onclick="goToPage(' + (page - 1) + ')" class="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">&laquo; Prev</button>';
+        }
+        // Show up to 5 page buttons
+        var startPage = Math.max(1, page - 2);
+        var endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+        for (var i = startPage; i <= endPage; i++) {
+            var activeClass = i === page ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 hover:bg-gray-50';
+            html += '<button onclick="goToPage(' + i + ')" class="px-2.5 py-1 border rounded text-xs font-medium ' + activeClass + '">' + i + '</button>';
+        }
+        if (page < totalPages) {
+            html += '<button onclick="goToPage(' + (page + 1) + ')" class="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50">Next &raquo;</button>';
+        }
+        btns.innerHTML = html;
+        bar.classList.remove('hidden');
+    }
+
+    function goToPage(p) {
+        currentFilters.page = p;
+        loadItems();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ============ SELECT ALL / BULK ============
+    function toggleSelectAll() {
+        var checked = document.getElementById('selectAll').checked;
+        document.querySelectorAll('.item-cb').forEach(function(cb) { cb.checked = checked; });
+        updateBulkBar();
+    }
+
+    function getSelectedIds() {
+        var ids = [];
+        document.querySelectorAll('.item-cb:checked').forEach(function(cb) { ids.push(cb.value); });
+        return ids;
+    }
+
+    function updateBulkBar() {
+        var ids = getSelectedIds();
+        var bar = document.getElementById('bulkBar');
+        document.getElementById('bulkCount').textContent = ids.length;
+        if (ids.length > 0) {
+            bar.classList.add('show');
+        } else {
+            bar.classList.remove('show');
+        }
+    }
+
+    // ============ EDIT PANEL ============
+    function openEditPanel(rowEl) {
+        var item;
+        try { item = JSON.parse(rowEl.getAttribute('data-item')); } catch (e) { return; }
+
+        document.getElementById('editZohoItemId').value = item.zoho_item_id;
+        document.getElementById('editItemName').value = item.item_name || '';
+        document.getElementById('editDescription').value = item.description || '';
+        document.getElementById('editSku').value = item.sku || '';
+        document.getElementById('editBase').value = item.base || '';
+        document.getElementById('editBrand').value = item.brand || '';
+        document.getElementById('editCategory').value = item.category || '';
+        document.getElementById('editDpl').value = item.dpl || '';
+
+        updatePriceCalc();
+
+        document.getElementById('editPanel').classList.add('open');
+        document.getElementById('panelOverlay').classList.add('open');
+    }
+
+    function closeEditPanel() {
+        document.getElementById('editPanel').classList.remove('open');
+        document.getElementById('panelOverlay').classList.remove('open');
+    }
+
+    function updatePriceCalc() {
+        var dpl = parseFloat(document.getElementById('editDpl').value);
+        var box = document.getElementById('priceCalcBox');
+        if (dpl > 0) {
+            box.classList.remove('hidden');
+            document.getElementById('calcPurchase').textContent = formatINR(dpl);
+            document.getElementById('calcSales').textContent = formatINR(Math.ceil(dpl * 1.298));
+        } else {
+            box.classList.add('hidden');
+        }
+    }
+
+    async function saveEditPanel() {
+        var zohoItemId = document.getElementById('editZohoItemId').value;
+        if (!zohoItemId) return;
+
+        var changes = {
+            zoho_item_id: zohoItemId,
+            item_name: document.getElementById('editItemName').value.trim(),
+            description: document.getElementById('editDescription').value.trim(),
+            sku: document.getElementById('editSku').value.trim(),
+            base: document.getElementById('editBase').value.trim(),
+            brand: document.getElementById('editBrand').value,
+            category: document.getElementById('editCategory').value,
+            cf_dpl: parseFloat(document.getElementById('editDpl').value) || 0
+        };
+
+        var btn = document.getElementById('editSaveBtn');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        try {
+            var resp = await fetch('/api/item-master/items/bulk-edit', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ items: [changes] })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Save failed');
+
+            showToast('Item updated successfully', 'success');
+            closeEditPanel();
+            loadItems();
+            loadSummary();
+        } catch (err) {
+            showToast('Save error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Save Changes';
+        }
+    }
+
+    // ============ BULK EDIT MODAL ============
+    function openBulkEditModal() {
+        var ids = getSelectedIds();
+        if (ids.length === 0) { showToast('Select items first', 'error'); return; }
+        document.getElementById('bulkEditCount').textContent = ids.length;
+        document.getElementById('bulkBrand').value = '';
+        document.getElementById('bulkCategory').value = '';
+        document.getElementById('bulkEditModal').classList.remove('hidden');
+    }
+
+    function closeBulkEditModal() {
+        document.getElementById('bulkEditModal').classList.add('hidden');
+    }
+
+    async function applyBulkEdit() {
+        var ids = getSelectedIds();
+        if (ids.length === 0) return;
+
+        var brand = document.getElementById('bulkBrand').value;
+        var category = document.getElementById('bulkCategory').value;
+
+        if (!brand && !category) { showToast('Select at least one field to change', 'error'); return; }
+
+        var items = ids.map(function(id) {
+            var changes = { zoho_item_id: id };
+            if (brand) changes.brand = brand;
+            if (category) changes.category = category;
+            return changes;
+        });
+
+        try {
+            var resp = await fetch('/api/item-master/items/bulk-edit', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ items: items })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Bulk edit failed');
+
+            showToast('Updated ' + ids.length + ' items', 'success');
+            closeBulkEditModal();
+            loadItems();
+            loadSummary();
+        } catch (err) {
+            showToast('Bulk edit error: ' + err.message, 'error');
+        }
+    }
+
+    // ============ AUTO-GENERATE NAMES ============
+    async function generateNamesSelected() {
+        var ids = getSelectedIds();
+        if (ids.length === 0) { showToast('Select items to generate names for', 'error'); return; }
+
+        showToast('Generating names for ' + ids.length + ' items...', 'info');
+
+        try {
+            var resp = await fetch('/api/item-master/generate-names', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ zoho_item_ids: ids })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Generate failed');
+
+            generatedNames = data.data.results || [];
+            showNamePreview();
+        } catch (err) {
+            showToast('Generate error: ' + err.message, 'error');
+        }
+    }
+
+    function showNamePreview() {
+        var body = document.getElementById('namePreviewBody');
+        var html = '';
+        generatedNames.forEach(function(r) {
+            var changed = r.current_name !== r.generated_name;
+            html += '<tr class="' + (changed ? 'bg-green-50' : '') + '">';
+            html += '<td class="p-2 text-gray-600" style="max-width:220px"><div class="truncate">' + esc(r.current_name) + '</div></td>';
+            html += '<td class="p-2 font-medium ' + (changed ? 'text-green-700' : 'text-gray-400') + '" style="max-width:220px"><div class="truncate">' + esc(r.generated_name) + '</div></td>';
+            html += '</tr>';
+        });
+        if (generatedNames.length === 0) {
+            html = '<tr><td colspan="2" class="text-center py-6 text-gray-400">No names generated</td></tr>';
+        }
+        body.innerHTML = html;
+        document.getElementById('namePreviewModal').classList.remove('hidden');
+    }
+
+    function closeNamePreview() {
+        document.getElementById('namePreviewModal').classList.add('hidden');
+    }
+
+    async function confirmGeneratedNames() {
+        var items = generatedNames.filter(function(r) { return r.current_name !== r.generated_name; }).map(function(r) {
+            return { zoho_item_id: r.zoho_item_id, item_name: r.generated_name };
+        });
+
+        if (items.length === 0) { showToast('No name changes to apply', 'info'); closeNamePreview(); return; }
+
+        var btn = document.getElementById('confirmNamesBtn');
+        btn.disabled = true;
+        btn.textContent = 'Applying...';
+
+        try {
+            var resp = await fetch('/api/item-master/items/bulk-edit', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ items: items })
+            });
+            var data = await resp.json();
+            if (!resp.ok || !data.success) throw new Error(data.message || 'Apply failed');
+
+            showToast('Applied ' + items.length + ' name changes', 'success');
+            closeNamePreview();
+            loadItems();
+        } catch (err) {
+            showToast('Apply error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Apply Names';
+        }
+    }
+
+    // ============ INIT ============
+    (async function init() {
+        // Check URL for tab param
+        var params = new URLSearchParams(window.location.search);
+        var tab = params.get('tab');
+        if (tab) switchTab(tab);
+
+        await Promise.all([loadSummary(), loadItems()]);
+    })();
+    </script>
+</body>
+</html>
