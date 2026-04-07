@@ -69,6 +69,7 @@
         'estimate-actions': CONFIG.SALES_SUBNAV_PATH,
         'estimate-settings': CONFIG.SALES_SUBNAV_PATH,
         // Products & Inventory
+        'item-master': CONFIG.ZOHO_SUBNAV_PATH,
         'products': CONFIG.PRODUCTS_SUBNAV_PATH,
         'categories': CONFIG.PRODUCTS_SUBNAV_PATH,
         'brands': CONFIG.PRODUCTS_SUBNAV_PATH,
