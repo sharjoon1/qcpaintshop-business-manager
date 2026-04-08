@@ -70,6 +70,8 @@
             thead { display: table-header-group; }
             tr { page-break-inside: avoid; }
             .img-thumb { width: 28px !important; height: 28px !important; }
+            #upiSection { display: block !important; }
+            #upiPayLink { display: none !important; }
         }
 
         .company-logo {
@@ -356,6 +358,18 @@
                 </div>
             </div>
 
+            <!-- UPI Payment Section -->
+            <div id="upiSection" style="display:none; padding: 16px 32px; border-top: 1px solid var(--border); text-align: center;">
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-mid); margin-bottom: 8px;">Pay via UPI</div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <img id="upiQrImage" src="" alt="UPI QR Code" style="width: 160px; height: 160px; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+                    <a id="upiPayLink" href="#" class="no-print" style="display: inline-flex; align-items: center; gap: 4px; background: var(--primary); color: white; font-size: 12px; font-weight: 600; padding: 8px 16px; border-radius: 8px; text-decoration: none;">
+                        Pay &#x20B9;<span id="upiAmount"></span>
+                    </a>
+                    <div style="font-size: 11px; color: var(--text-light);">UPI ID: 7418831122@superyes</div>
+                </div>
+            </div>
+
             <!-- Notes -->
             <div id="notesSection" class="hidden section-pad" style="padding: 12px 32px; border-top: 1px solid var(--border);">
                 <div class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Notes</div>
@@ -530,8 +544,9 @@
 
                 renderTable();
 
-                // Load branding
+                // Load branding + UPI QR
                 loadBranding(token);
+                loadUpiQr(estimateId);
 
                 // Show content
                 document.getElementById('loadingState').classList.add('hidden');
@@ -574,6 +589,24 @@
                     document.getElementById('companyDetails').innerHTML = details.join('<br>');
                 }
             } catch {}
+        }
+
+        // Load UPI QR Code
+        async function loadUpiQr(estId) {
+            try {
+                const resp = await fetch(`/api/estimates/${estId}/upi-qr`, {
+                    headers: { 'Authorization': 'Bearer ' + getToken() }
+                });
+                const data = await resp.json();
+                if (data.success && data.data) {
+                    document.getElementById('upiQrImage').src = data.data.qr_image;
+                    document.getElementById('upiPayLink').href = data.data.upi_url;
+                    document.getElementById('upiAmount').textContent = parseFloat(data.data.amount).toLocaleString('en-IN');
+                    document.getElementById('upiSection').style.display = 'block';
+                }
+            } catch (err) {
+                console.error('UPI QR load error:', err);
+            }
         }
 
         // ========================================
