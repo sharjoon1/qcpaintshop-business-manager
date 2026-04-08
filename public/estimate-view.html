@@ -208,6 +208,7 @@
         let cv = { qty: true, area: false, mix: true, price: true, markup: false, discount: false, final: false, breakdown: false, color: false, total: true };
         let showSummarySection = true;
         let estimateData = null;
+        let existingPO = null;
 
         if (!estimateId) { alert('No estimate ID provided'); window.location.href = 'estimates.html'; }
 
@@ -269,6 +270,7 @@
                 renderItems();
                 updateButtonStates();
                 updatePaymentBadge();
+                checkExistingPO();
 
                 document.getElementById('loadingState').classList.add('hidden');
                 document.getElementById('mainContent').classList.remove('hidden');
@@ -637,7 +639,73 @@
             return null;
         }
 
+        async function checkExistingPO() {
+            try {
+                var token = localStorage.getItem('auth_token');
+                var resp = await fetch('/api/estimates/' + estimateId + '/purchase-orders', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                var data = await resp.json();
+                if (data.success && data.data && data.data.length > 0) {
+                    existingPO = data.data[0];
+                    var btn = document.getElementById('btnCreatePO');
+                    if (btn) {
+                        btn.textContent = '📦 View PO';
+                        btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-500 text-white hover:bg-blue-600';
+                        btn.onclick = function() { openExistingPO(); };
+                    }
+                }
+            } catch (err) { console.error('Check PO error:', err); }
+        }
+
+        function openExistingPO() {
+            if (!existingPO) return;
+            var po = existingPO;
+            var msg = 'PO #' + po.po_number + '\n' +
+                'Vendor: ' + (po.vendor_name || 'Unknown') + '\n' +
+                'Status: ' + po.status + '\n' +
+                'Total: \u20B9' + parseFloat(po.grand_total).toLocaleString('en-IN') + '\n\n' +
+                'What would you like to do?\n' +
+                '1. Open in Vendor Management\n' +
+                '2. Resend PO via WhatsApp\n' +
+                '3. Create another PO';
+
+            var choice = prompt(msg, '1');
+            if (choice === '1') {
+                window.open('staff-vendors.html?tab=purchase-orders&po=' + po.id, '_blank');
+            } else if (choice === '2') {
+                resendPO(po);
+            } else if (choice === '3') {
+                existingPO = null;
+                var btn = document.getElementById('btnCreatePO');
+                btn.textContent = '📦 PO';
+                btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600';
+                btn.onclick = function() { openPoModal(); };
+                openPoModal();
+            }
+        }
+
+        async function resendPO(po) {
+            var phone = prompt('Send PO to vendor phone:', po.vendor_phone || '');
+            if (!phone || phone.trim().length < 10) return;
+            try {
+                var token = localStorage.getItem('auth_token');
+                var resp = await fetch('/api/estimates/' + estimateId + '/create-po', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ vendor_id: po.vendor_id, send_whatsapp: true, vendor_phone: phone.trim(), notes: 'Resend PO #' + po.po_number, show_prices: true })
+                });
+                var data = await resp.json();
+                if (data.success) alert('PO resent via WhatsApp!');
+                else alert('Failed: ' + (data.message || 'Error'));
+            } catch (err) { alert('Error: ' + err.message); }
+        }
+
         function openPoModal() {
+            if (existingPO) {
+                openExistingPO();
+                return;
+            }
             if (!estimateData) return;
 
             const select = document.getElementById('poVendor');

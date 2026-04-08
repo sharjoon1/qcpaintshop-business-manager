@@ -623,6 +623,25 @@ router.post('/:id/create-po', requireAuth, async (req, res) => {
 });
 
 // ========================================
+// GET PURCHASE ORDERS FOR ESTIMATE
+// ========================================
+router.get('/:id/purchase-orders', requireAuth, async (req, res) => {
+    try {
+        const [pos] = await pool.query(
+            `SELECT po.*, v.vendor_name, v.phone as vendor_phone
+             FROM vendor_purchase_orders po
+             LEFT JOIN vendors v ON po.vendor_id = v.id
+             WHERE po.estimate_id = ? ORDER BY po.created_at DESC`,
+            [req.params.id]
+        );
+        res.json({ success: true, data: pos });
+    } catch (err) {
+        console.error('Get estimate POs error:', err);
+        res.status(500).json({ success: false, message: 'Failed to fetch POs' });
+    }
+});
+
+// ========================================
 // GET SINGLE ESTIMATE
 // ========================================
 router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
