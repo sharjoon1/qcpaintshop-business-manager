@@ -24,7 +24,20 @@
             gap: 1rem;
         }
 
+        @media (min-width: 640px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
         @media (min-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 1.25rem;
+            }
+        }
+
+        @media (min-width: 1024px) {
             .stats-grid {
                 grid-template-columns: repeat(5, 1fr);
                 gap: 1.5rem;
@@ -362,6 +375,10 @@
 
         .badge-outside_work { background: #cffafe; color: #0e7490; }
         .badge-prayer { background: #d1fae5; color: #059669; }
+
+        @media (max-width: 768px) {
+            .hide-mobile { display: none !important; }
+        }
     </style>
 </head>
 <body data-page="attendance-admin">
@@ -422,7 +439,7 @@
             <!-- Tab 1: Live Today -->
             <div class="tab-content active" id="tab-live">
                 <div class="filter-bar">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1">Date</label>
                             <input type="date" id="liveDate" onchange="loadLiveAttendance()">
@@ -445,15 +462,15 @@
                             <thead class="gradient-header">
                                 <tr>
                                     <th>Staff Name</th>
-                                    <th>Branch</th>
+                                    <th class="hide-mobile">Branch</th>
                                     <th>Clock In</th>
-                                    <th>Clock Out</th>
-                                    <th>Break</th>
-                                    <th>Working Hours</th>
-                                    <th>Activity</th>
-                                    <th>Distance</th>
+                                    <th class="hide-mobile">Clock Out</th>
+                                    <th class="hide-mobile">Break</th>
+                                    <th class="hide-mobile">Working Hours</th>
+                                    <th class="hide-mobile">Activity</th>
+                                    <th class="hide-mobile">Distance</th>
                                     <th>Status</th>
-                                    <th>Late</th>
+                                    <th class="hide-mobile">Late</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -515,7 +532,7 @@
             <!-- Tab: OT Requests -->
             <div class="tab-content" id="tab-ot">
                 <div class="filter-bar">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
                             <select id="otStatusFilter" onchange="loadOTRequests()">
@@ -589,7 +606,7 @@
             <!-- Tab 3: Monthly View -->
             <div class="tab-content" id="tab-monthly">
                 <div class="filter-bar">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1">Staff Member</label>
                             <select id="monthlyStaff">
@@ -696,7 +713,7 @@
             <!-- Tab 5: Staff Timeline -->
             <div class="tab-content" id="tab-timeline">
                 <div class="filter-bar">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1">Staff Member</label>
                             <select id="timelineStaff">
@@ -1400,15 +1417,15 @@
 
                     return `<tr>
                         <td class="font-semibold">${escapeHtml(r.full_name)}</td>
-                        <td>${escapeHtml(r.branch_name)}</td>
+                        <td class="hide-mobile">${escapeHtml(r.branch_name)}</td>
                         <td>${clockIn}</td>
-                        <td>${clockOut}</td>
-                        <td>${breakDur}</td>
-                        <td>${workHrs}</td>
-                        <td>${activityHtml}</td>
-                        <td>${distDisplay}</td>
+                        <td class="hide-mobile">${clockOut}</td>
+                        <td class="hide-mobile">${breakDur}</td>
+                        <td class="hide-mobile">${workHrs}</td>
+                        <td class="hide-mobile">${activityHtml}</td>
+                        <td class="hide-mobile">${distDisplay}</td>
                         <td><span class="badge badge-${statusClass}">${statusClass}</span></td>
-                        <td>${r.is_late ? '<span class="badge badge-late">LATE</span>' : '-'}</td>
+                        <td class="hide-mobile">${r.is_late ? '<span class="badge badge-late">LATE</span>' : '-'}</td>
                         <td>
                             ${r.clock_in_time ? `<button class="action-btn-sm btn-primary" onclick="viewPhotos(${r.id})" title="View Photos">Photos</button>` : '-'}
                             ${r.clock_in_time ? ` <button class="action-btn-sm btn-secondary" onclick="openTimelineFor(${r.user_id}, '${date}')" title="View Timeline">Timeline</button>` : ''}

@@ -18,6 +18,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
     <script src="/universal-nav-loader.js"></script>
+    <style>
+        @media (max-width: 768px) {
+            .hide-mobile { display: none !important; }
+        }
+    </style>
 </head>
 <body class="bg-gray-50" data-page="customers">
 <!-- Main Content -->
@@ -56,16 +61,16 @@
         <!-- Customers Table -->
         <div class="card">
             <div class="overflow-x-auto">
-                <table class="table min-w-[1000px]">
+                <table class="table min-w-0">
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th class="hide-mobile">ID</th>
                             <th>Name</th>
                             <th>Phone</th>
-                            <th>Email</th>
-                            <th>City</th>
+                            <th class="hide-mobile">Email</th>
+                            <th class="hide-mobile">City</th>
                             <th>Branch</th>
-                            <th>GST Number</th>
+                            <th class="hide-mobile">GST Number</th>
                             <th>Status</th>
                             <th class="text-center whitespace-nowrap">Actions</th>
                         </tr>
@@ -191,6 +196,7 @@
 
                 // Handle both response formats
                 branches = result.success ? result.data : result;
+                if (!Array.isArray(branches)) branches = [];
 
                 // Populate branch filter
                 const filterSelect = document.getElementById('branchFilter');
@@ -283,15 +289,15 @@
 
             tbody.innerHTML = filtered.map(customer => `
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">${customer.id}</td>
+                    <td class="px-6 py-4 text-sm font-semibold text-gray-900 hide-mobile">${customer.id}</td>
                     <td class="px-6 py-4 text-sm font-semibold text-gray-900">${esc(customer.name)}</td>
                     <td class="px-6 py-4 text-sm text-gray-700">${esc(customer.phone) || '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-700">${esc(customer.email) || '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-700">${esc(customer.city) || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700 hide-mobile">${esc(customer.email) || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700 hide-mobile">${esc(customer.city) || '-'}</td>
                     <td class="px-6 py-4 text-sm">
                         <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">${esc(customer.branch_name)}</span>
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-700">${esc(customer.gst_number) || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700 hide-mobile">${esc(customer.gst_number) || '-'}</td>
                     <td class="px-6 py-4">
                         <span class="badge ${
                             customer.status === 'approved' ? 'badge-success' :

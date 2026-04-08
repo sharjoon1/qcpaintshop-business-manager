@@ -215,7 +215,7 @@
         .timeline-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9998; }
         .timeline-overlay.open { display:block; }
         .timeline-panel {
-            position:fixed; top:0; right:-420px; width:400px; max-width:90vw; height:100vh;
+            position:fixed; top:0; right:calc(-1 * min(400px, 90vw)); width:min(400px, 90vw); height:100vh;
             background:white; z-index:9999; box-shadow:-4px 0 20px rgba(0,0,0,0.15);
             transition: right 0.3s ease; overflow-y:auto;
         }
