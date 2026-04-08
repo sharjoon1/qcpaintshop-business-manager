@@ -575,7 +575,7 @@ router.post('/:id/create-po', requireAuth, async (req, res) => {
                 // Generate PO PDF as simple HTML → Puppeteer
                 const token = req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : '';
                 const baseUrl = `http://localhost:${process.env.PORT || 3000}`;
-                const pdfResp = await fetch(`${baseUrl}/api/estimates/${req.params.id}/pdf?po=${poId}&hide_payment=1${show_prices === false ? '&hide_prices=1' : ''}`, {
+                const pdfResp = await fetch(`${baseUrl}/api/estimates/${req.params.id}/pdf?po=${poId}&hide_payment=1${!show_prices ? '&hide_prices=1' : ''}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 

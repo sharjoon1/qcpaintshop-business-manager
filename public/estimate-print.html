@@ -70,7 +70,7 @@
             thead { display: table-header-group; }
             tr { page-break-inside: avoid; }
             .img-thumb { width: 28px !important; height: 28px !important; }
-            #upiSection { display: block !important; }
+            #upiSection:not(.force-hidden) { display: block !important; }
             #upiPayLink { display: none !important; }
         }
 
@@ -552,8 +552,12 @@
                 loadBranding(token);
                 var hidePayment = urlParams.get('hide_payment') === '1';
                 var poId = urlParams.get('po');
-                if (!hidePayment) {
+                if (!hidePayment && !poId) {
                     loadUpiQr(estimateId);
+                } else {
+                    // Force hide UPI section even from print CSS
+                    var upiEl = document.getElementById('upiSection');
+                    if (upiEl) { upiEl.classList.add('force-hidden'); upiEl.style.display = 'none'; }
                 }
                 // PO mode: change title + show delivery info + GST breakdown + hide prices
                 if (poId) {
