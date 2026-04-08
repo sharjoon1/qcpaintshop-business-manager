@@ -361,9 +361,9 @@ router.post('/:id/record-payment', requireAuth, async (req, res) => {
             for (const item of items) {
                 if (item.item_type === 'labor') continue;
                 await pool.query(`
-                    INSERT INTO billing_invoice_items (invoice_id, item_name, brand, quantity, unit_price, line_total)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                `, [invoiceId, item.item_name, item.brand, item.quantity, item.unit_price || item.final_price, item.line_total]);
+                    INSERT INTO billing_invoice_items (invoice_id, item_name, quantity, unit_price, line_total)
+                    VALUES (?, ?, ?, ?, ?)
+                `, [invoiceId, item.item_name, item.quantity, item.unit_price || item.final_price, item.line_total]);
             }
 
             await pool.query('UPDATE estimates SET billing_invoice_id = ?, status = ? WHERE id = ?',
