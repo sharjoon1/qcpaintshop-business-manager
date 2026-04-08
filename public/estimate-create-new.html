@@ -1731,8 +1731,14 @@
 
                 if (response.ok && result.success) {
                     if (editMode) {
-                        alert('Estimate updated successfully!');
-                        window.location.href = 'estimates.html';
+                        savedEstimateId = result.id || result.estimate_id;
+                        savedEstimateNumber = result.estimate_number || savedEstimateId;
+                        savedCustomerPhone = selectedCustomer ? (selectedCustomer.phone || selectedCustomer.customer_phone || '') : '';
+
+                        document.getElementById('postSaveTitle').textContent = 'Estimate Updated!';
+                        document.getElementById('postSaveSubtitle').textContent = 'Share with customer or open print preview';
+                        document.getElementById('postSavePhone').value = savedCustomerPhone;
+                        document.getElementById('postSaveModal').style.display = 'flex';
                     } else {
                         const urlParams = new URLSearchParams(window.location.search);
                         const requestId = urlParams.get('from_request');
@@ -1741,13 +1747,14 @@
                             await markRequestAsConverted(requestId, result.id || result.estimate_id);
                         }
 
-                        const estNum = result.estimate_number || result.id;
-                        const estId = result.id || result.estimate_id;
-                        if (confirm('Estimate #' + estNum + ' created! Open print preview?')) {
-                            window.location.href = 'estimate-print.html?id=' + estId;
-                        } else {
-                            window.location.href = 'estimates.html';
-                        }
+                        savedEstimateId = result.id || result.estimate_id;
+                        savedEstimateNumber = result.estimate_number || savedEstimateId;
+                        savedCustomerPhone = selectedCustomer ? (selectedCustomer.phone || selectedCustomer.customer_phone || '') : '';
+
+                        document.getElementById('postSaveTitle').textContent = 'Estimate #' + savedEstimateNumber + ' Created!';
+                        document.getElementById('postSaveSubtitle').textContent = 'Share with customer or open print preview';
+                        document.getElementById('postSavePhone').value = savedCustomerPhone;
+                        document.getElementById('postSaveModal').style.display = 'flex';
                     }
                 } else {
                     alert('Failed to save estimate: ' + (result.message || result.error || 'Unknown error'));
@@ -2146,7 +2153,120 @@
             }
         }
 
+        // ========================================
+        // POST-SAVE WHATSAPP SHARE
+        // ========================================
+        let savedEstimateId = null;
+        let savedEstimateNumber = null;
+        let savedCustomerPhone = null;
+
+        async function sendEstimateWhatsApp() {
+            const phone = document.getElementById('postSavePhone').value.trim();
+            if (!phone || phone.length < 10) {
+                alert('Enter a valid phone number');
+                return;
+            }
+
+            const btn = document.getElementById('postSaveSendBtn');
+            const status = document.getElementById('postSaveSendStatus');
+            btn.disabled = true;
+            btn.innerHTML = 'Sending...';
+
+            try {
+                const resp = await apiRequest('/api/share/whatsapp', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        resource_type: 'estimate',
+                        resource_id: savedEstimateId,
+                        customer_phone: phone
+                    })
+                });
+
+                const respData = await resp.json();
+
+                if (respData.success) {
+                    status.textContent = 'Sent successfully!';
+                    status.className = 'text-xs mt-2 text-green-600 font-semibold';
+                    status.classList.remove('hidden');
+                    btn.textContent = 'Sent!';
+                    btn.className = btn.className.replace('bg-green-600', 'bg-green-400');
+
+                    // Try to send via server WhatsApp (whatsapp-web.js)
+                    try {
+                        await apiRequest('/api/whatsapp-chat/quick-send', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                phone: phone,
+                                message: respData.data.message,
+                                source: 'estimate'
+                            })
+                        });
+                        status.textContent = 'Sent via WhatsApp!';
+                    } catch (e) {
+                        // Fallback: open wa.me link
+                        if (respData.data && respData.data.whatsapp_url) {
+                            window.open(respData.data.whatsapp_url, '_blank');
+                        }
+                        status.textContent = 'Opened in WhatsApp';
+                    }
+                } else {
+                    throw new Error(respData.message || 'Failed');
+                }
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                status.className = 'text-xs mt-2 text-red-600';
+                status.classList.remove('hidden');
+                btn.disabled = false;
+                btn.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.614-1.476A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.156 0-4.154-.675-5.794-1.823l-.413-.27-2.737.876.728-2.656-.296-.436A9.716 9.716 0 012.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75z"/></svg> Send`;
+            }
+        }
+
+        function openPrintPreview() {
+            window.location.href = 'estimate-print.html?id=' + savedEstimateId;
+        }
+
+        function closePostSaveModal() {
+            document.getElementById('postSaveModal').style.display = 'none';
+            window.location.href = 'estimates.html';
+        }
+
         init();
     </script>
+
+    <!-- Post-Save Share Modal -->
+    <div id="postSaveModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style="display:none;">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
+                <h3 class="text-white font-bold text-lg" id="postSaveTitle">Estimate Created!</h3>
+                <p class="text-indigo-100 text-sm" id="postSaveSubtitle"></p>
+            </div>
+            <div class="p-6 space-y-3">
+                <!-- WhatsApp Send -->
+                <div class="border border-green-200 rounded-xl p-4 bg-green-50">
+                    <div class="font-semibold text-green-800 text-sm mb-2">Send via WhatsApp</div>
+                    <div class="flex gap-2 items-end">
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-500">Phone Number</label>
+                            <input type="tel" id="postSavePhone" placeholder="Customer phone"
+                                class="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:border-green-500 focus:ring-1 focus:ring-green-200 outline-none">
+                        </div>
+                        <button onclick="sendEstimateWhatsApp()" id="postSaveSendBtn"
+                            class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 flex items-center gap-1 whitespace-nowrap">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.614-1.476A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.156 0-4.154-.675-5.794-1.823l-.413-.27-2.737.876.728-2.656-.296-.436A9.716 9.716 0 012.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75z"/></svg>
+                            Send
+                        </button>
+                    </div>
+                    <div id="postSaveSendStatus" class="text-xs mt-2 hidden"></div>
+                </div>
+                <!-- Other actions -->
+                <button onclick="openPrintPreview()" class="w-full bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-700">
+                    Open Print Preview
+                </button>
+                <button onclick="closePostSaveModal()" class="w-full bg-gray-100 text-gray-600 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200">
+                    Back to Estimates
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
