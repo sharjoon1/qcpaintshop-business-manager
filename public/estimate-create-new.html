@@ -127,7 +127,7 @@
                         class="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none text-sm"
                         oninput="onGlobalSearch(this.value)" autocomplete="off">
                 </div>
-                <div id="globalSearchResults" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border-2 border-purple-300 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+                <div id="globalSearchResults" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border-2 border-purple-300 rounded-lg shadow-xl z-50 max-h-48 sm:max-h-80 overflow-y-auto">
                 </div>
             </div>
             <p class="text-xs text-gray-500 mb-3 -mt-2">Or browse by Brand &rarr; Category &rarr; Product below:</p>
@@ -1156,7 +1156,7 @@
                 }
 
                 // Product name + description
-                row += `<td class="px-4 py-3 align-top" style="min-width:180px">
+                row += `<td class="px-4 py-3 align-top min-w-0 sm:min-w-[180px]">
                     <div class="font-semibold text-sm" style="white-space:pre-line">${displayName}</div>
                     ${item.custom_description && !showDescOnly ? `<div class="text-xs text-gray-500 mt-1" style="white-space:pre-line">${escHtml(item.custom_description)}</div>` : ''}
                     <div class="flex items-center gap-2 mt-1">
@@ -1177,7 +1177,7 @@
                 // Unit Price column — base price + markup controls + per-row show/hide
                 if (cv.show_price) {
                     const hidePrice = item.hide_price;
-                    row += `<td class="px-4 py-3 align-top text-right" style="min-width:140px">
+                    row += `<td class="px-4 py-3 align-top text-right min-w-0 sm:min-w-[140px]">
                         ${hidePrice ? `<div class="text-xs text-gray-400 italic">Hidden</div>` : `
                             <div class="flex items-center gap-1 justify-end">
                                 <span class="text-xs text-gray-400">₹</span>

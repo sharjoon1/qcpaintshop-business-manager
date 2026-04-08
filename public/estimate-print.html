@@ -255,7 +255,7 @@
                 </div>
 
                 <!-- Actions -->
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
                     <button onclick="shareViaWhatsApp()" class="px-4 py-2 text-sm font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 no-print flex items-center gap-1" title="Share via WhatsApp">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.614-1.476A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.156 0-4.154-.675-5.794-1.823l-.413-.27-2.737.876.728-2.656-.296-.436A9.716 9.716 0 012.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75z"/></svg>
                         WhatsApp
@@ -366,7 +366,7 @@
             <div id="upiSection" style="display:none; padding: 16px 32px; border-top: 1px solid var(--border); text-align: center;">
                 <div style="font-size: 13px; font-weight: 600; color: var(--text-mid); margin-bottom: 8px;">Pay via UPI</div>
                 <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
-                    <img id="upiQrImage" src="" alt="UPI QR Code" style="width: 160px; height: 160px; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+                    <img id="upiQrImage" src="" alt="UPI QR Code" class="w-32 sm:w-40" style="height: auto; aspect-ratio: 1; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
                     <a id="upiPayLink" href="#" class="no-print" style="display: inline-flex; align-items: center; gap: 4px; background: var(--primary); color: white; font-size: 12px; font-weight: 600; padding: 8px 16px; border-radius: 8px; text-decoration: none;">
                         Pay &#x20B9;<span id="upiAmount"></span>
                     </a>
@@ -626,21 +626,21 @@
             const laborItemsList = itemsData.filter(i => i.item_type === 'labor');
 
             // Build header
-            let hdr = '<th style="text-align:left; width: 30px;">#</th>';
-            if (colVis.show_image) hdr += '<th style="text-align:left; width: 50px;">Image</th>';
+            let hdr = '<th style="text-align:left; max-width: 30px;">#</th>';
+            if (colVis.show_image) hdr += '<th style="text-align:left; max-width: 50px;">Image</th>';
             hdr += '<th style="text-align:left;">Item Details</th>';
-            if (colVis.show_pack_size) hdr += '<th style="text-align:left; width: 80px;">Pack Size</th>';
-            if (colVis.show_qty) hdr += '<th style="text-align:right; width: 70px;">Qty</th>';
-            if (colVis.show_area) hdr += '<th style="text-align:right; width: 80px;">Area (sqft)</th>';
-            if (colVis.show_mix) hdr += '<th style="text-align:left; width: 100px;">Mix Info</th>';
-            if (colVis.show_price) hdr += '<th style="text-align:right; width: 80px;">Base Price</th>';
-            if (colVis.show_markup) hdr += '<th style="text-align:right; width: 80px;">Markup</th>';
-            if (colVis.show_discount) hdr += '<th style="text-align:right; width: 80px;">Discount</th>';
-            if (colVis.show_final_price) hdr += '<th style="text-align:right; width: 80px;">Final Price</th>';
-            if (colVis.show_price_sqft) hdr += '<th style="text-align:right; width: 80px;">Price/sqft</th>';
-            if (colVis.show_breakdown) hdr += '<th style="text-align:left; width: 80px;">Breakdown</th>';
-            if (colVis.show_color) hdr += '<th style="text-align:right; width: 70px;">Color</th>';
-            if (colVis.show_total) hdr += '<th style="text-align:right; width: 90px;">Total</th>';
+            if (colVis.show_pack_size) hdr += '<th style="text-align:left; max-width: 80px;">Pack Size</th>';
+            if (colVis.show_qty) hdr += '<th style="text-align:right; max-width: 70px;">Qty</th>';
+            if (colVis.show_area) hdr += '<th style="text-align:right; max-width: 80px;">Area (sqft)</th>';
+            if (colVis.show_mix) hdr += '<th style="text-align:left; max-width: 100px;">Mix Info</th>';
+            if (colVis.show_price) hdr += '<th style="text-align:right; max-width: 80px;">Base Price</th>';
+            if (colVis.show_markup) hdr += '<th style="text-align:right; max-width: 80px;">Markup</th>';
+            if (colVis.show_discount) hdr += '<th style="text-align:right; max-width: 80px;">Discount</th>';
+            if (colVis.show_final_price) hdr += '<th style="text-align:right; max-width: 80px;">Final Price</th>';
+            if (colVis.show_price_sqft) hdr += '<th style="text-align:right; max-width: 80px;">Price/sqft</th>';
+            if (colVis.show_breakdown) hdr += '<th style="text-align:left; max-width: 80px;">Breakdown</th>';
+            if (colVis.show_color) hdr += '<th style="text-align:right; max-width: 70px;">Color</th>';
+            if (colVis.show_total) hdr += '<th style="text-align:right; max-width: 90px;">Total</th>';
             thead.innerHTML = hdr;
 
             const colCount = thead.querySelectorAll('th').length;

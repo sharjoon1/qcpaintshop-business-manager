@@ -25,6 +25,9 @@
         .status-rejected { background: #fee2e2; color: #991b1b; }
         .viz-card { transition: transform 0.2s, box-shadow 0.2s; }
         .viz-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        @media (max-width: 768px) {
+            .hide-mobile { display: none !important; }
+        }
         .color-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
         .gen-pulse { animation: genPulse 2s ease-in-out infinite; }
         @keyframes genPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
@@ -41,7 +44,7 @@
         </div>
 
         <!-- Stats Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-6">
             <div class="bg-white rounded-lg shadow p-5">
                 <p class="text-sm text-gray-600">Total</p>
                 <p class="text-2xl font-bold text-gray-800" id="statTotal">0</p>
@@ -96,8 +99,8 @@
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Request #</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mobile</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">City</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Photo</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hide-mobile">City</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hide-mobile">Photo</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -186,7 +189,7 @@
 
     <!-- AI Color Visualizer Modal -->
     <div id="vizModal" class="fixed inset-0 bg-black/60 z-[60] hidden flex items-center justify-center p-2">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg md:max-w-4xl lg:max-w-6xl max-h-[95vh] flex flex-col">
             <!-- Header -->
             <div class="flex justify-between items-center p-4 border-b shrink-0">
                 <div>
@@ -324,8 +327,8 @@
                         <td class="px-4 py-3 font-mono text-sm font-semibold text-purple-700">${esc(r.request_number)}</td>
                         <td class="px-4 py-3 font-medium">${esc(r.name)}</td>
                         <td class="px-4 py-3"><a href="tel:${esc(r.mobile)}" class="text-blue-600 hover:underline">${esc(r.mobile)}</a></td>
-                        <td class="px-4 py-3 text-gray-600">${esc(r.city || '-')}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3 text-gray-600 hide-mobile">${esc(r.city || '-')}</td>
+                        <td class="px-4 py-3 hide-mobile">
                             ${r.photo_path
                                 ? `<img src="${esc(r.photo_path)}" alt="Photo" class="w-12 h-12 object-cover rounded-lg cursor-pointer" onclick="window.open('${esc(r.photo_path)}','_blank')">`
                                 : '<span class="text-gray-400 text-sm">No photo</span>'}
