@@ -265,38 +265,25 @@ router.post('/:id/send-whatsapp', requireAuth, async (req, res) => {
         const ADMIN_BRANCH = -1;
         const GENERAL_ID = 0;
 
+        // Build caption with UPI payment link — everything in ONE message with the PDF
+        const amount = parseFloat(est.grand_total) || 0;
+        const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality%20Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${est.estimate_number}`;
+        const caption = `Dear ${est.customer_name || 'Customer'},\n\nEstimate *#${est.estimate_number}* from *Quality Colours*\n\n*Total: ₹${amount.toLocaleString('en-IN')}*\n\n💳 *Pay via UPI:*\n${upiUrl}\n\n_UPI ID: 7418831122@superyes_\n\nThank you! 🙏`;
+
         let sent = false;
+        const mediaOpts = {
+            type: 'document',
+            mediaPath: pdfPath,
+            caption: caption,
+            filename: `Estimate-${est.estimate_number}.pdf`
+        };
         try {
-            sent = await sessionManager.sendMedia(ADMIN_BRANCH, phone, {
-                type: 'document',
-                mediaPath: pdfPath,
-                caption: `Estimate #${est.estimate_number} - Quality Colours\nTotal: ₹${parseFloat(est.grand_total).toLocaleString('en-IN')}`,
-                filename: `Estimate-${est.estimate_number}.pdf`
-            }, { source: 'estimate', sent_by: req.user.id });
+            sent = await sessionManager.sendMedia(ADMIN_BRANCH, phone, mediaOpts, { source: 'estimate', sent_by: req.user.id });
         } catch (e) {
-            // Fallback to General session
             try {
-                sent = await sessionManager.sendMedia(GENERAL_ID, phone, {
-                    type: 'document',
-                    mediaPath: pdfPath,
-                    caption: `Estimate #${est.estimate_number} - Quality Colours\nTotal: ₹${parseFloat(est.grand_total).toLocaleString('en-IN')}`,
-                    filename: `Estimate-${est.estimate_number}.pdf`
-                }, { source: 'estimate', sent_by: req.user.id });
+                sent = await sessionManager.sendMedia(GENERAL_ID, phone, mediaOpts, { source: 'estimate', sent_by: req.user.id });
             } catch (e2) {
                 console.error('WhatsApp send failed on both sessions:', e2.message);
-            }
-        }
-
-        // Also send text message with UPI payment link
-        if (sent) {
-            const amount = parseFloat(est.grand_total) || 0;
-            const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality%20Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${est.estimate_number}`;
-            const textMsg = `Dear ${est.customer_name || 'Customer'},\n\nYour estimate #${est.estimate_number} from *Quality Colours* is attached above.\n\n*Total: ₹${amount.toLocaleString('en-IN')}*\n\n💳 *Pay via UPI:*\n${upiUrl}\n\n_UPI ID: 7418831122@superyes_\n\nThank you! 🙏`;
-
-            try {
-                await sessionManager.sendMessage(ADMIN_BRANCH, phone, textMsg, { source: 'estimate', sent_by: req.user.id });
-            } catch (e) {
-                await sessionManager.sendMessage(GENERAL_ID, phone, textMsg, { source: 'estimate', sent_by: req.user.id }).catch(() => {});
             }
         }
 
