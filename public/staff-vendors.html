@@ -574,8 +574,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabParam === 'purchase-orders') {
         switchTab('purchaseOrders');
         if (poParam) {
-            // Auto-open PO for editing after a short delay for data to load
-            setTimeout(() => { editPo(parseInt(poParam)); }, 800);
+            // Auto-open PO detail after data loads
+            setTimeout(() => { viewPo(parseInt(poParam)); }, 1200);
         }
     }
 });
