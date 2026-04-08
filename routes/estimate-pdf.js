@@ -73,12 +73,15 @@ router.get('/:id/pdf', async (req, res) => {
         // Build URL to the print page
         const protocol = req.protocol;
         const host = req.get('host');
-        const printUrl = `${protocol}://${host}/estimate-print.html?id=${req.params.id}&mode=pdf&token=${token}`;
+        const isReceipt = req.query.receipt === '1';
+        const pageFile = isReceipt ? 'payment-receipt.html' : 'estimate-print.html';
+        const printUrl = `${protocol}://${host}/${pageFile}?id=${req.params.id}&mode=pdf&token=${token}`;
 
         await page.goto(printUrl, { waitUntil: 'networkidle0', timeout: 15000 });
 
         // Wait for content to render
-        await page.waitForSelector('#printContent', { timeout: 10000 });
+        const waitSelector = isReceipt ? '#receiptContent' : '#printContent';
+        await page.waitForSelector(waitSelector, { timeout: 15000 });
 
         const pdfBuffer = await page.pdf({
             format: 'A4',
@@ -86,7 +89,9 @@ router.get('/:id/pdf', async (req, res) => {
             printBackground: true
         });
 
-        const filename = `${estimates[0].estimate_number || 'Estimate'}.pdf`;
+        const filename = isReceipt
+            ? `Receipt-${estimates[0].estimate_number || req.params.id}.pdf`
+            : `Estimate-${estimates[0].estimate_number || req.params.id}.pdf`;
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.send(pdfBuffer);
