@@ -116,7 +116,19 @@ router.post('/whatsapp', requireAuth, async (req, res) => {
         // Build WhatsApp message
         const branding = await getBranding();
         const bizName = branding.business_name || 'Quality Colours';
-        const defaultMsg = `Dear ${customerName},\n\nPlease find your ${resource_type === 'estimate' ? 'estimate' : 'design request'} (${resourceLabel}) from ${bizName}:\n\n${shareUrl}\n\nThank you!\n${bizName}`;
+
+        // Build UPI payment link for estimates
+        let upiLine = '';
+        if (resource_type === 'estimate') {
+            const [estRows] = await pool.query('SELECT grand_total, estimate_number FROM estimates WHERE id = ?', [resource_id]);
+            if (estRows.length) {
+                const amount = parseFloat(estRows[0].grand_total) || 0;
+                const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality%20Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${estRows[0].estimate_number}`;
+                upiLine = `\n\n💳 *Pay Online:* ${upiUrl}\n_UPI ID: 7418831122@superyes_`;
+            }
+        }
+
+        const defaultMsg = `Dear ${customerName},\n\nPlease find your ${resource_type === 'estimate' ? 'estimate' : 'design request'} (${resourceLabel}) from ${bizName}:\n\n${shareUrl}${upiLine}\n\nThank you!\n${bizName}`;
         const message = message_template || defaultMsg;
 
         // Format phone for wa.me
@@ -194,6 +206,35 @@ router.get('/public/:token', async (req, res) => {
     } catch (error) {
         console.error('Public share error:', error);
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// GET /api/public/share/:token/upi-qr - Generate UPI QR for shared estimate
+router.get('/public/:token/upi-qr', async (req, res) => {
+    try {
+        const [shares] = await pool.query(
+            `SELECT s.resource_id, e.estimate_number, e.grand_total
+             FROM share_tokens s
+             JOIN estimates e ON s.resource_id = e.id
+             WHERE s.token = ? AND s.resource_type = 'estimate' AND s.is_active = 1 AND (s.expires_at IS NULL OR s.expires_at > NOW())`,
+            [req.params.token]
+        );
+        if (!shares.length) return res.status(404).json({ error: 'Not found' });
+
+        const est = shares[0];
+        const amount = parseFloat(est.grand_total) || 0;
+        const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${est.estimate_number}`;
+
+        const QRCode = require('qrcode');
+        const qrDataUrl = await QRCode.toDataURL(upiUrl, { width: 200, margin: 1 });
+
+        res.json({
+            success: true,
+            data: { qr_image: qrDataUrl, upi_url: upiUrl, amount }
+        });
+    } catch (err) {
+        console.error('Public UPI QR error:', err);
+        res.status(500).json({ error: 'Failed to generate QR' });
     }
 });
 

@@ -191,6 +191,39 @@ router.get('/', requirePermission('estimates', 'view'), async (req, res) => {
 });
 
 // ========================================
+// UPI QR CODE GENERATION
+// ========================================
+router.get('/:id/upi-qr', requireAuth, async (req, res) => {
+    try {
+        const [estimates] = await pool.query(
+            'SELECT id, estimate_number, grand_total FROM estimates WHERE id = ?',
+            [req.params.id]
+        );
+        if (!estimates.length) return res.status(404).json({ error: 'Estimate not found' });
+
+        const est = estimates[0];
+        const amount = parseFloat(est.grand_total) || 0;
+        const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${est.estimate_number}`;
+
+        const QRCode = require('qrcode');
+        const qrDataUrl = await QRCode.toDataURL(upiUrl, { width: 200, margin: 1 });
+
+        res.json({
+            success: true,
+            data: {
+                qr_image: qrDataUrl,
+                upi_url: upiUrl,
+                amount: amount,
+                estimate_number: est.estimate_number
+            }
+        });
+    } catch (err) {
+        console.error('UPI QR error:', err);
+        res.status(500).json({ error: 'Failed to generate UPI QR' });
+    }
+});
+
+// ========================================
 // GET SINGLE ESTIMATE
 // ========================================
 router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
