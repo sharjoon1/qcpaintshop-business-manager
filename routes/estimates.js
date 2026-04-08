@@ -268,7 +268,7 @@ router.post('/:id/send-whatsapp', requireAuth, async (req, res) => {
         // Build caption with UPI payment link — everything in ONE message with the PDF
         const amount = parseFloat(est.grand_total) || 0;
         const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality%20Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${est.estimate_number}`;
-        const caption = `Dear ${est.customer_name || 'Customer'},\n\nEstimate *#${est.estimate_number}* from *Quality Colours*\n\n*Total: ₹${amount.toLocaleString('en-IN')}*\n\n💳 *Pay via UPI:*\n${upiUrl}\n\n_UPI ID: 7418831122@superyes_\n\nThank you! 🙏`;
+        const caption = `Dear ${est.customer_name || 'Customer'},\n\nEstimate *#${est.estimate_number}* from *Quality Colours*\n\n*Total: ₹${amount.toLocaleString('en-IN')}*\n\n💳 *Pay via UPI:*\n${upiUrl}\n\n_UPI ID: 7418831122@superyes_\n\nThank you!`;
 
         let sent = false;
         const mediaOpts = {
@@ -355,7 +355,7 @@ router.post('/:id/send-receipt', requireAuth, async (req, res) => {
         const grandTotal = parseFloat(est.grand_total) || 0;
         const paid = parseFloat(est.payment_amount) || 0;
         const balance = Math.max(0, grandTotal - paid);
-        const caption = `Dear ${est.customer_name || 'Customer'},\n\n✅ *Payment Receipt*\n\nEstimate: *#${est.estimate_number}*\nTotal: *₹${grandTotal.toLocaleString('en-IN')}*\nPaid: *₹${paid.toLocaleString('en-IN')}*\nBalance: *₹${balance.toLocaleString('en-IN')}*${est.payment_method ? '\nMethod: ' + est.payment_method.toUpperCase() : ''}${est.payment_reference ? '\nRef: ' + est.payment_reference : ''}\n\nThank you! 🙏\n_Quality Colours_`;
+        const caption = `Dear ${est.customer_name || 'Customer'},\n\n✅ *Payment Receipt*\n\nEstimate: *#${est.estimate_number}*\nTotal: *₹${grandTotal.toLocaleString('en-IN')}*\nPaid: *₹${paid.toLocaleString('en-IN')}*\nBalance: *₹${balance.toLocaleString('en-IN')}*${est.payment_method ? '\nMethod: ' + est.payment_method.toUpperCase() : ''}${est.payment_reference ? '\nRef: ' + est.payment_reference : ''}\n\nThank you!\n_Quality Colours_`;
 
         let sent = false;
         try {
@@ -377,6 +377,26 @@ router.post('/:id/send-receipt', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('Send receipt error:', err);
         res.status(500).json({ success: false, message: err.message || 'Failed to send receipt' });
+    }
+});
+
+// ========================================
+// UPDATE PAYMENT REFERENCE
+// ========================================
+router.post('/:id/update-payment-ref', requireAuth, async (req, res) => {
+    try {
+        const { payment_reference } = req.body;
+        await pool.query('UPDATE estimates SET payment_reference = ? WHERE id = ?', [payment_reference || null, req.params.id]);
+        // Also update the billing invoice payment if exists
+        const [est] = await pool.query('SELECT billing_invoice_id FROM estimates WHERE id = ?', [req.params.id]);
+        if (est[0] && est[0].billing_invoice_id) {
+            await pool.query('UPDATE billing_payments SET payment_reference = ? WHERE invoice_id = ? ORDER BY id DESC LIMIT 1',
+                [payment_reference || null, est[0].billing_invoice_id]);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Update payment ref error:', err);
+        res.status(500).json({ success: false, message: 'Failed to update reference' });
     }
 });
 
@@ -482,7 +502,7 @@ router.post('/:id/record-payment', requireAuth, async (req, res) => {
 
                     const sessionManager = require('../services/whatsapp-session-manager');
                     const paidAmt = parseFloat(amount).toLocaleString('en-IN');
-                    const caption = `Dear ${est.customer_name || 'Customer'},\n\n✅ *Payment Received!*\n\nEstimate: *#${est.estimate_number}*\nAmount Paid: *₹${paidAmt}*\nTotal: *₹${grandTotal.toLocaleString('en-IN')}*\nBalance: *₹${balanceDue.toLocaleString('en-IN')}*\nMethod: ${payment_method.toUpperCase()}${payment_reference ? '\nRef: ' + payment_reference : ''}\n\nThank you! 🙏\n_Quality Colours_`;
+                    const caption = `Dear ${est.customer_name || 'Customer'},\n\n✅ *Payment Received!*\n\nEstimate: *#${est.estimate_number}*\nAmount Paid: *₹${paidAmt}*\nTotal: *₹${grandTotal.toLocaleString('en-IN')}*\nBalance: *₹${balanceDue.toLocaleString('en-IN')}*\nMethod: ${payment_method.toUpperCase()}${payment_reference ? '\nRef: ' + payment_reference : ''}\n\nThank you!\n_Quality Colours_`;
 
                     try {
                         await sessionManager.sendMedia(-1, phone, { type: 'document', mediaPath: receiptPath, caption, filename: `Receipt-${est.estimate_number}.pdf` }, { source: 'payment-receipt', sent_by: req.user.id });
@@ -510,7 +530,7 @@ router.post('/:id/record-payment', requireAuth, async (req, res) => {
 // ========================================
 router.post('/:id/create-po', requireAuth, async (req, res) => {
     try {
-        const { vendor_id, send_whatsapp, vendor_phone, notes } = req.body;
+        const { vendor_id, send_whatsapp, vendor_phone, notes, show_prices } = req.body;
         if (!vendor_id) return res.status(400).json({ success: false, message: 'Vendor is required' });
 
         const [estimates] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
@@ -555,7 +575,7 @@ router.post('/:id/create-po', requireAuth, async (req, res) => {
                 // Generate PO PDF as simple HTML → Puppeteer
                 const token = req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : '';
                 const baseUrl = `http://localhost:${process.env.PORT || 3000}`;
-                const pdfResp = await fetch(`${baseUrl}/api/estimates/${req.params.id}/pdf?po=${poId}`, {
+                const pdfResp = await fetch(`${baseUrl}/api/estimates/${req.params.id}/pdf?po=${poId}&hide_payment=1${show_prices === false ? '&hide_prices=1' : ''}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 

@@ -331,14 +331,7 @@
                 </div>
             </div>
 
-            <!-- UPI QR Section (shown if balance > 0) -->
-            <div id="upiSection" style="display:none; padding: 16px 32px; border-top: 1px solid var(--border); text-align: center;">
-                <div style="font-size: 13px; font-weight: 600; color: var(--text-mid); margin-bottom: 8px;">Pay Remaining Balance via UPI</div>
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
-                    <img id="upiQrImage" src="" alt="UPI QR Code" style="width: 160px; height: 160px; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
-                    <div style="font-size: 11px; color: var(--text-light);">UPI ID: 7418831122@superyes</div>
-                </div>
-            </div>
+            <!-- UPI QR Section removed — receipt should not show QR since payment is already made -->
 
             <!-- Footer -->
             <div class="footer-section" style="padding: 16px 32px; background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);">
@@ -457,10 +450,7 @@
                 // Load branding
                 loadBranding(token);
 
-                // Load UPI QR if balance > 0
-                if (balance > 0) {
-                    loadUpiQr(estimateId);
-                }
+                // QR removed — receipt should not show QR since payment is already made
 
                 // Show content
                 document.getElementById('loadingState').classList.add('hidden');

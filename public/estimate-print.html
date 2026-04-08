@@ -555,22 +555,47 @@
                 if (!hidePayment) {
                     loadUpiQr(estimateId);
                 }
-                // PO mode: change title + show delivery info
+                // PO mode: change title + show delivery info + GST breakdown + hide prices
                 if (poId) {
-                    var titleEl = document.querySelector('.doc-title') || document.querySelector('h2');
+                    var titleEl = document.querySelector('.estimate-title');
                     if (titleEl) titleEl.textContent = 'PURCHASE ORDER';
                     var refEl = document.getElementById('estNumber');
                     if (refEl) refEl.textContent = 'PO-' + poId;
                     // Add delivery info after customer section
-                    var custSection = document.querySelector('.bill-to') || document.querySelector('[class*="bill"]');
+                    var custSection = document.querySelector('.bill-to-label');
                     if (custSection && estimateData.customer_address) {
                         var delDiv = document.createElement('div');
                         delDiv.style.cssText = 'margin-top:12px;padding:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:12px;';
-                        delDiv.innerHTML = '<strong style="color:#c2410c;">📦 3rd Party Delivery — Ship to Customer:</strong><br>' +
+                        delDiv.innerHTML = '<strong style="color:#c2410c;">3rd Party Delivery - Ship to Customer:</strong><br>' +
                             (estimateData.customer_name || '') + '<br>' +
                             (estimateData.customer_phone || '') + '<br>' +
                             (estimateData.customer_address || '');
-                        custSection.parentNode.insertBefore(delDiv, custSection.nextSibling);
+                        custSection.parentNode.appendChild(delDiv);
+                    }
+                    // Hide prices if requested
+                    var hidePrices = urlParams.get('hide_prices') === '1';
+                    if (hidePrices) {
+                        colVis.show_price = false;
+                        colVis.show_final_price = false;
+                        colVis.show_total = false;
+                        colVis.show_markup = false;
+                        colVis.show_discount = false;
+                        colVis.show_price_sqft = false;
+                        colVis.show_subtotal = false;
+                        colVis.show_gst = false;
+                        renderTable();
+                        // Hide summary section
+                        var summaryEl = document.querySelector('.summary-section');
+                        if (summaryEl) summaryEl.style.display = 'none';
+                    }
+                    // Add GST breakdown for PO (purchase prices are excl GST)
+                    if (!hidePrices) {
+                        var grandTotal = parseFloat(estimateData.grand_total) || 0;
+                        var baseExclGST = Math.round(grandTotal / 1.18);
+                        var gstAmount = grandTotal - baseExclGST;
+                        document.getElementById('subtotalVal').textContent = formatINR(baseExclGST);
+                        document.getElementById('gstVal').textContent = formatINR(gstAmount);
+                        document.getElementById('gstBreakdownSection').classList.remove('hidden');
                     }
                 }
 
