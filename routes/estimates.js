@@ -318,6 +318,183 @@ router.post('/:id/send-whatsapp', requireAuth, async (req, res) => {
 });
 
 // ========================================
+// RECORD PAYMENT ON ESTIMATE
+// ========================================
+router.post('/:id/record-payment', requireAuth, async (req, res) => {
+    try {
+        const { amount, payment_method, payment_reference, send_whatsapp, phone } = req.body;
+        if (!amount || amount <= 0) return res.status(400).json({ success: false, message: 'Valid amount required' });
+        if (!payment_method) return res.status(400).json({ success: false, message: 'Payment method required' });
+
+        const [estimates] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        const est = estimates[0];
+        const grandTotal = parseFloat(est.grand_total) || 0;
+        const prevPaid = parseFloat(est.payment_amount) || 0;
+        const newTotalPaid = prevPaid + parseFloat(amount);
+        const balanceDue = Math.max(0, grandTotal - newTotalPaid);
+        const paymentStatus = balanceDue <= 0.01 ? 'paid' : (newTotalPaid > 0 ? 'partial' : 'unpaid');
+
+        // Update estimate payment fields
+        await pool.query(`
+            UPDATE estimates SET payment_amount = ?, payment_status = ?, payment_method = ?,
+                payment_reference = ?, payment_recorded_by = ?, payment_recorded_at = NOW()
+            WHERE id = ?
+        `, [newTotalPaid, paymentStatus, payment_method, payment_reference || null, req.user.id, req.params.id]);
+
+        // Auto-create billing invoice if not exists
+        let invoiceId = est.billing_invoice_id;
+        if (!invoiceId) {
+            const [items] = await pool.query('SELECT * FROM estimate_items WHERE estimate_id = ?', [req.params.id]);
+            const [[{ cnt }]] = await pool.query("SELECT COUNT(*) as cnt FROM billing_invoices WHERE DATE(created_at) = CURDATE()");
+            const invoiceNumber = `BI-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(Number(cnt) + 1).padStart(3,'0')}`;
+
+            const [invResult] = await pool.query(`
+                INSERT INTO billing_invoices (invoice_number, source, customer_name, customer_phone, customer_address,
+                    subtotal, discount_amount, grand_total, amount_paid, balance_due, payment_status, estimate_id, created_by)
+                VALUES (?, 'estimate', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [invoiceNumber, est.customer_name, est.customer_phone, est.customer_address,
+                parseFloat(est.subtotal) || grandTotal, parseFloat(est.total_discount) || 0, grandTotal,
+                newTotalPaid, balanceDue, paymentStatus, req.params.id, req.user.id]);
+            invoiceId = invResult.insertId;
+
+            for (const item of items) {
+                if (item.item_type === 'labor') continue;
+                await pool.query(`
+                    INSERT INTO billing_invoice_items (invoice_id, item_name, brand, quantity, unit_price, line_total)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `, [invoiceId, item.item_name, item.brand, item.quantity, item.unit_price || item.final_price, item.line_total]);
+            }
+
+            await pool.query('UPDATE estimates SET billing_invoice_id = ?, status = ? WHERE id = ?',
+                [invoiceId, 'converted', req.params.id]);
+        } else {
+            await pool.query('UPDATE billing_invoices SET amount_paid = ?, balance_due = ?, payment_status = ? WHERE id = ?',
+                [newTotalPaid, balanceDue, paymentStatus, invoiceId]);
+        }
+
+        // Record in billing_payments
+        await pool.query(`
+            INSERT INTO billing_payments (invoice_id, amount, payment_method, payment_reference, received_by, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `, [invoiceId, amount, payment_method, payment_reference || null, req.user.id,
+            `Payment for Estimate #${est.estimate_number}`]);
+
+        // Send receipt via WhatsApp
+        let whatsappSent = false;
+        if (send_whatsapp && phone) {
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const os = require('os');
+                const token = req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : '';
+                const baseUrl = `http://localhost:${process.env.PORT || 3000}`;
+
+                // Try receipt PDF first, fallback to estimate PDF
+                let pdfResp = await fetch(`${baseUrl}/api/estimates/${req.params.id}/pdf?receipt=1`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!pdfResp.ok) {
+                    pdfResp = await fetch(`${baseUrl}/api/estimates/${req.params.id}/pdf`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                }
+
+                if (pdfResp.ok) {
+                    const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
+                    const tmpDir = path.join(os.tmpdir(), 'qc-receipts');
+                    fs.mkdirSync(tmpDir, { recursive: true });
+                    const receiptPath = path.join(tmpDir, `Receipt-${est.estimate_number}.pdf`);
+                    fs.writeFileSync(receiptPath, pdfBuffer);
+
+                    const sessionManager = require('../services/whatsapp-session-manager');
+                    const paidAmt = parseFloat(amount).toLocaleString('en-IN');
+                    const caption = `Dear ${est.customer_name || 'Customer'},\n\n✅ *Payment Received!*\n\nEstimate: *#${est.estimate_number}*\nAmount Paid: *₹${paidAmt}*\nTotal: *₹${grandTotal.toLocaleString('en-IN')}*\nBalance: *₹${balanceDue.toLocaleString('en-IN')}*\nMethod: ${payment_method.toUpperCase()}${payment_reference ? '\nRef: ' + payment_reference : ''}\n\nThank you! 🙏\n_Quality Colours_`;
+
+                    try {
+                        await sessionManager.sendMedia(-1, phone, { type: 'document', mediaPath: receiptPath, caption, filename: `Receipt-${est.estimate_number}.pdf` }, { source: 'payment-receipt', sent_by: req.user.id });
+                        whatsappSent = true;
+                    } catch (e) {
+                        try {
+                            await sessionManager.sendMedia(0, phone, { type: 'document', mediaPath: receiptPath, caption, filename: `Receipt-${est.estimate_number}.pdf` }, { source: 'payment-receipt', sent_by: req.user.id });
+                            whatsappSent = true;
+                        } catch (e2) { console.error('WhatsApp receipt fallback failed:', e2.message); }
+                    }
+                    try { fs.unlinkSync(receiptPath); } catch (e) {}
+                }
+            } catch (waErr) { console.error('WhatsApp receipt error:', waErr.message); }
+        }
+
+        res.json({ success: true, data: { payment_status: paymentStatus, amount_paid: newTotalPaid, balance_due: balanceDue, invoice_id: invoiceId, whatsapp_sent: whatsappSent } });
+    } catch (err) {
+        console.error('Record payment error:', err);
+        res.status(500).json({ success: false, message: err.message || 'Failed to record payment' });
+    }
+});
+
+// ========================================
+// CREATE PURCHASE ORDER FROM ESTIMATE
+// ========================================
+router.post('/:id/create-po', requireAuth, async (req, res) => {
+    try {
+        const { vendor_id, send_whatsapp, vendor_phone, notes } = req.body;
+        if (!vendor_id) return res.status(400).json({ success: false, message: 'Vendor is required' });
+
+        const [estimates] = await pool.query('SELECT * FROM estimates WHERE id = ?', [req.params.id]);
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        const est = estimates[0];
+
+        const [items] = await pool.query("SELECT * FROM estimate_items WHERE estimate_id = ? AND item_type = 'product'", [req.params.id]);
+        if (!items.length) return res.status(400).json({ success: false, message: 'No product items in estimate' });
+
+        const [[{ cnt }]] = await pool.query("SELECT COUNT(*) as cnt FROM vendor_purchase_orders WHERE DATE(created_at) = CURDATE()");
+        const poNumber = `PO-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(Number(cnt) + 1).padStart(3,'0')}`;
+
+        const subtotal = items.reduce((sum, it) => sum + ((parseFloat(it.base_price) || parseFloat(it.unit_price) || 0) * (parseFloat(it.quantity) || 1)), 0);
+
+        const [poResult] = await pool.query(`
+            INSERT INTO vendor_purchase_orders
+                (po_number, vendor_id, estimate_id, subtotal, tax_amount, grand_total,
+                 delivery_name, delivery_phone, delivery_address, is_third_party,
+                 expected_date, notes, status, created_by)
+            VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, true, DATE_ADD(NOW(), INTERVAL 3 DAY), ?, 'draft', ?)
+        `, [poNumber, vendor_id, req.params.id, subtotal, subtotal,
+            est.customer_name, est.customer_phone, est.customer_address,
+            notes || `PO from Estimate #${est.estimate_number}`, req.user.id]);
+        const poId = poResult.insertId;
+
+        for (const item of items) {
+            const unitPrice = parseFloat(item.base_price) || parseFloat(item.unit_price) || 0;
+            await pool.query(`
+                INSERT INTO vendor_po_items (po_id, zoho_item_id, item_name, quantity, unit_price, line_total)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, [poId, item.zoho_item_id, item.item_name, parseFloat(item.quantity) || 1, unitPrice, unitPrice * (parseFloat(item.quantity) || 1)]);
+        }
+
+        let whatsappSent = false;
+        if (send_whatsapp && vendor_phone) {
+            try {
+                const sessionManager = require('../services/whatsapp-session-manager');
+                const poMsg = `*Purchase Order #${poNumber}*\n\nFrom: *Quality Colours*\nEstimate: #${est.estimate_number}\n\n*Items:*\n${items.map(it => '• ' + it.item_name + ' x' + (it.quantity || 1)).join('\n')}\n\n*Total: ₹${subtotal.toLocaleString('en-IN')}*\n\n📦 *3rd Party Delivery:*\n${est.customer_name}\n${est.customer_phone}\n${est.customer_address || 'Address TBC'}\n\nPlease confirm and deliver.\nThank you!`;
+                try {
+                    await sessionManager.sendMessage(-1, vendor_phone, poMsg, { source: 'purchase-order', sent_by: req.user.id });
+                    whatsappSent = true;
+                } catch (e) {
+                    await sessionManager.sendMessage(0, vendor_phone, poMsg, { source: 'purchase-order', sent_by: req.user.id }).catch(() => {});
+                    whatsappSent = true;
+                }
+                await pool.query("UPDATE vendor_purchase_orders SET status = 'sent' WHERE id = ?", [poId]);
+            } catch (waErr) { console.error('WhatsApp PO error:', waErr.message); }
+        }
+
+        res.json({ success: true, data: { po_id: poId, po_number: poNumber, grand_total: subtotal, whatsapp_sent: whatsappSent } });
+    } catch (err) {
+        console.error('Create PO error:', err);
+        res.status(500).json({ success: false, message: err.message || 'Failed to create PO' });
+    }
+});
+
+// ========================================
 // GET SINGLE ESTIMATE
 // ========================================
 router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
