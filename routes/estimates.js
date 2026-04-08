@@ -484,14 +484,47 @@ router.post('/:id/create-po', requireAuth, async (req, res) => {
         let whatsappSent = false;
         if (send_whatsapp && vendor_phone) {
             try {
+                const fs = require('fs');
+                const path = require('path');
+                const os = require('os');
                 const sessionManager = require('../services/whatsapp-session-manager');
-                const poMsg = `*Purchase Order #${poNumber}*\n\nFrom: *Quality Colours*\nEstimate: #${est.estimate_number}\n\n*Items:*\n${items.map(it => '• ' + it.item_name + ' x' + (it.quantity || 1)).join('\n')}\n\n*Total: ₹${subtotal.toLocaleString('en-IN')}*\n\n📦 *3rd Party Delivery:*\n${est.customer_name}\n${est.customer_phone}\n${est.customer_address || 'Address TBC'}\n\nPlease confirm and deliver.\nThank you!`;
-                try {
-                    await sessionManager.sendMessage(-1, vendor_phone, poMsg, { source: 'purchase-order', sent_by: req.user.id });
-                    whatsappSent = true;
-                } catch (e) {
-                    await sessionManager.sendMessage(0, vendor_phone, poMsg, { source: 'purchase-order', sent_by: req.user.id }).catch(() => {});
-                    whatsappSent = true;
+
+                // Generate PO PDF as simple HTML → Puppeteer
+                const token = req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : '';
+                const baseUrl = `http://localhost:${process.env.PORT || 3000}`;
+                const pdfResp = await fetch(`${baseUrl}/api/estimates/${req.params.id}/pdf?po=${poId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const caption = `*Purchase Order #${poNumber}*\nFrom: *Quality Colours*\n\n📦 *3rd Party Delivery:*\n${est.customer_name}\n${est.customer_phone}\n${est.customer_address || 'Address TBC'}\n\n*Total: ₹${subtotal.toLocaleString('en-IN')}*\n\nPlease confirm and deliver.\nThank you!`;
+
+                if (pdfResp.ok) {
+                    // Send as PDF document
+                    const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
+                    const tmpDir = path.join(os.tmpdir(), 'qc-po');
+                    fs.mkdirSync(tmpDir, { recursive: true });
+                    const poPath = path.join(tmpDir, `PO-${poNumber}.pdf`);
+                    fs.writeFileSync(poPath, pdfBuffer);
+
+                    try {
+                        await sessionManager.sendMedia(-1, vendor_phone, { type: 'document', mediaPath: poPath, caption, filename: `PO-${poNumber}.pdf` }, { source: 'purchase-order', sent_by: req.user.id });
+                        whatsappSent = true;
+                    } catch (e) {
+                        try {
+                            await sessionManager.sendMedia(0, vendor_phone, { type: 'document', mediaPath: poPath, caption, filename: `PO-${poNumber}.pdf` }, { source: 'purchase-order', sent_by: req.user.id });
+                            whatsappSent = true;
+                        } catch (e2) { console.error('WhatsApp PO fallback failed:', e2.message); }
+                    }
+                    try { fs.unlinkSync(poPath); } catch (e) {}
+                } else {
+                    // Fallback: send as text message if PDF fails
+                    try {
+                        await sessionManager.sendMessage(-1, vendor_phone, caption, { source: 'purchase-order', sent_by: req.user.id });
+                        whatsappSent = true;
+                    } catch (e) {
+                        await sessionManager.sendMessage(0, vendor_phone, caption, { source: 'purchase-order', sent_by: req.user.id }).catch(() => {});
+                        whatsappSent = true;
+                    }
                 }
                 await pool.query("UPDATE vendor_purchase_orders SET status = 'sent' WHERE id = ?", [poId]);
             } catch (waErr) { console.error('WhatsApp PO error:', waErr.message); }

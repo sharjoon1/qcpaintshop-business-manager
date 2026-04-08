@@ -468,9 +468,11 @@
             if (!estimateData) return;
             const payStatus = estimateData.payment_status;
             const payBadge = document.getElementById('paymentBadge');
+            const payBtn = document.getElementById('btnRecordPayment');
+            const paid = parseFloat(estimateData.payment_amount) || 0;
+            const total = parseFloat(estimateData.grand_total) || 0;
+
             if (payBadge && payStatus && payStatus !== 'unpaid') {
-                const paid = parseFloat(estimateData.payment_amount) || 0;
-                const total = parseFloat(estimateData.grand_total) || 0;
                 const balance = Math.max(0, total - paid);
                 if (payStatus === 'paid') {
                     payBadge.innerHTML = '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Paid ' + fmtINR(paid) + '</span>';
@@ -479,13 +481,54 @@
                 }
                 payBadge.classList.remove('hidden');
             }
+
+            // Change button: if fully paid, show "Resend Receipt" instead of "₹ Payment"
+            if (payBtn && payStatus === 'paid') {
+                payBtn.textContent = '📄 Resend Receipt';
+                payBtn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 text-white hover:bg-emerald-600';
+                payBtn.onclick = function() { openResendReceiptModal(); };
+            }
+        }
+
+        function openResendReceiptModal() {
+            if (!estimateData) return;
+            var phone = prompt('Send payment receipt to phone number:', estimateData.customer_phone || '');
+            if (!phone || phone.trim().length < 10) return;
+            resendReceipt(phone.trim());
+        }
+
+        async function resendReceipt(phone) {
+            try {
+                var token = localStorage.getItem('auth_token');
+                var resp = await fetch('/api/estimates/' + estimateId + '/send-whatsapp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ phone: phone })
+                });
+                var data = await resp.json();
+                if (data.success) {
+                    alert('Receipt sent via WhatsApp!');
+                } else if (data.fallback) {
+                    window.open(data.whatsapp_url, '_blank');
+                } else {
+                    alert('Failed: ' + (data.message || 'Error'));
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
         }
 
         function openPaymentModal() {
             if (!estimateData) return;
-            const total = parseFloat(estimateData.grand_total) || 0;
-            const paid = parseFloat(estimateData.payment_amount) || 0;
-            const balance = Math.max(0, total - paid);
+            var total = parseFloat(estimateData.grand_total) || 0;
+            var paid = parseFloat(estimateData.payment_amount) || 0;
+            var balance = Math.max(0, total - paid);
+
+            // If fully paid, resend receipt instead
+            if (balance <= 0.01) {
+                openResendReceiptModal();
+                return;
+            }
 
             document.getElementById('payModalSubtitle').textContent = 'Estimate #' + estimateData.estimate_number;
             document.getElementById('payCurrentStatus').innerHTML =

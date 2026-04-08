@@ -74,8 +74,11 @@ router.get('/:id/pdf', async (req, res) => {
         const protocol = req.protocol;
         const host = req.get('host');
         const isReceipt = req.query.receipt === '1';
-        const pageFile = isReceipt ? 'payment-receipt.html' : 'estimate-print.html';
-        const printUrl = `${protocol}://${host}/${pageFile}?id=${req.params.id}&mode=pdf&token=${token}`;
+        const isPO = req.query.po;
+        let pageFile = 'estimate-print.html';
+        if (isReceipt) pageFile = 'payment-receipt.html';
+        let printUrl = `${protocol}://${host}/${pageFile}?id=${req.params.id}&mode=pdf&token=${token}`;
+        if (isPO) printUrl += `&po=${isPO}&hide_payment=1`;
 
         await page.goto(printUrl, { waitUntil: 'networkidle0', timeout: 15000 });
 
@@ -89,9 +92,9 @@ router.get('/:id/pdf', async (req, res) => {
             printBackground: true
         });
 
-        const filename = isReceipt
-            ? `Receipt-${estimates[0].estimate_number || req.params.id}.pdf`
-            : `Estimate-${estimates[0].estimate_number || req.params.id}.pdf`;
+        let filename = `Estimate-${estimates[0].estimate_number || req.params.id}.pdf`;
+        if (isReceipt) filename = `Receipt-${estimates[0].estimate_number || req.params.id}.pdf`;
+        if (isPO) filename = `PO-${isPO}.pdf`;
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.send(pdfBuffer);
