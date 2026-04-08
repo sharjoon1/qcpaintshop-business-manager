@@ -78,7 +78,10 @@ router.get('/:id/pdf', async (req, res) => {
         let pageFile = 'estimate-print.html';
         if (isReceipt) pageFile = 'payment-receipt.html';
         let printUrl = `${protocol}://${host}/${pageFile}?id=${req.params.id}&mode=pdf&token=${token}`;
-        if (isPO) printUrl += `&po=${isPO}&hide_payment=1`;
+        if (isPO) {
+            printUrl += `&po=${isPO}&hide_payment=1`;
+            if (req.query.hide_prices === '1') printUrl += '&hide_prices=1';
+        }
 
         await page.goto(printUrl, { waitUntil: 'networkidle0', timeout: 15000 });
 
