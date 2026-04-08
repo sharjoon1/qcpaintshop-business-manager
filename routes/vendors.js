@@ -235,38 +235,7 @@ router.post('/sync-zoho',
 );
 
 // Get vendor detail
-router.get('/:id',
-    viewPerm,
-    validateParams(idParamSchema),
-    async (req, res) => {
-        try {
-            const { id } = req.params;
-
-            const [vendors] = await pool.query('SELECT * FROM vendors WHERE id = ?', [id]);
-            if (!vendors.length) {
-                return res.status(404).json({ success: false, message: 'Vendor not found' });
-            }
-
-            const [recent_bills] = await pool.query(
-                `SELECT * FROM vendor_bills WHERE vendor_id = ? ORDER BY created_at DESC LIMIT 10`,
-                [id]
-            );
-
-            const [recent_payments] = await pool.query(
-                `SELECT vp.*, u.full_name AS paid_by_name
-                 FROM vendor_payments vp
-                 LEFT JOIN users u ON vp.paid_by = u.id
-                 WHERE vp.vendor_id = ? ORDER BY vp.payment_date DESC LIMIT 10`,
-                [id]
-            );
-
-            res.json({ success: true, vendor: vendors[0], recent_bills, recent_payments });
-        } catch (error) {
-            console.error('Get vendor detail error:', error);
-            res.status(500).json({ success: false, message: 'Failed to get vendor details' });
-        }
-    }
-);
+// NOTE: GET /:id moved after all named routes (purchase-orders, payments) to avoid route conflicts
 
 // Create vendor
 router.post('/',
@@ -1022,6 +991,35 @@ router.post('/payments',
         } catch (error) {
             console.error('Record payment error:', error);
             res.status(500).json({ success: false, message: 'Failed to record payment' });
+        }
+    }
+);
+
+// ═══════════════════════════════════════════
+// GET VENDOR BY ID (must be LAST — /:id catches all)
+// ═══════════════════════════════════════════
+router.get('/:id',
+    viewPerm,
+    validateParams(idParamSchema),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const [vendors] = await pool.query('SELECT * FROM vendors WHERE id = ?', [id]);
+            if (!vendors.length) {
+                return res.status(404).json({ success: false, message: 'Vendor not found' });
+            }
+            const [recent_bills] = await pool.query(
+                'SELECT * FROM vendor_bills WHERE vendor_id = ? ORDER BY created_at DESC LIMIT 10', [id]
+            );
+            const [recent_payments] = await pool.query(
+                `SELECT vp.*, u.full_name AS paid_by_name
+                 FROM vendor_payments vp LEFT JOIN users u ON vp.paid_by = u.id
+                 WHERE vp.vendor_id = ? ORDER BY vp.payment_date DESC LIMIT 10`, [id]
+            );
+            res.json({ success: true, vendor: vendors[0], recent_bills, recent_payments });
+        } catch (error) {
+            console.error('Get vendor detail error:', error);
+            res.status(500).json({ success: false, message: 'Failed to get vendor details' });
         }
     }
 );
