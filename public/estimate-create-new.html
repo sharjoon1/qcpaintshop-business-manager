@@ -1179,7 +1179,13 @@
                     const hidePrice = item.hide_price;
                     row += `<td class="px-4 py-3 align-top text-right" style="min-width:140px">
                         ${hidePrice ? `<div class="text-xs text-gray-400 italic">Hidden</div>` : `
-                            <div class="font-semibold">${formatCurrency(item.base_price)}</div>
+                            <div class="flex items-center gap-1 justify-end">
+                                <span class="text-xs text-gray-400">₹</span>
+                                <input type="number" value="${item.base_price}" min="0" step="1"
+                                    onchange="onBasePriceChange(${item.id}, this.value)"
+                                    class="text-sm font-semibold border border-gray-200 rounded px-2 py-1 w-24 text-right focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none"
+                                    title="Edit base price">
+                            </div>
                             <div class="mt-1 flex items-center gap-1 justify-end">
                                 <select onchange="onItemMarkupTypeChange(${item.id}, this.value)" class="text-xs border rounded px-1 py-0.5" style="max-width:70px">
                                     <option value="" ${!item.markup_type ? 'selected' : ''}>--</option>
@@ -1365,6 +1371,16 @@
         // ========================================
         // ITEM EVENT HANDLERS (markup/discount/desc)
         // ========================================
+        function onBasePriceChange(itemId, newPrice) {
+            const item = estimateItems.find(i => i.id === itemId);
+            if (!item) return;
+            const price = parseFloat(newPrice) || 0;
+            item.base_price = price;
+            recalcItem(item);
+            renderEstimateTable();
+            updateTotals();
+        }
+
         function onItemMarkupTypeChange(itemId, type) {
             const item = estimateItems.find(i => i.id === itemId);
             if (!item) return;
