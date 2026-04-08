@@ -318,6 +318,69 @@ router.post('/:id/send-whatsapp', requireAuth, async (req, res) => {
 });
 
 // ========================================
+// RESEND PAYMENT RECEIPT VIA WHATSAPP
+// ========================================
+router.post('/:id/send-receipt', requireAuth, async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) return res.status(400).json({ success: false, message: 'Phone number required' });
+
+        const [estimates] = await pool.query(
+            'SELECT id, estimate_number, customer_name, grand_total, payment_amount, payment_method, payment_reference, payment_status FROM estimates WHERE id = ?',
+            [req.params.id]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        const est = estimates[0];
+
+        const fs = require('fs');
+        const path = require('path');
+        const os = require('os');
+        const token = req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : '';
+        const baseUrl = `http://localhost:${process.env.PORT || 3000}`;
+
+        // Generate RECEIPT PDF (not estimate PDF)
+        const pdfResp = await fetch(`${baseUrl}/api/estimates/${req.params.id}/pdf?receipt=1`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!pdfResp.ok) return res.status(500).json({ success: false, message: 'Failed to generate receipt PDF' });
+
+        const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
+        const tmpDir = path.join(os.tmpdir(), 'qc-receipts');
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const receiptPath = path.join(tmpDir, `Receipt-${est.estimate_number}.pdf`);
+        fs.writeFileSync(receiptPath, pdfBuffer);
+
+        const sessionManager = require('../services/whatsapp-session-manager');
+        const grandTotal = parseFloat(est.grand_total) || 0;
+        const paid = parseFloat(est.payment_amount) || 0;
+        const balance = Math.max(0, grandTotal - paid);
+        const caption = `Dear ${est.customer_name || 'Customer'},\n\n✅ *Payment Receipt*\n\nEstimate: *#${est.estimate_number}*\nTotal: *₹${grandTotal.toLocaleString('en-IN')}*\nPaid: *₹${paid.toLocaleString('en-IN')}*\nBalance: *₹${balance.toLocaleString('en-IN')}*${est.payment_method ? '\nMethod: ' + est.payment_method.toUpperCase() : ''}${est.payment_reference ? '\nRef: ' + est.payment_reference : ''}\n\nThank you! 🙏\n_Quality Colours_`;
+
+        let sent = false;
+        try {
+            await sessionManager.sendMedia(-1, phone, { type: 'document', mediaPath: receiptPath, caption, filename: `Receipt-${est.estimate_number}.pdf` }, { source: 'payment-receipt', sent_by: req.user.id });
+            sent = true;
+        } catch (e) {
+            try {
+                await sessionManager.sendMedia(0, phone, { type: 'document', mediaPath: receiptPath, caption, filename: `Receipt-${est.estimate_number}.pdf` }, { source: 'payment-receipt', sent_by: req.user.id });
+                sent = true;
+            } catch (e2) { console.error('Receipt send fallback failed:', e2.message); }
+        }
+        try { fs.unlinkSync(receiptPath); } catch (e) {}
+
+        if (sent) {
+            res.json({ success: true, message: 'Receipt sent via WhatsApp' });
+        } else {
+            res.json({ success: false, message: 'WhatsApp session not available' });
+        }
+    } catch (err) {
+        console.error('Send receipt error:', err);
+        res.status(500).json({ success: false, message: err.message || 'Failed to send receipt' });
+    }
+});
+
+// ========================================
 // RECORD PAYMENT ON ESTIMATE
 // ========================================
 router.post('/:id/record-payment', requireAuth, async (req, res) => {

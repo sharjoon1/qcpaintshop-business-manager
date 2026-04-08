@@ -500,16 +500,14 @@
         async function resendReceipt(phone) {
             try {
                 var token = localStorage.getItem('auth_token');
-                var resp = await fetch('/api/estimates/' + estimateId + '/send-whatsapp', {
+                var resp = await fetch('/api/estimates/' + estimateId + '/send-receipt', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                     body: JSON.stringify({ phone: phone })
                 });
                 var data = await resp.json();
                 if (data.success) {
-                    alert('Receipt sent via WhatsApp!');
-                } else if (data.fallback) {
-                    window.open(data.whatsapp_url, '_blank');
+                    alert('Payment receipt sent via WhatsApp!');
                 } else {
                     alert('Failed: ' + (data.message || 'Error'));
                 }
