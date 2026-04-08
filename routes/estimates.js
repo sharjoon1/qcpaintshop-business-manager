@@ -224,6 +224,113 @@ router.get('/:id/upi-qr', requireAuth, async (req, res) => {
 });
 
 // ========================================
+// SEND ESTIMATE PDF VIA WHATSAPP
+// ========================================
+router.post('/:id/send-whatsapp', requireAuth, async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) return res.status(400).json({ success: false, message: 'Phone number required' });
+
+        // Get estimate details
+        const [estimates] = await pool.query(
+            'SELECT id, estimate_number, customer_name, grand_total FROM estimates WHERE id = ?',
+            [req.params.id]
+        );
+        if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
+        const est = estimates[0];
+
+        // Generate PDF by fetching from internal endpoint
+        const fs = require('fs');
+        const path = require('path');
+        const os = require('os');
+
+        const token = req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : '';
+        const baseUrl = `http://localhost:${process.env.PORT || 3000}`;
+
+        const pdfResp = await fetch(`${baseUrl}/api/estimates/${req.params.id}/pdf`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!pdfResp.ok) throw new Error('Failed to generate PDF');
+        const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
+
+        // Save to temp file
+        const tmpDir = path.join(os.tmpdir(), 'qc-estimates');
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const pdfPath = path.join(tmpDir, `EST-${est.estimate_number}.pdf`);
+        fs.writeFileSync(pdfPath, pdfBuffer);
+
+        // Send PDF via WhatsApp
+        const sessionManager = require('../services/whatsapp-session-manager');
+        const ADMIN_BRANCH = -1;
+        const GENERAL_ID = 0;
+
+        let sent = false;
+        try {
+            sent = await sessionManager.sendMedia(ADMIN_BRANCH, phone, {
+                type: 'document',
+                mediaPath: pdfPath,
+                caption: `Estimate #${est.estimate_number} - Quality Colours\nTotal: ₹${parseFloat(est.grand_total).toLocaleString('en-IN')}`,
+                filename: `Estimate-${est.estimate_number}.pdf`
+            }, { source: 'estimate', sent_by: req.user.id });
+        } catch (e) {
+            // Fallback to General session
+            try {
+                sent = await sessionManager.sendMedia(GENERAL_ID, phone, {
+                    type: 'document',
+                    mediaPath: pdfPath,
+                    caption: `Estimate #${est.estimate_number} - Quality Colours\nTotal: ₹${parseFloat(est.grand_total).toLocaleString('en-IN')}`,
+                    filename: `Estimate-${est.estimate_number}.pdf`
+                }, { source: 'estimate', sent_by: req.user.id });
+            } catch (e2) {
+                console.error('WhatsApp send failed on both sessions:', e2.message);
+            }
+        }
+
+        // Also send text message with UPI payment link
+        if (sent) {
+            const amount = parseFloat(est.grand_total) || 0;
+            const upiUrl = `upi://pay?pa=7418831122@superyes&pn=Quality%20Colours&am=${amount.toFixed(2)}&cu=INR&tn=EST-${est.estimate_number}`;
+            const textMsg = `Dear ${est.customer_name || 'Customer'},\n\nYour estimate #${est.estimate_number} from *Quality Colours* is attached above.\n\n*Total: ₹${amount.toLocaleString('en-IN')}*\n\n💳 *Pay via UPI:*\n${upiUrl}\n\n_UPI ID: 7418831122@superyes_\n\nThank you! 🙏`;
+
+            try {
+                await sessionManager.sendMessage(ADMIN_BRANCH, phone, textMsg, { source: 'estimate', sent_by: req.user.id });
+            } catch (e) {
+                await sessionManager.sendMessage(GENERAL_ID, phone, textMsg, { source: 'estimate', sent_by: req.user.id }).catch(() => {});
+            }
+        }
+
+        // Clean up temp file
+        try { fs.unlinkSync(pdfPath); } catch (e) {}
+
+        if (sent) {
+            res.json({ success: true, message: 'Estimate PDF sent via WhatsApp' });
+        } else {
+            // Return wa.me fallback URL
+            const crypto = require('crypto');
+            const shareToken = crypto.randomBytes(32).toString('hex');
+            const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            await pool.query(
+                'INSERT INTO share_tokens (token, resource_type, resource_id, created_by, expires_at) VALUES (?, ?, ?, ?, ?)',
+                [shareToken, 'estimate', req.params.id, req.user.id, expiresAt]
+            );
+            const shareUrl = `${req.protocol}://${req.get('host')}/share/estimate/${shareToken}`;
+            const amount = parseFloat(est.grand_total) || 0;
+            const msg = `Dear ${est.customer_name || 'Customer'},\n\nPlease find your estimate #${est.estimate_number} from Quality Colours:\n${shareUrl}\n\nTotal: ₹${amount.toLocaleString('en-IN')}\n\nThank you!`;
+
+            let formattedPhone = phone.replace(/[^0-9]/g, '');
+            if (formattedPhone.length === 10) formattedPhone = '91' + formattedPhone;
+            const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`;
+
+            res.json({ success: false, fallback: true, whatsapp_url: waUrl, message: 'WhatsApp session not available, use link instead' });
+        }
+    } catch (err) {
+        console.error('Send WhatsApp estimate error:', err);
+        res.status(500).json({ success: false, message: err.message || 'Failed to send' });
+    }
+});
+
+// ========================================
 // GET SINGLE ESTIMATE
 // ========================================
 router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {

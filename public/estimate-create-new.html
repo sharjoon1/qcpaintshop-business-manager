@@ -2163,61 +2163,46 @@
         async function sendEstimateWhatsApp() {
             const phone = document.getElementById('postSavePhone').value.trim();
             if (!phone || phone.length < 10) {
-                alert('Enter a valid phone number');
+                showToast('Enter a valid phone number', 'error');
                 return;
             }
 
             const btn = document.getElementById('postSaveSendBtn');
             const status = document.getElementById('postSaveSendStatus');
             btn.disabled = true;
-            btn.innerHTML = 'Sending...';
+            btn.innerHTML = '<span class="animate-pulse">Sending PDF...</span>';
+            status.classList.add('hidden');
 
             try {
-                const resp = await apiRequest('/api/share/whatsapp', {
+                const rawResp = await apiRequest('/api/estimates/' + savedEstimateId + '/send-whatsapp', {
                     method: 'POST',
-                    body: JSON.stringify({
-                        resource_type: 'estimate',
-                        resource_id: savedEstimateId,
-                        customer_phone: phone
-                    })
+                    body: JSON.stringify({ phone: phone })
                 });
+                const resp = await rawResp.json();
 
-                const respData = await resp.json();
-
-                if (respData.success) {
-                    status.textContent = 'Sent successfully!';
+                if (resp.success) {
+                    status.textContent = '✓ PDF sent via WhatsApp!';
                     status.className = 'text-xs mt-2 text-green-600 font-semibold';
                     status.classList.remove('hidden');
-                    btn.textContent = 'Sent!';
-                    btn.className = btn.className.replace('bg-green-600', 'bg-green-400');
-
-                    // Try to send via server WhatsApp (whatsapp-web.js)
-                    try {
-                        await apiRequest('/api/whatsapp-chat/quick-send', {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                phone: phone,
-                                message: respData.data.message,
-                                source: 'estimate'
-                            })
-                        });
-                        status.textContent = 'Sent via WhatsApp!';
-                    } catch (e) {
-                        // Fallback: open wa.me link
-                        if (respData.data && respData.data.whatsapp_url) {
-                            window.open(respData.data.whatsapp_url, '_blank');
-                        }
-                        status.textContent = 'Opened in WhatsApp';
-                    }
+                    btn.innerHTML = '✓ Sent!';
+                    btn.className = btn.className.replace('bg-green-600', 'bg-green-400').replace('hover:bg-green-700', '');
+                } else if (resp.fallback) {
+                    // WhatsApp session not available — open wa.me link
+                    window.open(resp.whatsapp_url, '_blank');
+                    status.textContent = 'Opened in WhatsApp (PDF not sent — session offline)';
+                    status.className = 'text-xs mt-2 text-yellow-600';
+                    status.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Send';
                 } else {
-                    throw new Error(respData.message || 'Failed');
+                    throw new Error(resp.message || 'Failed');
                 }
             } catch (err) {
-                status.textContent = 'Error: ' + err.message;
+                status.textContent = 'Error: ' + (err.message || 'Send failed');
                 status.className = 'text-xs mt-2 text-red-600';
                 status.classList.remove('hidden');
                 btn.disabled = false;
-                btn.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.614-1.476A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.156 0-4.154-.675-5.794-1.823l-.413-.27-2.737.876.728-2.656-.296-.436A9.716 9.716 0 012.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75z"/></svg> Send`;
+                btn.innerHTML = 'Send';
             }
         }
 

@@ -833,52 +833,30 @@
         async function shareViaWhatsApp() {
             if (!estimateData) return;
 
-            const phone = prompt('Enter phone number to send estimate:', estimateData.customer_phone || '');
+            const phone = prompt('Enter phone number to send estimate PDF:', estimateData.customer_phone || '');
             if (!phone || phone.trim().length < 10) return;
 
             try {
-                const resp = await fetch('/api/share/whatsapp', {
+                const resp = await fetch('/api/estimates/' + estimateData.id + '/send-whatsapp', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + localStorage.getItem('auth_token')
                     },
-                    body: JSON.stringify({
-                        resource_type: 'estimate',
-                        resource_id: estimateData.id,
-                        customer_phone: phone.trim()
-                    })
+                    body: JSON.stringify({ phone: phone.trim() })
                 });
                 const data = await resp.json();
 
                 if (data.success) {
-                    // Try server-side WhatsApp first
-                    try {
-                        await fetch('/api/whatsapp-chat/quick-send', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + localStorage.getItem('auth_token')
-                            },
-                            body: JSON.stringify({
-                                phone: phone.trim(),
-                                message: data.data.message,
-                                source: 'estimate'
-                            })
-                        });
-                        alert('Estimate sent via WhatsApp!');
-                    } catch (e) {
-                        // Fallback to wa.me
-                        if (data.data && data.data.whatsapp_url) {
-                            window.open(data.data.whatsapp_url, '_blank');
-                        }
-                    }
+                    alert('Estimate PDF sent via WhatsApp!');
+                } else if (data.fallback) {
+                    window.open(data.whatsapp_url, '_blank');
                 } else {
-                    alert('Failed to generate share link');
+                    alert('Failed: ' + (data.message || 'Unknown error'));
                 }
             } catch (err) {
-                console.error('WhatsApp share error:', err);
-                alert('Error sharing estimate');
+                console.error('WhatsApp send error:', err);
+                alert('Error sending estimate');
             }
         }
     </script>
