@@ -331,6 +331,16 @@ router.post('/:id/record-payment', requireAuth, async (req, res) => {
         const est = estimates[0];
         const grandTotal = parseFloat(est.grand_total) || 0;
         const prevPaid = parseFloat(est.payment_amount) || 0;
+        const balance = Math.max(0, grandTotal - prevPaid);
+
+        // Prevent overpayment
+        if (parseFloat(amount) > balance + 0.01) {
+            return res.status(400).json({ success: false, message: `Amount ₹${amount} exceeds balance ₹${balance.toFixed(2)}` });
+        }
+        if (balance <= 0.01) {
+            return res.status(400).json({ success: false, message: 'Estimate is already fully paid' });
+        }
+
         const newTotalPaid = prevPaid + parseFloat(amount);
         const balanceDue = Math.max(0, grandTotal - newTotalPaid);
         const paymentStatus = balanceDue <= 0.01 ? 'paid' : (newTotalPaid > 0 ? 'partial' : 'unpaid');
