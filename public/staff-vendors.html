@@ -566,6 +566,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('pmDate').value = today;
     document.getElementById('bfBillDate').value = today;
+
+    // Handle URL params: ?tab=purchase-orders&po=123
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    const poParam = urlParams.get('po');
+    if (tabParam === 'purchase-orders') {
+        switchTab('purchaseOrders');
+        if (poParam) {
+            // Auto-open PO for editing after a short delay for data to load
+            setTimeout(() => { editPo(parseInt(poParam)); }, 800);
+        }
+    }
 });
 
 // =============================================
