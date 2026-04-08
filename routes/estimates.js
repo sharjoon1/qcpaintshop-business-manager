@@ -351,11 +351,11 @@ router.post('/:id/record-payment', requireAuth, async (req, res) => {
 
             const [invResult] = await pool.query(`
                 INSERT INTO billing_invoices (invoice_number, source, customer_name, customer_phone, customer_address,
-                    subtotal, discount_amount, grand_total, amount_paid, balance_due, payment_status, estimate_id, created_by)
-                VALUES (?, 'estimate', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    subtotal, discount_amount, grand_total, amount_paid, balance_due, payment_status, estimate_id, branch_id, created_by)
+                VALUES (?, 'estimate', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [invoiceNumber, est.customer_name, est.customer_phone, est.customer_address,
                 parseFloat(est.subtotal) || grandTotal, parseFloat(est.total_discount) || 0, grandTotal,
-                newTotalPaid, balanceDue, paymentStatus, req.params.id, req.user.id]);
+                newTotalPaid, balanceDue, paymentStatus, req.params.id, est.branch_id || 1, req.user.id]);
             invoiceId = invResult.insertId;
 
             for (const item of items) {
