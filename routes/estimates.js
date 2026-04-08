@@ -579,7 +579,7 @@ router.post('/:id/create-po', requireAuth, async (req, res) => {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
-                const caption = `*Purchase Order #${poNumber}*\nFrom: *Quality Colours*\n\n📦 *3rd Party Delivery:*\n${est.customer_name}\n${est.customer_phone}\n${est.customer_address || 'Address TBC'}\n\n*Total: ₹${subtotal.toLocaleString('en-IN')}*\n\nPlease confirm and deliver.\nThank you!`;
+                const caption = `*Purchase Order #${poNumber}*\nFrom: *Quality Colours*\n\n📦 *3rd Party Delivery:*\n${est.customer_name}\n${est.customer_phone}\n${est.customer_address || 'Address TBC'}\n\nPlease confirm and deliver.\nThank you!`;
 
                 if (pdfResp.ok) {
                     // Send as PDF document
