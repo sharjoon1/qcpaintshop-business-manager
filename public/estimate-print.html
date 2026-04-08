@@ -590,9 +590,9 @@
                     }
                     // Add GST breakdown for PO (purchase prices are excl GST)
                     if (!hidePrices) {
-                        var grandTotal = parseFloat(estimateData.grand_total) || 0;
-                        var baseExclGST = Math.round(grandTotal / 1.18);
-                        var gstAmount = grandTotal - baseExclGST;
+                        var poGrandTotal = parseFloat(estimateData.grand_total) || 0;
+                        var baseExclGST = Math.round(poGrandTotal / 1.18);
+                        var gstAmount = poGrandTotal - baseExclGST;
                         document.getElementById('subtotalVal').textContent = formatINR(baseExclGST);
                         document.getElementById('gstVal').textContent = formatINR(gstAmount);
                         document.getElementById('gstBreakdownSection').classList.remove('hidden');
