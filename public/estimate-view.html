@@ -86,6 +86,12 @@
             </div>
 
             <div class="flex gap-2">
+                <button onclick="openPaymentModal()" id="btnRecordPayment"
+                    class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700"
+                    title="Record Payment">₹ Payment</button>
+                <button onclick="openPoModal()" id="btnCreatePO"
+                    class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600"
+                    title="Create Purchase Order">📦 PO</button>
                 <button onclick="shareViaWhatsApp()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm" title="Share via WhatsApp">
                     📱 WhatsApp
                 </button>
@@ -138,6 +144,7 @@
                         <p class="text-sm print:text-xs"><strong>Date:</strong> <span id="estimateDate"></span></p>
                         <p class="text-sm print:text-xs"><strong>Ref #:</strong> <span id="estimateNumber"></span></p>
                         <div id="statusBadge" class="mt-2 inline-block no-print"></div>
+                        <span id="paymentBadge" class="hidden ml-2"></span>
                     </div>
                 </div>
             </div>
@@ -261,6 +268,7 @@
 
                 renderItems();
                 updateButtonStates();
+                updatePaymentBadge();
 
                 document.getElementById('loadingState').classList.add('hidden');
                 document.getElementById('mainContent').classList.remove('hidden');
@@ -453,9 +461,313 @@
             }
         }
 
+        // ===== PAYMENT FUNCTIONS =====
+        let vendors = [];
+
+        function updatePaymentBadge() {
+            if (!estimateData) return;
+            const payStatus = estimateData.payment_status;
+            const payBadge = document.getElementById('paymentBadge');
+            if (payBadge && payStatus && payStatus !== 'unpaid') {
+                const paid = parseFloat(estimateData.payment_amount) || 0;
+                const total = parseFloat(estimateData.grand_total) || 0;
+                const balance = Math.max(0, total - paid);
+                if (payStatus === 'paid') {
+                    payBadge.innerHTML = '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Paid ' + fmtINR(paid) + '</span>';
+                } else if (payStatus === 'partial') {
+                    payBadge.innerHTML = '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">Partial ' + fmtINR(paid) + ' / ' + fmtINR(total) + '</span>';
+                }
+                payBadge.classList.remove('hidden');
+            }
+        }
+
+        function openPaymentModal() {
+            if (!estimateData) return;
+            const total = parseFloat(estimateData.grand_total) || 0;
+            const paid = parseFloat(estimateData.payment_amount) || 0;
+            const balance = Math.max(0, total - paid);
+
+            document.getElementById('payModalSubtitle').textContent = 'Estimate #' + estimateData.estimate_number;
+            document.getElementById('payCurrentStatus').innerHTML =
+                '<div class="flex justify-between"><span>Grand Total:</span><strong>' + fmtINR(total) + '</strong></div>' +
+                '<div class="flex justify-between"><span>Already Paid:</span><strong>' + fmtINR(paid) + '</strong></div>' +
+                '<div class="flex justify-between text-green-700"><span>Balance Due:</span><strong>' + fmtINR(balance) + '</strong></div>';
+            document.getElementById('payAmount').value = balance > 0 ? balance : total;
+            document.getElementById('payPhone').value = estimateData.customer_phone || '';
+            document.getElementById('payStatus').classList.add('hidden');
+            document.getElementById('paySubmitBtn').disabled = false;
+            document.getElementById('paySubmitBtn').textContent = 'Record Payment';
+            document.getElementById('paymentModal').style.display = 'flex';
+        }
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').style.display = 'none';
+        }
+
+        async function recordPayment() {
+            const amount = parseFloat(document.getElementById('payAmount').value);
+            const method = document.getElementById('payMethod').value;
+            const reference = document.getElementById('payReference').value.trim();
+            const phone = document.getElementById('payPhone').value.trim();
+            const sendWa = document.getElementById('paySendWhatsApp').checked;
+
+            if (!amount || amount <= 0) { alert('Enter a valid amount'); return; }
+
+            const btn = document.getElementById('paySubmitBtn');
+            const status = document.getElementById('payStatus');
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const resp = await fetch('/api/estimates/' + estimateId + '/record-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ amount, payment_method: method, payment_reference: reference, send_whatsapp: sendWa, phone })
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    status.textContent = 'Payment recorded!' + (data.data.whatsapp_sent ? ' Receipt sent via WhatsApp.' : '');
+                    status.className = 'text-xs text-green-600 font-semibold';
+                    status.classList.remove('hidden');
+                    btn.textContent = 'Done';
+
+                    estimateData.payment_status = data.data.payment_status;
+                    estimateData.payment_amount = data.data.amount_paid;
+
+                    setTimeout(function() { location.reload(); }, 2000);
+                } else {
+                    throw new Error(data.message || 'Failed');
+                }
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                status.className = 'text-xs text-red-600';
+                status.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Record Payment';
+            }
+        }
+
+        // ===== PURCHASE ORDER FUNCTIONS =====
+
+        async function loadVendors() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const resp = await fetch('/api/vendors?limit=100', { headers: { 'Authorization': 'Bearer ' + token } });
+                const data = await resp.json();
+                vendors = data.data || data.vendors || data || [];
+                if (!Array.isArray(vendors)) vendors = [];
+            } catch (e) { console.error('Load vendors error:', e); }
+        }
+
+        function autoSuggestVendor() {
+            if (!estimateData || !estimateData.items || !vendors.length) return null;
+            const brands = [...new Set(estimateData.items.map(function(it) { return (it.brand || '').toLowerCase(); }).filter(Boolean))];
+            for (const v of vendors) {
+                const vName = (v.vendor_name || '').toLowerCase();
+                for (const brand of brands) {
+                    if (vName.includes(brand.split(' ')[0]) || brand.includes(vName.split(' ')[0])) return v;
+                }
+            }
+            return null;
+        }
+
+        function openPoModal() {
+            if (!estimateData) return;
+
+            const select = document.getElementById('poVendor');
+            let html = '<option value="">-- Select Vendor --</option>';
+            vendors.forEach(function(v) {
+                html += '<option value="' + v.id + '" data-phone="' + (v.phone || '') + '">' + (v.vendor_name || 'Vendor #' + v.id) + '</option>';
+            });
+            select.innerHTML = html;
+
+            const suggested = autoSuggestVendor();
+            const suggEl = document.getElementById('poVendorSuggestion');
+            if (suggested) {
+                select.value = suggested.id;
+                document.getElementById('poVendorPhone').value = suggested.phone || '';
+                suggEl.textContent = 'Auto-suggested: ' + suggested.vendor_name;
+                suggEl.classList.remove('hidden');
+            } else {
+                suggEl.classList.add('hidden');
+            }
+
+            const items = (estimateData.items || []).filter(function(it) { return it.item_type !== 'labor'; });
+            let itemsHtml = '';
+            let poTotal = 0;
+            items.forEach(function(it) {
+                const price = parseFloat(it.base_price) || parseFloat(it.unit_price) || 0;
+                const qty = parseFloat(it.quantity) || 1;
+                const lineTotal = price * qty;
+                poTotal += lineTotal;
+                itemsHtml += '<div class="flex justify-between"><span>' + (it.item_name || it.product_name || 'Item') + ' x' + qty + '</span><span>' + fmtINR(lineTotal) + '</span></div>';
+            });
+            document.getElementById('poItemsList').innerHTML = itemsHtml || '<div class="text-gray-400">No product items</div>';
+            document.getElementById('poTotal').textContent = fmtINR(poTotal);
+
+            document.getElementById('poDeliveryInfo').innerHTML =
+                '<strong>' + (estimateData.customer_name || 'Customer') + '</strong><br>' +
+                (estimateData.customer_phone || '') + '<br>' +
+                (estimateData.customer_address || 'Address not provided');
+
+            document.getElementById('poNotes').value = '';
+            document.getElementById('poStatus').classList.add('hidden');
+            document.getElementById('poSubmitBtn').disabled = false;
+            document.getElementById('poSubmitBtn').textContent = 'Create PO & Send';
+            document.getElementById('poModal').style.display = 'flex';
+        }
+
+        function onVendorSelect() {
+            const select = document.getElementById('poVendor');
+            const opt = select.options[select.selectedIndex];
+            if (opt && opt.dataset.phone) {
+                document.getElementById('poVendorPhone').value = opt.dataset.phone;
+            }
+        }
+
+        function closePoModal() {
+            document.getElementById('poModal').style.display = 'none';
+        }
+
+        async function createPurchaseOrder() {
+            const vendorId = document.getElementById('poVendor').value;
+            if (!vendorId) { alert('Select a vendor'); return; }
+
+            const vendorPhone = document.getElementById('poVendorPhone').value.trim();
+            const sendWa = document.getElementById('poSendWhatsApp').checked;
+            const notes = document.getElementById('poNotes').value.trim();
+
+            const btn = document.getElementById('poSubmitBtn');
+            const status = document.getElementById('poStatus');
+            btn.disabled = true;
+            btn.textContent = 'Creating PO...';
+
+            try {
+                const token = localStorage.getItem('auth_token');
+                const resp = await fetch('/api/estimates/' + estimateId + '/create-po', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ vendor_id: parseInt(vendorId), send_whatsapp: sendWa, vendor_phone: vendorPhone, notes: notes })
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    status.textContent = 'PO #' + data.data.po_number + ' created!' + (data.data.whatsapp_sent ? ' Sent to vendor via WhatsApp.' : '');
+                    status.className = 'text-xs text-green-600 font-semibold';
+                    status.classList.remove('hidden');
+                    btn.textContent = 'Created';
+                } else {
+                    throw new Error(data.message || 'Failed');
+                }
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                status.className = 'text-xs text-red-600';
+                status.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Create PO & Send';
+            }
+        }
+
         // Initialize
         loadEstimate();
+        loadVendors();
     </script>
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style="display:none">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="bg-gradient-to-r from-green-600 to-green-700 px-5 py-4">
+                <h3 class="text-white font-bold text-base">Record Payment</h3>
+                <p class="text-green-100 text-xs mt-0.5" id="payModalSubtitle"></p>
+            </div>
+            <div class="p-5 space-y-4">
+                <div id="payCurrentStatus" class="bg-gray-50 rounded-lg p-3 text-sm"></div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Amount (₹)</label>
+                    <input type="number" id="payAmount" min="1" step="1" class="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:border-green-500 outline-none" placeholder="Enter amount">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Payment Method</label>
+                    <select id="payMethod" class="w-full border rounded-lg px-3 py-2 text-sm mt-1">
+                        <option value="upi">UPI</option>
+                        <option value="cash">Cash</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="cheque">Cheque</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Reference / Transaction ID</label>
+                    <input type="text" id="payReference" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="Optional">
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-xs font-semibold text-gray-600">Phone</label>
+                    <input type="tel" id="payPhone" class="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="Customer phone">
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="paySendWhatsApp" checked class="w-4 h-4 text-green-600 rounded">
+                    <span class="text-sm text-gray-700">Send receipt via WhatsApp</span>
+                </label>
+                <div id="payStatus" class="text-xs hidden"></div>
+                <div class="flex gap-2">
+                    <button onclick="closePaymentModal()" class="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200">Cancel</button>
+                    <button onclick="recordPayment()" id="paySubmitBtn" class="flex-1 bg-green-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-green-700">Record Payment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PO Modal -->
+    <div id="poModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style="display:none">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-4">
+                <h3 class="text-white font-bold text-base">Create Purchase Order</h3>
+                <p class="text-orange-100 text-xs mt-0.5">3rd Party Delivery to Customer</p>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Vendor</label>
+                    <select id="poVendor" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" onchange="onVendorSelect()">
+                        <option value="">-- Select Vendor --</option>
+                    </select>
+                    <p id="poVendorSuggestion" class="text-xs text-blue-600 mt-1 hidden"></p>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600 mb-1 block">Items (Purchase Cost)</label>
+                    <div id="poItemsList" class="bg-gray-50 rounded-lg p-3 text-xs space-y-1 max-h-40 overflow-y-auto"></div>
+                    <div class="flex justify-between mt-2 text-sm font-bold">
+                        <span>PO Total:</span>
+                        <span id="poTotal">₹0</span>
+                    </div>
+                </div>
+                <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-xs font-bold text-orange-700">📦 3rd Party Delivery</span>
+                        <span class="bg-orange-200 text-orange-800 text-xs px-2 py-0.5 rounded-full">Ship to Customer</span>
+                    </div>
+                    <div class="text-xs text-gray-700" id="poDeliveryInfo"></div>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Vendor Phone (for WhatsApp)</label>
+                    <input type="tel" id="poVendorPhone" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="Vendor phone">
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="poSendWhatsApp" checked class="w-4 h-4 text-orange-500 rounded">
+                    <span class="text-sm text-gray-700">Send PO via WhatsApp</span>
+                </label>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Notes</label>
+                    <textarea id="poNotes" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="Optional notes"></textarea>
+                </div>
+                <div id="poStatus" class="text-xs hidden"></div>
+                <div class="flex gap-2">
+                    <button onclick="closePoModal()" class="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200">Cancel</button>
+                    <button onclick="createPurchaseOrder()" id="poSubmitBtn" class="flex-1 bg-orange-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-orange-600">Create PO & Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/components/logo-loader.js"></script>
 </body>
 </html>
