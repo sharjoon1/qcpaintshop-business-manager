@@ -740,8 +740,8 @@
         loadVendors();
     </script>
     <!-- Payment Modal -->
-    <div id="paymentModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style="display:none">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <div id="paymentModal" class="fixed inset-0 flex items-end sm:items-center justify-center bg-black bg-opacity-50" style="display:none; z-index:9999">
+        <div class="bg-white w-full sm:rounded-2xl sm:shadow-2xl sm:max-w-md sm:mx-4 rounded-t-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div class="bg-gradient-to-r from-green-600 to-green-700 px-5 py-4">
                 <h3 class="text-white font-bold text-base">Record Payment</h3>
                 <p class="text-green-100 text-xs mt-0.5" id="payModalSubtitle"></p>
@@ -783,8 +783,8 @@
     </div>
 
     <!-- PO Modal -->
-    <div id="poModal" class="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black bg-opacity-50 overflow-y-auto py-4" style="display:none">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden my-auto">
+    <div id="poModal" class="fixed inset-0 flex items-end sm:items-center justify-center bg-black bg-opacity-50" style="display:none; z-index:9999">
+        <div class="bg-white w-full sm:rounded-2xl sm:shadow-2xl sm:max-w-lg sm:mx-4 rounded-t-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div class="bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-4">
                 <h3 class="text-white font-bold text-base">Create Purchase Order</h3>
                 <p class="text-orange-100 text-xs mt-0.5">3rd Party Delivery to Customer</p>
@@ -829,10 +829,11 @@
                     <textarea id="poNotes" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="Optional notes"></textarea>
                 </div>
                 <div id="poStatus" class="text-xs hidden"></div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 pb-safe">
                     <button onclick="closePoModal()" class="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200">Cancel</button>
                     <button onclick="createPurchaseOrder()" id="poSubmitBtn" class="flex-1 bg-orange-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-orange-600">Create PO & Send</button>
                 </div>
+                <div class="h-4 sm:hidden"></div>
             </div>
         </div>
     </div>
