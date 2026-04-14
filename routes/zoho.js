@@ -2930,13 +2930,14 @@ router.get('/transactions/comparison', requirePermission('zoho', 'view'), async 
  */
 router.get('/reorder/config', requirePermission('zoho', 'view'), async (req, res) => {
     try {
-        const { item_id, location_id, page = 1, limit = 50 } = req.query;
+        const { item_id, location_id, source, page = 1, limit = 50 } = req.query;
 
         let where = 'WHERE 1=1';
         const params = [];
 
         if (item_id) { where += ' AND rc.zoho_item_id = ?'; params.push(item_id); }
         if (location_id) { where += ' AND rc.zoho_location_id = ?'; params.push(location_id); }
+        if (source) { where += ' AND rc.source = ?'; params.push(source); }
 
         const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
 
@@ -2953,7 +2954,7 @@ router.get('/reorder/config', requirePermission('zoho', 'view'), async (req, res
             ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
             ORDER BY rc.item_name ASC
             LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+        `, [...params, Number(limit), offset]);
 
         res.json({
             success: true,
@@ -3048,6 +3049,29 @@ router.post('/reorder/config/bulk', requirePermission('zoho', 'reorder'), async 
         res.json({ success: true, data: result });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * POST /api/zoho/reorder/config/reset-to-auto - Bulk reset selected configs to source='auto'
+ */
+router.post('/reorder/config/reset-to-auto', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ success: false, message: 'ids array required' });
+        }
+        const cleanIds = ids.map(n => parseInt(n, 10)).filter(Number.isFinite);
+        if (cleanIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'no valid ids' });
+        }
+        const [result] = await pool.query(
+            `UPDATE zoho_reorder_config SET source = 'auto' WHERE id IN (?)`,
+            [cleanIds]
+        );
+        res.json({ success: true, data: { updated: result.affectedRows } });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
     }
 });
 
