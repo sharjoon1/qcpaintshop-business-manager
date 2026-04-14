@@ -1119,6 +1119,7 @@
             return;
         }
         var ids = checked.map(function(c) { return parseInt(c.dataset.id, 10); });
+        if (!confirm(`Reset ${ids.length} row${ids.length > 1 ? 's' : ''} to auto? They will be recomputed on the next nightly cycle.`)) return;
         try {
             var resp = await fetch('/api/zoho/reorder/config/reset-to-auto', {
                 method: 'POST',
