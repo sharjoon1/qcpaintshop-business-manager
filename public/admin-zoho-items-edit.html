@@ -441,6 +441,8 @@
         { key: 'rate', label: 'Rate', type: 'number', zohoField: 'rate', step: '0.01', visible: false, filterable: true, width: 90, pctAdjust: true },
         { key: 'purchase_rate', label: 'Purchase Rate', type: 'number', zohoField: 'purchase_rate', step: '0.01', visible: false, filterable: true, width: 100, pctAdjust: true },
         { key: 'cf_dpl', label: 'DPL', type: 'number', zohoField: 'cf_dpl', step: '0.01', visible: false, filterable: true, width: 90 },
+        { key: 'dpl_rate_pct', label: 'DPL→Rate %', type: 'readonly', visible: true, width: 95 },
+        { key: 'dpl_updated_at', label: 'DPL Updated', type: 'readonly', visible: true, width: 110 },
         { key: 'unit', label: 'Unit', type: 'select', zohoField: 'unit', options: ['','pcs','kg','ltr','nos','box','set','mtr','sqft','gm','ml','pair','dozen','bundle'], visible: false, filterable: true, width: 75 },
         { key: 'hsn_or_sac', label: 'HSN/SAC', type: 'text', zohoField: 'hsn_or_sac', visible: false, filterable: true, width: 90 },
         { key: 'tax_percentage', label: 'Tax %', type: 'number', zohoField: 'tax_percentage', step: '0.01', visible: false, filterable: true, width: 65 },
@@ -459,6 +461,14 @@
     function showToast(msg, type) { var t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast toast-' + (type || 'info'); t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 3500); }
     function formatINR(a) { return '\u20B9' + parseFloat(a || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }); }
     function formatDateTime(d) { if (!d) return '--'; var dt = new Date(d); if (isNaN(dt.getTime())) return d; return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' + dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
+    function computeDplRatePct(itemId) {
+        var dpl = parseFloat(getCurrentValue(itemId, 'cf_dpl'));
+        var rate = parseFloat(getCurrentValue(itemId, 'rate'));
+        if (!isFinite(dpl) || dpl === 0 || !isFinite(rate)) return '--';
+        var pct = ((rate - dpl) / dpl) * 100;
+        var sign = pct > 0 ? '+' : '';
+        return sign + pct.toFixed(1) + '%';
+    }
     function escapeHtml(s) { if (s === null || s === undefined) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
     // ============ DIRTY TRACKING ============
@@ -711,7 +721,14 @@
                 var hiddenCls = col.visible ? '' : ' col-hidden';
                 var stickyCls = col.sticky ? ' col-name' : '';
                 if (col.type === 'readonly') {
-                    var rv = col.key === 'last_synced' ? formatDateTime(item[col.key]) : (item[col.key] != null ? String(item[col.key]) : '--');
+                    var rv;
+                    if (col.key === 'last_synced' || col.key === 'dpl_updated_at') {
+                        rv = formatDateTime(item[col.key]);
+                    } else if (col.key === 'dpl_rate_pct') {
+                        rv = computeDplRatePct(itemId);
+                    } else {
+                        rv = item[col.key] != null ? String(item[col.key]) : '--';
+                    }
                     html += '<td class="' + stickyCls + hiddenCls + '"><div class="rcell">' + escapeHtml(rv) + '</div></td>';
                 } else {
                     var val = getCurrentValue(itemId, col.key);
@@ -794,6 +811,14 @@
         // Update row dirty class
         var tr = cell.closest('tr');
         if (tr) tr.classList.toggle('row-dirty', dirtyItems.has(itemId));
+        // Refresh computed DPL→Rate% when rate or DPL changes
+        if ((field === 'rate' || field === 'cf_dpl') && tr) {
+            var pctIdx = allColumns.findIndex(function(c){return c.key==='dpl_rate_pct';});
+            if (pctIdx >= 0) {
+                var pctTd = tr.children[pctIdx + 1]; // +1 for checkbox col
+                if (pctTd) { var rc = pctTd.querySelector('.rcell'); if (rc) rc.textContent = computeDplRatePct(itemId); }
+            }
+        }
         // Show paste dropdown on blur-commit (always, so user can paste value to other rows)
         if (fromBlur && displayVal) {
             setTimeout(function() { showPasteDropdown(cell, itemId, field, val); }, 50);
@@ -900,6 +925,8 @@
             html += '<span>SKU: <b class="text-gray-700">'+escapeHtml(getCurrentValue(itemId,'sku')||'--')+'</b></span>';
             html += '<span>Rate: <b class="text-gray-700">'+formatINR(getCurrentValue(itemId,'rate'))+'</b></span>';
             html += '<span>DPL: <b class="text-gray-700">'+escapeHtml(getCurrentValue(itemId,'cf_dpl')||'--')+'</b></span>';
+            html += '<span>DPL→Rate: <b class="text-gray-700">'+escapeHtml(computeDplRatePct(itemId))+'</b></span>';
+            if (item.dpl_updated_at) html += '<span>DPL Upd: <b class="text-gray-700">'+escapeHtml(formatDateTime(item.dpl_updated_at))+'</b></span>';
             html += '</div>';
             if (hasDirty) { var cc = Object.keys(dirtyItems.get(itemId)).filter(function(k){return k!=='_itemName';}).length; html += '<div class="mt-1"><span class="change-badge">'+cc+' change'+(cc>1?'s':'')+'</span></div>'; }
             html += '</div>';

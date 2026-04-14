@@ -1747,6 +1747,7 @@ router.get('/items', requirePermission('zoho', 'view'), async (req, res) => {
                 zim.zoho_part_number as part_number,
                 zim.zoho_cf_product_name as cf_product_name,
                 zim.zoho_cf_dpl as cf_dpl,
+                zim.dpl_updated_at as dpl_updated_at,
                 zim.zoho_status as status,
                 zim.last_synced_at as last_synced
             FROM zoho_items_map zim
@@ -2645,6 +2646,9 @@ router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req,
                     vals.push(val);
                 }
             }
+            if (Object.prototype.hasOwnProperty.call(item.changes, 'cf_dpl')) {
+                sets.push('dpl_updated_at = NOW()');
+            }
             if (sets.length > 0) {
                 vals.push(item.zoho_item_id);
                 await pool.query(`UPDATE zoho_items_map SET ${sets.join(', ')} WHERE zoho_item_id = ?`, vals);
@@ -3380,7 +3384,7 @@ router.post('/items/apply-price-list', requirePermission('zoho', 'manage'), asyn
         for (const item of items) {
             if (!item.zoho_item_id || item.cf_dpl === undefined) continue;
             const [result] = await pool.query(
-                `UPDATE zoho_items_map SET zoho_cf_dpl = ? WHERE zoho_item_id = ?`,
+                `UPDATE zoho_items_map SET zoho_cf_dpl = ?, dpl_updated_at = NOW() WHERE zoho_item_id = ?`,
                 [item.cf_dpl, item.zoho_item_id]
             );
             if (result.affectedRows > 0) updated++;
