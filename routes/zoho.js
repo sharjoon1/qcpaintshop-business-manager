@@ -3595,6 +3595,48 @@ router.get('/purchase-suggestions/batch/:batchId', requirePermission('zoho', 'vi
 });
 
 /**
+ * GET /api/zoho/reorder/sales-analysis - Per-branch per-item sales velocity (60-day rolling)
+ */
+router.get('/reorder/sales-analysis', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const { branch_id, brand, category, from, to } = req.query;
+        const days = 60;
+        let where = `WHERE bis.sale_date >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`;
+        const params = [];
+        if (branch_id) { where += ` AND bis.local_branch_id = ?`; params.push(parseInt(branch_id, 10)); }
+        if (brand) { where += ` AND zim.zoho_brand = ?`; params.push(brand); }
+        if (category) { where += ` AND zim.zoho_category_name = ?`; params.push(category); }
+        if (from) { where += ` AND bis.sale_date >= ?`; params.push(from); }
+        if (to) { where += ` AND bis.sale_date <= ?`; params.push(to); }
+
+        const [rows] = await pool.query(`
+            SELECT bis.local_branch_id, b.name AS branch_name,
+                   bis.zoho_item_id, zim.zoho_item_name AS item_name, zim.zoho_sku AS sku,
+                   zim.zoho_brand AS brand, zim.zoho_category_name AS category,
+                   SUM(bis.qty_sold) AS total_qty,
+                   SUM(bis.revenue) AS total_revenue,
+                   ROUND(SUM(bis.qty_sold) / ${days}, 3) AS avg_daily_sales,
+                   COALESCE(ls.stock_on_hand, 0) AS current_stock,
+                   rc.reorder_level
+            FROM branch_item_sales bis
+            JOIN zoho_items_map zim ON zim.zoho_item_id = bis.zoho_item_id
+            LEFT JOIN branches b ON b.id = bis.local_branch_id
+            LEFT JOIN zoho_locations_map zlm ON zlm.local_branch_id = bis.local_branch_id
+            LEFT JOIN zoho_location_stock ls ON ls.zoho_item_id = bis.zoho_item_id AND ls.zoho_location_id = zlm.zoho_location_id
+            LEFT JOIN zoho_reorder_config rc ON rc.zoho_item_id = bis.zoho_item_id AND rc.zoho_location_id = zlm.zoho_location_id
+            ${where}
+            GROUP BY bis.local_branch_id, bis.zoho_item_id, b.name, zim.zoho_item_name, zim.zoho_sku, zim.zoho_brand, zim.zoho_category_name, ls.stock_on_hand, rc.reorder_level
+            ORDER BY total_qty DESC
+            LIMIT 2000
+        `, params);
+
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
  * POST /api/zoho/items/parse-price-list - Parse a brand dealer price list PDF
  * Returns extracted items with product name, pack size, and DPL
  * Optionally matches against existing Zoho items

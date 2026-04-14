@@ -230,6 +230,14 @@
                 Daily Report
             </span>
         </button>
+        <button id="tabSalesAnalysis" class="tab-btn" onclick="switchTab('sales-analysis')">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Sales Analysis
+            </span>
+        </button>
     </div>
 
     <!-- =========================================
@@ -557,6 +565,47 @@
         </div>
     </div>
 
+    <!-- =========================================
+         TAB 5: SALES ANALYSIS
+         ========================================= -->
+    <div id="panelSalesAnalysis" class="hidden">
+        <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <div class="flex gap-3 items-end mb-3 flex-wrap">
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Branch</label>
+                    <select id="saBranch" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Brand</label>
+                    <input type="text" id="saBrand" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Asian Paints">
+                </div>
+                <button onclick="loadSalesAnalysis()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
+                <button onclick="exportSalesAnalysisCsv()" class="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Export CSV</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-2 py-2 text-left font-semibold text-gray-600">Item</th>
+                            <th class="px-2 py-2 text-left font-semibold text-gray-600">Branch</th>
+                            <th class="px-2 py-2 text-left font-semibold text-gray-600">Brand</th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600">60d qty</th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600">Avg/day</th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600">Stock</th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600">Days left</th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600">Reorder @</th>
+                        </tr>
+                    </thead>
+                    <tbody id="saBody">
+                        <tr><td colspan="8" class="text-center text-gray-400 py-6">Select filters and click Load</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- Resolve Alert Modal -->
@@ -692,10 +741,12 @@
         document.getElementById('tabConfig').classList.toggle('active', tab === 'config');
         document.getElementById('tabBrandConfig').classList.toggle('active', tab === 'brand-config');
         document.getElementById('tabDailyReport').classList.toggle('active', tab === 'daily-report');
+        document.getElementById('tabSalesAnalysis').classList.toggle('active', tab === 'sales-analysis');
         document.getElementById('panelAlerts').classList.toggle('hidden', tab !== 'alerts');
         document.getElementById('panelConfig').classList.toggle('hidden', tab !== 'config');
         document.getElementById('panelBrandConfig').classList.toggle('hidden', tab !== 'brand-config');
         document.getElementById('panelDailyReport').classList.toggle('hidden', tab !== 'daily-report');
+        document.getElementById('panelSalesAnalysis').classList.toggle('hidden', tab !== 'sales-analysis');
 
         if (tab === 'config') {
             loadConfigs();
@@ -706,6 +757,9 @@
         if (tab === 'daily-report') {
             document.getElementById('reportDate').value = new Date().toISOString().slice(0, 10);
             loadReportBranches().then(() => loadReport());
+        }
+        if (tab === 'sales-analysis') {
+            loadSalesAnalysisBranches().then(() => loadSalesAnalysis());
         }
     }
 
@@ -1915,6 +1969,82 @@
         } catch (e) {
             showToast('Re-run failed: ' + e.message, 'error');
         }
+    }
+
+    // ============================
+    // SALES ANALYSIS
+    // ============================
+    let saRows = [];
+    let saFirstLoad = false;
+
+    async function loadSalesAnalysisBranches() {
+        try {
+            const res = await fetch('/api/branches', { headers: getAuthHeaders() });
+            const json = await res.json();
+            const list = Array.isArray(json) ? json : (json.data || []);
+            const sel = document.getElementById('saBranch');
+            sel.innerHTML = '<option value="">All</option>' +
+                list.filter(b => b.is_active !== 0).map(b =>
+                    '<option value="' + b.id + '">' + escapeHtml(b.name || b.branch_name || '') + '</option>'
+                ).join('');
+        } catch (e) { console.error('loadSalesAnalysisBranches error:', e); }
+    }
+
+    async function loadSalesAnalysis() {
+        const body = document.getElementById('saBody');
+        body.innerHTML = '<tr><td colspan="8" class="text-center text-gray-400 py-6">Loading...</td></tr>';
+        try {
+            const branch = document.getElementById('saBranch').value;
+            const brand = document.getElementById('saBrand').value.trim();
+            const qs = new URLSearchParams();
+            if (branch) qs.set('branch_id', branch);
+            if (brand) qs.set('brand', brand);
+            const res = await fetch('/api/zoho/reorder/sales-analysis?' + qs.toString(), { headers: getAuthHeaders() });
+            const json = await res.json();
+            if (!json.success) { alert(json.message); return; }
+            saRows = json.data;
+            if (saRows.length === 0) {
+                body.innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-4">No sales data</td></tr>';
+                return;
+            }
+            body.innerHTML = saRows.map(r => {
+                const avg = Number(r.avg_daily_sales) || 0;
+                const daysLeft = avg > 0 ? Math.floor(Number(r.current_stock) / avg) : '&#8734;';
+                return '<tr class="border-b hover:bg-gray-50">' +
+                    '<td class="px-2 py-1.5"><div class="font-medium text-gray-800">' + escapeHtml(r.item_name || '') + '</div>' +
+                    '<div class="text-xs text-gray-400">' + escapeHtml(r.sku || '') + '</div></td>' +
+                    '<td class="px-2 py-1.5 text-gray-700">' + escapeHtml(r.branch_name || '') + '</td>' +
+                    '<td class="px-2 py-1.5 text-gray-700">' + escapeHtml(r.brand || '') + '</td>' +
+                    '<td class="px-2 py-1.5 text-right font-semibold">' + r.total_qty + '</td>' +
+                    '<td class="px-2 py-1.5 text-right">' + avg.toFixed(2) + '</td>' +
+                    '<td class="px-2 py-1.5 text-right">' + r.current_stock + '</td>' +
+                    '<td class="px-2 py-1.5 text-right">' + daysLeft + '</td>' +
+                    '<td class="px-2 py-1.5 text-right">' + (r.reorder_level != null ? r.reorder_level : '&mdash;') + '</td>' +
+                    '</tr>';
+            }).join('');
+        } catch (e) {
+            alert('Load failed: ' + e.message);
+            body.innerHTML = '<tr><td colspan="8" class="text-center text-red-500 py-4">' + escapeHtml(e.message) + '</td></tr>';
+        }
+    }
+
+    function exportSalesAnalysisCsv() {
+        if (saRows.length === 0) { alert('No data to export'); return; }
+        const headers = ['item', 'sku', 'branch', 'brand', 'qty_60d', 'avg_daily', 'stock', 'reorder_level'];
+        const quote = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+        const lines = [headers.join(',')];
+        for (const r of saRows) {
+            lines.push([
+                quote(r.item_name), quote(r.sku), quote(r.branch_name), quote(r.brand),
+                r.total_qty, r.avg_daily_sales, r.current_stock, r.reorder_level || ''
+            ].join(','));
+        }
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'sales-analysis.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     // ============================
