@@ -3164,6 +3164,26 @@ router.post('/reorder/check', requirePermission('zoho', 'reorder'), async (req, 
 // ========================================
 
 /**
+ * GET /api/zoho/reorder/brands/available - List distinct brand names from zoho_items_map
+ * (used by the Brand Config Add modal to populate a dropdown)
+ */
+router.get('/reorder/brands/available', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT DISTINCT zoho_brand AS brand_name,
+                   COUNT(*) AS item_count
+            FROM zoho_items_map
+            WHERE zoho_brand IS NOT NULL AND zoho_brand != ''
+            GROUP BY zoho_brand
+            ORDER BY zoho_brand ASC
+        `);
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
  * GET /api/zoho/reorder/brands - List all brand configs with item counts and updated-by name
  */
 router.get('/reorder/brands', requirePermission('zoho', 'reorder'), async (req, res) => {

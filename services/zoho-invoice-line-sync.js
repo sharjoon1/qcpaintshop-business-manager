@@ -21,17 +21,19 @@ function addDays(date, days) {
 
 /**
  * Pure helper — compute sync window.
- * @param {string|null} lastSaleDate - ISO date string or null
+ * Always honours `backfillDays` when explicitly given (non-default), so users can
+ * extend the historical window backwards. The cursor table prevents re-fetching
+ * invoices already synced, so overlap is safe + cheap.
+ *
+ * @param {string|null} lastSaleDate - ISO date string or null (unused when backfillDays explicit)
  * @param {Date} now
+ * @param {number} backfillDays - window size in days (default 90)
  * @returns {{ from: string, to: string }}
  */
 function computeSyncWindow(lastSaleDate, now = new Date(), backfillDays = 90) {
     const yesterday = addDays(now, -1);
-    if (!lastSaleDate) {
-        return { from: toIsoDate(addDays(now, -backfillDays)), to: toIsoDate(yesterday) };
-    }
-    const from = addDays(new Date(lastSaleDate), -1);
-    return { from: toIsoDate(from), to: toIsoDate(yesterday) };
+    // Always compute window from (today - N days). Cursor de-dups already-synced invoices.
+    return { from: toIsoDate(addDays(now, -backfillDays)), to: toIsoDate(yesterday) };
 }
 
 /**

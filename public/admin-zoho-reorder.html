@@ -667,7 +667,10 @@
                 <input type="hidden" id="brandId">
                 <div class="mb-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Brand name</label>
-                    <input type="text" id="brandName" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="brandNameSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">— Choose a brand —</option>
+                    </select>
+                    <input type="text" id="brandName" class="hidden w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" readonly>
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Lead time (days)</label>
@@ -1670,23 +1673,50 @@
         }
     }
 
-    function openBrandModal() {
+    async function populateBrandDropdown(excludeExisting) {
+        var sel = document.getElementById('brandNameSelect');
+        sel.innerHTML = '<option value="">Loading brands...</option>';
+        try {
+            var [availRes, cfgRes] = await Promise.all([
+                fetch('/api/zoho/reorder/brands/available', { headers: getAuthHeaders() }).then(r => r.json()),
+                fetch('/api/zoho/reorder/brands', { headers: getAuthHeaders() }).then(r => r.json())
+            ]);
+            var existing = new Set((cfgRes.data || []).map(function(b) { return b.brand_name; }));
+            var opts = ['<option value="">— Choose a brand —</option>'];
+            (availRes.data || []).forEach(function(b) {
+                var disabled = excludeExisting && existing.has(b.brand_name);
+                opts.push('<option value="' + escapeHtml(b.brand_name) + '"' + (disabled ? ' disabled' : '') + '>' +
+                    escapeHtml(b.brand_name) + ' (' + b.item_count + ' items)' +
+                    (disabled ? ' — already configured' : '') + '</option>');
+            });
+            sel.innerHTML = opts.join('');
+        } catch (e) {
+            sel.innerHTML = '<option value="">Failed to load brands</option>';
+        }
+    }
+
+    async function openBrandModal() {
         document.getElementById('brandModalTitle').textContent = 'Add Brand';
         document.getElementById('brandId').value = '';
+        // Show dropdown, hide text input (Add mode)
+        document.getElementById('brandNameSelect').classList.remove('hidden');
+        document.getElementById('brandName').classList.add('hidden');
         document.getElementById('brandName').value = '';
-        document.getElementById('brandName').readOnly = false;
-        document.getElementById('brandName').classList.remove('bg-gray-100');
         document.getElementById('brandLead').value = 7;
         document.getElementById('brandSafety').value = 5;
         document.getElementById('brandActive').checked = true;
         document.getElementById('brandModal').classList.remove('hidden');
+        // Populate dropdown, excluding already-configured brands
+        await populateBrandDropdown(true);
     }
 
     function editBrand(b) {
         document.getElementById('brandModalTitle').textContent = 'Edit Brand \u2014 ' + b.brand_name;
         document.getElementById('brandId').value = b.id;
+        // Hide dropdown, show readonly text input (Edit mode, brand immutable)
+        document.getElementById('brandNameSelect').classList.add('hidden');
+        document.getElementById('brandName').classList.remove('hidden');
         document.getElementById('brandName').value = b.brand_name;
-        document.getElementById('brandName').readOnly = true;
         document.getElementById('brandName').classList.add('bg-gray-100');
         document.getElementById('brandLead').value = b.lead_time_days;
         document.getElementById('brandSafety').value = b.safety_days;
@@ -1707,8 +1737,13 @@
     async function saveBrand(ev) {
         ev.preventDefault();
         var id = document.getElementById('brandId').value;
+        // Read brand_name: from dropdown in Add mode, from text input in Edit mode
+        var brandName = id
+            ? document.getElementById('brandName').value.trim()
+            : document.getElementById('brandNameSelect').value.trim();
+        if (!brandName) { alert('Please select a brand'); return; }
         var body = {
-            brand_name: document.getElementById('brandName').value.trim(),
+            brand_name: brandName,
             lead_time_days: parseInt(document.getElementById('brandLead').value, 10),
             safety_days: parseInt(document.getElementById('brandSafety').value, 10),
             is_active: document.getElementById('brandActive').checked ? 1 : 0
