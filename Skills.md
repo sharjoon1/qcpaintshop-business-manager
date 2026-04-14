@@ -3051,7 +3051,21 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 - **Backend**: Added `hasPoints` and `inStock` query params to `GET /api/painters/me/catalog`
 - **DI**: 17 API interfaces (added PointsApi, CardsApi, VisualizationApi, ReferralApi, NotificationApi, ProfileApi)
 - **Key new files**: `ui/catalog/FilterBottomSheet.kt`, `ui/catalog/ProductDetailSheet.kt`, `ui/home/components/` (11 files), `ui/profile/` (16 new files), `ui/work/estimates/EstimateDetailScreen.kt`, `ui/work/quotations/QuotationDetailScreen.kt`, `ui/notifications/NotificationsScreen.kt`, `utils/TimeUtils.kt`, `utils/NotificationBadge.kt`
-- **APK**: `app/build/outputs/apk/painter/release/app-painter-release.apk` (8.3MB)
+- **APK**: `app/build/outputs/apk/painter/release/app-painter-release.apk` (8.7MB)
+
+### Painter App Bug Fixes & Enhancements (Apr 6-7, 12 builds)
+- **Loyalty levels**: Bronze 0/1x → Silver 3,000/1.2x → Gold 5,000/1.5x → Diamond 10,000/2x. Migration: `migrate-painter-levels-update.js`
+- **Card design v8**: Enterprise redesign — photo-first visiting card (1400×800), QR-dominant ID card (800×1200), level-colored accents
+- **Card share**: Image + marketing text + referral link. Fullscreen viewer on tap. Download to gallery
+- **Estimate create UI**: Compact single-row header (back arrow + step dots on green bar), inline filter chips (Search/Brand/Category/Points), collapsed product cards (tap to expand variants), self billing shows prices, customer billing hides prices
+- **Catalog filters**: Inline chips (Search/Brand/Category/Points) matching estimate style. Points chip filters to products with regular_points > 0
+- **Variant sort**: Numeric order (1L→4L→10L→20L) via `CAST(ps.size AS DECIMAL)`
+- **Points in estimate**: `regular_points` and `annual_points` shown per variant from `painter_product_point_rates`
+- **Catalog product detail**: Fixed size/points display (field name mapping: `product_id`, `pack_size`→`size`, `points_per_unit`→`regular_points`). Fixed variant.id type (String not Int for zoho_item_id)
+- **Backend**: `hasPoints` filter on `/me/estimates/products`, points data in pack_sizes response, dashboard returns `painterCity`
+
+### Zoho Price-Adjust, Sidebar Accordion, Login-After-Logout fix (Apr 14, 2026)
+- **Zoho Price-Adjust**: `% Adjust` on `admin-zoho-items-edit.html` now supports source→target dropdowns (default DPL→Rate, formula `source × (1 + pct/100)`); admin sidebar converted to click-to-expand accordion with full subnav parity (Zoho/WhatsApp/Painters/System sections now list every page from their horizontal subnav); `auth-helper.js` added proactive `validateSession()` against `/api/auth/me` so stale sessions no longer leave the user on a non-functional dashboard — expired sessions redirect to `/login.html?reason=expired` with a toast. Files: `public/admin-zoho-items-edit.html`, `public/components/sidebar-complete.html`, `public/universal-nav-loader.js`, `public/js/auth-helper.js`, `public/login.html`. Spec: `docs/superpowers/specs/2026-04-14-zoho-bugs-sidebar-auth-design.md`.
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-04-06 | Version: 3.3.9 (Staff/Customer), 2.1.0 (Painter) | Maintained by: Development Team*
+*Last Updated: 2026-04-14 | Version: 3.3.9 (Staff/Customer), 2.1.0 (Painter) | Maintained by: Development Team*
