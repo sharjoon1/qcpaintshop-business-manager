@@ -151,13 +151,22 @@
                         % Adjust
                     </button>
                     <div id="pctPopover" class="pct-popover hidden">
-                        <div class="text-xs font-semibold text-gray-700 mb-2">Adjust Rates by Percentage</div>
+                        <div class="text-xs font-semibold text-gray-700 mb-2">Adjust Price by Percentage</div>
                         <div class="space-y-2">
                             <div>
-                                <label class="text-xs text-gray-500">Apply to</label>
-                                <select id="pctField" class="w-full mt-0.5 px-2 py-1.5 border border-gray-300 rounded text-xs">
+                                <label class="text-xs text-gray-500">Source field (read from)</label>
+                                <select id="pctSource" class="w-full mt-0.5 px-2 py-1.5 border border-gray-300 rounded text-xs">
+                                    <option value="cf_dpl" selected>DPL</option>
                                     <option value="rate">Rate (Selling Price)</option>
                                     <option value="purchase_rate">Purchase Rate</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500">Target field (write to)</label>
+                                <select id="pctTarget" class="w-full mt-0.5 px-2 py-1.5 border border-gray-300 rounded text-xs">
+                                    <option value="rate" selected>Rate (Selling Price)</option>
+                                    <option value="purchase_rate">Purchase Rate</option>
+                                    <option value="cf_dpl">DPL</option>
                                 </select>
                             </div>
                             <div>
@@ -166,6 +175,7 @@
                                     <input type="number" id="pctValue" step="0.01" placeholder="e.g. 10 or -5" class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs outline-none focus:border-indigo-500">
                                     <span class="flex items-center text-xs text-gray-400">%</span>
                                 </div>
+                                <div class="text-[10px] text-gray-400 mt-1">New Target = Source × (1 + %/100)</div>
                             </div>
                             <div>
                                 <label class="text-xs text-gray-500">Scope</label>
@@ -510,29 +520,35 @@
     // ============ % ADJUSTMENT ============
     function togglePctPopover() { document.getElementById('pctPopover').classList.toggle('hidden'); }
     function applyPctAdjust() {
-        var field = document.getElementById('pctField').value;
+        var source = document.getElementById('pctSource').value;
+        var target = document.getElementById('pctTarget').value;
         var pct = parseFloat(document.getElementById('pctValue').value);
         var scope = document.getElementById('pctScope').value;
-        if (isNaN(pct) || pct === 0) { showToast('Enter a non-zero percentage', 'error'); return; }
+        if (!source || !target) { showToast('Select source and target fields', 'error'); return; }
+        if (isNaN(pct)) { showToast('Enter a percentage', 'error'); return; }
         var targetItems = [];
         if (scope === 'selected') {
             if (selectedItemIds.size === 0) { showToast('Select items first', 'error'); return; }
             targetItems = items.filter(function(it) { return selectedItemIds.has(String(it.item_id || it.zoho_item_id)); });
         } else { targetItems = getFilteredItems(); }
-        if (!confirm('Apply ' + (pct > 0 ? '+' : '') + pct + '% to ' + field.replace('_', ' ') + ' for ' + targetItems.length + ' items?')) return;
-        var count = 0;
+        var prettyLabel = function(k) { return k === 'cf_dpl' ? 'DPL' : k === 'rate' ? 'Rate' : k === 'purchase_rate' ? 'Purchase Rate' : k; };
+        var sign = pct > 0 ? '+' : '';
+        var msg = 'Apply ' + sign + pct + '% from ' + prettyLabel(source) + ' to ' + prettyLabel(target) + ' for ' + targetItems.length + ' items?';
+        if (!confirm(msg)) return;
+        var updated = 0, skipped = 0;
         targetItems.forEach(function(item) {
             var id = String(item.item_id || item.zoho_item_id);
-            var current = parseFloat(getCurrentValue(id, field)) || 0;
-            if (current > 0) {
-                var newVal = Math.round((current * (1 + pct / 100)) * 100) / 100;
-                setDirty(id, field, String(newVal));
-                count++;
-            }
+            var currentSource = parseFloat(getCurrentValue(id, source));
+            if (!isFinite(currentSource) || currentSource === 0) { skipped++; return; }
+            var newTarget = Math.round((currentSource * (1 + pct / 100)) * 100) / 100;
+            setDirty(id, target, String(newTarget));
+            updated++;
         });
         togglePctPopover();
         renderTable();
-        showToast('Adjusted ' + field.replace('_', ' ') + ' by ' + (pct > 0 ? '+' : '') + pct + '% for ' + count + ' items', 'success');
+        var resultMsg = 'Updated ' + prettyLabel(target) + ' for ' + updated + ' items';
+        if (skipped > 0) resultMsg += ' (skipped ' + skipped + ' with empty ' + prettyLabel(source) + ')';
+        showToast(resultMsg, 'success');
     }
 
     // ============ MARK INACTIVE ============
