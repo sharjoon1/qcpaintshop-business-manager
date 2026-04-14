@@ -3277,12 +3277,14 @@ router.post('/reorder/backfill-sales', requirePermission('zoho', 'reorder'), asy
             message: 'Back-fill already running since ' + invoiceBackfillState.startedAt.toISOString()
         });
     }
-    invoiceBackfillState = { running: true, startedAt: new Date() };
-    res.json({ success: true, message: 'Sync started — watch sales-sync-status' });
+    const days = Math.max(1, Math.min(730, parseInt(req.body.days, 10) || 90));
+    invoiceBackfillState = { running: true, startedAt: new Date(), days };
+    res.json({ success: true, message: `Sync started for last ${days} days — watch sales-sync-status` });
     setImmediate(async () => {
         try {
             const io = req.app.get('io');
             const result = await invoiceLineSync.syncInvoiceLines({
+                backfillDays: days,
                 emitProgress: p => io?.emit('invoice-line-sync-progress', p)
             });
             io?.emit('invoice-line-sync-done', result);
@@ -3292,7 +3294,7 @@ router.post('/reorder/backfill-sales', requirePermission('zoho', 'reorder'), asy
             const io = req.app.get('io');
             io?.emit('invoice-line-sync-done', { error: e.message });
         } finally {
-            invoiceBackfillState = { running: false, startedAt: null };
+            invoiceBackfillState = { running: false, startedAt: null, days: null };
         }
     });
 });

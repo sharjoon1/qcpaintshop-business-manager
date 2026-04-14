@@ -25,10 +25,10 @@ function addDays(date, days) {
  * @param {Date} now
  * @returns {{ from: string, to: string }}
  */
-function computeSyncWindow(lastSaleDate, now = new Date()) {
+function computeSyncWindow(lastSaleDate, now = new Date(), backfillDays = 90) {
     const yesterday = addDays(now, -1);
     if (!lastSaleDate) {
-        return { from: toIsoDate(addDays(now, -90)), to: toIsoDate(yesterday) };
+        return { from: toIsoDate(addDays(now, -backfillDays)), to: toIsoDate(yesterday) };
     }
     const from = addDays(new Date(lastSaleDate), -1);
     return { from: toIsoDate(from), to: toIsoDate(yesterday) };
@@ -120,11 +120,11 @@ function isRateLimitError(err) {
  * @param {{ emitProgress?: Function }} options
  * @returns {{ synced, failed, total, window, pausedOnRateLimit? }}
  */
-async function syncInvoiceLines({ emitProgress } = {}) {
+async function syncInvoiceLines({ emitProgress, backfillDays = 90 } = {}) {
     if (!pool) throw new Error('pool not set');
 
     const lastDate = await getLastSyncedDate();
-    const window = computeSyncWindow(lastDate);
+    const window = computeSyncWindow(lastDate, new Date(), backfillDays);
     const invoices = await fetchUnsyncedInvoices(window);
 
     console.log(`[InvoiceLineSync] Window ${window.from}..${window.to} — ${invoices.length} unsynced invoices`);

@@ -188,9 +188,14 @@
             <div class="text-sm">
                 <span id="syncStatusText">Loading...</span>
             </div>
-            <button id="backfillBtn" onclick="triggerBackfill()" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
-                Back-fill sales history
-            </button>
+            <div class="flex items-center gap-2">
+                <label class="text-xs text-gray-600">Last</label>
+                <input type="number" id="backfillDays" value="30" min="1" max="730" class="w-16 px-2 py-1 border rounded text-sm">
+                <label class="text-xs text-gray-600">days</label>
+                <button id="backfillBtn" onclick="triggerBackfill()" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+                    Back-fill
+                </button>
+            </div>
         </div>
         <div id="syncProgress" class="mt-2 text-xs text-gray-600 hidden"></div>
     </div>
@@ -1775,7 +1780,8 @@
     }
 
     async function triggerBackfill() {
-        if (!confirm('Start invoice-line sync? First run may take up to 10 minutes.')) return;
+        const days = Math.max(1, Math.min(730, parseInt(document.getElementById('backfillDays').value, 10) || 30));
+        if (!confirm('Start invoice-line sync for last ' + days + ' days? May take several minutes.')) return;
         const btn = document.getElementById('backfillBtn');
         btn.disabled = true;
         const progressEl = document.getElementById('syncProgress');
@@ -1784,7 +1790,8 @@
         try {
             const res = await fetch('/api/zoho/reorder/backfill-sales', {
                 method: 'POST',
-                headers: getAuthHeaders()
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ days })
             });
             const json = await res.json();
             if (!json.success) {
