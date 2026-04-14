@@ -142,7 +142,38 @@ async function migrate() {
             console.warn('⚠️  zoho_reorder_config does not exist — run zoho reorder migration first');
         }
 
-        // 6. Seed ai_config keys (INSERT IGNORE — non-destructive)
+        // 6a. Ensure zoho_reorder_alerts has (item, location) unique key so upserts work
+        if (await tableExists(pool, 'zoho_reorder_alerts')) {
+            const [idx] = await pool.query(
+                `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zoho_reorder_alerts' AND INDEX_NAME = 'uq_item_loc'`
+            );
+            if (idx.length === 0) {
+                await pool.query(`ALTER TABLE zoho_reorder_alerts ADD UNIQUE KEY uq_item_loc (zoho_item_id, zoho_location_id)`);
+                console.log('✅ zoho_reorder_alerts.uq_item_loc added');
+            } else {
+                console.log('⏭️  zoho_reorder_alerts.uq_item_loc exists');
+            }
+        }
+
+        // 6b. Ensure zoho_sync_log.sync_type ENUM includes 'reorder_compute'
+        if (await tableExists(pool, 'zoho_sync_log')) {
+            const [enumRows] = await pool.query(
+                `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zoho_sync_log' AND COLUMN_NAME = 'sync_type'`
+            );
+            if (enumRows.length > 0 && !enumRows[0].COLUMN_TYPE.includes('reorder_compute')) {
+                // Insert current enum values plus 'reorder_compute'
+                const currentType = enumRows[0].COLUMN_TYPE; // e.g. enum('a','b',...)
+                const newType = currentType.replace(/\)$/, ",'reorder_compute')");
+                await pool.query(`ALTER TABLE zoho_sync_log MODIFY COLUMN sync_type ${newType} NOT NULL`);
+                console.log('✅ zoho_sync_log.sync_type ENUM extended with reorder_compute');
+            } else {
+                console.log('⏭️  zoho_sync_log.sync_type already has reorder_compute (or table missing)');
+            }
+        }
+
+        // 7. Seed ai_config keys (INSERT IGNORE — non-destructive)
         const configKeys = [
             ['reorder_sales_window_days',        '60'],
             ['reorder_min_sales_for_auto',        '1'],
