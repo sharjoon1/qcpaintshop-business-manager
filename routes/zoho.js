@@ -42,6 +42,9 @@ const invoiceLineSync = require('../services/zoho-invoice-line-sync');
 
 let pool;
 
+// Module-scoped flag to prevent concurrent invoice-line back-fills
+let invoiceBackfillState = { running: false, startedAt: null };
+
 // === DEBOUNCE & CACHE ===
 // Prevents rapid-fire sync clicks from wasting API calls
 const _syncDebounce = {}; // { operationKey: lastCallTimestamp }
@@ -3232,6 +3235,13 @@ router.delete('/reorder/brands/:id', requirePermission('zoho', 'reorder'), async
  * Returns immediately; progress emitted via Socket.io.
  */
 router.post('/reorder/backfill-sales', requirePermission('zoho', 'reorder'), async (req, res) => {
+    if (invoiceBackfillState.running) {
+        return res.status(409).json({
+            success: false,
+            message: 'Back-fill already running since ' + invoiceBackfillState.startedAt.toISOString()
+        });
+    }
+    invoiceBackfillState = { running: true, startedAt: new Date() };
     res.json({ success: true, message: 'Sync started — watch sales-sync-status' });
     setImmediate(async () => {
         try {
@@ -3245,6 +3255,8 @@ router.post('/reorder/backfill-sales', requirePermission('zoho', 'reorder'), asy
             console.error('[BackfillSales] failed:', e);
             const io = req.app.get('io');
             io?.emit('invoice-line-sync-done', { error: e.message });
+        } finally {
+            invoiceBackfillState = { running: false, startedAt: null };
         }
     });
 });
@@ -3267,7 +3279,9 @@ router.get('/reorder/sales-sync-status', requirePermission('zoho', 'reorder'), a
                 invoices_synced: cursor_count,
                 sales_rows: stats.sales_count,
                 earliest_date: stats.min_date,
-                latest_date: stats.max_date
+                latest_date: stats.max_date,
+                running: invoiceBackfillState.running,
+                started_at: invoiceBackfillState.startedAt
             }
         });
     } catch (e) {

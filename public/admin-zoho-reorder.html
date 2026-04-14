@@ -1558,11 +1558,11 @@
     // ============================
     // SALES SYNC STATUS + BACKFILL
     // ============================
+    let backfillPollTimer = null;
+
     async function loadSyncStatus() {
         try {
-            const res = await fetch('/api/zoho/reorder/sales-sync-status', {
-                headers: getAuthHeaders()
-            });
+            const res = await fetch('/api/zoho/reorder/sales-sync-status', { headers: getAuthHeaders() });
             const json = await res.json();
             if (!json.success) return;
             const banner = document.getElementById('syncStatusBanner');
@@ -1571,8 +1571,35 @@
             const fmt = (v) => v ? new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
             document.getElementById('syncStatusText').innerHTML =
                 'Sales rows: <b>' + d.sales_rows + '</b> | Invoices synced: <b>' + d.invoices_synced + '</b> | Range: ' + fmt(d.earliest_date) + ' → ' + fmt(d.latest_date);
+
+            // If running on load, disable button + start polling
+            const btn = document.getElementById('backfillBtn');
+            const progressEl = document.getElementById('syncProgress');
+            if (d.running) {
+                btn.disabled = true;
+                progressEl.classList.remove('hidden');
+                const startedMs = d.started_at ? Date.now() - new Date(d.started_at).getTime() : 0;
+                progressEl.textContent = 'Syncing (running for ' + Math.floor(startedMs / 1000) + 's)...';
+                if (!backfillPollTimer) startBackfillPoll();
+            } else if (backfillPollTimer) {
+                stopBackfillPoll(d);
+                btn.disabled = false;
+            }
         } catch (e) {
             console.error('loadSyncStatus failed:', e);
+        }
+    }
+
+    function startBackfillPoll() {
+        if (backfillPollTimer) return;
+        backfillPollTimer = setInterval(loadSyncStatus, 5000);
+    }
+
+    function stopBackfillPoll(finalData) {
+        if (backfillPollTimer) { clearInterval(backfillPollTimer); backfillPollTimer = null; }
+        const progressEl = document.getElementById('syncProgress');
+        if (finalData) {
+            progressEl.textContent = 'Done — ' + (finalData.invoices_synced || 0) + ' invoices synced total';
         }
     }
 
@@ -1589,9 +1616,14 @@
                 headers: getAuthHeaders()
             });
             const json = await res.json();
+            if (!json.success) {
+                progressEl.textContent = json.message || 'Failed to start';
+                btn.disabled = false;
+                return;
+            }
             progressEl.textContent = json.message || 'Started';
 
-            // Listen for progress via socket
+            // If socket available, use it (preferred — live progress)
             if (window.qcSocket) {
                 const onProgress = (p) => {
                     progressEl.textContent = 'Syncing ' + p.synced + '/' + p.total + ' (' + p.failed + ' failed)';
@@ -1606,9 +1638,8 @@
                 window.qcSocket.on('invoice-line-sync-progress', onProgress);
                 window.qcSocket.on('invoice-line-sync-done', onDone);
             } else {
-                // No socket — back-fill still runs; refresh page to see updated status
-                btn.disabled = false;
-                console.warn('No qcSocket; back-fill progress not streamed. Refresh to update status banner.');
+                // Polling fallback — every 5s refresh status until running=false
+                startBackfillPoll();
             }
         } catch (e) {
             progressEl.textContent = 'Error: ' + e.message;
