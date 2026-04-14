@@ -567,6 +567,16 @@
                     <label class="block text-xs text-gray-600 mb-1">Search item / SKU / brand</label>
                     <input type="text" id="reportSearch" placeholder="e.g. Ace Advanced" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Sort by</label>
+                    <select id="reportSort" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="severity">Severity (default)</option>
+                        <option value="avg_desc">Avg/day (high → low)</option>
+                        <option value="avg_asc">Avg/day (low → high)</option>
+                        <option value="days_asc">Days left (soonest)</option>
+                        <option value="order_desc">Order qty (high → low)</option>
+                    </select>
+                </div>
                 <button onclick="loadReport()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
                 <button onclick="downloadReportPdf()" class="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Download PDF</button>
                 <button onclick="rerunReport()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg transition">Re-run</button>
@@ -788,6 +798,11 @@
                     t = setTimeout(rerender, 150);
                 });
                 searchEl._wired = true;
+            }
+            var sortEl = document.getElementById('reportSort');
+            if (sortEl && !sortEl._wired) {
+                sortEl.addEventListener('change', rerender);
+                sortEl._wired = true;
             }
             loadReportBranches().then(() => loadReport());
         }
@@ -1945,6 +1960,23 @@
                        (row.brand || '').toLowerCase().indexOf(q) !== -1;
             });
         }
+        // Apply client-side sort
+        var sortEl = document.getElementById('reportSort');
+        var sortMode = sortEl ? sortEl.value : 'severity';
+        if (sortMode === 'avg_desc') {
+            rows = [...rows].sort(function(a, b) { return (b.avg_daily_sales || 0) - (a.avg_daily_sales || 0); });
+        } else if (sortMode === 'avg_asc') {
+            rows = [...rows].sort(function(a, b) { return (a.avg_daily_sales || 0) - (b.avg_daily_sales || 0); });
+        } else if (sortMode === 'days_asc') {
+            rows = [...rows].sort(function(a, b) {
+                var ad = a.days_to_stockout == null ? Infinity : a.days_to_stockout;
+                var bd = b.days_to_stockout == null ? Infinity : b.days_to_stockout;
+                return ad - bd;
+            });
+        } else if (sortMode === 'order_desc') {
+            rows = [...rows].sort(function(a, b) { return (b.suggested_order_qty || 0) - (a.suggested_order_qty || 0); });
+        }
+        // else: use server-default severity order
         var sev = { critical: 0, high: 0, medium: 0, low: 0 };
         rows.forEach(function(row) { sev[row.severity] = (sev[row.severity] || 0) + 1; });
         document.getElementById('reportSummary').innerHTML =
@@ -1989,8 +2021,11 @@
                 var otherBranches = (row.other_branches || []).length === 0
                     ? '<span class="text-gray-400">—</span>'
                     : (row.other_branches || []).slice(0, 5).map(function(o) {
+                        var avgStr = (o.avg_daily_sales != null && o.avg_daily_sales > 0)
+                            ? ' <span class="text-gray-500">(' + Number(o.avg_daily_sales).toFixed(2) + '/d)</span>'
+                            : '';
                         return '<span class="inline-block bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded text-xs mr-1 mb-0.5">' +
-                            escapeHtml(o.branch_name || '') + ': ' + o.stock_on_hand + '</span>';
+                            escapeHtml(o.branch_name || '') + ': ' + o.stock_on_hand + avgStr + '</span>';
                     }).join('');
                 return '<tr class="border-b hover:bg-gray-50">' +
                     '<td class="px-2 py-2"><span class="badge-severity ' + severityClass(row.severity) + ' rounded px-2 py-0.5 text-xs">' + escapeHtml(row.severity || '') + '</span></td>' +
@@ -2015,8 +2050,11 @@
                 var otherChips = (row.other_branches || []).length === 0 ? '' :
                     '<div class="mt-2 flex flex-wrap gap-1">' +
                     (row.other_branches || []).slice(0, 5).map(function(o) {
+                        var avgStr = (o.avg_daily_sales != null && o.avg_daily_sales > 0)
+                            ? ' <span class="text-gray-500">(' + Number(o.avg_daily_sales).toFixed(2) + '/d)</span>'
+                            : '';
                         return '<span class="inline-block bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded text-xs">' +
-                            escapeHtml(o.branch_name || '') + ': ' + o.stock_on_hand + '</span>';
+                            escapeHtml(o.branch_name || '') + ': ' + o.stock_on_hand + avgStr + '</span>';
                     }).join('') + '</div>';
                 return '<div class="border border-gray-200 rounded-lg p-3 bg-white">' +
                     '<div class="flex items-start justify-between gap-2 mb-2">' +

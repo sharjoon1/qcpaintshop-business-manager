@@ -109,6 +109,7 @@ async function assembleReport({ branchId = null, date = null } = {}) {
         const otherBranches = otherBranchesMap.get(a.zoho_item_id) || [];
 
         return {
+            zoho_item_id: a.zoho_item_id,
             item_name: a.item_name,
             sku: a.sku,
             brand: a.brand,
@@ -176,6 +177,25 @@ async function assembleReport({ branchId = null, date = null } = {}) {
         allStocks = extraStocks;
     }
 
+    // Velocity map: 60-day sales per (item × branch), used to attach avg/day to other-branches chips
+    const velocityMap = new Map();  // key: `${itemId}|${branchId}` → avgPerDay
+    if (allItemIds.length > 0) {
+        const [velRows] = await pool.query(`
+            SELECT zoho_item_id, local_branch_id, SUM(qty_sold) AS total_qty
+            FROM branch_item_sales
+            WHERE zoho_item_id IN (?)
+              AND sale_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+            GROUP BY zoho_item_id, local_branch_id
+        `, [allItemIds]);
+        for (const v of velRows) {
+            velocityMap.set(`${v.zoho_item_id}|${v.local_branch_id}`, Number(v.total_qty) / 60);
+        }
+    }
+    const attachVelocity = (itemId, branches) => branches.map(b => ({
+        ...b,
+        avg_daily_sales: velocityMap.get(`${itemId}|${b.branch_id}`) || 0
+    }));
+
     const suggestedRows = [];
     for (const s of suggestRows) {
         const key = `${s.branch_id}|${s.zoho_item_id}`;
@@ -194,6 +214,7 @@ async function assembleReport({ branchId = null, date = null } = {}) {
         const otherBranches = otherBranchesMap.get(s.zoho_item_id) || [];
 
         suggestedRows.push({
+            zoho_item_id: s.zoho_item_id,
             item_name: s.item_name,
             sku: s.sku,
             brand: s.brand,
@@ -212,6 +233,11 @@ async function assembleReport({ branchId = null, date = null } = {}) {
     }
 
     const allRows = [...rows, ...suggestedRows];
+
+    // Enrich each row's other_branches entries with avg/day looked up from velocityMap
+    for (const row of allRows) {
+        row.other_branches = attachVelocity(row.zoho_item_id, row.other_branches || []);
+    }
 
     return {
         report_date: reportDate,
