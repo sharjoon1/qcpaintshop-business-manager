@@ -57,10 +57,9 @@ function aggregateLineItems(invoices) {
             const agg = map.get(k);
             agg.qty_sold += Number(li.quantity || 0);
             agg.revenue += Number(li.item_total || 0);
-            const seenKey = `${inv.invoice_id}|${li.item_id}`;
-            if (!seenItems.has(seenKey)) {
+            if (!seenItems.has(li.item_id)) {
                 agg.invoice_count += 1;
-                seenItems.add(seenKey);
+                seenItems.add(li.item_id);
             }
         }
     }
@@ -137,33 +136,48 @@ async function syncInvoiceLines({ emitProgress } = {}) {
     for (let i = 0; i < invoices.length; i += BATCH) {
         const slice = invoices.slice(i, i + BATCH);
         const fetched = [];
+        const pendingCursor = [];  // {invoice_id, line_count}
 
+        let hitRateLimit = false;
         for (const inv of slice) {
             try {
                 const resp = await zohoAPI.getInvoice(inv.invoice_id);
                 const full = resp?.invoice || resp;
+                const lineItems = full?.line_items || [];
                 fetched.push({
                     invoice_id: inv.invoice_id,
-                    invoice_date: inv.invoice_date instanceof Date ? toIsoDate(inv.invoice_date) : inv.invoice_date,
+                    invoice_date: toIsoDate(new Date(inv.invoice_date)),
                     local_branch_id: inv.local_branch_id,
-                    line_items: full?.line_items || []
+                    line_items: lineItems
                 });
-                await markCursor(inv.invoice_id, (full?.line_items || []).length);
-                synced++;
+                pendingCursor.push({ invoice_id: inv.invoice_id, line_count: lineItems.length });
             } catch (e) {
                 failed++;
                 console.error(`[InvoiceLineSync] ${inv.invoice_id}: ${e.message}`);
                 if (isRateLimitError(e)) {
                     console.warn('[InvoiceLineSync] Rate limit hit, stopping batch for resume next run');
-                    const aggs = aggregateLineItems(fetched);
-                    await upsertAggregates(aggs);
-                    return { synced, failed, total: invoices.length, window, pausedOnRateLimit: true };
+                    hitRateLimit = true;
+                    break;
                 }
             }
         }
 
-        const aggs = aggregateLineItems(fetched);
-        await upsertAggregates(aggs);
+        // Flush: upsert first, THEN mark cursors. If upsert fails, cursors stay unmarked → next run retries these invoices.
+        try {
+            await upsertAggregates(aggregateLineItems(fetched));
+            for (const c of pendingCursor) {
+                await markCursor(c.invoice_id, c.line_count);
+                synced++;
+            }
+        } catch (e) {
+            console.error(`[InvoiceLineSync] Batch upsert failed, cursors NOT marked; will retry next run: ${e.message}`);
+            // Don't mark cursors. Let next run re-fetch and retry this batch.
+            throw e;  // surface the failure; caller (cron) will log and retry
+        }
+
+        if (hitRateLimit) {
+            return { synced, failed, total: invoices.length, window, pausedOnRateLimit: true };
+        }
 
         if (emitProgress) emitProgress({ synced, failed, total: invoices.length });
         console.log(`[InvoiceLineSync] Progress ${synced}/${invoices.length}`);
