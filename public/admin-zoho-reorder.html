@@ -201,6 +201,14 @@
                 Configuration
             </span>
         </button>
+        <button id="tabBrandConfig" class="tab-btn" onclick="switchTab('brand-config')">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"></path>
+                </svg>
+                Brand Config
+            </span>
+        </button>
     </div>
 
     <!-- =========================================
@@ -458,6 +466,35 @@
         </div>
     </div>
 
+    <!-- =========================================
+         TAB 3: BRAND CONFIG
+         ========================================= -->
+    <div id="panelBrandConfig" class="hidden">
+        <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Brand Lead Time Configuration</h3>
+                <button onclick="openBrandModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">+ Add Brand</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left font-semibold text-gray-600">Brand</th>
+                            <th class="px-3 py-2 text-right font-semibold text-gray-600">Lead time (days)</th>
+                            <th class="px-3 py-2 text-right font-semibold text-gray-600">Safety (days)</th>
+                            <th class="px-3 py-2 text-center font-semibold text-gray-600">Items using</th>
+                            <th class="px-3 py-2 text-center font-semibold text-gray-600">Active</th>
+                            <th class="px-3 py-2 text-right font-semibold text-gray-600">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="brandConfigBody">
+                        <tr><td colspan="6" class="text-gray-400 p-4 text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- Resolve Alert Modal -->
@@ -494,6 +531,43 @@
         <div class="border-t px-6 py-4 flex justify-end gap-3">
             <button onclick="closeDeleteModalDirect()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
             <button onclick="submitDelete()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Brand Config Add/Edit Modal -->
+<div id="brandModal" class="modal-overlay hidden" onclick="closeBrandModalOverlay(event)">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
+        <div class="border-b px-6 py-4 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800" id="brandModalTitle">Add Brand</h3>
+            <button onclick="closeBrandModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-6">
+            <form id="brandForm" onsubmit="saveBrand(event)">
+                <input type="hidden" id="brandId">
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Brand name</label>
+                    <input type="text" id="brandName" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Lead time (days)</label>
+                    <input type="number" min="0" id="brandLead" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Safety (days)</label>
+                    <input type="number" min="0" id="brandSafety" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="mb-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="brandActive" checked class="rounded border-gray-300 text-indigo-600">
+                        <span class="text-sm text-gray-700">Active</span>
+                    </label>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="closeBrandModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -554,11 +628,16 @@
         currentTab = tab;
         document.getElementById('tabAlerts').classList.toggle('active', tab === 'alerts');
         document.getElementById('tabConfig').classList.toggle('active', tab === 'config');
+        document.getElementById('tabBrandConfig').classList.toggle('active', tab === 'brand-config');
         document.getElementById('panelAlerts').classList.toggle('hidden', tab !== 'alerts');
         document.getElementById('panelConfig').classList.toggle('hidden', tab !== 'config');
+        document.getElementById('panelBrandConfig').classList.toggle('hidden', tab !== 'brand-config');
 
         if (tab === 'config') {
             loadConfigs();
+        }
+        if (tab === 'brand-config') {
+            loadBrandConfigs();
         }
     }
 
@@ -1340,8 +1419,128 @@
         if (e.key === 'Escape') {
             closeResolveModalDirect();
             closeDeleteModalDirect();
+            closeBrandModal();
         }
     });
+
+    // ============================
+    // BRAND CONFIG
+    // ============================
+    async function loadBrandConfigs() {
+        const tbody = document.getElementById('brandConfigBody');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-gray-400 p-4 text-center">Loading...</td></tr>';
+        try {
+            const res = await fetch('/api/zoho/reorder/brands', {
+                headers: getAuthHeaders()
+            });
+            if (res.status === 401) { window.location.href = '/login.html'; return; }
+            const json = await res.json();
+            if (!json.success) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-red-600 p-3">' + escapeHtml(json.message || 'Failed to load') + '</td></tr>';
+                return;
+            }
+            if (!json.data || json.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-gray-500 p-4 text-center">No brand configs found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = json.data.map(function(b) {
+                var isDefault = b.brand_name === '__default__';
+                return '<tr class="border-b ' + (isDefault ? 'bg-blue-50' : 'hover:bg-gray-50') + '">' +
+                    '<td class="px-3 py-2 font-medium text-gray-800">' + escapeHtml(b.brand_name) +
+                    (isDefault ? ' <span class="text-xs font-normal text-blue-600 ml-1">(fallback)</span>' : '') + '</td>' +
+                    '<td class="px-3 py-2 text-right text-gray-700">' + b.lead_time_days + '</td>' +
+                    '<td class="px-3 py-2 text-right text-gray-700">' + b.safety_days + '</td>' +
+                    '<td class="px-3 py-2 text-center text-gray-700">' + (b.item_count || 0) + '</td>' +
+                    '<td class="px-3 py-2 text-center">' +
+                    (b.is_active
+                        ? '<span class="badge-status badge-active">Yes</span>'
+                        : '<span class="badge-status badge-resolved">No</span>') +
+                    '</td>' +
+                    '<td class="px-3 py-2 text-right">' +
+                    '<button onclick=\'editBrand(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\' class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">Edit</button>' +
+                    (!isDefault
+                        ? ' <span class="text-gray-300 mx-1">|</span><button onclick="deleteBrand(' + b.id + ', \'' + escapeHtml(b.brand_name).replace(/'/g, '&#39;') + '\')" class="text-red-600 hover:text-red-800 text-xs font-medium">Delete</button>'
+                        : '') +
+                    '</td>' +
+                    '</tr>';
+            }).join('');
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-red-600 p-3">Error: ' + escapeHtml(err.message) + '</td></tr>';
+        }
+    }
+
+    function openBrandModal() {
+        document.getElementById('brandModalTitle').textContent = 'Add Brand';
+        document.getElementById('brandId').value = '';
+        document.getElementById('brandName').value = '';
+        document.getElementById('brandName').readOnly = false;
+        document.getElementById('brandName').classList.remove('bg-gray-100');
+        document.getElementById('brandLead').value = 7;
+        document.getElementById('brandSafety').value = 5;
+        document.getElementById('brandActive').checked = true;
+        document.getElementById('brandModal').classList.remove('hidden');
+    }
+
+    function editBrand(b) {
+        document.getElementById('brandModalTitle').textContent = 'Edit Brand \u2014 ' + b.brand_name;
+        document.getElementById('brandId').value = b.id;
+        document.getElementById('brandName').value = b.brand_name;
+        document.getElementById('brandName').readOnly = true;
+        document.getElementById('brandName').classList.add('bg-gray-100');
+        document.getElementById('brandLead').value = b.lead_time_days;
+        document.getElementById('brandSafety').value = b.safety_days;
+        document.getElementById('brandActive').checked = !!b.is_active;
+        document.getElementById('brandModal').classList.remove('hidden');
+    }
+
+    function closeBrandModal() {
+        document.getElementById('brandModal').classList.add('hidden');
+    }
+
+    function closeBrandModalOverlay(event) {
+        if (event.target === document.getElementById('brandModal')) {
+            closeBrandModal();
+        }
+    }
+
+    async function saveBrand(ev) {
+        ev.preventDefault();
+        var id = document.getElementById('brandId').value;
+        var body = {
+            brand_name: document.getElementById('brandName').value.trim(),
+            lead_time_days: parseInt(document.getElementById('brandLead').value, 10),
+            safety_days: parseInt(document.getElementById('brandSafety').value, 10),
+            is_active: document.getElementById('brandActive').checked ? 1 : 0
+        };
+        var url = id ? '/api/zoho/reorder/brands/' + id : '/api/zoho/reorder/brands';
+        var method = id ? 'PUT' : 'POST';
+        try {
+            var headers = getAuthHeaders();
+            headers['Content-Type'] = 'application/json';
+            var res = await fetch(url, { method: method, headers: headers, body: JSON.stringify(body) });
+            var json = await res.json();
+            if (!json.success) { alert(json.message || 'Failed to save'); return; }
+            closeBrandModal();
+            loadBrandConfigs();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    }
+
+    async function deleteBrand(id, name) {
+        if (!confirm('Delete brand "' + name + '"?')) return;
+        try {
+            var res = await fetch('/api/zoho/reorder/brands/' + id, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+            var json = await res.json();
+            if (!json.success) { alert(json.message || 'Failed to delete'); return; }
+            loadBrandConfigs();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    }
 
     // ============================
     // INITIALIZE
