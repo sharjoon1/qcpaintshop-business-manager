@@ -2,7 +2,7 @@
 
 > **Platform**: act.qcpaintshop.com
 > **Version**: 3.3.7
-> **Last Updated**: 2026-03-09
+> **Last Updated**: 2026-04-15
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
@@ -1945,6 +1945,46 @@ node promote-release.js internal production
 ---
 
 ## 8. RECENT UPDATES & CHANGELOG
+
+### 2026-04-14/15 - Reorder Intelligence (Branch-wise Sales → Auto Reorder → Daily Report)
+
+Full spec + plan under `docs/superpowers/specs/` + `docs/superpowers/plans/`. Detailed memory at `memory/project_reorder_intelligence.md`.
+
+**Data model** — 4 new tables via `migrations/migrate-reorder-intelligence.js`:
+- `branch_item_sales` (per branch × item × date aggregates, additive upsert, unique key on triple)
+- `brand_reorder_config` (per-brand lead + safety days, seeded `__default__` 7+5)
+- `invoice_line_sync_cursor` (resumable sync state)
+- `reorder_report_log` (daily report audit)
+- Extended `zoho_reorder_config`: `source` ENUM('manual','auto'), `avg_daily_sales`, `computed_at`
+- Added unique key `uq_item_loc` on `zoho_reorder_alerts`; extended `zoho_sync_log.sync_type` ENUM with `'reorder_compute'`
+
+**Services** — 4 new in `services/`:
+- `zoho-invoice-line-sync.js` — pulls invoice line items from Zoho, aggregates nightly. Cursor de-dups; marked AFTER successful upsert (no data-loss window). Configurable `backfillDays` (1-730).
+- `reorder-compute-service.js` — 60-day velocity × brand lead+safety → reorder level. Hybrid: preloads manual rows as Set, skips them. Writes run-log to `zoho_sync_log` with try/finally for failed-run tracking.
+- `reorder-report-service.js` — assembles alerts + suggested items (sales-velocity items without config yet). Attaches per-branch `avg_daily_sales` to each `other_branches` entry via velocity-map query. Delivery via WhatsApp + FCM + dashboard, idempotent via `reorder_report_log`.
+- `reorder-report-pdf-generator.js` — A4 PDFKit, green/gold branding, severity-colored cards grouped by branch.
+
+**Scheduler** (via `automation-registry`): `invoice-line-sync` 02:00, `reorder-compute` 02:30, `reorder-report` 07:00 IST daily.
+
+**UI** — extended `public/admin-zoho-reorder.html` from 2 tabs → 5 tabs: Alerts, Configuration (enhanced with source badge + avg/day + computed columns + "Reset Selected → Auto"), Brand Config (new; dropdown sourced from `/brands/available`), Daily Report (new; Date/Branch/Min avg/day/Search/Sort filters, card layout on mobile), Sales Analysis (new; CSV export). Back-fill banner with configurable days input + concurrency guard + polling fallback (socket-helper not loaded on this page).
+
+**Key endpoints**: `POST /api/zoho/reorder/backfill-sales` (body: `{days}`), `GET /sales-sync-status`, `POST /compute-now`, `CRUD /brands`, `GET /brands/available`, `POST /config/reset-to-auto`, `POST /run-report`, `GET /report`, `GET /report/pdf` (accepts `?token=` query param via shim — WebView-friendly), `GET /sales-analysis`. All under `requirePermission('zoho', 'reorder')`.
+
+**Config keys** (`ai_config`): `reorder_sales_window_days` 60, `reorder_min_sales_for_auto` 1, `reorder_invoice_sync_time` 02:00, `reorder_compute_time` 02:30, `reorder_report_time` 07:00, `reorder_report_recipients` [] (JSON user IDs), `reorder_report_whatsapp_enabled` 0 (disabled by default), `reorder_report_fcm_enabled` 0, `reorder_report_pdf_enabled` 1.
+
+**Delivery routing**: branch-wise (manager gets own branch alerts) + consolidated (admin+purchase). WhatsApp via `whatsapp-session-manager.sendMessage/sendMedia` (branchId=0 general session). FCM via `notification-service.send(userId, {ttlSeconds:86400})`.
+
+**Tests**: 15 new passing Jest tests across 4 files (`brand-config`, `invoice-line-sync`, `reorder-compute`, `reorder-report`).
+
+---
+
+### 2026-04-14 - Zoho Items DPL Fixes
+
+- **cf_dpl push to Zoho** was silently ignored. Fix: `services/zoho-api.js::updateItem` now auto-wraps any `cf_*` key into `custom_fields: [{api_name, value}]` before PUT. All callers unchanged.
+- **% Adjust** on `admin-zoho-items-edit.html` now ceils to whole rupee (`Math.ceil(source * (1 + pct/100))`) — no paise.
+- **New readonly columns** on the edit page: "DPL→Rate %" (live computed markup) and "DPL Updated" (date). Backend adds `zoho_items_map.dpl_updated_at` column stamped on bulk-edit + apply-price-list. Migration: `migrations/add-dpl-updated-at.js`.
+
+---
 
 ### 2026-02-28 - Staff Lead Management System (Per-Staff Isolation)
 
