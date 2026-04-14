@@ -247,6 +247,9 @@
                 // Ensure global functions exist
                 ensureGlobalFunctions();
 
+                // Wire accordion: auto-expand the section for the current page
+                initSidebarAccordion();
+
                 // Load module subnavs based on data-page
                 const dataPage = document.body.getAttribute('data-page') || document.documentElement.getAttribute('data-page') || '';
                 const header = document.getElementById('mainHeader');
@@ -329,7 +332,65 @@
             };
         }
     }
-    
+
+    /**
+     * Toggle a single nav section's submenu. Accordion behavior:
+     * clicking a section closes all others and toggles the clicked one.
+     * Exposed as global so inline onclick="qcToggleNavSection(this)" works.
+     */
+    function qcToggleNavSection(btn) {
+        if (!btn) return;
+        var sidebar = btn.closest('.qc-sidebar');
+        if (!sidebar) return;
+        var section = btn.getAttribute('data-section');
+        var isOpen = btn.getAttribute('aria-expanded') === 'true';
+        // Close all toggles in this sidebar
+        sidebar.querySelectorAll('.qc-nav-section-toggle').forEach(function(t) {
+            t.setAttribute('aria-expanded', 'false');
+        });
+        sidebar.querySelectorAll('.qc-nav-submenu').forEach(function(s) {
+            s.classList.remove('open');
+        });
+        // If the clicked one wasn't open, open it
+        if (!isOpen) {
+            btn.setAttribute('aria-expanded', 'true');
+            var submenu = sidebar.querySelector('.qc-nav-submenu[data-section="' + section + '"]');
+            if (submenu) submenu.classList.add('open');
+        }
+    }
+    window.qcToggleNavSection = qcToggleNavSection;
+
+    /**
+     * Auto-expand the section containing the current URL's page.
+     * Matches each <a href> inside each .qc-nav-submenu against location.pathname.
+     */
+    function initSidebarAccordion() {
+        var sidebar = document.querySelector('.qc-sidebar');
+        if (!sidebar) return;
+        var path = window.location.pathname.replace(/\/+$/, '');
+        if (!path) path = '/';
+        // Strip leading slash for comparison flexibility
+        var target = path.toLowerCase();
+        var matchedSection = null;
+        sidebar.querySelectorAll('.qc-nav-submenu').forEach(function(submenu) {
+            if (matchedSection) return;
+            var links = submenu.querySelectorAll('a[href]');
+            for (var i = 0; i < links.length; i++) {
+                var href = (links[i].getAttribute('href') || '').toLowerCase().replace(/\/+$/, '') || '/';
+                if (href === target || (target !== '/' && href !== '/' && target.indexOf(href) === 0 && (target[href.length] === undefined || target[href.length] === '/' || target[href.length] === '?'))) {
+                    matchedSection = submenu.getAttribute('data-section');
+                    break;
+                }
+            }
+        });
+        if (matchedSection) {
+            var btn = sidebar.querySelector('.qc-nav-section-toggle[data-section="' + matchedSection + '"]');
+            var submenu = sidebar.querySelector('.qc-nav-submenu[data-section="' + matchedSection + '"]');
+            if (btn) btn.setAttribute('aria-expanded', 'true');
+            if (submenu) submenu.classList.add('open');
+        }
+    }
+
     /**
      * Show error notification to user
      */

@@ -200,15 +200,47 @@
     }
 
     /* Submenu */
+    /* Collapsible section toggle button */
+    .qc-nav-section-toggle {
+        width: 100%;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        padding: 0.75rem 1.25rem 0.375rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #94a3b8;
+        font-family: inherit;
+        font-size: 0.625rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        transition: color 0.15s ease, background 0.15s ease;
+    }
+    .qc-nav-section-toggle:hover { color: #475569; background: #f8fafc; }
+    .qc-nav-section-toggle:focus { outline: none; color: #475569; }
+    .qc-nav-section-label { flex: 1; text-align: left; }
+    .qc-nav-chevron {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+        color: #94a3b8;
+    }
+    .qc-nav-section-toggle[aria-expanded="true"] .qc-nav-chevron {
+        transform: rotate(90deg);
+    }
+    .qc-nav-section-toggle[aria-expanded="true"] { color: #1e293b; }
+    /* Hide section toggles when sidebar is collapsed */
+    .qc-sidebar.collapsed .qc-nav-section-toggle { display: none; }
+    /* Submenu wraps .qc-nav-item rows — let items render normally inside */
     .qc-nav-submenu {
         max-height: 0;
         overflow: hidden;
         transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        background: #f8fafc;
-        border-radius: 0 0 8px 8px;
-        margin: 0 0.5rem;
     }
-    .qc-nav-submenu.open { max-height: 500px; }
+    .qc-nav-submenu.open { max-height: 2000px; }
     .qc-nav-submenu-item {
         padding: 0.5rem 1rem 0.5rem 3rem;
         color: #94a3b8;
@@ -572,7 +604,11 @@
 
         <!-- Sales & Estimates -->
         <div class="qc-nav-section" data-roles="admin,manager,staff">
-            <div class="qc-nav-section-title">Sales & Estimates</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="sales" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">Sales & Estimates</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="sales">
             <a href="/estimates.html" class="qc-nav-item" data-page="estimates">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
                 <span class="qc-nav-item-text">All Estimates</span>
@@ -593,11 +629,16 @@
                 <span class="qc-nav-item-text">Estimate Settings</span>
                 <span class="qc-nav-tooltip">Estimate Settings</span>
             </a>
+            </div>
         </div>
 
         <!-- Products & Inventory -->
         <div class="qc-nav-section" data-roles="admin,manager,staff">
-            <div class="qc-nav-section-title">Products & Inventory</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="products" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">Products & Inventory</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="products">
             <a href="/admin-products.html" class="qc-nav-item" data-page="products">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
                 <span class="qc-nav-item-text">Products</span>
@@ -613,11 +654,16 @@
                 <span class="qc-nav-item-text">Brands</span>
                 <span class="qc-nav-tooltip">Brands</span>
             </a>
+            </div>
         </div>
 
         <!-- Customers -->
         <div class="qc-nav-section" data-roles="admin,manager,staff">
-            <div class="qc-nav-section-title">Customers</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="customers" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">Customers</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="customers">
             <a href="/admin-customers.html" class="qc-nav-item" data-page="customers">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
                 <span class="qc-nav-item-text">Customer List</span>
@@ -633,11 +679,16 @@
                 <span class="qc-nav-item-text">Credit Limits</span>
                 <span class="qc-nav-tooltip">Credit Limits</span>
             </a>
+            </div>
         </div>
 
         <!-- Leads -->
         <div class="qc-nav-section" data-roles="admin,manager">
-            <div class="qc-nav-section-title">Leads & CRM</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="leads" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">Leads & CRM</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="leads">
             <a href="/admin-leads.html" class="qc-nav-item" data-page="leads">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
                 <span class="qc-nav-item-text">Lead Management</span>
@@ -648,11 +699,16 @@
                 <span class="qc-nav-item-text">Design Requests</span>
                 <span class="qc-nav-tooltip">Design Requests</span>
             </a>
+            </div>
         </div>
 
         <!-- Branches & Staff -->
         <div class="qc-nav-section" data-roles="admin">
-            <div class="qc-nav-section-title">Branches & Staff</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="branches" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">Branches & Staff</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="branches">
             <a href="/admin-branches.html" class="qc-nav-item" data-page="branches">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
                 <span class="qc-nav-item-text">Branches</span>
@@ -678,11 +734,16 @@
                 <span class="qc-nav-item-text">Permissions</span>
                 <span class="qc-nav-tooltip">Permissions</span>
             </a>
+            </div>
         </div>
 
         <!-- HR & Attendance -->
         <div class="qc-nav-section">
-            <div class="qc-nav-section-title">HR & Attendance</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="hr" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">HR & Attendance</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="hr">
             <a href="/staff/clock-in.html" class="qc-nav-item" data-page="clock-in">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
                 <span class="qc-nav-item-text">Clock In</span>
@@ -738,11 +799,16 @@
                 <span class="qc-nav-item-text">Geo-Fence Logs</span>
                 <span class="qc-nav-tooltip">Geo-Fence Logs</span>
             </a>
+            </div>
         </div>
 
         <!-- Salary -->
         <div class="qc-nav-section" data-roles="admin,manager,accountant,staff">
-            <div class="qc-nav-section-title">Salary & Payroll</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="salary" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">Salary & Payroll</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="salary">
             <a href="/staff/salary.html" class="qc-nav-item" data-page="my-salary" data-roles="staff">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
                 <span class="qc-nav-item-text">My Salary</span>
@@ -778,11 +844,16 @@
                 <span class="qc-nav-item-text">Salary Reports</span>
                 <span class="qc-nav-tooltip">Salary Reports</span>
             </a>
+            </div>
         </div>
 
         <!-- Zoho Books -->
         <div class="qc-nav-section" data-roles="admin">
-            <div class="qc-nav-section-title">Zoho Books</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="zoho" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">Zoho Books</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="zoho">
             <a href="/admin-zoho-dashboard.html" class="qc-nav-item" data-page="zoho-dashboard">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
                 <span class="qc-nav-item-text">Zoho Dashboard</span>
@@ -798,55 +869,145 @@
                 <span class="qc-nav-item-text">Items & Stock</span>
                 <span class="qc-nav-tooltip">Items & Stock</span>
             </a>
+            <a href="/admin-zoho-items-edit.html" class="qc-nav-item" data-page="zoho-items-edit">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Edit Items</span>
+                <span class="qc-nav-tooltip">Edit Items</span>
+            </a>
+            <a href="/admin-dpl.html" class="qc-nav-item" data-page="zoho-dpl">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">DPL Import</span>
+                <span class="qc-nav-tooltip">DPL Import</span>
+            </a>
             <a href="/admin-zoho-stock.html" class="qc-nav-item" data-page="zoho-stock">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
                 <span class="qc-nav-item-text">Stock Levels</span>
                 <span class="qc-nav-tooltip">Stock Levels</span>
+            </a>
+            <a href="/admin-zoho-stock-adjust.html" class="qc-nav-item" data-page="zoho-stock-adjust">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Stock Adjust</span>
+                <span class="qc-nav-tooltip">Stock Adjust</span>
+            </a>
+            <a href="/admin-stock-check.html" class="qc-nav-item" data-page="zoho-stock-check">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Stock Check</span>
+                <span class="qc-nav-tooltip">Stock Check</span>
             </a>
             <a href="/admin-zoho-locations.html" class="qc-nav-item" data-page="zoho-locations">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
                 <span class="qc-nav-item-text">Locations</span>
                 <span class="qc-nav-tooltip">Locations</span>
             </a>
+            <a href="/admin-zoho-reorder.html" class="qc-nav-item" data-page="zoho-reorder">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+                <span class="qc-nav-item-text">Reorder Alerts</span>
+                <span class="qc-nav-tooltip">Reorder Alerts</span>
+            </a>
+            <a href="/admin-zoho-purchase-suggestions.html" class="qc-nav-item" data-page="zoho-purchase-suggestions">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Purchase Orders</span>
+                <span class="qc-nav-tooltip">Purchase Orders</span>
+            </a>
             <a href="/admin-zoho-transactions.html" class="qc-nav-item" data-page="zoho-transactions">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
                 <span class="qc-nav-item-text">Transactions</span>
                 <span class="qc-nav-tooltip">Transactions</span>
             </a>
-            <a href="/admin-zoho-reorder.html" class="qc-nav-item" data-page="zoho-reorder">
-                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
-                <span class="qc-nav-item-text">Reorder Alerts</span>
-                <span class="qc-nav-tooltip">Reorder Alerts</span>
+            <a href="/admin-zoho-collections.html" class="qc-nav-item" data-page="zoho-collections">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Collections</span>
+                <span class="qc-nav-tooltip">Collections</span>
+            </a>
+            <a href="/admin-zoho-bulk-jobs.html" class="qc-nav-item" data-page="zoho-bulk-jobs">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Bulk Jobs</span>
+                <span class="qc-nav-tooltip">Bulk Jobs</span>
             </a>
             <a href="/admin-zoho-reports.html" class="qc-nav-item" data-page="zoho-reports">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
                 <span class="qc-nav-item-text">Financial Reports</span>
                 <span class="qc-nav-tooltip">Financial Reports</span>
             </a>
+            <a href="/admin-stock-migration.html" class="qc-nav-item" data-page="zoho-stock-migrate">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Stock Migration</span>
+                <span class="qc-nav-tooltip">Stock Migration</span>
+            </a>
+            <a href="/admin-item-master.html" class="qc-nav-item" data-page="item-master">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Item Master</span>
+                <span class="qc-nav-tooltip">Item Master</span>
+            </a>
             <a href="/admin-zoho-settings.html" class="qc-nav-item" data-page="zoho-settings">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
                 <span class="qc-nav-item-text">Zoho Settings</span>
                 <span class="qc-nav-tooltip">Zoho Settings</span>
             </a>
+            </div>
         </div>
 
         <div class="qc-nav-divider"></div>
 
         <!-- WhatsApp -->
         <div class="qc-nav-section" data-roles="admin">
-            <div class="qc-nav-section-title">WhatsApp</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="whatsapp" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">WhatsApp</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="whatsapp">
             <a href="/admin-wa-dashboard.html" class="qc-nav-item" data-page="wa-dashboard">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.654-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg></span>
-                <span class="qc-nav-item-text">WhatsApp</span>
-                <span class="qc-nav-tooltip">WhatsApp</span>
+                <span class="qc-nav-item-text">Dashboard</span>
+                <span class="qc-nav-tooltip">Dashboard</span>
             </a>
+            <a href="/admin-whatsapp-chat.html" class="qc-nav-item" data-page="whatsapp-chat">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Chat</span>
+                <span class="qc-nav-tooltip">Chat</span>
+            </a>
+            <a href="/admin-wa-contacts.html" class="qc-nav-item" data-page="wa-contacts">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Contacts</span>
+                <span class="qc-nav-tooltip">Contacts</span>
+            </a>
+            <a href="/admin-wa-marketing.html" class="qc-nav-item" data-page="wa-marketing">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Campaigns</span>
+                <span class="qc-nav-tooltip">Campaigns</span>
+            </a>
+            <a href="/admin-wa-templates.html" class="qc-nav-item" data-page="wa-templates">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Templates</span>
+                <span class="qc-nav-tooltip">Templates</span>
+            </a>
+            <a href="/admin-whatsapp-sessions.html" class="qc-nav-item" data-page="whatsapp-sessions">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Sessions</span>
+                <span class="qc-nav-tooltip">Sessions</span>
+            </a>
+            <a href="/admin-wa-admin-login.html" class="qc-nav-item" data-page="wa-admin-login">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Admin Login</span>
+                <span class="qc-nav-tooltip">Admin Login</span>
+            </a>
+            <a href="/admin-wa-settings.html" class="qc-nav-item" data-page="wa-settings">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">WA Settings</span>
+                <span class="qc-nav-tooltip">WA Settings</span>
+            </a>
+            </div>
         </div>
 
         <div class="qc-nav-divider"></div>
 
         <!-- Billing -->
         <div class="qc-nav-section">
-            <div class="qc-nav-section-title">Billing</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="billing" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">Billing</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="billing">
             <a href="/staff-billing.html" class="qc-nav-item" data-page="billing" data-requires="billing.estimate">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="12" y2="15"/><path d="M17 15l-2 2 4 4"/></svg></span>
                 <span class="qc-nav-item-text">Billing</span>
@@ -857,25 +1018,55 @@
                 <span class="qc-nav-item-text">Vendors</span>
                 <span class="qc-nav-tooltip">Vendors</span>
             </a>
+            </div>
         </div>
 
         <div class="qc-nav-divider"></div>
 
         <!-- Painters -->
         <div class="qc-nav-section" data-roles="admin">
-            <div class="qc-nav-section-title">Painters</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="painters" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">Painters</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="painters">
             <a href="/admin-painters.html" class="qc-nav-item" data-page="painters">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
                 <span class="qc-nav-item-text">Painter Program</span>
                 <span class="qc-nav-tooltip">Painter Program</span>
             </a>
+            <a href="/admin-painters.html?tab=points" class="qc-nav-item" data-page="painter-points">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Points & Invoices</span>
+                <span class="qc-nav-tooltip">Points & Invoices</span>
+            </a>
+            <a href="/admin-painters.html?tab=rates" class="qc-nav-item" data-page="painter-rates">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Rates & Slabs</span>
+                <span class="qc-nav-tooltip">Rates & Slabs</span>
+            </a>
+            <a href="/admin-painters.html?tab=withdrawals" class="qc-nav-item" data-page="painter-withdrawals">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Withdrawals</span>
+                <span class="qc-nav-tooltip">Withdrawals</span>
+            </a>
+            <a href="/admin-painters.html?tab=reports" class="qc-nav-item" data-page="painter-reports">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Referrals & Reports</span>
+                <span class="qc-nav-tooltip">Referrals & Reports</span>
+            </a>
+            </div>
         </div>
 
         <div class="qc-nav-divider"></div>
 
         <!-- System -->
         <div class="qc-nav-section">
-            <div class="qc-nav-section-title">System</div>
+            <button type="button" class="qc-nav-section-toggle" data-section="system" aria-expanded="false" onclick="qcToggleNavSection(this)">
+                <span class="qc-nav-section-label">System</span>
+                <svg class="qc-nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="qc-nav-submenu" data-section="system">
             <a href="/admin-reports.html" class="qc-nav-item" data-page="reports" data-roles="admin,manager,accountant">
                 <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>
                 <span class="qc-nav-item-text">Reports</span>
@@ -891,6 +1082,47 @@
                 <span class="qc-nav-item-text">My Profile</span>
                 <span class="qc-nav-tooltip">My Profile</span>
             </a>
+            <a href="/admin-website.html" class="qc-nav-item" data-page="website">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Website</span>
+                <span class="qc-nav-tooltip">Website</span>
+            </a>
+            <a href="/admin-guides.html" class="qc-nav-item" data-page="guides">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Guides</span>
+                <span class="qc-nav-tooltip">Guides</span>
+            </a>
+            <a href="/admin-ai.html" class="qc-nav-item" data-page="ai">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">AI</span>
+                <span class="qc-nav-tooltip">AI</span>
+            </a>
+            <a href="/admin-system-health.html" class="qc-nav-item" data-page="system-health">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">System Health</span>
+                <span class="qc-nav-tooltip">System Health</span>
+            </a>
+            <a href="/admin-bug-reports.html" class="qc-nav-item" data-page="bug-reports">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Bug Reports</span>
+                <span class="qc-nav-tooltip">Bug Reports</span>
+            </a>
+            <a href="/admin-anomalies.html" class="qc-nav-item" data-page="anomalies">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Anomalies</span>
+                <span class="qc-nav-tooltip">Anomalies</span>
+            </a>
+            <a href="/admin-monitoring.html" class="qc-nav-item" data-page="monitoring">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Monitor</span>
+                <span class="qc-nav-tooltip">Monitor</span>
+            </a>
+            <a href="/admin-photos.html" class="qc-nav-item" data-page="photos">
+                <span class="qc-nav-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="qc-nav-item-text">Photos</span>
+                <span class="qc-nav-tooltip">Photos</span>
+            </a>
+            </div>
         </div>
     </nav>
 
