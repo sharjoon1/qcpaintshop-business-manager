@@ -167,7 +167,7 @@ async function migrate() {
         console.error('Migration failed:', error);
         process.exitCode = 1;
     } finally {
-        if (pool) await pool.end();
+        try { if (pool) await pool.end(); } catch (e) { console.error('pool.end failed:', e); }
         process.exit(process.exitCode || 0);
     }
 }
