@@ -8,7 +8,23 @@
 let pool;
 function setPool(p) { pool = p; }
 
-const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1, suggested: 0 };
+
+function computeSuggestedLevel(avgDaily, leadDays, safetyDays) {
+    return Math.ceil(avgDaily * (leadDays + safetyDays));
+}
+function computeSuggestedQty(avgDaily) {
+    return Math.ceil(avgDaily * 15);
+}
+function severityForRatio(currentStock, reorderLevel) {
+    if (reorderLevel <= 0) return null;
+    const ratio = currentStock / reorderLevel;
+    if (ratio > 1) return null;
+    if (ratio <= 0.25) return 'critical';
+    if (ratio <= 0.50) return 'high';
+    if (ratio <= 0.75) return 'medium';
+    return 'low';
+}
 
 function sortReportRows(rows) {
     return [...rows].sort((a, b) => {
@@ -53,7 +69,7 @@ async function assembleReport({ branchId = null, date = null } = {}) {
                zim.zoho_brand AS brand,
                zim.zoho_unit AS unit,
                zlm.local_branch_id AS branch_id,
-               zlm.location_name AS branch_name,
+               zlm.zoho_location_name AS branch_name,
                rc.reorder_level,
                rc.reorder_quantity,
                rc.avg_daily_sales,
@@ -72,7 +88,7 @@ async function assembleReport({ branchId = null, date = null } = {}) {
     let stocks = [];
     if (itemIds.length > 0) {
         const [rowsStocks] = await pool.query(`
-            SELECT ls.zoho_item_id, zlm.local_branch_id, zlm.location_name,
+            SELECT ls.zoho_item_id, zlm.local_branch_id, zlm.zoho_location_name AS location_name,
                    ls.stock_on_hand
             FROM zoho_location_stock ls
             JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id
@@ -109,10 +125,98 @@ async function assembleReport({ branchId = null, date = null } = {}) {
         };
     });
 
+    // --- ALSO include suggested items: recent sales but no active alert row yet ---
+    // Pulls items from branch_item_sales with velocity > 0 that are NOT already in alerts,
+    // computes suggested reorder_level from brand config, includes only if stock <= suggested.
+    const existingKeys = new Set(alerts.map(a => `${a.branch_id}|${a.zoho_item_id}`));
+
+    let suggestWhere = `WHERE bis.sale_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)`;
+    const suggestParams = [];
+    if (branchId != null) {
+        suggestWhere += ` AND bis.local_branch_id = ?`;
+        suggestParams.push(branchId);
+    }
+
+    const [suggestRows] = await pool.query(`
+        SELECT bis.local_branch_id AS branch_id,
+               bis.zoho_item_id,
+               SUM(bis.qty_sold) AS total_qty,
+               zim.zoho_item_name AS item_name,
+               zim.zoho_sku AS sku,
+               zim.zoho_brand AS brand,
+               zim.zoho_unit AS unit,
+               zlm.zoho_location_id,
+               zlm.zoho_location_name AS branch_name,
+               COALESCE(ls.stock_on_hand, 0) AS current_stock
+        FROM branch_item_sales bis
+        JOIN zoho_items_map zim ON zim.zoho_item_id = bis.zoho_item_id
+        LEFT JOIN zoho_locations_map zlm ON zlm.local_branch_id = bis.local_branch_id
+        LEFT JOIN zoho_location_stock ls ON ls.zoho_item_id = bis.zoho_item_id AND ls.zoho_location_id = zlm.zoho_location_id
+        ${suggestWhere}
+        GROUP BY bis.local_branch_id, bis.zoho_item_id, zim.zoho_item_name, zim.zoho_sku,
+                 zim.zoho_brand, zim.zoho_unit, zlm.zoho_location_id, zlm.zoho_location_name, ls.stock_on_hand
+    `, suggestParams);
+
+    // Preload brand configs for fast lookup
+    const [brandCfgs] = await pool.query(`SELECT brand_name, lead_time_days, safety_days FROM brand_reorder_config WHERE is_active = 1`);
+    const brandMap = new Map(brandCfgs.map(b => [b.brand_name, b]));
+    const defCfg = brandMap.get('__default__') || { lead_time_days: 7, safety_days: 5 };
+
+    // Additional stock rows for other-branches lookup (may include items not yet in alerts)
+    const allItemIds = [...new Set([...alerts.map(a => a.zoho_item_id), ...suggestRows.map(s => s.zoho_item_id)])];
+    let allStocks = stocks;
+    if (allItemIds.length > itemIds.length && allItemIds.length > 0) {
+        const [extraStocks] = await pool.query(`
+            SELECT ls.zoho_item_id, zlm.local_branch_id, zlm.zoho_location_name AS location_name,
+                   ls.stock_on_hand
+            FROM zoho_location_stock ls
+            JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id
+            WHERE ls.zoho_item_id IN (?) AND ls.stock_on_hand > 0
+        `, [allItemIds]);
+        allStocks = extraStocks;
+    }
+
+    const suggestedRows = [];
+    for (const s of suggestRows) {
+        const key = `${s.branch_id}|${s.zoho_item_id}`;
+        if (existingKeys.has(key)) continue;  // already covered by alerts
+        const avg = Number(s.total_qty) / 60;
+        if (avg <= 0) continue;
+        const cfg = brandMap.get(s.brand) || defCfg;
+        const suggestedLevel = computeSuggestedLevel(avg, cfg.lead_time_days, cfg.safety_days);
+        const stock = Number(s.current_stock);
+        const severity = severityForRatio(stock, suggestedLevel);
+        if (!severity) continue;  // stock above suggested — no need to reorder
+        const orderQty = Math.max(0, suggestedLevel + computeSuggestedQty(avg) - stock);
+        const daysToStockout = Math.floor(stock / avg);
+
+        const otherBranchesMap = buildOtherBranchesMap(allStocks, s.branch_id);
+        const otherBranches = otherBranchesMap.get(s.zoho_item_id) || [];
+
+        suggestedRows.push({
+            item_name: s.item_name,
+            sku: s.sku,
+            brand: s.brand,
+            unit: s.unit,
+            branch_id: s.branch_id,
+            branch_name: s.branch_name,
+            current_stock: stock,
+            reorder_level: suggestedLevel,
+            severity,
+            avg_daily_sales: avg,
+            days_to_stockout: daysToStockout,
+            suggested_order_qty: orderQty,
+            other_branches: otherBranches,
+            is_suggested: true
+        });
+    }
+
+    const allRows = [...rows, ...suggestedRows];
+
     return {
         report_date: reportDate,
         scope: branchId != null ? `branch:${branchId}` : 'consolidated',
-        rows: sortReportRows(rows)
+        rows: sortReportRows(allRows)
     };
 }
 
