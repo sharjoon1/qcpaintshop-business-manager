@@ -59,7 +59,7 @@ async function computeAll({ windowDays = 60, minSales = 1 } = {}) {
                     zlm.zoho_location_id
              FROM branch_item_sales bis
              JOIN zoho_items_map zim ON zim.zoho_item_id = bis.zoho_item_id
-             LEFT JOIN zoho_locations_map zlm ON zlm.local_branch_id = bis.local_branch_id
+             LEFT JOIN zoho_locations_map zlm ON zlm.local_branch_id = bis.local_branch_id AND zlm.is_active = 1
              WHERE bis.sale_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
              GROUP BY bis.local_branch_id, bis.zoho_item_id, zim.zoho_brand, zlm.zoho_location_id`,
             [windowDays]

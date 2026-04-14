@@ -76,7 +76,7 @@ async function assembleReport({ branchId = null, date = null } = {}) {
                COALESCE(ls.stock_on_hand, 0) AS current_stock
         FROM zoho_reorder_alerts a
         JOIN zoho_items_map zim ON zim.zoho_item_id = a.zoho_item_id
-        JOIN zoho_locations_map zlm ON zlm.zoho_location_id = a.zoho_location_id
+        JOIN zoho_locations_map zlm ON zlm.zoho_location_id = a.zoho_location_id AND zlm.is_active = 1
         LEFT JOIN zoho_reorder_config rc
             ON rc.zoho_item_id = a.zoho_item_id AND rc.zoho_location_id = a.zoho_location_id
         LEFT JOIN zoho_location_stock ls
@@ -91,7 +91,7 @@ async function assembleReport({ branchId = null, date = null } = {}) {
             SELECT ls.zoho_item_id, zlm.local_branch_id, zlm.zoho_location_name AS location_name,
                    ls.stock_on_hand
             FROM zoho_location_stock ls
-            JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id
+            JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id AND zlm.is_active = 1
             WHERE ls.zoho_item_id IN (?) AND ls.stock_on_hand > 0
         `, [itemIds]);
         stocks = rowsStocks;
@@ -150,7 +150,7 @@ async function assembleReport({ branchId = null, date = null } = {}) {
                COALESCE(ls.stock_on_hand, 0) AS current_stock
         FROM branch_item_sales bis
         JOIN zoho_items_map zim ON zim.zoho_item_id = bis.zoho_item_id
-        LEFT JOIN zoho_locations_map zlm ON zlm.local_branch_id = bis.local_branch_id
+        LEFT JOIN zoho_locations_map zlm ON zlm.local_branch_id = bis.local_branch_id AND zlm.is_active = 1
         LEFT JOIN zoho_location_stock ls ON ls.zoho_item_id = bis.zoho_item_id AND ls.zoho_location_id = zlm.zoho_location_id
         ${suggestWhere}
         GROUP BY bis.local_branch_id, bis.zoho_item_id, zim.zoho_item_name, zim.zoho_sku,
@@ -170,7 +170,7 @@ async function assembleReport({ branchId = null, date = null } = {}) {
             SELECT ls.zoho_item_id, zlm.local_branch_id, zlm.zoho_location_name AS location_name,
                    ls.stock_on_hand
             FROM zoho_location_stock ls
-            JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id
+            JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id AND zlm.is_active = 1
             WHERE ls.zoho_item_id IN (?) AND ls.stock_on_hand > 0
         `, [allItemIds]);
         allStocks = extraStocks;
