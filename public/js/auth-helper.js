@@ -44,12 +44,18 @@ function getCurrentUser() {
 }
 
 /**
- * Logout user and redirect to login
+ * Logout user and redirect to login.
+ * @param {Object} [opts]
+ * @param {string} [opts.reason] - Optional reason shown as toast on login page ('expired')
  */
-function logout() {
+function logout(opts) {
+    // Guard against double-logout when multiple in-flight requests 401 simultaneously
+    if (window.__qcLoggingOut) return;
+    window.__qcLoggingOut = true;
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
-    window.location.href = '/login.html';
+    var reason = opts && opts.reason ? '?reason=' + encodeURIComponent(opts.reason) : '';
+    window.location.href = '/login.html' + reason;
 }
 
 /**
@@ -68,10 +74,10 @@ async function apiRequest(url, options = {}) {
     try {
         const response = await fetch(url, { ...restOptions, headers: mergedHeaders });
 
-        // Handle 401 Unauthorized
+        // Handle 401 Unauthorized — token invalid or session expired server-side
         if (response.status === 401) {
             console.warn('⚠️ Unauthorized - redirecting to login');
-            logout();
+            logout({ reason: 'expired' });
             throw new Error('Unauthorized');
         }
 
@@ -85,13 +91,57 @@ async function apiRequest(url, options = {}) {
 /**
  * Check authentication and redirect to login if not authenticated.
  * Call this at the top of every protected page.
+ *
+ * Returns a boolean (for legacy callers that check synchronously), but
+ * also kicks off async validateSession() which may redirect asynchronously
+ * if the server says the token is expired.
  */
 function checkAuthOrRedirect() {
     if (!isAuthenticated()) {
         window.location.href = '/login.html';
         return false;
     }
+    // Fire-and-forget server-side validation. If the token is stale,
+    // validateSession() hard-redirects to /login.html?reason=expired.
+    validateSession();
     return true;
+}
+
+/**
+ * Ask the server whether the local token is still valid. If 401, clear
+ * state and redirect to login. If 200, refresh the cached user object.
+ * Network errors are tolerated (offline-friendly — the reactive 401
+ * handler in apiRequest() catches expired tokens on the next live call).
+ */
+async function validateSession() {
+    // Don't validate on public / login pages (would loop)
+    var p = window.location.pathname;
+    var publicPaths = ['/login.html', '/forgot-password.html', '/painter-login.html', '/painter-register.html', '/painter-dashboard.html'];
+    if (publicPaths.indexOf(p) !== -1 || p.indexOf('/share/') === 0) {
+        return;
+    }
+    var token = localStorage.getItem('auth_token');
+    if (!token) return; // checkAuthOrRedirect already redirected
+    try {
+        var res = await fetch('/api/auth/me', {
+            headers: { 'Authorization': 'Bearer ' + token },
+            cache: 'no-store'
+        });
+        if (res.status === 401) {
+            logout({ reason: 'expired' });
+            return;
+        }
+        if (res.ok) {
+            var data = await res.json();
+            if (data && data.success && data.user) {
+                localStorage.setItem('user', JSON.stringify(data.user));
+            }
+        }
+    } catch (err) {
+        // Network failure — don't log user out, they may be offline.
+        // apiRequest() will catch expired tokens on the next real call.
+        console.warn('validateSession: network error, proceeding with cached session', err);
+    }
 }
 
 /**
@@ -225,6 +275,8 @@ function requireAdminOrRedirect() {
         window.location.href = '/staff/dashboard.html';
         return false;
     }
+    // Kick off async server-side validation — hard-redirects if token is stale
+    validateSession();
     return true;
 }
 
@@ -237,6 +289,7 @@ window.apiRequest = apiRequest;
 window.apiFetch = apiFetch;
 window.checkAuthOrRedirect = checkAuthOrRedirect;
 window.requireAdminOrRedirect = requireAdminOrRedirect;
+window.validateSession = validateSession;
 window.isAndroidApp = isAndroidApp;
 
 console.log('✅ Auth helper loaded');

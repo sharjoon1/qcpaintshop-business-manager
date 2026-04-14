@@ -204,5 +204,28 @@
             }
         }
     </script>
+<!-- Expired-session toast: shown when auth-helper redirects here with ?reason=expired -->
+<div id="qcExpiredToast" style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:10px 16px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);font-size:13px;z-index:9999;display:none;max-width:90vw;text-align:center;">
+    Your session expired — please log in again.
+</div>
+<script>
+(function() {
+    try {
+        var reason = new URLSearchParams(window.location.search).get('reason');
+        if (reason === 'expired') {
+            var t = document.getElementById('qcExpiredToast');
+            if (t) {
+                t.style.display = 'block';
+                // Dismiss when the user starts interacting with the form
+                var dismiss = function() { t.style.display = 'none'; };
+                document.addEventListener('click', dismiss, { once: true });
+                document.addEventListener('keydown', dismiss, { once: true });
+                // Also auto-dismiss after 8 seconds
+                setTimeout(dismiss, 8000);
+            }
+        }
+    } catch(e) { /* no-op */ }
+})();
+</script>
 </body>
 </html>
