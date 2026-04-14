@@ -256,6 +256,8 @@ const invoiceLineSync = require('./services/zoho-invoice-line-sync');
 invoiceLineSync.setPool(pool);
 const reorderCompute = require('./services/reorder-compute-service');
 reorderCompute.setPool(pool);
+const reorderReport = require('./services/reorder-report-service');
+reorderReport.setPool(pool);
 monitoringRoutes.setAutomationRegistry(automationRegistry);
 monitoringRoutes.setResponseTracker(responseTracker);
 monitoringRoutes.setProductionMonitor(productionMonitor);

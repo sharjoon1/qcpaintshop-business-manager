@@ -40,6 +40,9 @@ const purchaseSuggestion = require('../services/purchase-suggestion');
 const aiEngine = require('../services/ai-engine');
 const invoiceLineSync = require('../services/zoho-invoice-line-sync');
 const reorderCompute = require('../services/reorder-compute-service');
+const reorderReport = require('../services/reorder-report-service');
+const pathMod = require('path');
+const fsMod = require('fs');
 
 let pool;
 
@@ -3325,6 +3328,54 @@ router.post('/reorder/compute-now', requirePermission('zoho', 'reorder'), async 
         res.json({ success: true, data: result });
     } catch (e) {
         console.error('[ComputeNow]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /api/zoho/reorder/run-report - Manual report run (admin)
+ */
+router.post('/reorder/run-report', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const force = req.body.force === true || req.query.force === '1';
+        const result = await reorderReport.runDailyReport({ force });
+        res.json({ success: true, data: result });
+    } catch (e) {
+        console.error('[RunReport]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * GET /api/zoho/reorder/report - Fetch assembled report (dashboard view)
+ */
+router.get('/reorder/report', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const branchId = req.query.branch_id ? parseInt(req.query.branch_id, 10) : null;
+        const date = req.query.date || null;
+        const report = await reorderReport.assembleReport({ branchId, date });
+        res.json({ success: true, data: report });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * GET /api/zoho/reorder/report/pdf - Download PDF
+ */
+router.get('/reorder/report/pdf', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const branchId = req.query.branch_id ? parseInt(req.query.branch_id, 10) : null;
+        const report = await reorderReport.assembleReport({ branchId });
+        const uploadsDir = pathMod.join(__dirname, '..', 'uploads', 'reorder-reports');
+        if (!fsMod.existsSync(uploadsDir)) fsMod.mkdirSync(uploadsDir, { recursive: true });
+        const safeScope = report.scope.replace(':', '-');
+        const pdfPath = pathMod.join(uploadsDir, `reorder-${report.report_date}-${safeScope}.pdf`);
+        const { generateReorderPdf } = require('../services/reorder-report-pdf-generator');
+        await generateReorderPdf(report, pdfPath);
+        res.download(pdfPath);
+    } catch (e) {
+        console.error('[ReportPDF]', e);
         res.status(500).json({ success: false, message: e.message });
     }
 });

@@ -122,3 +122,169 @@ module.exports = {
     buildOtherBranchesMap,
     assembleReport
 };
+
+// ========================================
+// TASK 11: Delivery (WhatsApp + FCM + PDF)
+// ========================================
+
+const path = require('path');
+const fs = require('fs');
+
+async function getConfigMap(keys) {
+    const [rows] = await pool.query(
+        `SELECT config_key, config_value FROM ai_config WHERE config_key IN (?)`,
+        [keys]
+    );
+    const map = {};
+    rows.forEach(r => { map[r.config_key] = r.config_value; });
+    return map;
+}
+
+async function getRecipientsForScope(scope) {
+    if (scope.startsWith('branch:')) {
+        const branchId = parseInt(scope.split(':')[1], 10);
+        const [rows] = await pool.query(
+            `SELECT u.id AS user_id, u.full_name, u.phone
+             FROM branches b
+             JOIN users u ON u.id = b.manager_id
+             WHERE b.id = ? AND u.is_active = 1`,
+            [branchId]
+        );
+        return rows;
+    }
+    const cfg = await getConfigMap(['reorder_report_recipients']);
+    let userIds = [];
+    try { userIds = JSON.parse(cfg.reorder_report_recipients || '[]'); } catch (e) { userIds = []; }
+    if (!Array.isArray(userIds) || userIds.length === 0) return [];
+    const [rows] = await pool.query(
+        `SELECT id AS user_id, full_name, phone FROM users WHERE id IN (?) AND is_active = 1`,
+        [userIds]
+    );
+    return rows;
+}
+
+async function deliverReport(report, { force = false } = {}) {
+    const [existing] = await pool.query(
+        `SELECT id FROM reorder_report_log WHERE report_date = ? AND scope = ?`,
+        [report.report_date, report.scope]
+    );
+    if (existing.length > 0 && !force) {
+        return { skipped: true, reason: 'Already sent today' };
+    }
+
+    const deliveryStatus = { dashboard: 1, pdf: null, whatsapp: null, fcm: null };
+    const cfg = await getConfigMap([
+        'reorder_report_whatsapp_enabled',
+        'reorder_report_fcm_enabled',
+        'reorder_report_pdf_enabled'
+    ]);
+
+    let pdfPath = null;
+    if (cfg.reorder_report_pdf_enabled === '1' && report.rows.length > 0) {
+        const uploadsDir = path.join(__dirname, '..', 'uploads', 'reorder-reports');
+        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+        const safeScope = report.scope.replace(':', '-');
+        pdfPath = path.join(uploadsDir, `reorder-${report.report_date}-${safeScope}.pdf`);
+        try {
+            const { generateReorderPdf } = require('./reorder-report-pdf-generator');
+            await generateReorderPdf(report, pdfPath);
+            deliveryStatus.pdf = path.basename(pdfPath);
+        } catch (e) {
+            deliveryStatus.pdf = 'failed:' + e.message;
+            pdfPath = null;
+        }
+    }
+
+    const recipients = await getRecipientsForScope(report.scope);
+    const criticalCount = report.rows.filter(r => r.severity === 'critical').length;
+    const summary = report.rows.length === 0
+        ? `No reorder needed (${report.report_date})`
+        : `Reorder Alert — ${report.rows.length} items need reorder (${criticalCount} critical)`;
+
+    // WhatsApp via whatsapp-session-manager
+    // sendMessage(branchId, phone, message) — general session branchId=0
+    // sendMedia(branchId, phone, options) — for PDF attachments
+    if (cfg.reorder_report_whatsapp_enabled === '1' && recipients.length > 0) {
+        try {
+            const waManager = require('./whatsapp-session-manager');
+            for (const r of recipients) {
+                if (!r.phone) continue;
+                if (typeof waManager.sendMessage === 'function') {
+                    await waManager.sendMessage(0, r.phone, summary).catch(e => console.error('[ReorderWA]', e.message));
+                    if (pdfPath && typeof waManager.sendMedia === 'function') {
+                        await waManager.sendMedia(0, r.phone, {
+                            type: 'document',
+                            path: pdfPath,
+                            caption: 'Reorder Report'
+                        }).catch(e => console.error('[ReorderWA-PDF]', e.message));
+                    }
+                } else {
+                    console.warn('[ReorderReport] whatsapp-session-manager sendMessage not found — skipped WA for', r.phone);
+                }
+            }
+            deliveryStatus.whatsapp = 'sent';
+        } catch (e) {
+            deliveryStatus.whatsapp = 'failed:' + e.message;
+        }
+    }
+
+    // FCM via notification-service.send(userId, {...})
+    if (cfg.reorder_report_fcm_enabled === '1' && recipients.length > 0) {
+        try {
+            const notificationService = require('./notification-service');
+            for (const r of recipients) {
+                await notificationService.send(r.user_id, {
+                    type: 'reorder_report',
+                    title: `Reorder Report (${report.scope})`,
+                    body: summary,
+                    data: { scope: report.scope, date: report.report_date },
+                    ttlSeconds: 86400
+                }).catch(e => console.error('[ReorderFCM]', e.message));
+            }
+            deliveryStatus.fcm = 'sent';
+        } catch (e) {
+            deliveryStatus.fcm = 'failed:' + e.message;
+        }
+    }
+
+    if (existing.length > 0 && force) {
+        await pool.query(
+            `UPDATE reorder_report_log SET delivery_status = ?, generated_at = NOW(), items_count = ? WHERE id = ?`,
+            [JSON.stringify(deliveryStatus), report.rows.length, existing[0].id]
+        );
+    } else {
+        await pool.query(
+            `INSERT INTO reorder_report_log (report_date, scope, items_count, delivery_status)
+             VALUES (?, ?, ?, ?)`,
+            [report.report_date, report.scope, report.rows.length, JSON.stringify(deliveryStatus)]
+        );
+    }
+
+    return { delivered: true, deliveryStatus, pdfPath };
+}
+
+async function runDailyReport({ force = false } = {}) {
+    const [branches] = await pool.query(`
+        SELECT DISTINCT zlm.local_branch_id AS branch_id
+        FROM zoho_reorder_alerts a
+        JOIN zoho_locations_map zlm ON zlm.zoho_location_id = a.zoho_location_id
+        WHERE a.status = 'active' AND zlm.local_branch_id IS NOT NULL
+    `);
+
+    const results = [];
+    for (const b of branches) {
+        const rep = await assembleReport({ branchId: b.branch_id });
+        const r = await deliverReport(rep, { force });
+        results.push({ scope: rep.scope, ...r });
+    }
+
+    const consolidated = await assembleReport({});
+    const cr = await deliverReport(consolidated, { force });
+    results.push({ scope: consolidated.scope, ...cr });
+
+    return { branches: branches.length, results };
+}
+
+module.exports.deliverReport = deliverReport;
+module.exports.runDailyReport = runDailyReport;
+module.exports.getRecipientsForScope = getRecipientsForScope;
