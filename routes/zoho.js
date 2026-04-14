@@ -3179,18 +3179,24 @@ router.post('/reorder/brands', requirePermission('zoho', 'reorder'), async (req,
 router.put('/reorder/brands/:id', requirePermission('zoho', 'reorder'), async (req, res) => {
     try {
         const id = parseInt(req.params.id, 10);
+        if (!Number.isFinite(id)) {
+            return res.status(400).json({ success: false, message: 'Invalid id' });
+        }
         const { lead_time_days, safety_days, is_active } = req.body;
         const lead = Number(lead_time_days);
         const safety = Number(safety_days);
         if (!Number.isFinite(lead) || lead < 0 || !Number.isFinite(safety) || safety < 0) {
             return res.status(400).json({ success: false, message: 'lead_time_days and safety_days must be non-negative numbers' });
         }
-        await pool.query(
+        const [result] = await pool.query(
             `UPDATE brand_reorder_config
              SET lead_time_days = ?, safety_days = ?, is_active = ?, updated_by = ?
              WHERE id = ?`,
             [lead, safety, is_active === false ? 0 : 1, req.user.id, id]
         );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Brand config not found' });
+        }
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
@@ -3203,6 +3209,9 @@ router.put('/reorder/brands/:id', requirePermission('zoho', 'reorder'), async (r
 router.delete('/reorder/brands/:id', requirePermission('zoho', 'reorder'), async (req, res) => {
     try {
         const id = parseInt(req.params.id, 10);
+        if (!Number.isFinite(id)) {
+            return res.status(400).json({ success: false, message: 'Invalid id' });
+        }
         const [rows] = await pool.query(`SELECT brand_name FROM brand_reorder_config WHERE id = ?`, [id]);
         if (rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Brand config not found' });
