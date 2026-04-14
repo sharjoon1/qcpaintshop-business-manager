@@ -76,13 +76,13 @@ async function getLastSyncedDate() {
 
 async function fetchUnsyncedInvoices(window) {
     const [rows] = await pool.query(
-        `SELECT zi.invoice_id, zi.invoice_date, zi.local_branch_id
+        `SELECT zi.zoho_invoice_id AS invoice_id, zi.invoice_date, zi.local_branch_id
          FROM zoho_invoices zi
-         LEFT JOIN invoice_line_sync_cursor c ON c.invoice_id = zi.invoice_id
+         LEFT JOIN invoice_line_sync_cursor c ON c.invoice_id = zi.zoho_invoice_id
          WHERE zi.invoice_date BETWEEN ? AND ?
            AND zi.local_branch_id IS NOT NULL
            AND c.invoice_id IS NULL
-         ORDER BY zi.invoice_date ASC, zi.invoice_id ASC`,
+         ORDER BY zi.invoice_date ASC, zi.zoho_invoice_id ASC`,
         [window.from, window.to]
     );
     return rows;
