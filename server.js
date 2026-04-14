@@ -258,6 +258,8 @@ const reorderCompute = require('./services/reorder-compute-service');
 reorderCompute.setPool(pool);
 const reorderReport = require('./services/reorder-report-service');
 reorderReport.setPool(pool);
+const branchScopeMiddleware = require('./middleware/branchScope');
+branchScopeMiddleware.setPool(pool);
 monitoringRoutes.setAutomationRegistry(automationRegistry);
 monitoringRoutes.setResponseTracker(responseTracker);
 monitoringRoutes.setProductionMonitor(productionMonitor);

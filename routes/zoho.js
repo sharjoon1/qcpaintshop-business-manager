@@ -30,6 +30,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { branchScope } = require('../middleware/branchScope');
 
 // Services (initialized via setPool)
 const zohoOAuth = require('../services/zoho-oauth');
@@ -2931,15 +2932,22 @@ router.get('/transactions/comparison', requirePermission('zoho', 'view'), async 
 /**
  * GET /api/zoho/reorder/config - List reorder configurations
  */
-router.get('/reorder/config', requirePermission('zoho', 'view'), async (req, res) => {
+router.get('/reorder/config', requirePermission('zoho', 'view'), branchScope, async (req, res) => {
     try {
-        const { item_id, location_id, source, page = 1, limit = 50 } = req.query;
+        const { item_id, source, page = 1, limit = 50 } = req.query;
 
         let where = 'WHERE 1=1';
         const params = [];
 
         if (item_id) { where += ' AND rc.zoho_item_id = ?'; params.push(item_id); }
-        if (location_id) { where += ' AND rc.zoho_location_id = ?'; params.push(location_id); }
+        // Branch-scope: manager's branch overrides user-supplied location_id
+        if (req.branchScope.branchId != null) {
+            where += ' AND lm.local_branch_id = ?';
+            params.push(req.branchScope.branchId);
+        } else if (req.query.location_id) {
+            where += ' AND rc.zoho_location_id = ?';
+            params.push(req.query.location_id);
+        }
         if (source) { where += ' AND rc.source = ?'; params.push(source); }
 
         const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
@@ -3349,9 +3357,11 @@ router.post('/reorder/run-report', requirePermission('zoho', 'reorder'), async (
 /**
  * GET /api/zoho/reorder/report - Fetch assembled report (dashboard view)
  */
-router.get('/reorder/report', requirePermission('zoho', 'reorder'), async (req, res) => {
+router.get('/reorder/report', requirePermission('zoho', 'reorder'), branchScope, async (req, res) => {
     try {
-        const branchId = req.query.branch_id ? parseInt(req.query.branch_id, 10) : null;
+        const branchId = req.branchScope.branchId != null
+            ? req.branchScope.branchId
+            : (req.query.branch_id ? parseInt(req.query.branch_id, 10) : null);
         const date = req.query.date || null;
         const report = await reorderReport.assembleReport({ branchId, date });
         res.json({ success: true, data: report });
