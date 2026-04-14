@@ -563,6 +563,10 @@
                     <label class="block text-xs text-gray-600 mb-1" title="Hide slow-movers below this daily velocity">Min avg/day</label>
                     <input type="number" step="0.1" min="0" id="reportMinAvg" value="0" class="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
+                <div class="flex-1 min-w-[160px]">
+                    <label class="block text-xs text-gray-600 mb-1">Search item / SKU / brand</label>
+                    <input type="text" id="reportSearch" placeholder="e.g. Ace Advanced" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
                 <button onclick="loadReport()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
                 <button onclick="downloadReportPdf()" class="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Download PDF</button>
                 <button onclick="rerunReport()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg transition">Re-run</button>
@@ -768,13 +772,22 @@
         }
         if (tab === 'daily-report') {
             document.getElementById('reportDate').value = new Date().toISOString().slice(0, 10);
-            // Min avg/day — client-side re-filter (no re-fetch)
+            // Client-side re-filters (no re-fetch) — wired once
+            var rerender = function() { if (lastReportData) renderReport(lastReportData); };
             var minAvgEl = document.getElementById('reportMinAvg');
             if (minAvgEl && !minAvgEl._wired) {
-                minAvgEl.addEventListener('input', function() {
-                    if (lastReportData) renderReport(lastReportData);
-                });
+                minAvgEl.addEventListener('input', rerender);
                 minAvgEl._wired = true;
+            }
+            var searchEl = document.getElementById('reportSearch');
+            if (searchEl && !searchEl._wired) {
+                // Debounce search for smoother typing
+                var t = null;
+                searchEl.addEventListener('input', function() {
+                    clearTimeout(t);
+                    t = setTimeout(rerender, 150);
+                });
+                searchEl._wired = true;
             }
             loadReportBranches().then(() => loadReport());
         }
@@ -1921,6 +1934,16 @@
         var minAvg = minAvgEl ? (parseFloat(minAvgEl.value) || 0) : 0;
         if (minAvg > 0) {
             rows = rows.filter(function(row) { return (row.avg_daily_sales || 0) >= minAvg; });
+        }
+        // Apply client-side search on item name / SKU / brand
+        var searchEl = document.getElementById('reportSearch');
+        var q = searchEl ? searchEl.value.trim().toLowerCase() : '';
+        if (q) {
+            rows = rows.filter(function(row) {
+                return (row.item_name || '').toLowerCase().indexOf(q) !== -1 ||
+                       (row.sku || '').toLowerCase().indexOf(q) !== -1 ||
+                       (row.brand || '').toLowerCase().indexOf(q) !== -1;
+            });
         }
         var sev = { critical: 0, high: 0, medium: 0, low: 0 };
         rows.forEach(function(row) { sev[row.severity] = (sev[row.severity] || 0) + 1; });
