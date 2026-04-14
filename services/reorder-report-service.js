@@ -69,20 +69,16 @@ async function assembleReport({ branchId = null, date = null } = {}) {
     `, params);
 
     const itemIds = [...new Set(alerts.map(a => a.zoho_item_id))];
-    let otherMap = new Map();
+    let stocks = [];
     if (itemIds.length > 0) {
-        const [stocks] = await pool.query(`
+        const [rowsStocks] = await pool.query(`
             SELECT ls.zoho_item_id, zlm.local_branch_id, zlm.location_name,
                    ls.stock_on_hand
             FROM zoho_location_stock ls
             JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id
             WHERE ls.zoho_item_id IN (?) AND ls.stock_on_hand > 0
         `, [itemIds]);
-        otherMap = new Map();
-        for (const s of stocks) {
-            if (!otherMap.has(s.zoho_item_id)) otherMap.set(s.zoho_item_id, []);
-            otherMap.get(s.zoho_item_id).push(s);
-        }
+        stocks = rowsStocks;
     }
 
     const rows = alerts.map(a => {
@@ -93,15 +89,8 @@ async function assembleReport({ branchId = null, date = null } = {}) {
             Number(a.reorder_level || 0) + Number(a.reorder_quantity || 0) - Number(a.current_stock)
         );
 
-        const othersForItem = otherMap.get(a.zoho_item_id) || [];
-        const otherBranches = othersForItem
-            .filter(s => s.local_branch_id !== a.branch_id)
-            .sort((x, y) => Number(y.stock_on_hand) - Number(x.stock_on_hand))
-            .map(s => ({
-                branch_id: s.local_branch_id,
-                branch_name: s.location_name,
-                stock_on_hand: Number(s.stock_on_hand)
-            }));
+        const otherBranchesMap = buildOtherBranchesMap(stocks, a.branch_id);
+        const otherBranches = otherBranchesMap.get(a.zoho_item_id) || [];
 
         return {
             item_name: a.item_name,
