@@ -39,6 +39,7 @@ const whatsappProcessor = require('../services/whatsapp-processor');
 const purchaseSuggestion = require('../services/purchase-suggestion');
 const aiEngine = require('../services/ai-engine');
 const invoiceLineSync = require('../services/zoho-invoice-line-sync');
+const reorderCompute = require('../services/reorder-compute-service');
 
 let pool;
 
@@ -3285,6 +3286,21 @@ router.get('/reorder/sales-sync-status', requirePermission('zoho', 'reorder'), a
             }
         });
     } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /api/zoho/reorder/compute-now - Run compute inline, return summary
+ */
+router.post('/reorder/compute-now', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const windowDays = parseInt(req.body.window_days, 10) || 60;
+        const minSales = parseInt(req.body.min_sales, 10) || 1;
+        const result = await reorderCompute.computeAll({ windowDays, minSales });
+        res.json({ success: true, data: result });
+    } catch (e) {
+        console.error('[ComputeNow]', e);
         res.status(500).json({ success: false, message: e.message });
     }
 });

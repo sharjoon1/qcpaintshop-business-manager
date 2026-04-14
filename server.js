@@ -254,6 +254,8 @@ photosRoutes.setPool(pool);
 if (itemMasterRoutes.setPool) itemMasterRoutes.setPool(pool);
 const invoiceLineSync = require('./services/zoho-invoice-line-sync');
 invoiceLineSync.setPool(pool);
+const reorderCompute = require('./services/reorder-compute-service');
+reorderCompute.setPool(pool);
 monitoringRoutes.setAutomationRegistry(automationRegistry);
 monitoringRoutes.setResponseTracker(responseTracker);
 monitoringRoutes.setProductionMonitor(productionMonitor);
