@@ -3375,7 +3375,15 @@ router.get('/reorder/report', requirePermission('zoho', 'reorder'), branchScope,
 /**
  * GET /api/zoho/reorder/report/pdf - Download PDF
  */
-router.get('/reorder/report/pdf', requirePermission('zoho', 'reorder'), async (req, res) => {
+// Shim: accept token via ?token= for direct-link downloads (WebView-friendly)
+const pdfTokenShim = (req, res, next) => {
+    if (!req.headers.authorization && req.query.token) {
+        req.headers.authorization = 'Bearer ' + req.query.token;
+    }
+    next();
+};
+
+router.get('/reorder/report/pdf', pdfTokenShim, requirePermission('zoho', 'reorder'), async (req, res) => {
     try {
         const branchId = req.query.branch_id ? parseInt(req.query.branch_id, 10) : null;
         const report = await reorderReport.assembleReport({ branchId });

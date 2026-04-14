@@ -1891,8 +1891,9 @@
             return 'bg-gray-100 text-gray-700';
         }
 
-        body.innerHTML =
-            '<table class="min-w-full text-sm">' +
+        // Desktop table (hidden on mobile) + mobile cards (hidden on desktop)
+        var tableHtml =
+            '<div class="hidden md:block overflow-x-auto"><table class="min-w-full text-sm">' +
             '<thead class="bg-gray-50"><tr>' +
             '<th class="px-2 py-2 text-left font-semibold text-gray-600">Severity</th>' +
             '<th class="px-2 py-2 text-left font-semibold text-gray-600">Item</th>' +
@@ -1926,36 +1927,51 @@
                     '<td class="px-2 py-2">' + otherBranches + '</td>' +
                     '</tr>';
             }).join('') +
-            '</tbody></table>';
+            '</tbody></table></div>';
+
+        // Mobile card view
+        var cardsHtml = '<div class="md:hidden space-y-2">' +
+            rows.map(function(row) {
+                var daysLeft = row.days_to_stockout != null ? row.days_to_stockout : '∞';
+                var daysClass = (row.days_to_stockout != null && row.days_to_stockout <= 3) ? 'text-red-600 font-semibold' : 'text-gray-700';
+                var otherChips = (row.other_branches || []).length === 0 ? '' :
+                    '<div class="mt-2 flex flex-wrap gap-1">' +
+                    (row.other_branches || []).slice(0, 5).map(function(o) {
+                        return '<span class="inline-block bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded text-xs">' +
+                            escapeHtml(o.branch_name || '') + ': ' + o.stock_on_hand + '</span>';
+                    }).join('') + '</div>';
+                return '<div class="border border-gray-200 rounded-lg p-3 bg-white">' +
+                    '<div class="flex items-start justify-between gap-2 mb-2">' +
+                    '<div class="flex-1 min-w-0">' +
+                    '<div class="font-medium text-sm text-gray-800 truncate">' + escapeHtml(row.item_name || '') + '</div>' +
+                    '<div class="text-xs text-gray-400 truncate">' + escapeHtml(row.sku || '') + (row.brand ? ' · ' + escapeHtml(row.brand) : '') + ' · ' + escapeHtml(row.branch_name || '') + '</div>' +
+                    '</div>' +
+                    '<span class="badge-severity ' + severityClass(row.severity) + ' rounded px-2 py-0.5 text-xs flex-shrink-0">' + escapeHtml(row.severity || '') + '</span>' +
+                    '</div>' +
+                    '<div class="grid grid-cols-4 gap-2 text-xs">' +
+                    '<div><div class="text-gray-500">Stock</div><div class="font-semibold tabular-nums">' + (row.current_stock != null ? row.current_stock : '—') + '</div></div>' +
+                    '<div><div class="text-gray-500">Reorder @</div><div class="font-semibold tabular-nums">' + (row.reorder_level != null ? row.reorder_level : '—') + '</div></div>' +
+                    '<div><div class="text-gray-500">Days left</div><div class="font-semibold tabular-nums ' + daysClass + '">' + daysLeft + '</div></div>' +
+                    '<div><div class="text-gray-500">Order</div><div class="font-semibold tabular-nums text-indigo-700">' + (row.suggested_order_qty != null ? row.suggested_order_qty : '—') + '</div></div>' +
+                    '</div>' +
+                    otherChips +
+                    '</div>';
+            }).join('') + '</div>';
+
+        body.innerHTML = tableHtml + cardsHtml;
     }
 
     function downloadReportPdf() {
         var date = document.getElementById('reportDate').value;
         var branchId = document.getElementById('reportBranch').value;
+        var token = localStorage.getItem('auth_token');
         var qs = new URLSearchParams();
         if (date) qs.set('date', date);
         if (branchId) qs.set('branch_id', branchId);
-        var token = localStorage.getItem('auth_token');
-        fetch('/api/zoho/reorder/report/pdf?' + qs.toString(), {
-            headers: { 'Authorization': 'Bearer ' + token }
-        })
-        .then(function(res) {
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            return res.blob();
-        })
-        .then(function(blob) {
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'reorder-report' + (date ? '-' + date : '') + '.pdf';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        })
-        .catch(function(e) {
-            showToast('PDF download failed: ' + e.message, 'error');
-        });
+        qs.set('token', token);
+        // Direct-link download — WebView friendly. Server validates token from query param.
+        var url = '/api/zoho/reorder/report/pdf?' + qs.toString();
+        window.location.href = url;
     }
 
     async function rerunReport() {
