@@ -540,7 +540,7 @@
             var id = String(item.item_id || item.zoho_item_id);
             var currentSource = parseFloat(getCurrentValue(id, source));
             if (!isFinite(currentSource) || currentSource === 0) { skipped++; return; }
-            var newTarget = Math.round((currentSource * (1 + pct / 100)) * 100) / 100;
+            var newTarget = Math.ceil(currentSource * (1 + pct / 100));
             setDirty(id, target, String(newTarget));
             updated++;
         });
