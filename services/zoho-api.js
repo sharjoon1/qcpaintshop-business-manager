@@ -1624,11 +1624,26 @@ async function getLocationStockDashboard(filters = {}) {
 
 /**
  * Update a single item in Zoho
+ *
+ * Zoho ignores top-level custom field keys (e.g. cf_dpl) — they must be
+ * sent inside custom_fields: [{ api_name, value }]. Transform any cf_* keys
+ * on the incoming payload into the expected wrapped format.
  */
 async function updateItem(itemId, data) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    const payload = { ...data };
+    const cfKeys = Object.keys(payload).filter(k => k.startsWith('cf_'));
+    if (cfKeys.length > 0) {
+        const existing = Array.isArray(payload.custom_fields) ? [...payload.custom_fields] : [];
+        const byApi = new Map(existing.map(f => [f.api_name, f]));
+        for (const k of cfKeys) {
+            byApi.set(k, { api_name: k, value: payload[k] });
+            delete payload[k];
+        }
+        payload.custom_fields = Array.from(byApi.values());
+    }
     // Rate limiting now handled centrally in apiPut
-    return await apiPut(`/items/${itemId}?organization_id=${orgId}`, data);
+    return await apiPut(`/items/${itemId}?organization_id=${orgId}`, payload);
 }
 
 /**
