@@ -252,6 +252,8 @@ activityTrackerRoutes.setReportService(attendanceReport);
 monitoringRoutes.setPool(pool);
 photosRoutes.setPool(pool);
 if (itemMasterRoutes.setPool) itemMasterRoutes.setPool(pool);
+const invoiceLineSync = require('./services/zoho-invoice-line-sync');
+invoiceLineSync.setPool(pool);
 monitoringRoutes.setAutomationRegistry(automationRegistry);
 monitoringRoutes.setResponseTracker(responseTracker);
 monitoringRoutes.setProductionMonitor(productionMonitor);

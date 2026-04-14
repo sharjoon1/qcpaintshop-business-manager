@@ -182,6 +182,19 @@
         </div>
     </div>
 
+    <!-- Sales Sync Status Banner -->
+    <div id="syncStatusBanner" class="bg-amber-50 border border-amber-200 rounded p-3 mb-3 hidden">
+        <div class="flex justify-between items-center flex-wrap gap-2">
+            <div class="text-sm">
+                <span id="syncStatusText">Loading...</span>
+            </div>
+            <button id="backfillBtn" onclick="triggerBackfill()" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+                Back-fill sales history
+            </button>
+        </div>
+        <div id="syncProgress" class="mt-2 text-xs text-gray-600 hidden"></div>
+    </div>
+
     <!-- Tabs -->
     <div class="flex border-b border-gray-200 mb-6">
         <button id="tabAlerts" class="tab-btn active" onclick="switchTab('alerts')">
@@ -1543,12 +1556,74 @@
     }
 
     // ============================
+    // SALES SYNC STATUS + BACKFILL
+    // ============================
+    async function loadSyncStatus() {
+        try {
+            const res = await fetch('/api/zoho/reorder/sales-sync-status', {
+                headers: getAuthHeaders()
+            });
+            const json = await res.json();
+            if (!json.success) return;
+            const banner = document.getElementById('syncStatusBanner');
+            banner.classList.remove('hidden');
+            const d = json.data;
+            const fmt = (v) => v ? new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+            document.getElementById('syncStatusText').innerHTML =
+                'Sales rows: <b>' + d.sales_rows + '</b> | Invoices synced: <b>' + d.invoices_synced + '</b> | Range: ' + fmt(d.earliest_date) + ' → ' + fmt(d.latest_date);
+        } catch (e) {
+            console.error('loadSyncStatus failed:', e);
+        }
+    }
+
+    async function triggerBackfill() {
+        if (!confirm('Start invoice-line sync? First run may take up to 10 minutes.')) return;
+        const btn = document.getElementById('backfillBtn');
+        btn.disabled = true;
+        const progressEl = document.getElementById('syncProgress');
+        progressEl.classList.remove('hidden');
+        progressEl.textContent = 'Starting...';
+        try {
+            const res = await fetch('/api/zoho/reorder/backfill-sales', {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+            const json = await res.json();
+            progressEl.textContent = json.message || 'Started';
+
+            // Listen for progress via socket
+            if (window.qcSocket) {
+                const onProgress = (p) => {
+                    progressEl.textContent = 'Syncing ' + p.synced + '/' + p.total + ' (' + p.failed + ' failed)';
+                };
+                const onDone = (result) => {
+                    progressEl.textContent = result?.error ? ('Failed: ' + result.error) : ('Done — synced ' + (result?.synced || 0) + ' invoices');
+                    btn.disabled = false;
+                    window.qcSocket.off('invoice-line-sync-progress', onProgress);
+                    window.qcSocket.off('invoice-line-sync-done', onDone);
+                    loadSyncStatus();
+                };
+                window.qcSocket.on('invoice-line-sync-progress', onProgress);
+                window.qcSocket.on('invoice-line-sync-done', onDone);
+            } else {
+                // No socket — back-fill still runs; refresh page to see updated status
+                btn.disabled = false;
+                console.warn('No qcSocket; back-fill progress not streamed. Refresh to update status banner.');
+            }
+        } catch (e) {
+            progressEl.textContent = 'Error: ' + e.message;
+            btn.disabled = false;
+        }
+    }
+
+    // ============================
     // INITIALIZE
     // ============================
     function init() {
         loadLocations();
         loadAlertsSummary();
         loadAlerts();
+        loadSyncStatus();
     }
 
     init();

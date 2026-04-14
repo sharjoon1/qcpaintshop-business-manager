@@ -38,6 +38,7 @@ const syncScheduler = require('../services/sync-scheduler');
 const whatsappProcessor = require('../services/whatsapp-processor');
 const purchaseSuggestion = require('../services/purchase-suggestion');
 const aiEngine = require('../services/ai-engine');
+const invoiceLineSync = require('../services/zoho-invoice-line-sync');
 
 let pool;
 
@@ -3221,6 +3222,54 @@ router.delete('/reorder/brands/:id', requirePermission('zoho', 'reorder'), async
         }
         await pool.query(`DELETE FROM brand_reorder_config WHERE id = ?`, [id]);
         res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /api/zoho/reorder/backfill-sales - Trigger invoice-line sync (background)
+ * Returns immediately; progress emitted via Socket.io.
+ */
+router.post('/reorder/backfill-sales', requirePermission('zoho', 'reorder'), async (req, res) => {
+    res.json({ success: true, message: 'Sync started — watch sales-sync-status' });
+    setImmediate(async () => {
+        try {
+            const io = req.app.get('io');
+            const result = await invoiceLineSync.syncInvoiceLines({
+                emitProgress: p => io?.emit('invoice-line-sync-progress', p)
+            });
+            io?.emit('invoice-line-sync-done', result);
+            console.log('[BackfillSales] completed:', result);
+        } catch (e) {
+            console.error('[BackfillSales] failed:', e);
+            const io = req.app.get('io');
+            io?.emit('invoice-line-sync-done', { error: e.message });
+        }
+    });
+});
+
+/**
+ * GET /api/zoho/reorder/sales-sync-status - Sync status/progress (cursor count, date range)
+ */
+router.get('/reorder/sales-sync-status', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const [[{ cursor_count }]] = await pool.query(
+            `SELECT COUNT(*) AS cursor_count FROM invoice_line_sync_cursor`
+        );
+        const [[stats]] = await pool.query(
+            `SELECT COUNT(*) AS sales_count, MIN(sale_date) AS min_date, MAX(sale_date) AS max_date
+             FROM branch_item_sales`
+        );
+        res.json({
+            success: true,
+            data: {
+                invoices_synced: cursor_count,
+                sales_rows: stats.sales_count,
+                earliest_date: stats.min_date,
+                latest_date: stats.max_date
+            }
+        });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }
