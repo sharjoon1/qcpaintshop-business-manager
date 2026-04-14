@@ -18,12 +18,18 @@
 const cron = require('node-cron');
 const zohoAPI = require('./zoho-api');
 const rateLimiter = require('./zoho-rate-limiter');
+const invoiceLineSync = require('./zoho-invoice-line-sync');
+const reorderCompute = require('./reorder-compute-service');
+const reorderReport = require('./reorder-report-service');
 
 let pool;
 let syncJob = null;           // Interval-based sync cron task
 let dailyReportJob = null;    // Daily report generation cron task
 let stockSyncJob = null;      // Stock sync cron task
 let bulkJobProcessor = null;  // Bulk job processor cron task
+let invoiceLineSyncJob = null; // Invoice line items sync cron task (02:00 IST)
+let reorderComputeJob = null;  // Reorder level compute cron task (02:30 IST)
+let reorderReportJob = null;   // Daily reorder report cron task (07:00 IST)
 let configCache = {};         // Cached config values
 let isRunning = false;
 let lastSyncAttempt = null;
@@ -330,6 +336,57 @@ async function executeDailyReport() {
     }
 }
 
+/**
+ * Sync Zoho invoice line items into branch_item_sales (for reorder intelligence)
+ */
+async function executeInvoiceLineSync() {
+    if (!pool) return;
+    try {
+        console.log('[Scheduler] Starting invoice line items sync...');
+        if (registry) registry.markRunning('invoice-line-sync');
+        await invoiceLineSync.syncInvoiceLines();
+        console.log('[Scheduler] Invoice line items sync completed');
+        if (registry) registry.markCompleted('invoice-line-sync', { details: 'Invoice line sync done' });
+    } catch (error) {
+        console.error('[Scheduler] Invoice line sync failed:', error.message);
+        if (registry) registry.markFailed('invoice-line-sync', { error: error.message });
+    }
+}
+
+/**
+ * Compute auto reorder levels from 60-day sales velocity
+ */
+async function executeReorderCompute() {
+    if (!pool) return;
+    try {
+        console.log('[Scheduler] Starting reorder level compute...');
+        if (registry) registry.markRunning('reorder-compute');
+        await reorderCompute.computeAll();
+        console.log('[Scheduler] Reorder level compute completed');
+        if (registry) registry.markCompleted('reorder-compute', { details: 'Reorder compute done' });
+    } catch (error) {
+        console.error('[Scheduler] Reorder compute failed:', error.message);
+        if (registry) registry.markFailed('reorder-compute', { error: error.message });
+    }
+}
+
+/**
+ * Generate and deliver daily reorder report per branch + consolidated
+ */
+async function executeReorderReport() {
+    if (!pool) return;
+    try {
+        console.log('[Scheduler] Starting daily reorder report...');
+        if (registry) registry.markRunning('reorder-report');
+        await reorderReport.runDailyReport();
+        console.log('[Scheduler] Daily reorder report completed');
+        if (registry) registry.markCompleted('reorder-report', { details: 'Reorder report done' });
+    } catch (error) {
+        console.error('[Scheduler] Reorder report failed:', error.message);
+        if (registry) registry.markFailed('reorder-report', { error: error.message });
+    }
+}
+
 // ========================================
 // CRON MANAGEMENT
 // ========================================
@@ -380,6 +437,9 @@ async function start() {
             registry.register('zoho-stock-sync', { name: 'Zoho Stock Sync', service: 'sync-scheduler', schedule: '0 2,6,12,18 * * *', description: 'Heavy stock level sync from Zoho' });
             registry.register('zoho-daily-report', { name: 'Daily Financial Report', service: 'sync-scheduler', schedule: `${parseInt((dailyTime || '09:00').split(':')[1]) || 0} ${parseInt((dailyTime || '09:00').split(':')[0]) || 9} * * *`, description: 'Auto P&L + receivables report' });
             registry.register('zoho-bulk-processor', { name: 'Bulk Job Processor', service: 'sync-scheduler', schedule: '*/5 * * * *', description: 'Process pending Zoho bulk import/export jobs' });
+            registry.register('invoice-line-sync', { name: 'Invoice line items sync', service: 'sync-scheduler', schedule: '0 2 * * *', description: 'Pulls line items from Zoho invoices into branch_item_sales (for reorder intelligence)' });
+            registry.register('reorder-compute', { name: 'Reorder level compute', service: 'sync-scheduler', schedule: '30 2 * * *', description: 'Computes auto reorder levels from 60-day sales velocity' });
+            registry.register('reorder-report', { name: 'Daily reorder report', service: 'sync-scheduler', schedule: '0 7 * * *', description: 'Generates & delivers daily reorder report per branch + consolidated' });
         }
 
         // Auto-sync cron job
@@ -448,6 +508,27 @@ async function start() {
         });
         console.log('[Scheduler] Bulk job processor scheduled: every 5 min');
 
+        // Invoice line items sync — 02:00 IST (runs before reorder compute)
+        invoiceLineSyncJob = cron.schedule('0 2 * * *', executeInvoiceLineSync, {
+            scheduled: true,
+            timezone: 'Asia/Kolkata'
+        });
+        console.log('[Scheduler] Invoice line sync scheduled: 0 2 * * * (02:00 IST)');
+
+        // Reorder level compute — 02:30 IST (depends on invoice line sync)
+        reorderComputeJob = cron.schedule('30 2 * * *', executeReorderCompute, {
+            scheduled: true,
+            timezone: 'Asia/Kolkata'
+        });
+        console.log('[Scheduler] Reorder compute scheduled: 30 2 * * * (02:30 IST)');
+
+        // Daily reorder report — 07:00 IST (delivered at start of business day)
+        reorderReportJob = cron.schedule('0 7 * * *', executeReorderReport, {
+            scheduled: true,
+            timezone: 'Asia/Kolkata'
+        });
+        console.log('[Scheduler] Reorder report scheduled: 0 7 * * * (07:00 IST)');
+
         isRunning = true;
         console.log('[Scheduler] Started successfully');
 
@@ -475,6 +556,18 @@ function stop() {
     if (bulkJobProcessor) {
         bulkJobProcessor.stop();
         bulkJobProcessor = null;
+    }
+    if (invoiceLineSyncJob) {
+        invoiceLineSyncJob.stop();
+        invoiceLineSyncJob = null;
+    }
+    if (reorderComputeJob) {
+        reorderComputeJob.stop();
+        reorderComputeJob = null;
+    }
+    if (reorderReportJob) {
+        reorderReportJob.stop();
+        reorderReportJob = null;
     }
     isRunning = false;
     nextSyncTime = null;
