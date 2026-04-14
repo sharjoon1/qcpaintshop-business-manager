@@ -3120,6 +3120,104 @@ router.post('/reorder/check', requirePermission('zoho', 'reorder'), async (req, 
 });
 
 // ========================================
+// BRAND REORDER CONFIG
+// ========================================
+
+/**
+ * GET /api/zoho/reorder/brands - List all brand configs with item counts and updated-by name
+ */
+router.get('/reorder/brands', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT bc.*, u.full_name AS updated_by_name,
+                   (SELECT COUNT(DISTINCT zoho_item_id) FROM zoho_items_map
+                    WHERE zoho_brand = bc.brand_name) AS item_count
+            FROM brand_reorder_config bc
+            LEFT JOIN users u ON u.id = bc.updated_by
+            ORDER BY (bc.brand_name = '__default__') DESC, bc.brand_name ASC
+        `);
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /api/zoho/reorder/brands - Create a brand config
+ */
+router.post('/reorder/brands', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const { brand_name, lead_time_days, safety_days, is_active } = req.body;
+        if (!brand_name || !brand_name.trim()) {
+            return res.status(400).json({ success: false, message: 'brand_name required' });
+        }
+        if (brand_name === '__default__') {
+            return res.status(400).json({ success: false, message: 'Use PUT to edit __default__' });
+        }
+        const lead = Number(lead_time_days);
+        const safety = Number(safety_days);
+        if (!Number.isFinite(lead) || lead < 0 || !Number.isFinite(safety) || safety < 0) {
+            return res.status(400).json({ success: false, message: 'lead_time_days and safety_days must be non-negative numbers' });
+        }
+        await pool.query(
+            `INSERT INTO brand_reorder_config (brand_name, lead_time_days, safety_days, is_active, updated_by)
+             VALUES (?, ?, ?, ?, ?)`,
+            [brand_name.trim(), lead, safety, is_active === false ? 0 : 1, req.user.id]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        if (e.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ success: false, message: 'Brand already exists' });
+        }
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * PUT /api/zoho/reorder/brands/:id - Update lead/safety/is_active (brand_name is immutable)
+ */
+router.put('/reorder/brands/:id', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        const { lead_time_days, safety_days, is_active } = req.body;
+        const lead = Number(lead_time_days);
+        const safety = Number(safety_days);
+        if (!Number.isFinite(lead) || lead < 0 || !Number.isFinite(safety) || safety < 0) {
+            return res.status(400).json({ success: false, message: 'lead_time_days and safety_days must be non-negative numbers' });
+        }
+        await pool.query(
+            `UPDATE brand_reorder_config
+             SET lead_time_days = ?, safety_days = ?, is_active = ?, updated_by = ?
+             WHERE id = ?`,
+            [lead, safety, is_active === false ? 0 : 1, req.user.id, id]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * DELETE /api/zoho/reorder/brands/:id - Delete a brand config (__default__ is protected)
+ */
+router.delete('/reorder/brands/:id', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        const [rows] = await pool.query(`SELECT brand_name FROM brand_reorder_config WHERE id = ?`, [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Brand config not found' });
+        }
+        if (rows[0].brand_name === '__default__') {
+            return res.status(400).json({ success: false, message: '__default__ cannot be deleted' });
+        }
+        await pool.query(`DELETE FROM brand_reorder_config WHERE id = ?`, [id]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ========================================
 // PURCHASE SUGGESTIONS
 // ========================================
 
