@@ -684,7 +684,9 @@
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">Brand</label>
-                    <input type="text" id="vmBrand" placeholder="Asian Paints" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="vmBrand" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[140px]">
+                        <option value="">All brands</option>
+                    </select>
                 </div>
                 <div>
                     <label class="flex items-center gap-2 text-sm text-gray-700">
@@ -699,24 +701,27 @@
                     </label>
                 </div>
                 <button onclick="loadVendorMapping()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
-                <button onclick="pushBulkVendors()" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition">Push All to Zoho</button>
+                <button onclick="pushSelectedVendors()" id="vmPushSelectedBtn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition">Push Selected</button>
+                <button onclick="pushBulkVendors(false)" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition" title="Push every item that has a primary vendor set">Push All Mapped</button>
+                <button onclick="pushBulkVendors(true)" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition" title="Skip items already pushed with no new mapping change">Push Only Unpushed</button>
             </div>
             <div id="vmScanStatus" class="text-xs text-gray-600 mb-3"></div>
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white text-sm">
                     <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-2 py-2 text-left font-semibold text-gray-600">Item</th>
-                            <th class="px-2 py-2 text-left font-semibold text-gray-600">Brand</th>
-                            <th class="px-2 py-2 text-left font-semibold text-gray-600">Preferred Vendor</th>
-                            <th class="px-2 py-2 text-right font-semibold text-gray-600">Last rate</th>
-                            <th class="px-2 py-2 text-right font-semibold text-gray-600">Last bill</th>
-                            <th class="px-2 py-2 text-center font-semibold text-gray-600">Pushed</th>
+                        <tr id="vmHeaderRow">
+                            <th class="px-2 py-2 text-center w-8"><input type="checkbox" id="vmSelectAll" onchange="toggleSelectAllVm(this)"></th>
+                            <th class="px-2 py-2 text-left font-semibold text-gray-600 cursor-pointer select-none" data-vm-sort="item_name">Item <span class="vm-sort-arrow text-xs text-gray-400"></span></th>
+                            <th class="px-2 py-2 text-left font-semibold text-gray-600 cursor-pointer select-none" data-vm-sort="brand">Brand <span class="vm-sort-arrow text-xs text-gray-400"></span></th>
+                            <th class="px-2 py-2 text-left font-semibold text-gray-600 cursor-pointer select-none" data-vm-sort="preferred_vendor_name">Preferred Vendor <span class="vm-sort-arrow text-xs text-gray-400"></span></th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600 cursor-pointer select-none" data-vm-sort="last_purchase_rate">Last rate <span class="vm-sort-arrow text-xs text-gray-400"></span></th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600 cursor-pointer select-none" data-vm-sort="last_bill_date">Last bill <span class="vm-sort-arrow text-xs text-gray-400"></span></th>
+                            <th class="px-2 py-2 text-center font-semibold text-gray-600 cursor-pointer select-none" data-vm-sort="vendor_pushed_at">Pushed <span class="vm-sort-arrow text-xs text-gray-400"></span></th>
                             <th class="px-2 py-2 text-center font-semibold text-gray-600">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="vmBody">
-                        <tr><td colspan="7" class="text-center text-gray-400 py-6">Click "Scan Zoho Bills" first, then "Load".</td></tr>
+                        <tr><td colspan="8" class="text-center text-gray-400 py-6">Click "Scan Zoho Bills" first, then "Load".</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -963,8 +968,10 @@
             loadSalesAnalysisBranches().then(() => loadSalesAnalysis());
         }
         if (tab === 'vendor-mapping') {
+            loadVmBrandOptions();
             loadVendorScanStatus();
             loadVendorMapping();
+            wireVmHeaderSort();
         }
     }
 
@@ -2503,6 +2510,28 @@
     // ============================
     var vmPage = 1;
     var vmTotalPages = 1;
+    var vmRows = [];              // currently-loaded page rows
+    var vmSort = { key: null, dir: 'asc' };
+    var vmBrandsLoaded = false;
+
+    async function loadVmBrandOptions() {
+        if (vmBrandsLoaded) return;
+        try {
+            var res = await fetch('/api/zoho/reorder/brands/available', { headers: getAuthHeaders() });
+            var json = await res.json();
+            var brands = Array.isArray(json) ? json : (json.data || []);
+            var sel = document.getElementById('vmBrand');
+            var prev = sel.value;
+            sel.innerHTML = '<option value="">All brands</option>' +
+                brands.map(function(b) {
+                    var name = typeof b === 'string' ? b : (b.brand_name || b.brand || '');
+                    if (!name) return '';
+                    return '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+                }).join('');
+            if (prev) sel.value = prev;
+            vmBrandsLoaded = true;
+        } catch (e) { /* silent */ }
+    }
 
     async function loadVendorScanStatus() {
         try {
@@ -2549,7 +2578,7 @@
 
     async function loadVendorMapping() {
         var body = document.getElementById('vmBody');
-        body.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-6">Loading…</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="text-center text-gray-400 py-6">Loading…</td></tr>';
         try {
             var search = (document.getElementById('vmSearch').value || '').trim();
             var brand = (document.getElementById('vmBrand').value || '').trim();
@@ -2564,39 +2593,12 @@
             var res = await fetch('/api/zoho/reorder/vendor-mapping?' + qs.toString(), { headers: getAuthHeaders() });
             var json = await res.json();
             if (!json.success) {
-                body.innerHTML = '<tr><td colspan="7" class="text-center text-red-500 py-4">' + escapeHtml(json.message || 'Load failed') + '</td></tr>';
+                body.innerHTML = '<tr><td colspan="8" class="text-center text-red-500 py-4">' + escapeHtml(json.message || 'Load failed') + '</td></tr>';
                 return;
             }
-            var rows = json.data || [];
+            vmRows = json.data || [];
             vmTotalPages = json.pagination ? json.pagination.pages : 1;
-            if (rows.length === 0) {
-                body.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-6">No items match the filter.</td></tr>';
-            } else {
-                body.innerHTML = rows.map(function(r) {
-                    var pushedBadge = r.vendor_pushed_at
-                        ? '<span class="text-green-600 text-xs" title="' + escapeHtml(r.vendor_pushed_at) + '">✓ pushed</span>'
-                        : (r.preferred_vendor_id ? '<span class="text-amber-600 text-xs">pending</span>' : '<span class="text-gray-400 text-xs">—</span>');
-                    var vendorDisplay = r.preferred_vendor_id
-                        ? '<div class="font-medium text-gray-800">' + escapeHtml(r.preferred_vendor_name || ('Vendor #' + r.preferred_vendor_id)) + '</div>' +
-                          '<div class="text-xs text-gray-400">' + (r.vendor_count || 0) + ' vendor' + (r.vendor_count > 1 ? 's' : '') + ' in history</div>'
-                        : '<span class="text-gray-400 italic">Not mapped</span>';
-                    var actions =
-                        '<button onclick="openCandidatesModal(\'' + r.zoho_item_id + '\')" class="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition mr-1">Candidates</button>' +
-                        (r.preferred_vendor_id
-                            ? '<button onclick="pushSingleVendor(\'' + r.zoho_item_id + '\', this)" class="px-2 py-1 text-xs bg-green-50 hover:bg-green-100 text-green-700 rounded transition">Push to Zoho</button>'
-                            : '');
-                    return '<tr class="border-b hover:bg-gray-50">' +
-                        '<td class="px-2 py-2"><div class="font-medium text-gray-800">' + escapeHtml(r.item_name || '') + '</div>' +
-                            '<div class="text-xs text-gray-400">' + escapeHtml(r.sku || '') + '</div></td>' +
-                        '<td class="px-2 py-2 text-gray-700">' + escapeHtml(r.brand || '') + '</td>' +
-                        '<td class="px-2 py-2">' + vendorDisplay + '</td>' +
-                        '<td class="px-2 py-2 text-right tabular-nums">' + (r.last_purchase_rate != null ? Number(r.last_purchase_rate).toFixed(2) : '—') + '</td>' +
-                        '<td class="px-2 py-2 text-right text-xs text-gray-500">' + (r.last_bill_date ? escapeHtml(String(r.last_bill_date).slice(0,10)) : '—') + '</td>' +
-                        '<td class="px-2 py-2 text-center">' + pushedBadge + '</td>' +
-                        '<td class="px-2 py-2 text-center">' + actions + '</td>' +
-                        '</tr>';
-                }).join('');
-            }
+            renderVmBody();
 
             var pager = document.getElementById('vmPagination');
             pager.innerHTML = json.pagination
@@ -2607,8 +2609,131 @@
                   '</span>'
                 : '';
         } catch (e) {
-            body.innerHTML = '<tr><td colspan="7" class="text-center text-red-500 py-4">' + escapeHtml(e.message) + '</td></tr>';
+            body.innerHTML = '<tr><td colspan="8" class="text-center text-red-500 py-4">' + escapeHtml(e.message) + '</td></tr>';
         }
+    }
+
+    function renderVmBody() {
+        var body = document.getElementById('vmBody');
+        if (vmRows.length === 0) {
+            body.innerHTML = '<tr><td colspan="8" class="text-center text-gray-400 py-6">No items match the filter.</td></tr>';
+            renderVmSortArrows();
+            return;
+        }
+        var rows = vmRows.slice();
+        if (vmSort.key) {
+            var k = vmSort.key, dir = vmSort.dir === 'desc' ? -1 : 1;
+            rows.sort(function(a, b) {
+                var va = a[k], vb = b[k];
+                // nulls always sink
+                if (va == null && vb == null) return 0;
+                if (va == null) return 1;
+                if (vb == null) return -1;
+                if (k === 'last_purchase_rate') return (Number(va) - Number(vb)) * dir;
+                if (k === 'last_bill_date' || k === 'vendor_pushed_at') {
+                    return (new Date(va).getTime() - new Date(vb).getTime()) * dir;
+                }
+                return String(va).localeCompare(String(vb)) * dir;
+            });
+        }
+        body.innerHTML = rows.map(function(r) {
+            var pushedBadge = r.vendor_pushed_at
+                ? '<span class="text-green-600 text-xs" title="' + escapeHtml(r.vendor_pushed_at) + '">✓ pushed</span>'
+                : (r.preferred_vendor_id ? '<span class="text-amber-600 text-xs">pending</span>' : '<span class="text-gray-400 text-xs">—</span>');
+            var vendorDisplay = r.preferred_vendor_id
+                ? '<div class="font-medium text-gray-800">' + escapeHtml(r.preferred_vendor_name || ('Vendor #' + r.preferred_vendor_id)) + '</div>' +
+                  '<div class="text-xs text-gray-400">' + (r.vendor_count || 0) + ' vendor' + (r.vendor_count > 1 ? 's' : '') + ' in history</div>'
+                : '<span class="text-gray-400 italic">Not mapped</span>';
+            var actions =
+                '<button onclick="openCandidatesModal(\'' + r.zoho_item_id + '\')" class="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition mr-1">Candidates</button>' +
+                (r.preferred_vendor_id
+                    ? '<button onclick="pushSingleVendor(\'' + r.zoho_item_id + '\', this)" class="px-2 py-1 text-xs bg-green-50 hover:bg-green-100 text-green-700 font-semibold rounded transition">Push</button>'
+                    : '');
+            var cb = r.preferred_vendor_id
+                ? '<input type="checkbox" class="vm-row-cb" data-item="' + escapeHtml(r.zoho_item_id) + '">'
+                : '';
+            return '<tr class="border-b hover:bg-gray-50">' +
+                '<td class="px-2 py-2 text-center">' + cb + '</td>' +
+                '<td class="px-2 py-2"><div class="font-medium text-gray-800">' + escapeHtml(r.item_name || '') + '</div>' +
+                    '<div class="text-xs text-gray-400">' + escapeHtml(r.sku || '') + '</div></td>' +
+                '<td class="px-2 py-2 text-gray-700">' + escapeHtml(r.brand || '') + '</td>' +
+                '<td class="px-2 py-2">' + vendorDisplay + '</td>' +
+                '<td class="px-2 py-2 text-right tabular-nums">' + (r.last_purchase_rate != null ? Number(r.last_purchase_rate).toFixed(2) : '—') + '</td>' +
+                '<td class="px-2 py-2 text-right text-xs text-gray-500">' + (r.last_bill_date ? escapeHtml(String(r.last_bill_date).slice(0,10)) : '—') + '</td>' +
+                '<td class="px-2 py-2 text-center">' + pushedBadge + '</td>' +
+                '<td class="px-2 py-2 text-center">' + actions + '</td>' +
+                '</tr>';
+        }).join('');
+        renderVmSortArrows();
+    }
+
+    function renderVmSortArrows() {
+        var ths = document.querySelectorAll('#vmHeaderRow [data-vm-sort]');
+        ths.forEach(function(th) {
+            var key = th.getAttribute('data-vm-sort');
+            var arrow = th.querySelector('.vm-sort-arrow');
+            if (!arrow) return;
+            if (vmSort.key === key) {
+                arrow.textContent = vmSort.dir === 'desc' ? ' ▼' : ' ▲';
+                arrow.className = 'vm-sort-arrow text-xs text-indigo-600';
+            } else {
+                arrow.textContent = ' ⇅';
+                arrow.className = 'vm-sort-arrow text-xs text-gray-300';
+            }
+        });
+    }
+
+    function wireVmHeaderSort() {
+        var ths = document.querySelectorAll('#vmHeaderRow [data-vm-sort]');
+        ths.forEach(function(th) {
+            if (th._wired) return;
+            th._wired = true;
+            th.addEventListener('click', function() {
+                var key = th.getAttribute('data-vm-sort');
+                if (vmSort.key === key) {
+                    vmSort.dir = vmSort.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    vmSort.key = key;
+                    vmSort.dir = 'asc';
+                }
+                renderVmBody();
+            });
+        });
+        renderVmSortArrows();
+    }
+
+    function toggleSelectAllVm(cb) {
+        document.querySelectorAll('.vm-row-cb').forEach(function(el) { el.checked = cb.checked; });
+    }
+
+    async function pushSelectedVendors() {
+        var ids = [].slice.call(document.querySelectorAll('.vm-row-cb:checked'))
+            .map(function(el) { return el.getAttribute('data-item'); });
+        if (ids.length === 0) {
+            showToast('No items selected — tick the checkboxes first', 'error');
+            return;
+        }
+        if (!confirm('Push ' + ids.length + ' selected item(s) to Zoho Books?')) return;
+        var btn = document.getElementById('vmPushSelectedBtn');
+        btn.disabled = true;
+        var prev = btn.textContent;
+        btn.textContent = 'Pushing 0/' + ids.length;
+        var ok = 0, fail = [];
+        for (var i = 0; i < ids.length; i++) {
+            try {
+                var res = await fetch('/api/zoho/reorder/vendor-mapping/push/' + encodeURIComponent(ids[i]), {
+                    method: 'POST', headers: getAuthHeaders()
+                });
+                var json = await res.json();
+                if (json.success) ok++;
+                else fail.push({ id: ids[i], error: json.message });
+            } catch (e) { fail.push({ id: ids[i], error: e.message }); }
+            btn.textContent = 'Pushing ' + (i + 1) + '/' + ids.length;
+        }
+        btn.disabled = false; btn.textContent = prev;
+        showToast(ok + ' pushed' + (fail.length ? ' · ' + fail.length + ' failed' : ''),
+                  fail.length ? 'error' : 'success');
+        await loadVendorMapping();
     }
 
     function vmGoto(p) {
@@ -2637,13 +2762,16 @@
         btn.disabled = false; btn.textContent = prevText;
     }
 
-    async function pushBulkVendors() {
-        if (!confirm('Push ALL mapped items to Zoho Books (preferred_vendor)?\nOnly items that have not been pushed (or have an updated mapping) will be sent.')) return;
+    async function pushBulkVendors(onlyUnpushed) {
+        var msg = onlyUnpushed
+            ? 'Push items that haven\'t been pushed yet (or whose mapping changed since last push)?'
+            : 'Force-push EVERY item that has a primary vendor set to Zoho Books?\n\nThis will re-push items already pushed — use only when you need to refresh Zoho.';
+        if (!confirm(msg)) return;
         try {
             var res = await fetch('/api/zoho/reorder/vendor-mapping/push-bulk', {
                 method: 'POST',
                 headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
-                body: JSON.stringify({ only_unpushed: true })
+                body: JSON.stringify({ only_unpushed: !!onlyUnpushed })
             });
             var json = await res.json();
             if (json.success) {
