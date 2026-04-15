@@ -388,7 +388,16 @@ async function deliverReport(report, { force = false } = {}) {
     return { delivered: true, deliveryStatus, pdfPath };
 }
 
-async function runDailyReport({ force = false } = {}) {
+async function runDailyReport({ force = false, windowDays = null } = {}) {
+    // If caller didn't pin a window, read from ai_config (default 30 = avg/month)
+    if (windowDays == null) {
+        const [cfg] = await pool.query(
+            `SELECT config_value FROM ai_config WHERE config_key = 'reorder_report_window_days' LIMIT 1`
+        );
+        windowDays = cfg.length ? parseInt(cfg[0].config_value, 10) : 30;
+        if (!Number.isFinite(windowDays)) windowDays = 30;
+    }
+
     const [branches] = await pool.query(`
         SELECT DISTINCT zlm.local_branch_id AS branch_id
         FROM zoho_reorder_alerts a
@@ -398,16 +407,16 @@ async function runDailyReport({ force = false } = {}) {
 
     const results = [];
     for (const b of branches) {
-        const rep = await assembleReport({ branchId: b.branch_id });
+        const rep = await assembleReport({ branchId: b.branch_id, windowDays });
         const r = await deliverReport(rep, { force });
-        results.push({ scope: rep.scope, ...r });
+        results.push({ scope: rep.scope, window_days: windowDays, ...r });
     }
 
-    const consolidated = await assembleReport({});
+    const consolidated = await assembleReport({ windowDays });
     const cr = await deliverReport(consolidated, { force });
-    results.push({ scope: consolidated.scope, ...cr });
+    results.push({ scope: consolidated.scope, window_days: windowDays, ...cr });
 
-    return { branches: branches.length, results };
+    return { branches: branches.length, window_days: windowDays, results };
 }
 
 module.exports.deliverReport = deliverReport;
