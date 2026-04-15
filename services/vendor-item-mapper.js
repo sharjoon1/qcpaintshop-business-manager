@@ -68,11 +68,14 @@ async function scanFromZohoBills({ monthsBack = 6, triggeredBy = null } = {}) {
         const itemTouch = new Set();
 
         while (true) {
+            // Zoho rejects comma-separated status values; date_start alone
+            // is enough — we want every bill in the window regardless of
+            // payment state for vendor inference. (Matches getBillsByLocation
+            // pattern at zoho-api.js:1834.)
             const resp = await zohoAPI.getBills({
                 page,
                 per_page: perPage,
-                date_start: fromStr,
-                status: 'paid,open,overdue,partially_paid'
+                date_start: fromStr
             });
             const bills = resp?.bills || [];
             if (bills.length === 0) break;
