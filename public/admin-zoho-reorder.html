@@ -2843,10 +2843,16 @@
                         '<button onclick="refreshVendorsFromZoho(this)" class="text-xs text-indigo-600 hover:underline">↻ Sync from Zoho</button>' +
                     '</div>' +
                     '<div class="text-xs text-gray-500 mb-2">Any vendor in the local list (mirrored from Zoho Books contacts) can be mapped as primary, even without prior bill history.</div>' +
-                    '<div class="flex gap-2">' +
-                        '<input type="text" id="vmPickSearch" oninput="filterAllVendors()" placeholder="Search vendor name, phone…" class="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">' +
-                        '<select id="vmPickSelect" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm min-w-[200px]"></select>' +
-                        '<button onclick="setPrimaryFromPicker()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">Set as primary</button>' +
+                    '<div class="flex gap-2 items-start">' +
+                        '<div class="relative flex-1">' +
+                            '<input type="text" id="vmPickSearch" autocomplete="off"' +
+                                ' oninput="onVendorComboInput()" onfocus="showVendorCombo()"' +
+                                ' onkeydown="onVendorComboKey(event)"' +
+                                ' placeholder="Type to search — name, contact, phone…"' +
+                                ' class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">' +
+                            '<div id="vmPickDropdown" class="hidden absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto text-sm"></div>' +
+                        '</div>' +
+                        '<button onclick="setPrimaryFromPicker()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg whitespace-nowrap">Set as primary</button>' +
                     '</div>' +
                     '<div id="vmPickCount" class="text-xs text-gray-400 mt-1"></div>' +
                 '</div>';
@@ -2859,6 +2865,10 @@
         }
     }
 
+    var _vendorPicked = null;       // { id, vendor_name } currently chosen in the combo
+    var _vendorComboHighlight = -1; // keyboard highlight index
+    var _vendorComboFiltered = [];
+
     async function loadAllVendorsIntoPicker() {
         if (!_allVendorsCache) {
             try {
@@ -2867,40 +2877,112 @@
                 _allVendorsCache = (json.vendors || json.data || []);
             } catch (e) { _allVendorsCache = []; }
         }
-        renderVendorPickerOptions(_allVendorsCache, '');
+        _vendorPicked = null;
+        var inp = document.getElementById('vmPickSearch');
+        if (inp) inp.value = '';
+        filterVendorCombo('');
+        document.getElementById('vmPickCount').textContent =
+            (_allVendorsCache.length || 0) + ' vendor' + (_allVendorsCache.length !== 1 ? 's' : '') + ' available';
     }
 
-    function renderVendorPickerOptions(list, filterText) {
-        var sel = document.getElementById('vmPickSelect');
-        if (!sel) return;
-        var q = (filterText || '').toLowerCase().trim();
-        var filtered = q
+    function filterVendorCombo(q) {
+        q = (q || '').toLowerCase().trim();
+        var list = _allVendorsCache || [];
+        _vendorComboFiltered = q
             ? list.filter(function(v) {
                 return (v.vendor_name || '').toLowerCase().indexOf(q) !== -1 ||
                        (v.contact_person || '').toLowerCase().indexOf(q) !== -1 ||
                        (v.phone || '').toLowerCase().indexOf(q) !== -1;
               })
             : list;
-        sel.innerHTML = (filtered.length === 0
-            ? '<option value="">No match</option>'
-            : '<option value="">— Select vendor —</option>' + filtered.slice(0, 500).map(function(v) {
-                var suffix = v.phone ? ' · ' + v.phone : '';
-                return '<option value="' + v.id + '">' + escapeHtml(v.vendor_name || ('Vendor #' + v.id)) + escapeHtml(suffix) + '</option>';
-              }).join(''));
-        var count = document.getElementById('vmPickCount');
-        if (count) count.textContent = filtered.length + ' vendor' + (filtered.length !== 1 ? 's' : '') + ' available' + (filtered.length > 500 ? ' (showing first 500 — refine the search)' : '');
+        renderVendorCombo();
     }
 
-    function filterAllVendors() {
-        var q = document.getElementById('vmPickSearch').value;
-        renderVendorPickerOptions(_allVendorsCache || [], q);
+    function renderVendorCombo() {
+        var dd = document.getElementById('vmPickDropdown');
+        if (!dd) return;
+        var list = _vendorComboFiltered.slice(0, 300);
+        if (list.length === 0) {
+            dd.innerHTML = '<div class="px-3 py-2 text-gray-400">No matching vendor. Try "↻ Sync from Zoho" above.</div>';
+        } else {
+            dd.innerHTML = list.map(function(v, i) {
+                var highlight = i === _vendorComboHighlight ? 'bg-indigo-50' : '';
+                var sub = [v.contact_person, v.phone].filter(Boolean).join(' · ');
+                return '<div class="px-3 py-2 cursor-pointer hover:bg-indigo-50 border-b last:border-b-0 ' + highlight + '"' +
+                    ' data-idx="' + i + '"' +
+                    ' onmousedown="pickVendorCombo(' + i + ')">' +
+                    '<div class="font-medium text-gray-800">' + escapeHtml(v.vendor_name || ('Vendor #' + v.id)) + '</div>' +
+                    (sub ? '<div class="text-xs text-gray-500">' + escapeHtml(sub) + '</div>' : '') +
+                    '</div>';
+            }).join('');
+            if (_vendorComboFiltered.length > list.length) {
+                dd.innerHTML += '<div class="px-3 py-2 text-xs text-gray-400 bg-gray-50">Showing ' + list.length + ' of ' + _vendorComboFiltered.length + ' — narrow the search to see more</div>';
+            }
+        }
+        var count = document.getElementById('vmPickCount');
+        if (count) count.textContent = _vendorComboFiltered.length + ' match' + (_vendorComboFiltered.length !== 1 ? 'es' : '');
+    }
+
+    function showVendorCombo() {
+        var dd = document.getElementById('vmPickDropdown');
+        if (dd) dd.classList.remove('hidden');
+        // Close dropdown when user clicks anywhere else
+        setTimeout(function() {
+            document.addEventListener('mousedown', _vendorComboOutsideClick, { once: true });
+        }, 0);
+    }
+    function hideVendorCombo() {
+        var dd = document.getElementById('vmPickDropdown');
+        if (dd) dd.classList.add('hidden');
+    }
+    function _vendorComboOutsideClick(ev) {
+        var wrap = document.getElementById('vmPickDropdown');
+        var inp = document.getElementById('vmPickSearch');
+        if (!wrap || !inp) return;
+        if (wrap.contains(ev.target) || ev.target === inp) {
+            // keep open
+            document.addEventListener('mousedown', _vendorComboOutsideClick, { once: true });
+        } else {
+            hideVendorCombo();
+        }
+    }
+
+    function onVendorComboInput() {
+        _vendorPicked = null;
+        _vendorComboHighlight = -1;
+        filterVendorCombo(document.getElementById('vmPickSearch').value);
+        showVendorCombo();
+    }
+    function onVendorComboKey(e) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            _vendorComboHighlight = Math.min(_vendorComboHighlight + 1, _vendorComboFiltered.length - 1);
+            renderVendorCombo();
+            showVendorCombo();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            _vendorComboHighlight = Math.max(_vendorComboHighlight - 1, 0);
+            renderVendorCombo();
+        } else if (e.key === 'Enter') {
+            if (_vendorComboHighlight >= 0) {
+                e.preventDefault();
+                pickVendorCombo(_vendorComboHighlight);
+            }
+        } else if (e.key === 'Escape') {
+            hideVendorCombo();
+        }
+    }
+    function pickVendorCombo(i) {
+        var v = _vendorComboFiltered[i];
+        if (!v) return;
+        _vendorPicked = v;
+        document.getElementById('vmPickSearch').value = v.vendor_name + (v.phone ? ' · ' + v.phone : '');
+        hideVendorCombo();
     }
 
     async function setPrimaryFromPicker() {
-        var sel = document.getElementById('vmPickSelect');
-        var vendorId = parseInt(sel.value, 10);
-        if (!Number.isFinite(vendorId)) { showToast('Pick a vendor first', 'error'); return; }
-        await setPrimaryVendor(_candidatesCurrentItemId, vendorId);
+        if (!_vendorPicked) { showToast('Pick a vendor from the dropdown first', 'error'); return; }
+        await setPrimaryVendor(_candidatesCurrentItemId, _vendorPicked.id);
     }
 
     async function refreshVendorsFromZoho(btn) {
