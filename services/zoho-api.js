@@ -2264,6 +2264,11 @@ async function getBills(params = {}) {
     return await apiGet('/bills', { organization_id: orgId, ...params });
 }
 
+async function getBill(billId) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiGet(`/bills/${billId}`, { organization_id: orgId });
+}
+
 async function createBill(billData) {
     const orgId = process.env.ZOHO_ORGANIZATION_ID;
     return await apiPost(`/bills?organization_id=${orgId}`, billData);
@@ -2348,6 +2353,7 @@ module.exports = {
     createTransferOrder,
     // Vendor Bills & Purchase Orders
     getBills,
+    getBill,
     createBill,
     getPurchaseOrders,
     createPurchaseOrder

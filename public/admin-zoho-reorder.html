@@ -243,6 +243,14 @@
                 Sales Analysis
             </span>
         </button>
+        <button id="tabVendorMapping" class="tab-btn" onclick="switchTab('vendor-mapping')">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+                Vendor Mapping
+            </span>
+        </button>
     </div>
 
     <!-- =========================================
@@ -654,6 +662,97 @@
         </div>
     </div>
 
+    <!-- =========================================
+         TAB 6: VENDOR MAPPING
+         ========================================= -->
+    <div id="panelVendorMapping" class="hidden">
+        <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <div class="flex gap-3 items-end mb-4 flex-wrap">
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Scan months back</label>
+                    <select id="vmMonthsBack" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="3">3 months</option>
+                        <option value="6" selected>6 months</option>
+                        <option value="12">12 months</option>
+                        <option value="24">24 months</option>
+                    </select>
+                </div>
+                <button onclick="runVendorScan()" id="vmScanBtn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Scan Zoho Bills</button>
+                <div class="flex-1 min-w-[180px]">
+                    <label class="block text-xs text-gray-600 mb-1">Search item / SKU</label>
+                    <input type="text" id="vmSearch" placeholder="e.g. Ace Advanced" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Brand</label>
+                    <input type="text" id="vmBrand" placeholder="Asian Paints" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" id="vmOnlyUnmapped" onchange="loadVendorMapping()">
+                        Unmapped only
+                    </label>
+                </div>
+                <div>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" id="vmOnlyUnpushed" onchange="loadVendorMapping()">
+                        Unpushed only
+                    </label>
+                </div>
+                <button onclick="loadVendorMapping()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
+                <button onclick="pushBulkVendors()" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition">Push All to Zoho</button>
+            </div>
+            <div id="vmScanStatus" class="text-xs text-gray-600 mb-3"></div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-2 py-2 text-left font-semibold text-gray-600">Item</th>
+                            <th class="px-2 py-2 text-left font-semibold text-gray-600">Brand</th>
+                            <th class="px-2 py-2 text-left font-semibold text-gray-600">Preferred Vendor</th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600">Last rate</th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600">Last bill</th>
+                            <th class="px-2 py-2 text-center font-semibold text-gray-600">Pushed</th>
+                            <th class="px-2 py-2 text-center font-semibold text-gray-600">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vmBody">
+                        <tr><td colspan="7" class="text-center text-gray-400 py-6">Click "Scan Zoho Bills" first, then "Load".</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="vmPagination" class="mt-3 flex justify-between items-center text-sm text-gray-600"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Vendor Candidates Modal -->
+<div id="candidatesModal" class="modal-overlay hidden" onclick="(function(e){ if(e.target.id==='candidatesModal') closeCandidatesModal(); })(event)">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full" onclick="event.stopPropagation()">
+        <div class="border-b px-6 py-4 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800" id="candidatesModalTitle">Vendor candidates</h3>
+            <button onclick="closeCandidatesModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-4 max-h-[60vh] overflow-y-auto" id="candidatesModalBody"></div>
+        <div class="border-t px-6 py-3 flex justify-end">
+            <button onclick="closeCandidatesModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create PO Modal -->
+<div id="createPoModal" class="modal-overlay hidden" onclick="(function(e){ if(e.target.id==='createPoModal') closeCreatePoModal(); })(event)">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full" onclick="event.stopPropagation()">
+        <div class="border-b px-6 py-4 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800">Create Purchase Order</h3>
+            <button onclick="closeCreatePoModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-6" id="createPoBody"></div>
+        <div class="border-t px-6 py-4 flex justify-end gap-3">
+            <button onclick="closeCreatePoModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg">Cancel</button>
+            <button id="createPoSubmit" onclick="submitCreatePo()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">Create PO</button>
+        </div>
+    </div>
 </div>
 
 <!-- Send WhatsApp Modal -->
@@ -820,11 +919,13 @@
         document.getElementById('tabBrandConfig').classList.toggle('active', tab === 'brand-config');
         document.getElementById('tabDailyReport').classList.toggle('active', tab === 'daily-report');
         document.getElementById('tabSalesAnalysis').classList.toggle('active', tab === 'sales-analysis');
+        document.getElementById('tabVendorMapping').classList.toggle('active', tab === 'vendor-mapping');
         document.getElementById('panelAlerts').classList.toggle('hidden', tab !== 'alerts');
         document.getElementById('panelConfig').classList.toggle('hidden', tab !== 'config');
         document.getElementById('panelBrandConfig').classList.toggle('hidden', tab !== 'brand-config');
         document.getElementById('panelDailyReport').classList.toggle('hidden', tab !== 'daily-report');
         document.getElementById('panelSalesAnalysis').classList.toggle('hidden', tab !== 'sales-analysis');
+        document.getElementById('panelVendorMapping').classList.toggle('hidden', tab !== 'vendor-mapping');
 
         if (tab === 'config') {
             loadConfigs();
@@ -860,6 +961,10 @@
         }
         if (tab === 'sales-analysis') {
             loadSalesAnalysisBranches().then(() => loadSalesAnalysis());
+        }
+        if (tab === 'vendor-mapping') {
+            loadVendorScanStatus();
+            loadVendorMapping();
         }
     }
 
@@ -1007,13 +1112,18 @@
             var status = (alert.status || 'active').toLowerCase();
             var actions = '';
 
+            var poBtn = alert.zoho_item_id
+                ? '<button onclick="openCreatePoModal(\'' + alert.zoho_item_id + '\', ' + (Number(alert.reorder_level) || 0) + ', ' + JSON.stringify(alert.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition mr-1" title="Create Purchase Order">PO</button>'
+                : '';
             if (status === 'active') {
-                actions = '<button onclick="acknowledgeAlert(\'' + id + '\')" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition mr-1">Acknowledge</button>' +
+                actions = poBtn +
+                    '<button onclick="acknowledgeAlert(\'' + id + '\')" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition mr-1">Acknowledge</button>' +
                     '<button onclick="openResolveModal(\'' + id + '\')" class="px-2.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold rounded-lg transition">Resolve</button>';
             } else if (status === 'acknowledged') {
-                actions = '<button onclick="openResolveModal(\'' + id + '\')" class="px-2.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold rounded-lg transition">Resolve</button>';
+                actions = poBtn +
+                    '<button onclick="openResolveModal(\'' + id + '\')" class="px-2.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold rounded-lg transition">Resolve</button>';
             } else {
-                actions = '<span class="text-xs text-gray-400">--</span>';
+                actions = poBtn || '<span class="text-xs text-gray-400">--</span>';
             }
 
             return '<tr class="hover:bg-gray-50 transition">' +
@@ -2089,6 +2199,7 @@
             '<th class="px-2 py-2 text-right font-semibold text-gray-600">Days left</th>' +
             '<th class="px-2 py-2 text-right font-semibold text-gray-600">Order Qty</th>' +
             '<th class="px-2 py-2 text-left font-semibold text-gray-600">Other branches</th>' +
+            '<th class="px-2 py-2 text-center font-semibold text-gray-600">PO</th>' +
             '</tr></thead><tbody>' +
             rows.map(function(row) {
                 var daysLeft = row.days_to_stockout != null ? row.days_to_stockout : '∞';
@@ -2115,6 +2226,11 @@
                     '<td class="px-2 py-2 text-right tabular-nums ' + daysClass + '">' + daysLeft + '</td>' +
                     '<td class="px-2 py-2 text-right tabular-nums font-semibold text-indigo-700">' + (row.suggested_order_qty != null ? row.suggested_order_qty : '—') + '</td>' +
                     '<td class="px-2 py-2">' + otherBranches + '</td>' +
+                    '<td class="px-2 py-2 text-center">' +
+                        (row.zoho_item_id
+                            ? '<button onclick="openCreatePoModal(\'' + row.zoho_item_id + '\', ' + (Number(row.suggested_order_qty) || 0) + ', ' + JSON.stringify(row.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2 py-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded transition" title="Create PO for this item">+PO</button>'
+                            : '<span class="text-gray-400">—</span>') +
+                    '</td>' +
                     '</tr>';
             }).join('') +
             '</tbody></table></div>';
@@ -2150,6 +2266,9 @@
                     '<div><div class="text-gray-500">Order</div><div class="font-semibold tabular-nums text-indigo-700">' + (row.suggested_order_qty != null ? row.suggested_order_qty : '—') + '</div></div>' +
                     '</div>' +
                     otherChips +
+                    (row.zoho_item_id
+                        ? '<div class="mt-2 text-right"><button onclick="openCreatePoModal(\'' + row.zoho_item_id + '\', ' + (Number(row.suggested_order_qty) || 0) + ', ' + JSON.stringify(row.item_name || '').replace(/"/g, '&quot;') + ')" class="px-2.5 py-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded transition">+ Create PO</button></div>'
+                        : '') +
                     '</div>';
             }).join('') + '</div>';
 
@@ -2377,6 +2496,324 @@
         a.href = url; a.download = 'sales-analysis.csv';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    // ============================
+    // VENDOR MAPPING TAB
+    // ============================
+    var vmPage = 1;
+    var vmTotalPages = 1;
+
+    async function loadVendorScanStatus() {
+        try {
+            var res = await fetch('/api/zoho/reorder/vendor-mapping/scans', { headers: getAuthHeaders() });
+            var json = await res.json();
+            var rows = (json.data || []).slice(0, 1);
+            var el = document.getElementById('vmScanStatus');
+            if (!rows.length) { el.textContent = 'No scans yet.'; return; }
+            var s = rows[0];
+            el.innerHTML = 'Last scan: <b>' + escapeHtml(s.status) + '</b>' +
+                (s.bills_fetched ? ' · ' + s.bills_fetched + ' bills' : '') +
+                (s.items_mapped ? ' · ' + s.items_mapped + ' items mapped' : '') +
+                ' · ' + escapeHtml(new Date(s.started_at).toLocaleString()) +
+                (s.error_message ? ' · <span class="text-red-600">' + escapeHtml(s.error_message) + '</span>' : '');
+        } catch (e) { /* silent */ }
+    }
+
+    async function runVendorScan() {
+        var btn = document.getElementById('vmScanBtn');
+        var monthsBack = parseInt(document.getElementById('vmMonthsBack').value, 10) || 6;
+        if (!confirm('Scan Zoho Books bills from the last ' + monthsBack + ' months?\n\nThis fetches every bill + line-item and may take a few minutes.')) return;
+        btn.disabled = true; btn.textContent = 'Scanning…';
+        document.getElementById('vmScanStatus').textContent = 'Scan running… (this can take 1-5 minutes)';
+        try {
+            var res = await fetch('/api/zoho/reorder/vendor-mapping/scan', {
+                method: 'POST',
+                headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ months_back: monthsBack })
+            });
+            var json = await res.json();
+            if (json.success) {
+                var d = json.data || {};
+                showToast('Scan complete: ' + (d.billsFetched || 0) + ' bills, ' + (d.itemsMapped || 0) + ' items, ' + (d.itemsPrimaried || 0) + ' primaries set', 'success');
+                await loadVendorScanStatus();
+                await loadVendorMapping();
+            } else {
+                showToast(json.message || 'Scan failed', 'error');
+            }
+        } catch (e) {
+            showToast('Scan failed: ' + e.message, 'error');
+        }
+        btn.disabled = false; btn.textContent = 'Scan Zoho Bills';
+    }
+
+    async function loadVendorMapping() {
+        var body = document.getElementById('vmBody');
+        body.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-6">Loading…</td></tr>';
+        try {
+            var search = (document.getElementById('vmSearch').value || '').trim();
+            var brand = (document.getElementById('vmBrand').value || '').trim();
+            var unmapped = document.getElementById('vmOnlyUnmapped').checked;
+            var unpushed = document.getElementById('vmOnlyUnpushed').checked;
+            var qs = new URLSearchParams({ page: vmPage, limit: 50 });
+            if (search) qs.set('search', search);
+            if (brand) qs.set('brand', brand);
+            if (unmapped) qs.set('only_unmapped', '1');
+            if (unpushed) qs.set('only_unpushed', '1');
+
+            var res = await fetch('/api/zoho/reorder/vendor-mapping?' + qs.toString(), { headers: getAuthHeaders() });
+            var json = await res.json();
+            if (!json.success) {
+                body.innerHTML = '<tr><td colspan="7" class="text-center text-red-500 py-4">' + escapeHtml(json.message || 'Load failed') + '</td></tr>';
+                return;
+            }
+            var rows = json.data || [];
+            vmTotalPages = json.pagination ? json.pagination.pages : 1;
+            if (rows.length === 0) {
+                body.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-6">No items match the filter.</td></tr>';
+            } else {
+                body.innerHTML = rows.map(function(r) {
+                    var pushedBadge = r.vendor_pushed_at
+                        ? '<span class="text-green-600 text-xs" title="' + escapeHtml(r.vendor_pushed_at) + '">✓ pushed</span>'
+                        : (r.preferred_vendor_id ? '<span class="text-amber-600 text-xs">pending</span>' : '<span class="text-gray-400 text-xs">—</span>');
+                    var vendorDisplay = r.preferred_vendor_id
+                        ? '<div class="font-medium text-gray-800">' + escapeHtml(r.preferred_vendor_name || ('Vendor #' + r.preferred_vendor_id)) + '</div>' +
+                          '<div class="text-xs text-gray-400">' + (r.vendor_count || 0) + ' vendor' + (r.vendor_count > 1 ? 's' : '') + ' in history</div>'
+                        : '<span class="text-gray-400 italic">Not mapped</span>';
+                    var actions =
+                        '<button onclick="openCandidatesModal(\'' + r.zoho_item_id + '\')" class="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition mr-1">Candidates</button>' +
+                        (r.preferred_vendor_id
+                            ? '<button onclick="pushSingleVendor(\'' + r.zoho_item_id + '\', this)" class="px-2 py-1 text-xs bg-green-50 hover:bg-green-100 text-green-700 rounded transition">Push to Zoho</button>'
+                            : '');
+                    return '<tr class="border-b hover:bg-gray-50">' +
+                        '<td class="px-2 py-2"><div class="font-medium text-gray-800">' + escapeHtml(r.item_name || '') + '</div>' +
+                            '<div class="text-xs text-gray-400">' + escapeHtml(r.sku || '') + '</div></td>' +
+                        '<td class="px-2 py-2 text-gray-700">' + escapeHtml(r.brand || '') + '</td>' +
+                        '<td class="px-2 py-2">' + vendorDisplay + '</td>' +
+                        '<td class="px-2 py-2 text-right tabular-nums">' + (r.last_purchase_rate != null ? Number(r.last_purchase_rate).toFixed(2) : '—') + '</td>' +
+                        '<td class="px-2 py-2 text-right text-xs text-gray-500">' + (r.last_bill_date ? escapeHtml(String(r.last_bill_date).slice(0,10)) : '—') + '</td>' +
+                        '<td class="px-2 py-2 text-center">' + pushedBadge + '</td>' +
+                        '<td class="px-2 py-2 text-center">' + actions + '</td>' +
+                        '</tr>';
+                }).join('');
+            }
+
+            var pager = document.getElementById('vmPagination');
+            pager.innerHTML = json.pagination
+                ? '<span>Page ' + json.pagination.page + ' of ' + json.pagination.pages + ' · ' + json.pagination.total + ' items</span>' +
+                  '<span>' +
+                    '<button onclick="vmGoto(' + (vmPage - 1) + ')" class="px-2 py-1 border rounded mr-1" ' + (vmPage <= 1 ? 'disabled' : '') + '>‹ Prev</button>' +
+                    '<button onclick="vmGoto(' + (vmPage + 1) + ')" class="px-2 py-1 border rounded" ' + (vmPage >= vmTotalPages ? 'disabled' : '') + '>Next ›</button>' +
+                  '</span>'
+                : '';
+        } catch (e) {
+            body.innerHTML = '<tr><td colspan="7" class="text-center text-red-500 py-4">' + escapeHtml(e.message) + '</td></tr>';
+        }
+    }
+
+    function vmGoto(p) {
+        if (p < 1 || p > vmTotalPages) return;
+        vmPage = p;
+        loadVendorMapping();
+    }
+
+    async function pushSingleVendor(itemId, btn) {
+        btn.disabled = true;
+        var prevText = btn.textContent;
+        btn.textContent = 'Pushing…';
+        try {
+            var res = await fetch('/api/zoho/reorder/vendor-mapping/push/' + encodeURIComponent(itemId), {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+            var json = await res.json();
+            if (json.success) {
+                showToast('Pushed to Zoho', 'success');
+                await loadVendorMapping();
+            } else {
+                showToast(json.message || 'Push failed', 'error');
+            }
+        } catch (e) { showToast('Push failed: ' + e.message, 'error'); }
+        btn.disabled = false; btn.textContent = prevText;
+    }
+
+    async function pushBulkVendors() {
+        if (!confirm('Push ALL mapped items to Zoho Books (preferred_vendor)?\nOnly items that have not been pushed (or have an updated mapping) will be sent.')) return;
+        try {
+            var res = await fetch('/api/zoho/reorder/vendor-mapping/push-bulk', {
+                method: 'POST',
+                headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ only_unpushed: true })
+            });
+            var json = await res.json();
+            if (json.success) {
+                var d = json.data || {};
+                var msg = 'Pushed ' + (d.pushed || 0) + ' / ' + (d.total || 0);
+                if (d.errors && d.errors.length) msg += ' · ' + d.errors.length + ' errors';
+                showToast(msg, (d.errors && d.errors.length) ? 'error' : 'success');
+                await loadVendorMapping();
+            } else {
+                showToast(json.message || 'Bulk push failed', 'error');
+            }
+        } catch (e) { showToast('Bulk push failed: ' + e.message, 'error'); }
+    }
+
+    // --- Candidates modal (vendor history for one item, with "set primary" action) ---
+    async function openCandidatesModal(itemId) {
+        try {
+            var res = await fetch('/api/zoho/reorder/vendor-mapping/' + encodeURIComponent(itemId) + '/candidates', { headers: getAuthHeaders() });
+            var json = await res.json();
+            if (!json.success) { showToast(json.message || 'Load failed', 'error'); return; }
+            var rows = json.data || [];
+            var body = document.getElementById('candidatesModalBody');
+            if (rows.length === 0) {
+                body.innerHTML = '<div class="text-gray-500 text-sm">No vendor history. Run Scan first.</div>';
+            } else {
+                body.innerHTML = '<table class="min-w-full text-sm"><thead class="bg-gray-50"><tr>' +
+                    '<th class="px-2 py-2 text-left">Vendor</th>' +
+                    '<th class="px-2 py-2 text-right">Bills</th>' +
+                    '<th class="px-2 py-2 text-right">Last rate</th>' +
+                    '<th class="px-2 py-2 text-right">Last bill</th>' +
+                    '<th class="px-2 py-2 text-center">Action</th></tr></thead><tbody>' +
+                    rows.map(function(r) {
+                        var primaryBadge = r.is_primary
+                            ? ' <span class="ml-1 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">primary</span>'
+                            : '';
+                        var sourceBadge = r.source === 'manual'
+                            ? ' <span class="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">manual</span>'
+                            : '';
+                        return '<tr class="border-b">' +
+                            '<td class="px-2 py-1.5">' + escapeHtml(r.vendor_name || '') + primaryBadge + sourceBadge + '</td>' +
+                            '<td class="px-2 py-1.5 text-right">' + r.bill_count + '</td>' +
+                            '<td class="px-2 py-1.5 text-right">' + (r.last_bill_rate != null ? Number(r.last_bill_rate).toFixed(2) : '—') + '</td>' +
+                            '<td class="px-2 py-1.5 text-right">' + (r.last_bill_date ? String(r.last_bill_date).slice(0,10) : '—') + '</td>' +
+                            '<td class="px-2 py-1.5 text-center">' +
+                                (r.is_primary
+                                    ? '<span class="text-xs text-gray-400">—</span>'
+                                    : '<button onclick="setPrimaryVendor(\'' + itemId + '\', ' + r.vendor_id + ')" class="px-2 py-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded">Set primary</button>') +
+                            '</td></tr>';
+                    }).join('') + '</tbody></table>';
+            }
+            document.getElementById('candidatesModalTitle').textContent = 'Vendor candidates';
+            document.getElementById('candidatesModal').classList.remove('hidden');
+        } catch (e) { showToast('Load failed: ' + e.message, 'error'); }
+    }
+    function closeCandidatesModal() { document.getElementById('candidatesModal').classList.add('hidden'); }
+    async function setPrimaryVendor(itemId, vendorId) {
+        try {
+            var res = await fetch('/api/zoho/reorder/vendor-mapping/' + encodeURIComponent(itemId), {
+                method: 'PUT',
+                headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ vendor_id: vendorId })
+            });
+            var json = await res.json();
+            if (json.success) {
+                showToast('Primary vendor updated', 'success');
+                closeCandidatesModal();
+                await loadVendorMapping();
+            } else {
+                showToast(json.message || 'Update failed', 'error');
+            }
+        } catch (e) { showToast('Update failed: ' + e.message, 'error'); }
+    }
+
+    // ============================
+    // CREATE PO FROM ALERT / DAILY REPORT
+    // ============================
+    var _poPreview = null;
+    async function openCreatePoModal(zohoItemId, suggestedQty, itemName) {
+        var modal = document.getElementById('createPoModal');
+        var bodyEl = document.getElementById('createPoBody');
+        bodyEl.innerHTML = '<div class="text-gray-400 text-sm">Loading preview…</div>';
+        modal.classList.remove('hidden');
+        try {
+            var qs = new URLSearchParams({ zoho_item_id: zohoItemId });
+            if (suggestedQty) qs.set('quantity', suggestedQty);
+            var res = await fetch('/api/zoho/reorder/po-preview?' + qs.toString(), { headers: getAuthHeaders() });
+            var json = await res.json();
+            if (!json.success) { bodyEl.innerHTML = '<div class="text-red-500 text-sm">' + escapeHtml(json.message) + '</div>'; return; }
+            _poPreview = json.data;
+            renderCreatePoForm(_poPreview, suggestedQty || 0, itemName);
+        } catch (e) { bodyEl.innerHTML = '<div class="text-red-500 text-sm">' + escapeHtml(e.message) + '</div>'; }
+    }
+    function renderCreatePoForm(data, suggestedQty, itemName) {
+        var item = data.item;
+        var suggestion = data.suggestion;
+        var candidates = data.candidates || [];
+        var candidateOpts = candidates.length === 0
+            ? '<option value="">(no history — pick vendor manually)</option>'
+            : candidates.map(function(c) {
+                return '<option value="' + c.vendor_id + '"' + (c.is_primary ? ' selected' : '') + '>' +
+                    escapeHtml(c.vendor_name) + ' · ' + c.bill_count + ' bills · ₹' + Number(c.last_bill_rate || 0).toFixed(2) + '</option>';
+            }).join('');
+        var qty = Number(suggestedQty || suggestion.quantity || 0);
+        var rate = Number(suggestion.unit_price || 0);
+
+        document.getElementById('createPoBody').innerHTML =
+            '<div class="mb-3 p-3 bg-indigo-50 rounded">' +
+                '<div class="font-medium">' + escapeHtml(itemName || item.item_name) + '</div>' +
+                '<div class="text-xs text-gray-500">SKU: ' + escapeHtml(item.sku || '') + (item.brand ? ' · ' + escapeHtml(item.brand) : '') + (item.unit ? ' · ' + escapeHtml(item.unit) : '') + '</div>' +
+            '</div>' +
+            '<div class="space-y-2">' +
+                '<label class="block text-sm font-medium text-gray-700">Vendor</label>' +
+                '<select id="poVendorSelect" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">' + candidateOpts + '</select>' +
+                (candidates.length === 0 ? '<div class="text-xs text-amber-600">No bill history. Run Vendor Mapping scan first, or the vendor list is empty — use <a href="/staff-vendors.html" class="underline" target="_blank">Vendors</a> page to create.</div>' : '') +
+                '<div class="grid grid-cols-3 gap-2">' +
+                    '<div><label class="block text-xs text-gray-600 mb-1">Qty</label><input type="number" step="0.01" id="poQty" value="' + qty + '" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"></div>' +
+                    '<div><label class="block text-xs text-gray-600 mb-1">Unit price</label><input type="number" step="0.01" id="poRate" value="' + rate.toFixed(2) + '" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"></div>' +
+                    '<div><label class="block text-xs text-gray-600 mb-1">Expected</label><input type="date" id="poExpected" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"></div>' +
+                '</div>' +
+                '<div><label class="block text-xs text-gray-600 mb-1">Notes</label><textarea id="poNotes" rows="2" placeholder="Auto-created from reorder alert" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"></textarea></div>' +
+                '<label class="flex items-center gap-2 text-sm"><input type="checkbox" id="poPushZoho" checked> Also push to Zoho Books immediately</label>' +
+            '</div>';
+    }
+    function closeCreatePoModal() { document.getElementById('createPoModal').classList.add('hidden'); }
+    async function submitCreatePo() {
+        var btn = document.getElementById('createPoSubmit');
+        btn.disabled = true;
+        var prevText = btn.textContent;
+        btn.textContent = 'Creating…';
+        try {
+            var vendorId = parseInt(document.getElementById('poVendorSelect').value, 10);
+            var qty = parseFloat(document.getElementById('poQty').value) || 0;
+            var rate = parseFloat(document.getElementById('poRate').value) || 0;
+            var expected = document.getElementById('poExpected').value || null;
+            var notes = document.getElementById('poNotes').value || null;
+            var push = document.getElementById('poPushZoho').checked;
+            if (!vendorId || !_poPreview?.item) {
+                showToast('Select a vendor', 'error');
+                btn.disabled = false; btn.textContent = prevText; return;
+            }
+            var body = {
+                vendor_id: vendorId,
+                items: [{
+                    zoho_item_id: _poPreview.item.zoho_item_id,
+                    item_name: _poPreview.item.item_name,
+                    quantity: qty,
+                    unit_price: rate
+                }],
+                expected_date: expected,
+                notes: notes || 'Auto-created from reorder alert',
+                push_to_zoho: push
+            };
+            var res = await fetch('/api/zoho/reorder/create-po', {
+                method: 'POST',
+                headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+                body: JSON.stringify(body)
+            });
+            var json = await res.json();
+            if (json.success) {
+                var d = json.data || {};
+                var msg = 'PO created: ' + d.po_number;
+                if (d.zoho?.zoho_po_id) msg += ' · pushed to Zoho';
+                else if (d.zoho?.error) msg += ' · Zoho push failed: ' + d.zoho.error;
+                showToast(msg, 'success');
+                closeCreatePoModal();
+            } else {
+                showToast(json.message || 'Create PO failed', 'error');
+            }
+        } catch (e) { showToast('Create PO failed: ' + e.message, 'error'); }
+        btn.disabled = false; btn.textContent = prevText;
     }
 
     // ============================

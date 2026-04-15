@@ -42,6 +42,7 @@ const aiEngine = require('../services/ai-engine');
 const invoiceLineSync = require('../services/zoho-invoice-line-sync');
 const reorderCompute = require('../services/reorder-compute-service');
 const reorderReport = require('../services/reorder-report-service');
+const vendorItemMapper = require('../services/vendor-item-mapper');
 const pathMod = require('path');
 const fsMod = require('fs');
 
@@ -3708,6 +3709,323 @@ router.get('/reorder/sales-analysis', requirePermission('zoho', 'reorder'), asyn
 
         res.json({ success: true, data: rows, window_days: days });
     } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ========================================
+// VENDOR MAPPING (bills → preferred vendor per item)
+// ========================================
+
+/**
+ * POST /reorder/vendor-mapping/scan - Scan Zoho Books bills to infer vendors per item
+ * Body: { months_back?: 1-24 }
+ */
+router.post('/reorder/vendor-mapping/scan', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const monthsBack = parseInt(req.body.months_back, 10) || 6;
+        const scanResult = await vendorItemMapper.scanFromZohoBills({ monthsBack, triggeredBy: req.user.id });
+        const inferResult = await vendorItemMapper.inferPrimaries();
+        res.json({ success: true, data: { ...scanResult, ...inferResult } });
+    } catch (e) {
+        console.error('[VendorMapping][scan]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * GET /reorder/vendor-mapping/scans - Recent scan runs
+ */
+router.get('/reorder/vendor-mapping/scans', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT s.*, u.full_name AS triggered_by_name
+             FROM vendor_mapping_scans s
+             LEFT JOIN users u ON u.id = s.triggered_by
+             ORDER BY s.id DESC LIMIT 10`
+        );
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * GET /reorder/vendor-mapping - Review table of items + preferred vendor
+ * Query: search, brand, only_unpushed, only_unmapped
+ */
+router.get('/reorder/vendor-mapping', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const { search, brand, only_unpushed, only_unmapped } = req.query;
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(200, parseInt(req.query.limit, 10) || 50);
+        const offset = (page - 1) * limit;
+
+        let where = `WHERE zim.zoho_status = 'active'`;
+        const params = [];
+        if (search) {
+            where += ` AND (zim.zoho_item_name LIKE ? OR zim.zoho_sku LIKE ?)`;
+            params.push(`%${search}%`, `%${search}%`);
+        }
+        if (brand) { where += ` AND zim.zoho_brand = ?`; params.push(brand); }
+        if (only_unpushed === '1') {
+            where += ` AND zim.preferred_vendor_id IS NOT NULL AND (zim.vendor_pushed_at IS NULL)`;
+        }
+        if (only_unmapped === '1') {
+            where += ` AND zim.preferred_vendor_id IS NULL`;
+        }
+
+        const [[{ total }]] = await pool.query(
+            `SELECT COUNT(*) AS total FROM zoho_items_map zim ${where}`, params
+        );
+
+        const [rows] = await pool.query(`
+            SELECT zim.zoho_item_id, zim.zoho_item_name AS item_name, zim.zoho_sku AS sku,
+                   zim.zoho_brand AS brand, zim.zoho_unit AS unit,
+                   zim.preferred_vendor_id, zim.last_purchase_rate,
+                   zim.vendor_pushed_at,
+                   v.vendor_name AS preferred_vendor_name,
+                   v.zoho_contact_id AS preferred_vendor_zoho_id,
+                   (SELECT COUNT(*) FROM item_vendor_map ivm2 WHERE ivm2.zoho_item_id = zim.zoho_item_id) AS vendor_count,
+                   (SELECT MAX(last_bill_date) FROM item_vendor_map ivm3 WHERE ivm3.zoho_item_id = zim.zoho_item_id) AS last_bill_date
+            FROM zoho_items_map zim
+            LEFT JOIN vendors v ON v.id = zim.preferred_vendor_id
+            ${where}
+            ORDER BY (zim.preferred_vendor_id IS NULL) DESC, zim.zoho_item_name ASC
+            LIMIT ? OFFSET ?
+        `, [...params, limit, offset]);
+
+        res.json({
+            success: true,
+            data: rows,
+            pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+        });
+    } catch (e) {
+        console.error('[VendorMapping][list]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * GET /reorder/vendor-mapping/:zohoItemId/candidates - Per-item vendor history
+ */
+router.get('/reorder/vendor-mapping/:zohoItemId/candidates', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT ivm.*, v.vendor_name, v.zoho_contact_id
+            FROM item_vendor_map ivm
+            JOIN vendors v ON v.id = ivm.vendor_id
+            WHERE ivm.zoho_item_id = ?
+            ORDER BY ivm.is_primary DESC, ivm.bill_count DESC, ivm.last_bill_date DESC
+        `, [req.params.zohoItemId]);
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * PUT /reorder/vendor-mapping/:zohoItemId - Manual override: set primary vendor
+ * Body: { vendor_id }
+ */
+router.put('/reorder/vendor-mapping/:zohoItemId', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const vendorId = parseInt(req.body.vendor_id, 10);
+        if (!Number.isFinite(vendorId)) {
+            return res.status(400).json({ success: false, message: 'vendor_id required' });
+        }
+        const result = await vendorItemMapper.setManualPrimary(req.params.zohoItemId, vendorId);
+        res.json({ success: true, data: result });
+    } catch (e) {
+        console.error('[VendorMapping][override]', e);
+        res.status(400).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /reorder/vendor-mapping/push/:zohoItemId - Push preferred vendor to Zoho
+ */
+router.post('/reorder/vendor-mapping/push/:zohoItemId', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const result = await vendorItemMapper.pushPreferredVendorToZoho(req.params.zohoItemId);
+        res.json({ success: true, data: result });
+    } catch (e) {
+        console.error('[VendorMapping][push]', e);
+        res.status(400).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /reorder/vendor-mapping/push-bulk - Push all unpushed items to Zoho
+ * Body: { only_unpushed?: bool (default true) }
+ */
+router.post('/reorder/vendor-mapping/push-bulk', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const onlyUnpushed = req.body.only_unpushed !== false;
+        const result = await vendorItemMapper.pushAll({ onlyUnpushed });
+        res.json({ success: true, data: result });
+    } catch (e) {
+        console.error('[VendorMapping][push-bulk]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ========================================
+// CREATE PO FROM REORDER ALERT
+// ========================================
+
+/**
+ * GET /reorder/po-preview - Preview data for "Create PO" modal
+ * Query: zoho_item_id, branch_id?, quantity?
+ * Returns: suggested vendor, last rate, and item details
+ */
+router.get('/reorder/po-preview', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const { zoho_item_id } = req.query;
+        const quantity = parseFloat(req.query.quantity) || 0;
+        if (!zoho_item_id) {
+            return res.status(400).json({ success: false, message: 'zoho_item_id required' });
+        }
+
+        const [itemRows] = await pool.query(`
+            SELECT zim.zoho_item_id, zim.zoho_item_name AS item_name, zim.zoho_sku AS sku,
+                   zim.zoho_brand AS brand, zim.zoho_unit AS unit, zim.zoho_rate AS rate,
+                   zim.preferred_vendor_id, zim.last_purchase_rate,
+                   v.vendor_name AS preferred_vendor_name, v.zoho_contact_id
+            FROM zoho_items_map zim
+            LEFT JOIN vendors v ON v.id = zim.preferred_vendor_id
+            WHERE zim.zoho_item_id = ?
+            LIMIT 1
+        `, [zoho_item_id]);
+
+        if (!itemRows.length) return res.status(404).json({ success: false, message: 'Item not found' });
+        const item = itemRows[0];
+
+        const [candidateRows] = await pool.query(`
+            SELECT ivm.vendor_id, v.vendor_name, ivm.bill_count, ivm.last_bill_rate, ivm.last_bill_date, ivm.is_primary
+            FROM item_vendor_map ivm
+            JOIN vendors v ON v.id = ivm.vendor_id
+            WHERE ivm.zoho_item_id = ?
+            ORDER BY ivm.is_primary DESC, ivm.bill_count DESC, ivm.last_bill_date DESC
+            LIMIT 10
+        `, [zoho_item_id]);
+
+        const suggestedRate = Number(item.last_purchase_rate || item.rate || 0);
+        const suggestedTotal = quantity * suggestedRate;
+
+        res.json({
+            success: true,
+            data: {
+                item,
+                candidates: candidateRows,
+                suggestion: {
+                    vendor_id: item.preferred_vendor_id,
+                    vendor_name: item.preferred_vendor_name,
+                    quantity,
+                    unit_price: suggestedRate,
+                    line_total: suggestedTotal
+                }
+            }
+        });
+    } catch (e) {
+        console.error('[POPreview]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /reorder/create-po - Create a local draft PO from one or more alert rows
+ * Body: { vendor_id, items: [{zoho_item_id, item_name, quantity, unit_price}], expected_date?, notes?, push_to_zoho? }
+ */
+router.post('/reorder/create-po', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const { vendor_id, items, expected_date, notes, tax_amount, push_to_zoho } = req.body;
+        if (!vendor_id || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: 'vendor_id and items[] required' });
+        }
+
+        // Generate PO number locally (avoid cross-module coupling with routes/vendors.js)
+        const [[{ nextNo }]] = await pool.query(
+            `SELECT IFNULL(MAX(CAST(SUBSTRING_INDEX(po_number, '-', -1) AS UNSIGNED)), 0) + 1 AS nextNo
+             FROM vendor_purchase_orders WHERE po_number LIKE 'PO-%'`
+        );
+        const po_number = `PO-${String(nextNo).padStart(5, '0')}`;
+
+        const subtotal = items.reduce((sum, it) => sum + (Number(it.quantity) * Number(it.unit_price)), 0);
+        const tax = Number(tax_amount) || 0;
+        const grand_total = subtotal + tax;
+
+        const [result] = await pool.query(
+            `INSERT INTO vendor_purchase_orders
+                (vendor_id, po_number, subtotal, tax_amount, grand_total, expected_date, notes,
+                 source, source_reference, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'reorder_alert', ?, ?)`,
+            [vendor_id, po_number, subtotal, tax, grand_total, expected_date || null,
+             notes || null, `items=${items.length}`, req.user.id]
+        );
+        const poId = result.insertId;
+
+        for (const it of items) {
+            const amount = Number(it.quantity) * Number(it.unit_price);
+            await pool.query(
+                `INSERT INTO vendor_po_items (po_id, zoho_item_id, item_name, quantity, unit_price, amount)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [poId, it.zoho_item_id || null, it.item_name, it.quantity, it.unit_price, amount]
+            );
+        }
+
+        // Optional immediate push
+        let zohoResult = null;
+        if (push_to_zoho) {
+            try {
+                const [vendorRows] = await pool.query(
+                    `SELECT vendor_name, zoho_contact_id, gst_number FROM vendors WHERE id = ?`,
+                    [vendor_id]
+                );
+                const vendor = vendorRows[0];
+                let zohoContactId = vendor?.zoho_contact_id;
+                if (!zohoContactId && vendor) {
+                    const contactResp = await zohoAPI.createContact({
+                        contact_name: vendor.vendor_name,
+                        contact_type: 'vendor',
+                        gst_no: vendor.gst_number || undefined
+                    });
+                    zohoContactId = contactResp.contact?.contact_id;
+                    if (zohoContactId) {
+                        await pool.query('UPDATE vendors SET zoho_contact_id = ? WHERE id = ?', [zohoContactId, vendor_id]);
+                    }
+                }
+                if (zohoContactId) {
+                    const zohoResp = await zohoAPI.createPurchaseOrder({
+                        vendor_id: zohoContactId,
+                        purchaseorder_number: po_number,
+                        delivery_date: expected_date,
+                        line_items: items.map(it => ({
+                            item_id: it.zoho_item_id || undefined,
+                            name: it.item_name,
+                            quantity: Number(it.quantity),
+                            rate: Number(it.unit_price)
+                        }))
+                    });
+                    const zohoPOId = zohoResp.purchaseorder?.purchaseorder_id;
+                    await pool.query(
+                        `UPDATE vendor_purchase_orders SET zoho_status = 'pushed', zoho_po_id = ?, status = 'sent' WHERE id = ?`,
+                        [zohoPOId || null, poId]
+                    );
+                    zohoResult = { zoho_po_id: zohoPOId };
+                }
+            } catch (e) {
+                console.error('[create-po][push]', e);
+                zohoResult = { error: e.message };
+            }
+        }
+
+        res.json({
+            success: true,
+            data: { po_id: poId, po_number, subtotal, tax_amount: tax, grand_total, zoho: zohoResult }
+        });
+    } catch (e) {
+        console.error('[create-po]', e);
         res.status(500).json({ success: false, message: e.message });
     }
 });
