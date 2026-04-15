@@ -2788,24 +2788,36 @@
         } catch (e) { showToast('Bulk push failed: ' + e.message, 'error'); }
     }
 
-    // --- Candidates modal (vendor history for one item, with "set primary" action) ---
+    // --- Candidates modal (vendor history + full vendor picker) ---
+    var _candidatesCurrentItemId = null;
+    var _allVendorsCache = null;   // lazy-loaded on first modal open
+
     async function openCandidatesModal(itemId) {
+        _candidatesCurrentItemId = itemId;
+        document.getElementById('candidatesModalTitle').textContent = 'Vendor candidates';
+        document.getElementById('candidatesModal').classList.remove('hidden');
+        await renderCandidatesModalContent(itemId);
+    }
+
+    async function renderCandidatesModalContent(itemId) {
+        var body = document.getElementById('candidatesModalBody');
+        body.innerHTML = '<div class="text-gray-400 text-sm">Loading…</div>';
         try {
             var res = await fetch('/api/zoho/reorder/vendor-mapping/' + encodeURIComponent(itemId) + '/candidates', { headers: getAuthHeaders() });
             var json = await res.json();
-            if (!json.success) { showToast(json.message || 'Load failed', 'error'); return; }
+            if (!json.success) throw new Error(json.message || 'Load failed');
             var rows = json.data || [];
-            var body = document.getElementById('candidatesModalBody');
-            if (rows.length === 0) {
-                body.innerHTML = '<div class="text-gray-500 text-sm">No vendor history. Run Scan first.</div>';
-            } else {
-                body.innerHTML = '<table class="min-w-full text-sm"><thead class="bg-gray-50"><tr>' +
+
+            var historyHtml = rows.length === 0
+                ? '<div class="text-gray-500 text-sm mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded">No bill history for this item yet. Pick any vendor from the list below to map manually.</div>'
+                : '<div class="mb-4"><div class="text-xs uppercase text-gray-500 font-semibold mb-1">From bill history</div>' +
+                  '<table class="min-w-full text-sm border rounded"><thead class="bg-gray-50"><tr>' +
                     '<th class="px-2 py-2 text-left">Vendor</th>' +
                     '<th class="px-2 py-2 text-right">Bills</th>' +
                     '<th class="px-2 py-2 text-right">Last rate</th>' +
                     '<th class="px-2 py-2 text-right">Last bill</th>' +
                     '<th class="px-2 py-2 text-center">Action</th></tr></thead><tbody>' +
-                    rows.map(function(r) {
+                  rows.map(function(r) {
                         var primaryBadge = r.is_primary
                             ? ' <span class="ml-1 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">primary</span>'
                             : '';
@@ -2822,11 +2834,91 @@
                                     ? '<span class="text-xs text-gray-400">—</span>'
                                     : '<button onclick="setPrimaryVendor(\'' + itemId + '\', ' + r.vendor_id + ')" class="px-2 py-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded">Set primary</button>') +
                             '</td></tr>';
-                    }).join('') + '</tbody></table>';
+                  }).join('') + '</tbody></table></div>';
+
+            var pickerHtml =
+                '<div class="mt-4 pt-4 border-t">' +
+                    '<div class="flex items-center justify-between mb-1">' +
+                        '<div class="text-xs uppercase text-gray-500 font-semibold">Pick any vendor</div>' +
+                        '<button onclick="refreshVendorsFromZoho(this)" class="text-xs text-indigo-600 hover:underline">↻ Sync from Zoho</button>' +
+                    '</div>' +
+                    '<div class="text-xs text-gray-500 mb-2">Any vendor in the local list (mirrored from Zoho Books contacts) can be mapped as primary, even without prior bill history.</div>' +
+                    '<div class="flex gap-2">' +
+                        '<input type="text" id="vmPickSearch" oninput="filterAllVendors()" placeholder="Search vendor name, phone…" class="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">' +
+                        '<select id="vmPickSelect" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm min-w-[200px]"></select>' +
+                        '<button onclick="setPrimaryFromPicker()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">Set as primary</button>' +
+                    '</div>' +
+                    '<div id="vmPickCount" class="text-xs text-gray-400 mt-1"></div>' +
+                '</div>';
+
+            body.innerHTML = historyHtml + pickerHtml;
+
+            await loadAllVendorsIntoPicker();
+        } catch (e) {
+            body.innerHTML = '<div class="text-red-500 text-sm">' + escapeHtml(e.message) + '</div>';
+        }
+    }
+
+    async function loadAllVendorsIntoPicker() {
+        if (!_allVendorsCache) {
+            try {
+                var res = await fetch('/api/vendors?status=active&limit=1000', { headers: getAuthHeaders() });
+                var json = await res.json();
+                _allVendorsCache = (json.vendors || json.data || []);
+            } catch (e) { _allVendorsCache = []; }
+        }
+        renderVendorPickerOptions(_allVendorsCache, '');
+    }
+
+    function renderVendorPickerOptions(list, filterText) {
+        var sel = document.getElementById('vmPickSelect');
+        if (!sel) return;
+        var q = (filterText || '').toLowerCase().trim();
+        var filtered = q
+            ? list.filter(function(v) {
+                return (v.vendor_name || '').toLowerCase().indexOf(q) !== -1 ||
+                       (v.contact_person || '').toLowerCase().indexOf(q) !== -1 ||
+                       (v.phone || '').toLowerCase().indexOf(q) !== -1;
+              })
+            : list;
+        sel.innerHTML = (filtered.length === 0
+            ? '<option value="">No match</option>'
+            : '<option value="">— Select vendor —</option>' + filtered.slice(0, 500).map(function(v) {
+                var suffix = v.phone ? ' · ' + v.phone : '';
+                return '<option value="' + v.id + '">' + escapeHtml(v.vendor_name || ('Vendor #' + v.id)) + escapeHtml(suffix) + '</option>';
+              }).join(''));
+        var count = document.getElementById('vmPickCount');
+        if (count) count.textContent = filtered.length + ' vendor' + (filtered.length !== 1 ? 's' : '') + ' available' + (filtered.length > 500 ? ' (showing first 500 — refine the search)' : '');
+    }
+
+    function filterAllVendors() {
+        var q = document.getElementById('vmPickSearch').value;
+        renderVendorPickerOptions(_allVendorsCache || [], q);
+    }
+
+    async function setPrimaryFromPicker() {
+        var sel = document.getElementById('vmPickSelect');
+        var vendorId = parseInt(sel.value, 10);
+        if (!Number.isFinite(vendorId)) { showToast('Pick a vendor first', 'error'); return; }
+        await setPrimaryVendor(_candidatesCurrentItemId, vendorId);
+    }
+
+    async function refreshVendorsFromZoho(btn) {
+        btn.disabled = true;
+        var prev = btn.textContent;
+        btn.textContent = '⏳ syncing…';
+        try {
+            var res = await fetch('/api/vendors/sync-zoho', { method: 'POST', headers: getAuthHeaders() });
+            var json = await res.json();
+            if (json.success) {
+                showToast(json.message || 'Vendors synced from Zoho', 'success');
+                _allVendorsCache = null;  // force re-fetch
+                await loadAllVendorsIntoPicker();
+            } else {
+                showToast(json.message || 'Sync failed', 'error');
             }
-            document.getElementById('candidatesModalTitle').textContent = 'Vendor candidates';
-            document.getElementById('candidatesModal').classList.remove('hidden');
-        } catch (e) { showToast('Load failed: ' + e.message, 'error'); }
+        } catch (e) { showToast('Sync failed: ' + e.message, 'error'); }
+        btn.disabled = false; btn.textContent = prev;
     }
     function closeCandidatesModal() { document.getElementById('candidatesModal').classList.add('hidden'); }
     async function setPrimaryVendor(itemId, vendorId) {
@@ -2839,7 +2931,13 @@
             var json = await res.json();
             if (json.success) {
                 showToast('Primary vendor updated', 'success');
-                closeCandidatesModal();
+                // Re-render the candidates modal in place (not closing it) so
+                // the user can verify the new primary is set.
+                if (_candidatesCurrentItemId === itemId) {
+                    await renderCandidatesModalContent(itemId);
+                } else {
+                    closeCandidatesModal();
+                }
                 await loadVendorMapping();
             } else {
                 showToast(json.message || 'Update failed', 'error');
