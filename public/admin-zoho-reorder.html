@@ -689,16 +689,20 @@
                     </select>
                 </div>
                 <div>
-                    <label class="flex items-center gap-2 text-sm text-gray-700">
-                        <input type="checkbox" id="vmOnlyUnmapped" onchange="loadVendorMapping()">
-                        Unmapped only
-                    </label>
+                    <label class="block text-xs text-gray-600 mb-1">Mapping</label>
+                    <select id="vmMappingStatus" onchange="loadVendorMapping()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">All</option>
+                        <option value="mapped">Mapped only</option>
+                        <option value="unmapped">Unmapped only</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="flex items-center gap-2 text-sm text-gray-700">
-                        <input type="checkbox" id="vmOnlyUnpushed" onchange="loadVendorMapping()">
-                        Unpushed only
-                    </label>
+                    <label class="block text-xs text-gray-600 mb-1">Push status</label>
+                    <select id="vmPushStatus" onchange="loadVendorMapping()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">All</option>
+                        <option value="pushed">Pushed only</option>
+                        <option value="unpushed">Unpushed only</option>
+                    </select>
                 </div>
                 <button onclick="loadVendorMapping()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
                 <button onclick="pushSelectedVendors()" id="vmPushSelectedBtn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition">Push Selected</button>
@@ -2582,15 +2586,15 @@
         try {
             var search = (document.getElementById('vmSearch').value || '').trim();
             var brand = (document.getElementById('vmBrand').value || '').trim();
-            var unmapped = document.getElementById('vmOnlyUnmapped').checked;
-            var unpushed = document.getElementById('vmOnlyUnpushed').checked;
+            var mappingStatus = document.getElementById('vmMappingStatus').value;
+            var pushStatus = document.getElementById('vmPushStatus').value;
             // Fetch the whole set in one shot so client-side sort works across
             // everything (not just one paginated slice).
             var qs = new URLSearchParams({ page: 1, limit: 5000 });
             if (search) qs.set('search', search);
             if (brand) qs.set('brand', brand);
-            if (unmapped) qs.set('only_unmapped', '1');
-            if (unpushed) qs.set('only_unpushed', '1');
+            if (mappingStatus) qs.set('mapping_status', mappingStatus);
+            if (pushStatus) qs.set('push_status', pushStatus);
 
             var res = await fetch('/api/zoho/reorder/vendor-mapping?' + qs.toString(), { headers: getAuthHeaders() });
             var json = await res.json();

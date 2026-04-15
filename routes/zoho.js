@@ -3756,7 +3756,7 @@ router.get('/reorder/vendor-mapping/scans', requirePermission('zoho', 'reorder')
  */
 router.get('/reorder/vendor-mapping', requirePermission('zoho', 'reorder'), async (req, res) => {
     try {
-        const { search, brand, only_unpushed, only_unmapped } = req.query;
+        const { search, brand, mapping_status, push_status } = req.query;
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
         // Cap raised to 5000 so the whole vendor-mapping table can be fetched
         // in one shot (≈1.9k items currently) — avoids cross-page sort headache.
@@ -3770,10 +3770,21 @@ router.get('/reorder/vendor-mapping', requirePermission('zoho', 'reorder'), asyn
             params.push(`%${search}%`, `%${search}%`);
         }
         if (brand) { where += ` AND zim.zoho_brand = ?`; params.push(brand); }
-        if (only_unpushed === '1') {
-            where += ` AND zim.preferred_vendor_id IS NOT NULL AND (zim.vendor_pushed_at IS NULL)`;
+        if (mapping_status === 'mapped') {
+            where += ` AND zim.preferred_vendor_id IS NOT NULL`;
+        } else if (mapping_status === 'unmapped') {
+            where += ` AND zim.preferred_vendor_id IS NULL`;
         }
-        if (only_unmapped === '1') {
+        if (push_status === 'pushed') {
+            where += ` AND zim.vendor_pushed_at IS NOT NULL`;
+        } else if (push_status === 'unpushed') {
+            where += ` AND zim.preferred_vendor_id IS NOT NULL AND zim.vendor_pushed_at IS NULL`;
+        }
+        // Legacy query-param aliases for older clients
+        if (req.query.only_unpushed === '1' && !push_status) {
+            where += ` AND zim.preferred_vendor_id IS NOT NULL AND zim.vendor_pushed_at IS NULL`;
+        }
+        if (req.query.only_unmapped === '1' && !mapping_status) {
             where += ` AND zim.preferred_vendor_id IS NULL`;
         }
 
