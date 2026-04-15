@@ -2847,9 +2847,9 @@
     async function ensureBulkVendorsLoaded() {
         if (!_allVendorsCache) {
             try {
-                var res = await fetch('/api/vendors?status=active&limit=1000', { headers: getAuthHeaders() });
+                var res = await fetch('/api/zoho/reorder/vendors-list', { headers: getAuthHeaders() });
                 var json = await res.json();
-                _allVendorsCache = (json.vendors || json.data || []);
+                _allVendorsCache = (json.data || json.vendors || []);
             } catch (e) { _allVendorsCache = []; }
         }
         updateVendorCacheInfo();
@@ -3088,9 +3088,10 @@
     async function loadAllVendorsIntoPicker() {
         if (!_allVendorsCache) {
             try {
-                var res = await fetch('/api/vendors?status=active&limit=1000', { headers: getAuthHeaders() });
+                // Dedicated flat endpoint (unpaginated) — /api/vendors caps limit at 100.
+                var res = await fetch('/api/zoho/reorder/vendors-list', { headers: getAuthHeaders() });
                 var json = await res.json();
-                _allVendorsCache = (json.vendors || json.data || []);
+                _allVendorsCache = (json.data || json.vendors || []);
             } catch (e) { _allVendorsCache = []; }
         }
         _vendorPicked = null;

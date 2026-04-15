@@ -3869,6 +3869,27 @@ router.post('/reorder/vendor-mapping/push/:zohoItemId', requirePermission('zoho'
 });
 
 /**
+ * GET /reorder/vendors-list - Flat list of active vendors for the mapping picker.
+ * The generic /api/vendors endpoint caps limit at 100; this one is unpaginated
+ * (≤2000 vendors) and returns only the fields the picker needs.
+ */
+router.get('/reorder/vendors-list', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT id, vendor_name, contact_person, phone, email, zoho_contact_id
+            FROM vendors
+            WHERE status = 'active'
+            ORDER BY vendor_name ASC
+            LIMIT 2000
+        `);
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        console.error('[vendors-list]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
  * POST /reorder/vendor-mapping/apply-brand - Bulk map every item of a brand
  * to a single vendor. Body: { brand, vendor_id }
  */
