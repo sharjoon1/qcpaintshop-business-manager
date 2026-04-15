@@ -3869,6 +3869,25 @@ router.post('/reorder/vendor-mapping/push/:zohoItemId', requirePermission('zoho'
 });
 
 /**
+ * POST /reorder/vendor-mapping/apply-brand - Bulk map every item of a brand
+ * to a single vendor. Body: { brand, vendor_id }
+ */
+router.post('/reorder/vendor-mapping/apply-brand', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const { brand, vendor_id } = req.body;
+        const vendorId = parseInt(vendor_id, 10);
+        if (!brand || !Number.isFinite(vendorId)) {
+            return res.status(400).json({ success: false, message: 'brand and vendor_id required' });
+        }
+        const result = await vendorItemMapper.applyBrandVendor(brand, vendorId);
+        res.json({ success: true, data: result });
+    } catch (e) {
+        console.error('[VendorMapping][apply-brand]', e);
+        res.status(400).json({ success: false, message: e.message });
+    }
+});
+
+/**
  * POST /reorder/vendor-mapping/push-bulk - Push all unpushed items to Zoho
  * Body: { only_unpushed?: bool (default true) }
  */

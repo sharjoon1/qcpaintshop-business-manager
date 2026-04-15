@@ -296,6 +296,47 @@ async function pushAll({ onlyUnpushed = true } = {}) {
 }
 
 /**
+ * Bulk map: flag `vendorId` as the manual primary for every active item of
+ * `brand`. Use case: "all Asian Paints items come from Supplier X". Counts
+ * how many rows were affected so the UI can report.
+ */
+async function applyBrandVendor(brand, vendorId) {
+    if (!pool) throw new Error('pool not set');
+    if (!brand || !vendorId) throw new Error('brand and vendor_id required');
+    const [vRows] = await pool.query(`SELECT id FROM vendors WHERE id = ?`, [vendorId]);
+    if (!vRows.length) throw new Error('Vendor not found');
+
+    const [items] = await pool.query(
+        `SELECT zoho_item_id FROM zoho_items_map
+         WHERE zoho_brand = ? AND zoho_status = 'active'`,
+        [brand]
+    );
+    if (items.length === 0) return { brand, vendor_id: vendorId, items: 0 };
+
+    // Demote any existing primaries for these items, then upsert the new manual primary.
+    for (const it of items) {
+        await pool.query(
+            `UPDATE item_vendor_map SET is_primary = 0 WHERE zoho_item_id = ?`,
+            [it.zoho_item_id]
+        );
+        await pool.query(
+            `INSERT INTO item_vendor_map (zoho_item_id, vendor_id, is_primary, source, bill_count)
+             VALUES (?, ?, 1, 'manual', 0)
+             ON DUPLICATE KEY UPDATE is_primary = 1, source = 'manual'`,
+            [it.zoho_item_id, vendorId]
+        );
+    }
+    // Single UPDATE for zoho_items_map is more efficient than row-by-row
+    await pool.query(
+        `UPDATE zoho_items_map SET preferred_vendor_id = ?, vendor_pushed_at = NULL
+         WHERE zoho_brand = ? AND zoho_status = 'active'`,
+        [vendorId, brand]
+    );
+
+    return { brand, vendor_id: vendorId, items: items.length };
+}
+
+/**
  * Manual override: flag a specific (item, vendor) pair as the primary mapping.
  */
 async function setManualPrimary(zohoItemId, vendorId) {
@@ -326,5 +367,6 @@ module.exports = {
     inferPrimaries,
     pushPreferredVendorToZoho,
     pushAll,
-    setManualPrimary
+    setManualPrimary,
+    applyBrandVendor
 };

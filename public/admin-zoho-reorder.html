@@ -710,6 +710,38 @@
                 <button onclick="pushBulkVendors(true)" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition" title="Skip items already pushed with no new mapping change">Push Only Unpushed</button>
             </div>
             <div id="vmScanStatus" class="text-xs text-gray-600 mb-3"></div>
+
+            <!-- Bulk brand → vendor -->
+            <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-sm font-semibold text-indigo-900">Bulk: Map a brand → single vendor</div>
+                    <span class="text-xs text-indigo-700">All active items of the chosen brand will be mapped to this vendor</span>
+                </div>
+                <div class="flex gap-2 items-start flex-wrap">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Brand</label>
+                        <select id="vmBulkBrand" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm min-w-[180px]">
+                            <option value="">— Choose brand —</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 min-w-[240px]">
+                        <label class="block text-xs text-gray-600 mb-1">Vendor</label>
+                        <div class="relative">
+                            <input type="text" id="vmBulkVendorSearch" autocomplete="off"
+                                oninput="onBulkVendorInput()" onfocus="showBulkVendorCombo()"
+                                onkeydown="onBulkVendorKey(event)"
+                                placeholder="Type to search vendors…"
+                                class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <div id="vmBulkVendorDropdown" class="hidden absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="self-end">
+                        <button onclick="applyBrandVendor()" id="vmApplyBrandBtn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Apply mapping</button>
+                    </div>
+                </div>
+                <div id="vmBulkBrandInfo" class="text-xs text-gray-600 mt-2"></div>
+            </div>
+
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white text-sm">
                     <thead class="bg-gray-50">
@@ -2533,6 +2565,18 @@
                     return '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
                 }).join('');
             if (prev) sel.value = prev;
+
+            // Also populate the bulk-brand dropdown with item counts
+            var bulk = document.getElementById('vmBulkBrand');
+            if (bulk) {
+                bulk.innerHTML = '<option value="">— Choose brand —</option>' +
+                    brands.map(function(b) {
+                        var name = typeof b === 'string' ? b : (b.brand_name || b.brand || '');
+                        var cnt = typeof b === 'object' ? (b.item_count || 0) : 0;
+                        if (!name) return '';
+                        return '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + (cnt ? ' (' + cnt + ' items)' : '') + '</option>';
+                    }).join('');
+            }
             vmBrandsLoaded = true;
         } catch (e) { /* silent */ }
     }
@@ -2786,6 +2830,139 @@
                 showToast(json.message || 'Bulk push failed', 'error');
             }
         } catch (e) { showToast('Bulk push failed: ' + e.message, 'error'); }
+    }
+
+    // --- Bulk brand → vendor combobox (separate instance from per-item picker) ---
+    var _bulkVendorPicked = null;
+    var _bulkVendorFiltered = [];
+    var _bulkVendorHighlight = -1;
+
+    async function ensureBulkVendorsLoaded() {
+        if (!_allVendorsCache) {
+            try {
+                var res = await fetch('/api/vendors?status=active&limit=1000', { headers: getAuthHeaders() });
+                var json = await res.json();
+                _allVendorsCache = (json.vendors || json.data || []);
+            } catch (e) { _allVendorsCache = []; }
+        }
+    }
+
+    function filterBulkVendorCombo(q) {
+        q = (q || '').toLowerCase().trim();
+        var list = _allVendorsCache || [];
+        _bulkVendorFiltered = q
+            ? list.filter(function(v) {
+                return (v.vendor_name || '').toLowerCase().indexOf(q) !== -1 ||
+                       (v.contact_person || '').toLowerCase().indexOf(q) !== -1 ||
+                       (v.phone || '').toLowerCase().indexOf(q) !== -1;
+              })
+            : list;
+        renderBulkVendorCombo();
+    }
+
+    function renderBulkVendorCombo() {
+        var dd = document.getElementById('vmBulkVendorDropdown');
+        if (!dd) return;
+        var list = _bulkVendorFiltered.slice(0, 300);
+        if (list.length === 0) {
+            dd.innerHTML = '<div class="px-3 py-2 text-gray-400">No matching vendor. Click "↻ Sync from Zoho" in a Candidates modal to refresh.</div>';
+        } else {
+            dd.innerHTML = list.map(function(v, i) {
+                var hl = i === _bulkVendorHighlight ? 'bg-indigo-50' : '';
+                var sub = [v.contact_person, v.phone].filter(Boolean).join(' · ');
+                return '<div class="px-3 py-2 cursor-pointer hover:bg-indigo-50 border-b last:border-b-0 ' + hl + '"' +
+                    ' onmousedown="pickBulkVendor(' + i + ')">' +
+                    '<div class="font-medium text-gray-800">' + escapeHtml(v.vendor_name || ('Vendor #' + v.id)) + '</div>' +
+                    (sub ? '<div class="text-xs text-gray-500">' + escapeHtml(sub) + '</div>' : '') +
+                    '</div>';
+            }).join('');
+            if (_bulkVendorFiltered.length > list.length) {
+                dd.innerHTML += '<div class="px-3 py-2 text-xs text-gray-400 bg-gray-50">Showing ' + list.length + ' of ' + _bulkVendorFiltered.length + ' — narrow the search</div>';
+            }
+        }
+    }
+
+    async function showBulkVendorCombo() {
+        await ensureBulkVendorsLoaded();
+        if (!_bulkVendorFiltered.length) filterBulkVendorCombo('');
+        document.getElementById('vmBulkVendorDropdown').classList.remove('hidden');
+        setTimeout(function() {
+            document.addEventListener('mousedown', _bulkVendorOutsideClick, { once: true });
+        }, 0);
+    }
+    function hideBulkVendorCombo() {
+        var dd = document.getElementById('vmBulkVendorDropdown');
+        if (dd) dd.classList.add('hidden');
+    }
+    function _bulkVendorOutsideClick(ev) {
+        var dd = document.getElementById('vmBulkVendorDropdown');
+        var inp = document.getElementById('vmBulkVendorSearch');
+        if (!dd || !inp) return;
+        if (dd.contains(ev.target) || ev.target === inp) {
+            document.addEventListener('mousedown', _bulkVendorOutsideClick, { once: true });
+        } else {
+            hideBulkVendorCombo();
+        }
+    }
+    function onBulkVendorInput() {
+        _bulkVendorPicked = null;
+        _bulkVendorHighlight = -1;
+        filterBulkVendorCombo(document.getElementById('vmBulkVendorSearch').value);
+        showBulkVendorCombo();
+    }
+    function onBulkVendorKey(e) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            _bulkVendorHighlight = Math.min(_bulkVendorHighlight + 1, _bulkVendorFiltered.length - 1);
+            renderBulkVendorCombo();
+            showBulkVendorCombo();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            _bulkVendorHighlight = Math.max(_bulkVendorHighlight - 1, 0);
+            renderBulkVendorCombo();
+        } else if (e.key === 'Enter' && _bulkVendorHighlight >= 0) {
+            e.preventDefault();
+            pickBulkVendor(_bulkVendorHighlight);
+        } else if (e.key === 'Escape') {
+            hideBulkVendorCombo();
+        }
+    }
+    function pickBulkVendor(i) {
+        var v = _bulkVendorFiltered[i];
+        if (!v) return;
+        _bulkVendorPicked = v;
+        document.getElementById('vmBulkVendorSearch').value = v.vendor_name + (v.phone ? ' · ' + v.phone : '');
+        hideBulkVendorCombo();
+    }
+
+    async function applyBrandVendor() {
+        var brand = document.getElementById('vmBulkBrand').value;
+        if (!brand) { showToast('Choose a brand first', 'error'); return; }
+        if (!_bulkVendorPicked) { showToast('Pick a vendor from the dropdown first', 'error'); return; }
+        if (!confirm('Map ALL items of brand "' + brand + '" to vendor "' + _bulkVendorPicked.vendor_name + '"?\n\nThis will overwrite the primary vendor on every active item of that brand.')) return;
+
+        var btn = document.getElementById('vmApplyBrandBtn');
+        btn.disabled = true;
+        var prev = btn.textContent;
+        btn.textContent = 'Applying…';
+        try {
+            var res = await fetch('/api/zoho/reorder/vendor-mapping/apply-brand', {
+                method: 'POST',
+                headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ brand: brand, vendor_id: _bulkVendorPicked.id })
+            });
+            var json = await res.json();
+            if (json.success) {
+                var d = json.data || {};
+                showToast('Mapped ' + (d.items || 0) + ' items of "' + brand + '" → ' + _bulkVendorPicked.vendor_name, 'success');
+                document.getElementById('vmBulkBrandInfo').innerHTML =
+                    'Last: <b>' + escapeHtml(brand) + '</b> → <b>' + escapeHtml(_bulkVendorPicked.vendor_name) + '</b> · ' + (d.items || 0) + ' items updated · <span class="text-amber-600">Click "Push Selected" or "Push All Mapped" to send to Zoho.</span>';
+                await loadVendorMapping();
+            } else {
+                showToast(json.message || 'Apply failed', 'error');
+            }
+        } catch (e) { showToast('Apply failed: ' + e.message, 'error'); }
+        btn.disabled = false; btn.textContent = prev;
     }
 
     // --- Candidates modal (vendor history + full vendor picker) ---
