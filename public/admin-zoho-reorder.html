@@ -713,10 +713,14 @@
 
             <!-- Bulk brand → vendor -->
             <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="text-sm font-semibold text-indigo-900">Bulk: Map a brand → single vendor</div>
-                    <span class="text-xs text-indigo-700">All active items of the chosen brand will be mapped to this vendor</span>
+                <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <div>
+                        <div class="text-sm font-semibold text-indigo-900">Bulk: Map a brand → single vendor</div>
+                        <div class="text-xs text-indigo-700">All active items of the chosen brand will be mapped to this vendor</div>
+                    </div>
+                    <button onclick="syncVendorsFromZohoTop(this)" id="vmSyncVendorsBtn" class="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-300 rounded-lg transition">↻ Sync vendors from Zoho</button>
                 </div>
+                <div id="vmVendorCacheInfo" class="text-xs text-gray-500 mb-2"></div>
                 <div class="flex gap-2 items-start flex-wrap">
                     <div>
                         <label class="block text-xs text-gray-600 mb-1">Brand</label>
@@ -1008,6 +1012,9 @@
             loadVendorScanStatus();
             loadVendorMapping();
             wireVmHeaderSort();
+            // Preload local vendor cache so the Bulk panel's search works
+            // immediately and the count hint is shown.
+            ensureBulkVendorsLoaded();
         }
     }
 
@@ -2845,6 +2852,38 @@
                 _allVendorsCache = (json.vendors || json.data || []);
             } catch (e) { _allVendorsCache = []; }
         }
+        updateVendorCacheInfo();
+    }
+
+    function updateVendorCacheInfo() {
+        var el = document.getElementById('vmVendorCacheInfo');
+        if (!el) return;
+        var n = (_allVendorsCache || []).length;
+        el.textContent = n + ' vendor' + (n !== 1 ? 's' : '') + ' available in the local list' +
+            (n === 0 ? ' — click ↻ Sync vendors from Zoho to pull them.' : '.');
+    }
+
+    async function syncVendorsFromZohoTop(btn) {
+        btn.disabled = true;
+        var prev = btn.textContent;
+        btn.textContent = '⏳ Syncing…';
+        try {
+            var res = await fetch('/api/vendors/sync-zoho', { method: 'POST', headers: getAuthHeaders() });
+            var json = await res.json();
+            if (json.success) {
+                showToast(json.message || 'Vendors synced', 'success');
+                _allVendorsCache = null;
+                await ensureBulkVendorsLoaded();
+                // refresh both comboboxes
+                filterBulkVendorCombo(document.getElementById('vmBulkVendorSearch').value || '');
+                if (document.getElementById('vmPickSearch')) {
+                    filterVendorCombo(document.getElementById('vmPickSearch').value || '');
+                }
+            } else {
+                showToast(json.message || 'Sync failed', 'error');
+            }
+        } catch (e) { showToast('Sync failed: ' + e.message, 'error'); }
+        btn.disabled = false; btn.textContent = prev;
     }
 
     function filterBulkVendorCombo(q) {
@@ -2865,7 +2904,7 @@
         if (!dd) return;
         var list = _bulkVendorFiltered.slice(0, 300);
         if (list.length === 0) {
-            dd.innerHTML = '<div class="px-3 py-2 text-gray-400">No matching vendor. Click "↻ Sync from Zoho" in a Candidates modal to refresh.</div>';
+            dd.innerHTML = '<div class="px-3 py-2 text-gray-500">No matching vendor in the local list. Click the <b>↻ Sync vendors from Zoho</b> button above to pull the full vendor list from Zoho Books.</div>';
         } else {
             dd.innerHTML = list.map(function(v, i) {
                 var hl = i === _bulkVendorHighlight ? 'bg-indigo-50' : '';
