@@ -276,8 +276,8 @@ async function getRecipientsForScope(scope) {
         const [rows] = await pool.query(
             `SELECT u.id AS user_id, u.full_name, u.phone
              FROM branches b
-             JOIN users u ON u.id = b.manager_id
-             WHERE b.id = ? AND u.is_active = 1`,
+             JOIN users u ON u.id = b.manager_user_id
+             WHERE b.id = ? AND u.status = 'active'`,
             [branchId]
         );
         return rows;
@@ -287,7 +287,7 @@ async function getRecipientsForScope(scope) {
     try { userIds = JSON.parse(cfg.reorder_report_recipients || '[]'); } catch (e) { userIds = []; }
     if (!Array.isArray(userIds) || userIds.length === 0) return [];
     const [rows] = await pool.query(
-        `SELECT id AS user_id, full_name, phone FROM users WHERE id IN (?) AND is_active = 1`,
+        `SELECT id AS user_id, full_name, phone FROM users WHERE id IN (?) AND status = 'active'`,
         [userIds]
     );
     return rows;

@@ -2132,11 +2132,20 @@ async function getReorderDashboard(filters = {}) {
         ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)`, params);
 
     const [alerts] = await pool.query(`
-        SELECT ra.*, u1.full_name as acknowledged_by_name, u2.full_name as resolved_by_name
+        SELECT ra.*,
+               zim.zoho_item_name AS item_name,
+               zim.zoho_sku AS sku,
+               zim.zoho_brand AS brand,
+               lm.zoho_location_name AS location_name,
+               lm.local_branch_id AS branch_id,
+               GREATEST(ra.reorder_level - ra.current_stock, 0) AS shortage,
+               u1.full_name as acknowledged_by_name,
+               u2.full_name as resolved_by_name
         FROM zoho_reorder_alerts ra
+        LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ra.zoho_item_id
+        LEFT JOIN zoho_locations_map lm ON ra.zoho_location_id = lm.zoho_location_id
         LEFT JOIN users u1 ON ra.acknowledged_by = u1.id
         LEFT JOIN users u2 ON ra.resolved_by = u2.id
-        LEFT JOIN zoho_locations_map lm ON ra.zoho_location_id = lm.zoho_location_id
         ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
         ORDER BY FIELD(ra.severity, 'critical','high','medium','low'), ra.created_at DESC
         LIMIT ? OFFSET ?
