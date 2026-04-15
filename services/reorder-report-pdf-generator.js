@@ -103,11 +103,20 @@ async function generateReorderPdf(report, outPath) {
             doc.text(`Avg/${periodShort}: ${periodValue.toFixed(2)}`, metricsX, top + 25);
             doc.fillColor(COLORS.gold).text(`Order: ${r.suggested_order_qty}`, metricsX, top + 37);
 
-            // Other branches compact line
-            if (r.other_branches && r.other_branches.length > 0) {
+            // Transfer-from suggestions (branches with surplus)
+            const surplusBranches = (r.other_branches || []).filter(o => Number(o.transferable_qty) > 0);
+            if (surplusBranches.length > 0) {
+                const txt = surplusBranches.slice(0, 4)
+                    .map(o => `${o.branch_name}: ${o.transferable_qty}↗`)
+                    .join('  |  ');
+                doc.fontSize(7).fillColor(COLORS.primary).text(
+                    `Transfer from: ${txt}`, 48, top + 45, { width: 500, height: 10 }
+                );
+            } else if (r.other_branches && r.other_branches.length > 0) {
+                // No surplus anywhere — still show where any stock exists
                 const others = r.other_branches.slice(0, 6)
                     .map(o => `${o.branch_name}: ${o.stock_on_hand}`).join('  |  ');
-                doc.fontSize(7).fillColor(COLORS.primaryLight).text(
+                doc.fontSize(7).fillColor(COLORS.mute).text(
                     `Other: ${others}`, 48, top + 45, { width: 500, height: 10 }
                 );
             }

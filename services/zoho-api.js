@@ -2161,6 +2161,53 @@ async function getReorderDashboard(filters = {}) {
         LIMIT ? OFFSET ?
     `, [...params, limit, offset]);
 
+    // Attach transfer-from suggestions: other branches with surplus for the same item
+    if (alerts.length > 0) {
+        const itemIds = [...new Set(alerts.map(a => a.zoho_item_id))];
+        const [stockRows] = await pool.query(`
+            SELECT ls.zoho_item_id,
+                   ls.zoho_location_id,
+                   zlm.zoho_location_name AS location_name,
+                   zlm.local_branch_id,
+                   ls.stock_on_hand,
+                   COALESCE(rc.reorder_level, 0) AS their_reorder_level
+            FROM zoho_location_stock ls
+            JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id AND zlm.is_active = 1
+            LEFT JOIN zoho_reorder_config rc
+                ON rc.zoho_item_id = ls.zoho_item_id AND rc.zoho_location_id = ls.zoho_location_id
+            WHERE ls.zoho_item_id IN (?) AND ls.stock_on_hand > 0
+        `, [itemIds]);
+
+        const byItem = new Map();
+        for (const s of stockRows) {
+            if (!byItem.has(s.zoho_item_id)) byItem.set(s.zoho_item_id, []);
+            byItem.get(s.zoho_item_id).push(s);
+        }
+
+        for (const a of alerts) {
+            const all = byItem.get(a.zoho_item_id) || [];
+            const suggestions = all
+                .filter(s => s.zoho_location_id !== a.zoho_location_id)
+                .map(s => {
+                    // Transferable = stock above their reorder level; if they have no
+                    // reorder level, treat any stock as transferable.
+                    const transferable = Math.max(0, Number(s.stock_on_hand) - Number(s.their_reorder_level || 0));
+                    return {
+                        zoho_location_id: s.zoho_location_id,
+                        location_name: s.location_name,
+                        branch_id: s.local_branch_id,
+                        stock_on_hand: Number(s.stock_on_hand),
+                        their_reorder_level: Number(s.their_reorder_level || 0),
+                        transferable_qty: transferable
+                    };
+                })
+                .filter(s => s.transferable_qty > 0 || s.stock_on_hand > 0)
+                .sort((x, y) => y.transferable_qty - x.transferable_qty || y.stock_on_hand - x.stock_on_hand)
+                .slice(0, 5);
+            a.transfer_suggestions = suggestions;
+        }
+    }
+
     return { data: alerts, pagination: { total, page, limit, pages: Math.ceil(total / limit) } };
 }
 

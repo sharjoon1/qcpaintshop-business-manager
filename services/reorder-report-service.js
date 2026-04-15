@@ -41,13 +41,23 @@ function buildOtherBranchesMap(stockRows, targetBranchId) {
         if (targetBranchId != null && s.local_branch_id === targetBranchId) continue;
         if (Number(s.stock_on_hand) <= 0) continue;
         if (!map.has(s.zoho_item_id)) map.set(s.zoho_item_id, []);
+        const stock = Number(s.stock_on_hand);
+        const theirLevel = Number(s.their_reorder_level || 0);
+        // Transferable = stock above that branch's own reorder level. If they have
+        // no reorder_level set, treat the full stock as transferable.
+        const transferable = Math.max(0, stock - theirLevel);
         map.get(s.zoho_item_id).push({
             branch_id: s.local_branch_id,
             branch_name: s.location_name,
-            stock_on_hand: Number(s.stock_on_hand)
+            stock_on_hand: stock,
+            their_reorder_level: theirLevel,
+            transferable_qty: transferable
         });
     }
-    for (const arr of map.values()) arr.sort((a, b) => b.stock_on_hand - a.stock_on_hand);
+    // Sort by transferable first (most surplus first), then by raw stock
+    for (const arr of map.values()) {
+        arr.sort((a, b) => (b.transferable_qty - a.transferable_qty) || (b.stock_on_hand - a.stock_on_hand));
+    }
     return map;
 }
 
@@ -127,9 +137,12 @@ async function assembleReport({ branchId = null, date = null, windowDays = 60 } 
     if (allItemIds.length > 0) {
         const [stockRows] = await pool.query(`
             SELECT ls.zoho_item_id, zlm.local_branch_id, zlm.zoho_location_name AS location_name,
-                   ls.stock_on_hand
+                   ls.stock_on_hand,
+                   COALESCE(rc.reorder_level, 0) AS their_reorder_level
             FROM zoho_location_stock ls
             JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id AND zlm.is_active = 1
+            LEFT JOIN zoho_reorder_config rc
+                ON rc.zoho_item_id = ls.zoho_item_id AND rc.zoho_location_id = ls.zoho_location_id
             WHERE ls.zoho_item_id IN (?) AND ls.stock_on_hand > 0
         `, [allItemIds]);
         allStocks = stockRows;
