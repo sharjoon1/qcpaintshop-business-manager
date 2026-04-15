@@ -51,9 +51,10 @@ function buildOtherBranchesMap(stockRows, targetBranchId) {
     return map;
 }
 
-async function assembleReport({ branchId = null, date = null } = {}) {
+async function assembleReport({ branchId = null, date = null, windowDays = 60 } = {}) {
     if (!pool) throw new Error('pool not set');
     const reportDate = date || new Date().toISOString().slice(0, 10);
+    windowDays = Math.max(1, Math.min(365, parseInt(windowDays, 10) || 60));
 
     let where = `WHERE a.status = 'active'`;
     const params = [];
@@ -84,55 +85,11 @@ async function assembleReport({ branchId = null, date = null } = {}) {
         ${where}
     `, params);
 
-    const itemIds = [...new Set(alerts.map(a => a.zoho_item_id))];
-    let stocks = [];
-    if (itemIds.length > 0) {
-        const [rowsStocks] = await pool.query(`
-            SELECT ls.zoho_item_id, zlm.local_branch_id, zlm.zoho_location_name AS location_name,
-                   ls.stock_on_hand
-            FROM zoho_location_stock ls
-            JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id AND zlm.is_active = 1
-            WHERE ls.zoho_item_id IN (?) AND ls.stock_on_hand > 0
-        `, [itemIds]);
-        stocks = rowsStocks;
-    }
-
-    const rows = alerts.map(a => {
-        const avg = Number(a.avg_daily_sales || 0);
-        const daysToStockout = avg > 0 ? Math.floor(Number(a.current_stock) / avg) : null;
-        const suggestedQty = Math.max(
-            0,
-            Number(a.reorder_level || 0) + Number(a.reorder_quantity || 0) - Number(a.current_stock)
-        );
-
-        const otherBranchesMap = buildOtherBranchesMap(stocks, a.branch_id);
-        const otherBranches = otherBranchesMap.get(a.zoho_item_id) || [];
-
-        return {
-            zoho_item_id: a.zoho_item_id,
-            item_name: a.item_name,
-            sku: a.sku,
-            brand: a.brand,
-            unit: a.unit,
-            branch_id: a.branch_id,
-            branch_name: a.branch_name,
-            current_stock: Number(a.current_stock),
-            reorder_level: Number(a.reorder_level || 0),
-            severity: a.severity,
-            avg_daily_sales: avg,
-            days_to_stockout: daysToStockout,
-            suggested_order_qty: suggestedQty,
-            other_branches: otherBranches
-        };
-    });
-
-    // --- ALSO include suggested items: recent sales but no active alert row yet ---
-    // Pulls items from branch_item_sales with velocity > 0 that are NOT already in alerts,
-    // computes suggested reorder_level from brand config, includes only if stock <= suggested.
+    // --- Query suggested items (items with sales in window but no active alert) ---
     const existingKeys = new Set(alerts.map(a => `${a.branch_id}|${a.zoho_item_id}`));
 
-    let suggestWhere = `WHERE bis.sale_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)`;
-    const suggestParams = [];
+    let suggestWhere = `WHERE bis.sale_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)`;
+    const suggestParams = [windowDays];
     if (branchId != null) {
         suggestWhere += ` AND bis.local_branch_id = ?`;
         suggestParams.push(branchId);
@@ -158,37 +115,33 @@ async function assembleReport({ branchId = null, date = null } = {}) {
                  zim.zoho_brand, zim.zoho_unit, zlm.zoho_location_id, zlm.zoho_location_name, ls.stock_on_hand
     `, suggestParams);
 
-    // Preload brand configs for fast lookup
-    const [brandCfgs] = await pool.query(`SELECT brand_name, lead_time_days, safety_days FROM brand_reorder_config WHERE is_active = 1`);
-    const brandMap = new Map(brandCfgs.map(b => [b.brand_name, b]));
-    const defCfg = brandMap.get('__default__') || { lead_time_days: 7, safety_days: 5 };
-
-    // Additional stock rows for other-branches lookup (may include items not yet in alerts)
+    // --- Build combined item list so we fetch stocks + velocity in one go ---
     const allItemIds = [...new Set([...alerts.map(a => a.zoho_item_id), ...suggestRows.map(s => s.zoho_item_id)])];
-    let allStocks = stocks;
-    if (allItemIds.length > itemIds.length && allItemIds.length > 0) {
-        const [extraStocks] = await pool.query(`
+
+    let allStocks = [];
+    if (allItemIds.length > 0) {
+        const [stockRows] = await pool.query(`
             SELECT ls.zoho_item_id, zlm.local_branch_id, zlm.zoho_location_name AS location_name,
                    ls.stock_on_hand
             FROM zoho_location_stock ls
             JOIN zoho_locations_map zlm ON zlm.zoho_location_id = ls.zoho_location_id AND zlm.is_active = 1
             WHERE ls.zoho_item_id IN (?) AND ls.stock_on_hand > 0
         `, [allItemIds]);
-        allStocks = extraStocks;
+        allStocks = stockRows;
     }
 
-    // Velocity map: 60-day sales per (item × branch), used to attach avg/day to other-branches chips
+    // Velocity map: per-day avg within the selected windowDays
     const velocityMap = new Map();  // key: `${itemId}|${branchId}` → avgPerDay
     if (allItemIds.length > 0) {
         const [velRows] = await pool.query(`
             SELECT zoho_item_id, local_branch_id, SUM(qty_sold) AS total_qty
             FROM branch_item_sales
             WHERE zoho_item_id IN (?)
-              AND sale_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+              AND sale_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
             GROUP BY zoho_item_id, local_branch_id
-        `, [allItemIds]);
+        `, [allItemIds, windowDays]);
         for (const v of velRows) {
-            velocityMap.set(`${v.zoho_item_id}|${v.local_branch_id}`, Number(v.total_qty) / 60);
+            velocityMap.set(`${v.zoho_item_id}|${v.local_branch_id}`, Number(v.total_qty) / windowDays);
         }
     }
     const attachVelocity = (itemId, branches) => branches.map(b => ({
@@ -196,11 +149,48 @@ async function assembleReport({ branchId = null, date = null } = {}) {
         avg_daily_sales: velocityMap.get(`${itemId}|${b.branch_id}`) || 0
     }));
 
+    // --- Build alert rows using velocityMap (falls back to rc.avg_daily_sales if no sales in window) ---
+    const rows = alerts.map(a => {
+        const suggestedQty = Math.max(
+            0,
+            Number(a.reorder_level || 0) + Number(a.reorder_quantity || 0) - Number(a.current_stock)
+        );
+
+        const otherBranchesMap = buildOtherBranchesMap(allStocks, a.branch_id);
+        const otherBranches = otherBranchesMap.get(a.zoho_item_id) || [];
+
+        const windowAvg = velocityMap.get(`${a.zoho_item_id}|${a.branch_id}`);
+        const avg = windowAvg != null ? windowAvg : Number(a.avg_daily_sales || 0);
+        const daysToStockout = avg > 0 ? Math.floor(Number(a.current_stock) / avg) : null;
+
+        return {
+            zoho_item_id: a.zoho_item_id,
+            item_name: a.item_name,
+            sku: a.sku,
+            brand: a.brand,
+            unit: a.unit,
+            branch_id: a.branch_id,
+            branch_name: a.branch_name,
+            current_stock: Number(a.current_stock),
+            reorder_level: Number(a.reorder_level || 0),
+            severity: a.severity,
+            avg_daily_sales: avg,
+            days_to_stockout: daysToStockout,
+            suggested_order_qty: suggestedQty,
+            other_branches: otherBranches
+        };
+    });
+
+    // Preload brand configs for suggested rows
+    const [brandCfgs] = await pool.query(`SELECT brand_name, lead_time_days, safety_days FROM brand_reorder_config WHERE is_active = 1`);
+    const brandMap = new Map(brandCfgs.map(b => [b.brand_name, b]));
+    const defCfg = brandMap.get('__default__') || { lead_time_days: 7, safety_days: 5 };
+
     const suggestedRows = [];
     for (const s of suggestRows) {
         const key = `${s.branch_id}|${s.zoho_item_id}`;
         if (existingKeys.has(key)) continue;  // already covered by alerts
-        const avg = Number(s.total_qty) / 60;
+        const avg = Number(s.total_qty) / windowDays;
         if (avg <= 0) continue;
         const cfg = brandMap.get(s.brand) || defCfg;
         const suggestedLevel = computeSuggestedLevel(avg, cfg.lead_time_days, cfg.safety_days);
@@ -242,6 +232,7 @@ async function assembleReport({ branchId = null, date = null } = {}) {
     return {
         report_date: reportDate,
         scope: branchId != null ? `branch:${branchId}` : 'consolidated',
+        window_days: windowDays,
         rows: sortReportRows(allRows)
     };
 }
@@ -422,3 +413,139 @@ async function runDailyReport({ force = false } = {}) {
 module.exports.deliverReport = deliverReport;
 module.exports.runDailyReport = runDailyReport;
 module.exports.getRecipientsForScope = getRecipientsForScope;
+
+// ========================================
+// MANUAL SEND (Daily Report "Send to WhatsApp Now")
+// ========================================
+
+const PERIOD_LABELS = {
+    1: 'Day',
+    7: 'Week',
+    14: '2 Weeks',
+    30: 'Month',
+    90: '3 Months',
+    180: '6 Months'
+};
+function periodLabel(windowDays) {
+    return PERIOD_LABELS[windowDays] || `${windowDays}d`;
+}
+
+function applyFilters(rows, { minAvgPerDay = 0, search = '', sortMode = 'severity' } = {}) {
+    let out = rows;
+    if (minAvgPerDay > 0) {
+        out = out.filter(r => (r.avg_daily_sales || 0) >= minAvgPerDay);
+    }
+    if (search && search.trim()) {
+        const q = search.trim().toLowerCase();
+        out = out.filter(r =>
+            (r.item_name || '').toLowerCase().includes(q) ||
+            (r.sku || '').toLowerCase().includes(q) ||
+            (r.brand || '').toLowerCase().includes(q)
+        );
+    }
+    if (sortMode === 'avg_desc') {
+        out = [...out].sort((a, b) => (b.avg_daily_sales || 0) - (a.avg_daily_sales || 0));
+    } else if (sortMode === 'avg_asc') {
+        out = [...out].sort((a, b) => (a.avg_daily_sales || 0) - (b.avg_daily_sales || 0));
+    } else if (sortMode === 'days_asc') {
+        out = [...out].sort((a, b) => {
+            const ad = a.days_to_stockout == null ? Infinity : a.days_to_stockout;
+            const bd = b.days_to_stockout == null ? Infinity : b.days_to_stockout;
+            return ad - bd;
+        });
+    } else if (sortMode === 'order_desc') {
+        out = [...out].sort((a, b) => (b.suggested_order_qty || 0) - (a.suggested_order_qty || 0));
+    }
+    return out;
+}
+
+/**
+ * Send an on-demand reorder report via WhatsApp to explicit recipients,
+ * honouring the same filters the user has applied in the UI.
+ * @param {Object} opts - { branchId, windowDays, minAvgPerDay, search, sortMode, userIds, triggeredBy }
+ * @returns {Object} { sent, skipped, totalRecipients, rows, scope, pdfPath }
+ */
+async function sendReportNow({
+    branchId = null, windowDays = 60,
+    minAvgPerDay = 0, search = '', sortMode = 'severity',
+    userIds = null, triggeredBy = null
+} = {}) {
+    const report = await assembleReport({ branchId, windowDays });
+    report.rows = applyFilters(report.rows, { minAvgPerDay, search, sortMode });
+
+    // Resolve recipients: explicit userIds or admin config fallback
+    let ids = Array.isArray(userIds) ? userIds.filter(Number.isFinite) : [];
+    if (ids.length === 0) {
+        const cfg = await getConfigMap(['reorder_report_recipients']);
+        try { ids = JSON.parse(cfg.reorder_report_recipients || '[]'); } catch { ids = []; }
+        if (!Array.isArray(ids)) ids = [];
+    }
+    if (ids.length === 0) {
+        return { sent: 0, skipped: 'no_recipients_configured', rows: report.rows.length, scope: report.scope };
+    }
+
+    const [users] = await pool.query(
+        `SELECT id AS user_id, full_name, phone FROM users WHERE id IN (?) AND status = 'active'`,
+        [ids]
+    );
+
+    // Generate PDF with unique timestamped name so manual runs don't overwrite cron artefact
+    const uploadsDir = path.join(__dirname, '..', 'uploads', 'reorder-reports');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    const safeScope = report.scope.replace(':', '-');
+    const ts = Date.now();
+    const pdfPath = path.join(uploadsDir, `reorder-${report.report_date}-${safeScope}-manual-${ts}.pdf`);
+
+    let pdfOk = false;
+    if (report.rows.length > 0) {
+        try {
+            const { generateReorderPdf } = require('./reorder-report-pdf-generator');
+            await generateReorderPdf(report, pdfPath);
+            pdfOk = true;
+        } catch (e) {
+            console.error('[SendReportNow][PDF]', e.message);
+        }
+    }
+
+    const waManager = require('./whatsapp-session-manager');
+    const criticalCount = report.rows.filter(r => r.severity === 'critical').length;
+    const header = `📋 Reorder Report (manual) — ${report.report_date}\nScope: ${report.scope}\nPeriod: ${periodLabel(windowDays)}`;
+    const summary = report.rows.length === 0
+        ? `${header}\n\n✅ No items match the current filters.`
+        : `${header}\n\n⚠️ ${report.rows.length} items need reorder (${criticalCount} critical)`;
+
+    let sent = 0;
+    const errors = [];
+    for (const u of users) {
+        if (!u.phone) continue;
+        try {
+            await waManager.sendMessage(0, u.phone, summary, { source: 'manual_reorder_report', sent_by: triggeredBy });
+            if (pdfOk) {
+                await waManager.sendMedia(0, u.phone, {
+                    type: 'document',
+                    mediaPath: pdfPath,
+                    filename: path.basename(pdfPath),
+                    caption: `Reorder Report — ${report.scope} (${periodLabel(windowDays)})`
+                }, { source: 'manual_reorder_report', sent_by: triggeredBy });
+            }
+            sent++;
+        } catch (e) {
+            errors.push({ phone: u.phone, error: e.message });
+            console.error('[SendReportNow][WA]', u.phone, e.message);
+        }
+    }
+
+    return {
+        sent,
+        totalRecipients: users.length,
+        rows: report.rows.length,
+        scope: report.scope,
+        period: periodLabel(windowDays),
+        pdfPath: pdfOk ? pdfPath : null,
+        errors: errors.length ? errors : undefined
+    };
+}
+
+module.exports.sendReportNow = sendReportNow;
+module.exports.periodLabel = periodLabel;
+module.exports.applyFilters = applyFilters;

@@ -3385,7 +3385,8 @@ router.get('/reorder/report', requirePermission('zoho', 'reorder'), branchScope,
             ? req.branchScope.branchId
             : (req.query.branch_id ? parseInt(req.query.branch_id, 10) : null);
         const date = req.query.date || null;
-        const report = await reorderReport.assembleReport({ branchId, date });
+        const windowDays = parseInt(req.query.window_days, 10) || 60;
+        const report = await reorderReport.assembleReport({ branchId, date, windowDays });
         res.json({ success: true, data: report });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
@@ -3406,7 +3407,14 @@ const pdfTokenShim = (req, res, next) => {
 router.get('/reorder/report/pdf', pdfTokenShim, requirePermission('zoho', 'reorder'), async (req, res) => {
     try {
         const branchId = req.query.branch_id ? parseInt(req.query.branch_id, 10) : null;
-        const report = await reorderReport.assembleReport({ branchId });
+        const windowDays = parseInt(req.query.window_days, 10) || 60;
+        const minAvgPerDay = parseFloat(req.query.min_avg_per_day) || 0;
+        const search = req.query.search || '';
+        const sortMode = req.query.sort || 'severity';
+
+        const report = await reorderReport.assembleReport({ branchId, windowDays });
+        report.rows = reorderReport.applyFilters(report.rows, { minAvgPerDay, search, sortMode });
+
         const uploadsDir = pathMod.join(__dirname, '..', 'uploads', 'reorder-reports');
         if (!fsMod.existsSync(uploadsDir)) fsMod.mkdirSync(uploadsDir, { recursive: true });
         const safeScope = report.scope.replace(':', '-');
@@ -3416,6 +3424,33 @@ router.get('/reorder/report/pdf', pdfTokenShim, requirePermission('zoho', 'reord
         res.download(pdfPath);
     } catch (e) {
         console.error('[ReportPDF]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /api/zoho/reorder/report/send-whatsapp - Send current filtered report via WhatsApp now
+ * Body: { branch_id?, window_days?, min_avg_per_day?, search?, sort?, user_ids? }
+ */
+router.post('/reorder/report/send-whatsapp', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const branchId = req.body.branch_id != null && req.body.branch_id !== ''
+            ? parseInt(req.body.branch_id, 10) : null;
+        const windowDays = parseInt(req.body.window_days, 10) || 60;
+        const minAvgPerDay = parseFloat(req.body.min_avg_per_day) || 0;
+        const search = req.body.search || '';
+        const sortMode = req.body.sort || 'severity';
+        const userIds = Array.isArray(req.body.user_ids)
+            ? req.body.user_ids.map(x => parseInt(x, 10)).filter(Number.isFinite)
+            : null;
+
+        const result = await reorderReport.sendReportNow({
+            branchId, windowDays, minAvgPerDay, search, sortMode,
+            userIds, triggeredBy: req.user.id
+        });
+        res.json({ success: true, data: result });
+    } catch (e) {
+        console.error('[SendReportNow]', e);
         res.status(500).json({ success: false, message: e.message });
     }
 });
@@ -3640,7 +3675,8 @@ router.get('/purchase-suggestions/batch/:batchId', requirePermission('zoho', 'vi
 router.get('/reorder/sales-analysis', requirePermission('zoho', 'reorder'), async (req, res) => {
     try {
         const { branch_id, brand, category, from, to } = req.query;
-        const days = 60;
+        const rawDays = parseInt(req.query.window_days, 10);
+        const days = Number.isFinite(rawDays) ? Math.max(1, Math.min(365, rawDays)) : 60;
         let where = `WHERE bis.sale_date >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)`;
         const params = [];
         if (branch_id) { where += ` AND bis.local_branch_id = ?`; params.push(parseInt(branch_id, 10)); }
@@ -3670,7 +3706,7 @@ router.get('/reorder/sales-analysis', requirePermission('zoho', 'reorder'), asyn
             LIMIT 2000
         `, params);
 
-        res.json({ success: true, data: rows });
+        res.json({ success: true, data: rows, window_days: days });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }

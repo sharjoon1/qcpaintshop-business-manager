@@ -560,7 +560,19 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-600 mb-1" title="Hide slow-movers below this daily velocity">Min avg/day</label>
+                    <label class="block text-xs text-gray-600 mb-1" title="Period for sales velocity (both lookback window and display unit)">Period</label>
+                    <select id="reportPeriod" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="1">Day</option>
+                        <option value="7">Week</option>
+                        <option value="14">2 Weeks</option>
+                        <option value="30">Month</option>
+                        <option value="60" selected>2 Months</option>
+                        <option value="90">3 Months</option>
+                        <option value="180">6 Months</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1" id="reportMinAvgLabel" title="Hide slow-movers below this velocity (per selected period)">Min avg/2mo</label>
                     <input type="number" step="0.1" min="0" id="reportMinAvg" value="0" class="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
                 <div class="flex-1 min-w-[160px]">
@@ -571,14 +583,15 @@
                     <label class="block text-xs text-gray-600 mb-1">Sort by</label>
                     <select id="reportSort" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                         <option value="severity">Severity (default)</option>
-                        <option value="avg_desc">Avg/day (high → low)</option>
-                        <option value="avg_asc">Avg/day (low → high)</option>
+                        <option value="avg_desc">Avg (high → low)</option>
+                        <option value="avg_asc">Avg (low → high)</option>
                         <option value="days_asc">Days left (soonest)</option>
                         <option value="order_desc">Order qty (high → low)</option>
                     </select>
                 </div>
                 <button onclick="loadReport()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
                 <button onclick="downloadReportPdf()" class="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Download PDF</button>
+                <button onclick="openSendWhatsAppModal()" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition">Send WhatsApp</button>
                 <button onclick="rerunReport()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg transition">Re-run</button>
             </div>
             <div id="reportSummary" class="text-sm text-gray-700 mb-4"></div>
@@ -604,6 +617,18 @@
                     <label class="block text-xs text-gray-600 mb-1">Brand</label>
                     <input type="text" id="saBrand" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Asian Paints">
                 </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Period</label>
+                    <select id="saPeriod" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="1">Day</option>
+                        <option value="7">Week</option>
+                        <option value="14">2 Weeks</option>
+                        <option value="30">Month</option>
+                        <option value="60" selected>2 Months</option>
+                        <option value="90">3 Months</option>
+                        <option value="180">6 Months</option>
+                    </select>
+                </div>
                 <button onclick="loadSalesAnalysis()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Load</button>
                 <button onclick="exportSalesAnalysisCsv()" class="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Export CSV</button>
             </div>
@@ -614,8 +639,8 @@
                             <th class="px-2 py-2 text-left font-semibold text-gray-600">Item</th>
                             <th class="px-2 py-2 text-left font-semibold text-gray-600">Branch</th>
                             <th class="px-2 py-2 text-left font-semibold text-gray-600">Brand</th>
-                            <th class="px-2 py-2 text-right font-semibold text-gray-600">60d qty</th>
-                            <th class="px-2 py-2 text-right font-semibold text-gray-600">Avg/day</th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600" id="saQtyHeader">Period qty</th>
+                            <th class="px-2 py-2 text-right font-semibold text-gray-600" id="saAvgHeader">Avg/period</th>
                             <th class="px-2 py-2 text-right font-semibold text-gray-600">Stock</th>
                             <th class="px-2 py-2 text-right font-semibold text-gray-600">Days left</th>
                             <th class="px-2 py-2 text-right font-semibold text-gray-600">Reorder @</th>
@@ -629,6 +654,33 @@
         </div>
     </div>
 
+</div>
+
+<!-- Send WhatsApp Modal -->
+<div id="sendWaModal" class="modal-overlay hidden" onclick="closeSendWaModalOverlay(event)">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full" onclick="event.stopPropagation()">
+        <div class="border-b px-6 py-4 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800">Send Report to WhatsApp</h3>
+            <button onclick="closeSendWaModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-6">
+            <p class="text-sm text-gray-600 mb-3">
+                This will send the <b>currently filtered view</b> (period, branch, min avg, search, sort) as a WhatsApp message + PDF to the selected recipients.
+            </p>
+            <div id="sendWaSummary" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-700 mb-3"></div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Recipients</label>
+            <div id="sendWaRecipients" class="space-y-1 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                <div class="text-xs text-gray-400">Loading recipients…</div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+                Defaults from <code>reorder_report_recipients</code> config. Uncheck anyone you want to skip.
+            </p>
+        </div>
+        <div class="border-t px-6 py-4 flex justify-end gap-3">
+            <button onclick="closeSendWaModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
+            <button id="sendWaConfirmBtn" onclick="sendWhatsAppReport()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition">Send now</button>
+        </div>
+    </div>
 </div>
 
 <!-- Resolve Alert Modal -->
@@ -1918,6 +1970,20 @@
         }
     }
 
+    // Period helpers shared across Daily Report + Sales Analysis
+    var PERIOD_LABELS = { 1: 'Day', 7: 'Week', 14: '2 Weeks', 30: 'Month', 60: '2 Months', 90: '3 Months', 180: '6 Months' };
+    var PERIOD_SHORT  = { 1: 'day', 7: 'wk',   14: '2wk',      30: 'mo',    60: '2mo',      90: '3mo',      180: '6mo' };
+    function periodLabel(d) { return PERIOD_LABELS[d] || (d + 'd'); }
+    function periodShort(d) { return PERIOD_SHORT[d]  || (d + 'd'); }
+    function getReportWindowDays() {
+        var el = document.getElementById('reportPeriod');
+        return el ? (parseInt(el.value, 10) || 60) : 60;
+    }
+    function getSalesAnalysisWindowDays() {
+        var el = document.getElementById('saPeriod');
+        return el ? (parseInt(el.value, 10) || 60) : 60;
+    }
+
     var lastReportData = null;
     async function loadReport() {
         var bodyEl = document.getElementById('reportBody');
@@ -1926,9 +1992,14 @@
         try {
             var date = document.getElementById('reportDate').value;
             var branchId = document.getElementById('reportBranch').value;
+            var windowDays = getReportWindowDays();
+            // Refresh "Min avg/<period>" label
+            var minAvgLabelEl = document.getElementById('reportMinAvgLabel');
+            if (minAvgLabelEl) minAvgLabelEl.textContent = 'Min avg/' + periodShort(windowDays);
             var qs = new URLSearchParams();
             if (date) qs.set('date', date);
             if (branchId) qs.set('branch_id', branchId);
+            qs.set('window_days', String(windowDays));
             var res = await fetch('/api/zoho/reorder/report?' + qs.toString(), { headers: getAuthHeaders() });
             var json = await res.json();
             if (!json.success) {
@@ -1944,11 +2015,15 @@
 
     function renderReport(r) {
         var rows = r.rows || [];
-        // Apply client-side min avg/day filter
+        var windowDays = r.window_days || getReportWindowDays();
+        var pShort = periodShort(windowDays);
+        // Apply client-side min avg filter — the input is in per-period units,
+        // but row.avg_daily_sales is per-day, so we convert threshold.
         var minAvgEl = document.getElementById('reportMinAvg');
-        var minAvg = minAvgEl ? (parseFloat(minAvgEl.value) || 0) : 0;
-        if (minAvg > 0) {
-            rows = rows.filter(function(row) { return (row.avg_daily_sales || 0) >= minAvg; });
+        var minAvgPerPeriod = minAvgEl ? (parseFloat(minAvgEl.value) || 0) : 0;
+        var minAvgPerDay = minAvgPerPeriod > 0 ? (minAvgPerPeriod / windowDays) : 0;
+        if (minAvgPerDay > 0) {
+            rows = rows.filter(function(row) { return (row.avg_daily_sales || 0) >= minAvgPerDay; });
         }
         // Apply client-side search on item name / SKU / brand
         var searchEl = document.getElementById('reportSearch');
@@ -2010,7 +2085,7 @@
             '<th class="px-2 py-2 text-left font-semibold text-gray-600">Branch</th>' +
             '<th class="px-2 py-2 text-right font-semibold text-gray-600">Stock</th>' +
             '<th class="px-2 py-2 text-right font-semibold text-gray-600">Reorder @</th>' +
-            '<th class="px-2 py-2 text-right font-semibold text-gray-600">Avg/day</th>' +
+            '<th class="px-2 py-2 text-right font-semibold text-gray-600">Avg/' + escapeHtml(pShort) + '</th>' +
             '<th class="px-2 py-2 text-right font-semibold text-gray-600">Days left</th>' +
             '<th class="px-2 py-2 text-right font-semibold text-gray-600">Order Qty</th>' +
             '<th class="px-2 py-2 text-left font-semibold text-gray-600">Other branches</th>' +
@@ -2018,11 +2093,13 @@
             rows.map(function(row) {
                 var daysLeft = row.days_to_stockout != null ? row.days_to_stockout : '∞';
                 var daysClass = (row.days_to_stockout != null && row.days_to_stockout <= 3) ? 'text-red-600 font-semibold' : '';
+                var avgPeriod = (Number(row.avg_daily_sales) || 0) * windowDays;
                 var otherBranches = (row.other_branches || []).length === 0
                     ? '<span class="text-gray-400">—</span>'
                     : (row.other_branches || []).slice(0, 5).map(function(o) {
-                        var avgStr = (o.avg_daily_sales != null && o.avg_daily_sales > 0)
-                            ? ' <span class="text-gray-500">(' + Number(o.avg_daily_sales).toFixed(2) + '/d)</span>'
+                        var oAvg = (Number(o.avg_daily_sales) || 0) * windowDays;
+                        var avgStr = (oAvg > 0)
+                            ? ' <span class="text-gray-500">(' + oAvg.toFixed(2) + '/' + escapeHtml(pShort) + ')</span>'
                             : '';
                         return '<span class="inline-block bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded text-xs mr-1 mb-0.5">' +
                             escapeHtml(o.branch_name || '') + ': ' + o.stock_on_hand + avgStr + '</span>';
@@ -2034,7 +2111,7 @@
                     '<td class="px-2 py-2 text-gray-700">' + escapeHtml(row.branch_name || '') + '</td>' +
                     '<td class="px-2 py-2 text-right tabular-nums">' + (row.current_stock != null ? row.current_stock : '—') + '</td>' +
                     '<td class="px-2 py-2 text-right tabular-nums">' + (row.reorder_level != null ? row.reorder_level : '—') + '</td>' +
-                    '<td class="px-2 py-2 text-right tabular-nums text-gray-500">' + (row.avg_daily_sales != null ? Number(row.avg_daily_sales).toFixed(2) : '—') + '</td>' +
+                    '<td class="px-2 py-2 text-right tabular-nums text-gray-500">' + (row.avg_daily_sales != null ? avgPeriod.toFixed(2) : '—') + '</td>' +
                     '<td class="px-2 py-2 text-right tabular-nums ' + daysClass + '">' + daysLeft + '</td>' +
                     '<td class="px-2 py-2 text-right tabular-nums font-semibold text-indigo-700">' + (row.suggested_order_qty != null ? row.suggested_order_qty : '—') + '</td>' +
                     '<td class="px-2 py-2">' + otherBranches + '</td>' +
@@ -2047,11 +2124,13 @@
             rows.map(function(row) {
                 var daysLeft = row.days_to_stockout != null ? row.days_to_stockout : '∞';
                 var daysClass = (row.days_to_stockout != null && row.days_to_stockout <= 3) ? 'text-red-600 font-semibold' : 'text-gray-700';
+                var avgPeriod = (Number(row.avg_daily_sales) || 0) * windowDays;
                 var otherChips = (row.other_branches || []).length === 0 ? '' :
                     '<div class="mt-2 flex flex-wrap gap-1">' +
                     (row.other_branches || []).slice(0, 5).map(function(o) {
-                        var avgStr = (o.avg_daily_sales != null && o.avg_daily_sales > 0)
-                            ? ' <span class="text-gray-500">(' + Number(o.avg_daily_sales).toFixed(2) + '/d)</span>'
+                        var oAvg = (Number(o.avg_daily_sales) || 0) * windowDays;
+                        var avgStr = (oAvg > 0)
+                            ? ' <span class="text-gray-500">(' + oAvg.toFixed(2) + '/' + escapeHtml(pShort) + ')</span>'
                             : '';
                         return '<span class="inline-block bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded text-xs">' +
                             escapeHtml(o.branch_name || '') + ': ' + o.stock_on_hand + avgStr + '</span>';
@@ -2060,7 +2139,7 @@
                     '<div class="flex items-start justify-between gap-2 mb-2">' +
                     '<div class="flex-1 min-w-0">' +
                     '<div class="font-medium text-sm text-gray-800 break-words">' + escapeHtml(row.item_name || '') + '</div>' +
-                    '<div class="text-xs text-gray-400 break-words">' + escapeHtml(row.sku || '') + (row.brand ? ' · ' + escapeHtml(row.brand) : '') + ' · ' + escapeHtml(row.branch_name || '') + ' · <span class="text-gray-500">avg ' + (row.avg_daily_sales != null ? Number(row.avg_daily_sales).toFixed(2) : '—') + '/day</span></div>' +
+                    '<div class="text-xs text-gray-400 break-words">' + escapeHtml(row.sku || '') + (row.brand ? ' · ' + escapeHtml(row.brand) : '') + ' · ' + escapeHtml(row.branch_name || '') + ' · <span class="text-gray-500">avg ' + (row.avg_daily_sales != null ? avgPeriod.toFixed(2) : '—') + '/' + escapeHtml(pShort) + '</span></div>' +
                     '</div>' +
                     '<span class="badge-severity ' + severityClass(row.severity) + ' rounded px-2 py-0.5 text-xs flex-shrink-0">' + escapeHtml(row.severity || '') + '</span>' +
                     '</div>' +
@@ -2080,14 +2159,118 @@
     function downloadReportPdf() {
         var date = document.getElementById('reportDate').value;
         var branchId = document.getElementById('reportBranch').value;
+        var windowDays = getReportWindowDays();
+        var minAvgPerPeriod = parseFloat(document.getElementById('reportMinAvg').value) || 0;
+        var search = (document.getElementById('reportSearch').value || '').trim();
+        var sortMode = document.getElementById('reportSort').value || 'severity';
         var token = localStorage.getItem('auth_token');
         var qs = new URLSearchParams();
         if (date) qs.set('date', date);
         if (branchId) qs.set('branch_id', branchId);
+        qs.set('window_days', String(windowDays));
+        if (minAvgPerPeriod > 0) qs.set('min_avg_per_day', String(minAvgPerPeriod / windowDays));
+        if (search) qs.set('search', search);
+        if (sortMode) qs.set('sort', sortMode);
         qs.set('token', token);
         // Direct-link download — WebView friendly. Server validates token from query param.
         var url = '/api/zoho/reorder/report/pdf?' + qs.toString();
         window.location.href = url;
+    }
+
+    // ============================
+    // SEND TO WHATSAPP (on-demand)
+    // ============================
+    async function openSendWhatsAppModal() {
+        // Populate summary
+        var branchId = document.getElementById('reportBranch').value;
+        var branchLabel = branchId
+            ? (document.getElementById('reportBranch').selectedOptions[0]?.textContent || 'Branch ' + branchId)
+            : 'Consolidated';
+        var windowDays = getReportWindowDays();
+        var minAvg = parseFloat(document.getElementById('reportMinAvg').value) || 0;
+        var search = (document.getElementById('reportSearch').value || '').trim();
+        var sortMode = document.getElementById('reportSort').value || 'severity';
+        document.getElementById('sendWaSummary').innerHTML =
+            '<div><b>Scope:</b> ' + escapeHtml(branchLabel) + '</div>' +
+            '<div><b>Period:</b> ' + escapeHtml(periodLabel(windowDays)) + '</div>' +
+            (minAvg > 0 ? '<div><b>Min avg/' + escapeHtml(periodShort(windowDays)) + ':</b> ' + minAvg + '</div>' : '') +
+            (search ? '<div><b>Search:</b> ' + escapeHtml(search) + '</div>' : '') +
+            '<div><b>Sort:</b> ' + escapeHtml(sortMode) + '</div>';
+
+        // Load recipients: all active admin/super_admin users with a phone
+        var recDiv = document.getElementById('sendWaRecipients');
+        recDiv.innerHTML = '<div class="text-xs text-gray-400">Loading recipients…</div>';
+        try {
+            var res = await fetch('/api/users?status=active', { headers: getAuthHeaders() });
+            var json = await res.json();
+            var list = Array.isArray(json) ? json : (json.data || json.users || []);
+            var admins = list.filter(function(u) {
+                return (u.role === 'admin' || u.role === 'super_admin') && u.phone;
+            });
+            if (!admins.length) {
+                recDiv.innerHTML = '<div class="text-xs text-red-500">No admin users with phone numbers found.</div>';
+            } else {
+                recDiv.innerHTML = admins.map(function(u) {
+                    return '<label class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">' +
+                        '<input type="checkbox" class="wa-recipient" value="' + u.id + '" checked>' +
+                        '<span>' + escapeHtml(u.full_name || u.username || ('User #' + u.id)) + '</span>' +
+                        '<span class="text-xs text-gray-400">' + escapeHtml(u.phone) + '</span>' +
+                        '</label>';
+                }).join('');
+            }
+        } catch (e) {
+            recDiv.innerHTML = '<div class="text-xs text-red-500">' + escapeHtml(e.message) + '</div>';
+        }
+
+        document.getElementById('sendWaModal').classList.remove('hidden');
+    }
+    function closeSendWaModal() { document.getElementById('sendWaModal').classList.add('hidden'); }
+    function closeSendWaModalOverlay(ev) { if (ev.target.id === 'sendWaModal') closeSendWaModal(); }
+
+    async function sendWhatsAppReport() {
+        var btn = document.getElementById('sendWaConfirmBtn');
+        btn.disabled = true;
+        btn.textContent = 'Sending…';
+        try {
+            var branchId = document.getElementById('reportBranch').value;
+            var windowDays = getReportWindowDays();
+            var minAvgPerPeriod = parseFloat(document.getElementById('reportMinAvg').value) || 0;
+            var search = (document.getElementById('reportSearch').value || '').trim();
+            var sortMode = document.getElementById('reportSort').value || 'severity';
+            var userIds = [].slice.call(document.querySelectorAll('.wa-recipient:checked'))
+                .map(function(el) { return parseInt(el.value, 10); })
+                .filter(function(n) { return Number.isFinite(n); });
+            if (userIds.length === 0) {
+                showToast('Select at least one recipient', 'error');
+                btn.disabled = false; btn.textContent = 'Send now';
+                return;
+            }
+            var body = {
+                branch_id: branchId || null,
+                window_days: windowDays,
+                min_avg_per_day: minAvgPerPeriod > 0 ? (minAvgPerPeriod / windowDays) : 0,
+                search: search,
+                sort: sortMode,
+                user_ids: userIds
+            };
+            var res = await fetch('/api/zoho/reorder/report/send-whatsapp', {
+                method: 'POST',
+                headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+                body: JSON.stringify(body)
+            });
+            var json = await res.json();
+            if (json.success) {
+                var d = json.data || {};
+                showToast('Sent to ' + (d.sent || 0) + '/' + (d.totalRecipients || 0) + ' recipient(s). ' + (d.rows || 0) + ' items.', 'success');
+                closeSendWaModal();
+            } else {
+                showToast(json.message || 'Send failed', 'error');
+            }
+        } catch (e) {
+            showToast('Send failed: ' + e.message, 'error');
+        }
+        btn.disabled = false;
+        btn.textContent = 'Send now';
     }
 
     async function rerunReport() {
@@ -2129,33 +2312,41 @@
         } catch (e) { console.error('loadSalesAnalysisBranches error:', e); }
     }
 
+    let saWindowDays = 60;
     async function loadSalesAnalysis() {
         const body = document.getElementById('saBody');
         body.innerHTML = '<tr><td colspan="8" class="text-center text-gray-400 py-6">Loading...</td></tr>';
         try {
             const branch = document.getElementById('saBranch').value;
             const brand = document.getElementById('saBrand').value.trim();
+            const windowDays = getSalesAnalysisWindowDays();
+            saWindowDays = windowDays;
             const qs = new URLSearchParams();
             if (branch) qs.set('branch_id', branch);
             if (brand) qs.set('brand', brand);
+            qs.set('window_days', String(windowDays));
             const res = await fetch('/api/zoho/reorder/sales-analysis?' + qs.toString(), { headers: getAuthHeaders() });
             const json = await res.json();
             if (!json.success) { alert(json.message); return; }
             saRows = json.data;
+            const pShort = periodShort(windowDays);
+            document.getElementById('saQtyHeader').textContent = 'Qty/' + pShort;
+            document.getElementById('saAvgHeader').textContent = 'Avg/' + pShort;
             if (saRows.length === 0) {
                 body.innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-4">No sales data</td></tr>';
                 return;
             }
             body.innerHTML = saRows.map(r => {
-                const avg = Number(r.avg_daily_sales) || 0;
-                const daysLeft = avg > 0 ? Math.floor(Number(r.current_stock) / avg) : '&#8734;';
+                const avgPerDay = Number(r.avg_daily_sales) || 0;
+                const avgPerPeriod = avgPerDay * windowDays;
+                const daysLeft = avgPerDay > 0 ? Math.floor(Number(r.current_stock) / avgPerDay) : '&#8734;';
                 return '<tr class="border-b hover:bg-gray-50">' +
                     '<td class="px-2 py-1.5"><div class="font-medium text-gray-800">' + escapeHtml(r.item_name || '') + '</div>' +
                     '<div class="text-xs text-gray-400">' + escapeHtml(r.sku || '') + '</div></td>' +
                     '<td class="px-2 py-1.5 text-gray-700">' + escapeHtml(r.branch_name || '') + '</td>' +
                     '<td class="px-2 py-1.5 text-gray-700">' + escapeHtml(r.brand || '') + '</td>' +
                     '<td class="px-2 py-1.5 text-right font-semibold">' + r.total_qty + '</td>' +
-                    '<td class="px-2 py-1.5 text-right">' + avg.toFixed(2) + '</td>' +
+                    '<td class="px-2 py-1.5 text-right">' + avgPerPeriod.toFixed(2) + '</td>' +
                     '<td class="px-2 py-1.5 text-right">' + r.current_stock + '</td>' +
                     '<td class="px-2 py-1.5 text-right">' + daysLeft + '</td>' +
                     '<td class="px-2 py-1.5 text-right">' + (r.reorder_level != null ? r.reorder_level : '&mdash;') + '</td>' +
@@ -2169,13 +2360,15 @@
 
     function exportSalesAnalysisCsv() {
         if (saRows.length === 0) { alert('No data to export'); return; }
-        const headers = ['item', 'sku', 'branch', 'brand', 'qty_60d', 'avg_daily', 'stock', 'reorder_level'];
+        const pShort = periodShort(saWindowDays);
+        const headers = ['item', 'sku', 'branch', 'brand', 'qty_' + pShort, 'avg_per_' + pShort, 'stock', 'reorder_level'];
         const quote = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
         const lines = [headers.join(',')];
         for (const r of saRows) {
+            const avgPerPeriod = (Number(r.avg_daily_sales) || 0) * saWindowDays;
             lines.push([
                 quote(r.item_name), quote(r.sku), quote(r.branch_name), quote(r.brand),
-                r.total_qty, r.avg_daily_sales, r.current_stock, r.reorder_level || ''
+                r.total_qty, avgPerPeriod.toFixed(3), r.current_stock, r.reorder_level || ''
             ].join(','));
         }
         const blob = new Blob([lines.join('\n')], { type: 'text/csv' });

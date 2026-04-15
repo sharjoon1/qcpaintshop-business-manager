@@ -39,8 +39,12 @@ async function generateReorderPdf(report, outPath) {
     doc.fillColor(COLORS.primary).fontSize(20).text('Reorder Report', { align: 'left' });
     doc.fillColor(COLORS.gold).fontSize(11).text('Quality Colours - Stock Replenishment Alert');
     doc.moveDown(0.5);
+    const windowDays = report.window_days || 60;
+    const PERIOD_LABELS = { 1: 'Day', 7: 'Week', 14: '2 Weeks', 30: 'Month', 90: '3 Months', 180: '6 Months' };
+    const periodLabel = PERIOD_LABELS[windowDays] || `${windowDays}d`;
+    const periodShort = { 1: 'd', 7: 'wk', 14: '2wk', 30: 'mo', 90: '3mo', 180: '6mo' }[windowDays] || 'd';
     doc.fillColor(COLORS.text).fontSize(9).text(
-        `Report date: ${report.report_date}   Scope: ${report.scope}   Items: ${report.rows.length}`
+        `Report date: ${report.report_date}   Scope: ${report.scope}   Period: ${periodLabel}   Items: ${report.rows.length}`
     );
     doc.moveDown();
 
@@ -95,7 +99,8 @@ async function generateReorderPdf(report, outPath) {
             doc.fontSize(8).fillColor(COLORS.text);
             doc.text(`Stock: ${r.current_stock}`, metricsX, top + 5);
             doc.text(`Reorder @: ${r.reorder_level}`, metricsX, top + 15);
-            doc.text(`Avg/day: ${(r.avg_daily_sales || 0).toFixed(2)}`, metricsX, top + 25);
+            const periodValue = (Number(r.avg_daily_sales) || 0) * windowDays;
+            doc.text(`Avg/${periodShort}: ${periodValue.toFixed(2)}`, metricsX, top + 25);
             doc.fillColor(COLORS.gold).text(`Order: ${r.suggested_order_qty}`, metricsX, top + 37);
 
             // Other branches compact line
