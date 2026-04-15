@@ -29,9 +29,95 @@ function setPool(dbPool) {
 // ========================================
 
 /**
+ * Middleware: staff can view own salary only if the admin has enabled
+ * `users.salary_visible_to_staff` for them. Admin/manager/accountant bypass.
+ * Applies to /my-config, /my-monthly, /my-payments.
+ */
+async function requireSalaryVisibility(req, res, next) {
+    try {
+        const role = req.user?.role;
+        if (role === 'admin' || role === 'super_admin' || role === 'manager' || role === 'accountant') {
+            return next();
+        }
+        const [rows] = await pool.query(
+            `SELECT salary_visible_to_staff FROM users WHERE id = ? LIMIT 1`,
+            [req.user.id]
+        );
+        if (!rows.length || rows[0].salary_visible_to_staff !== 1) {
+            return res.status(403).json({
+                success: false,
+                code: 'salary_hidden',
+                message: 'Salary details are not available. Contact admin if you need them.'
+            });
+        }
+        next();
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+}
+
+/**
  * GET /my-config - Staff views own salary configuration
  */
-router.get('/my-config', requireAuth, async (req, res) => {
+/**
+ * GET /my-visibility - Staff self-check: can I view my salary right now?
+ * Always returns 200 (never 403) so the staff page can render a friendly
+ * "not available" message instead of a redirect.
+ */
+router.get('/my-visibility', requireAuth, async (req, res) => {
+    try {
+        const role = req.user?.role;
+        const adminBypass = role === 'admin' || role === 'super_admin' || role === 'manager' || role === 'accountant';
+        if (adminBypass) return res.json({ success: true, visible: true, reason: 'admin' });
+        const [rows] = await pool.query(
+            `SELECT salary_visible_to_staff FROM users WHERE id = ? LIMIT 1`,
+            [req.user.id]
+        );
+        const visible = rows.length && rows[0].salary_visible_to_staff === 1;
+        res.json({ success: true, visible: !!visible, reason: visible ? 'allowed' : 'hidden' });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * PUT /visibility/:userId - Admin toggles salary visibility for one staff user.
+ * Body: { visible: true|false }
+ */
+router.put('/visibility/:userId', requirePermission('salary', 'manage'), async (req, res) => {
+    try {
+        const userId = parseInt(req.params.userId, 10);
+        if (!Number.isFinite(userId)) return res.status(400).json({ success: false, message: 'Bad userId' });
+        const visible = req.body.visible ? 1 : 0;
+        const [r] = await pool.query(
+            `UPDATE users SET salary_visible_to_staff = ? WHERE id = ?`,
+            [visible, userId]
+        );
+        if (r.affectedRows === 0) return res.status(404).json({ success: false, message: 'User not found' });
+        res.json({ success: true, data: { user_id: userId, visible: !!visible } });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * GET /visibility - Admin reads current visibility flags for all staff-role users
+ */
+router.get('/visibility', requirePermission('salary', 'view'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT id, full_name, username, role, branch_id, salary_visible_to_staff
+             FROM users
+             WHERE status = 'active' AND role IN ('staff','sales_staff','branch_manager')
+             ORDER BY full_name ASC`
+        );
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+router.get('/my-config', requireAuth, requireSalaryVisibility, async (req, res) => {
     try {
         const [configs] = await pool.query(`
             SELECT sc.*, b.name as branch_name
@@ -54,7 +140,7 @@ router.get('/my-config', requireAuth, async (req, res) => {
 /**
  * GET /my-monthly - Staff views own monthly salary history
  */
-router.get('/my-monthly', requireAuth, async (req, res) => {
+router.get('/my-monthly', requireAuth, requireSalaryVisibility, async (req, res) => {
     try {
         const { month } = req.query;
         let query = `
@@ -84,7 +170,7 @@ router.get('/my-monthly', requireAuth, async (req, res) => {
 /**
  * GET /my-payments - Staff views own payment history
  */
-router.get('/my-payments', requireAuth, async (req, res) => {
+router.get('/my-payments', requireAuth, requireSalaryVisibility, async (req, res) => {
     try {
         const [payments] = await pool.query(`
             SELECT sp.*, ms.salary_month, ms.net_salary,

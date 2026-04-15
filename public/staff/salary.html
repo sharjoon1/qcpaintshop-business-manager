@@ -227,6 +227,30 @@
 
         async function loadAll() {
             document.getElementById('monthLabel').textContent = formatMonth(currentMonth);
+
+            // Visibility gate — admin may have disabled salary display for this staff.
+            try {
+                const vres = await fetch('/api/salary/my-visibility', { headers: getAuthHeaders() });
+                const vjson = await vres.json();
+                if (vjson.success && !vjson.visible) {
+                    document.getElementById('loadingState').style.display = 'none';
+                    const main = document.querySelector('main') || document.body;
+                    const banner = document.createElement('div');
+                    banner.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:16px;border-radius:10px;margin:20px 0;font-size:14px;';
+                    banner.innerHTML = '<b>Salary details are not available.</b><br>' +
+                        'Please contact admin if you need your payslip. Admin can share it with you via WhatsApp on request.';
+                    // Hide every salary info card on the page
+                    ['configCard','monthlyCard','historyCard','paymentsCard'].forEach(function(id) {
+                        var el = document.getElementById(id); if (el) el.style.display = 'none';
+                    });
+                    // Insert banner at top of main content
+                    const firstCard = document.querySelector('.card, .info-card, [id$="Card"]');
+                    if (firstCard) firstCard.parentNode.insertBefore(banner, firstCard);
+                    else main.insertBefore(banner, main.firstChild);
+                    return;
+                }
+            } catch (e) { /* fall through to normal load on failure */ }
+
             await Promise.all([loadConfig(), loadMonthly(), loadHistory(), loadPayments(), loadLeaveBalance()]);
             document.getElementById('loadingState').style.display = 'none';
         }
