@@ -347,7 +347,8 @@ async function deliverReport(report, { force = false } = {}) {
                     if (pdfPath && typeof waManager.sendMedia === 'function') {
                         await waManager.sendMedia(0, r.phone, {
                             type: 'document',
-                            path: pdfPath,
+                            mediaPath: pdfPath,
+                            filename: path.basename(pdfPath),
                             caption: 'Reorder Report'
                         }).catch(e => console.error('[ReorderWA-PDF]', e.message));
                     }
