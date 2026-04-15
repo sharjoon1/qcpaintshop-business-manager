@@ -82,7 +82,10 @@ async function assembleReport({ branchId = null, date = null, windowDays = 60 } 
             ON rc.zoho_item_id = a.zoho_item_id AND rc.zoho_location_id = a.zoho_location_id
         LEFT JOIN zoho_location_stock ls
             ON ls.zoho_item_id = a.zoho_item_id AND ls.zoho_location_id = a.zoho_location_id
+        LEFT JOIN reorder_snoozes snz
+            ON snz.zoho_item_id = a.zoho_item_id AND snz.zoho_location_id = a.zoho_location_id
         ${where}
+          AND (snz.zoho_item_id IS NULL OR (snz.snoozed_until IS NOT NULL AND snz.snoozed_until < NOW()))
     `, params);
 
     // --- Query suggested items (items with sales in window but no active alert) ---
@@ -110,7 +113,9 @@ async function assembleReport({ branchId = null, date = null, windowDays = 60 } 
         JOIN zoho_items_map zim ON zim.zoho_item_id = bis.zoho_item_id
         LEFT JOIN zoho_locations_map zlm ON zlm.local_branch_id = bis.local_branch_id AND zlm.is_active = 1
         LEFT JOIN zoho_location_stock ls ON ls.zoho_item_id = bis.zoho_item_id AND ls.zoho_location_id = zlm.zoho_location_id
+        LEFT JOIN reorder_snoozes snz ON snz.zoho_item_id = bis.zoho_item_id AND snz.zoho_location_id = zlm.zoho_location_id
         ${suggestWhere}
+          AND (snz.zoho_item_id IS NULL OR (snz.snoozed_until IS NOT NULL AND snz.snoozed_until < NOW()))
         GROUP BY bis.local_branch_id, bis.zoho_item_id, zim.zoho_item_name, zim.zoho_sku,
                  zim.zoho_brand, zim.zoho_unit, zlm.zoho_location_id, zlm.zoho_location_name, ls.stock_on_hand
     `, suggestParams);
@@ -165,6 +170,7 @@ async function assembleReport({ branchId = null, date = null, windowDays = 60 } 
 
         return {
             zoho_item_id: a.zoho_item_id,
+            zoho_location_id: a.zoho_location_id,
             item_name: a.item_name,
             sku: a.sku,
             brand: a.brand,
@@ -205,6 +211,7 @@ async function assembleReport({ branchId = null, date = null, windowDays = 60 } 
 
         suggestedRows.push({
             zoho_item_id: s.zoho_item_id,
+            zoho_location_id: s.zoho_location_id,
             item_name: s.item_name,
             sku: s.sku,
             brand: s.brand,

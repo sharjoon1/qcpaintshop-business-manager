@@ -2126,10 +2126,17 @@ async function getReorderDashboard(filters = {}) {
     const limit = Math.min(100, parseInt(filters.limit) || 50);
     const offset = (page - 1) * limit;
 
+    // Snoozed rows (manually marked "not needed") drop out of the list unless
+    // `include_snoozed=1` is passed.
+    const snoozeFilter = filters.include_snoozed === '1'
+        ? ''
+        : ` AND (snz.zoho_item_id IS NULL OR (snz.snoozed_until IS NOT NULL AND snz.snoozed_until < NOW()))`;
+
     const [[{ total }]] = await pool.query(`
         SELECT COUNT(*) as total FROM zoho_reorder_alerts ra
         LEFT JOIN zoho_locations_map lm ON ra.zoho_location_id = lm.zoho_location_id
-        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)`, params);
+        LEFT JOIN reorder_snoozes snz ON snz.zoho_item_id = ra.zoho_item_id AND snz.zoho_location_id = ra.zoho_location_id
+        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL) ${snoozeFilter}`, params);
 
     const [alerts] = await pool.query(`
         SELECT ra.*,
@@ -2140,13 +2147,16 @@ async function getReorderDashboard(filters = {}) {
                lm.local_branch_id AS branch_id,
                GREATEST(ra.reorder_level - ra.current_stock, 0) AS shortage,
                u1.full_name as acknowledged_by_name,
-               u2.full_name as resolved_by_name
+               u2.full_name as resolved_by_name,
+               snz.snoozed_until,
+               snz.notes AS snooze_notes
         FROM zoho_reorder_alerts ra
         LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ra.zoho_item_id
         LEFT JOIN zoho_locations_map lm ON ra.zoho_location_id = lm.zoho_location_id
+        LEFT JOIN reorder_snoozes snz ON snz.zoho_item_id = ra.zoho_item_id AND snz.zoho_location_id = ra.zoho_location_id
         LEFT JOIN users u1 ON ra.acknowledged_by = u1.id
         LEFT JOIN users u2 ON ra.resolved_by = u2.id
-        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL)
+        ${where} AND (lm.is_active = 1 OR lm.is_active IS NULL) ${snoozeFilter}
         ORDER BY FIELD(ra.severity, 'critical','high','medium','low'), ra.created_at DESC
         LIMIT ? OFFSET ?
     `, [...params, limit, offset]);

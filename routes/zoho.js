@@ -3114,7 +3114,9 @@ router.get('/reorder/alerts/summary', requirePermission('zoho', 'view'), async (
                 COUNT(CASE WHEN ra.severity = 'low' AND ra.status IN ('active','acknowledged') THEN 1 END) as low_count
             FROM zoho_reorder_alerts ra
             LEFT JOIN zoho_locations_map lm ON ra.zoho_location_id = lm.zoho_location_id
-            WHERE lm.is_active = 1 OR lm.is_active IS NULL
+            LEFT JOIN reorder_snoozes snz ON snz.zoho_item_id = ra.zoho_item_id AND snz.zoho_location_id = ra.zoho_location_id
+            WHERE (lm.is_active = 1 OR lm.is_active IS NULL)
+              AND (snz.zoho_item_id IS NULL OR (snz.snoozed_until IS NOT NULL AND snz.snoozed_until < NOW()))
         `);
 
         res.json({ success: true, data: summary[0] });
@@ -3708,6 +3710,89 @@ router.get('/reorder/sales-analysis', requirePermission('zoho', 'reorder'), asyn
         `, params);
 
         res.json({ success: true, data: rows, window_days: days });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ========================================
+// SNOOZE / HIDE ITEMS (from alerts + daily report)
+// ========================================
+
+/**
+ * GET /reorder/snoozes - List currently-snoozed items (not-yet-expired + forever).
+ */
+router.get('/reorder/snoozes', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT snz.zoho_item_id, snz.zoho_location_id, snz.snoozed_until, snz.notes,
+                   snz.created_at, snz.snoozed_by,
+                   zim.zoho_item_name AS item_name, zim.zoho_sku AS sku, zim.zoho_brand AS brand,
+                   zlm.zoho_location_name AS location_name,
+                   u.full_name AS snoozed_by_name
+            FROM reorder_snoozes snz
+            LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = snz.zoho_item_id
+            LEFT JOIN zoho_locations_map zlm ON zlm.zoho_location_id = snz.zoho_location_id
+            LEFT JOIN users u ON u.id = snz.snoozed_by
+            WHERE snz.snoozed_until IS NULL OR snz.snoozed_until > NOW()
+            ORDER BY snz.created_at DESC
+        `);
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        console.error('[snoozes-list]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /reorder/snooze - Mark (item × location) as not-needed.
+ * Body: { zoho_item_id, zoho_location_id, duration_days?, notes? }
+ * duration_days null/0 → snooze forever.
+ */
+router.post('/reorder/snooze', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const { zoho_item_id, zoho_location_id, duration_days, notes } = req.body;
+        if (!zoho_item_id || !zoho_location_id) {
+            return res.status(400).json({ success: false, message: 'zoho_item_id and zoho_location_id required' });
+        }
+        const days = parseInt(duration_days, 10);
+        const until = Number.isFinite(days) && days > 0
+            ? new Date(Date.now() + days * 86400000)
+            : null;
+
+        await pool.query(`
+            INSERT INTO reorder_snoozes (zoho_item_id, zoho_location_id, snoozed_until, notes, snoozed_by)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                snoozed_until = VALUES(snoozed_until),
+                notes = VALUES(notes),
+                snoozed_by = VALUES(snoozed_by)
+        `, [String(zoho_item_id), String(zoho_location_id), until, notes || null, req.user.id]);
+
+        res.json({
+            success: true,
+            data: {
+                zoho_item_id, zoho_location_id,
+                snoozed_until: until,
+                forever: until === null
+            }
+        });
+    } catch (e) {
+        console.error('[snooze]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * DELETE /reorder/snooze/:itemId/:locationId - Un-snooze an item (bring it back).
+ */
+router.delete('/reorder/snooze/:itemId/:locationId', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        await pool.query(
+            `DELETE FROM reorder_snoozes WHERE zoho_item_id = ? AND zoho_location_id = ?`,
+            [req.params.itemId, req.params.locationId]
+        );
+        res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }
