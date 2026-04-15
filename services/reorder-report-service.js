@@ -271,24 +271,27 @@ async function getConfigMap(keys) {
 }
 
 async function getRecipientsForScope(scope) {
+    const cfg = await getConfigMap(['reorder_report_recipients']);
+    let adminUserIds = [];
+    try { adminUserIds = JSON.parse(cfg.reorder_report_recipients || '[]'); } catch (e) { adminUserIds = []; }
+    if (!Array.isArray(adminUserIds)) adminUserIds = [];
+
+    const userIds = new Set(adminUserIds);
+
     if (scope.startsWith('branch:')) {
         const branchId = parseInt(scope.split(':')[1], 10);
-        const [rows] = await pool.query(
-            `SELECT u.id AS user_id, u.full_name, u.phone
-             FROM branches b
-             JOIN users u ON u.id = b.manager_user_id
+        const [mgrRows] = await pool.query(
+            `SELECT u.id FROM branches b JOIN users u ON u.id = b.manager_user_id
              WHERE b.id = ? AND u.status = 'active'`,
             [branchId]
         );
-        return rows;
+        mgrRows.forEach(r => userIds.add(r.id));
     }
-    const cfg = await getConfigMap(['reorder_report_recipients']);
-    let userIds = [];
-    try { userIds = JSON.parse(cfg.reorder_report_recipients || '[]'); } catch (e) { userIds = []; }
-    if (!Array.isArray(userIds) || userIds.length === 0) return [];
+
+    if (userIds.size === 0) return [];
     const [rows] = await pool.query(
         `SELECT id AS user_id, full_name, phone FROM users WHERE id IN (?) AND status = 'active'`,
-        [userIds]
+        [[...userIds]]
     );
     return rows;
 }
