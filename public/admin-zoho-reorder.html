@@ -2584,7 +2584,9 @@
             var brand = (document.getElementById('vmBrand').value || '').trim();
             var unmapped = document.getElementById('vmOnlyUnmapped').checked;
             var unpushed = document.getElementById('vmOnlyUnpushed').checked;
-            var qs = new URLSearchParams({ page: vmPage, limit: 50 });
+            // Fetch the whole set in one shot so client-side sort works across
+            // everything (not just one paginated slice).
+            var qs = new URLSearchParams({ page: 1, limit: 5000 });
             if (search) qs.set('search', search);
             if (brand) qs.set('brand', brand);
             if (unmapped) qs.set('only_unmapped', '1');
@@ -2597,17 +2599,13 @@
                 return;
             }
             vmRows = json.data || [];
-            vmTotalPages = json.pagination ? json.pagination.pages : 1;
             renderVmBody();
 
             var pager = document.getElementById('vmPagination');
-            pager.innerHTML = json.pagination
-                ? '<span>Page ' + json.pagination.page + ' of ' + json.pagination.pages + ' · ' + json.pagination.total + ' items</span>' +
-                  '<span>' +
-                    '<button onclick="vmGoto(' + (vmPage - 1) + ')" class="px-2 py-1 border rounded mr-1" ' + (vmPage <= 1 ? 'disabled' : '') + '>‹ Prev</button>' +
-                    '<button onclick="vmGoto(' + (vmPage + 1) + ')" class="px-2 py-1 border rounded" ' + (vmPage >= vmTotalPages ? 'disabled' : '') + '>Next ›</button>' +
-                  '</span>'
-                : '';
+            var total = json.pagination ? json.pagination.total : vmRows.length;
+            pager.innerHTML = '<span>Showing ' + vmRows.length + ' of ' + total + ' items'
+                + (total > vmRows.length ? ' · <span class="text-amber-600">more available — narrow the filter</span>' : '')
+                + '</span>';
         } catch (e) {
             body.innerHTML = '<tr><td colspan="8" class="text-center text-red-500 py-4">' + escapeHtml(e.message) + '</td></tr>';
         }

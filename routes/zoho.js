@@ -3758,7 +3758,9 @@ router.get('/reorder/vendor-mapping', requirePermission('zoho', 'reorder'), asyn
     try {
         const { search, brand, only_unpushed, only_unmapped } = req.query;
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-        const limit = Math.min(200, parseInt(req.query.limit, 10) || 50);
+        // Cap raised to 5000 so the whole vendor-mapping table can be fetched
+        // in one shot (≈1.9k items currently) — avoids cross-page sort headache.
+        const limit = Math.min(5000, parseInt(req.query.limit, 10) || 5000);
         const offset = (page - 1) * limit;
 
         let where = `WHERE zim.zoho_status = 'active'`;
