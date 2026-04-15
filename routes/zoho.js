@@ -3784,6 +3784,41 @@ router.post('/reorder/snooze', requirePermission('zoho', 'reorder'), async (req,
 });
 
 /**
+ * POST /reorder/snooze-bulk - Snooze many (item × location) pairs at once.
+ * Body: { items: [{zoho_item_id, zoho_location_id}], duration_days?, notes? }
+ */
+router.post('/reorder/snooze-bulk', requirePermission('zoho', 'reorder'), async (req, res) => {
+    try {
+        const { items, duration_days, notes } = req.body;
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: 'items[] required' });
+        }
+        const days = parseInt(duration_days, 10);
+        const until = Number.isFinite(days) && days > 0
+            ? new Date(Date.now() + days * 86400000)
+            : null;
+
+        let snoozed = 0;
+        for (const it of items) {
+            if (!it?.zoho_item_id || !it?.zoho_location_id) continue;
+            await pool.query(`
+                INSERT INTO reorder_snoozes (zoho_item_id, zoho_location_id, snoozed_until, notes, snoozed_by)
+                VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    snoozed_until = VALUES(snoozed_until),
+                    notes = VALUES(notes),
+                    snoozed_by = VALUES(snoozed_by)
+            `, [String(it.zoho_item_id), String(it.zoho_location_id), until, notes || null, req.user.id]);
+            snoozed++;
+        }
+        res.json({ success: true, data: { snoozed, total: items.length, snoozed_until: until, forever: until === null } });
+    } catch (e) {
+        console.error('[snooze-bulk]', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
  * DELETE /reorder/snooze/:itemId/:locationId - Un-snooze an item (bring it back).
  */
 router.delete('/reorder/snooze/:itemId/:locationId', requirePermission('zoho', 'reorder'), async (req, res) => {

@@ -326,11 +326,19 @@ async function applyBrandVendor(brand, vendorId) {
             [it.zoho_item_id, vendorId]
         );
     }
-    // Single UPDATE for zoho_items_map is more efficient than row-by-row
+    // Single UPDATE for zoho_items_map is more efficient than row-by-row.
+    // Only clear vendor_pushed_at on items where the vendor ACTUALLY changed —
+    // re-running bulk for a brand that already points at the same vendor must
+    // not flip everyone back to "pending".
     await pool.query(
-        `UPDATE zoho_items_map SET preferred_vendor_id = ?, vendor_pushed_at = NULL
+        `UPDATE zoho_items_map
+         SET preferred_vendor_id = ?,
+             vendor_pushed_at = CASE
+                 WHEN preferred_vendor_id <=> ? THEN vendor_pushed_at
+                 ELSE NULL
+             END
          WHERE zoho_brand = ? AND zoho_status = 'active'`,
-        [vendorId, brand]
+        [vendorId, vendorId, brand]
     );
 
     return { brand, vendor_id: vendorId, items: items.length };
@@ -354,9 +362,16 @@ async function setManualPrimary(zohoItemId, vendorId) {
          ON DUPLICATE KEY UPDATE is_primary = 1, source = 'manual'`,
         [zohoItemId, vendorId]
     );
+    // Same no-op-if-unchanged logic as applyBrandVendor
     await pool.query(
-        `UPDATE zoho_items_map SET preferred_vendor_id = ? WHERE zoho_item_id = ?`,
-        [vendorId, zohoItemId]
+        `UPDATE zoho_items_map
+         SET preferred_vendor_id = ?,
+             vendor_pushed_at = CASE
+                 WHEN preferred_vendor_id <=> ? THEN vendor_pushed_at
+                 ELSE NULL
+             END
+         WHERE zoho_item_id = ?`,
+        [vendorId, vendorId, zohoItemId]
     );
     return { zoho_item_id: zohoItemId, vendor_id: vendorId };
 }
