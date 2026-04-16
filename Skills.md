@@ -2984,6 +2984,81 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 
 ---
 
+### PNTR Painter Marketing System (Apr 2026)
+
+Bridge between Zoho Books PNTR-prefixed painter customers and the Painter Loyalty Program. Bulk-import painter customers from Zoho → branch-wise marketing pool → daily staff assignments → outcome tracking → convert interested leads into formal painters → universal Zoho customer + sales-person sync → annual points backfill for Dec 2025+ invoices (direct billing + salesperson attribution).
+
+#### New Tables (7)
+- `painter_leads` — Marketing pool (one per Zoho PNTR customer). Status: `new/in_progress/interested/converted/active_painter/not_interested/unreachable/wrong_number/duplicate/snoozed`.
+- `painter_lead_followups` — Per-call/WA/visit log with outcome enum.
+- `painter_daily_assignments` — Today's list snapshot per staff (sticky owner + daily quota).
+- `painter_marketing_config` — Per-branch or per-user quota + recycle-day overrides.
+- `painter_zoho_salesperson_map` — Zoho Sales Person → painter linkage with match_confidence.
+- `painter_pntr_import_runs` — Audit log for bulk/incremental imports.
+- `painter_lead_duplicate_queue` — Scenario 3 review.
+- `painter_zoho_sync_queue` — Failed Zoho creates retry with exponential backoff.
+
+#### ALTERs
+- `painters` gained: `zoho_customer_id`, `zoho_salesperson_id`, `created_via` ENUM, `activated_at`, `source_lead_id`. **Activation semantics**: `status='approved' AND activated_at IS NULL` = pending activation (no points), `activated_at IS NOT NULL` = fully active.
+- `painter_invoices_processed` gained: `attribution_type` ENUM(`direct_billing`,`salesperson`,`painter_estimate`), `source_invoice_date`, `zoho_invoice_id`. UNIQUE key upgraded to `(painter_id, invoice_id, attribution_type)` — same invoice CAN award points twice if painter is BOTH customer AND salesperson on it.
+- `zoho_invoices` gained: `zoho_salesperson_id`, `zoho_salesperson_name` — captured on every sync via `services/zoho-api.js::syncInvoices`.
+
+#### Services
+- `services/pntr-import-service.js` — Phone normalizer, branch-prefix parser, salesperson fuzzy matcher (exact_phone/exact_name/fuzzy_name via Levenshtein<3), bulk + incremental Zoho customer scan.
+- `services/painter-zoho-sync-service.js` — Universal `syncPainterToZoho(painterId)` hook (idempotent). Creates Zoho customer `PNTR {branchCode} {fullName}` + salesperson `{fullName} {phone}`. On failure queues in `painter_zoho_sync_queue` with retry 1h→4h→12h→24h, gives up at 5 attempts.
+- `services/painter-marketing-scheduler.js` — Outcome→status mapper, daily list picker (rollover + quota), load-balanced new-lead assignment, 7 IST cron registrations.
+- `services/painter-points-backfill-service.js` — Direct + salesperson scan against `zoho_invoices`. Idempotent via `painter_invoices_processed` composite unique. Rates from `ai_config` keys: `painter_self_billing_annual_rate`, `painter_customer_billing_regular_rate`, `painter_customer_billing_annual_rate` (default 0.005 each).
+
+#### Routes
+- `routes/painter-marketing.js` mounted at `/api/painter-marketing/*`.
+  - Staff: `GET /me/today`, `GET /me/painters`, `POST /leads/:id/followup`, `POST /leads/:id/convert`
+  - Admin: `POST /admin/import/{bulk,incremental}`, `GET /admin/import/runs`, queues (`unassigned`, `duplicates`, `salesperson-unmatched`), `GET+POST /admin/config`, `POST /admin/generate-daily-lists`, `POST /admin/backfill/{preview,run}`, `GET /admin/performance`.
+- `routes/painters.js` additions:
+  - `/register` INSERT now fires `syncPainterToZoho()` (fire-and-forget) for all 3 paths.
+  - `POST /:id/activate` — dual-auth (painter self via `x-painter-token` matching id, OR admin via `painters.manage`). Sets `activated_at`, updates lead status to `active_painter`, chains Zoho sync → backfill.
+
+#### Permissions (4 new, module=`painters`)
+- `marketing_view` — Staff see their daily list
+- `marketing_contact` — Log followups
+- `marketing_manage` — Admin config, queues, imports, backfill
+- `marketing_convert` — Convert lead → painter
+
+Default grants: manager gets all 4, staff gets view/contact/convert. Run `node migrations/migrate-pntr-marketing-permissions.js` to seed.
+
+#### Crons (7, all IST — registered from `painter-scheduler.js::start()`)
+| Time | Job |
+|------|-----|
+| 02:30 | Incremental PNTR Zoho customer sync |
+| 03:00 | `painter_zoho_sync_queue` retry |
+| 03:30 | Daily points backfill for new invoices |
+| 06:00 | Generate daily painter-call lists per staff |
+| 06:30 | FCM push "Today's calls ready" |
+| 17:00 | FCM reminder for < 50% completion |
+| 18:00 | WhatsApp alert to branch manager if any staff < 30% |
+
+#### UI Pages
+- `public/admin-painters.html` — New "📣 Marketing" tab with 7 sub-tabs: Branch Unassigned, Duplicate Phone, Salesperson Unmatched, Import Runs, Performance, Points Backfill, Config.
+- `public/staff-painter-marketing.html` — New staff page (today's list + outcome modal + "Convert" on interested leads). Added to `public/components/staff-sidebar.html` under "My Work".
+- `public/painter-login.html` — After OTP verify, fires `/api/painters/:id/activate` (painter's own id, or `?ref=` override) to trigger backfill.
+
+#### Migrations
+- `migrations/migrate-zoho-invoices-salesperson.js` — adds `zoho_salesperson_id/_name + index` on `zoho_invoices`
+- `migrations/migrate-pntr-painter-marketing.js` — all 7 tables + 2 ALTERs (painters, painter_invoices_processed)
+- `migrations/migrate-pntr-marketing-permissions.js` — 4 permissions + role grants
+- `migrations/migrate-pntr-wa-templates.js` — seeds `ai_config` rate keys (0.005) + Tamil WA templates (marketing prospecting + activation invite)
+
+#### WhatsApp Templates (in `ai_config`, Tamil — no வணக்கம் per project rule)
+- `painter_marketing_wa_template` — outbound prospecting message with `{painter_name}`, `{branch_name}`, `{staff_phone}` placeholders
+- `painter_activation_wa_template` — sent after Path A conversion with activation link `https://act.qcpaintshop.com/painter-onboard?ref={painter_id}`
+
+#### Tests
+- 22 tests in `tests/unit/pntr-import-service.test.js` (phone normalizer, branch parser, fuzzy matcher, pipeline w/ 4 scenarios)
+- 4 tests in `tests/unit/painter-zoho-sync-service.test.js` (idempotency, create, queue-on-error, backoff schedule)
+- 7 tests in `tests/unit/painter-marketing-scheduler.test.js` (every outcome branch)
+- 4 tests in `tests/unit/painter-points-backfill-service.test.js` (skip-not-activated, direct, salesperson, idempotent)
+
+---
+
 ## 10. KNOWN ISSUES & ROADMAP
 
 ### Known Issues
