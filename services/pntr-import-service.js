@@ -191,7 +191,7 @@ async function runBulkImport({ pool, zohoApi, triggeredBy = null, runType = 'ini
         while (hasMore) {
             const params = {
                 page, per_page: 200,
-                contact_name_contains: 'PNTR'
+                search_text: 'PNTR'
             };
             if (sinceIso) params.last_modified_time = sinceIso;
             const resp = await zohoApi.getContacts(params);
