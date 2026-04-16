@@ -3044,7 +3044,7 @@
     async function loadMktBranches() {
         try {
             const r = await fetch('/api/branches', { headers: mktAuthHeaders(false) }).then(x => x.json());
-            const list = r.branches || r.list || [];
+            const list = r.data || r.branches || r.list || [];
             const opts = '<option value="">Choose branch…</option>' +
                 list.map(b => `<option value="${b.id}">${mktEsc(b.name)}</option>`).join('');
             ['mktBulkBranch', 'mktCfgBranch', 'mktPerfBranch'].forEach(id => {

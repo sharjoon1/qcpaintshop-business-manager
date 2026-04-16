@@ -11,7 +11,8 @@ function normalizePhone(raw) {
 
 function parseBranchPrefix(name, branches) {
     if (!name) return null;
-    const m = String(name).match(/^\s*PNTR\s+([A-Za-z]{2,5})\s+/i);
+    // Support both "PNTR CODE Name" and "Name PNTR CODE" patterns
+    const m = String(name).match(/PNTR\s+([A-Za-z]{2,5})/i);
     if (!m) return null;
     const code = m[1].toUpperCase();
     const hit = branches.find(b => (b.code || '').toUpperCase() === code);
@@ -190,8 +191,7 @@ async function runBulkImport({ pool, zohoApi, triggeredBy = null, runType = 'ini
         let page = 1, hasMore = true;
         while (hasMore) {
             const params = {
-                page, per_page: 200,
-                search_text: 'PNTR'
+                page, per_page: 200
             };
             if (sinceIso) params.last_modified_time = sinceIso;
             const resp = await zohoApi.getContacts(params);
