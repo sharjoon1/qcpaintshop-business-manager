@@ -154,6 +154,24 @@ async function updateContact(contactId, data) {
 }
 
 /**
+ * Create a Sales Person in Zoho Books (separate endpoint from contacts)
+ */
+async function createSalesperson({ salesperson_name, salesperson_email = null }) {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    const body = { salesperson_name };
+    if (salesperson_email) body.salesperson_email = salesperson_email;
+    return await apiPost(`/settings/salespersons?organization_id=${orgId}`, body);
+}
+
+/**
+ * List all Sales Persons from Zoho
+ */
+async function listSalespersons() {
+    const orgId = process.env.ZOHO_ORGANIZATION_ID;
+    return await apiGet('/settings/salespersons', { organization_id: orgId });
+}
+
+/**
  * Get customer balance (outstanding)
  */
 async function getCustomerBalance(contactId) {
@@ -320,8 +338,9 @@ async function syncInvoices(triggeredBy = null) {
                             invoice_number, reference_number, invoice_date, due_date,
                             currency_code, sub_total, tax_total, total, balance,
                             status, customer_name, zoho_location_id, local_branch_id,
+                            zoho_salesperson_id, zoho_salesperson_name,
                             created_time, last_modified_time, last_synced_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                         ON DUPLICATE KEY UPDATE
                             balance = VALUES(balance),
                             status = VALUES(status),
@@ -330,6 +349,8 @@ async function syncInvoices(triggeredBy = null) {
                             total = VALUES(total),
                             zoho_location_id = VALUES(zoho_location_id),
                             local_branch_id = VALUES(local_branch_id),
+                            zoho_salesperson_id = VALUES(zoho_salesperson_id),
+                            zoho_salesperson_name = VALUES(zoho_salesperson_name),
                             last_modified_time = VALUES(last_modified_time),
                             last_synced_at = NOW(),
                             updated_at = CURRENT_TIMESTAMP
@@ -343,6 +364,7 @@ async function syncInvoices(triggeredBy = null) {
                         inv.total || 0, inv.balance || 0,
                         mapZohoStatus(inv.status), inv.customer_name,
                         zohoLocationId, localBranchId,
+                        inv.salesperson_id || null, inv.salesperson_name || null,
                         toMySQLDatetime(inv.created_time), toMySQLDatetime(inv.last_modified_time)
                     ]);
                     totalSynced++;
@@ -2358,6 +2380,8 @@ module.exports = {
     getContact,
     createContact,
     updateContact,
+    createSalesperson,
+    listSalespersons,
     getCustomerBalance,
     // Items
     getItems,
