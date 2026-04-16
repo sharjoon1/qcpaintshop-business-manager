@@ -151,6 +151,15 @@ router.post('/register', async (req, res) => {
             await pool.query('INSERT INTO painter_referrals (referrer_id, referred_id, status) VALUES (?, ?, "pending")', [referredBy, result.insertId]);
         }
 
+        // Fire-and-forget Zoho customer + salesperson sync
+        try {
+            const painterZohoSync = require('../services/painter-zoho-sync-service');
+            painterZohoSync.syncPainterToZoho(result.insertId, { pool, zohoApi: zohoAPI })
+                .catch(err => console.error('[painters] zoho sync after register failed', err.message));
+        } catch (err) {
+            console.error('[painters] zoho sync module load failed', err.message);
+        }
+
         res.json({ success: true, message: 'Registration submitted. Awaiting approval.', painterId: result.insertId, referralCode: myReferralCode });
     } catch (error) {
         console.error('Painter registration error:', error);
@@ -4712,6 +4721,76 @@ router.get('/', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('List painters error:', error);
         res.status(500).json({ success: false, message: 'Failed to list painters' });
+    }
+});
+
+// ═══════════════════════════════════════════
+// PAINTER ACTIVATION (self via painter-token OR admin via permission)
+// ═══════════════════════════════════════════
+router.post('/:id/activate', async (req, res) => {
+    try {
+        const painterId = Number(req.params.id);
+        if (!painterId) return res.status(400).json({ success: false, message: 'Invalid painter id' });
+
+        // Try painter self-activation first
+        let authorized = false;
+        const painterToken = req.headers['x-painter-token'];
+        if (painterToken) {
+            const [ps] = await pool.query(
+                `SELECT painter_id FROM painter_sessions WHERE token = ? AND expires_at > NOW() LIMIT 1`,
+                [painterToken]
+            );
+            if (ps.length && ps[0].painter_id === painterId) authorized = true;
+        }
+
+        // Fallback: admin with painters.manage
+        if (!authorized) {
+            const adminToken = req.headers.authorization?.replace('Bearer ', '');
+            if (adminToken) {
+                const [sessions] = await pool.query(
+                    `SELECT u.role FROM user_sessions s JOIN users u ON s.user_id = u.id
+                     WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status='active' LIMIT 1`,
+                    [adminToken]
+                );
+                if (sessions.length) {
+                    if (sessions[0].role === 'admin') authorized = true;
+                    else {
+                        const [perms] = await pool.query(
+                            `SELECT 1 FROM role_permissions rp
+                             JOIN permissions p ON rp.permission_id = p.id
+                             JOIN roles r ON rp.role_id = r.id
+                             WHERE r.name = ? AND p.module='painters' AND p.action='manage' LIMIT 1`,
+                            [sessions[0].role]
+                        );
+                        if (perms.length) authorized = true;
+                    }
+                }
+            }
+        }
+
+        if (!authorized) return res.status(403).json({ success: false, message: 'forbidden' });
+
+        const [rows] = await pool.query(`SELECT id, activated_at FROM painters WHERE id = ? LIMIT 1`, [painterId]);
+        if (!rows.length) return res.status(404).json({ success: false, message: 'not_found' });
+        if (rows[0].activated_at) return res.json({ success: true, already_activated: true });
+
+        await pool.query(`UPDATE painters SET activated_at = NOW() WHERE id = ?`, [painterId]);
+        await pool.query(
+            `UPDATE painter_leads SET status='active_painter', activated_at = NOW() WHERE painter_id = ?`,
+            [painterId]
+        );
+
+        // Fire-and-forget: Zoho sync → then backfill
+        const painterZohoSync = require('../services/painter-zoho-sync-service');
+        const backfill = require('../services/painter-points-backfill-service');
+        painterZohoSync.syncPainterToZoho(painterId, { pool, zohoApi: zohoAPI })
+            .then(() => backfill.backfillPainter(painterId, '2025-12-01', { pool }))
+            .catch(err => console.error('[painters] activate chain failed', err.message));
+
+        res.json({ success: true, activated: true });
+    } catch (err) {
+        console.error('[painters] activate endpoint error:', err);
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
