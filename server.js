@@ -222,6 +222,9 @@ aiRoutes.setCollector(appMetadataCollector);
 aiScheduler.setPool(pool);
 paintersRoutes.setPool(pool);
 painterMarketingRoutes.setPool(pool);
+if (typeof painterMarketingRoutes.setSessionManager === 'function') {
+    painterMarketingRoutes.setSessionManager(whatsappSessionManager);
+}
 paintersRoutes.setSessionManager(whatsappSessionManager);
 billingRoutes.setPool(pool);
 billingRoutes.setPointsEngine(require('./services/painter-points-engine'));
