@@ -276,8 +276,9 @@ router.put('/admin/leads/:id/assign', requirePermission('painters', 'marketing_m
             `UPDATE painter_leads SET branch_id = ?, assigned_to = ?, branch_detected_via = 'admin_assign' WHERE id = ?`,
             [branch_id, staffId, leadId]
         );
-        const [[{ staff_name }]] = await pool.query(`SELECT full_name AS staff_name FROM users WHERE id = ?`, [staffId]);
-        res.json({ success: true, assigned_to: staffId, staff_name });
+        const [staffRows] = await pool.query(`SELECT full_name AS staff_name FROM users WHERE id = ?`, [staffId]);
+        if (!staffRows.length) return res.status(400).json({ success: false, error: 'staff_user_not_found' });
+        res.json({ success: true, assigned_to: staffId, staff_name: staffRows[0].staff_name });
     } catch (err) {
         console.error('[admin/leads/assign]', err);
         res.status(500).json({ success: false, error: err.message });
@@ -297,6 +298,7 @@ router.get('/admin/leads/:id/history', requirePermission('painters', 'marketing_
         );
         res.json({ success: true, history });
     } catch (err) {
+        console.error('[admin/leads/history]', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
@@ -311,10 +313,11 @@ router.get('/admin/branches/:branch_id/staff', requirePermission('painters', 'ma
              WHERE rp.module = 'painters' AND rp.action = 'marketing_contact'
                AND u.branch_id = ? AND u.status = 'active'
              ORDER BY u.full_name`,
-            [Number(req.params.id)]
+            [Number(req.params.branch_id)]
         );
         res.json({ success: true, staff });
     } catch (err) {
+        console.error('[admin/branches/staff]', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
