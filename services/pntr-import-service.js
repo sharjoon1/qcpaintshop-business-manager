@@ -11,8 +11,8 @@ function normalizePhone(raw) {
 
 function parseBranchPrefix(name, branches) {
     if (!name) return null;
-    // Support both "PNTR CODE Name" and "Name PNTR CODE" patterns
-    const m = String(name).match(/PNTR\s+([A-Za-z]{2,5})/i);
+    // Support "PNTR CODE", "PNTR - CODE", "PNTR.CODE" patterns anywhere in name
+    const m = String(name).match(/PNTR\s*[-.]?\s*([A-Za-z]{2,5})/i);
     if (!m) return null;
     const code = m[1].toUpperCase();
     const hit = branches.find(b => (b.code || '').toUpperCase() === code);

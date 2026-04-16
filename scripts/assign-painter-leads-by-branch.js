@@ -25,8 +25,8 @@ const BRANCH_CODE_MAP = {
 
 function detectBranchFromName(name) {
     if (!name) return null;
-    // Match "PNTR {CODE}" anywhere in the name (case-insensitive)
-    const m = String(name).match(/PNTR\s+([A-Za-z]{2,5})/i);
+    // Match "PNTR CODE", "PNTR - CODE", "PNTR.CODE" anywhere in name (case-insensitive)
+    const m = String(name).match(/PNTR\s*[-.]?\s*([A-Za-z]{2,5})/i);
     if (!m) return null;
     const code = m[1].toUpperCase();
     return BRANCH_CODE_MAP[code] || null;
@@ -85,7 +85,7 @@ async function run() {
             const placeholders = ids.map(() => '?').join(',');
             const [result] = await pool.query(
                 `UPDATE painter_leads
-                 SET branch_id = ?, branch_detected_via = 'name_prefix', updated_at = NOW()
+                 SET branch_id = ?, branch_detected_via = 'name_prefix'
                  WHERE id IN (${placeholders}) AND branch_id IS NULL`,
                 [Number(branchId), ...ids]
             );
