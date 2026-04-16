@@ -3129,7 +3129,7 @@
         return h;
     }
     async function mktFetch(path, opts = {}) {
-        const headers = { ...mktAuthHeaders(opts.method === 'POST'), ...(opts.headers || {}) };
+        const headers = { ...mktAuthHeaders(['POST','PUT','PATCH'].includes(opts.method)), ...(opts.headers || {}) };
         const res = await fetch(MKT_API + path, { ...opts, headers });
         return res.json();
     }
@@ -3256,7 +3256,7 @@
                 '<td class="p-2 text-gray-500 hidden sm:table-cell">' + mktEsc(l.phone) + '</td>' +
                 '<td class="p-2 text-gray-500 text-xs hidden md:table-cell">' + (l.branch_name ? mktEsc(l.branch_name) : '<span class="text-orange-500">Unassigned</span>') + '</td>' +
                 '<td class="p-2 text-gray-500 text-xs hidden md:table-cell">' + (l.staff_name ? mktEsc(l.staff_name) : '<span class="text-gray-300">—</span>') + '</td>' +
-                '<td class="p-2">' + (MKT_STATUS_LABELS[l.status] || l.status) + '</td>' +
+                '<td class="p-2">' + (MKT_STATUS_LABELS[l.status] || mktEsc(l.status)) + '</td>' +
                 '<td class="p-2 text-gray-400 text-xs hidden lg:table-cell">' + (l.last_contact_date ? new Date(l.last_contact_date).toLocaleDateString('en-IN') : 'Never') + '</td>' +
                 '</tr>';
         }).join('');
