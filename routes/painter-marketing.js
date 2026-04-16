@@ -148,6 +148,40 @@ router.post('/leads/:id/convert', requirePermission('painters', 'marketing_conve
             [painterId, leadId]
         );
         await conn.commit();
+
+        // Auto-incentive for assigned staff
+        if (lead.assigned_to) {
+            try {
+                const [[cfg]] = await pool.query(
+                    `SELECT
+                        MAX(CASE WHEN config_key='incentive_enabled' THEN config_value END) AS enabled,
+                        MAX(CASE WHEN config_key='incentive_per_conversion' THEN config_value END) AS amount,
+                        MAX(CASE WHEN config_key='incentive_auto_approve' THEN config_value END) AS auto_approve
+                     FROM ai_config WHERE config_key IN ('incentive_enabled','incentive_per_conversion','incentive_auto_approve')`
+                );
+                if ((cfg.enabled || 'true') === 'true') {
+                    const amount = parseFloat(cfg.amount || '500');
+                    const autoApprove = (cfg.auto_approve || 'false') === 'true';
+                    const incMonth = new Date().toISOString().slice(0, 7);
+                    await pool.query(
+                        `INSERT INTO staff_incentives
+                            (user_id, lead_id, lead_type, incentive_month, amount, source, status, notes)
+                         VALUES (?, ?, 'painter', ?, ?, 'painter_convert', ?, ?)`,
+                        [
+                            lead.assigned_to,
+                            lead.source_lead_id || null,
+                            incMonth,
+                            amount,
+                            autoApprove ? 'approved' : 'pending',
+                            `Painter enrolled: ${lead.full_name} (${lead.phone})`
+                        ]
+                    );
+                }
+            } catch (incErr) {
+                console.error('[pntr-marketing] incentive insert failed (non-fatal)', incErr.message);
+            }
+        }
+
         painterZohoSync.syncPainterToZoho(painterId, { pool, zohoApi })
             .catch(err => console.error('[pntr-marketing] zoho sync after convert failed', err.message));
         res.json({ success: true, painter_id: painterId });
