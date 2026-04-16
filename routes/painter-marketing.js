@@ -15,6 +15,9 @@ const router = express.Router();
 let pool;
 function setPool(p) { pool = p; }
 
+let sessionManager;
+function setSessionManager(sm) { sessionManager = sm; }
+
 // ─────────── STAFF ENDPOINTS ───────────
 
 router.get('/me/today', requirePermission('painters', 'marketing_view'), async (req, res) => {
@@ -199,6 +202,160 @@ router.post('/admin/queues/unassigned/assign', requirePermission('painters', 'ma
     res.json({ success: true, count: ids.length });
 });
 
+router.get('/admin/leads', requirePermission('painters', 'marketing_view'), async (req, res) => {
+    try {
+        const { branch_id, status, search, page = 1, limit = 50 } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
+        const conditions = [];
+        const params = [];
+
+        if (branch_id === 'unassigned') {
+            conditions.push('pl.branch_id IS NULL');
+        } else if (branch_id) {
+            conditions.push('pl.branch_id = ?');
+            params.push(Number(branch_id));
+        }
+        if (status) {
+            conditions.push('pl.status = ?');
+            params.push(status);
+        }
+        if (search) {
+            conditions.push('(pl.full_name LIKE ? OR pl.phone LIKE ?)');
+            params.push(`%${search}%`, `%${search}%`);
+        }
+
+        const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+
+        const [leads] = await pool.query(
+            `SELECT pl.id, pl.full_name, pl.phone, pl.branch_id, pl.status,
+                    pl.total_attempts, pl.last_contact_date, pl.imported_at,
+                    b.name AS branch_name,
+                    u.full_name AS staff_name, pl.assigned_to
+             FROM painter_leads pl
+             LEFT JOIN branches b ON b.id = pl.branch_id
+             LEFT JOIN users u ON u.id = pl.assigned_to
+             ${where}
+             ORDER BY pl.imported_at DESC
+             LIMIT ? OFFSET ?`,
+            [...params, Number(limit), offset]
+        );
+
+        const [[{ total }]] = await pool.query(
+            `SELECT COUNT(*) AS total FROM painter_leads pl ${where}`,
+            params
+        );
+        const [[{ unassigned_count }]] = await pool.query(
+            `SELECT COUNT(*) AS unassigned_count FROM painter_leads WHERE branch_id IS NULL`
+        );
+
+        res.json({ success: true, leads, total, unassigned_count });
+    } catch (err) {
+        console.error('[admin/leads]', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.put('/admin/leads/:id/assign', requirePermission('painters', 'marketing_manage'), async (req, res) => {
+    try {
+        const leadId = Number(req.params.id);
+        const { branch_id, assigned_to } = req.body;
+        if (!branch_id) return res.status(400).json({ success: false, error: 'branch_id required' });
+
+        let staffId = assigned_to || null;
+        if (!staffId) {
+            await assignNewLead(pool, leadId, branch_id);
+            const [[updated]] = await pool.query(
+                `SELECT pl.assigned_to, u.full_name AS staff_name
+                 FROM painter_leads pl LEFT JOIN users u ON u.id = pl.assigned_to
+                 WHERE pl.id = ?`, [leadId]
+            );
+            return res.json({ success: true, assigned_to: updated.assigned_to, staff_name: updated.staff_name });
+        }
+
+        await pool.query(
+            `UPDATE painter_leads SET branch_id = ?, assigned_to = ?, branch_detected_via = 'admin_assign' WHERE id = ?`,
+            [branch_id, staffId, leadId]
+        );
+        const [[{ staff_name }]] = await pool.query(`SELECT full_name AS staff_name FROM users WHERE id = ?`, [staffId]);
+        res.json({ success: true, assigned_to: staffId, staff_name });
+    } catch (err) {
+        console.error('[admin/leads/assign]', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.get('/admin/leads/:id/history', requirePermission('painters', 'marketing_view'), async (req, res) => {
+    try {
+        const [history] = await pool.query(
+            `SELECT plf.followup_type, plf.call_status, plf.outcome, plf.notes, plf.created_at,
+                    u.full_name AS staff_name
+             FROM painter_lead_followups plf
+             LEFT JOIN users u ON u.id = plf.user_id
+             WHERE plf.painter_lead_id = ?
+             ORDER BY plf.created_at DESC`,
+            [Number(req.params.id)]
+        );
+        res.json({ success: true, history });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.get('/admin/branches/:branch_id/staff', requirePermission('painters', 'marketing_manage'), async (req, res) => {
+    try {
+        const [staff] = await pool.query(
+            `SELECT DISTINCT u.id, u.full_name
+             FROM users u
+             JOIN user_roles ur ON ur.user_id = u.id
+             JOIN role_permissions rp ON rp.role_id = ur.role_id
+             WHERE rp.module = 'painters' AND rp.action = 'marketing_contact'
+               AND u.branch_id = ? AND u.status = 'active'
+             ORDER BY u.full_name`,
+            [Number(req.params.id)]
+        );
+        res.json({ success: true, staff });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/admin/leads/:id/send-wa', requirePermission('painters', 'marketing_manage'), async (req, res) => {
+    try {
+        const leadId = Number(req.params.id);
+        const { message } = req.body;
+        if (!message || !message.trim()) return res.status(400).json({ success: false, error: 'message required' });
+
+        const [[lead]] = await pool.query(`SELECT phone, full_name FROM painter_leads WHERE id = ?`, [leadId]);
+        if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+
+        const digits = String(lead.phone).replace(/\D/g, '');
+        let waPhone = digits;
+        if (digits.length === 10) waPhone = '91' + digits;
+        else if (digits.length === 12 && digits.startsWith('91')) waPhone = digits;
+        else return res.status(400).json({ success: false, error: 'Invalid phone number' });
+
+        if (!sessionManager) return res.status(503).json({ success: false, error: 'WhatsApp session not available' });
+
+        await sessionManager.sendMessage(0, waPhone + '@c.us', message, { source: 'painter_marketing_admin' });
+
+        await pool.query(
+            `INSERT INTO painter_lead_followups (painter_lead_id, user_id, followup_type, outcome, notes)
+             VALUES (?, ?, 'whatsapp', 'message_sent', ?)`,
+            [leadId, req.user.id, message]
+        );
+
+        await pool.query(
+            `UPDATE painter_leads SET last_contact_date = NOW(), total_attempts = total_attempts + 1 WHERE id = ?`,
+            [leadId]
+        );
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[admin/send-wa]', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 router.get('/admin/queues/duplicates', requirePermission('painters', 'marketing_manage'), async (req, res) => {
     const [rows] = await pool.query(
         `SELECT dq.*, pl.full_name AS original_name, pl.phone AS original_phone
@@ -334,4 +491,4 @@ router.get('/admin/performance', requirePermission('painters', 'marketing_manage
     res.json({ success: true, stats });
 });
 
-module.exports = { router, setPool };
+module.exports = { router, setPool, setSessionManager };
