@@ -263,11 +263,14 @@ router.get('/admin/leads', requirePermission('painters', 'marketing_view'), asyn
         const [leads] = await pool.query(
             `SELECT pl.id, pl.full_name, pl.phone, pl.branch_id, pl.status,
                     pl.total_attempts, pl.last_contact_date, pl.imported_at,
+                    pl.source_lead_id,
                     b.name AS branch_name,
-                    u.full_name AS staff_name, pl.assigned_to
+                    u.full_name AS staff_name, pl.assigned_to,
+                    l2.name AS source_lead_name
              FROM painter_leads pl
              LEFT JOIN branches b ON b.id = pl.branch_id
              LEFT JOIN users u ON u.id = pl.assigned_to
+             LEFT JOIN leads l2 ON l2.id = pl.source_lead_id
              ${where}
              ORDER BY pl.imported_at DESC
              LIMIT ? OFFSET ?`,
