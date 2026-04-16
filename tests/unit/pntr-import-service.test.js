@@ -43,3 +43,46 @@ describe('parseBranchPrefix', () => {
         expect(parseBranchPrefix('RMD Karthik', branches)).toBeNull();
     });
 });
+
+const { matchSalesperson, levenshtein, parseSalespersonPhoneSuffix } = require('../../services/pntr-import-service');
+
+describe('parseSalespersonPhoneSuffix', () => {
+    test('extracts 10-digit suffix', () => {
+        expect(parseSalespersonPhoneSuffix('Karthik 9876543210')).toBe('9876543210');
+    });
+    test('returns null when no suffix', () => {
+        expect(parseSalespersonPhoneSuffix('Karthik')).toBeNull();
+    });
+});
+
+describe('levenshtein', () => {
+    test('identical strings → 0', () => {
+        expect(levenshtein('karthik', 'karthik')).toBe(0);
+    });
+    test('one edit', () => {
+        expect(levenshtein('karthik', 'kartik')).toBe(1);
+    });
+});
+
+describe('matchSalesperson', () => {
+    const painters = [
+        { id: 10, full_name: 'Karthik', phone: '9876543210' },
+        { id: 11, full_name: 'Ravi Kumar', phone: '9123456789' }
+    ];
+    test('exact phone match', () => {
+        const res = matchSalesperson({ name: 'Karthik 9876543210' }, painters);
+        expect(res).toEqual({ painter_id: 10, confidence: 'exact_phone' });
+    });
+    test('exact name match when phone missing', () => {
+        const res = matchSalesperson({ name: 'Ravi Kumar' }, painters);
+        expect(res).toEqual({ painter_id: 11, confidence: 'exact_name' });
+    });
+    test('fuzzy name (Levenshtein < 3)', () => {
+        const res = matchSalesperson({ name: 'Kartik' }, painters);
+        expect(res).toEqual({ painter_id: 10, confidence: 'fuzzy_name' });
+    });
+    test('unmatched returns null painter_id', () => {
+        const res = matchSalesperson({ name: 'Completely Different' }, painters);
+        expect(res).toEqual({ painter_id: null, confidence: 'unmatched' });
+    });
+});
