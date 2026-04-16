@@ -90,6 +90,7 @@
                 <button class="tab-btn" onclick="switchTab('training')">📚 Training</button>
                 <button class="tab-btn" onclick="switchTab('catalog')">Catalog</button>
                 <button class="tab-btn" onclick="switchTab('visualizations')">🎨 Visualizations</button>
+                <button class="tab-btn" onclick="switchTab('marketing')">📣 Marketing</button>
             </div>
 
             <!-- Tab 1: Painters -->
@@ -656,6 +657,128 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Tab 11: Marketing (PNTR painter marketing system) -->
+            <div id="tab-marketing" class="tab-content">
+                <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                    <div class="flex flex-wrap gap-2 border-b border-gray-200 pb-2 mb-4">
+                        <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="unassigned">Branch Unassigned</button>
+                        <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="duplicates">Duplicate Phone</button>
+                        <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="sp-unmatched">Salesperson Unmatched</button>
+                        <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="runs">Import Runs</button>
+                        <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="performance">Performance</button>
+                        <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="backfill">Points Backfill</button>
+                        <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="config">Config</button>
+                    </div>
+
+                    <!-- Sub: Unassigned -->
+                    <div class="mkt-sub" data-pane="unassigned">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-lg font-semibold">Leads without branch</h3>
+                            <div class="flex gap-2">
+                                <button onclick="runBulkImport()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Run Initial PNTR Import</button>
+                                <button onclick="runIncrementalImport()" class="px-3 py-1.5 bg-gray-200 text-gray-800 rounded-lg text-sm">Incremental</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 text-left"><tr>
+                                    <th class="p-2"><input type="checkbox" id="mktChkAll"></th>
+                                    <th class="p-2">Name</th><th class="p-2">Phone</th><th class="p-2">Zoho ID</th><th class="p-2">Imported</th>
+                                </tr></thead>
+                                <tbody id="mktUnassignedBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="flex gap-2 mt-3">
+                            <select id="mktBulkBranch" class="px-3 py-1.5 border rounded-lg text-sm"><option value="">Choose branch…</option></select>
+                            <button onclick="bulkAssignBranch()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Assign Selected</button>
+                        </div>
+                    </div>
+
+                    <!-- Sub: Duplicates -->
+                    <div class="mkt-sub hidden" data-pane="duplicates">
+                        <h3 class="text-lg font-semibold mb-3">Duplicate phone queue</h3>
+                        <div id="mktDupList"></div>
+                    </div>
+
+                    <!-- Sub: Salesperson unmatched -->
+                    <div class="mkt-sub hidden" data-pane="sp-unmatched">
+                        <h3 class="text-lg font-semibold mb-3">Unmatched Zoho Salespersons</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 text-left"><tr>
+                                    <th class="p-2">Zoho SP Name</th><th class="p-2">Phone</th><th class="p-2">Link</th>
+                                </tr></thead>
+                                <tbody id="mktSpBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Sub: Runs -->
+                    <div class="mkt-sub hidden" data-pane="runs">
+                        <h3 class="text-lg font-semibold mb-3">Import Runs</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 text-left"><tr>
+                                    <th class="p-2">Started</th><th class="p-2">Type</th><th class="p-2">Total</th>
+                                    <th class="p-2">Imported</th><th class="p-2">Linked</th><th class="p-2">Dupes</th>
+                                    <th class="p-2">Unresolved</th><th class="p-2">Errors</th><th class="p-2">Status</th>
+                                </tr></thead>
+                                <tbody id="mktRunsBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Sub: Performance -->
+                    <div class="mkt-sub hidden" data-pane="performance">
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            <input type="date" id="mktPerfFrom" class="px-2 py-1.5 border rounded-lg text-sm">
+                            <input type="date" id="mktPerfTo" class="px-2 py-1.5 border rounded-lg text-sm">
+                            <select id="mktPerfBranch" class="px-2 py-1.5 border rounded-lg text-sm"><option value="">All branches</option></select>
+                            <button onclick="loadMktPerf()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Load</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 text-left"><tr>
+                                    <th class="p-2">Staff</th><th class="p-2">Branch</th>
+                                    <th class="p-2">Assigned</th><th class="p-2">Contacted</th>
+                                    <th class="p-2">Interested</th><th class="p-2">Rate</th>
+                                </tr></thead>
+                                <tbody id="mktPerfBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Sub: Backfill -->
+                    <div class="mkt-sub hidden" data-pane="backfill">
+                        <h3 class="text-lg font-semibold mb-3">Annual Points Backfill</h3>
+                        <div class="bg-gray-50 rounded-lg p-3 mb-3">
+                            <label class="text-sm font-medium">From date: </label>
+                            <input type="date" id="mktBfFrom" value="2025-12-01" class="px-2 py-1.5 border rounded-lg text-sm">
+                            <button onclick="previewBackfill()" class="px-3 py-1.5 bg-gray-200 text-gray-800 rounded-lg text-sm ml-2">Preview</button>
+                            <button onclick="runBackfill()" id="mktBfRunBtn" disabled class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm ml-2 disabled:opacity-50">Run</button>
+                        </div>
+                        <pre id="mktBfPreview" class="bg-gray-900 text-green-300 text-xs p-3 rounded-lg whitespace-pre-wrap"></pre>
+                    </div>
+
+                    <!-- Sub: Config -->
+                    <div class="mkt-sub hidden" data-pane="config">
+                        <h3 class="text-lg font-semibold mb-3">Per-branch config</h3>
+                        <select id="mktCfgBranch" class="px-3 py-1.5 border rounded-lg text-sm"><option value="">Choose branch…</option></select>
+                        <div id="mktCfgForm" class="hidden mt-3 grid grid-cols-2 gap-3 max-w-lg">
+                            <label class="text-sm">Daily quota<input type="number" id="mktCfgQuota" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
+                            <label class="text-sm">Recycle new<input type="number" id="mktCfgNew" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
+                            <label class="text-sm">Recycle callback<input type="number" id="mktCfgCallback" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
+                            <label class="text-sm">Recycle will_visit<input type="number" id="mktCfgVisit" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
+                            <label class="text-sm">Recycle already_aware<input type="number" id="mktCfgAware" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
+                            <label class="text-sm">Recycle not_interested<input type="number" id="mktCfgNotInt" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
+                            <label class="text-sm">Recycle unreachable<input type="number" id="mktCfgUnreach" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
+                            <label class="text-sm">Recycle active_painter<input type="number" id="mktCfgActive" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
+                            <button onclick="saveMktCfg()" class="col-span-2 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Save</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -743,6 +866,7 @@
         if (tab === 'training') loadTrainingContent();
         if (tab === 'catalog') loadCatalogStats();
         if (tab === 'visualizations') loadVisualizations();
+        if (tab === 'marketing') initMarketingTab();
     }
 
     // ═══════════════════════════════════════
@@ -2869,6 +2993,217 @@
             btn.disabled = false;
             btn.textContent = 'Upload & Complete';
         }
+    }
+
+    // ═══════════════════════════════════════
+    // MARKETING TAB (PNTR painter marketing system)
+    // ═══════════════════════════════════════
+    const MKT_API = '/api/painter-marketing';
+
+    function mktEsc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+        );
+    }
+    function mktAuthHeaders(json = true) {
+        const h = { 'Authorization': 'Bearer ' + localStorage.getItem('auth_token') };
+        if (json) h['Content-Type'] = 'application/json';
+        return h;
+    }
+    async function mktFetch(path, opts = {}) {
+        const headers = { ...mktAuthHeaders(opts.method === 'POST'), ...(opts.headers || {}) };
+        const res = await fetch(MKT_API + path, { ...opts, headers });
+        return res.json();
+    }
+
+    let mktTabInitialized = false;
+    function initMarketingTab() {
+        if (!mktTabInitialized) {
+            document.querySelectorAll('.mkt-subtab').forEach(btn => {
+                btn.addEventListener('click', () => switchMktSub(btn.dataset.sub));
+            });
+            loadMktBranches();
+            mktTabInitialized = true;
+        }
+        switchMktSub('unassigned');
+    }
+
+    function switchMktSub(name) {
+        document.querySelectorAll('.mkt-subtab').forEach(b => {
+            if (b.dataset.sub === name) b.classList.add('bg-indigo-100', 'text-indigo-700');
+            else b.classList.remove('bg-indigo-100', 'text-indigo-700');
+        });
+        document.querySelectorAll('.mkt-sub').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== name));
+        if (name === 'unassigned') loadMktUnassigned();
+        if (name === 'duplicates') loadMktDupes();
+        if (name === 'sp-unmatched') loadMktSpUnmatched();
+        if (name === 'runs') loadMktRuns();
+        if (name === 'performance') loadMktPerf();
+    }
+
+    async function loadMktBranches() {
+        try {
+            const r = await fetch('/api/branches', { headers: mktAuthHeaders(false) }).then(x => x.json());
+            const list = r.branches || r.list || [];
+            const opts = '<option value="">Choose branch…</option>' +
+                list.map(b => `<option value="${b.id}">${mktEsc(b.name)}</option>`).join('');
+            ['mktBulkBranch', 'mktCfgBranch', 'mktPerfBranch'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = opts;
+            });
+            const cfg = document.getElementById('mktCfgBranch');
+            if (cfg) cfg.onchange = onMktCfgBranchChange;
+        } catch (err) { console.error('loadMktBranches', err); }
+    }
+
+    async function loadMktUnassigned() {
+        const r = await mktFetch('/admin/queues/unassigned');
+        const body = document.getElementById('mktUnassignedBody');
+        body.innerHTML = (r.list || []).map(l =>
+            `<tr class="border-t"><td class="p-2"><input type="checkbox" class="mkt-ua-chk" value="${l.id}"></td>
+             <td class="p-2">${mktEsc(l.full_name)}</td>
+             <td class="p-2">${mktEsc(l.phone)}</td>
+             <td class="p-2 text-xs text-gray-500">${mktEsc(l.zoho_customer_id || '')}</td>
+             <td class="p-2 text-xs">${new Date(l.imported_at).toLocaleDateString()}</td></tr>`
+        ).join('') || '<tr><td class="p-4 text-center text-gray-500" colspan="5">No unassigned leads</td></tr>';
+    }
+
+    async function bulkAssignBranch() {
+        const ids = Array.from(document.querySelectorAll('.mkt-ua-chk:checked')).map(c => Number(c.value));
+        const branch_id = Number(document.getElementById('mktBulkBranch').value);
+        if (!ids.length || !branch_id) return alert('Select leads + branch');
+        const r = await mktFetch('/admin/queues/unassigned/assign', { method: 'POST', body: JSON.stringify({ ids, branch_id }) });
+        if (r.success) { alert(`Assigned ${r.count} leads`); loadMktUnassigned(); } else alert(r.error || 'Failed');
+    }
+
+    async function runBulkImport() {
+        if (!confirm('Run initial PNTR bulk import? This can take several minutes.')) return;
+        const r = await mktFetch('/admin/import/bulk', { method: 'POST' });
+        alert(JSON.stringify(r, null, 2));
+        loadMktRuns();
+    }
+    async function runIncrementalImport() {
+        const r = await mktFetch('/admin/import/incremental', { method: 'POST' });
+        alert(JSON.stringify(r, null, 2));
+        loadMktRuns();
+    }
+
+    async function loadMktRuns() {
+        const r = await mktFetch('/admin/import/runs');
+        document.getElementById('mktRunsBody').innerHTML = (r.runs || []).map(x =>
+            `<tr class="border-t"><td class="p-2 text-xs">${new Date(x.started_at).toLocaleString()}</td>
+             <td class="p-2">${mktEsc(x.run_type)}</td>
+             <td class="p-2">${x.total_zoho_pntr_customers}</td>
+             <td class="p-2">${x.imported_count}</td>
+             <td class="p-2">${x.linked_existing_painter}</td>
+             <td class="p-2">${x.duplicates_queued}</td>
+             <td class="p-2">${x.branch_unresolved_count}</td>
+             <td class="p-2">${x.errors_count}</td>
+             <td class="p-2"><span class="text-xs ${x.status === 'completed' ? 'text-green-600' : x.status === 'failed' ? 'text-red-600' : 'text-gray-500'}">${mktEsc(x.status)}</span></td></tr>`
+        ).join('') || '<tr><td class="p-4 text-center text-gray-500" colspan="9">No runs yet</td></tr>';
+    }
+
+    async function loadMktDupes() {
+        const r = await mktFetch('/admin/queues/duplicates');
+        document.getElementById('mktDupList').innerHTML = (r.list || []).map(d =>
+            `<div class="border rounded-lg p-3 mb-2">
+                <div class="font-medium">${mktEsc(d.duplicate_zoho_name)} — ${mktEsc(d.duplicate_phone)}</div>
+                <div class="text-sm text-gray-500">Original: ${mktEsc(d.original_name || '—')} / ${mktEsc(d.original_phone || '—')}</div>
+                <div class="flex gap-1 mt-2">
+                    <button onclick="resolveDupe(${d.id},'kept_original')" class="px-2 py-1 text-xs bg-gray-200 rounded">Keep Original</button>
+                    <button onclick="resolveDupe(${d.id},'kept_duplicate')" class="px-2 py-1 text-xs bg-gray-200 rounded">Keep Duplicate</button>
+                    <button onclick="resolveDupe(${d.id},'merged')" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Merge</button>
+                    <button onclick="resolveDupe(${d.id},'ignored')" class="px-2 py-1 text-xs bg-gray-200 rounded">Ignore</button>
+                </div>
+            </div>`
+        ).join('') || '<div class="text-gray-500 text-center py-4">No pending duplicates</div>';
+    }
+    async function resolveDupe(id, resolution) {
+        const r = await mktFetch(`/admin/queues/duplicates/${id}/resolve`, { method: 'POST', body: JSON.stringify({ resolution }) });
+        if (r.success) loadMktDupes();
+    }
+
+    async function loadMktSpUnmatched() {
+        const r = await mktFetch('/admin/queues/salesperson-unmatched');
+        document.getElementById('mktSpBody').innerHTML = (r.list || []).map(sp =>
+            `<tr class="border-t"><td class="p-2">${mktEsc(sp.zoho_salesperson_name)}</td>
+             <td class="p-2">${mktEsc(sp.zoho_salesperson_phone || '')}</td>
+             <td class="p-2"><input type="number" placeholder="Painter ID" id="mktSpP${sp.id}" class="w-24 px-2 py-1 border rounded text-sm">
+                 <button onclick="linkSp(${sp.id})" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Link</button></td></tr>`
+        ).join('') || '<tr><td class="p-4 text-center text-gray-500" colspan="3">No unmatched</td></tr>';
+    }
+    async function linkSp(id) {
+        const painter_id = Number(document.getElementById(`mktSpP${id}`).value);
+        if (!painter_id) return alert('Enter painter id');
+        const r = await mktFetch(`/admin/queues/salesperson-unmatched/${id}/link`, { method: 'POST', body: JSON.stringify({ painter_id }) });
+        if (r.success) loadMktSpUnmatched();
+    }
+
+    async function loadMktPerf() {
+        const q = new URLSearchParams({
+            from: document.getElementById('mktPerfFrom').value,
+            to: document.getElementById('mktPerfTo').value,
+            branch_id: document.getElementById('mktPerfBranch').value
+        });
+        const r = await mktFetch(`/admin/performance?${q}`);
+        document.getElementById('mktPerfBody').innerHTML = (r.stats || []).map(s => {
+            const rate = s.total_assigned ? Math.round(100 * s.contacted / s.total_assigned) : 0;
+            return `<tr class="border-t"><td class="p-2">${mktEsc(s.full_name || '-')}</td>
+                    <td class="p-2">${s.branch_id || '-'}</td>
+                    <td class="p-2">${s.total_assigned}</td>
+                    <td class="p-2">${s.contacted}</td>
+                    <td class="p-2">${s.interested}</td>
+                    <td class="p-2"><span class="${rate >= 70 ? 'text-green-600' : rate >= 40 ? 'text-yellow-600' : 'text-red-600'}">${rate}%</span></td></tr>`;
+        }).join('') || '<tr><td class="p-4 text-center text-gray-500" colspan="6">No data</td></tr>';
+    }
+
+    let mktBfPreviewed = false;
+    async function previewBackfill() {
+        const from_date = document.getElementById('mktBfFrom').value;
+        if (!from_date) return alert('Pick a date');
+        const r = await mktFetch('/admin/backfill/preview', { method: 'POST', body: JSON.stringify({ from_date }) });
+        document.getElementById('mktBfPreview').textContent = JSON.stringify(r, null, 2);
+        mktBfPreviewed = true;
+        document.getElementById('mktBfRunBtn').disabled = false;
+    }
+    async function runBackfill() {
+        if (!mktBfPreviewed) return alert('Preview first');
+        if (!confirm('Run backfill? This writes points transactions.')) return;
+        const from_date = document.getElementById('mktBfFrom').value;
+        const r = await mktFetch('/admin/backfill/run', { method: 'POST', body: JSON.stringify({ from_date }) });
+        alert(JSON.stringify(r, null, 2));
+    }
+
+    async function onMktCfgBranchChange(e) {
+        const scope_id = Number(e.target.value);
+        if (!scope_id) { document.getElementById('mktCfgForm').classList.add('hidden'); return; }
+        const r = await mktFetch(`/admin/config?scope=branch&scope_id=${scope_id}`);
+        const c = r.config || {};
+        document.getElementById('mktCfgQuota').value = c.daily_quota || 10;
+        document.getElementById('mktCfgNew').value = c.recycle_days_new || 7;
+        document.getElementById('mktCfgCallback').value = c.recycle_days_callback || 3;
+        document.getElementById('mktCfgVisit').value = c.recycle_days_will_visit || 14;
+        document.getElementById('mktCfgAware').value = c.recycle_days_already_aware || 60;
+        document.getElementById('mktCfgNotInt').value = c.recycle_days_not_interested || 30;
+        document.getElementById('mktCfgUnreach').value = c.recycle_days_unreachable || 60;
+        document.getElementById('mktCfgActive').value = c.recycle_days_active_painter || 45;
+        document.getElementById('mktCfgForm').classList.remove('hidden');
+    }
+    async function saveMktCfg() {
+        const payload = {
+            scope: 'branch',
+            scope_id: Number(document.getElementById('mktCfgBranch').value),
+            daily_quota: Number(document.getElementById('mktCfgQuota').value),
+            recycle_days_new: Number(document.getElementById('mktCfgNew').value),
+            recycle_days_callback: Number(document.getElementById('mktCfgCallback').value),
+            recycle_days_will_visit: Number(document.getElementById('mktCfgVisit').value),
+            recycle_days_already_aware: Number(document.getElementById('mktCfgAware').value),
+            recycle_days_not_interested: Number(document.getElementById('mktCfgNotInt').value),
+            recycle_days_unreachable: Number(document.getElementById('mktCfgUnreach').value),
+            recycle_days_active_painter: Number(document.getElementById('mktCfgActive').value)
+        };
+        const r = await mktFetch('/admin/config', { method: 'POST', body: JSON.stringify(payload) });
+        alert(r.success ? 'Saved' : ('Failed: ' + (r.error || '')));
     }
     </script>
 </body>
