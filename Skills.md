@@ -2,7 +2,7 @@
 
 > **Platform**: act.qcpaintshop.com
 > **Version**: 3.3.7
-> **Last Updated**: 2026-04-15
+> **Last Updated**: 2026-04-17
 > **Total Codebase**: ~20,000+ lines (server) | 80+ frontend pages | Android app (2 flavors)
 
 ---
@@ -3011,8 +3011,9 @@ Bridge between Zoho Books PNTR-prefixed painter customers and the Painter Loyalt
 
 #### Routes
 - `routes/painter-marketing.js` mounted at `/api/painter-marketing/*`.
-  - Staff: `GET /me/today`, `GET /me/painters`, `POST /leads/:id/followup`, `POST /leads/:id/convert`
-  - Admin: `POST /admin/import/{bulk,incremental}`, `GET /admin/import/runs`, queues (`unassigned`, `duplicates`, `salesperson-unmatched`), `GET+POST /admin/config`, `POST /admin/generate-daily-lists`, `POST /admin/backfill/{preview,run}`, `GET /admin/performance`.
+  - Staff: `GET /me/today`, `GET /me/painters`, `POST /leads/:id/followup`, `POST /leads/:id/convert` (now creates `staff_incentives` with `source='painter_convert'` on success)
+  - Admin (original): `POST /admin/import/{bulk,incremental}`, `GET /admin/import/runs`, queues (`unassigned`, `duplicates`, `salesperson-unmatched`), `GET+POST /admin/config`, `POST /admin/generate-daily-lists`, `POST /admin/backfill/{preview,run}`, `GET /admin/performance`.
+  - Admin (Apr 17 additions): `GET /admin/leads` (all painter_leads with branch/status/search filter + source_lead_id + source_lead_name), `PUT /admin/leads/:id/assign` (manual branch+staff or auto), `GET /admin/leads/:id/history`, `GET /admin/branches/:branch_id/staff`, `POST /admin/leads/:id/send-wa` (system WA session), `POST /admin/leads/from-lead` (nominate customer lead as painter_lead, source_lead_id FK).
 - `routes/painters.js` additions:
   - `/register` INSERT now fires `syncPainterToZoho()` (fire-and-forget) for all 3 paths.
   - `POST /:id/activate` — dual-auth (painter self via `x-painter-token` matching id, OR admin via `painters.manage`). Sets `activated_at`, updates lead status to `active_painter`, chains Zoho sync → backfill.
@@ -3037,8 +3038,9 @@ Default grants: manager gets all 4, staff gets view/contact/convert. Run `node m
 | 18:00 | WhatsApp alert to branch manager if any staff < 30% |
 
 #### UI Pages
-- `public/admin-painters.html` — New "📣 Marketing" tab with 7 sub-tabs: Branch Unassigned, Duplicate Phone, Salesperson Unmatched, Import Runs, Performance, Points Backfill, Config.
-- `public/staff-painter-marketing.html` — New staff page (today's list + outcome modal + "Convert" on interested leads). Added to `public/components/staff-sidebar.html` under "My Work".
+- `public/admin-painters.html` — "📣 Marketing" tab now has 8 sub-tabs: **All Leads** (new, Apr 17 — branch/status/search filter table, row-click slide panel, manual assign, WA send, contact history), Branch Unassigned, Duplicate Phone, Salesperson Unmatched, Import Runs, Performance, Points Backfill, Config. Slide panel z-index=10000 (above universal-nav 9999).
+- `public/admin-leads.html` — Now has "🎨 Painter" button on every lead row (Apr 17). Click → modal → branch select → POST /admin/leads/from-lead → nominates as painter_lead. Already-nominated leads show "✓ Painter" badge. `escapeHtml()` is the XSS function (NOT `mktEsc`).
+- `public/staff-painter-marketing.html` — Staff page (today's list + outcome modal + "Convert" on interested leads). Added to `public/components/staff-sidebar.html` under "My Work".
 - `public/painter-login.html` — After OTP verify, fires `/api/painters/:id/activate` (painter's own id, or `?ref=` override) to trigger backfill.
 
 #### Migrations
@@ -3046,6 +3048,14 @@ Default grants: manager gets all 4, staff gets view/contact/convert. Run `node m
 - `migrations/migrate-pntr-painter-marketing.js` — all 7 tables + 2 ALTERs (painters, painter_invoices_processed)
 - `migrations/migrate-pntr-marketing-permissions.js` — 4 permissions + role grants
 - `migrations/migrate-pntr-wa-templates.js` — seeds `ai_config` rate keys (0.005) + Tamil WA templates (marketing prospecting + activation invite)
+- `migrations/migrate-painter-lead-incentive.js` — (Apr 17) ALTER `staff_incentives.source` ENUM to add `'painter_convert'`
+
+#### Leads ↔ Painter Program Integration (Apr 17)
+- `painter_leads.source_lead_id` FK → `leads.id` — already existed, now populated when staff nominates via admin-leads.html
+- `leads.lead_type = 'painter'` — set when lead is nominated
+- `staff_incentives.source = 'painter_convert'` — fired by `POST /leads/:id/convert` if `painter_lead.assigned_to` exists and `incentive_enabled=true`
+- Incentive amount: `incentive_per_conversion` ai_config (default ₹500), auto-approve if `incentive_auto_approve=true`
+- Source badge in All Leads: `l.source_lead_id` → "📋 Customer Lead" blue pill in Marketing All Leads table
 
 #### WhatsApp Templates (in `ai_config`, Tamil — no வணக்கம் per project rule)
 - `painter_marketing_wa_template` — outbound prospecting message with `{painter_name}`, `{branch_name}`, `{staff_phone}` placeholders
