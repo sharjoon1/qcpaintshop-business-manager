@@ -3141,6 +3141,27 @@
                 btn.addEventListener('click', () => switchMktSub(btn.dataset.sub));
             });
             loadMktBranches();
+            // All Leads filter listeners
+            document.getElementById('mktAlBranch').addEventListener('change', function() { loadAllLeads(1); });
+            document.getElementById('mktAlStatus').addEventListener('change', function() { loadAllLeads(1); });
+            document.getElementById('mktAlSearch').addEventListener('input', function() {
+                clearTimeout(mktAlSearchTimer);
+                mktAlSearchTimer = setTimeout(function() { loadAllLeads(1); }, 350);
+            });
+            document.getElementById('mktAlChkAll').addEventListener('change', function() {
+                document.querySelectorAll('.mkt-al-chk').forEach(function(c) { c.checked = this.checked; }.bind(this));
+            });
+            document.getElementById('mktAlBulkBranch').addEventListener('change', function() {
+                loadMktAlBulkStaff(this.value);
+            });
+            // Panel branch change
+            document.getElementById('mktPanelBranchSel').addEventListener('change', function() {
+                loadPanelStaff(Number(this.value), null);
+            });
+            // WA chip listeners
+            document.querySelectorAll('.mkt-wa-chip').forEach(function(c) {
+                c.addEventListener('click', function() { selectWaChip(this.dataset.tpl); });
+            });
             mktTabInitialized = true;
         }
         switchMktSub('unassigned');
@@ -3157,7 +3178,33 @@
         if (name === 'sp-unmatched') loadMktSpUnmatched();
         if (name === 'runs') loadMktRuns();
         if (name === 'performance') loadMktPerf();
+        if (name === 'all-leads' && !mktAlLoaded) {
+            mktAlLoaded = true;
+            loadAllLeads(1);
+        }
     }
+
+    // ─── All Leads + Slide Panel ───
+    const MKT_AL_TEMPLATES = {
+        welcome: function(name) { return name + ' அவர்களே, QC Colour Painter Program-ல் உங்களை அழைக்கிறோம். Points சம்பாதித்து பரிசுகள் வெல்லுங்கள். App Download: https://play.google.com/store/apps/details?id=com.qcpaintshop.painter'; },
+        points:  function(name) { return name + ' அவர்களே, ஒவ்வொரு purchase-க்கும் Loyalty Points கிடைக்கும். அதை திரும்ப பணமாக பெறலாம். App: https://play.google.com/store/apps/details?id=com.qcpaintshop.painter'; },
+        register: function()    { return 'QC Painter App: https://play.google.com/store/apps/details?id=com.qcpaintshop.painter'; },
+        custom:   function()    { return ''; }
+    };
+
+    const MKT_STATUS_LABELS = {
+        new: '<span class="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-700">New</span>',
+        in_progress: '<span class="px-2 py-0.5 rounded-full text-xs bg-orange-50 text-orange-700">In Progress</span>',
+        interested: '<span class="px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-700">Interested</span>',
+        converted: '<span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800 font-bold">Converted ✓</span>',
+        not_interested: '<span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">Not Interested</span>',
+        unreachable: '<span class="px-2 py-0.5 rounded-full text-xs bg-red-50 text-red-600">Unreachable</span>'
+    };
+
+    var mktAlPage = 1;
+    var mktAlLoaded = false;
+    var mktAlCurrentLead = null;
+    var mktAlSearchTimer;
 
     async function loadMktBranches() {
         try {
@@ -3165,13 +3212,197 @@
             const list = r.data || r.branches || r.list || [];
             const opts = '<option value="">Choose branch…</option>' +
                 list.map(b => `<option value="${b.id}">${mktEsc(b.name)}</option>`).join('');
-            ['mktBulkBranch', 'mktCfgBranch', 'mktPerfBranch'].forEach(id => {
+            ['mktBulkBranch', 'mktCfgBranch', 'mktPerfBranch', 'mktAlBranch', 'mktAlBulkBranch', 'mktPanelBranchSel'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerHTML = opts;
             });
             const cfg = document.getElementById('mktCfgBranch');
             if (cfg) cfg.onchange = onMktCfgBranchChange;
         } catch (err) { console.error('loadMktBranches', err); }
+    }
+
+    async function loadAllLeads(page) {
+        page = page || 1;
+        mktAlPage = page;
+        var branch_id = document.getElementById('mktAlBranch').value;
+        var status = document.getElementById('mktAlStatus').value;
+        var search = document.getElementById('mktAlSearch').value.trim();
+        var params = new URLSearchParams({ page: page, limit: 50 });
+        if (branch_id) params.set('branch_id', branch_id);
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+
+        var r = await mktFetch('/admin/leads?' + params.toString());
+        if (!r.success) return;
+
+        document.getElementById('mktAlCount').textContent = r.total + ' leads';
+        var badge = document.getElementById('mktAlUnassignedBadge');
+        if (r.unassigned_count > 0) {
+            badge.textContent = r.unassigned_count + ' unassigned';
+            badge.classList.remove('hidden');
+        } else { badge.classList.add('hidden'); }
+
+        var tbody = document.getElementById('mktAlBody');
+        if (!r.leads.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-400 text-sm">No leads found</td></tr>';
+            document.getElementById('mktAlPagination').innerHTML = '';
+            return;
+        }
+
+        tbody.innerHTML = r.leads.map(function(l) {
+            return '<tr class="hover:bg-green-50 cursor-pointer border-b border-gray-100 transition-colors" onclick="openMktPanel(' + JSON.stringify(l).replace(/"/g, '&quot;') + ')">' +
+                '<td class="p-2" onclick="event.stopPropagation()"><input type="checkbox" class="mkt-al-chk" value="' + l.id + '"></td>' +
+                '<td class="p-2 font-medium text-gray-900">' + mktEsc(l.full_name) + '</td>' +
+                '<td class="p-2 text-gray-500 hidden sm:table-cell">' + mktEsc(l.phone) + '</td>' +
+                '<td class="p-2 text-gray-500 text-xs hidden md:table-cell">' + (l.branch_name ? mktEsc(l.branch_name) : '<span class="text-orange-500">Unassigned</span>') + '</td>' +
+                '<td class="p-2 text-gray-500 text-xs hidden md:table-cell">' + (l.staff_name ? mktEsc(l.staff_name) : '<span class="text-gray-300">—</span>') + '</td>' +
+                '<td class="p-2">' + (MKT_STATUS_LABELS[l.status] || l.status) + '</td>' +
+                '<td class="p-2 text-gray-400 text-xs hidden lg:table-cell">' + (l.last_contact_date ? new Date(l.last_contact_date).toLocaleDateString('en-IN') : 'Never') + '</td>' +
+                '</tr>';
+        }).join('');
+
+        var totalPages = Math.ceil(r.total / 50);
+        var pg = document.getElementById('mktAlPagination');
+        if (totalPages > 1) {
+            pg.innerHTML =
+                '<button onclick="loadAllLeads(' + (page - 1) + ')" ' + (page <= 1 ? 'disabled' : '') + ' class="px-2 py-1 border rounded text-xs disabled:opacity-40">‹</button>' +
+                '<span class="px-2 py-1 text-xs text-gray-500">' + page + ' / ' + totalPages + '</span>' +
+                '<button onclick="loadAllLeads(' + (page + 1) + ')" ' + (page >= totalPages ? 'disabled' : '') + ' class="px-2 py-1 border rounded text-xs disabled:opacity-40">›</button>';
+        } else { pg.innerHTML = ''; }
+    }
+
+    async function mktAlBulkAssign() {
+        var ids = Array.from(document.querySelectorAll('.mkt-al-chk:checked')).map(function(c) { return Number(c.value); });
+        var branch_id = Number(document.getElementById('mktAlBulkBranch').value);
+        if (!ids.length || !branch_id) return alert('Select leads and a branch first');
+        var r = await mktFetch('/admin/queues/unassigned/assign', { method: 'POST', body: JSON.stringify({ ids: ids, branch_id: branch_id }) });
+        if (r.success) { alert('Assigned ' + r.count + ' leads'); loadAllLeads(mktAlPage); }
+        else alert(r.error || 'Failed');
+    }
+
+    async function loadMktAlBulkStaff(branchId) {
+        var sel = document.getElementById('mktAlBulkStaff');
+        sel.innerHTML = '<option value="">Auto assign staff</option>';
+        if (!branchId) return;
+        var r = await mktFetch('/admin/branches/' + branchId + '/staff');
+        if (r.success) r.staff.forEach(function(s) {
+            sel.innerHTML += '<option value="' + s.id + '">' + mktEsc(s.full_name) + '</option>';
+        });
+    }
+
+    function openMktPanel(lead) {
+        mktAlCurrentLead = lead;
+        document.getElementById('mktPanelName').textContent = lead.full_name;
+        document.getElementById('mktPanelPhone').textContent = '📱 ' + lead.phone;
+        document.getElementById('mktPanelBranchVal').textContent = lead.branch_name || 'Unassigned';
+        document.getElementById('mktPanelStaffVal').textContent = lead.staff_name || 'Not assigned';
+        document.getElementById('mktPanelCallsVal').textContent = lead.total_attempts || 0;
+        document.getElementById('mktPanelLastVal').textContent = lead.last_contact_date
+            ? new Date(lead.last_contact_date).toLocaleDateString('en-IN') : 'Never';
+
+        var branchSel = document.getElementById('mktPanelBranchSel');
+        branchSel.value = lead.branch_id || '';
+        loadPanelStaff(lead.branch_id, lead.assigned_to);
+        selectWaChip('welcome');
+        document.getElementById('mktWaStatus').textContent = '';
+        loadPanelHistory(lead.id);
+
+        document.getElementById('mktLeadPanel').classList.remove('hidden');
+        document.getElementById('mktPanelOverlay').classList.remove('hidden');
+    }
+
+    function closeMktPanel() {
+        document.getElementById('mktLeadPanel').classList.add('hidden');
+        document.getElementById('mktPanelOverlay').classList.add('hidden');
+        mktAlCurrentLead = null;
+    }
+
+    async function loadPanelStaff(branchId, selectedId) {
+        var sel = document.getElementById('mktPanelStaffSel');
+        sel.innerHTML = '<option value="">— Auto assign —</option>';
+        if (!branchId) return;
+        var r = await mktFetch('/admin/branches/' + branchId + '/staff');
+        if (r.success) r.staff.forEach(function(s) {
+            sel.innerHTML += '<option value="' + s.id + '"' + (s.id === selectedId ? ' selected' : '') + '>' + mktEsc(s.full_name) + '</option>';
+        });
+    }
+
+    async function savePanelAssign() {
+        if (!mktAlCurrentLead) return;
+        var branch_id = Number(document.getElementById('mktPanelBranchSel').value);
+        var assigned_to = document.getElementById('mktPanelStaffSel').value || null;
+        if (!branch_id) return alert('Choose a branch first');
+
+        var r = await mktFetch('/admin/leads/' + mktAlCurrentLead.id + '/assign', {
+            method: 'PUT',
+            body: JSON.stringify({ branch_id: branch_id, assigned_to: assigned_to ? Number(assigned_to) : null })
+        });
+        if (r.success) {
+            var branchText = document.getElementById('mktPanelBranchSel').selectedOptions[0] ? document.getElementById('mktPanelBranchSel').selectedOptions[0].text : '—';
+            document.getElementById('mktPanelBranchVal').textContent = branchText;
+            document.getElementById('mktPanelStaffVal').textContent = r.staff_name || 'Auto assigned';
+            mktAlCurrentLead.branch_id = branch_id;
+            mktAlCurrentLead.assigned_to = r.assigned_to;
+            loadAllLeads(mktAlPage);
+        } else alert(r.error || 'Failed to assign');
+    }
+
+    function selectWaChip(tpl) {
+        document.querySelectorAll('.mkt-wa-chip').forEach(function(c) {
+            c.classList.remove('bg-green-100', 'border-green-400', 'text-green-800');
+            c.classList.add('bg-gray-100', 'border-gray-200');
+        });
+        var active = document.querySelector('.mkt-wa-chip[data-tpl="' + tpl + '"]');
+        if (active) {
+            active.classList.remove('bg-gray-100', 'border-gray-200');
+            active.classList.add('bg-green-100', 'border-green-400', 'text-green-800');
+        }
+        var name = mktAlCurrentLead ? mktAlCurrentLead.full_name : '';
+        var fn = MKT_AL_TEMPLATES[tpl];
+        document.getElementById('mktWaMsg').value = fn ? fn(name) : '';
+        if (tpl === 'custom') document.getElementById('mktWaMsg').focus();
+    }
+
+    async function sendMktWa() {
+        if (!mktAlCurrentLead) return;
+        var message = document.getElementById('mktWaMsg').value.trim();
+        if (!message) return alert('Message cannot be empty');
+        var statusEl = document.getElementById('mktWaStatus');
+        statusEl.textContent = 'Sending…';
+        statusEl.className = 'text-xs mt-1 text-gray-500';
+        var r = await mktFetch('/admin/leads/' + mktAlCurrentLead.id + '/send-wa', {
+            method: 'POST',
+            body: JSON.stringify({ message: message })
+        });
+        if (r.success) {
+            statusEl.textContent = '✓ Sent successfully';
+            statusEl.className = 'text-xs mt-1 text-green-600';
+            loadPanelHistory(mktAlCurrentLead.id);
+        } else {
+            statusEl.textContent = '✗ ' + (r.error || 'Failed to send');
+            statusEl.className = 'text-xs mt-1 text-red-500';
+        }
+    }
+
+    async function loadPanelHistory(leadId) {
+        var el = document.getElementById('mktPanelHistory');
+        el.innerHTML = '<p class="text-xs text-gray-400">Loading…</p>';
+        var r = await mktFetch('/admin/leads/' + leadId + '/history');
+        if (!r.success || !r.history.length) {
+            el.innerHTML = '<div class="text-xs text-gray-400 text-center py-4">No contact history yet</div>';
+            return;
+        }
+        var typeIcon = { call: '📞', whatsapp: '💬', visit: '🤝' };
+        el.innerHTML = r.history.map(function(h) {
+            return '<div class="p-2 bg-gray-50 rounded-lg border-l-2 ' + (h.followup_type === 'whatsapp' ? 'border-green-400' : 'border-gray-300') + '">' +
+                '<div class="flex justify-between items-center mb-1">' +
+                '<span class="text-xs font-medium text-gray-600">' + (typeIcon[h.followup_type] || '•') + ' ' + mktEsc(h.staff_name || 'Admin') + '</span>' +
+                '<span class="text-xs text-gray-400">' + new Date(h.created_at).toLocaleDateString('en-IN') + '</span>' +
+                '</div>' +
+                (h.outcome ? '<span class="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">' + mktEsc(h.outcome) + '</span> ' : '') +
+                (h.notes ? '<p class="text-xs text-gray-500 mt-1 break-words">' + mktEsc(h.notes) + '</p>' : '') +
+                '</div>';
+        }).join('');
     }
 
     async function loadMktUnassigned() {
