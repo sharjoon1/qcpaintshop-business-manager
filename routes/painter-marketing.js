@@ -342,8 +342,8 @@ router.post('/admin/leads/:id/send-wa', requirePermission('painters', 'marketing
         await sessionManager.sendMessage(0, waPhone + '@c.us', message, { source: 'painter_marketing_admin' });
 
         await pool.query(
-            `INSERT INTO painter_lead_followups (painter_lead_id, user_id, followup_type, outcome, notes)
-             VALUES (?, ?, 'whatsapp', 'message_sent', ?)`,
+            `INSERT INTO painter_lead_followups (painter_lead_id, user_id, followup_type, notes)
+             VALUES (?, ?, 'whatsapp', ?)`,
             [leadId, req.user.id, message]
         );
 
