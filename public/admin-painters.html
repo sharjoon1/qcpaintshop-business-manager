@@ -662,6 +662,7 @@
             <div id="tab-marketing" class="tab-content">
                 <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
                     <div class="flex flex-wrap gap-2 border-b border-gray-200 pb-2 mb-4">
+                        <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="all-leads">All Leads</button>
                         <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="unassigned">Branch Unassigned</button>
                         <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="duplicates">Duplicate Phone</button>
                         <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="sp-unmatched">Salesperson Unmatched</button>
@@ -669,6 +670,53 @@
                         <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="performance">Performance</button>
                         <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="backfill">Points Backfill</button>
                         <button class="mkt-subtab px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100" data-sub="config">Config</button>
+                    </div>
+
+                    <!-- Sub: All Leads -->
+                    <div class="mkt-sub hidden" data-pane="all-leads">
+                        <div class="flex flex-wrap gap-2 mb-3 items-center">
+                            <select id="mktAlBranch" class="px-3 py-1.5 border rounded-lg text-sm bg-white">
+                                <option value="">All Branches</option>
+                            </select>
+                            <select id="mktAlStatus" class="px-3 py-1.5 border rounded-lg text-sm bg-white">
+                                <option value="">All Status</option>
+                                <option value="new">New</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="interested">Interested</option>
+                                <option value="converted">Converted</option>
+                                <option value="not_interested">Not Interested</option>
+                                <option value="unreachable">Unreachable</option>
+                            </select>
+                            <input id="mktAlSearch" type="text" placeholder="Search name or phone…" class="px-3 py-1.5 border rounded-lg text-sm flex-1 min-w-32">
+                            <span id="mktAlCount" class="text-xs text-gray-500"></span>
+                            <span id="mktAlUnassignedBadge" class="hidden text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold"></span>
+                        </div>
+                        <div class="overflow-x-auto rounded-lg border border-gray-200">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide">
+                                    <tr>
+                                        <th class="p-2 w-8"><input type="checkbox" id="mktAlChkAll"></th>
+                                        <th class="p-2">Name</th>
+                                        <th class="p-2 hidden sm:table-cell">Phone</th>
+                                        <th class="p-2 hidden md:table-cell">Branch</th>
+                                        <th class="p-2 hidden md:table-cell">Staff</th>
+                                        <th class="p-2">Status</th>
+                                        <th class="p-2 hidden lg:table-cell">Last Contact</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mktAlBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="flex gap-2 mt-3 flex-wrap items-center">
+                            <select id="mktAlBulkBranch" class="px-3 py-1.5 border rounded-lg text-sm bg-white">
+                                <option value="">Bulk: Choose branch…</option>
+                            </select>
+                            <select id="mktAlBulkStaff" class="px-3 py-1.5 border rounded-lg text-sm bg-white">
+                                <option value="">Auto assign staff</option>
+                            </select>
+                            <button onclick="mktAlBulkAssign()" class="px-3 py-1.5 bg-green-700 text-white rounded-lg text-sm font-semibold">Apply to Selected</button>
+                            <div id="mktAlPagination" class="ml-auto flex gap-1"></div>
+                        </div>
                     </div>
 
                     <!-- Sub: Unassigned -->
@@ -778,6 +826,76 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Lead Slide Panel -->
+                <div id="mktLeadPanel" class="hidden fixed top-0 right-0 h-full w-full sm:w-96 bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col overflow-hidden">
+                    <div class="flex items-start justify-between p-4 border-b border-gray-200">
+                        <div>
+                            <div id="mktPanelName" class="text-base font-bold text-gray-900"></div>
+                            <div id="mktPanelPhone" class="text-xs text-gray-500 mt-0.5"></div>
+                        </div>
+                        <button onclick="closeMktPanel()" class="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded px-2 py-1 text-lg leading-none">✕</button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-5">
+                        <!-- Info grid -->
+                        <div>
+                            <div class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Lead Info</div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="bg-gray-50 rounded-lg p-2">
+                                    <div id="mktPanelBranchVal" class="text-sm font-semibold text-gray-900">—</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">Branch</div>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-2">
+                                    <div id="mktPanelStaffVal" class="text-sm font-semibold text-gray-900">—</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">Assigned Staff</div>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-2">
+                                    <div id="mktPanelCallsVal" class="text-sm font-semibold text-gray-900">0</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">Total Contacts</div>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-2">
+                                    <div id="mktPanelLastVal" class="text-sm font-semibold text-gray-900">Never</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">Last Contact</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Assign -->
+                        <div>
+                            <div class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Assign Branch & Staff</div>
+                            <select id="mktPanelBranchSel" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 bg-white">
+                                <option value="">Choose branch…</option>
+                            </select>
+                            <div class="flex gap-2">
+                                <select id="mktPanelStaffSel" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                    <option value="">— Auto assign —</option>
+                                </select>
+                                <button onclick="savePanelAssign()" class="px-3 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">Save</button>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">Auto assign = picks staff with fewest leads in branch</p>
+                        </div>
+                        <!-- WhatsApp -->
+                        <div>
+                            <div class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">WhatsApp Message</div>
+                            <div class="flex flex-wrap gap-1.5 mb-2" id="mktWaChips">
+                                <button class="mkt-wa-chip text-xs px-3 py-1 rounded-full bg-gray-100 border border-gray-200 hover:bg-green-50 hover:border-green-300" data-tpl="welcome">PNTR Welcome</button>
+                                <button class="mkt-wa-chip text-xs px-3 py-1 rounded-full bg-gray-100 border border-gray-200 hover:bg-green-50 hover:border-green-300" data-tpl="points">Points Info</button>
+                                <button class="mkt-wa-chip text-xs px-3 py-1 rounded-full bg-gray-100 border border-gray-200 hover:bg-green-50 hover:border-green-300" data-tpl="register">Register Link</button>
+                                <button class="mkt-wa-chip text-xs px-3 py-1 rounded-full bg-gray-100 border border-gray-200 hover:bg-green-50 hover:border-green-300" data-tpl="custom">Custom…</button>
+                            </div>
+                            <textarea id="mktWaMsg" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-green-600"></textarea>
+                            <div class="flex gap-2 mt-2">
+                                <button onclick="sendMktWa()" class="flex-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold">📱 Send WhatsApp</button>
+                            </div>
+                            <div id="mktWaStatus" class="text-xs mt-1 text-gray-500"></div>
+                        </div>
+                        <!-- History -->
+                        <div>
+                            <div class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Contact History</div>
+                            <div id="mktPanelHistory" class="flex flex-col gap-2 text-sm"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="mktPanelOverlay" class="hidden fixed inset-0 bg-black bg-opacity-20 z-40" onclick="closeMktPanel()"></div>
             </div>
         </div>
     </div>
