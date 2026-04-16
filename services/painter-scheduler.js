@@ -12,6 +12,11 @@
 const cron = require('node-cron');
 const pointsEngine = require('./painter-points-engine');
 const painterNotificationService = require('./painter-notification-service');
+const pntrImportService = require('./pntr-import-service');
+const painterZohoSyncService = require('./painter-zoho-sync-service');
+const painterMarketingScheduler = require('./painter-marketing-scheduler');
+const painterBackfillService = require('./painter-points-backfill-service');
+const zohoApi = require('./zoho-api');
 
 let pool = null;
 let registry = null;
@@ -20,6 +25,7 @@ const jobs = {};
 function setPool(p) {
     pool = p;
     pointsEngine.setPool(p);
+    painterZohoSyncService.init({ pool: p, zohoApi });
 }
 
 function setAutomationRegistry(r) { registry = r; }
@@ -240,6 +246,15 @@ function start() {
     jobs.streakReminder = cron.schedule('0 20 * * *', runStreakReminder, { timezone: 'Asia/Kolkata' });
 
     console.log('[Painter Scheduler] Started: monthly-slabs(1st 6AM), quarterly-slabs(Q1 6:30AM), credit-check(daily 8AM), streak-reset(midnight), bonus-rotation(00:05), daily-bonus-push(7AM), streak-reminder(8PM)');
+
+    // PNTR Painter Marketing — register 4 IST crons (02:30 incremental, 03:00 retry, 03:30 backfill, 06:00 daily list)
+    painterMarketingScheduler.registerCron({
+        pool,
+        zohoApi,
+        pntrImportService,
+        backfillService: painterBackfillService,
+        painterZohoSyncService
+    });
 }
 
 function stop() {
