@@ -711,10 +711,7 @@
                             <select id="mktAlBulkBranch" class="px-3 py-1.5 border rounded-lg text-sm bg-white">
                                 <option value="">Bulk: Choose branch…</option>
                             </select>
-                            <select id="mktAlBulkStaff" class="px-3 py-1.5 border rounded-lg text-sm bg-white">
-                                <option value="">Auto assign staff</option>
-                            </select>
-                            <button onclick="mktAlBulkAssign()" class="px-3 py-1.5 bg-green-700 text-white rounded-lg text-sm font-semibold">Apply to Selected</button>
+                            <button onclick="mktAlBulkAssign()" class="px-3 py-1.5 bg-green-700 text-white rounded-lg text-sm font-semibold">Assign to Branch</button>
                             <div id="mktAlPagination" class="ml-auto flex gap-1"></div>
                         </div>
                     </div>
@@ -3212,7 +3209,7 @@
             const list = r.data || r.branches || r.list || [];
             const opts = '<option value="">Choose branch…</option>' +
                 list.map(b => `<option value="${b.id}">${mktEsc(b.name)}</option>`).join('');
-            ['mktBulkBranch', 'mktCfgBranch', 'mktPerfBranch', 'mktAlBranch', 'mktAlBulkBranch', 'mktPanelBranchSel'].forEach(id => {
+            ['mktBulkBranch', 'mktCfgBranch', 'mktPerfBranch', 'mktAlBranch', 'mktAlBulkBranch', 'mktPanelBranchSel'].forEach(id => { // mktAlBulkBranch kept for bulk-branch assign
                 const el = document.getElementById(id);
                 if (el) el.innerHTML = opts;
             });
