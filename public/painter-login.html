@@ -140,6 +140,19 @@
                 if (painter.status === 'approved') {
                     localStorage.setItem('painter_token', data.token);
                     localStorage.setItem('painter', JSON.stringify(painter));
+
+                    // PNTR activation: fire /activate endpoint (backfills Dec 2025+ invoices)
+                    try {
+                        const refId = new URLSearchParams(location.search).get('ref');
+                        const targetId = refId ? Number(refId) : painter.id;
+                        if (targetId) {
+                            await fetch(`/api/painters/${targetId}/activate`, {
+                                method: 'POST',
+                                headers: { 'x-painter-token': data.token, 'Content-Type': 'application/json' }
+                            });
+                        }
+                    } catch (_) { /* non-blocking */ }
+
                     window.location.href = '/painter-dashboard.html';
                 } else if (painter.status === 'pending') {
                     showStatus('warning', 'Registration Pending', 'Your registration is being reviewed. Please wait for approval.');
