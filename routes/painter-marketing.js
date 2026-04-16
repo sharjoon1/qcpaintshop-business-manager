@@ -303,6 +303,45 @@ router.get('/admin/leads/:id/history', requirePermission('painters', 'marketing_
     }
 });
 
+// Create painter_lead from an existing customer lead
+router.post('/admin/leads/from-lead', requirePermission('painters', 'marketing_manage'), async (req, res) => {
+    try {
+        const { lead_id, branch_id } = req.body;
+        if (!lead_id || !branch_id) return res.status(400).json({ success: false, error: 'lead_id and branch_id required' });
+
+        const [[lead]] = await pool.query(
+            `SELECT id, name, phone, email, assigned_to FROM leads WHERE id = ?`, [Number(lead_id)]
+        );
+        if (!lead) return res.status(404).json({ success: false, error: 'lead_not_found' });
+
+        const digits = String(lead.phone || '').replace(/\D/g, '');
+        let phone = digits;
+        if (digits.length === 12 && digits.startsWith('91')) phone = digits.slice(2);
+        else if (digits.length === 11 && digits.startsWith('0')) phone = digits.slice(1);
+        if (!phone || phone.length !== 10) return res.status(400).json({ success: false, error: 'invalid_phone' });
+
+        const [[existing]] = await pool.query(
+            `SELECT id FROM painter_leads WHERE phone = ? LIMIT 1`, [phone]
+        );
+        if (existing) return res.status(409).json({ success: false, error: 'already_exists', painter_lead_id: existing.id });
+
+        const [ins] = await pool.query(
+            `INSERT INTO painter_leads (full_name, phone, email, branch_id, branch_detected_via, assigned_to, source_lead_id, status)
+             VALUES (?, ?, ?, ?, 'admin_assign', ?, ?, 'new')`,
+            [lead.name, phone, lead.email || null, Number(branch_id), lead.assigned_to || null, Number(lead_id)]
+        );
+        const painter_lead_id = ins.insertId;
+
+        await pool.query(`UPDATE leads SET lead_type = 'painter' WHERE id = ?`, [Number(lead_id)]);
+        await assignNewLead(pool, painter_lead_id, Number(branch_id));
+
+        res.json({ success: true, painter_lead_id });
+    } catch (err) {
+        console.error('[admin/leads/from-lead]', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 router.get('/admin/branches/:branch_id/staff', requirePermission('painters', 'marketing_manage'), async (req, res) => {
     try {
         const [staff] = await pool.query(
