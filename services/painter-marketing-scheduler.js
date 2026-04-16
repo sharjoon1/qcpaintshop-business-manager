@@ -135,7 +135,73 @@ function registerCron({ pool, zohoApi, pntrImportService, backfillService, paint
         try { await generateDailyLists(pool); }
         catch (e) { console.error('[pntr-marketing] daily list gen failed', e.message); }
     }, { timezone: 'Asia/Kolkata' });
-    console.log('[pntr-marketing] crons registered: 02:30, 03:00, 03:30, 06:00 IST');
+
+    // 06:30 IST — FCM push "today's list ready"
+    cron.schedule('30 6 * * *', async () => {
+        try {
+            const [rows] = await pool.query(
+                `SELECT user_id, COUNT(*) AS n FROM painter_daily_assignments WHERE assigned_date = CURDATE() GROUP BY user_id`
+            );
+            const notif = require('./notification-service');
+            for (const r of rows) {
+                await notif.send(r.user_id, {
+                    type: 'painter_marketing_ready',
+                    title: '🎨 Today\'s painter calls',
+                    body: `${r.n} painters in today's list`,
+                    data: { url: '/staff-painter-marketing.html' }
+                });
+            }
+        } catch (e) { console.error('[pntr-marketing] 06:30 push failed', e.message); }
+    }, { timezone: 'Asia/Kolkata' });
+
+    // 17:00 IST — reminder to staff < 50% complete
+    cron.schedule('0 17 * * *', async () => {
+        try {
+            const [rows] = await pool.query(
+                `SELECT user_id, COUNT(*) AS total, SUM(contacted_at IS NOT NULL) AS done
+                 FROM painter_daily_assignments WHERE assigned_date = CURDATE()
+                 GROUP BY user_id HAVING total > 0 AND (done * 2 < total)`
+            );
+            const notif = require('./notification-service');
+            for (const r of rows) {
+                await notif.send(r.user_id, {
+                    type: 'painter_marketing_reminder',
+                    title: '⚠️ Painter calls pending',
+                    body: `${r.total - r.done} painter calls remaining today`,
+                    data: { url: '/staff-painter-marketing.html' }
+                });
+            }
+        } catch (e) { console.error('[pntr-marketing] 17:00 push failed', e.message); }
+    }, { timezone: 'Asia/Kolkata' });
+
+    // 18:00 IST — manager WhatsApp alert if any staff < 30% complete
+    cron.schedule('0 18 * * *', async () => {
+        try {
+            const [low] = await pool.query(
+                `SELECT pda.branch_id, u.full_name AS staff_name,
+                        COUNT(*) AS total, SUM(contacted_at IS NOT NULL) AS done
+                 FROM painter_daily_assignments pda JOIN users u ON u.id = pda.user_id
+                 WHERE pda.assigned_date = CURDATE()
+                 GROUP BY pda.user_id HAVING total > 0 AND (done * 10 < total * 3)`
+            );
+            if (!low.length) return;
+            const byBranch = {};
+            for (const r of low) { (byBranch[r.branch_id] ||= []).push(`${r.staff_name}: ${r.done}/${r.total}`); }
+            const branchIds = Object.keys(byBranch);
+            if (!branchIds.length) return;
+            const [branches] = await pool.query(`SELECT id, manager_user_id FROM branches WHERE id IN (?)`, [branchIds]);
+            const whatsapp = require('./whatsapp-session-manager');
+            for (const b of branches) {
+                if (!b.manager_user_id) continue;
+                const [mgr] = await pool.query(`SELECT phone FROM users WHERE id = ?`, [b.manager_user_id]);
+                if (!mgr[0]?.phone) continue;
+                const text = `Painter marketing — underperformers today:\n${byBranch[b.id].join('\n')}`;
+                await whatsapp.sendMessage(0, mgr[0].phone, text).catch(err => console.error('[pntr-marketing] WA send fail', err.message));
+            }
+        } catch (e) { console.error('[pntr-marketing] 18:00 WA failed', e.message); }
+    }, { timezone: 'Asia/Kolkata' });
+
+    console.log('[pntr-marketing] crons registered: 02:30, 03:00, 03:30, 06:00, 06:30, 17:00, 18:00 IST');
 }
 
 module.exports = {
