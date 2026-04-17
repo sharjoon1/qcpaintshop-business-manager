@@ -500,7 +500,7 @@ async function viewEstimate(id) {
                 ${est.customer_address ? `<div><span class="text-gray-500">Address:</span> ${esc(est.customer_address)}</div>` : ''}
                 <div><span class="text-gray-500">Type:</span> ${est.customer_type}</div>
             </div>
-            <table class="w-full text-sm mb-4">
+            <div class="overflow-x-auto -mx-1"><table class="w-full text-sm mb-4 min-w-[320px]">
                 <thead><tr class="border-b text-left text-gray-500">
                     <th class="py-2 font-medium">Product</th>
                     <th class="py-2 font-medium w-16 text-right">Qty</th>
@@ -515,7 +515,7 @@ async function viewEstimate(id) {
                         <td class="py-2 text-right font-medium">${formatCurrency(i.line_total)}</td>
                     </tr>`).join('')}
                 </tbody>
-            </table>
+            </table></div>
             <div class="space-y-1 text-sm">
                 <div class="flex justify-between"><span class="text-gray-500">Subtotal</span><span>${formatCurrency(est.subtotal)}</span></div>
                 ${est.discount_amount > 0 ? `<div class="flex justify-between"><span class="text-gray-500">Discount</span><span class="text-red-600">-${formatCurrency(est.discount_amount)}</span></div>` : ''}
@@ -654,7 +654,7 @@ async function viewInvoice(id) {
                 ${inv.customer_address ? `<div><span class="text-gray-500">Address:</span> ${esc(inv.customer_address)}</div>` : ''}
                 <div><span class="text-gray-500">Type:</span> ${inv.customer_type}</div>
             </div>
-            <table class="w-full text-sm mb-4">
+            <div class="overflow-x-auto -mx-1"><table class="w-full text-sm mb-4 min-w-[320px]">
                 <thead><tr class="border-b text-left text-gray-500">
                     <th class="py-2 font-medium">Product</th>
                     <th class="py-2 font-medium w-16 text-right">Qty</th>
@@ -669,7 +669,7 @@ async function viewInvoice(id) {
                         <td class="py-2 text-right font-medium">${formatCurrency(i.line_total)}</td>
                     </tr>`).join('')}
                 </tbody>
-            </table>
+            </table></div>
             <div class="space-y-1 text-sm mb-4">
                 <div class="flex justify-between"><span class="text-gray-500">Subtotal</span><span>${formatCurrency(inv.subtotal)}</span></div>
                 ${inv.discount_amount > 0 ? `<div class="flex justify-between"><span class="text-gray-500">Discount</span><span class="text-red-600">-${formatCurrency(inv.discount_amount)}</span></div>` : ''}
