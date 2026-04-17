@@ -238,7 +238,7 @@ router.post('/admin/queues/unassigned/assign', requirePermission('painters', 'ma
 
 router.get('/admin/leads', requirePermission('painters', 'marketing_view'), async (req, res) => {
     try {
-        const { branch_id, status, search, page = 1, limit = 50 } = req.query;
+        const { branch_id, status, search, staff_id, page = 1, limit = 50 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
         const conditions = [];
         const params = [];
@@ -248,6 +248,12 @@ router.get('/admin/leads', requirePermission('painters', 'marketing_view'), asyn
         } else if (branch_id) {
             conditions.push('pl.branch_id = ?');
             params.push(Number(branch_id));
+        }
+        if (staff_id === 'unassigned') {
+            conditions.push('pl.assigned_to IS NULL');
+        } else if (staff_id) {
+            conditions.push('pl.assigned_to = ?');
+            params.push(Number(staff_id));
         }
         if (status) {
             conditions.push('pl.status = ?');

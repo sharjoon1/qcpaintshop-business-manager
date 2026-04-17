@@ -699,6 +699,10 @@
                                 <option value="not_interested">Not Interested</option>
                                 <option value="unreachable">Unreachable</option>
                             </select>
+                            <select id="mktAlStaff" class="px-3 py-1.5 border rounded-lg text-sm bg-white">
+                                <option value="">All Staff</option>
+                                <option value="unassigned">— Unassigned —</option>
+                            </select>
                             <input id="mktAlSearch" type="text" placeholder="Search name or phone…" class="px-3 py-1.5 border rounded-lg text-sm flex-1 min-w-32">
                             <span id="mktAlCount" class="text-xs text-gray-500"></span>
                             <span id="mktAlUnassignedBadge" class="hidden text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold"></span>
@@ -3154,8 +3158,9 @@
             });
             loadMktBranches();
             // All Leads filter listeners
-            document.getElementById('mktAlBranch').addEventListener('change', function() { loadAllLeads(1); });
+            document.getElementById('mktAlBranch').addEventListener('change', function() { loadMktAlStaff(); loadAllLeads(1); });
             document.getElementById('mktAlStatus').addEventListener('change', function() { loadAllLeads(1); });
+            document.getElementById('mktAlStaff').addEventListener('change', function() { loadAllLeads(1); });
             document.getElementById('mktAlSearch').addEventListener('input', function() {
                 clearTimeout(mktAlSearchTimer);
                 mktAlSearchTimer = setTimeout(function() { loadAllLeads(1); }, 350);
@@ -3233,16 +3238,36 @@
         } catch (err) { console.error('loadMktBranches', err); }
     }
 
+    async function loadMktAlStaff() {
+        var branch_id = document.getElementById('mktAlBranch').value;
+        var sel = document.getElementById('mktAlStaff');
+        sel.innerHTML = '<option value="">All Staff</option><option value="unassigned">— Unassigned —</option>';
+        if (!branch_id) return;
+        try {
+            var r = await mktFetch('/admin/branches/' + branch_id + '/staff');
+            if (r.success && r.staff.length) {
+                r.staff.forEach(function(s) {
+                    var opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = mktEsc(s.full_name);
+                    sel.appendChild(opt);
+                });
+            }
+        } catch (e) { console.error('loadMktAlStaff', e); }
+    }
+
     async function loadAllLeads(page) {
         page = page || 1;
         mktAlPage = page;
         var branch_id = document.getElementById('mktAlBranch').value;
         var status = document.getElementById('mktAlStatus').value;
         var search = document.getElementById('mktAlSearch').value.trim();
+        var staff_id = document.getElementById('mktAlStaff').value;
         var params = new URLSearchParams({ page: page, limit: 50 });
         if (branch_id) params.set('branch_id', branch_id);
         if (status) params.set('status', status);
         if (search) params.set('search', search);
+        if (staff_id) params.set('staff_id', staff_id);
 
         var r = await mktFetch('/admin/leads?' + params.toString());
         if (!r.success) return;
