@@ -400,13 +400,17 @@ router.post('/staff/leads/from-lead', requireAuth, async (req, res) => {
         const [[existing]] = await pool.query(
             `SELECT id FROM painter_leads WHERE phone = ? LIMIT 1`, [phone]
         );
-        if (existing) return res.status(409).json({ success: false, error: 'already_exists' });
+        if (existing) return res.status(409).json({ success: false, error: 'already_exists', painter_lead_id: existing.id });
 
         const branchId = lead.branch_id || null;
+        if (branchId && req.user.branch_id && branchId !== req.user.branch_id) {
+            return res.status(403).json({ success: false, error: 'lead_not_in_your_branch' });
+        }
+
         const [ins] = await pool.query(
-            `INSERT INTO painter_leads (full_name, phone, email, branch_id, branch_detected_via, assigned_to, source_lead_id, status)
-             VALUES (?, ?, ?, ?, 'staff_assign', ?, ?, 'new')`,
-            [lead.name, phone, lead.email || null, branchId, lead.assigned_to || null, Number(lead_id)]
+            `INSERT INTO painter_leads (full_name, phone, email, branch_id, branch_detected_via, assigned_to, source_lead_id, notes, status)
+             VALUES (?, ?, ?, ?, 'staff_assign', ?, ?, ?, 'new')`,
+            [lead.name, phone, lead.email || null, branchId, lead.assigned_to || null, Number(lead_id), notes || null]
         );
         const painter_lead_id = ins.insertId;
 
