@@ -191,7 +191,7 @@ async function runBulkImport({ pool, zohoApi, triggeredBy = null, runType = 'ini
         let page = 1, hasMore = true;
         while (hasMore) {
             const params = {
-                page, per_page: 200
+                contact_type: 'customer', page, per_page: 200
             };
             if (sinceIso) params.last_modified_time = sinceIso;
             const resp = await zohoApi.getContacts(params);

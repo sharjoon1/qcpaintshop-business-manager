@@ -66,7 +66,7 @@ async function generateDailyLists(pool) {
     for (const br of branches) {
         stats.branches++;
         const [staff] = await pool.query(
-            `SELECT id FROM users WHERE branch_id = ? AND role IN ('staff','manager') AND is_active = 1`,
+            `SELECT id FROM users WHERE branch_id = ? AND role IN ('staff','manager') AND status = 'active'`,
             [br.id]
         );
         for (const s of staff) {
@@ -105,7 +105,7 @@ async function assignNewLead(pool, painterLeadId, branchId) {
     const [candidates] = await pool.query(
         `SELECT u.id, COUNT(pl.id) AS cnt
          FROM users u LEFT JOIN painter_leads pl ON pl.assigned_to = u.id AND pl.status NOT IN ('converted','active_painter','wrong_number','duplicate')
-         WHERE u.branch_id = ? AND u.role IN ('staff','manager') AND u.is_active = 1
+         WHERE u.branch_id = ? AND u.role IN ('staff','manager') AND u.status = 'active'
          GROUP BY u.id ORDER BY cnt ASC LIMIT 1`,
         [branchId]
     );
