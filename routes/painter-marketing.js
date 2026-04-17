@@ -427,13 +427,9 @@ router.post('/staff/leads/from-lead', requireAuth, async (req, res) => {
 router.get('/admin/branches/:branch_id/staff', requirePermission('painters', 'marketing_manage'), async (req, res) => {
     try {
         const [staff] = await pool.query(
-            `SELECT DISTINCT u.id, u.full_name
-             FROM users u
-             JOIN user_roles ur ON ur.user_id = u.id
-             JOIN role_permissions rp ON rp.role_id = ur.role_id
-             WHERE rp.module = 'painters' AND rp.action = 'marketing_contact'
-               AND u.branch_id = ? AND u.status = 'active'
-             ORDER BY u.full_name`,
+            `SELECT id, full_name FROM users
+             WHERE branch_id = ? AND status = 'active' AND role IN ('staff','manager')
+             ORDER BY full_name`,
             [Number(req.params.branch_id)]
         );
         res.json({ success: true, staff });
