@@ -3,184 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1B5E3B">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
     <title>Painter Marketing — QC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/design-system.css">
+    <script src="/universal-nav-loader.js"></script>
+    <script src="/js/auth-helper.js"></script>
+    <script>checkAuthOrRedirect();</script>
     <style>
-        body { background: #f0fdf4; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111827; }
-        .container { max-width: 720px; margin: 0 auto; padding: 1rem; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
-        header h1 { margin: 0; font-size: 20px; color: #0D3D23; }
-        .summary { color: #6b7280; font-size: 14px; margin-bottom: .5rem; }
-        .progress-bar { height: 8px; background: #e5e7eb; border-radius: 999px; overflow: hidden; margin-bottom: .75rem; }
-        .progress-fill { height: 100%; background: #1B5E3B; transition: width .3s; }
-        .pills { display: flex; gap: .5rem; margin: .5rem 0 1rem; flex-wrap: wrap; }
-        .pill { padding: 6px 14px; border-radius: 999px; border: 1px solid #d1d5db; cursor: pointer; background: #fff; font-size: 14px; color: #374151; text-decoration: none; display: inline-block; }
-        .pill.active { background: #1B5E3B; color: #fff; border-color: #1B5E3B; }
-        .card { background: #fff; border-radius: .75rem; padding: 1rem; margin-bottom: .75rem; box-shadow: 0 1px 2px rgba(0,0,0,.05); border: 1px solid #e5e7eb; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
-        .badge-new { background: #e0f2fe; color: #075985; }
-        .badge-interested { background: #dcfce7; color: #166534; }
-        .badge-in_progress { background: #fef3c7; color: #92400e; }
-        .badge-unreachable { background: #fee2e2; color: #991b1b; }
-        .badge-not_interested { background: #f3f4f6; color: #4b5563; }
-        .badge-wrong_number { background: #fecaca; color: #7f1d1d; }
-        .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
-        .modal { background: #fff; border-radius: 1rem 1rem 0 0; padding: 1rem; width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto; }
-        .modal h3 { margin-top: 0; color: #0D3D23; }
-        .modal label { display: block; margin: .5rem 0 .25rem; font-size: 13px; color: #374151; font-weight: 500; }
-        .modal select, .modal input, .modal textarea { width: 100%; padding: .5rem; border: 1px solid #d1d5db; border-radius: .375rem; font-size: 14px; box-sizing: border-box; }
-        .modal textarea { resize: vertical; min-height: 60px; }
-        @media (min-width: 640px) { .modal-bg { align-items: center; } .modal { border-radius: 1rem; } }
+        .badge-new           { background:#dbeafe; color:#1e40af; }
+        .badge-interested    { background:#dcfce7; color:#166534; }
+        .badge-in_progress   { background:#fef3c7; color:#92400e; }
+        .badge-unreachable   { background:#fee2e2; color:#991b1b; }
+        .badge-not_interested{ background:#f3f4f6; color:#4b5563; }
+        .badge-wrong_number  { background:#fecaca; color:#7f1d1d; }
+        .badge-converted     { background:#e9d5ff; color:#6b21a8; }
+        .pill-filter.active  { background:#1B5E3B !important; color:#fff !important; border-color:#1B5E3B !important; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🎨 Today's Painter Calls</h1>
-            <a class="pill" href="#" id="linkMyPainters">My Painters</a>
-        </header>
-        <div class="summary" id="summary">Loading…</div>
-        <div class="progress-bar"><div class="progress-fill" id="progress" style="width: 0%"></div></div>
-        <div class="pills">
-            <button class="pill active" data-filter="all">All</button>
-            <button class="pill" data-filter="pending">Pending</button>
-            <button class="pill" data-filter="done">Done</button>
+<body class="bg-gray-50" data-page="painter-marketing">
+
+<div id="mainContent" class="px-4 sm:px-6 py-4 pb-20 max-w-2xl mx-auto">
+
+    <!-- Header card -->
+    <div class="relative overflow-hidden rounded-2xl p-4 mb-4 text-white" style="background:linear-gradient(135deg,#0D3D23 0%,#1B5E3B 100%)">
+        <div class="absolute -top-6 -right-6 w-28 h-28 bg-white/5 rounded-full pointer-events-none"></div>
+        <div class="flex items-center justify-between mb-3 relative">
+            <h1 class="text-lg font-bold">Today's Painter Calls</h1>
+            <span id="progressBadge" class="text-xs font-semibold px-3 py-1 rounded-full bg-white/20">0/0</span>
         </div>
-        <div id="list"></div>
+        <div class="h-2 rounded-full overflow-hidden bg-white/20 relative">
+            <div id="progressFill" class="h-full rounded-full bg-white transition-all duration-300" style="width:0%"></div>
+        </div>
+        <p id="summary" class="text-xs mt-2 text-green-100">Loading…</p>
     </div>
 
-    <div id="modalRoot"></div>
+    <!-- Filter pills -->
+    <div class="flex gap-2 mb-4 overflow-x-auto pb-1">
+        <button class="pill-filter active flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="all">All</button>
+        <button class="pill-filter flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="pending">Pending</button>
+        <button class="pill-filter flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600" data-filter="done">Done</button>
+    </div>
 
-    <script>
-        const token = localStorage.getItem('auth_token');
-        if (!token) location.href = '/login.html';
-        const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
-        function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    <!-- Lead list -->
+    <div id="list"></div>
+</div>
 
-        let allLeads = [];
-        let filter = 'all';
+<div id="modalRoot"></div>
 
-        async function load() {
-            try {
-                const r = await fetch('/api/painter-marketing/me/today', { headers }).then(x => x.json());
-                allLeads = r.list || [];
-                render();
-            } catch (err) {
-                document.getElementById('list').innerHTML = '<div class="card" style="color:#991b1b">Error: ' + esc(err.message) + '</div>';
-            }
-        }
+<script>
+    const token = localStorage.getItem('auth_token');
+    const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-        function render() {
-            const total = allLeads.length;
-            const done = allLeads.filter(l => l.contacted_at).length;
-            document.getElementById('summary').textContent = `${done} of ${total} contacted`;
-            document.getElementById('progress').style.width = total ? (100 * done / total) + '%' : '0%';
-            let list = allLeads;
-            if (filter === 'pending') list = allLeads.filter(l => !l.contacted_at);
-            if (filter === 'done') list = allLeads.filter(l => l.contacted_at);
-            if (!list.length) {
-                document.getElementById('list').innerHTML = '<div class="card" style="text-align:center;color:#6b7280">No leads in this view</div>';
-                return;
-            }
-            document.getElementById('list').innerHTML = list.map(l => {
-                const badgeClass = 'badge-' + (l.status || 'new');
-                const lastTxt = l.last_contact_date
-                    ? `Last: ${Math.floor((Date.now() - new Date(l.last_contact_date)) / 86400000)}d ago — ${esc(l.last_outcome || '')}`
-                    : 'No prior contact';
-                return `<div class="card">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <strong>${esc(l.full_name)}</strong>
-                        <span class="badge ${badgeClass}">${esc(l.status)}</span>
-                    </div>
-                    <div style="color:#6b7280;margin:.25rem 0;font-size:14px;">📞 ${esc(l.phone)}</div>
-                    <div style="font-size:12px;color:#6b7280;">${lastTxt}</div>
-                    ${l.notes ? `<div style="font-size:12px;margin-top:.25rem;font-style:italic;">"${esc(l.notes)}"</div>` : ''}
-                    <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;">
-                        <a class="pill" href="tel:${esc(l.phone)}">📞 Call</a>
-                        <a class="pill" href="https://wa.me/91${esc(l.phone)}" target="_blank" rel="noopener">💬 WhatsApp</a>
-                        <button class="pill" onclick="openOutcome(${l.id})">✏️ Log</button>
-                        ${l.status === 'interested' ? `<button class="pill" style="background:#1B5E3B;color:#fff;border-color:#1B5E3B" onclick="convertLead(${l.id})">Convert →</button>` : ''}
-                    </div>
-                </div>`;
-            }).join('');
-        }
+    let allLeads = [], filter = 'all';
 
-        function openOutcome(leadId) {
-            document.getElementById('modalRoot').innerHTML = `
-            <div class="modal-bg" onclick="if(event.target===this) closeModal()">
-                <div class="modal">
-                    <h3>Log Outcome</h3>
-                    <label>Channel</label>
-                    <select id="ch" onchange="toggleCallFields()"><option value="call">Call</option><option value="whatsapp">WhatsApp</option><option value="visit">Visited Shop</option></select>
-                    <div id="callFields">
-                        <label>Call Status</label>
-                        <select id="cs">
-                            <option value="">—</option>
-                            <option value="connected">Connected</option>
-                            <option value="not_answered">Not Answered</option>
-                            <option value="wrong_number">Wrong Number</option>
-                            <option value="switched_off">Switched Off</option>
-                            <option value="busy">Busy</option>
-                        </select>
-                    </div>
-                    <label>Outcome</label>
-                    <select id="oc">
-                        <option value="">—</option>
-                        <option value="interested_in_program">Interested ⭐</option>
-                        <option value="already_aware">Already Aware</option>
-                        <option value="will_visit_shop">Will Visit Shop</option>
-                        <option value="wants_callback">Wants Callback</option>
-                        <option value="not_interested">Not Interested</option>
-                        <option value="no_answer">No Answer</option>
-                        <option value="wrong_number">Wrong Number</option>
-                    </select>
-                    <label>Callback date (if wants callback)</label>
-                    <input type="date" id="cd">
-                    <label>Notes</label>
-                    <textarea id="nt" rows="2" placeholder="Optional"></textarea>
-                    <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;">
-                        <button class="pill" onclick="closeModal()">Cancel</button>
-                        <button class="pill active" onclick="saveOutcome(${leadId})">Save &amp; Next</button>
-                    </div>
-                </div>
-            </div>`;
-        }
-        function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
-        function toggleCallFields() {
-            const ch = document.getElementById('ch').value;
-            document.getElementById('callFields').style.display = ch === 'call' ? 'block' : 'none';
-        }
-
-        async function saveOutcome(leadId) {
-            const body = {
-                followup_type: document.getElementById('ch').value,
-                call_status: document.getElementById('cs').value || null,
-                outcome: document.getElementById('oc').value || null,
-                next_followup_date: document.getElementById('cd').value || null,
-                notes: document.getElementById('nt').value || null
-            };
-            try {
-                const r = await fetch(`/api/painter-marketing/leads/${leadId}/followup`, { method: 'POST', headers, body: JSON.stringify(body) }).then(x => x.json());
-                if (r.success) { closeModal(); load(); } else { alert(r.error?.message || r.error || 'Failed'); }
-            } catch (err) { alert('Error: ' + err.message); }
-        }
-
-        async function convertLead(leadId) {
-            if (!confirm('Convert this lead to a painter? A Zoho customer + salesperson will be created automatically.')) return;
-            try {
-                const r = await fetch(`/api/painter-marketing/leads/${leadId}/convert`, { method: 'POST', headers, body: JSON.stringify({}) }).then(x => x.json());
-                if (r.success) { alert('Converted! Painter ID: ' + r.painter_id); load(); } else { alert(r.error?.message || r.error || 'Failed'); }
-            } catch (err) { alert('Error: ' + err.message); }
-        }
-
-        document.querySelectorAll('.pill[data-filter]').forEach(p => p.onclick = () => {
-            document.querySelectorAll('.pill[data-filter]').forEach(x => x.classList.remove('active'));
-            p.classList.add('active');
-            filter = p.dataset.filter;
+    async function load() {
+        try {
+            const r = await fetch('/api/painter-marketing/me/today', { headers }).then(x => x.json());
+            allLeads = r.list || [];
             render();
-        });
+        } catch (err) {
+            document.getElementById('list').innerHTML = `<div class="bg-red-50 text-red-600 rounded-xl p-4 text-sm">${esc(err.message)}</div>`;
+        }
+    }
 
-        load();
-    </script>
+    function render() {
+        const total = allLeads.length;
+        const done  = allLeads.filter(l => l.contacted_at).length;
+        document.getElementById('summary').textContent = `${done} of ${total} contacted today`;
+        document.getElementById('progressBadge').textContent = `${done}/${total}`;
+        document.getElementById('progressFill').style.width = total ? (100 * done / total) + '%' : '0%';
+
+        let list = allLeads;
+        if (filter === 'pending') list = allLeads.filter(l => !l.contacted_at);
+        if (filter === 'done')    list = allLeads.filter(l =>  l.contacted_at);
+
+        if (!list.length) {
+            document.getElementById('list').innerHTML = `<div class="bg-white rounded-xl p-8 text-center text-gray-400 text-sm shadow-sm">No leads in this view</div>`;
+            return;
+        }
+
+        document.getElementById('list').innerHTML = list.map(l => {
+            const lastTxt = l.last_contact_date
+                ? `Last: ${Math.floor((Date.now() - new Date(l.last_contact_date)) / 86400000)}d ago — ${esc(l.last_outcome || '')}`
+                : 'No prior contact';
+            const ph = esc(l.phone || '');
+            return `<div class="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100">
+                <div class="flex items-start justify-between mb-1">
+                    <strong class="text-gray-900 text-sm">${esc(l.full_name)}</strong>
+                    <span class="badge badge-${esc(l.status)} text-xs font-medium px-2 py-0.5 rounded-full">${esc(l.status)}</span>
+                </div>
+                <div class="text-gray-500 text-xs mb-0.5">📞 ${ph}</div>
+                <div class="text-gray-400 text-xs mb-2">${lastTxt}</div>
+                ${l.notes ? `<div class="text-xs text-gray-500 italic mb-2 line-clamp-2">"${esc(l.notes)}"</div>` : ''}
+                <div class="grid grid-cols-3 gap-2">
+                    <a href="tel:${ph}" class="flex items-center justify-center py-2 rounded-lg text-xs font-semibold text-white" style="background:#1B5E3B">📞 Call</a>
+                    <a href="https://wa.me/91${ph}" target="_blank" rel="noopener" class="flex items-center justify-center py-2 rounded-lg text-xs font-semibold text-white" style="background:#25d366">💬 WA</a>
+                    <button onclick="openOutcome(${l.id})" class="flex items-center justify-center py-2 rounded-lg text-xs font-semibold border text-green-700 bg-white" style="border-color:#1B5E3B">✏️ Log</button>
+                </div>
+                ${l.status === 'interested' ? `
+                <div class="mt-2 rounded-lg px-3 py-2 flex items-center justify-between bg-amber-50">
+                    <span class="text-xs text-amber-700">⭐ Interested — Convert?</span>
+                    <button onclick="convertLead(${l.id})" class="text-xs font-bold" style="color:#1B5E3B">Convert →</button>
+                </div>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    function openOutcome(leadId) {
+        document.getElementById('modalRoot').innerHTML = `
+        <div class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50" onclick="if(event.target===this)closeModal()">
+            <div class="bg-white rounded-t-2xl sm:rounded-2xl p-4 w-full sm:max-w-md max-h-[85vh] overflow-y-auto">
+                <h3 class="font-bold text-base mb-3" style="color:#0D3D23">Log Outcome</h3>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Channel</label>
+                <select id="ch" onchange="toggleCallFields()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
+                    <option value="call">Call</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="visit">Visited Shop</option>
+                </select>
+                <div id="callFields">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Call Status</label>
+                    <select id="cs" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
+                        <option value="">—</option>
+                        <option value="connected">Connected</option>
+                        <option value="not_answered">Not Answered</option>
+                        <option value="wrong_number">Wrong Number</option>
+                        <option value="switched_off">Switched Off</option>
+                        <option value="busy">Busy</option>
+                    </select>
+                </div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Outcome</label>
+                <select id="oc" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
+                    <option value="">—</option>
+                    <option value="interested_in_program">Interested ⭐</option>
+                    <option value="already_aware">Already Aware</option>
+                    <option value="will_visit_shop">Will Visit Shop</option>
+                    <option value="wants_callback">Wants Callback</option>
+                    <option value="not_interested">Not Interested</option>
+                    <option value="no_answer">No Answer</option>
+                    <option value="wrong_number">Wrong Number</option>
+                </select>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Callback date</label>
+                <input type="date" id="cd" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                <textarea id="nt" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 resize-none" placeholder="Optional"></textarea>
+                <div class="flex gap-2 justify-end">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600">Cancel</button>
+                    <button onclick="saveOutcome(${leadId})" class="px-4 py-2 text-sm text-white rounded-lg font-semibold" style="background:#1B5E3B">Save</button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
+    function toggleCallFields() {
+        document.getElementById('callFields').style.display = document.getElementById('ch').value === 'call' ? 'block' : 'none';
+    }
+
+    async function saveOutcome(leadId) {
+        const body = {
+            followup_type: document.getElementById('ch').value,
+            call_status:   document.getElementById('cs').value || null,
+            outcome:       document.getElementById('oc').value || null,
+            next_followup_date: document.getElementById('cd').value || null,
+            notes:         document.getElementById('nt').value || null
+        };
+        try {
+            const r = await fetch(`/api/painter-marketing/leads/${leadId}/followup`, { method: 'POST', headers, body: JSON.stringify(body) }).then(x => x.json());
+            if (r.success) { closeModal(); load(); } else { alert(r.error?.message || r.error || 'Failed'); }
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function convertLead(leadId) {
+        if (!confirm('Convert this lead to a painter? A Zoho customer + salesperson will be created automatically.')) return;
+        try {
+            const r = await fetch(`/api/painter-marketing/leads/${leadId}/convert`, { method: 'POST', headers, body: JSON.stringify({}) }).then(x => x.json());
+            if (r.success) { alert('Converted! Painter ID: ' + r.painter_id); load(); } else { alert(r.error?.message || r.error || 'Failed'); }
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    document.querySelectorAll('.pill-filter').forEach(p => p.onclick = () => {
+        document.querySelectorAll('.pill-filter').forEach(x => x.classList.remove('active'));
+        p.classList.add('active');
+        filter = p.dataset.filter;
+        render();
+    });
+
+    load();
+</script>
 </body>
 </html>
