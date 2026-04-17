@@ -2984,6 +2984,19 @@ Profile avatar, server-generated visiting card, color visualization system, and 
 
 ---
 
+### Staff & Admin Mobile UX Upgrade (Apr 17 2026)
+
+5 pages made fully mobile-friendly + Painter Program nomination flow added to staff:
+
+- **`staff-painter-marketing.html`** — Full rewrite: Tailwind + staff sidebar nav + action-first cards (Call/WA/Log 3-col grid) + interested→convert strip. Replaced fixed 720px container.
+- **`staff-leads.html`** — Paint roller SVG button on each lead card → nomination modal → `POST /api/painter-marketing/staff/leads/from-lead`. On success: toast + card updates to `✓ Painter` badge without reload.
+- **`admin-leads.html`** — Mobile card view (`md:hidden`) alongside existing table (`hidden md:block`). Nomination modal now bottom-sheet on mobile.
+- **`admin-painters.html`** — Marketing/All Leads subtab: mobile card list + `#mktLeadPanel` becomes bottom-sheet on mobile via CSS (`@media max-width:767px`).
+- **`staff-billing.html`** — Items tables in detail panels wrapped with `overflow-x-auto`.
+- **Backend** — `POST /api/painter-marketing/staff/leads/from-lead` (`requireAuth`). Normalizes phone, guards branch ownership, saves notes, returns `painter_lead_id`. Migration: `migrations/migrate-staff-assign-enum.js` adds `staff_assign` to `branch_detected_via` ENUM.
+
+---
+
 ### PNTR Painter Marketing System (Apr 2026)
 
 Bridge between Zoho Books PNTR-prefixed painter customers and the Painter Loyalty Program. Bulk-import painter customers from Zoho → branch-wise marketing pool → daily staff assignments → outcome tracking → convert interested leads into formal painters → universal Zoho customer + sales-person sync → annual points backfill for Dec 2025+ invoices (direct billing + salesperson attribution).
