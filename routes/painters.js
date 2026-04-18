@@ -1096,7 +1096,14 @@ router.get('/me/estimates', requirePainterAuth, async (req, res) => {
 // Create estimate
 router.post('/me/estimates', requirePainterAuth, async (req, res) => {
     try {
-        const { billing_type, customer_name, customer_phone, customer_address, items, notes, submit } = req.body;
+        const {
+            billing_type, customer_name, customer_phone, customer_address,
+            items, notes, submit,
+            // v3.1 cart/markup flow additions:
+            pricing_mode,        // 'direct' (default) | 'request_qc_price'
+            labour_charge,       // decimal, customer path only
+            hide_qc_branding,    // 0/1, customer path only
+        } = req.body;
         if (!billing_type || !['self', 'customer'].includes(billing_type)) {
             return res.status(400).json({ success: false, message: 'billing_type must be self or customer' });
         }
@@ -1107,16 +1114,16 @@ router.post('/me/estimates', requirePainterAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: 'At least one item is required' });
         }
 
-        // Fetch GST config
-        const [gstConfig] = await pool.query("SELECT config_value FROM ai_config WHERE config_key = 'painter_estimate_gst_pct'");
-        const gstPct = gstConfig.length ? parseFloat(gstConfig[0].config_value) : 18;
+        const pricingMode = (billing_type === 'customer' && pricing_mode === 'request_qc_price') ? 'request_qc_price' : 'direct';
+        const labourCharge = (billing_type === 'customer') ? Math.max(0, parseFloat(labour_charge) || 0) : 0;
+        const hideBranding = (billing_type === 'customer' && (hide_qc_branding === 1 || hide_qc_branding === '1' || hide_qc_branding === true)) ? 1 : 0;
 
         // Validate items — each has pack_size_id + quantity
         const packSizeIds = items.map(i => i.pack_size_id || i.item_id);
         const [packSizeRows] = await pool.query(`
             SELECT ps.id as pack_size_id, ps.zoho_item_id, ps.size, ps.unit, ps.base_price, ps.product_id,
                    p.name as product_name, p.product_type,
-                   zim.zoho_item_name, zim.zoho_brand, zim.zoho_category_name, zim.zoho_rate
+                   zim.zoho_item_name, zim.zoho_brand, zim.zoho_category_name, zim.zoho_rate, zim.zoho_label_rate
             FROM pack_sizes ps
             INNER JOIN products p ON p.id = ps.product_id
             LEFT JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
@@ -1130,6 +1137,7 @@ router.post('/me/estimates', requirePainterAuth, async (req, res) => {
         const status = submit ? 'pending_admin' : 'draft';
 
         let subtotal = 0;
+        let markupSubtotal = 0;
         const lineItems = [];
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
@@ -1142,6 +1150,24 @@ router.post('/me/estimates', requirePainterAuth, async (req, res) => {
             const unitPrice = parseFloat(psRow.zoho_rate || psRow.base_price || 0);
             const lineTotal = qty * unitPrice;
             subtotal += lineTotal;
+
+            // v3.1: per-item markup (customer+direct only). Enforce strict MRP cap.
+            let markupUnitPrice = 0;
+            let markupLineTotal = 0;
+            if (billing_type === 'customer' && pricingMode === 'direct' && item.markup_pct != null) {
+                const pct = Math.max(0, parseFloat(item.markup_pct) || 0);
+                markupUnitPrice = Math.round(unitPrice * (1 + pct / 100) * 100) / 100;
+                const mrp = parseFloat(psRow.zoho_label_rate || psRow.zoho_rate || 0);
+                if (mrp > 0 && markupUnitPrice > mrp + 0.01) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Markup for "${psRow.product_name} ${psRow.size}${psRow.unit}" exceeds MRP (₹${mrp.toFixed(2)}). Reduce the % or increase the MRP in Zoho.`,
+                    });
+                }
+                markupLineTotal = Math.round(qty * markupUnitPrice * 100) / 100;
+                markupSubtotal += markupLineTotal;
+            }
+
             lineItems.push({
                 zoho_item_id: psRow.zoho_item_id,
                 item_name: `${psRow.product_name} ${psRow.size}${psRow.unit}`,
@@ -1150,22 +1176,30 @@ router.post('/me/estimates', requirePainterAuth, async (req, res) => {
                 quantity: qty,
                 unit_price: unitPrice,
                 line_total: lineTotal,
+                markup_unit_price: markupUnitPrice,
+                markup_line_total: markupLineTotal,
                 display_order: i
             });
         }
 
-        // Prices already include GST — store 0 for gst_amount, grandTotal = subtotal
+        // Prices already include GST — store 0 for gst_amount, grandTotal = subtotal [+ markup + labour].
+        // For customer+direct path, customer-facing total = markupSubtotal + labourCharge (what the
+        // painter shows their end-customer). We still record cost subtotal for audit.
         const gstAmount = 0;
-        const grandTotal = subtotal;
+        const grandTotal = (billing_type === 'customer' && pricingMode === 'direct' && markupSubtotal > 0)
+            ? (markupSubtotal + labourCharge)
+            : subtotal;
 
         const [result] = await pool.query(
             `INSERT INTO painter_estimates
              (estimate_number, painter_id, billing_type, customer_name, customer_phone, customer_address,
-              subtotal, gst_amount, grand_total, status, notes, created_by_painter)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              subtotal, gst_amount, grand_total, status, notes, created_by_painter,
+              pricing_mode, labour_charge, hide_qc_branding)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [estimateNumber, req.painter.id, billing_type,
              customer_name || null, customer_phone || null, customer_address || null,
-             subtotal, gstAmount, grandTotal, status, notes || null, req.painter.id]
+             subtotal, gstAmount, grandTotal, status, notes || null, req.painter.id,
+             pricingMode, labourCharge, hideBranding]
         );
 
         const estimateId = result.insertId;
@@ -1174,10 +1208,12 @@ router.post('/me/estimates', requirePainterAuth, async (req, res) => {
         for (const li of lineItems) {
             await pool.query(
                 `INSERT INTO painter_estimate_items
-                 (estimate_id, zoho_item_id, item_name, brand, category, quantity, unit_price, line_total, display_order)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                 (estimate_id, zoho_item_id, item_name, brand, category, quantity, unit_price, line_total,
+                  markup_unit_price, markup_line_total, display_order)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [estimateId, li.zoho_item_id, li.item_name, li.brand, li.category,
-                 li.quantity, li.unit_price, li.line_total, li.display_order]
+                 li.quantity, li.unit_price, li.line_total,
+                 li.markup_unit_price, li.markup_line_total, li.display_order]
             );
         }
 
