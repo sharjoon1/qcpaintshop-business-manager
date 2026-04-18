@@ -3505,6 +3505,47 @@ router.post('/estimates/:estimateId/markup', requirePermission('painters', 'esti
     }
 });
 
+// Admin: approve a customer estimate at painter's base rate only (strip markup).
+// The estimate's billing_type flips to 'self' so the points engine (processInvoice)
+// awards annual-only points instead of regular + annual. Used when admin decides
+// the painter shouldn't earn customer-markup commission for this deal.
+router.post('/estimates/:estimateId/approve-as-self', requirePermission('painters', 'estimates'), async (req, res) => {
+    try {
+        const [estimates] = await pool.query(
+            "SELECT * FROM painter_estimates WHERE id = ? AND status IN ('pending_admin','admin_review')",
+            [req.params.estimateId]
+        );
+        if (!estimates.length) {
+            return res.status(404).json({ success: false, message: 'Estimate not found or not pending review' });
+        }
+        // Wipe any existing markup — base rate only, annual points only.
+        await pool.query(
+            'UPDATE painter_estimate_items SET markup_unit_price = 0, markup_line_total = 0 WHERE estimate_id = ?',
+            [estimates[0].id]
+        );
+        await pool.query(
+            `UPDATE painter_estimates
+             SET billing_type = 'self',
+                 markup_subtotal = 0,
+                 markup_gst_amount = 0,
+                 markup_grand_total = 0,
+                 status = 'approved',
+                 reviewed_by = ?,
+                 reviewed_at = NOW()
+             WHERE id = ?`,
+            [req.user.id, estimates[0].id]
+        );
+        await logEstimateStatusChange(
+            estimates[0].id, estimates[0].status, 'approved', req.user.id,
+            'Approved as self-billing (base rate only, annual points only)'
+        );
+        res.json({ success: true, message: 'Approved at base rate — self-billing, annual points only' });
+    } catch (error) {
+        console.error('Approve-as-self error:', error);
+        res.status(500).json({ success: false, message: 'Failed to approve' });
+    }
+});
+
 // Generate share token + WhatsApp link
 router.post('/estimates/:estimateId/share', requirePermission('painters', 'estimates'), async (req, res) => {
     try {

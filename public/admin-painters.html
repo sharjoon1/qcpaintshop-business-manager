@@ -2037,8 +2037,13 @@
                     <button class="btn-sm btn-success" onclick="reviewEstimate(${est.id},'approve')">Approve</button>
                     <button class="btn-sm btn-danger" onclick="reviewEstimate(${est.id},'reject')">Reject</button>`;
             }
-        } else if (est.status === 'admin_review') {
-            actionsHtml = `<button class="btn-sm btn-primary" onclick="saveMarkupPrices(${est.id})">Save Markup & Approve</button>`;
+        } else if (est.status === 'admin_review' || est.status === 'pending_admin') {
+            // "Approve Base Only" — strips markup, flips billing_type to self so
+            // the points engine awards annual-only (painter doesn't earn the
+            // customer-markup commission for this deal).
+            actionsHtml = `
+                <button class="btn-sm btn-primary" onclick="saveMarkupPrices(${est.id})">Save Markup & Approve</button>
+                ${isCustomer ? `<button class="btn-sm btn-warning" onclick="approveAsSelf(${est.id})" title="Approve at painter rate only — no markup kept. Treated as self-billing: annual points only.">Approve Base Only</button>` : ''}`;
         } else if (est.status === 'approved' || est.status === 'sent_to_customer') {
             if (isCustomer && est.status === 'approved') {
                 actionsHtml += `<button class="btn-sm btn-primary" onclick="shareEstimate(${est.id})">Share with Customer</button> `;
@@ -2240,6 +2245,20 @@
             const res = await fetch(`${API}/estimates/${id}/review`, {
                 method: 'PUT', headers: authHeaders(),
                 body: JSON.stringify({ action, admin_notes: notes })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert(data.message);
+            closeEstimateDetail();
+            loadEstimates();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function approveAsSelf(estId) {
+        if (!confirm('Approve at painter base rate only?\n\nMarkup will be cleared. Estimate becomes self-billing → painter earns ANNUAL points only (no regular points).')) return;
+        try {
+            const res = await fetch(`${API}/estimates/${estId}/approve-as-self`, {
+                method: 'POST', headers: authHeaders(),
             });
             const data = await res.json();
             if (!data.success) throw new Error(data.message);
