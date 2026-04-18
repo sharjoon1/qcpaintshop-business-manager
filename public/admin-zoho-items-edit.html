@@ -440,6 +440,8 @@
         { key: 'sku', label: 'SKU', type: 'text', zohoField: 'sku', visible: false, filterable: true, width: 110 },
         { key: 'rate', label: 'Rate', type: 'number', zohoField: 'rate', step: '0.01', visible: false, filterable: true, width: 90, pctAdjust: true },
         { key: 'purchase_rate', label: 'Purchase Rate', type: 'number', zohoField: 'purchase_rate', step: '0.01', visible: false, filterable: true, width: 100, pctAdjust: true },
+        // MRP — Zoho's label_rate field, visible in painter catalog as MRP cap.
+        { key: 'label_rate', label: 'MRP', type: 'number', zohoField: 'label_rate', step: '0.01', visible: true, filterable: true, width: 90, pctAdjust: true },
         { key: 'cf_dpl', label: 'DPL', type: 'number', zohoField: 'cf_dpl', step: '0.01', visible: false, filterable: true, width: 90 },
         { key: 'dpl_rate_pct', label: 'DPL→Rate %', type: 'readonly', visible: true, width: 95 },
         { key: 'dpl_updated_at', label: 'DPL Updated', type: 'readonly', visible: true, width: 110 },

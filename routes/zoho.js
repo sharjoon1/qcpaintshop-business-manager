@@ -2640,6 +2640,7 @@ router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req,
         const FIELD_MAP = {
             name: 'zoho_item_name', sku: 'zoho_sku', rate: 'zoho_rate',
             purchase_rate: 'zoho_purchase_rate', cf_dpl: 'zoho_cf_dpl',
+            label_rate: 'zoho_label_rate',
             unit: 'zoho_unit', hsn_or_sac: 'zoho_hsn_or_sac',
             tax_percentage: 'zoho_tax_percentage', brand: 'zoho_brand',
             category_name: 'zoho_category_name', manufacturer: 'zoho_manufacturer',
