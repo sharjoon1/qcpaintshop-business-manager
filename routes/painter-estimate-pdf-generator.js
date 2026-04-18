@@ -8,6 +8,15 @@ function formatINR(num) {
     return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Register Noto Sans if available. Helvetica (PDFKit default) doesn't ship the
+// Indian Rupee glyph (U+20B9) — it renders as garbage (what users see as a
+// "chain"). Noto Sans has full Unicode coverage including ₹.
+const NOTO_REG  = path.join(__dirname, '..', 'public', 'fonts', 'NotoSans-Regular.ttf');
+const NOTO_BOLD = path.join(__dirname, '..', 'public', 'fonts', 'NotoSans-Bold.ttf');
+const hasNoto = fs.existsSync(NOTO_REG) && fs.existsSync(NOTO_BOLD);
+const F_REG  = hasNoto ? 'Body'      : 'Helvetica';
+const F_BOLD = hasNoto ? 'Body-Bold' : 'Helvetica-Bold';
+
 /**
  * Generate painter estimate PDF and pipe to response
  * @param {Response} res - Express response
@@ -20,9 +29,22 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
     const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
 
     const filename = `${estimate.estimate_number || 'Estimate'}.pdf`;
+    // Inline disposition lets the Android WebView preview the PDF; the Kotlin
+    // side decides whether to save or share (via FileProvider).
+    const disposition = options.inline ? 'inline' : 'attachment';
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`);
     doc.pipe(res);
+
+    // Register Noto Sans for ₹ glyph support (falls back to Helvetica if missing)
+    if (hasNoto) {
+        try {
+            doc.registerFont('Body', NOTO_REG);
+            doc.registerFont('Body-Bold', NOTO_BOLD);
+        } catch (e) {
+            console.warn('Noto font registration failed, using Helvetica:', e.message);
+        }
+    }
 
     // Painter brand colors
     const green = '#1B5E3B';
@@ -62,18 +84,18 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
     if (hideBranding) {
         // Painter-as-issuer: just name (green) and phone + city. No GST, no email, no logo.
         const painterName = estimate.painter_name || 'Painter';
-        doc.fontSize(18).fillColor(green).font('Helvetica-Bold')
+        doc.fontSize(18).fillColor(green).font(F_BOLD)
             .text(painterName, textStartX, headerTop);
-        doc.fontSize(9).fillColor(medGray).font('Helvetica');
+        doc.fontSize(9).fillColor(medGray).font(F_REG);
         const line1 = [estimate.painter_phone, estimate.painter_city].filter(Boolean).join('   •   ');
         if (line1) doc.text(line1, textStartX, headerTop + 26);
     } else {
         // Company Name
-        doc.fontSize(18).fillColor(green).font('Helvetica-Bold')
+        doc.fontSize(18).fillColor(green).font(F_BOLD)
             .text(branding.business_name || 'Quality Colours', textStartX, headerTop);
 
         // Company details
-        doc.fontSize(8).fillColor(medGray).font('Helvetica');
+        doc.fontSize(8).fillColor(medGray).font(F_REG);
         const compAddr = branding.business_address || 'Ramanathapuram';
         const compPhone = branding.business_phone || '+91 7418831122';
         const compEmail = branding.business_email || 'info@qcpaintshop.com';
@@ -84,14 +106,14 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
     }
 
     // Estimate title - right side
-    doc.fontSize(24).fillColor(gold).font('Helvetica-Bold')
+    doc.fontSize(24).fillColor(gold).font(F_BOLD)
         .text('ESTIMATE', 350, headerTop, { width: 205, align: 'right' });
 
     // Estimate meta
     const estDate = estimate.estimate_date || estimate.created_at
         ? new Date(estimate.estimate_date || estimate.created_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })
         : '';
-    doc.fontSize(9).fillColor(darkGray).font('Helvetica')
+    doc.fontSize(9).fillColor(darkGray).font(F_REG)
         .text(`Date: ${estDate}`, 350, headerTop + 30, { width: 205, align: 'right' })
         .text(`Ref #: ${estimate.estimate_number}`, 350, headerTop + 42, { width: 205, align: 'right' })
         .text(`Status: ${(estimate.status || 'draft').replace(/_/g, ' ').toUpperCase()}`, 350, headerTop + 54, { width: 205, align: 'right' });
@@ -104,17 +126,17 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
 
     // Left side: Bill To (customer) or Painter info
     if (estimate.billing_type === 'customer' && estimate.customer_name) {
-        doc.fontSize(9).fillColor(medGray).font('Helvetica-Bold').text('BILL TO:', 40, doc.y);
-        doc.fontSize(12).fillColor(darkGray).font('Helvetica-Bold')
+        doc.fontSize(9).fillColor(medGray).font(F_BOLD).text('BILL TO:', 40, doc.y);
+        doc.fontSize(12).fillColor(darkGray).font(F_BOLD)
             .text(estimate.customer_name, 40, doc.y + 2);
-        doc.fontSize(9).fillColor(medGray).font('Helvetica');
+        doc.fontSize(9).fillColor(medGray).font(F_REG);
         if (estimate.customer_phone) doc.text(estimate.customer_phone);
         if (estimate.customer_address) doc.text(estimate.customer_address);
     } else {
-        doc.fontSize(9).fillColor(medGray).font('Helvetica-Bold').text('PAINTER:', 40, doc.y);
-        doc.fontSize(12).fillColor(darkGray).font('Helvetica-Bold')
+        doc.fontSize(9).fillColor(medGray).font(F_BOLD).text('PAINTER:', 40, doc.y);
+        doc.fontSize(12).fillColor(darkGray).font(F_BOLD)
             .text(estimate.painter_name || '', 40, doc.y + 2);
-        doc.fontSize(9).fillColor(medGray).font('Helvetica');
+        doc.fontSize(9).fillColor(medGray).font(F_REG);
         if (estimate.painter_phone) doc.text(estimate.painter_phone);
     }
 
@@ -142,7 +164,7 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
 
     // Header text
     x = 40;
-    doc.fontSize(7.5).fillColor('#ffffff').font('Helvetica-Bold');
+    doc.fontSize(7.5).fillColor('#ffffff').font(F_BOLD);
     cols.forEach(col => {
         const textX = col.align === 'right' ? x : x + 4;
         doc.text(col.label, textX, tableTop + 7, { width: col.width - 8, align: col.align });
@@ -162,7 +184,7 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
         }
 
         x = 40;
-        doc.fontSize(8).fillColor(darkGray).font('Helvetica');
+        doc.fontSize(8).fillColor(darkGray).font(F_REG);
 
         const unitPrice = showMarkup
             ? (parseFloat(item.markup_unit_price) || parseFloat(item.unit_price))
@@ -204,7 +226,7 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
         ? (parseFloat(estimate.markup_subtotal) || parseFloat(estimate.subtotal))
         : parseFloat(estimate.subtotal);
 
-    doc.fontSize(9).fillColor(darkGray).font('Helvetica');
+    doc.fontSize(9).fillColor(darkGray).font(F_REG);
     doc.text('Subtotal:', summaryX, y, { width: 120 });
     doc.text(`₹${formatINR(subtotal)}`, summaryX + 120, y, { width: summaryW - 120, align: 'right' });
     y += 16;
@@ -241,13 +263,13 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
         grandTotal = parseFloat(estimate.grand_total);
     }
 
-    doc.fontSize(13).fillColor(green).font('Helvetica-Bold');
+    doc.fontSize(13).fillColor(green).font(F_BOLD);
     doc.text('Grand Total:', summaryX, y, { width: 100 });
     doc.text(`₹${formatINR(grandTotal)}`, summaryX + 100, y, { width: summaryW - 100, align: 'right' });
     y += 20;
 
     // GST note
-    doc.fontSize(7.5).fillColor(medGray).font('Helvetica')
+    doc.fontSize(7.5).fillColor(medGray).font(F_REG)
         .text('* Prices inclusive of GST', summaryX, y, { width: summaryW, align: 'right' });
 
     // ===== NOTES =====
@@ -256,15 +278,15 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
         if (y > doc.page.height - 80) { doc.addPage(); y = 40; }
         doc.moveTo(40, y).lineTo(555, y).strokeColor('#e5e7eb').lineWidth(0.5).stroke();
         y += 10;
-        doc.fontSize(9).fillColor(darkGray).font('Helvetica-Bold').text('Notes:', 40, y);
+        doc.fontSize(9).fillColor(darkGray).font(F_BOLD).text('Notes:', 40, y);
         y += 14;
-        doc.fontSize(8).fillColor(medGray).font('Helvetica').text(estimate.notes, 40, y, { width: 515 });
+        doc.fontSize(8).fillColor(medGray).font(F_REG).text(estimate.notes, 40, y, { width: 515 });
     }
 
     // Footer (suppressed entirely when branding is hidden)
     if (!hideBranding) {
         const footerY = doc.page.height - 40;
-        doc.fontSize(7).fillColor(gold).font('Helvetica-Bold')
+        doc.fontSize(7).fillColor(gold).font(F_BOLD)
             .text('Quality Colours — Your Trusted Paint Partner', 40, footerY, { width: 515, align: 'center' });
     }
 
