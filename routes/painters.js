@@ -1536,9 +1536,51 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                 max_rate: parseFloat(p.max_rate || 0),
                 total_stock: parseFloat(p.total_stock || 0),
                 points_per_unit: p.points_per_unit ? parseFloat(p.points_per_unit) : null,
-                offer: matchedOffers.length > 0 ? matchedOffers[0] : null
+                offer: matchedOffers.length > 0 ? matchedOffers[0] : null,
+                pack_sizes: [],
             };
         });
+
+        // Fetch pack_sizes per product so catalog cards can render inline variant chips
+        const productIds = productsWithOffers.map(p => p.product_id);
+        if (productIds.length) {
+            const [variants] = await pool.query(`
+                SELECT ps.product_id, ps.id AS pack_size_id, ps.size, ps.unit,
+                       ps.zoho_item_id,
+                       CAST(zim.zoho_rate AS DECIMAL(10,2)) AS rate,
+                       COALESCE((SELECT SUM(zls.stock_on_hand) FROM zoho_location_stock zls
+                                 WHERE zls.zoho_item_id = zim.zoho_item_id), 0) AS stock,
+                       ppr.regular_points_per_unit AS regular_points,
+                       ppr.annual_eligible, ppr.annual_pct
+                FROM pack_sizes ps
+                INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+                LEFT JOIN painter_product_point_rates ppr
+                    ON ppr.item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
+                WHERE ps.product_id IN (?) AND ps.is_active = 1
+                ORDER BY ps.product_id, CAST(ps.size AS DECIMAL(10,2))
+            `, [productIds]);
+            const bySize = {};
+            for (const v of variants) {
+                if (!bySize[v.product_id]) bySize[v.product_id] = [];
+                const reg = v.regular_points ? parseFloat(v.regular_points) : null;
+                const annualPts = (reg && v.annual_eligible && v.annual_pct)
+                    ? Math.round(reg * parseFloat(v.annual_pct) / 100 * 100) / 100
+                    : null;
+                bySize[v.product_id].push({
+                    pack_size_id: v.pack_size_id,
+                    size: String(parseFloat(v.size) || v.size || ''),
+                    unit: v.unit,
+                    zoho_item_id: v.zoho_item_id,
+                    rate: parseFloat(v.rate || 0),
+                    stock: parseFloat(v.stock || 0),
+                    regular_points: reg,
+                    annual_points: annualPts,
+                });
+            }
+            for (const p of productsWithOffers) {
+                p.pack_sizes = bySize[p.product_id] || [];
+            }
+        }
 
         // Filter options
         const [brands] = await pool.query(`
