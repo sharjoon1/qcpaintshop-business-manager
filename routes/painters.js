@@ -1002,7 +1002,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
                    b.name as brand, b.id as brand_id,
                    c.name as category, c.id as category_id,
                    ps.id as pack_size_id, ps.size, ps.unit, ps.base_price, ps.zoho_item_id,
-                   zim.zoho_rate, zim.zoho_stock_on_hand as stock,
+                   zim.zoho_rate, zim.zoho_label_rate, zim.zoho_stock_on_hand as stock,
                    pprs.regular_points_per_unit as regular_points,
                    pprs.annual_eligible, pprs.annual_pct
             FROM products p
@@ -1042,6 +1042,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
                 size: String(parseFloat(row.size) || row.size || ''),
                 unit: row.unit,
                 rate: showPrices ? parseFloat(row.zoho_rate || row.base_price || 0) : null,
+                mrp: parseFloat(row.zoho_label_rate || row.zoho_rate || row.base_price || 0),
                 zoho_item_id: row.zoho_item_id,
                 stock: parseFloat(row.stock || 0),
                 regular_points: regularPts,
@@ -1548,6 +1549,7 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                 SELECT ps.product_id, ps.id AS pack_size_id, ps.size, ps.unit,
                        ps.zoho_item_id,
                        CAST(zim.zoho_rate AS DECIMAL(10,2)) AS rate,
+                       CAST(zim.zoho_label_rate AS DECIMAL(10,2)) AS mrp,
                        COALESCE((SELECT SUM(zls.stock_on_hand) FROM zoho_location_stock zls
                                  WHERE zls.zoho_item_id = zim.zoho_item_id), 0) AS stock,
                        ppr.regular_points_per_unit AS regular_points,
@@ -1566,12 +1568,14 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                 const annualPts = (reg && v.annual_eligible && v.annual_pct)
                     ? Math.round(reg * parseFloat(v.annual_pct) / 100 * 100) / 100
                     : null;
+                const rate = parseFloat(v.rate || 0);
                 bySize[v.product_id].push({
                     pack_size_id: v.pack_size_id,
                     size: String(parseFloat(v.size) || v.size || ''),
                     unit: v.unit,
                     zoho_item_id: v.zoho_item_id,
-                    rate: parseFloat(v.rate || 0),
+                    rate,
+                    mrp: parseFloat(v.mrp || v.rate || 0),
                     stock: parseFloat(v.stock || 0),
                     regular_points: reg,
                     annual_points: annualPts,
