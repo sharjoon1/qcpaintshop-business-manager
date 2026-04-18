@@ -364,6 +364,43 @@ router.put('/me', requirePainterAuth, async (req, res) => {
     }
 });
 
+// Unified profile update (multipart: full_name, city, optional photo)
+// Used by painter Android EditProfileScreen — single multipart call
+router.put('/me/profile', requirePainterAuth, uploadProfile.single('photo'), async (req, res) => {
+    try {
+        const fullName = (req.body.full_name || '').trim();
+        const city = req.body.city || null;
+        if (!fullName) return res.status(400).json({ success: false, message: 'Name is required' });
+
+        let photoUrl = null;
+        if (req.file) {
+            const filename = `painter_${req.painter.id}.jpg`;
+            const outputPath = require('path').join(__dirname, '..', 'public', 'uploads', 'profiles', filename);
+            await sharp(req.file.path)
+                .resize(400, 400, { fit: 'cover' })
+                .jpeg({ quality: 80 })
+                .toFile(outputPath + '.tmp');
+            const fs = require('fs');
+            if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+            fs.renameSync(outputPath + '.tmp', outputPath);
+            if (req.file.path !== outputPath) { try { fs.unlinkSync(req.file.path); } catch (e) {} }
+            photoUrl = `/uploads/profiles/${filename}?v=${Date.now()}`;
+        }
+
+        const sets = ['full_name = ?', 'city = COALESCE(?, city)', 'card_generated_at = NULL', 'id_card_generated_at = NULL'];
+        const params = [fullName, city];
+        if (photoUrl) {
+            sets.splice(2, 0, 'profile_photo = ?');
+            params.splice(2, 0, photoUrl);
+        }
+        await pool.query(`UPDATE painters SET ${sets.join(', ')} WHERE id = ?`, [...params, req.painter.id]);
+        res.json({ success: true, message: 'Profile updated', photo_url: photoUrl });
+    } catch (error) {
+        console.error('Profile update error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update profile' });
+    }
+});
+
 // Upload/update profile photo
 router.put('/me/profile-photo', requirePainterAuth, uploadProfile.single('photo'), async (req, res) => {
     try {
@@ -529,13 +566,22 @@ router.get('/me/points/:pool', requirePainterAuth, async (req, res) => {
 
 router.get('/me/referrals', requirePainterAuth, async (req, res) => {
     try {
+        const [[self]] = await pool.query('SELECT referral_code FROM painters WHERE id = ?', [req.painter.id]);
         const [referrals] = await pool.query(
-            `SELECT pr.*, p.full_name, p.phone, p.status as painter_status, p.city
+            `SELECT pr.id, pr.status, pr.created_at,
+                    pr.total_referral_points AS earnings,
+                    p.full_name, p.phone, p.status AS painter_status, p.city
              FROM painter_referrals pr JOIN painters p ON pr.referred_id = p.id
              WHERE pr.referrer_id = ? ORDER BY pr.created_at DESC`,
             [req.painter.id]
         );
-        res.json({ success: true, referrals });
+        const totalEarnings = referrals.reduce((sum, r) => sum + parseFloat(r.earnings || 0), 0);
+        res.json({
+            success: true,
+            referral_code: self?.referral_code || null,
+            total_earnings: totalEarnings,
+            referrals,
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to get referrals' });
     }
@@ -1778,7 +1824,7 @@ router.get('/me/training', requirePainterAuth, async (req, res) => {
             ORDER BY sort_order ASC, name ASC
         `);
 
-        res.json({ success: true, content, categories });
+        res.json({ success: true, training: content, content, categories });
     } catch (error) {
         console.error('Training list error:', error);
         res.status(500).json({ success: false, message: 'Failed to load training content' });
