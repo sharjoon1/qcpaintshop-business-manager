@@ -1555,7 +1555,7 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         const now = new Date();
         const [offers] = await pool.query(`
             SELECT * FROM painter_special_offers
-            WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
+            WHERE is_active = 1 AND DATE(start_date) <= DATE(?) AND DATE(end_date) >= DATE(?)
             ORDER BY created_at DESC
         `, [now, now]);
 
@@ -1732,7 +1732,7 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
         const now = new Date();
         const [offers] = await pool.query(`
             SELECT * FROM painter_special_offers
-            WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
+            WHERE is_active = 1 AND DATE(start_date) <= DATE(?) AND DATE(end_date) >= DATE(?)
             AND (
                 applies_to = 'all'
                 OR (applies_to = 'brand' AND target_id = ?)
@@ -1762,7 +1762,7 @@ router.get('/me/offers', requirePainterAuth, async (req, res) => {
         const now = new Date();
         const [offers] = await pool.query(`
             SELECT * FROM painter_special_offers
-            WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
+            WHERE is_active = 1 AND DATE(start_date) <= DATE(?) AND DATE(end_date) >= DATE(?)
             ORDER BY created_at DESC
         `, [now, now]);
 
@@ -1786,7 +1786,7 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
         const now = new Date();
         const [offers] = await pool.query(`
             SELECT * FROM painter_special_offers
-            WHERE is_active = 1 AND start_date <= ? AND end_date >= ?
+            WHERE is_active = 1 AND DATE(start_date) <= DATE(?) AND DATE(end_date) >= DATE(?)
             ORDER BY created_at DESC
         `, [now, now]);
 
