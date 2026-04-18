@@ -1134,7 +1134,14 @@ router.post('/me/estimates', requirePainterAuth, async (req, res) => {
         packSizeRows.forEach(r => { packSizeMap[r.pack_size_id] = r; });
 
         const estimateNumber = await generateEstimateNumber();
-        const status = submit ? 'pending_admin' : 'draft';
+        // Customer-direct estimates are the painter's private marketing tool:
+        // they save to "saved_direct" so they don't clog admin's approval queue.
+        // After the customer confirms, painter uses /me/estimates/:id/submit-to-admin
+        // to convert to pending_admin as either self or customer billing.
+        const isDirectCustomer = billing_type === 'customer' && pricingMode === 'direct';
+        const status = submit
+            ? (isDirectCustomer ? 'saved_direct' : 'pending_admin')
+            : 'draft';
 
         let subtotal = 0;
         let markupSubtotal = 0;
@@ -1338,6 +1345,47 @@ router.post('/me/estimates/:estimateId/submit', requirePainterAuth, async (req, 
         res.json({ success: true, message: 'Estimate submitted for admin review' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to submit estimate' });
+    }
+});
+
+// Painter: convert a saved_direct customer estimate to admin approval. Painter
+// picks either 'self' (admin approves at painter rate, no markup kept — points
+// flow as self-billing i.e. annual only) or 'customer' (admin reviews full
+// markup and can approve with markup or downgrade to base-only).
+router.post('/me/estimates/:estimateId/submit-to-admin', requirePainterAuth, async (req, res) => {
+    try {
+        const { mode } = req.body; // 'self' | 'customer'
+        if (!['self', 'customer'].includes(mode)) {
+            return res.status(400).json({ success: false, message: "mode must be 'self' or 'customer'" });
+        }
+        const [estimates] = await pool.query(
+            "SELECT * FROM painter_estimates WHERE id = ? AND painter_id = ? AND status = 'saved_direct'",
+            [req.params.estimateId, req.painter.id]
+        );
+        if (!estimates.length) {
+            return res.status(404).json({ success: false, message: 'Saved estimate not found (only saved_direct estimates can be submitted)' });
+        }
+        // Mode 'self': painter wants this billed under their own loyalty account.
+        // Keep markup_unit_price on items for painter's reference, but clear
+        // branding flag and switch billing_type. Points will compute against
+        // unit_price (base), awarding annual only.
+        const newBillingType = mode === 'self' ? 'self' : 'customer';
+        await pool.query(
+            `UPDATE painter_estimates
+             SET status = 'pending_admin',
+                 billing_type = ?,
+                 hide_qc_branding = 0
+             WHERE id = ?`,
+            [newBillingType, estimates[0].id]
+        );
+        await logEstimateStatusChange(
+            estimates[0].id, 'saved_direct', 'pending_admin', req.painter.id,
+            `Painter converted saved estimate → admin review as ${newBillingType} billing`
+        );
+        res.json({ success: true, message: `Submitted for admin review (${newBillingType} billing)` });
+    } catch (error) {
+        console.error('submit-to-admin error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit' });
     }
 });
 
