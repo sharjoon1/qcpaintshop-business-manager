@@ -32,12 +32,16 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
     const lightGray = '#f3f4f6';
 
     const showMarkup = options.showMarkup && estimate.billing_type === 'customer';
+    // v3.1 customer path: when hide_qc_branding is set, the customer-facing PDF
+    // swaps QC logo/name/address/UPI/footer for the painter's own name+phone+city.
+    // Painters use this to white-label their customer estimates.
+    const hideBranding = estimate.hide_qc_branding == 1 || estimate.hide_qc_branding === true;
 
     // ===== HEADER =====
     const headerTop = doc.y;
 
-    // Try to load company logo
-    const logoPaths = [
+    // Try to load company logo (skipped entirely on hidden-branding).
+    const logoPaths = hideBranding ? [] : [
         branding.business_logo ? path.join(__dirname, '..', 'public', 'uploads', 'logos', branding.business_logo) : null,
         path.join(__dirname, '..', 'public', 'logo.png')
     ].filter(Boolean);
@@ -55,19 +59,29 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
 
     const textStartX = logoLoaded ? 100 : 40;
 
-    // Company Name
-    doc.fontSize(18).fillColor(green).font('Helvetica-Bold')
-        .text(branding.business_name || 'Quality Colours', textStartX, headerTop);
+    if (hideBranding) {
+        // Painter-as-issuer: just name (green) and phone + city. No GST, no email, no logo.
+        const painterName = estimate.painter_name || 'Painter';
+        doc.fontSize(18).fillColor(green).font('Helvetica-Bold')
+            .text(painterName, textStartX, headerTop);
+        doc.fontSize(9).fillColor(medGray).font('Helvetica');
+        const line1 = [estimate.painter_phone, estimate.painter_city].filter(Boolean).join('   •   ');
+        if (line1) doc.text(line1, textStartX, headerTop + 26);
+    } else {
+        // Company Name
+        doc.fontSize(18).fillColor(green).font('Helvetica-Bold')
+            .text(branding.business_name || 'Quality Colours', textStartX, headerTop);
 
-    // Company details
-    doc.fontSize(8).fillColor(medGray).font('Helvetica');
-    const compAddr = branding.business_address || 'Ramanathapuram';
-    const compPhone = branding.business_phone || '+91 7418831122';
-    const compEmail = branding.business_email || 'info@qcpaintshop.com';
-    const compGst = branding.business_gst || '33EMXPS2411G1ZT';
-    doc.text(compAddr, textStartX, headerTop + 24);
-    doc.text(`Phone: ${compPhone} | Email: ${compEmail}`, textStartX, headerTop + 35);
-    doc.text(`GST: ${compGst}`, textStartX, headerTop + 46);
+        // Company details
+        doc.fontSize(8).fillColor(medGray).font('Helvetica');
+        const compAddr = branding.business_address || 'Ramanathapuram';
+        const compPhone = branding.business_phone || '+91 7418831122';
+        const compEmail = branding.business_email || 'info@qcpaintshop.com';
+        const compGst = branding.business_gst || '33EMXPS2411G1ZT';
+        doc.text(compAddr, textStartX, headerTop + 24);
+        doc.text(`Phone: ${compPhone} | Email: ${compEmail}`, textStartX, headerTop + 35);
+        doc.text(`GST: ${compGst}`, textStartX, headerTop + 46);
+    }
 
     // Estimate title - right side
     doc.fontSize(24).fillColor(gold).font('Helvetica-Bold')
@@ -205,6 +219,15 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
         y += 16;
     }
 
+    // Labour charge (v3.1 customer-direct flow)
+    const labourCharge = parseFloat(estimate.labour_charge) || 0;
+    if (labourCharge > 0) {
+        doc.fillColor(darkGray);
+        doc.text('Labour:', summaryX, y, { width: 120 });
+        doc.text(`₹${formatINR(labourCharge)}`, summaryX + 120, y, { width: summaryW - 120, align: 'right' });
+        y += 16;
+    }
+
     doc.moveTo(summaryX, y).lineTo(summaryX + summaryW, y).strokeColor('#d1d5db').lineWidth(0.5).stroke();
     y += 5;
 
@@ -238,10 +261,12 @@ function generatePainterEstimatePDF(res, estimate, items, branding, options = {}
         doc.fontSize(8).fillColor(medGray).font('Helvetica').text(estimate.notes, 40, y, { width: 515 });
     }
 
-    // Footer
-    const footerY = doc.page.height - 40;
-    doc.fontSize(7).fillColor(gold).font('Helvetica-Bold')
-        .text('Quality Colours — Your Trusted Paint Partner', 40, footerY, { width: 515, align: 'center' });
+    // Footer (suppressed entirely when branding is hidden)
+    if (!hideBranding) {
+        const footerY = doc.page.height - 40;
+        doc.fontSize(7).fillColor(gold).font('Helvetica-Bold')
+            .text('Quality Colours — Your Trusted Paint Partner', 40, footerY, { width: 515, align: 'center' });
+    }
 
     doc.end();
 }

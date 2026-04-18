@@ -1421,7 +1421,7 @@ router.delete('/me/estimates/:estimateId', requirePainterAuth, async (req, res) 
 router.get('/me/estimates/:estimateId/pdf', requirePainterAuth, async (req, res) => {
     try {
         const [estimates] = await pool.query(
-            `SELECT pe.*, p.full_name as painter_name, p.phone as painter_phone
+            `SELECT pe.*, p.full_name as painter_name, p.phone as painter_phone, p.city as painter_city
              FROM painter_estimates pe JOIN painters p ON pe.painter_id = p.id
              WHERE pe.id = ? AND pe.painter_id = ?`,
             [req.params.estimateId, req.painter.id]
