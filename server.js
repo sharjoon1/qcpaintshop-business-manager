@@ -164,6 +164,15 @@ app.use(responseTracker.middleware);
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
+// Applink referral short URL: https://act.qcpaintshop.com/r/{code}
+// On Android (painter app installed + verified assetlinks), this opens the app's
+// Register screen with the ref code prefilled. On web or uninstalled devices, we
+// fall back to the existing painter-register.html page carrying the same ref.
+app.get('/r/:code', (req, res) => {
+    const code = (req.params.code || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32);
+    res.redirect(302, `/painter-register.html?ref=${encodeURIComponent(code)}`);
+});
+
 // ========================================
 // DATABASE CONNECTION
 // ========================================

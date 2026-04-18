@@ -3,9 +3,19 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
+      "package_name": "com.qcpaintshop.painter",
+      "sha256_cert_fingerprints": [
+        "05:A1:8C:5D:A4:F2:01:9A:43:44:57:F8:B6:A2:C1:8B:C5:18:95:8C:9C:7D:F9:A3:FE:C9:D2:43:DF:47:24:E1"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
       "package_name": "com.qcpaintshop.act",
       "sha256_cert_fingerprints": [
-        "TODO:REPLACE_WITH_YOUR_RELEASE_SIGNING_CERTIFICATE_SHA256_FINGERPRINT"
+        "05:A1:8C:5D:A4:F2:01:9A:43:44:57:F8:B6:A2:C1:8B:C5:18:95:8C:9C:7D:F9:A3:FE:C9:D2:43:DF:47:24:E1"
       ]
     }
   }
