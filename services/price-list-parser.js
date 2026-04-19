@@ -724,66 +724,165 @@ async function parsePriceList(pdfBuffer, filename) {
     };
 }
 
+// ============ SKU STRUCTURE PARSER ============
+// Our naming convention for emulsion products (e.g., Birla Opus):
+//   SKU prefix: "EC101" = EC (product abbrev: EverClear) + 1 (base number) + 01 (pack size code)
+//   Full SKU:   "EC101 EVER CLEAR BIRLA OPUS 01 L"
+// Pack size code: 01=1L, 04=4L, 09=9L, 10=10L, 18=18L, 20=20L, 2M=200ml, etc.
+function parseSkuStructure(skuOrName) {
+    if (!skuOrName) return null;
+    const firstTok = String(skuOrName).trim().split(/\s+/)[0] || '';
+    // Primary pattern: 2-3 letters + base digit + 2-digit pack code (e.g., EC101, CS204, OPE301)
+    const m1 = firstTok.match(/^([A-Z]{2,3})(\d)(\d{2})$/);
+    if (m1) return { abbrev: m1[1], base: m1[2], packCode: m1[3], raw: firstTok };
+    // Alt pattern: 2 letters + 2-digit pack (no base, for non-tinted products)
+    const m2 = firstTok.match(/^([A-Z]{2,4})(\d{2})$/);
+    if (m2) return { abbrev: m2[1], base: null, packCode: m2[2], raw: firstTok };
+    return null;
+}
+
+// Normalize a PDF pack-size string to our 2-char pack code.
+// "1L" → "01", "4L" → "04", "0.9L" → "09" (treated as 0.9 → 0.9), "200ml" → "2M", "20L" → "20"
+function packSizeToCode(sz) {
+    if (!sz) return null;
+    const s = String(sz).toUpperCase().trim().replace(/\s+/g, '');
+    const ml = s.match(/^(\d+(?:\.\d+)?)ML$/);
+    if (ml) return (ml[1].replace('.', '')).substr(0, 2) + 'M';
+    const lt = s.match(/^(\d+(?:\.\d+)?)(?:L|LT|LTR|LITRE|LITER|LITRES)?$/);
+    if (lt) {
+        const n = parseFloat(lt[1]);
+        if (n < 1) return '0' + Math.round(n * 10); // 0.9 → 09
+        const int = Math.floor(n);
+        return int < 10 ? '0' + int : String(int);
+    }
+    const kg = s.match(/^(\d+(?:\.\d+)?)KG$/);
+    if (kg) {
+        const n = parseFloat(kg[1]);
+        return (n < 10 ? '0' + Math.floor(n) : String(Math.floor(n)));
+    }
+    return null;
+}
+
+// Extract product abbreviation from a PDF product name.
+// Strategy: split by " - " into parts; pick the part with the most significant words
+// (this naturally skips metadata like "Annexure" or trailing base like "White").
+// "One Pure Elegance - White"       → mainPart="One Pure Elegance"       → "OPE"
+// "Annexure - Calista Sparkle Gl"   → mainPart="Calista Sparkle Gl"      → "CSG"
+// "Calista Sparkle PU - Brown"      → mainPart="Calista Sparkle PU"      → "CSP"
+function extractProductAbbrev(productName) {
+    if (!productName) return null;
+    const stopWords = new Set([
+        'THE', 'AND', 'OF', 'FOR', 'BASE', 'PAINT', 'PAINTS', 'ANNEXURE', 'EMULSION',
+        'ENAMEL', 'PRIMER', 'WHITE', 'SUPER', 'SHADE', 'CODE', 'NAME', 'PROD'
+    ]);
+    const parts = String(productName).split(/\s*-\s*/);
+    let bestAbbrev = null;
+    let bestCount = 0;
+    for (const part of parts) {
+        const words = part.toUpperCase()
+            .replace(/[^A-Z ]/g, ' ')
+            .split(/\s+/)
+            .filter(w => w && !stopWords.has(w) && w.length >= 2);
+        if (words.length > bestCount) {
+            bestCount = words.length;
+            bestAbbrev = words.slice(0, Math.min(3, words.length)).map(w => w[0]).join('');
+        }
+    }
+    return bestAbbrev;
+}
+
+// Detect base number from PDF product/baseName.
+// "White" → "W", "Super White" → "W", "Base 1" → "1", "1" → "1", "- 5" → "5"
+function extractBase(productName, baseCode) {
+    const text = String(productName || '').toUpperCase();
+    if (/\bSUPER\s*WHITE\b|\bWHITE\b|\bDEEP\s*WHITE\b/.test(text)) return 'W';
+    // Tail after "-"
+    const tail = text.split(/\s*-\s*/).slice(1).join(' ');
+    const m = tail.match(/\b(?:BASE\s*)?([1-9])\b/);
+    if (m) return m[1];
+    // From 4-digit baseCode last digit (e.g., 9901 → base 1)
+    if (baseCode && /^\d{4}$/.test(String(baseCode))) {
+        const last = String(baseCode).slice(-1);
+        if (last === '0') return 'W';
+        return last;
+    }
+    return null;
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
     const unmatched = [];
 
-    // Build lookup maps for Zoho items
-    // Zoho items use abbreviated names like "OP01 CF13 STYLE COLOR FRESH OPUS 01 L"
-    // PDF items use full names like "One Pure Elegance - White"
-    const zohoByName = new Map(); // uppercase name → zoho item
-    const zohoByWords = []; // for fuzzy word matching
+    const zohoByName = new Map();
+    const zohoByWords = [];
+    const zohoBySku = []; // [{item, struct:{abbrev,base,packCode}, name, sku}]
 
     zohoItems.forEach(zi => {
         const name = (zi.name || zi.zoho_item_name || '').toUpperCase().trim();
+        const sku = (zi.sku || zi.zoho_sku || '').toUpperCase().trim();
         if (name) {
             zohoByName.set(name, zi);
             zohoByWords.push({ words: name.split(/\s+/), item: zi, name });
         }
+        // Prefer SKU-parse; fall back to parsing first token of name
+        const struct = parseSkuStructure(sku) || parseSkuStructure(name);
+        if (struct) zohoBySku.push({ item: zi, struct, name, sku });
     });
 
-    // Build keyword map from parsed product names
     for (const parsed of parsedItems) {
         const productName = parsed.product.toUpperCase().trim();
-        const packSize = (parsed.packSize || '').toUpperCase().replace(/\s+/g, '');
-
-        // Normalize pack size for matching: "4L" → "04 L", "500ml" → "500 ML", "1L" → "01 L"
         const sizePatterns = normalizeSizeForMatch(parsed.packSize);
 
-        // Strategy 1: Exact full name match
         let match = zohoByName.get(productName);
 
-        // Strategy 2: Match by significant keywords + size
+        // Strategy 0 (NEW): SKU-structure match — abbrev + pack + optional base
         if (!match) {
-            // Extract significant keywords from product name (skip common words)
-            const keywords = extractKeywords(productName);
+            const pdfAbbrev = extractProductAbbrev(parsed.product);
+            const pdfPack = packSizeToCode(parsed.packSize);
+            const pdfBase = extractBase(parsed.product, parsed.baseCode);
 
+            if (pdfAbbrev && pdfPack) {
+                const strictCandidates = [];
+                const looseCandidates = [];
+                for (const ent of zohoBySku) {
+                    if (ent.struct.packCode !== pdfPack) continue;
+                    // Abbrev must overlap: SKU abbrev starts with pdfAbbrev OR vice versa
+                    const a = ent.struct.abbrev, b = pdfAbbrev;
+                    const abbrevMatch = a === b || a.startsWith(b) || b.startsWith(a);
+                    if (!abbrevMatch) continue;
+                    // If both sides have a base, they must match
+                    if (pdfBase && ent.struct.base && pdfBase !== ent.struct.base) continue;
+                    // Strict = abbrev exact + base agrees; Loose = prefix abbrev
+                    if (a === b && (!pdfBase || !ent.struct.base || pdfBase === ent.struct.base)) {
+                        strictCandidates.push(ent.item);
+                    } else {
+                        looseCandidates.push(ent.item);
+                    }
+                }
+                if (strictCandidates.length === 1) match = strictCandidates[0];
+                else if (strictCandidates.length > 1) match = strictCandidates[0]; // tie → first
+                else if (looseCandidates.length === 1) match = looseCandidates[0];
+            }
+        }
+
+        // Strategy 2: fallback keyword match (existing)
+        if (!match) {
+            const keywords = extractKeywords(productName);
             let bestScore = 0;
             let bestMatch = null;
-
             for (const entry of zohoByWords) {
-                // Check if pack size matches in the Zoho name
                 const hasSize = sizePatterns.some(sp => entry.name.includes(sp));
                 if (!hasSize && sizePatterns.length > 0) continue;
-
-                // Count matching keywords
                 let score = 0;
-                for (const kw of keywords) {
-                    if (entry.name.includes(kw)) score++;
-                }
-
-                // Require at least 2 keyword matches (or 1 if product name is short)
+                for (const kw of keywords) if (entry.name.includes(kw)) score++;
                 const minRequired = keywords.length <= 2 ? 1 : 2;
                 if (score >= minRequired && score > bestScore) {
                     bestScore = score;
                     bestMatch = entry.item;
                 }
             }
-
-            if (bestMatch && bestScore >= 2) {
-                match = bestMatch;
-            }
+            if (bestMatch && bestScore >= 2) match = bestMatch;
         }
 
         if (match) {
