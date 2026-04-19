@@ -2254,15 +2254,19 @@
     // ============ INIT ============
     async function loadFilterOptions() {
         try {
-            var resp = await fetch('/api/zoho/items/reassign/scan?nameContains=%20', { headers: getAuthHeaders() });
+            var resp = await fetch('/api/zoho/items/filter-options', { headers: getAuthHeaders() });
             var data = await resp.json();
             if (!data.success) return;
             var bsel = document.getElementById('brandFilter');
             var csel = document.getElementById('categoryFilter');
             if (bsel) bsel.innerHTML = '<option value="">All Brands</option>' +
-                (data.brands || []).map(function(b){ return '<option value="'+escapeHtml(b)+'">'+escapeHtml(b)+'</option>'; }).join('');
+                (data.brands || []).map(function(b){
+                    return '<option value="'+escapeHtml(b.name)+'">'+escapeHtml(b.name)+' ('+b.count+')</option>';
+                }).join('');
             if (csel) csel.innerHTML = '<option value="">All Categories</option>' +
-                (data.categories || []).map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('');
+                (data.categories || []).map(function(c){
+                    return '<option value="'+escapeHtml(c.name)+'">'+escapeHtml(c.name)+' ('+c.count+')</option>';
+                }).join('');
         } catch (_) { /* non-blocking */ }
     }
 

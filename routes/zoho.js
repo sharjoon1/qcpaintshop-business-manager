@@ -4467,6 +4467,33 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
 });
 
 /**
+ * GET /api/zoho/items/filter-options
+ * Returns all distinct brands + categories for dropdown filters on the items-edit page.
+ */
+router.get('/items/filter-options', requirePermission('zoho', 'view'), async (req, res) => {
+    try {
+        const [brands] = await pool.query(`
+            SELECT DISTINCT zoho_brand AS name, COUNT(*) AS n FROM zoho_items_map
+            WHERE zoho_status = 'active' AND zoho_brand IS NOT NULL AND zoho_brand <> ''
+            GROUP BY zoho_brand ORDER BY zoho_brand
+        `);
+        const [categories] = await pool.query(`
+            SELECT DISTINCT zoho_category_name AS name, COUNT(*) AS n FROM zoho_items_map
+            WHERE zoho_status = 'active' AND zoho_category_name IS NOT NULL AND zoho_category_name <> ''
+            GROUP BY zoho_category_name ORDER BY zoho_category_name
+        `);
+        res.json({
+            success: true,
+            brands: brands.map(b => ({ name: b.name, count: b.n })),
+            categories: categories.map(c => ({ name: c.name, count: c.n }))
+        });
+    } catch (error) {
+        console.error('Filter options error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
  * GET /api/zoho/items/reassign/scan
  * Query params: nameContains, currentBrand, currentCategory (any combo; all optional)
  * Returns items matching the criteria so admin can bulk-fix their brand/category.
