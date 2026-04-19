@@ -4251,97 +4251,103 @@ router.post('/items/parse-price-list', requirePermission('zoho', 'manage'), uplo
 router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
         const brand = req.query.brand;
+        const category = (req.query.category || '').trim();          // optional filter
+        const userCode = (req.query.code || '').trim().toUpperCase(); // explicit prefix code (e.g. "EM", "IPR")
+        const hasBases = req.query.hasBases === '1' || req.query.hasBases === 'true';
         if (!brand) return res.status(400).json({ success: false, message: 'brand query param is required' });
 
+        const whereParts = [`zoho_status = 'active'`, `zoho_brand = ?`];
+        const params = [brand];
+        if (category) { whereParts.push('zoho_category_name = ?'); params.push(category); }
+
         const [rows] = await pool.query(
-            `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_brand AS brand, zoho_unit AS unit, zoho_cf_product_name AS cf_product_name
+            `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_brand AS brand,
+                    zoho_unit AS unit, zoho_category_name AS category, zoho_cf_product_name AS cf_product_name
              FROM zoho_items_map
-             WHERE zoho_status = 'active' AND zoho_brand = ?
+             WHERE ${whereParts.join(' AND ')}
              ORDER BY zoho_item_name ASC`,
-            [brand]
+            params
         );
 
         const summary = { conformant: 0, needs_rename: 0, cannot_parse: 0 };
         const results = [];
 
+        // Validate the category code
+        if (userCode && !/^[A-Z]{2,5}$/.test(userCode)) {
+            return res.status(400).json({ success: false, message: 'code must be 2-5 uppercase letters (e.g. IPR, EM)' });
+        }
+
         for (const row of rows) {
-            const nameUp = String(row.name || '').toUpperCase().trim();
+            const rawName = String(row.name || '').trim();
+            const nameUp = rawName.toUpperCase();
             const skuUp = String(row.sku || '').toUpperCase().trim();
             const brandUp = String(row.brand || '').toUpperCase().trim();
 
-            // 1. Parse current SKU prefix (first token)
+            // 1. Parse current SKU prefix (for display only now)
             const currentStruct =
                 priceListParser.parseSkuStructure(skuUp) ||
                 priceListParser.parseSkuStructure(nameUp);
 
-            // 2. Infer pack code from the trailing pack-size in the name
+            // 2. Pack code from trailing pack-size in the name
             let inferPack = null;
             const packMatch = nameUp.match(/\b(\d{1,3}(?:\.\d+)?)\s*(ML|L|LT|LTR|LITRE|LITER|KG|GM?)\s*$/i);
             if (packMatch) {
                 inferPack = priceListParser.packSizeToCode(packMatch[1] + packMatch[2]);
             }
 
-            // 3. Infer base — "BASE N", "B N", or "WHITE"
+            // 3. Base detection — only matters if hasBases is true
             let inferBase = null;
-            const bMatch = nameUp.match(/\bBASE\s*([1-9])\b|\bB([1-9])\b/);
-            if (bMatch) inferBase = bMatch[1] || bMatch[2];
-            else if (/\bWHITE\b|\bSUPER\s*WHITE\b/.test(nameUp)) inferBase = 'W';
-
-            // 4. Infer product abbreviation from remaining significant words
-            //    Strip: leading prefix (if looks like SKU), brand words, pack trailer, base markers
-            const brandTokens = new Set(brandUp.split(/\s+/).filter(w => w && w.length >= 2));
-            const stopWords = new Set(['THE', 'AND', 'OF', 'FOR', 'BASE', 'PAINT', 'PAINTS',
-                'EMULSION', 'WHITE', 'SUPER', 'DEEP', 'SHADE', 'LITRE', 'LITER']);
-            const unitWords = new Set(['L', 'LT', 'LTR', 'ML', 'KG', 'G', 'GM']);
-
-            let working = nameUp;
-            // Drop a leading prefix-looking token (letters+digits, 4-6 chars)
-            if (currentStruct) working = working.replace(/^[A-Z0-9]{4,8}\s+/, '');
-            // Drop trailing pack size
-            working = working.replace(/\b\d{1,3}(?:\.\d+)?\s*(ML|L|LT|LTR|LITRE|LITER|KG|GM?)\s*$/i, '');
-            // Drop base markers
-            working = working.replace(/\bBASE\s*[1-9]\b|\bB[1-9]\b/g, '');
-            // Drop standalone single-letter tokens & pure digits
-            const words = working
-                .replace(/[^A-Z ]/g, ' ')
-                .split(/\s+/)
-                .filter(w => w && w.length >= 2
-                    && !stopWords.has(w) && !brandTokens.has(w) && !unitWords.has(w));
-
-            let inferAbbrev = null;
-            if (words.length >= 1) {
-                inferAbbrev = words.slice(0, Math.min(3, words.length))
-                    .map(w => w[0]).join('');
+            if (hasBases) {
+                const bMatch = nameUp.match(/\bBASE\s*([1-9])\b|\bB([1-9])\b/);
+                if (bMatch) inferBase = bMatch[1] || bMatch[2];
+                else if (/\bWHITE\b|\bSUPER\s*WHITE\b|\bDEEP\s*WHITE\b/.test(nameUp)) inferBase = 'W';
             }
 
-            // 5. Decide status + propose rename
+            // 4. Strip known noise (old prefix, brand, pack, base) → remaining is the "middle" product name
+            const brandTokens = new Set(brandUp.split(/\s+/).filter(w => w && w.length >= 2));
+            const unitWords = new Set(['L', 'LT', 'LTR', 'ML', 'KG', 'G', 'GM', 'LITRE', 'LITER']);
+
+            let middle = rawName;
+            // Drop a leading prefix-looking token (letters+digits, 3-8 chars)
+            middle = middle.replace(/^[A-Z0-9]{3,8}\s+/i, '');
+            // Drop trailing pack size
+            middle = middle.replace(/\s*\b\d{1,3}(?:\.\d+)?\s*(ML|L|LT|LTR|LITRE|LITER|KG|GM?)\s*$/i, '');
+            // Drop base markers when applicable
+            if (hasBases) {
+                middle = middle.replace(/\bBASE\s*[1-9]\b/gi, '');
+                middle = middle.replace(/\bB[1-9]\b/gi, '');
+                middle = middle.replace(/\b(?:SUPER\s*|DEEP\s*)?WHITE\b/gi, '');
+            }
+            // Drop brand tokens from the middle
+            for (const bt of brandTokens) {
+                middle = middle.replace(new RegExp('\\b' + bt + '\\b', 'gi'), '');
+            }
+            // Drop unit words
+            for (const uw of unitWords) {
+                middle = middle.replace(new RegExp('\\b' + uw + '\\b', 'gi'), '');
+            }
+            middle = middle.replace(/\s+/g, ' ').trim();
+
+            // 5. Build proposed prefix + full name using USER-SUPPLIED code
             let status = 'cannot_parse';
             let proposedPrefix = null;
             let proposedName = null;
 
-            const canProposeSku = inferAbbrev && inferPack;
-            if (canProposeSku) {
-                const baseDigit = inferBase === 'W' ? '' : (inferBase || '');
-                proposedPrefix = inferAbbrev + baseDigit + inferPack;
+            if (userCode && inferPack) {
+                const baseDigit = hasBases ? (inferBase === 'W' ? '0' : (inferBase || '')) : '';
+                proposedPrefix = userCode + baseDigit + inferPack;
+                // Build full name: [PREFIX] [middle product name] [BRAND] [PACK L]
+                const displayPack = (packMatch ? packMatch[1] + ' ' + packMatch[2].toUpperCase() : '').trim();
+                const parts = [proposedPrefix, (middle || '').toUpperCase(), brandUp, displayPack]
+                    .filter(Boolean).map(s => s.trim()).filter(Boolean);
+                proposedName = parts.join(' ').replace(/\s+/g, ' ').trim();
 
-                // Check if already conformant: SKU prefix equals proposal (fuzzy on abbrev)
-                if (currentStruct) {
-                    const ca = currentStruct.abbrev, cb = inferAbbrev;
-                    const abbrevOk = ca === cb || ca.startsWith(cb) || cb.startsWith(ca);
-                    const packOk = currentStruct.packCode === inferPack;
-                    const baseOk = !inferBase || !currentStruct.base ||
-                                    currentStruct.base === inferBase ||
-                                    (inferBase === 'W' && !currentStruct.base);
-                    if (abbrevOk && packOk && baseOk) {
-                        status = 'conformant';
-                    } else {
-                        status = 'needs_rename';
-                        // Name: replace existing prefix with proposal
-                        proposedName = proposedPrefix + ' ' + (row.name || '').replace(/^[A-Z0-9]{4,8}\s+/, '');
-                    }
+                // Already conformant? (current name starts with proposed prefix and matches exactly)
+                if (nameUp === proposedName.toUpperCase()) {
+                    status = 'conformant';
+                    proposedName = null;
                 } else {
                     status = 'needs_rename';
-                    proposedName = proposedPrefix + ' ' + (row.name || '');
                 }
             }
 
@@ -4350,8 +4356,9 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
                 zoho_item_id: row.zoho_item_id,
                 current_name: row.name,
                 current_sku: row.sku,
+                current_category: row.category,
                 current_prefix: currentStruct ? currentStruct.raw : null,
-                inferred_abbrev: inferAbbrev,
+                middle_name: middle || null,
                 inferred_base: inferBase,
                 inferred_pack: inferPack,
                 proposed_prefix: proposedPrefix,
@@ -4363,12 +4370,83 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
         res.json({
             success: true,
             brand,
+            category: category || null,
+            code: userCode || null,
+            has_bases: hasBases,
             total: rows.length,
             summary,
             items: results
         });
     } catch (error) {
         console.error('Normalize scan error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * GET /api/zoho/items/normalize/meta?brand=X
+ * Returns distinct categories for the brand (for the category dropdown).
+ */
+router.get('/items/normalize/meta', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = req.query.brand;
+        if (!brand) return res.status(400).json({ success: false, message: 'brand param required' });
+        const [rows] = await pool.query(
+            `SELECT zoho_category_name AS category, COUNT(*) AS item_count
+             FROM zoho_items_map
+             WHERE zoho_status = 'active' AND zoho_brand = ? AND zoho_category_name IS NOT NULL AND zoho_category_name <> ''
+             GROUP BY zoho_category_name
+             ORDER BY zoho_category_name ASC`,
+            [brand]
+        );
+        // Read saved category codes from ai_config if present
+        let saved = {};
+        try {
+            const [[cfg]] = await pool.query(
+                "SELECT config_value FROM ai_config WHERE config_key = 'item_normalize_category_codes'"
+            );
+            if (cfg?.config_value) saved = JSON.parse(cfg.config_value) || {};
+        } catch (_) { /* ignore */ }
+        res.json({
+            success: true,
+            brand,
+            categories: rows.map(r => ({
+                name: r.category,
+                count: r.item_count,
+                saved_code: (saved[r.category] && saved[r.category].code) || null,
+                saved_has_bases: !!(saved[r.category] && saved[r.category].has_bases)
+            }))
+        });
+    } catch (error) {
+        console.error('Normalize meta error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * POST /api/zoho/items/normalize/remember
+ * Body: { category, code, has_bases }
+ * Persists the chosen code so it's pre-filled next time.
+ */
+router.post('/items/normalize/remember', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const { category, code, has_bases } = req.body;
+        if (!category || !code) return res.status(400).json({ success: false, message: 'category + code required' });
+        let saved = {};
+        const [[cfg]] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'item_normalize_category_codes'"
+        );
+        if (cfg?.config_value) { try { saved = JSON.parse(cfg.config_value) || {}; } catch (_) { saved = {}; } }
+        saved[category] = { code: String(code).toUpperCase(), has_bases: !!has_bases };
+        await pool.query(
+            `INSERT INTO ai_config (config_key, config_value)
+             VALUES ('item_normalize_category_codes', ?)
+             ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)`,
+            [JSON.stringify(saved)]
+        );
+        res.json({ success: true, message: 'Saved' });
+    } catch (error) {
+        console.error('Normalize remember error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
