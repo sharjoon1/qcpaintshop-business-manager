@@ -319,7 +319,7 @@
     </div>
 
     <!-- Normalize Names Modal -->
-    <div id="normOverlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:60;padding:16px;overflow-y:auto" onclick="if(event.target===this)closeNormalizeModal()">
+    <div id="normOverlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;padding:16px;overflow-y:auto" onclick="if(event.target===this)closeNormalizeModal()">
         <div style="background:white;border-radius:12px;max-width:1100px;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)" onclick="event.stopPropagation()">
             <div style="padding:14px 18px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:white;border-radius:12px 12px 0 0">
                 <div>
@@ -1699,7 +1699,7 @@
         document.getElementById('normFooter').classList.add('hidden');
 
         try {
-            var resp = await fetch('/api/zoho/items/normalize-scan?brand=' + encodeURIComponent(brand), { headers: getAuthHeaders() });
+            var resp = await fetch('/api/zoho/items/normalize/scan?brand=' + encodeURIComponent(brand), { headers: getAuthHeaders() });
             var data = await resp.json();
             if (!data.success) throw new Error(data.message);
 
@@ -1811,7 +1811,7 @@
         document.getElementById('normLoadingText').textContent = 'Applying ' + simple.length + ' renames — pushing to Zoho...';
 
         try {
-            var resp = await fetch('/api/zoho/items/normalize-apply', {
+            var resp = await fetch('/api/zoho/items/normalize/apply', {
                 method: 'POST',
                 headers: Object.assign({'Content-Type':'application/json'}, getAuthHeaders()),
                 body: JSON.stringify({ items: simple })

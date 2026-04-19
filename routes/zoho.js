@@ -4248,7 +4248,7 @@ router.post('/items/parse-price-list', requirePermission('zoho', 'manage'), uplo
  * GET /api/zoho/items/normalize-scan?brand=X
  * Scan all items of a brand, infer canonical SKU prefix from name, return proposed renames.
  */
-router.get('/items/normalize-scan', requirePermission('zoho', 'manage'), async (req, res) => {
+router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
         const brand = req.query.brand;
         if (!brand) return res.status(400).json({ success: false, message: 'brand query param is required' });
@@ -4378,7 +4378,7 @@ router.get('/items/normalize-scan', requirePermission('zoho', 'manage'), async (
  * Body: { items: [{ zoho_item_id, new_name, new_sku? }, ...] }
  * Updates DB and pushes to Zoho.
  */
-router.post('/items/normalize-apply', requirePermission('zoho', 'manage'), async (req, res) => {
+router.post('/items/normalize/apply', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
         const { items } = req.body;
         if (!items || !Array.isArray(items) || items.length === 0) {
