@@ -1891,7 +1891,14 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                     WHERE ps4.product_id = p.id AND ps4.is_active = 1
                         AND ppr4.annual_eligible = 1 AND ppr4.annual_pct > 0
                     ORDER BY ppr4.regular_points_per_unit DESC
-                    LIMIT 1) as annual_points
+                    LIMIT 1) as annual_points,
+                   (SELECT CAST(zim5.zoho_rate AS DECIMAL(10,2)) FROM pack_sizes ps5
+                    INNER JOIN zoho_items_map zim5 ON zim5.zoho_item_id = ps5.zoho_item_id
+                    WHERE ps5.product_id = p.id AND ps5.is_active = 1
+                    ORDER BY CAST(ps5.size AS DECIMAL(10,2)) DESC LIMIT 1) as max_variant_rate,
+                   (SELECT CONCAT(ps6.size, ' ', COALESCE(ps6.unit, '')) FROM pack_sizes ps6
+                    WHERE ps6.product_id = p.id AND ps6.is_active = 1
+                    ORDER BY CAST(ps6.size AS DECIMAL(10,2)) DESC LIMIT 1) as max_variant_size
             FROM products p
             INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
             INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
@@ -1916,7 +1923,9 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                 max_rate: p.max_rate ? parseFloat(p.max_rate) : null,
                 points_per_unit: p.points_per_unit ? parseFloat(p.points_per_unit) : null,
                 mrp: p.mrp ? parseFloat(p.mrp) : null,
-                annual_points: p.annual_points ? Math.round(parseFloat(p.annual_points) * 100) / 100 : null
+                annual_points: p.annual_points ? Math.round(parseFloat(p.annual_points) * 100) / 100 : null,
+                max_variant_rate: p.max_variant_rate ? parseFloat(p.max_variant_rate) : null,
+                max_variant_size: p.max_variant_size ? String(p.max_variant_size).trim() : null
             })),
             offers: offers.map(o => ({
                 id: o.id,
@@ -1925,7 +1934,8 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                 bonus_points: o.bonus_points ? parseFloat(o.bonus_points) : null,
                 multiplier_value: o.multiplier_value ? parseFloat(o.multiplier_value) : null,
                 applies_to: o.applies_to,
-                target_id: o.target_id
+                target_id: o.target_id,
+                banner_image_url: o.banner_image_url || null
             }))
         });
     } catch (error) {
