@@ -99,6 +99,7 @@
                 <button class="tab-btn" onclick="switchTab('reports')">Referrals & Reports</button>
                 <button class="tab-btn" onclick="switchTab('estimates')">Estimates</button>
                 <button class="tab-btn" onclick="switchTab('offers')">🎁 Offers</button>
+                <button class="tab-btn" onclick="switchTab('overrides')">⚙️ Overrides</button>
                 <button class="tab-btn" onclick="switchTab('training')">📚 Training</button>
                 <button class="tab-btn" onclick="switchTab('catalog')">Catalog</button>
                 <button class="tab-btn" onclick="switchTab('visualizations')">🎨 Visualizations</button>
@@ -453,8 +454,11 @@
                                 </select>
                             </div>
                             <div id="offerTargetDiv" class="form-group hidden">
-                                <label>Target</label>
-                                <input type="text" id="offerTarget" placeholder="Brand/Category/Product ID" class="w-full">
+                                <label>Target <span id="offerTargetLabel" class="text-xs text-gray-500"></span></label>
+                                <select id="offerTarget" class="w-full">
+                                    <option value="">— Select —</option>
+                                </select>
+                                <div id="offerTargetHint" class="text-xs text-gray-500 mt-1"></div>
                             </div>
                             <div class="form-group">
                                 <label>Start Date *</label>
@@ -494,6 +498,78 @@
                             </thead>
                             <tbody id="offersTableBody">
                                 <tr><td colspan="7" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Per-Painter Overrides -->
+            <div id="tab-overrides" class="tab-content">
+                <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+                    <h3 class="text-lg font-semibold mb-3">Painter-Specific Overrides</h3>
+                    <p class="text-sm text-gray-600 mb-4">Give a painter a discount % on their normal price, or extra regular points on top of what they already earn. Scope can be a single item, a brand, or a category.</p>
+
+                    <div class="form-group mb-4">
+                        <label>Pick Painter *</label>
+                        <select id="ovrPainterSelect" class="w-full" onchange="loadPainterOverrides()">
+                            <option value="">— Select painter —</option>
+                        </select>
+                    </div>
+
+                    <form id="ovrForm" onsubmit="return handleOverrideSubmit(event)">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Scope *</label>
+                                <select id="ovrScope" class="w-full" onchange="loadOvrTarget()">
+                                    <option value="brand">Specific Brand</option>
+                                    <option value="category">Specific Category</option>
+                                    <option value="item">Specific Item (SKU)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Target *</label>
+                                <select id="ovrTarget" class="w-full"><option value="">Loading…</option></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Discount % (from normal painter rate)</label>
+                                <input type="number" id="ovrDiscount" min="0" max="100" step="0.5" value="0" class="w-full">
+                            </div>
+                            <div class="form-group">
+                                <label>Bonus Regular Points (added per unit)</label>
+                                <input type="number" id="ovrBonus" min="0" step="0.01" value="0" class="w-full">
+                            </div>
+                            <div class="form-group md:col-span-2">
+                                <label>Notes (optional)</label>
+                                <input type="text" id="ovrNotes" maxlength="500" class="w-full" placeholder="e.g., High-value painter — extra 5% off 10L">
+                            </div>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <button type="submit" class="btn-sm btn-primary">Save Override</button>
+                            <button type="button" onclick="resetOvrForm()" class="btn-sm btn-outline">Reset</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 class="font-semibold">Existing Overrides</h3>
+                        <span id="ovrCount" class="text-xs text-gray-500"></span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Scope</th>
+                                    <th>Target</th>
+                                    <th>Discount %</th>
+                                    <th>Bonus pts</th>
+                                    <th>Notes</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ovrList">
+                                <tr><td colspan="6" class="text-center p-6 text-gray-500">Select a painter above to view overrides</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -997,6 +1073,7 @@
         if (tab === 'reports') loadReportsTab();
         if (tab === 'estimates') loadEstimates();
         if (tab === 'offers') loadOffers();
+        if (tab === 'overrides') { ensureOvrPainterList(); loadOvrTarget(); }
         if (tab === 'training') loadTrainingContent();
         if (tab === 'catalog') loadCatalogStats();
         if (tab === 'visualizations') loadVisualizations();
@@ -2716,10 +2793,9 @@
         document.getElementById('offerType').value = offer.offer_type || 'multiplier';
         document.getElementById('offerValue').value = offer.multiplier_value || offer.bonus_points || 2;
         document.getElementById('offerAppliesTo').value = offer.applies_to || 'all';
-        document.getElementById('offerTarget').value = offer.target_id || '';
         document.getElementById('offerStart').value = offer.start_date ? offer.start_date.substring(0, 10) : '';
         document.getElementById('offerEnd').value = offer.end_date ? offer.end_date.substring(0, 10) : '';
-        toggleOfferTarget();
+        toggleOfferTarget(offer.target_id);
         document.getElementById('offerFormTitle').textContent = 'Edit Offer';
         document.getElementById('offerSubmitBtn').textContent = 'Update Offer';
         document.getElementById('tab-offers').scrollIntoView({ behavior: 'smooth' });
@@ -2751,16 +2827,46 @@
         } catch (err) { alert('Error: ' + err.message); }
     }
 
-    function toggleOfferTarget() {
+    async function toggleOfferTarget(preserveValue) {
         const val = document.getElementById('offerAppliesTo').value;
         const div = document.getElementById('offerTargetDiv');
+        const sel = document.getElementById('offerTarget');
+        const hint = document.getElementById('offerTargetHint');
+        const lbl = document.getElementById('offerTargetLabel');
         if (val === 'all') {
             div.classList.add('hidden');
-            document.getElementById('offerTarget').value = '';
-        } else {
-            div.classList.remove('hidden');
+            sel.innerHTML = '<option value="">— Select —</option>';
+            return;
+        }
+        div.classList.remove('hidden');
+        lbl.textContent = `(${val})`;
+        sel.innerHTML = '<option value="">Loading…</option>';
+        hint.textContent = '';
+        try {
+            const res = await fetch(`${API}/offer-targets?type=${val}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message || 'Failed to load');
+            const options = ['<option value="">— Select —</option>'].concat(
+                (data.items || []).map(it => {
+                    const extra = it.brand || it.category
+                        ? ` (${[it.brand, it.category].filter(Boolean).join(' • ')})`
+                        : '';
+                    return `<option value="${escAttr(it.value)}">${escHtml(it.label)}${escHtml(extra)}</option>`;
+                })
+            );
+            sel.innerHTML = options.join('');
+            hint.textContent = `${(data.items || []).length} ${val}(s) available`;
+            if (preserveValue != null && preserveValue !== '') {
+                sel.value = String(preserveValue);
+            }
+        } catch (err) {
+            sel.innerHTML = '<option value="">Failed to load</option>';
+            hint.textContent = 'Error: ' + err.message;
         }
     }
+
+    function escHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function escAttr(s) { return escHtml(s); }
 
     function resetOfferForm() {
         document.getElementById('offerForm').reset();
@@ -2769,6 +2875,150 @@
         document.getElementById('offerSubmitBtn').textContent = 'Create Offer';
         document.getElementById('offerValue').value = '2.00';
         toggleOfferTarget();
+    }
+
+    // ═══════════════════════════════════════
+    // PAINTER OVERRIDES TAB
+    // ═══════════════════════════════════════
+    let ovrPaintersLoaded = false;
+
+    async function ensureOvrPainterList() {
+        if (ovrPaintersLoaded) return;
+        try {
+            const res = await fetch(`${API}?limit=1000`, { headers: authHeaders() });
+            const data = await res.json();
+            const sel = document.getElementById('ovrPainterSelect');
+            sel.innerHTML = '<option value="">— Select painter —</option>' +
+                (data.painters || []).map(p =>
+                    `<option value="${p.id}">${escHtml(p.full_name)} (${escHtml(p.mobile || '')})</option>`
+                ).join('');
+            ovrPaintersLoaded = true;
+        } catch (err) {
+            console.error('Failed to load painters', err);
+        }
+    }
+
+    async function loadOvrTarget(preserve) {
+        const scope = document.getElementById('ovrScope').value;
+        const sel = document.getElementById('ovrTarget');
+        sel.innerHTML = '<option value="">Loading…</option>';
+        try {
+            const type = scope === 'item' ? 'product' : scope;
+            const res = await fetch(`${API}/offer-targets?type=${type}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            // For 'item' scope we actually need SKU-level pickers — show products for now;
+            // user can pick product, we'll store product name in target_id. But for true item
+            // overrides we need a zoho_item_id. Fall back to showing each active zoho item.
+            if (scope === 'item') {
+                // Fetch zoho items directly (use zoho-items-map)
+                const r2 = await fetch('/api/zoho/items?limit=500', { headers: authHeaders() });
+                const d2 = await r2.json();
+                const items = d2.items || d2.data || [];
+                sel.innerHTML = '<option value="">— Select item —</option>' +
+                    items.map(i => `<option value="${escAttr(i.zoho_item_id || i.item_id)}">${escHtml(i.zoho_item_name || i.name)} (${escHtml(i.zoho_brand || '')})</option>`).join('');
+            } else {
+                sel.innerHTML = '<option value="">— Select —</option>' +
+                    (data.items || []).map(it => `<option value="${escAttr(it.value)}">${escHtml(it.label)}</option>`).join('');
+            }
+            if (preserve) sel.value = String(preserve);
+        } catch (err) {
+            sel.innerHTML = '<option value="">Failed to load</option>';
+        }
+    }
+
+    async function loadPainterOverrides() {
+        const painterId = document.getElementById('ovrPainterSelect').value;
+        const tbody = document.getElementById('ovrList');
+        const count = document.getElementById('ovrCount');
+        if (!painterId) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center p-6 text-gray-500">Select a painter above to view overrides</td></tr>';
+            count.textContent = '';
+            return;
+        }
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4">Loading…</td></tr>';
+        try {
+            const res = await fetch(`${API}/custom-rates/${painterId}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            const rates = data.rates || [];
+            count.textContent = `${rates.length} override(s)`;
+            if (!rates.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center p-6 text-gray-500">No overrides yet for this painter</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rates.map(r => {
+                const targetLabel = r.scope === 'item'
+                    ? `${escHtml(r.zoho_item_name || r.zoho_item_id || '')} <span class="text-xs text-gray-500">(${escHtml(r.zoho_brand || '')})</span>`
+                    : escHtml(r.target_id);
+                return `
+                    <tr>
+                        <td><span class="badge">${escHtml(r.scope)}</span></td>
+                        <td>${targetLabel}</td>
+                        <td>${r.discount_pct > 0 ? r.discount_pct + '%' : '—'}</td>
+                        <td>${r.bonus_regular_points > 0 ? '+' + r.bonus_regular_points : '—'}</td>
+                        <td class="text-xs text-gray-600">${escHtml(r.notes || '')}</td>
+                        <td>
+                            <button onclick="deleteOverride(${r.id})" class="btn-sm btn-danger">Delete</button>
+                        </td>
+                    </tr>`;
+            }).join('');
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-red-600">Error: ${escHtml(err.message)}</td></tr>`;
+        }
+    }
+
+    async function handleOverrideSubmit(e) {
+        e.preventDefault();
+        const painterId = document.getElementById('ovrPainterSelect').value;
+        if (!painterId) { alert('Select a painter first'); return false; }
+        const scope = document.getElementById('ovrScope').value;
+        const target = document.getElementById('ovrTarget').value;
+        if (!target) { alert('Select a target'); return false; }
+        const discount = parseFloat(document.getElementById('ovrDiscount').value || 0);
+        const bonus = parseFloat(document.getElementById('ovrBonus').value || 0);
+        if (discount === 0 && bonus === 0) {
+            alert('Set at least one of: discount % or bonus points');
+            return false;
+        }
+        const body = {
+            painter_id: parseInt(painterId),
+            scope,
+            target_id: scope === 'item' ? target : target, // For item, target IS zoho_item_id
+            zoho_item_id: scope === 'item' ? target : null,
+            discount_pct: discount,
+            bonus_regular_points: bonus,
+            notes: document.getElementById('ovrNotes').value.trim() || null
+        };
+        try {
+            const res = await fetch(`${API}/custom-rates`, {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert('Override saved');
+            resetOvrForm();
+            loadPainterOverrides();
+        } catch (err) { alert('Error: ' + err.message); }
+        return false;
+    }
+
+    async function deleteOverride(id) {
+        if (!confirm('Delete this override?')) return;
+        try {
+            const res = await fetch(`${API}/custom-rates/${id}`, { method: 'DELETE', headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            loadPainterOverrides();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    function resetOvrForm() {
+        document.getElementById('ovrDiscount').value = 0;
+        document.getElementById('ovrBonus').value = 0;
+        document.getElementById('ovrNotes').value = '';
     }
 
     // ═══════════════════════════════════════

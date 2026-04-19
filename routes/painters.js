@@ -32,6 +32,50 @@ function setPool(p) {
 function setIO(ioInstance) { io = ioInstance; }
 function setSessionManager(sm) { sessionManager = sm; }
 
+// ─── Painter Custom-Rate Resolver ─────────────────────────
+// Loads painter's overrides once and returns (zohoItemId, brand, category) -> {discountPct, bonusPts}
+// Priority: item > brand > category. Used by /me/products, /me/catalog, /me/offer-products.
+async function getPainterOverrideResolver(painterId) {
+    if (!painterId) return () => ({ discountPct: 0, bonusPts: 0 });
+    let rows;
+    try {
+        [rows] = await pool.query(
+            `SELECT scope, target_id, zoho_item_id, discount_pct, bonus_regular_points
+             FROM painter_custom_rates WHERE painter_id = ?`,
+            [painterId]
+        );
+    } catch (err) {
+        // Table may not exist yet (migration not run). Fail open — no overrides.
+        if (err && err.code === 'ER_NO_SUCH_TABLE') return () => ({ discountPct: 0, bonusPts: 0 });
+        throw err;
+    }
+    const byItem = new Map();
+    const byBrand = new Map();
+    const byCategory = new Map();
+    for (const r of rows) {
+        const entry = {
+            discountPct: parseFloat(r.discount_pct || 0),
+            bonusPts: parseFloat(r.bonus_regular_points || 0)
+        };
+        if (r.scope === 'item' && r.zoho_item_id) byItem.set(String(r.zoho_item_id), entry);
+        else if (r.scope === 'brand') byBrand.set(r.target_id, entry);
+        else if (r.scope === 'category') byCategory.set(r.target_id, entry);
+    }
+    return (zohoItemId, brand, category) => (
+        (zohoItemId && byItem.get(String(zohoItemId))) ||
+        (brand && byBrand.get(brand)) ||
+        (category && byCategory.get(category)) ||
+        { discountPct: 0, bonusPts: 0 }
+    );
+}
+
+function applyOverrideToRate(rate, discountPct) {
+    if (!rate || !discountPct) return rate;
+    const d = parseFloat(discountPct);
+    if (d <= 0 || d >= 100) return rate;
+    return Math.round(parseFloat(rate) * (1 - d / 100) * 100) / 100;
+}
+
 // ─── Estimate Status History Logging ─────────────────────────
 async function logEstimateStatusChange(estimateId, oldStatus, newStatus, changedBy, notes) {
     try {
@@ -1016,6 +1060,9 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             ORDER BY b.name, p.name, CAST(ps.size AS DECIMAL(10,2))
         `, params);
 
+        // Painter overrides
+        const resolveOverride = await getPainterOverrideResolver(req.painter?.id);
+
         // Group by product
         const productMap = {};
         for (const row of rows) {
@@ -1034,14 +1081,18 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
                     pack_sizes: []
                 };
             }
+            const ov = resolveOverride(row.zoho_item_id, row.brand, row.category);
             const showPrices = billing_type === 'self';
-            const regularPts = row.regular_points ? parseFloat(row.regular_points) : null;
+            const baseReg = row.regular_points ? parseFloat(row.regular_points) : null;
+            const regularPts = baseReg != null ? baseReg + (ov.bonusPts || 0) : null;
             const annualPts = (regularPts && row.annual_eligible && row.annual_pct) ? Math.round(regularPts * parseFloat(row.annual_pct) / 100 * 100) / 100 : null;
+            const baseRate = parseFloat(row.zoho_rate || row.base_price || 0);
+            const adjRate = applyOverrideToRate(baseRate, ov.discountPct);
             productMap[row.id].pack_sizes.push({
                 pack_size_id: row.pack_size_id,
                 size: String(parseFloat(row.size) || row.size || ''),
                 unit: row.unit,
-                rate: showPrices ? parseFloat(row.zoho_rate || row.base_price || 0) : null,
+                rate: showPrices ? adjRate : null,
                 mrp: parseFloat(row.zoho_label_rate || row.zoho_rate || row.base_price || 0),
                 zoho_item_id: row.zoho_item_id,
                 stock: parseFloat(row.stock || 0),
@@ -1607,7 +1658,10 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
             ORDER BY created_at DESC
         `, [now, now]);
 
-        // Match offers to grouped products
+        // Painter overrides (discount % / bonus regular points)
+        const resolveOverride = await getPainterOverrideResolver(req.painter?.id);
+
+        // Match offers to grouped products + apply painter overrides
         const productsWithOffers = products.map(p => {
             const matchedOffers = offers.filter(o => {
                 if (o.applies_to === 'all') return true;
@@ -1615,12 +1669,14 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                 if (o.applies_to === 'category' && o.target_id === p.category) return true;
                 return false;
             });
+            const ov = resolveOverride(null, p.brand, p.category);
+            const baseReg = p.points_per_unit ? parseFloat(p.points_per_unit) : null;
             return {
                 ...p,
-                min_rate: parseFloat(p.min_rate || 0),
-                max_rate: parseFloat(p.max_rate || 0),
+                min_rate: applyOverrideToRate(parseFloat(p.min_rate || 0), ov.discountPct),
+                max_rate: applyOverrideToRate(parseFloat(p.max_rate || 0), ov.discountPct),
                 total_stock: parseFloat(p.total_stock || 0),
-                points_per_unit: p.points_per_unit ? parseFloat(p.points_per_unit) : null,
+                points_per_unit: baseReg != null ? baseReg + (ov.bonusPts || 0) : null,
                 offer: matchedOffers.length > 0 ? matchedOffers[0] : null,
                 pack_sizes: [],
             };
@@ -1645,14 +1701,23 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                 WHERE ps.product_id IN (?) AND ps.is_active = 1
                 ORDER BY ps.product_id, CAST(ps.size AS DECIMAL(10,2))
             `, [productIds]);
+            // Build product-id -> {brand, category} lookup for per-variant override resolution
+            const prodMeta = {};
+            for (const p of productsWithOffers) {
+                prodMeta[p.product_id] = { brand: p.brand, category: p.category };
+            }
+
             const bySize = {};
             for (const v of variants) {
                 if (!bySize[v.product_id]) bySize[v.product_id] = [];
-                const reg = v.regular_points ? parseFloat(v.regular_points) : null;
+                const meta = prodMeta[v.product_id] || {};
+                const ov = resolveOverride(v.zoho_item_id, meta.brand, meta.category);
+                const baseReg = v.regular_points ? parseFloat(v.regular_points) : null;
+                const reg = baseReg != null ? baseReg + (ov.bonusPts || 0) : null;
                 const annualPts = (reg && v.annual_eligible && v.annual_pct)
                     ? Math.round(reg * parseFloat(v.annual_pct) / 100 * 100) / 100
                     : null;
-                const rate = parseFloat(v.rate || 0);
+                const rate = applyOverrideToRate(parseFloat(v.rate || 0), ov.discountPct);
                 bySize[v.product_id].push({
                     pack_size_id: v.pack_size_id,
                     size: String(parseFloat(v.size) || v.size || ''),
@@ -1749,6 +1814,29 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
         const category = variants[0].category;
         const image_url = variants.find(v => v.image_url)?.image_url || null;
 
+        // Painter overrides
+        const resolveOverride = await getPainterOverrideResolver(req.painter?.id);
+
+        const adjustedVariants = variants.map(v => {
+            const ov = resolveOverride(v.item_id, brand, category);
+            const baseReg = v.points_per_unit ? parseFloat(v.points_per_unit) : 0;
+            const regularPts = baseReg + (ov.bonusPts || 0);
+            const annualPts = (regularPts && v.annual_eligible && v.annual_pct)
+                ? Math.round(regularPts * parseFloat(v.annual_pct) / 100 * 100) / 100
+                : 0;
+            const rate = applyOverrideToRate(parseFloat(v.rate || 0), ov.discountPct);
+            return {
+                id: v.item_id,
+                size: String(parseFloat(v.pack_size) || v.pack_size || ''),
+                unit: v.pack_unit || '',
+                rate,
+                stock: parseFloat(v.stock || 0),
+                regular_points: regularPts,
+                annual_points: annualPts,
+                image_url: v.image_url || null,
+            };
+        });
+
         const product = {
             product_id: prod.id,
             name: prod.name,
@@ -1756,24 +1844,11 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
             brand,
             category,
             image_url,
-            variant_count: variants.length,
-            min_rate: Math.min(...variants.map(v => parseFloat(v.rate || 0))),
-            max_rate: Math.max(...variants.map(v => parseFloat(v.rate || 0))),
-            total_stock: variants.reduce((s, v) => s + parseFloat(v.stock || 0), 0),
-            variants: variants.map(v => {
-                const regularPts = v.points_per_unit ? parseFloat(v.points_per_unit) : 0;
-                const annualPts = (regularPts && v.annual_eligible && v.annual_pct) ? Math.round(regularPts * parseFloat(v.annual_pct) / 100 * 100) / 100 : 0;
-                return {
-                    id: v.item_id,
-                    size: String(parseFloat(v.pack_size) || v.pack_size || ''),
-                    unit: v.pack_unit || '',
-                    rate: parseFloat(v.rate || 0),
-                    stock: parseFloat(v.stock || 0),
-                    regular_points: regularPts,
-                    annual_points: annualPts,
-                    image_url: v.image_url || null,
-                };
-            })
+            variant_count: adjustedVariants.length,
+            min_rate: Math.min(...adjustedVariants.map(v => v.rate)),
+            max_rate: Math.max(...adjustedVariants.map(v => v.rate)),
+            total_stock: adjustedVariants.reduce((s, v) => s + v.stock, 0),
+            variants: adjustedVariants
         };
 
         // Matching offers
@@ -1914,19 +1989,36 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
         // Unique brands
         const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
 
+        // Apply painter-specific overrides (discount % on rate, bonus on regular points)
+        const resolveOverride = await getPainterOverrideResolver(req.painter?.id);
+
         res.json({
             success: true,
             brands,
-            products: products.map(p => ({
-                ...p,
-                min_rate: p.min_rate ? parseFloat(p.min_rate) : null,
-                max_rate: p.max_rate ? parseFloat(p.max_rate) : null,
-                points_per_unit: p.points_per_unit ? parseFloat(p.points_per_unit) : null,
-                mrp: p.mrp ? parseFloat(p.mrp) : null,
-                annual_points: p.annual_points ? Math.round(parseFloat(p.annual_points) * 100) / 100 : null,
-                max_variant_rate: p.max_variant_rate ? parseFloat(p.max_variant_rate) : null,
-                max_variant_size: p.max_variant_size ? String(p.max_variant_size).trim() : null
-            })),
+            products: products.map(p => {
+                const ov = resolveOverride(null, p.brand, p.category);
+                const baseRegular = p.points_per_unit ? parseFloat(p.points_per_unit) : 0;
+                const adjustedRegular = baseRegular + (ov.bonusPts || 0);
+                // Annual recompute: we preserved raw annual_points from biggest variant earlier.
+                // If a bonus is added, scale annual by same ratio.
+                const rawAnnual = p.annual_points ? parseFloat(p.annual_points) : 0;
+                const adjustedAnnual = baseRegular > 0
+                    ? Math.round(rawAnnual * (adjustedRegular / baseRegular) * 100) / 100
+                    : rawAnnual;
+                const minRate = p.min_rate ? applyOverrideToRate(p.min_rate, ov.discountPct) : null;
+                const maxRate = p.max_rate ? applyOverrideToRate(p.max_rate, ov.discountPct) : null;
+                const maxVRate = p.max_variant_rate ? applyOverrideToRate(p.max_variant_rate, ov.discountPct) : null;
+                return {
+                    ...p,
+                    min_rate: minRate,
+                    max_rate: maxRate,
+                    points_per_unit: adjustedRegular > 0 ? adjustedRegular : null,
+                    mrp: p.mrp ? parseFloat(p.mrp) : null,
+                    annual_points: adjustedAnnual > 0 ? adjustedAnnual : null,
+                    max_variant_rate: maxVRate,
+                    max_variant_size: p.max_variant_size ? String(p.max_variant_size).trim() : null
+                };
+            }),
             offers: offers.map(o => ({
                 id: o.id,
                 title: o.title,
@@ -2267,7 +2359,172 @@ router.put('/me/notifications/:id/read', requirePainterAuth, async (req, res) =>
 // ADMIN NAMED ROUTES (must come BEFORE /:id parameterized routes)
 // ═══════════════════════════════════════════════════════════════
 
+// --- PAINTER CUSTOM RATES (per-painter overrides) ---
+
+// List all overrides for a painter
+router.get('/custom-rates/:painterId', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const painterId = parseInt(req.params.painterId);
+        if (!painterId) return res.status(400).json({ success: false, message: 'Invalid painter id' });
+
+        const [rows] = await pool.query(`
+            SELECT pcr.*, zim.zoho_item_name, zim.zoho_brand, zim.zoho_category_name
+            FROM painter_custom_rates pcr
+            LEFT JOIN zoho_items_map zim
+                ON zim.zoho_item_id = pcr.zoho_item_id COLLATE utf8mb4_unicode_ci
+            WHERE pcr.painter_id = ?
+            ORDER BY pcr.scope, pcr.target_id
+        `, [painterId]);
+
+        res.json({
+            success: true,
+            rates: rows.map(r => ({
+                id: r.id,
+                painter_id: r.painter_id,
+                scope: r.scope,
+                target_id: r.target_id,
+                zoho_item_id: r.zoho_item_id,
+                discount_pct: parseFloat(r.discount_pct),
+                bonus_regular_points: parseFloat(r.bonus_regular_points),
+                notes: r.notes,
+                created_at: r.created_at,
+                zoho_item_name: r.zoho_item_name,
+                zoho_brand: r.zoho_brand,
+                zoho_category_name: r.zoho_category_name
+            }))
+        });
+    } catch (error) {
+        console.error('List custom-rates error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list custom rates' });
+    }
+});
+
+// Upsert (create or update) an override
+router.post('/custom-rates', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const {
+            painter_id, scope, target_id, zoho_item_id,
+            discount_pct, bonus_regular_points, notes
+        } = req.body;
+
+        if (!painter_id || !scope || !target_id) {
+            return res.status(400).json({ success: false, message: 'painter_id, scope, target_id required' });
+        }
+        if (!['item', 'brand', 'category'].includes(scope)) {
+            return res.status(400).json({ success: false, message: 'scope must be item|brand|category' });
+        }
+        if (scope === 'item' && !zoho_item_id) {
+            return res.status(400).json({ success: false, message: 'zoho_item_id required when scope=item' });
+        }
+
+        const disc = parseFloat(discount_pct || 0);
+        const bonus = parseFloat(bonus_regular_points || 0);
+        if (disc < 0 || disc > 100) {
+            return res.status(400).json({ success: false, message: 'discount_pct must be 0..100' });
+        }
+        if (disc === 0 && bonus === 0) {
+            return res.status(400).json({ success: false, message: 'At least one of discount_pct / bonus_regular_points must be > 0' });
+        }
+
+        await pool.query(`
+            INSERT INTO painter_custom_rates
+                (painter_id, scope, target_id, zoho_item_id, discount_pct, bonus_regular_points, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                zoho_item_id = VALUES(zoho_item_id),
+                discount_pct = VALUES(discount_pct),
+                bonus_regular_points = VALUES(bonus_regular_points),
+                notes = VALUES(notes),
+                updated_at = CURRENT_TIMESTAMP
+        `, [
+            parseInt(painter_id), scope, target_id,
+            scope === 'item' ? zoho_item_id : null,
+            disc, bonus, notes || null, req.user.id
+        ]);
+
+        res.json({ success: true, message: 'Override saved' });
+    } catch (error) {
+        console.error('Upsert custom-rate error:', error);
+        res.status(500).json({ success: false, message: 'Failed to save override' });
+    }
+});
+
+// Delete an override
+router.delete('/custom-rates/:id', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        await pool.query(`DELETE FROM painter_custom_rates WHERE id = ?`, [id]);
+        res.json({ success: true, message: 'Override deleted' });
+    } catch (error) {
+        console.error('Delete custom-rate error:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete override' });
+    }
+});
+
 // --- OFFERS ADMIN ---
+
+// Dropdown source for offer form: brands / categories / products
+// GET /offer-targets?type=brand|category|product&q=searchTerm
+router.get('/offer-targets', requireAuth, async (req, res) => {
+    try {
+        const type = String(req.query.type || '').toLowerCase();
+        const q = (req.query.q || '').trim();
+        if (!['brand', 'category', 'product'].includes(type)) {
+            return res.status(400).json({ success: false, message: 'type must be brand|category|product' });
+        }
+
+        if (type === 'brand') {
+            const [rows] = await pool.query(`
+                SELECT DISTINCT zoho_brand AS value
+                FROM zoho_items_map
+                WHERE zoho_brand IS NOT NULL AND zoho_brand <> ''
+                  ${q ? 'AND zoho_brand LIKE ?' : ''}
+                ORDER BY zoho_brand ASC
+                LIMIT 200
+            `, q ? [`%${q}%`] : []);
+            return res.json({ success: true, items: rows.map(r => ({ value: r.value, label: r.value })) });
+        }
+
+        if (type === 'category') {
+            const [rows] = await pool.query(`
+                SELECT DISTINCT zoho_category_name AS value
+                FROM zoho_items_map
+                WHERE zoho_category_name IS NOT NULL AND zoho_category_name <> ''
+                  ${q ? 'AND zoho_category_name LIKE ?' : ''}
+                ORDER BY zoho_category_name ASC
+                LIMIT 200
+            `, q ? [`%${q}%`] : []);
+            return res.json({ success: true, items: rows.map(r => ({ value: r.value, label: r.value })) });
+        }
+
+        // type === 'product'
+        const [rows] = await pool.query(`
+            SELECT p.id AS value, p.name AS label,
+                   MAX(zim.zoho_brand) AS brand,
+                   MAX(zim.zoho_category_name) AS category
+            FROM products p
+            INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
+            INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
+            WHERE p.status = 'active'
+              ${q ? 'AND p.name LIKE ?' : ''}
+            GROUP BY p.id, p.name
+            ORDER BY p.name ASC
+            LIMIT 200
+        `, q ? [`%${q}%`] : []);
+        return res.json({
+            success: true,
+            items: rows.map(r => ({
+                value: String(r.value),
+                label: r.label,
+                brand: r.brand,
+                category: r.category
+            }))
+        });
+    } catch (error) {
+        console.error('offer-targets error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load targets' });
+    }
+});
 
 // List all offers
 router.get('/offers', requireAuth, async (req, res) => {
