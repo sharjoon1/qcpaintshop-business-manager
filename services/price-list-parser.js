@@ -924,14 +924,24 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                 family.push({ zi: ent.zi, struct: { packCode: ent.packCode }, rate: ent.rate });
             }
 
-            // Fallback: keyword-overlap scan. Finds Zoho items whose names share ≥2
-            // significant words with the PDF product, groups them by cleaned-name abbrev,
-            // and picks the best-scoring group. Handles cases where PDF and Zoho use
+            // Fallback: keyword-overlap scan. Handles cases where PDF and Zoho use
             // slightly different product wording (e.g. "Effects" vs "Metallic" trimmed).
+            // Strict: excludes brand/series noise, requires ≥60% of PDF keywords to hit,
+            // and requires both sides to have ≥2 distinguishing words.
+            let fromFallback = false;
             if (family.length === 0) {
+                // Noise = brand names + marketing/tier words that don't distinguish products.
+                // We INTENTIONALLY keep product-line words (ALLWOOD, STYLE, INTERIOR, EXTERIOR)
+                // because they are distinguishing features within a brand.
+                const SERIES_NOISE = new Set([
+                    'BIRLA', 'OPUS', 'ASIAN', 'BERGER', 'NIPPON', 'JSW', 'GEM', 'ASTRAL',
+                    'PAINT', 'PAINTS', 'BRAND',
+                    'PREMIUM', 'LUXURY', 'ECONOMY', 'STANDARD', 'ULTRA', 'DESIGNER', 'PROFESSIONAL'
+                ]);
                 const pdfKeywords = extractKeywords(p.product.toUpperCase())
-                    .filter(w => w.length >= 3 && !/^\d+$/.test(w));
+                    .filter(w => w.length >= 3 && !/^\d+$/.test(w) && !SERIES_NOISE.has(w));
                 if (pdfKeywords.length >= 2) {
+                    const requiredHits = Math.max(2, Math.ceil(pdfKeywords.length * 0.6));
                     const scored = [];
                     for (const zi of scopedZoho) {
                         const nameText = (zi.name || zi.zoho_item_name || '').toUpperCase();
@@ -940,7 +950,7 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                         for (const kw of pdfKeywords) {
                             if (cleaned.includes(kw)) hits++;
                         }
-                        if (hits < 2) continue;
+                        if (hits < requiredHits) continue;
                         const finish = detectFinish(nameText);
                         if (pdfFinish && finish && pdfFinish !== finish) continue;
                         const packCode = extractZohoPackCode(zi);
@@ -948,21 +958,23 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                         const groupKey = extractProductAbbrev(cleaned) || 'UNKNOWN';
                         scored.push({ zi, score: hits, packCode, rate: parseFloat(zi.rate || 0), groupKey });
                     }
-                    // Pick the group with highest total score
                     const groups = new Map();
                     for (const s of scored) {
                         if (!groups.has(s.groupKey)) groups.set(s.groupKey, []);
                         groups.get(s.groupKey).push(s);
                     }
-                    let best = null, bestTotal = 0;
+                    let best = null, bestTotal = 0, secondTotal = 0;
                     for (const [, members] of groups) {
                         const total = members.reduce((a, m) => a + m.score, 0);
-                        if (total > bestTotal) { bestTotal = total; best = members; }
+                        if (total > bestTotal) { secondTotal = bestTotal; bestTotal = total; best = members; }
+                        else if (total > secondTotal) { secondTotal = total; }
                     }
-                    if (best) {
+                    // Require a clear winner — best must beat runner-up by >1 point
+                    if (best && (bestTotal - secondTotal) >= 1) {
                         for (const m of best) {
                             family.push({ zi: m.zi, struct: { packCode: m.packCode }, rate: m.rate });
                         }
+                        fromFallback = true;
                     }
                 }
             }
@@ -1003,7 +1015,8 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                     dpl: price,
                     baseCode: p.baseCode,
                     category: p.category,
-                    _assignedZohoId: fam.zi.zoho_item_id || fam.zi.item_id
+                    _assignedZohoId: fam.zi.zoho_item_id || fam.zi.item_id,
+                    _fuzzy: fromFallback || undefined
                 });
             }
             // Any leftover prices (more prices than family members) → unmatched
@@ -1128,6 +1141,9 @@ function matchWithZohoItems(parsedItems, zohoItems) {
             };
             if (matchRate >= 100 && parsedDpl > 0 && parsedDpl < matchRate * 0.25) {
                 out._warning = `DPL ₹${parsedDpl} is <25% of rate ₹${matchRate} — verify before applying`;
+            }
+            if (parsed._fuzzy) {
+                out._warning = (out._warning ? out._warning + '; ' : '') + 'Fuzzy keyword match — verify';
             }
             matched.push(out);
         } else {
