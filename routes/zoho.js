@@ -4296,43 +4296,67 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
                 else if (/\bWHITE\b|\bSUPER\s*WHITE\b|\bDEEP\s*WHITE\b/.test(nameUp)) inferBase = 'W';
             }
 
-            // 4. Derive PRODUCT ABBREVIATION — unique per product family.
-            //    Priority:
-            //    (a) Extract letters from current SKU (e.g., "PFP01" → "PFP")
-            //    (b) Extract letters from current name first token (e.g., "EC101 EVER CLEAR ..." → "EC")
-            //    (c) Fallback: first letters of significant product words
+            // 4. Derive PRODUCT PREFIX.
+            //    The SKU is the source of truth when it matches pattern [A-Z]{2,5}\d{2,6}
+            //    (e.g., "CF1301" = CF + base13 + pack01 → full prefix is just "CF1301").
+            //    For items with partial SKU we fall back to building abbrev+base+pack.
             let productAbbrev = null;
+            let skuDerivedPrefix = null;
 
-            // (a) SKU letters
-            const skuLetters = skuUp.match(/^([A-Z]{2,5})/);
-            if (skuLetters) productAbbrev = skuLetters[1];
-
-            // (b) Name first-token letters — IF SKU didn't give us a good one
-            if (!productAbbrev) {
-                const nameLetters = firstToken.match(/^([A-Z]{2,5})/);
-                if (nameLetters) productAbbrev = nameLetters[1];
+            // Match full SKU pattern: letters + digits (digits = base + pack combined)
+            const skuFullMatch = skuUp.match(/^([A-Z]{2,5})(\d{2,6})$/);
+            if (skuFullMatch) {
+                productAbbrev = skuFullMatch[1];
+                skuDerivedPrefix = skuUp; // entire SKU becomes the prefix
+            } else {
+                // Fallback: just take leading letters
+                const skuLetters = skuUp.match(/^([A-Z]{2,5})/);
+                if (skuLetters) productAbbrev = skuLetters[1];
+                if (!productAbbrev) {
+                    const nameLetters = firstToken.match(/^([A-Z]{2,5})/);
+                    if (nameLetters) productAbbrev = nameLetters[1];
+                }
             }
 
-            // Strip noise to isolate product-name words in the middle
+            // Strip noise to isolate the product-name words in the middle
             const brandTokens = new Set(brandUp.split(/\s+/).filter(w => w && w.length >= 2));
             const unitWords = new Set(['L', 'LT', 'LTR', 'ML', 'KG', 'G', 'GM', 'LITRE', 'LITER']);
             let middle = rawName;
-            middle = middle.replace(/^[A-Z0-9]{2,8}\s+/i, '');
+
+            // Strip ALL leading prefix-like tokens (anything with digits) so we strip
+            // both "OP01" AND "CF13" from "OP01 CF13 STYLE COLOR FRESH OPUS 01 L"
+            const midParts = middle.split(/\s+/);
+            while (midParts.length > 0 && /\d/.test(midParts[0]) && midParts[0].length <= 8) {
+                midParts.shift();
+            }
+            middle = midParts.join(' ');
+
+            // Drop trailing pack size
             middle = middle.replace(/\s*\b\d{1,3}(?:\.\d+)?\s*(ML|L|LT|LTR|LITRE|LITER|KG|GM?)\s*$/i, '');
+            // Drop base markers when applicable
             if (hasBases) {
-                middle = middle.replace(/\bBASE\s*[1-9]\b/gi, '');
-                middle = middle.replace(/\bB[1-9]\b/gi, '');
+                middle = middle.replace(/\bBASE\s*[1-9][0-9]?\b/gi, '');
+                middle = middle.replace(/\bB[1-9][0-9]?\b/gi, '');
                 middle = middle.replace(/\b(?:SUPER\s*|DEEP\s*)?WHITE\b/gi, '');
             }
+            // Drop brand tokens from the middle (incl. partial/short forms like "OPUS" from "BIRLA OPUS")
             for (const bt of brandTokens) {
                 middle = middle.replace(new RegExp('\\b' + bt + '\\b', 'gi'), '');
             }
+            // Also strip common brand short-forms
+            const shortBrands = ['OPUS', 'BIRLA'];
+            for (const sb of shortBrands) {
+                if (brandUp.includes(sb)) {
+                    middle = middle.replace(new RegExp('\\b' + sb + '\\b', 'gi'), '');
+                }
+            }
+            // Drop unit words
             for (const uw of unitWords) {
                 middle = middle.replace(new RegExp('\\b' + uw + '\\b', 'gi'), '');
             }
             middle = middle.replace(/\s+/g, ' ').trim();
 
-            // (c) Fallback abbreviation from middle words
+            // Fallback abbrev from middle words
             if (!productAbbrev && middle) {
                 const words = middle.toUpperCase()
                     .replace(/[^A-Z ]/g, ' ')
@@ -4350,7 +4374,19 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
             let proposedName = null;
             let proposedSku = null;
 
-            if (productAbbrev && inferPack) {
+            if (skuDerivedPrefix) {
+                // SKU already encodes everything — use it as-is.
+                proposedPrefix = skuDerivedPrefix;
+                proposedSku = skuDerivedPrefix;
+                const displayPack = (packMatch ? packMatch[1] + ' ' + packMatch[2].toUpperCase() : '').trim();
+                const parts = [proposedPrefix, (middle || '').toUpperCase(), brandUp, displayPack]
+                    .filter(Boolean).map(s => s.trim()).filter(Boolean);
+                proposedName = parts.join(' ').replace(/\s+/g, ' ').trim();
+
+                status = (nameUp === proposedName.toUpperCase()) ? 'conformant' : 'needs_rename';
+                if (status === 'conformant') { proposedName = null; proposedSku = null; }
+            } else if (productAbbrev && inferPack) {
+                // No clean SKU → build from abbrev + inferred base + pack
                 const baseDigit = hasBases ? (inferBase === 'W' ? '0' : (inferBase || '')) : '';
                 proposedPrefix = productAbbrev + baseDigit + inferPack;
                 const displayPack = (packMatch ? packMatch[1] + ' ' + packMatch[2].toUpperCase() : '').trim();
