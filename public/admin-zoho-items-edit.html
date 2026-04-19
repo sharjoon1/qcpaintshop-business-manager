@@ -34,9 +34,6 @@
         .edit-table thead th .th-label:hover { background: #e2e8f0; }
         .edit-table thead th .th-label .sort-icon { opacity: 0.3; font-size: 0.65rem; }
         .edit-table thead th .th-label .sort-icon.active { opacity: 1; color: #667eea; }
-        .edit-table thead th .th-filter { padding: 2px 4px 4px; }
-        .edit-table thead th .th-filter input, .edit-table thead th .th-filter select { width: 100%; padding: 2px 5px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.7rem; outline: none; background: white; }
-        .edit-table thead th .th-filter input:focus, .edit-table thead th .th-filter select:focus { border-color: #667eea; }
         .edit-table tbody td { padding: 1px 3px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
         .edit-table tbody tr:hover { background: #f0f4ff; }
         .edit-table tbody tr.row-dirty { background: #fffdf5; }
@@ -81,47 +78,38 @@
         .pct-popover { position: absolute; top: 100%; left: 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 12px; z-index: 60; min-width: 240px; }
 
         /* Mobile */
-        @media (max-width: 767px) { .edit-table-outer { display: none; } .edit-cards { display: block; } }
+        @media (max-width: 767px) {
+            .edit-table-outer { display: none; }
+            .edit-cards { display: block; }
+            /* Larger touch targets + readable type on phones */
+            .qc-mobile-btn, .qc-mobile-btn button, button.qc-mobile-btn, a.qc-mobile-btn {
+                min-height: 40px; padding-top: 8px !important; padding-bottom: 8px !important; font-size: 0.8rem !important;
+            }
+            /* Stack all toolbar buttons full-width on mobile */
+            .top-toolbar .toolbar-actions { flex-direction: column; align-items: stretch; gap: 6px; width: 100%; }
+            .top-toolbar .toolbar-actions > * { width: 100%; justify-content: center; }
+            /* Search row: full-width input + clear + show-inactive below */
+            .search-row { flex-direction: column !important; align-items: stretch !important; }
+            .search-row input[type="text"] { font-size: 0.95rem !important; padding: 10px 12px 10px 34px !important; }
+            .search-row > button { min-height: 38px; }
+            /* AI command bar grows vertically on mobile */
+            #aiCommandBar .ai-row { flex-direction: column; align-items: stretch; gap: 6px; }
+            #aiCommandInput { font-size: 0.95rem !important; padding: 10px 12px !important; }
+            #aiApplyBtn { min-height: 40px; }
+            /* Bottom sticky push bar spacing */
+            .edit-toolbar { padding: 8px 12px !important; }
+            #pushBtn { min-height: 40px; padding: 8px 14px !important; }
+        }
         @media (min-width: 768px) { .edit-table-outer { display: block; } .edit-cards { display: none; } }
         .edit-card-field label { font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em; }
         .edit-card-field input, .edit-card-field select, .edit-card-field textarea { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.8125rem; outline: none; transition: border-color 0.15s; }
         .edit-card-field input:focus, .edit-card-field select:focus, .edit-card-field textarea:focus { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.15); }
         .edit-card-field .dirty-input { background: #fffbeb; border-color: #fbbf24; }
-        .paste-dropdown-trigger { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; background: #667eea; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 20; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: all 0.15s; }
-        .paste-dropdown-trigger:hover { background: #5a67d8; transform: translateY(-50%) scale(1.1); }
-        .paste-dropdown-menu { position: absolute; right: 0; top: 100%; margin-top: 4px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 100; min-width: 200px; overflow: hidden; }
-        .paste-dropdown-menu button { display: block; width: 100%; text-align: left; padding: 8px 12px; font-size: 12px; color: #374151; border: none; background: white; cursor: pointer; }
-        .paste-dropdown-menu button:hover { background: #f3f4f6; }
-        .paste-dropdown-menu button:disabled { color: #9ca3af; cursor: not-allowed; }
-        .paste-dropdown-menu button:disabled:hover { background: white; }
         .slide-form-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
         .slide-form { background: white; border-radius: 16px 16px 0 0; width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto; padding: 1rem; animation: slideUp 0.25s ease; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
         /* AI Chat Sidebar */
-        .ai-chat-toggle { position: fixed; right: 16px; bottom: 80px; z-index: 45; width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; box-shadow: 0 4px 16px rgba(102,126,234,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
-        .ai-chat-toggle:hover { transform: scale(1.1); box-shadow: 0 6px 24px rgba(102,126,234,0.5); }
-        .ai-chat-toggle.has-badge::after { content: ''; position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; background: #10b981; border-radius: 50%; border: 2px solid white; }
-        .ai-chat-sidebar { position: fixed; top: 0; right: -420px; width: 400px; max-width: 90vw; height: 100vh; height: 100dvh; background: white; border-left: 1px solid #e2e8f0; box-shadow: -4px 0 24px rgba(0,0,0,0.1); z-index: 1050; display: flex; flex-direction: column; transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
-        .ai-chat-sidebar.open { right: 0; }
-        .ai-chat-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 1049; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-        .ai-chat-overlay.visible { opacity: 1; pointer-events: auto; }
-        .ai-chat-header { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-        .ai-chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-        .ai-chat-msg { max-width: 90%; padding: 10px 14px; border-radius: 12px; font-size: 0.8125rem; line-height: 1.5; word-break: break-word; }
-        .ai-chat-msg.user { align-self: flex-end; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-bottom-right-radius: 4px; }
-        .ai-chat-msg.assistant { align-self: flex-start; background: #f1f5f9; color: #1e293b; border-bottom-left-radius: 4px; }
-        .ai-chat-msg.assistant .edit-count { display: inline-block; margin-top: 6px; padding: 2px 8px; background: #dbeafe; color: #1e40af; border-radius: 8px; font-size: 0.7rem; font-weight: 600; }
-        .ai-chat-msg pre { background: #1e293b; color: #e2e8f0; padding: 8px 10px; border-radius: 6px; overflow-x: auto; font-size: 0.75rem; margin: 6px 0; }
-        .ai-chat-msg code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 0.75rem; }
-        .ai-chat-input-area { padding: 10px 12px; border-top: 1px solid #e2e8f0; flex-shrink: 0; background: #fafbfc; }
-        .ai-chat-attachment { margin-bottom: 8px; }
-        .ai-chat-attachment-preview { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 0.7rem; color: #475569; max-height: 80px; overflow: hidden; position: relative; font-family: monospace; white-space: pre; }
-        .ai-chat-attachment-preview .remove-att { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .ai-typing { display: flex; gap: 4px; padding: 8px 14px; align-self: flex-start; }
-        .ai-typing span { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; animation: typingBounce 1.4s infinite ease-in-out; }
-        .ai-typing span:nth-child(2) { animation-delay: 0.2s; }
-        .ai-typing span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes typingBounce { 0%,80%,100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
     </style>
 </head>
@@ -131,7 +119,7 @@
     <div style="padding: 12px 16px; max-width: 100%;">
 
         <!-- Header Row -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
+        <div class="top-toolbar flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
             <div>
                 <div class="flex items-center gap-3">
                     <h2 class="text-xl md:text-2xl font-bold text-gray-800">Edit Items</h2>
@@ -141,9 +129,9 @@
                     </span>
                     <span id="itemsCount" class="inline-block bg-gray-200 text-gray-700 text-xs font-semibold px-2 py-0.5 rounded-full">--</span>
                 </div>
-                <p class="text-gray-500 mt-0.5 text-xs">Click any cell to edit inline. Use column headers to sort/filter.</p>
+                <p class="text-gray-500 mt-0.5 text-xs">Tap any cell to edit. Changes appear in bottom bar — push to Zoho when ready.</p>
             </div>
-            <div class="flex items-center gap-2 flex-wrap">
+            <div class="toolbar-actions flex items-center gap-2 flex-wrap">
                 <!-- % Adjust button -->
                 <div class="relative" id="pctAdjustWrap">
                     <button onclick="togglePctPopover()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1.5 transition" title="Adjust rates by %">
@@ -204,9 +192,9 @@
                     </button>
                     <div id="colDropdown" class="col-toggle-dropdown hidden"></div>
                 </div>
-                <a href="/admin-dpl.html" class="px-3 py-1.5 rounded-lg border border-green-300 bg-green-50 hover:bg-green-100 text-xs font-medium text-green-700 flex items-center gap-1.5 transition" title="Import DPL from brand price list PDF">
+                <a href="/admin-dpl.html" class="qc-mobile-btn px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-xs font-semibold text-white flex items-center gap-1.5 transition shadow-sm" title="Upload brand DPL/MRP PDF — AI matches + updates prices">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3-3m0 0l3 3m-3-3v12"></path></svg>
-                    Import DPL
+                    Import DPL / MRP
                 </a>
                 <button onclick="syncItems()" id="syncBtn" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1.5 transition">
                     <svg id="syncIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -217,7 +205,7 @@
         </div>
 
         <!-- Search -->
-        <div class="bg-white rounded-lg shadow-sm p-2 mb-3 flex flex-col sm:flex-row gap-2 items-end">
+        <div class="search-row bg-white rounded-lg shadow-sm p-2 mb-3 flex flex-col sm:flex-row gap-2 items-end">
             <div class="flex-1 relative">
                 <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 <input type="text" id="searchInput" onkeyup="debounceSearch()" placeholder="Search by item name or SKU..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
@@ -231,7 +219,7 @@
 
         <!-- AI Command Bar -->
         <div id="aiCommandBar" class="bg-white rounded-lg shadow-sm p-3 mb-3 border border-indigo-100">
-            <div class="flex items-center gap-2 mb-2">
+            <div class="ai-row flex items-center gap-2 mb-2">
                 <div class="flex items-center gap-1.5 text-indigo-600">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                     <span class="text-xs font-bold">KAI</span>
@@ -246,19 +234,8 @@
                 </button>
             </div>
             <!-- Scope indicator -->
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-1.5 flex-wrap" id="aiQuickCommands">
-                    <span class="text-xs text-gray-400 mr-1">Quick:</span>
-                    <button onclick="setAiCommand('Set DPL (cf_dpl) to 80% of rate for all items')" class="px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs transition">DPL = 80% Rate</button>
-                    <button onclick="setAiCommand('Round all rates to nearest 10')" class="px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs transition">Round Rates</button>
-                    <button onclick="setAiCommand('Find items where DPL is greater than rate and fix them')" class="px-2 py-0.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs transition">Fix DPL > Rate</button>
-                    <button onclick="setAiCommand('Increase all rates by 5%')" class="px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs transition">+5% Rate</button>
-                    <button onclick="setAiCommand('Find items with missing or zero purchase_rate')" class="px-2 py-0.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs transition">Missing Prices</button>
-                    <button onclick="setAiCommand('Set purchase_rate to 60% of rate for items where purchase_rate is 0')" class="px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs transition">Fix Purchase Rate</button>
-                    <button onclick="setAiCommand('Update [Brand] category to [Category] where item name contains [keyword]')" class="px-2 py-0.5 rounded-full bg-green-50 hover:bg-green-100 text-green-700 text-xs transition">Bulk Category</button>
-                    <button onclick="setAiCommand('Generate description from name for [Brand]')" class="px-2 py-0.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs transition">Desc from Name</button>
-                </div>
-                <div id="aiScopeLabel" class="text-xs text-gray-400 whitespace-nowrap ml-2">all items</div>
+            <div class="flex items-center justify-end">
+                <div id="aiScopeLabel" class="text-xs text-gray-400 whitespace-nowrap">all items</div>
             </div>
         </div>
 
@@ -337,70 +314,6 @@
         </div>
     </div>
 
-    <!-- AI Chat Toggle Button -->
-    <button id="aiChatToggle" class="ai-chat-toggle" onclick="toggleAiChat()" title="Chat with KAI">
-        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-    </button>
-
-    <!-- AI Chat Overlay -->
-    <div id="aiChatOverlay" class="ai-chat-overlay" onclick="toggleAiChat()"></div>
-
-    <!-- AI Chat Sidebar -->
-    <div id="aiChatSidebar" class="ai-chat-sidebar">
-        <div class="ai-chat-header">
-            <div class="flex items-center gap-2">
-                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                <div>
-                    <div class="font-bold text-sm">KAI Items Assistant</div>
-                    <div class="text-xs opacity-75">Paste Excel tables, ask questions, edit items</div>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <button onclick="clearAiChat()" class="p-1 hover:bg-white/20 rounded transition" title="Clear chat">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                </button>
-                <button onclick="toggleAiChat()" class="p-1 hover:bg-white/20 rounded transition" title="Close">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-        </div>
-
-        <div id="aiChatMessages" class="ai-chat-messages">
-            <div class="ai-chat-msg assistant">
-                <strong>Hi! I'm KAI, your Items Editor.</strong><br><br>
-                You can:
-                <ul style="margin: 6px 0 0 16px; list-style: disc;">
-                    <li>Paste Excel tables as reference data</li>
-                    <li>Ask me to update rates, DPL, brands, etc.</li>
-                    <li>Ask questions about your items</li>
-                </ul>
-                <br>
-                <em style="font-size: 0.75rem; opacity: 0.7;">Tip: Copy cells from Excel and paste directly into the text box below!</em>
-            </div>
-        </div>
-
-        <div class="ai-chat-input-area">
-            <!-- Attachment preview -->
-            <div id="chatAttachment" class="ai-chat-attachment" style="display: none;">
-                <div class="ai-chat-attachment-preview">
-                    <button class="remove-att" onclick="removeChatAttachment()" title="Remove">&times;</button>
-                    <div id="chatAttachmentText"></div>
-                </div>
-                <div class="text-xs text-gray-400 mt-1" id="chatAttachmentInfo"></div>
-            </div>
-            <!-- Input -->
-            <div class="flex gap-2">
-                <div class="flex-1 relative">
-                    <textarea id="aiChatInput" rows="1" placeholder="Type a message or paste Excel data..." class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none transition" style="max-height: 120px;" onkeydown="handleChatKeydown(event)" onpaste="handleChatPaste(event)" oninput="autoResizeChatInput()"></textarea>
-                </div>
-                <button onclick="sendChatMessage()" id="chatSendBtn" class="px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg transition flex items-center justify-center" title="Send">
-                    <svg id="chatSendIcon" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                    <svg id="chatSendSpinner" class="hidden animate-spin" width="18" height="18" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Mobile Edit Slide-up -->
     <div id="mobileEditOverlay" class="slide-form-overlay hidden" onclick="if(event.target===this)closeMobileEditForm()">
         <div class="slide-form" onclick="event.stopPropagation()">
@@ -433,25 +346,24 @@
 
     // Column definitions
     var allColumns = [
-        { key: 'name', label: 'Item Name', type: 'text', zohoField: 'name', sticky: true, visible: true, filterable: true },
-        { key: 'description', label: 'Description', type: 'textarea', zohoField: 'description', visible: true, filterable: true, width: 200 },
-        { key: 'brand', label: 'Brand', type: 'text', zohoField: 'brand', visible: true, filterable: true, width: 110 },
-        { key: 'category_name', label: 'Category', type: 'text', zohoField: 'category_name', visible: true, filterable: true, width: 120 },
-        { key: 'sku', label: 'SKU', type: 'text', zohoField: 'sku', visible: false, filterable: true, width: 110 },
-        { key: 'rate', label: 'Rate', type: 'number', zohoField: 'rate', step: '0.01', visible: false, filterable: true, width: 90, pctAdjust: true },
-        { key: 'purchase_rate', label: 'Purchase Rate', type: 'number', zohoField: 'purchase_rate', step: '0.01', visible: false, filterable: true, width: 100, pctAdjust: true },
+        { key: 'name', label: 'Item Name', type: 'text', zohoField: 'name', sticky: true, visible: true },
+        { key: 'brand', label: 'Brand', type: 'text', zohoField: 'brand', visible: true, width: 110 },
+        { key: 'category_name', label: 'Category', type: 'text', zohoField: 'category_name', visible: false, width: 120 },
+        { key: 'sku', label: 'SKU', type: 'text', zohoField: 'sku', visible: false, width: 110 },
+        { key: 'cf_dpl', label: 'DPL', type: 'number', zohoField: 'cf_dpl', step: '0.01', visible: true, width: 90, pctAdjust: true },
         // MRP — Zoho's label_rate field, visible in painter catalog as MRP cap.
-        { key: 'label_rate', label: 'MRP', type: 'number', zohoField: 'label_rate', step: '0.01', visible: true, filterable: true, width: 90, pctAdjust: true },
-        { key: 'cf_dpl', label: 'DPL', type: 'number', zohoField: 'cf_dpl', step: '0.01', visible: false, filterable: true, width: 90 },
+        { key: 'label_rate', label: 'MRP', type: 'number', zohoField: 'label_rate', step: '0.01', visible: true, width: 90, pctAdjust: true },
+        { key: 'rate', label: 'Rate', type: 'number', zohoField: 'rate', step: '0.01', visible: true, width: 90, pctAdjust: true },
         { key: 'dpl_rate_pct', label: 'DPL→Rate %', type: 'readonly', visible: true, width: 95 },
-        { key: 'dpl_updated_at', label: 'DPL Updated', type: 'readonly', visible: true, width: 110 },
-        { key: 'unit', label: 'Unit', type: 'select', zohoField: 'unit', options: ['','pcs','kg','ltr','nos','box','set','mtr','sqft','gm','ml','pair','dozen','bundle'], visible: false, filterable: true, width: 75 },
-        { key: 'hsn_or_sac', label: 'HSN/SAC', type: 'text', zohoField: 'hsn_or_sac', visible: false, filterable: true, width: 90 },
-        { key: 'tax_percentage', label: 'Tax %', type: 'number', zohoField: 'tax_percentage', step: '0.01', visible: false, filterable: true, width: 65 },
-        { key: 'manufacturer', label: 'Manufacturer', type: 'text', zohoField: 'manufacturer', visible: false, filterable: true, width: 110 },
-        { key: 'reorder_level', label: 'Reorder Lvl', type: 'number', zohoField: 'reorder_level', step: '1', visible: false, filterable: true, width: 80 },
-        { key: 'cf_product_name', label: 'Product Name', type: 'text', zohoField: 'cf_product_name', visible: false, filterable: true, width: 150 },
-        { key: 'status', label: 'Status', type: 'select', zohoField: 'status', options: ['active','inactive'], visible: false, filterable: true, width: 85 },
+        { key: 'dpl_updated_at', label: 'DPL Updated', type: 'readonly', visible: false, width: 110 },
+        { key: 'description', label: 'Description', type: 'textarea', zohoField: 'description', visible: false, width: 200 },
+        { key: 'purchase_rate', label: 'Purchase Rate', type: 'number', zohoField: 'purchase_rate', step: '0.01', visible: false, width: 100, pctAdjust: true },
+        { key: 'unit', label: 'Unit', type: 'select', zohoField: 'unit', options: ['','pcs','kg','ltr','nos','box','set','mtr','sqft','gm','ml','pair','dozen','bundle'], visible: false, width: 75 },
+        { key: 'hsn_or_sac', label: 'HSN/SAC', type: 'text', zohoField: 'hsn_or_sac', visible: false, width: 90 },
+        { key: 'tax_percentage', label: 'Tax %', type: 'number', zohoField: 'tax_percentage', step: '0.01', visible: false, width: 65 },
+        { key: 'manufacturer', label: 'Manufacturer', type: 'text', zohoField: 'manufacturer', visible: false, width: 110 },
+        { key: 'reorder_level', label: 'Reorder Lvl', type: 'number', zohoField: 'reorder_level', step: '1', visible: false, width: 80 },
+        { key: 'status', label: 'Status', type: 'select', zohoField: 'status', options: ['active','inactive'], visible: false, width: 85 },
         { key: 'stock_on_hand', label: 'Stock', type: 'readonly', visible: false, width: 70 },
         { key: 'last_synced', label: 'Last Synced', type: 'readonly', visible: false, width: 110 }
     ];
@@ -604,24 +516,7 @@
         });
     }
 
-    // ============ COLUMN FILTERS ============
-    var colFilterTimeout = null;
-    function onColumnFilter(field, value) {
-        if (value) { columnFilters[field] = value.toLowerCase(); } else { delete columnFilters[field]; }
-        // If not all items are loaded (paginated), reload all items for full filtering
-        if (totalItems > items.length && Object.keys(columnFilters).length > 0) {
-            clearTimeout(colFilterTimeout);
-            colFilterTimeout = setTimeout(function() {
-                var origLimit = PAGE_LIMIT;
-                PAGE_LIMIT = 10000;
-                currentPage = 1;
-                loadItems().then(function() { PAGE_LIMIT = origLimit; });
-            }, 400);
-        } else {
-            renderTable();
-            renderPagination();
-        }
-    }
+    // columnFilters variable kept (always empty) for getFilteredItems back-compat
     function getFilteredItems() {
         var keys = Object.keys(columnFilters);
         if (keys.length === 0) return items;
@@ -697,9 +592,6 @@
             html += '<th class="' + stickyCls + hiddenCls + '" style="' + w + '">';
             html += '<div class="th-inner">';
             html += '<div class="th-label" onclick="toggleSort(\'' + col.key + '\')">' + escapeHtml(col.label) + ' ' + sortIcon + '</div>';
-            if (col.filterable) {
-                html += '<div class="th-filter"><input type="text" placeholder="Filter..." value="' + escapeHtml(columnFilters[col.key] || '') + '" oninput="onColumnFilter(\'' + col.key + '\', this.value)" onclick="event.stopPropagation()"></div>';
-            }
             html += '</div></th>';
         });
         tr.innerHTML = html;
@@ -820,96 +712,6 @@
                 var pctTd = tr.children[pctIdx + 1]; // +1 for checkbox col
                 if (pctTd) { var rc = pctTd.querySelector('.rcell'); if (rc) rc.textContent = computeDplRatePct(itemId); }
             }
-        }
-        // Show paste dropdown on blur-commit (always, so user can paste value to other rows)
-        if (fromBlur && displayVal) {
-            setTimeout(function() { showPasteDropdown(cell, itemId, field, val); }, 50);
-        }
-    }
-
-    // ============ PASTE TO ALL ROWS ============
-    var pasteDropdownTimeout = null;
-    var activePasteDropdown = null;
-
-    function showPasteDropdown(cell, itemId, field, value) {
-        removePasteDropdown();
-        var readonlyFields = ['zoho_item_id', 'stock_on_hand', 'last_synced', 'zoho_stock_on_hand', 'last_synced_at'];
-        if (readonlyFields.indexOf(field) !== -1) return;
-        // Append to parent td for reliable absolute positioning
-        var parentTd = cell.closest('td') || cell;
-        parentTd.style.position = 'relative';
-        var trigger = document.createElement('button');
-        trigger.className = 'paste-dropdown-trigger';
-        trigger.innerHTML = '&#9662;';
-        trigger.title = 'Paste this value to multiple rows';
-        trigger.onclick = function(e) { e.stopPropagation(); e.preventDefault(); togglePasteMenu(parentTd, field, value); };
-        parentTd.appendChild(trigger);
-        activePasteDropdown = { cell: parentTd, trigger: trigger, field: field, value: value };
-        pasteDropdownTimeout = setTimeout(removePasteDropdown, 4000);
-    }
-
-    function togglePasteMenu(cell, field, value) {
-        var existing = cell.querySelector('.paste-dropdown-menu');
-        if (existing) { existing.remove(); return; }
-        clearTimeout(pasteDropdownTimeout);
-        var menu = document.createElement('div');
-        menu.className = 'paste-dropdown-menu';
-        var filteredCount = getFilteredItems().length;
-        var selectedCount = selectedItemIds.size;
-        var btn1 = document.createElement('button');
-        btn1.textContent = 'Paste to all rows (' + filteredCount + ')';
-        btn1.onclick = function() { pasteToRows('filtered', field, value); menu.remove(); };
-        var btn2 = document.createElement('button');
-        btn2.textContent = 'Paste to selected (' + selectedCount + ')';
-        btn2.disabled = selectedCount === 0;
-        btn2.onclick = function() { pasteToRows('selected', field, value); menu.remove(); };
-        menu.appendChild(btn1);
-        menu.appendChild(btn2);
-        cell.appendChild(menu);
-        setTimeout(function() { document.addEventListener('click', closePasteMenu, { once: true }); }, 10);
-    }
-
-    function closePasteMenu() {
-        document.querySelectorAll('.paste-dropdown-menu').forEach(function(m) { m.remove(); });
-    }
-
-    function removePasteDropdown() {
-        clearTimeout(pasteDropdownTimeout);
-        if (activePasteDropdown) {
-            if (activePasteDropdown.trigger && activePasteDropdown.trigger.parentElement) activePasteDropdown.trigger.remove();
-            activePasteDropdown = null;
-        }
-        closePasteMenu();
-    }
-
-    function pasteToRows(scope, field, value) {
-        var displayVal = String(value).length > 20 ? String(value).substring(0, 20) + '...' : String(value);
-        var targetItems;
-        if (scope === 'selected') {
-            targetItems = items.filter(function(it) { return selectedItemIds.has(String(it.item_id || it.zoho_item_id)); });
-        } else {
-            targetItems = getFilteredItems();
-        }
-        if (targetItems.length === 0) { showToast('No items to paste to', 'error'); return; }
-        if (!confirm("Apply '" + displayVal + "' to " + field + " for " + targetItems.length + " rows?\n\nValue: " + String(value))) return;
-        var count = 0;
-        var skipped = 0;
-        targetItems.forEach(function(item) {
-            var id = String(item.item_id || item.zoho_item_id);
-            var origVal = String(getOriginal(id, field) ?? '');
-            var newVal = String(value ?? '');
-            if (origVal === newVal) {
-                skipped++;
-            }
-            setDirty(id, field, newVal);
-            count++;
-        });
-        removePasteDropdown();
-        renderTable();
-        if (skipped > 0 && skipped === count) {
-            showToast('All ' + count + ' rows already have this value — no changes needed', 'info');
-        } else {
-            showToast('Updated ' + (count - skipped) + ' rows' + (skipped > 0 ? ' (' + skipped + ' already had this value)' : ''), 'success');
         }
     }
 
@@ -1777,255 +1579,6 @@
     }
 
     // ============ AI CHAT SIDEBAR ============
-    var chatHistory = []; // [{ role: 'user'|'assistant', content: '...' }]
-    var chatAttachmentData = null; // pasted Excel/table text
-    var isChatSending = false;
-
-    function toggleAiChat() {
-        var sidebar = document.getElementById('aiChatSidebar');
-        var overlay = document.getElementById('aiChatOverlay');
-        var isOpen = sidebar.classList.contains('open');
-        if (isOpen) {
-            sidebar.classList.remove('open');
-            overlay.classList.remove('visible');
-        } else {
-            sidebar.classList.add('open');
-            overlay.classList.add('visible');
-            document.getElementById('aiChatInput').focus();
-            scrollChatToBottom();
-        }
-    }
-
-    function clearAiChat() {
-        chatHistory = [];
-        chatAttachmentData = null;
-        document.getElementById('chatAttachment').style.display = 'none';
-        document.getElementById('aiChatMessages').innerHTML = '<div class="ai-chat-msg assistant"><strong>Chat cleared.</strong> Paste Excel data or type a command.</div>';
-    }
-
-    function scrollChatToBottom() {
-        var el = document.getElementById('aiChatMessages');
-        setTimeout(function() { el.scrollTop = el.scrollHeight; }, 50);
-    }
-
-    function autoResizeChatInput() {
-        var ta = document.getElementById('aiChatInput');
-        ta.style.height = 'auto';
-        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-    }
-
-    function handleChatKeydown(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendChatMessage();
-        }
-    }
-
-    function handleChatPaste(e) {
-        // Check for pasted table/spreadsheet data
-        var clipData = e.clipboardData || window.clipboardData;
-        if (!clipData) return;
-
-        var plainText = clipData.getData('text/plain') || '';
-
-        // Detect if it looks like tabular data (has tabs = Excel/Sheets paste)
-        if (plainText.includes('\t') && plainText.includes('\n')) {
-            e.preventDefault(); // Don't paste into textarea
-
-            chatAttachmentData = plainText;
-
-            // Show preview
-            var lines = plainText.split('\n').filter(function(l) { return l.trim(); });
-            var rowCount = lines.length;
-            var colCount = lines[0] ? lines[0].split('\t').length : 0;
-
-            document.getElementById('chatAttachmentText').textContent = plainText.substring(0, 500) + (plainText.length > 500 ? '...' : '');
-            document.getElementById('chatAttachmentInfo').textContent = rowCount + ' rows × ' + colCount + ' columns detected (Excel/table data)';
-            document.getElementById('chatAttachment').style.display = 'block';
-
-            // Auto-fill a helpful prompt
-            var input = document.getElementById('aiChatInput');
-            if (!input.value.trim()) {
-                input.value = 'Update items using this reference table data';
-            }
-            input.focus();
-
-            showToast('Excel table pasted! Add your command and press Enter.', 'success');
-        }
-        // If it's just regular text, let it paste normally
-    }
-
-    function removeChatAttachment() {
-        chatAttachmentData = null;
-        document.getElementById('chatAttachment').style.display = 'none';
-    }
-
-    function addChatMessage(role, content, editCount) {
-        var container = document.getElementById('aiChatMessages');
-        var div = document.createElement('div');
-        div.className = 'ai-chat-msg ' + role;
-
-        if (role === 'assistant') {
-            // Simple markdown rendering
-            var html = content
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                .replace(/\n- /g, '\n• ')
-                .replace(/\n/g, '<br>');
-            div.innerHTML = html;
-            if (editCount > 0) {
-                div.innerHTML += '<div class="edit-count">' + editCount + ' items edited in table</div>';
-            }
-        } else {
-            // User message
-            var text = content.length > 200 ? content.substring(0, 200) + '...' : content;
-            div.textContent = text;
-            if (chatAttachmentData) {
-                var attBadge = document.createElement('div');
-                attBadge.style.cssText = 'margin-top: 6px; padding: 2px 8px; background: rgba(255,255,255,0.2); border-radius: 6px; font-size: 0.7rem;';
-                attBadge.textContent = '📎 Excel data attached';
-                div.appendChild(attBadge);
-            }
-        }
-
-        container.appendChild(div);
-        scrollChatToBottom();
-    }
-
-    function showChatTyping() {
-        var container = document.getElementById('aiChatMessages');
-        var div = document.createElement('div');
-        div.id = 'chatTypingIndicator';
-        div.className = 'ai-typing';
-        div.innerHTML = '<span></span><span></span><span></span>';
-        container.appendChild(div);
-        scrollChatToBottom();
-    }
-
-    function hideChatTyping() {
-        var el = document.getElementById('chatTypingIndicator');
-        if (el) el.remove();
-    }
-
-    async function sendChatMessage() {
-        var input = document.getElementById('aiChatInput');
-        var message = input.value.trim();
-        if (!message && !chatAttachmentData) return;
-        if (isChatSending) return;
-        if (items.length === 0) { showToast('No items loaded yet', 'info'); return; }
-
-        isChatSending = true;
-        var sendBtn = document.getElementById('chatSendBtn');
-        document.getElementById('chatSendIcon').classList.add('hidden');
-        document.getElementById('chatSendSpinner').classList.remove('hidden');
-        sendBtn.disabled = true;
-
-        // Display user message
-        addChatMessage('user', message || '(Excel data attached)');
-
-        // Clear input
-        input.value = '';
-        input.style.height = 'auto';
-
-        showChatTyping();
-
-        // Determine scope
-        var srcItems = items;
-        if (selectedItemIds.size > 0) {
-            srcItems = items.filter(function(it) {
-                return selectedItemIds.has(String(it.item_id || it.zoho_item_id));
-            });
-        }
-
-        try {
-            // Longer timeout for batch processing (5 min)
-            var controller = new AbortController();
-            var timeout = setTimeout(function() { controller.abort(); }, 300000);
-            var resp = await fetch('/api/zoho/items/ai-edit', {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                signal: controller.signal,
-                body: JSON.stringify({
-                    command: message || 'Process the attached reference data',
-                    items: compactItemsForAI(srcItems),
-                    context: chatAttachmentData || null,
-                    history: chatHistory.slice(-6)
-                })
-            });
-            clearTimeout(timeout);
-
-            var data = await resp.json();
-            hideChatTyping();
-
-            if (!resp.ok || !data.success) {
-                throw new Error(data.message || 'AI request failed');
-            }
-
-            // Store in chat history
-            chatHistory.push({ role: 'user', content: message + (chatAttachmentData ? '\n[Excel data attached]' : '') });
-
-            var replyText = data.reply || data.summary || 'Done.';
-            var edits = data.edits || [];
-
-            // Apply edits if any
-            if (edits.length > 0) {
-                // Save undo snapshot
-                var dirtyBefore = new Map();
-                dirtyItems.forEach(function(v, k) { dirtyBefore.set(k, Object.assign({}, v)); });
-                aiUndoSnapshot = { dirtyBefore: dirtyBefore, affectedIds: [] };
-
-                edits.forEach(function(edit) {
-                    var itemId = String(edit.zoho_item_id);
-                    var item = items.find(function(it) { return String(it.item_id || it.zoho_item_id) === itemId; });
-                    if (!item) return;
-
-                    if (!originalValues.has(itemId)) {
-                        var orig = {};
-                        allColumns.forEach(function(col) { orig[col.key] = item[col.key] !== undefined ? item[col.key] : null; });
-                        originalValues.set(itemId, orig);
-                    }
-
-                    var existing = dirtyItems.get(itemId) || { _itemName: item.name || item.item_name || '' };
-                    var changes = edit.changes || {};
-                    for (var field in changes) {
-                        if (changes.hasOwnProperty(field)) {
-                            existing[field] = changes[field];
-                            item[field] = changes[field];
-                        }
-                    }
-                    dirtyItems.set(itemId, existing);
-                    aiUndoSnapshot.affectedIds.push(itemId);
-                });
-
-                renderTable(); renderCards(); updateChangesUI(); updateAiScope();
-
-                // Show result banner too
-                var batchInfo = data.batchCount > 1 ? ' [' + data.batchCount + ' batches]' : '';
-                document.getElementById('aiResultText').textContent = data.summary + batchInfo + (data.model ? ' (via ' + data.model + ')' : '');
-                document.getElementById('aiResultBanner').classList.remove('hidden');
-            }
-
-            chatHistory.push({ role: 'assistant', content: replyText });
-            addChatMessage('assistant', replyText, edits.length);
-
-            // Clear attachment after successful send
-            chatAttachmentData = null;
-            document.getElementById('chatAttachment').style.display = 'none';
-
-        } catch (err) {
-            hideChatTyping();
-            addChatMessage('assistant', 'Error: ' + err.message, 0);
-        } finally {
-            isChatSending = false;
-            document.getElementById('chatSendIcon').classList.remove('hidden');
-            document.getElementById('chatSendSpinner').classList.add('hidden');
-            sendBtn.disabled = false;
-        }
-    }
-
     // ============ INIT ============
     document.addEventListener('DOMContentLoaded', function() { loadItems(); updateAiScope(); });
     window.addEventListener('beforeunload', function(e) { if(getDirtyItemCount()>0){e.preventDefault();e.returnValue='';} });
