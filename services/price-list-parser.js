@@ -923,6 +923,50 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                 if (pdfFinish && ent.finish && pdfFinish !== ent.finish) continue;
                 family.push({ zi: ent.zi, struct: { packCode: ent.packCode }, rate: ent.rate });
             }
+
+            // Fallback: keyword-overlap scan. Finds Zoho items whose names share ≥2
+            // significant words with the PDF product, groups them by cleaned-name abbrev,
+            // and picks the best-scoring group. Handles cases where PDF and Zoho use
+            // slightly different product wording (e.g. "Effects" vs "Metallic" trimmed).
+            if (family.length === 0) {
+                const pdfKeywords = extractKeywords(p.product.toUpperCase())
+                    .filter(w => w.length >= 3 && !/^\d+$/.test(w));
+                if (pdfKeywords.length >= 2) {
+                    const scored = [];
+                    for (const zi of scopedZoho) {
+                        const nameText = (zi.name || zi.zoho_item_name || '').toUpperCase();
+                        const cleaned = cleanZohoName(nameText);
+                        let hits = 0;
+                        for (const kw of pdfKeywords) {
+                            if (cleaned.includes(kw)) hits++;
+                        }
+                        if (hits < 2) continue;
+                        const finish = detectFinish(nameText);
+                        if (pdfFinish && finish && pdfFinish !== finish) continue;
+                        const packCode = extractZohoPackCode(zi);
+                        if (!packCode) continue;
+                        const groupKey = extractProductAbbrev(cleaned) || 'UNKNOWN';
+                        scored.push({ zi, score: hits, packCode, rate: parseFloat(zi.rate || 0), groupKey });
+                    }
+                    // Pick the group with highest total score
+                    const groups = new Map();
+                    for (const s of scored) {
+                        if (!groups.has(s.groupKey)) groups.set(s.groupKey, []);
+                        groups.get(s.groupKey).push(s);
+                    }
+                    let best = null, bestTotal = 0;
+                    for (const [, members] of groups) {
+                        const total = members.reduce((a, m) => a + m.score, 0);
+                        if (total > bestTotal) { bestTotal = total; best = members; }
+                    }
+                    if (best) {
+                        for (const m of best) {
+                            family.push({ zi: m.zi, struct: { packCode: m.packCode }, rate: m.rate });
+                        }
+                    }
+                }
+            }
+
             if (family.length === 0) {
                 unmatched.push({
                     ...p, dpl: p._prices[0], packSize: '?',
