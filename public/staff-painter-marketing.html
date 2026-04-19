@@ -115,20 +115,24 @@
     }
 
     function openOutcome(leadId) {
-        document.getElementById('modalRoot').innerHTML = `
-        <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:1010;padding-bottom:68px" onclick="if(event.target===this)closeModal()">
-            <div style="background:white;border-radius:1rem 1rem 0 0;width:100%;max-width:28rem;max-height:calc(100vh - 140px);display:flex;flex-direction:column;overflow:hidden" onclick="event.stopPropagation()">
-                <div style="overflow-y:auto;padding:1rem;flex:1;min-height:0">
-                    <h3 class="font-bold text-base mb-3" style="color:#0D3D23">Log Outcome</h3>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Channel</label>
-                    <select id="ch" onchange="toggleCallFields()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
+        closeModal();
+        const el = document.createElement('div');
+        el.id = 'outcomeModal';
+        el.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;justify-content:center;z-index:99999';
+        el.onclick = function(e){ if(e.target===el) closeModal(); };
+        el.innerHTML = `
+            <div style="background:white;border-radius:1rem 1rem 0 0;width:100%;max-width:28rem;display:flex;flex-direction:column;overflow:hidden;margin-bottom:68px">
+                <div style="overflow-y:auto;padding:1rem;flex:1;min-height:0;max-height:60vh">
+                    <h3 style="font-weight:700;font-size:1rem;margin-bottom:0.75rem;color:#0D3D23">Log Outcome</h3>
+                    <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Channel</label>
+                    <select id="ch" onchange="toggleCallFields()" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem">
                         <option value="call">Call</option>
                         <option value="whatsapp">WhatsApp</option>
                         <option value="visit">Visited Shop</option>
                     </select>
                     <div id="callFields">
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Call Status</label>
-                        <select id="cs" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
+                        <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Call Status</label>
+                        <select id="cs" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem">
                             <option value="">—</option>
                             <option value="connected">Connected</option>
                             <option value="not_answered">Not Answered</option>
@@ -137,8 +141,8 @@
                             <option value="busy">Busy</option>
                         </select>
                     </div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Outcome</label>
-                    <select id="oc" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
+                    <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Outcome</label>
+                    <select id="oc" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem">
                         <option value="">—</option>
                         <option value="interested_in_program">Interested ⭐</option>
                         <option value="already_aware">Already Aware</option>
@@ -148,20 +152,20 @@
                         <option value="no_answer">No Answer</option>
                         <option value="wrong_number">Wrong Number</option>
                     </select>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Callback date</label>
-                    <input type="date" id="cd" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-                    <textarea id="nt" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none" placeholder="Optional"></textarea>
+                    <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Callback date</label>
+                    <input type="date" id="cd" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem">
+                    <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Notes</label>
+                    <textarea id="nt" rows="2" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;resize:none" placeholder="Optional"></textarea>
                 </div>
                 <div style="flex-shrink:0;display:flex;gap:0.5rem;justify-content:flex-end;padding:1rem;border-top:1px solid #f3f4f6;background:white">
-                    <button onclick="closeModal()" class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600">Cancel</button>
-                    <button onclick="saveOutcome(${leadId})" class="px-4 py-2 text-sm text-white rounded-lg font-semibold" style="background:#1B5E3B">Save</button>
+                    <button onclick="closeModal()" style="padding:0.5rem 1rem;font-size:0.875rem;border:1px solid #d1d5db;border-radius:0.5rem;color:#4b5563;background:white;cursor:pointer">Cancel</button>
+                    <button onclick="saveOutcome(${leadId})" style="padding:0.5rem 1rem;font-size:0.875rem;border:none;border-radius:0.5rem;color:white;background:#1B5E3B;font-weight:600;cursor:pointer">Save</button>
                 </div>
-            </div>
-        </div>`;
+            </div>`;
+        document.body.appendChild(el);
     }
 
-    function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
+    function closeModal() { const el = document.getElementById('outcomeModal'); if(el) el.remove(); }
     function toggleCallFields() {
         document.getElementById('callFields').style.display = document.getElementById('ch').value === 'call' ? 'block' : 'none';
     }
