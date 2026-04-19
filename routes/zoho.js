@@ -4283,10 +4283,11 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
             const skuUp = String(row.sku || '').toUpperCase().trim();
             const brandUp = String(row.brand || '').toUpperCase().trim();
 
-            // 1. Parse current SKU prefix (for display only now)
-            const currentStruct =
-                priceListParser.parseSkuStructure(skuUp) ||
-                priceListParser.parseSkuStructure(nameUp);
+            // 1. Current "name prefix" = the first token of the ITEM NAME (what the user sees)
+            //    (NOT the SKU — the user stores SKU separately as a unique-identifier string.)
+            const firstToken = nameUp.split(/\s+/)[0] || '';
+            const currentNamePrefix = /^[A-Z0-9]{3,8}$/.test(firstToken) ? firstToken : null;
+            const currentStruct = priceListParser.parseSkuStructure(nameUp);
 
             // 2. Pack code from trailing pack-size in the name
             let inferPack = null;
@@ -4328,24 +4329,28 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
             }
             middle = middle.replace(/\s+/g, ' ').trim();
 
-            // 5. Build proposed prefix + full name using USER-SUPPLIED code
+            // 5. Build proposed prefix + full name + SKU using USER-SUPPLIED code
             let status = 'cannot_parse';
             let proposedPrefix = null;
             let proposedName = null;
+            let proposedSku = null;
 
             if (userCode && inferPack) {
                 const baseDigit = hasBases ? (inferBase === 'W' ? '0' : (inferBase || '')) : '';
                 proposedPrefix = userCode + baseDigit + inferPack;
-                // Build full name: [PREFIX] [middle product name] [BRAND] [PACK L]
+                // Full name: [PREFIX] [middle product name] [BRAND] [PACK L]
                 const displayPack = (packMatch ? packMatch[1] + ' ' + packMatch[2].toUpperCase() : '').trim();
                 const parts = [proposedPrefix, (middle || '').toUpperCase(), brandUp, displayPack]
                     .filter(Boolean).map(s => s.trim()).filter(Boolean);
                 proposedName = parts.join(' ').replace(/\s+/g, ' ').trim();
+                // SKU: same prefix (SKU = compact unique identifier derived from prefix)
+                proposedSku = proposedPrefix;
 
                 // Already conformant? (current name starts with proposed prefix and matches exactly)
-                if (nameUp === proposedName.toUpperCase()) {
+                if (nameUp === proposedName.toUpperCase() && skuUp === proposedSku) {
                     status = 'conformant';
                     proposedName = null;
+                    proposedSku = null;
                 } else {
                     status = 'needs_rename';
                 }
@@ -4357,12 +4362,14 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
                 current_name: row.name,
                 current_sku: row.sku,
                 current_category: row.category,
-                current_prefix: currentStruct ? currentStruct.raw : null,
+                current_name_prefix: currentNamePrefix,     // from NAME
+                current_sku_value: row.sku || null,         // raw SKU for display
                 middle_name: middle || null,
                 inferred_base: inferBase,
                 inferred_pack: inferPack,
                 proposed_prefix: proposedPrefix,
                 proposed_name: proposedName,
+                proposed_sku: proposedSku,
                 status
             });
         }

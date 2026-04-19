@@ -394,10 +394,11 @@
                             <thead style="background:#f9fafb;position:sticky;top:0;z-index:1">
                                 <tr>
                                     <th style="padding:8px;text-align:left">✓</th>
-                                    <th style="padding:8px;text-align:left">Current Name</th>
-                                    <th style="padding:8px;text-align:left">Current Prefix</th>
+                                    <th style="padding:8px;text-align:left">Current Name<br><span style="font-weight:normal;color:#9ca3af;font-size:0.65rem">(name prefix shown)</span></th>
+                                    <th style="padding:8px;text-align:left">Current SKU</th>
                                     <th style="padding:8px;text-align:left">Proposed Prefix</th>
                                     <th style="padding:8px;text-align:left">Proposed New Name</th>
+                                    <th style="padding:8px;text-align:left">Proposed SKU</th>
                                     <th style="padding:8px;text-align:left">Status</th>
                                 </tr>
                             </thead>
@@ -1849,9 +1850,20 @@
             var dis = it.status === 'cannot_parse';
             html += '<tr style="border-top:1px solid #e5e7eb">';
             html += '<td style="padding:6px 8px"><input type="checkbox" ' + (dis ? 'disabled' : '') + ' onchange="updateNormSelectedCount()" data-idx="' + idx + '" class="norm-cb"></td>';
-            html += '<td style="padding:6px 8px;max-width:260px"><div style="font-weight:600">' + escapeHtml(it.current_name || '') + '</div><div style="color:#9ca3af;font-size:0.65rem">' + escapeHtml(it.current_sku || '—') + '</div></td>';
-            html += '<td style="padding:6px 8px;font-family:monospace;color:#6366f1">' + escapeHtml(it.current_prefix || '—') + '</td>';
+            // Current Name with name-prefix highlighted
+            html += '<td style="padding:6px 8px;max-width:280px"><div style="font-weight:600">';
+            if (it.current_name_prefix) {
+                html += '<span style="color:#6366f1;font-family:monospace">' + escapeHtml(it.current_name_prefix) + '</span> ';
+                html += escapeHtml((it.current_name || '').substring(it.current_name_prefix.length).trim());
+            } else {
+                html += escapeHtml(it.current_name || '');
+            }
+            html += '</div></td>';
+            // Current SKU
+            html += '<td style="padding:6px 8px;font-family:monospace;color:#6b7280;font-size:0.7rem">' + escapeHtml(it.current_sku_value || '—') + '</td>';
+            // Proposed prefix
             html += '<td style="padding:6px 8px;font-family:monospace;color:#d97706;font-weight:700">' + escapeHtml(it.proposed_prefix || '—') + '</td>';
+            // Proposed new name (editable)
             html += '<td style="padding:6px 8px;max-width:300px">';
             if (it.proposed_name) {
                 html += '<input type="text" value="' + escapeHtml(it.proposed_name) + '" onchange="normItems[' + idx + '].proposed_name=this.value" style="width:100%;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.7rem">';
@@ -1859,10 +1871,18 @@
                 html += '<span style="color:#9ca3af">—</span>';
             }
             html += '</td>';
+            // Proposed SKU (editable)
+            html += '<td style="padding:6px 8px">';
+            if (it.proposed_sku) {
+                html += '<input type="text" value="' + escapeHtml(it.proposed_sku) + '" onchange="normItems[' + idx + '].proposed_sku=this.value.toUpperCase()" style="width:90px;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.7rem;font-family:monospace">';
+            } else {
+                html += '<span style="color:#9ca3af">—</span>';
+            }
+            html += '</td>';
             html += '<td style="padding:6px 8px">' + (statusBadge[it.status] || it.status) + '</td>';
             html += '</tr>';
         });
-        if (!html) html = '<tr><td colspan="6" style="padding:24px;text-align:center;color:#9ca3af">No items match the current filter</td></tr>';
+        if (!html) html = '<tr><td colspan="7" style="padding:24px;text-align:center;color:#9ca3af">No items match the current filter</td></tr>';
         document.getElementById('normTableBody').innerHTML = html;
         updateNormSelectedCount();
     }
@@ -1901,11 +1921,15 @@
             };
         });
 
-        // Simpler: send new_name only — Zoho item name is the primary ID we show
+        // Send BOTH new_name AND new_sku (SKU is the compact unique identifier = prefix)
         var simple = checked.map(function(b) {
             var idx = parseInt(b.dataset.idx);
             var it = normItems[idx];
-            return { zoho_item_id: it.zoho_item_id, new_name: it.proposed_name };
+            return {
+                zoho_item_id: it.zoho_item_id,
+                new_name: it.proposed_name,
+                new_sku: it.proposed_sku || null
+            };
         });
 
         document.getElementById('normApplyBtn').disabled = true;
