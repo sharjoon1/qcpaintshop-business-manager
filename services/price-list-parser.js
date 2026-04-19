@@ -205,42 +205,14 @@ function parseBirlaOpus(text) {
             const prices = tokens.slice(priceStart).map(t => cleanPrice(t)).filter(p => p > 0);
 
             // PDF text extraction loses column alignment — empty cells disappear.
-            // Use price VALUE RANGES to determine pack size instead of column position.
-            // Typical Birla Opus price ranges:
-            //   200ml: 50-250, 1L: 250-1000, 4L: 1000-3500, 10L: 3500-13000, 20L: 6000-25000
-            // Available sizes from header (for reference only, not used for positional mapping)
-            const availableSizes = sizeHeaders.map(s => {
-                if (s.match(/^\d+ml$/i)) return s;
-                return s.includes('L') || s.includes('l') ? s : s + 'L';
-            });
-            const has200ml = availableSizes.some(s => /200ml/i.test(s));
-
-            for (const price of prices) {
-                let packSize;
-                if (price < 250 && has200ml) {
-                    packSize = '200ml';
-                } else if (price >= 250 && price < 1000) {
-                    // Could be 0.9L or 1L — prefer 1L if available in header
-                    packSize = availableSizes.some(s => /^1L$/i.test(s)) ? '1L' : '0.9L';
-                } else if (price >= 1000 && price < 3500) {
-                    // Could be 3.6L or 4L — prefer 4L if available
-                    packSize = availableSizes.some(s => /^4L$/i.test(s)) ? '4L' : '3.6L';
-                } else if (price >= 3500 && price < 7000) {
-                    // Could be 9L or 10L — prefer 10L if available
-                    packSize = availableSizes.some(s => /^10L$/i.test(s)) ? '10L' : '9L';
-                } else if (price >= 7000) {
-                    // Could be 18L or 20L — prefer 20L if available
-                    packSize = availableSizes.some(s => /^20L$/i.test(s)) ? '20L' : '18L';
-                } else {
-                    // Small price but no 200ml in header — treat as 1L
-                    packSize = '1L';
-                }
-
+            // Don't guess pack size here. Emit a single group with all row prices and
+            // let the matcher use Zoho's actual SKUs/rates as ground truth to assign
+            // prices to sizes by ascending rate-ratio.
+            if (prices.length > 0) {
                 results.push({
                     brand: 'Birla Opus',
                     product: currentProduct + ' - ' + baseName,
-                    packSize: packSize,
-                    dpl: price,
+                    _prices: prices,
                     baseCode: dataMatch[1],
                     category: currentCategory
                 });
@@ -744,6 +716,29 @@ function parseSkuStructure(skuOrName) {
     return null;
 }
 
+// Convert a pack code like "01", "04", "20", "10M" to ml value for sorting/compare.
+// packSizeToCode encodes ml as substr(0,2)+"M" (200ml→"20M", 100ml→"10M"). Reverse: ×10.
+function packCodeToMl(pc) {
+    if (!pc) return 0;
+    const s = String(pc).toUpperCase();
+    const mlMatch = s.match(/^(\d+)M$/);
+    if (mlMatch) return parseInt(mlMatch[1], 10) * 10;  // 20M → 200ml, 10M → 100ml
+    const lMatch = s.match(/^(\d+)$/);
+    if (lMatch) return parseInt(lMatch[1], 10) * 1000;  // 20 → 20000ml, 04 → 4000ml, 09 → 9000ml
+    return 0;
+}
+
+// Reverse of packSizeToCode — for display in matched output.
+function packCodeToSize(pc) {
+    if (!pc) return '?';
+    const s = String(pc).toUpperCase();
+    const mlMatch = s.match(/^(\d+)M$/);
+    if (mlMatch) return (parseInt(mlMatch[1], 10) * 10) + 'ml';   // 20M → 200ml
+    const lMatch = s.match(/^(\d+)$/);
+    if (lMatch) return parseInt(lMatch[1], 10) + 'L';             // 01 → 1L, 20 → 20L
+    return s;
+}
+
 // Normalize a PDF pack-size string to our 2-char pack code.
 // "1L" → "01", "4L" → "04", "0.9L" → "09" (treated as 0.9 → 0.9), "200ml" → "2M", "20L" → "20"
 function packSizeToCode(sz) {
@@ -851,6 +846,82 @@ function matchWithZohoItems(parsedItems, zohoItems) {
         });
     }
 
+    // ============ GROUP EXPANSION (Birla Opus style parsers emit _prices arrays) ============
+    // For rows where we have multiple prices but unknown column alignment, use Zoho's
+    // actual rates as ground truth. Assign each parsed price to the Zoho family member
+    // whose rate is closest by ratio.
+    const expandedParsed = [];
+    for (const p of parsedItems) {
+        if (Array.isArray(p._prices) && p._prices.length > 0) {
+            const abbrev = extractProductAbbrev(p.product);
+            const base = extractBase(p.product, p.baseCode);
+            const pdfFinish = detectFinish(p.product);
+            // Find Zoho family members: same brand scope + same abbrev (strict) + same base
+            const family = [];
+            for (const zi of scopedZoho) {
+                const skuText = (zi.sku || zi.zoho_sku || '').toUpperCase();
+                const nameText = (zi.name || zi.zoho_item_name || '').toUpperCase();
+                const struct = parseSkuStructure(skuText) || parseSkuStructure(nameText);
+                if (!struct || !abbrev) continue;
+                const a = struct.abbrev, b = abbrev;
+                const abbrevMatch = a === b || a.startsWith(b) || b.startsWith(a);
+                if (!abbrevMatch) continue;
+                if (base && struct.base && base !== struct.base) continue;
+                const ziFinish = detectFinish(nameText);
+                if (pdfFinish && ziFinish && pdfFinish !== ziFinish) continue;
+                family.push({ zi, struct, rate: parseFloat(zi.rate || 0) });
+            }
+            if (family.length === 0) {
+                unmatched.push({
+                    ...p, dpl: p._prices[0], packSize: '?',
+                    _reject_reason: `No Zoho family found for abbrev ${abbrev || '(unknown)'} base ${base || '-'}`
+                });
+                continue;
+            }
+            // Rate-anchored assignment: smallest price → smallest-rate family member, ascending.
+            // If rates are missing/zero, fall back to ascending pack size.
+            const famSorted = family.slice().sort((x, y) => {
+                if (x.rate > 0 && y.rate > 0) return x.rate - y.rate;
+                return packCodeToMl(x.struct.packCode) - packCodeToMl(y.struct.packCode);
+            });
+            const pricesSorted = p._prices.slice().sort((a, b) => a - b);
+
+            // Skip Zoho sizes that clearly don't appear in PDF: if PDF's min price is
+            // >2x the Zoho rate for the smallest family member, that member is skipped.
+            let startIdx = 0;
+            while (
+                startIdx < famSorted.length - pricesSorted.length &&
+                famSorted[startIdx].rate > 0 &&
+                pricesSorted[0] > famSorted[startIdx].rate * 2
+            ) {
+                startIdx++;
+            }
+            const take = Math.min(pricesSorted.length, famSorted.length - startIdx);
+            for (let i = 0; i < take; i++) {
+                const fam = famSorted[startIdx + i];
+                const price = pricesSorted[i];
+                expandedParsed.push({
+                    brand: p.brand,
+                    product: p.product,
+                    packSize: packCodeToSize(fam.struct.packCode),
+                    dpl: price,
+                    baseCode: p.baseCode,
+                    category: p.category,
+                    _assignedZohoId: fam.zi.zoho_item_id || fam.zi.item_id
+                });
+            }
+            // Any leftover prices (more prices than family members) → unmatched
+            for (let i = take; i < pricesSorted.length; i++) {
+                unmatched.push({
+                    ...p, dpl: pricesSorted[i], packSize: '?',
+                    _reject_reason: `Extra price in PDF row — family has ${famSorted.length - startIdx} sizes, PDF row has ${pricesSorted.length}`
+                });
+            }
+        } else {
+            expandedParsed.push(p);
+        }
+    }
+
     const zohoByName = new Map();
     const zohoByWords = [];
     const zohoBySku = []; // [{item, struct:{abbrev,base,packCode}, name, sku, finish}]
@@ -868,12 +939,26 @@ function matchWithZohoItems(parsedItems, zohoItems) {
         if (struct) zohoBySku.push({ item: zi, struct, name, sku, finish });
     });
 
-    for (const parsed of parsedItems) {
+    // Build a quick lookup by Zoho item id for shortcut path (group-expanded rows
+    // already know their target Zoho item — skip all fallback matching).
+    const zohoById = new Map();
+    scopedZoho.forEach(zi => {
+        const id = zi.zoho_item_id || zi.item_id;
+        if (id) zohoById.set(String(id), zi);
+    });
+
+    for (const parsed of expandedParsed) {
         const productName = parsed.product.toUpperCase().trim();
         const sizePatterns = normalizeSizeForMatch(parsed.packSize);
         const pdfFinish = detectFinish(productName);
 
-        let match = zohoByName.get(productName);
+        // Shortcut: rate-anchored expansion already picked the Zoho target.
+        let match = null;
+        if (parsed._assignedZohoId) {
+            match = zohoById.get(String(parsed._assignedZohoId)) || null;
+        }
+
+        if (!match) match = zohoByName.get(productName);
         // Exact-name match still ok — but refuse if finishes disagree (e.g., glossy vs matte)
         if (match) {
             const mFin = detectFinish(match.name || match.zoho_item_name || '');
@@ -933,26 +1018,22 @@ function matchWithZohoItems(parsedItems, zohoItems) {
         }
 
         if (match) {
-            // Sanity check: a DPL should be reasonably close to the painter's sales rate.
-            // If DPL is absurdly low (< 40% of rate) for a high-rate item (> ₹100),
-            // this is almost certainly a pack-size mismatch (e.g. 200ml sampler price
-            // matched to a 1L item). Reject and push to unmatched so admin can review.
+            // Advisory sanity check: if DPL is <25% of the current rate on a priced item,
+            // flag it for review but DON'T drop the match — the admin can eyeball in the
+            // review panel and uncheck before applying.
             const matchRate = parseFloat(match.rate || 0);
             const parsedDpl = parseFloat(parsed.dpl || 0);
-            if (matchRate >= 100 && parsedDpl > 0 && parsedDpl < matchRate * 0.4) {
-                unmatched.push({
-                    ...parsed,
-                    _reject_reason: `DPL ₹${parsedDpl} is <40% of rate ₹${matchRate} — likely pack-size mismatch`
-                });
-            } else {
-                matched.push({
-                    ...parsed,
-                    zoho_item_id: match.zoho_item_id || match.item_id,
-                    zoho_item_name: match.name || match.zoho_item_name,
-                    currentDpl: match.cf_dpl || match.zoho_cf_dpl,
-                    currentRate: match.rate
-                });
+            const out = {
+                ...parsed,
+                zoho_item_id: match.zoho_item_id || match.item_id,
+                zoho_item_name: match.name || match.zoho_item_name,
+                currentDpl: match.cf_dpl || match.zoho_cf_dpl,
+                currentRate: match.rate
+            };
+            if (matchRate >= 100 && parsedDpl > 0 && parsedDpl < matchRate * 0.25) {
+                out._warning = `DPL ₹${parsedDpl} is <25% of rate ₹${matchRate} — verify before applying`;
             }
+            matched.push(out);
         } else {
             unmatched.push(parsed);
         }

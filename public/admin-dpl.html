@@ -215,7 +215,7 @@
                         <p class="text-xs text-gray-500 mb-2">These items from the PDF couldn't be auto-matched. Use <b>Send to KAI</b> below for AI-assisted matching.</p>
                         <div style="max-height:300px; overflow-y:auto;">
                             <table class="w-full match-table">
-                                <thead><tr><th class="text-left">Product Name</th><th class="text-right">Pack Size</th><th class="text-right">DPL</th><th class="text-left">Category</th></tr></thead>
+                                <thead><tr><th class="text-left">Product Name</th><th class="text-right">Pack Size</th><th class="text-right">DPL</th><th class="text-left">Category</th><th class="text-left">Reason</th></tr></thead>
                                 <tbody id="unmatchedBody"></tbody>
                             </table>
                         </div>
@@ -394,7 +394,8 @@
             var rowClass = changed ? 'row-changed' : 'row-same';
             html += '<tr class="' + rowClass + '">';
             html += '<td><input type="checkbox" class="match-cb" data-idx="' + idx + '" ' + (changed ? 'checked' : '') + ' onchange="updateSelectedCount()"></td>';
-            html += '<td class="font-medium" style="max-width:220px" title="' + escapeHtml(m.zoho_item_name) + '"><div class="truncate">' + escapeHtml(m.zoho_item_name) + '</div></td>';
+            var warnBadge = m._warning ? ' <span class="text-[9px] px-1 py-0.5 bg-amber-100 text-amber-700 rounded" title="' + escapeHtml(m._warning) + '">⚠</span>' : '';
+            html += '<td class="font-medium" style="max-width:220px" title="' + escapeHtml(m.zoho_item_name) + (m._warning ? ' — ' + escapeHtml(m._warning) : '') + '"><div class="truncate">' + escapeHtml(m.zoho_item_name) + warnBadge + '</div></td>';
             html += '<td class="text-gray-500" style="max-width:180px" title="' + escapeHtml(m.product) + '"><div class="truncate">' + escapeHtml(m.product) + '</div></td>';
             html += '<td class="text-right">' + escapeHtml(m.packSize) + '</td>';
             html += '<td class="text-right font-bold text-green-700">' + formatINR(newDpl) + '</td>';
@@ -429,13 +430,14 @@
         unmatched.forEach(function(u) {
             html += '<tr>';
             html += '<td>' + escapeHtml(u.product) + '</td>';
-            html += '<td class="text-right">' + escapeHtml(u.packSize) + '</td>';
+            html += '<td class="text-right">' + escapeHtml(u.packSize || '?') + '</td>';
             html += '<td class="text-right font-medium">' + formatINR(u.dpl) + '</td>';
             html += '<td class="text-gray-400">' + escapeHtml(u.category || '') + '</td>';
+            html += '<td class="text-amber-600 text-xs">' + escapeHtml(u._reject_reason || '') + '</td>';
             html += '</tr>';
         });
         if (unmatched.length === 0) {
-            html = '<tr><td colspan="4" class="text-center py-4 text-gray-400">All items matched!</td></tr>';
+            html = '<tr><td colspan="5" class="text-center py-4 text-gray-400">All items matched!</td></tr>';
         }
         document.getElementById('unmatchedBody').innerHTML = html;
     }
