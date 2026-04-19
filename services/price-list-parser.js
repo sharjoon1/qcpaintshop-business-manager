@@ -809,34 +809,75 @@ function extractBase(productName, baseCode) {
     return null;
 }
 
+// Normalize brand names for comparison: "Birla Opus" / "birlaopus" / "BIRLA-OPUS" → "BIRLAOPUS"
+function normalizeBrand(b) {
+    return String(b || '').toUpperCase().replace(/[^A-Z]/g, '');
+}
+
+// Detect finish/type keyword in a name — so Glossy items don't match Matte items of same family.
+// Returns one of: 'GLOSS' | 'MATTE' | 'SATIN' | 'SEMIGLOSS' | null
+function detectFinish(name) {
+    const up = String(name || '').toUpperCase();
+    if (/\bSEMI[\s-]*GLOSS\b|\bSEMIGLOSS\b/.test(up)) return 'SEMIGLOSS';
+    if (/\bGLOS{1,2}Y\b|\bGLOSS\b|\bGLOOSY\b/.test(up)) return 'GLOSS';  // typos incl.
+    if (/\bMATT?E?\b/.test(up)) return 'MATTE';
+    if (/\bSATIN\b/.test(up)) return 'SATIN';
+    return null;
+}
+
 // ============ MATCH WITH ZOHO ITEMS ============
 function matchWithZohoItems(parsedItems, zohoItems) {
     const matched = [];
     const unmatched = [];
 
+    // Scope to same brand as PDF items to prevent cross-brand false matches.
+    // If the PDF carries no brand info, fall back to the full zoho list.
+    const pdfBrandSet = new Set(
+        parsedItems.map(p => normalizeBrand(p.brand)).filter(Boolean)
+    );
+    let scopedZoho = zohoItems;
+    if (pdfBrandSet.size > 0) {
+        scopedZoho = zohoItems.filter(zi => {
+            const zb = normalizeBrand(zi.brand || zi.zoho_brand);
+            if (!zb) return true; // items with no brand on our side — keep (avoid losing good candidates)
+            // Match if any PDF brand's normalized form is contained or equals
+            for (const pb of pdfBrandSet) {
+                if (zb === pb || zb.includes(pb) || pb.includes(zb)) return true;
+            }
+            return false;
+        });
+    }
+
     const zohoByName = new Map();
     const zohoByWords = [];
-    const zohoBySku = []; // [{item, struct:{abbrev,base,packCode}, name, sku}]
+    const zohoBySku = []; // [{item, struct:{abbrev,base,packCode}, name, sku, finish}]
 
-    zohoItems.forEach(zi => {
+    scopedZoho.forEach(zi => {
         const name = (zi.name || zi.zoho_item_name || '').toUpperCase().trim();
         const sku = (zi.sku || zi.zoho_sku || '').toUpperCase().trim();
+        const finish = detectFinish(name);
         if (name) {
             zohoByName.set(name, zi);
-            zohoByWords.push({ words: name.split(/\s+/), item: zi, name });
+            zohoByWords.push({ words: name.split(/\s+/), item: zi, name, finish });
         }
         // Prefer SKU-parse; fall back to parsing first token of name
         const struct = parseSkuStructure(sku) || parseSkuStructure(name);
-        if (struct) zohoBySku.push({ item: zi, struct, name, sku });
+        if (struct) zohoBySku.push({ item: zi, struct, name, sku, finish });
     });
 
     for (const parsed of parsedItems) {
         const productName = parsed.product.toUpperCase().trim();
         const sizePatterns = normalizeSizeForMatch(parsed.packSize);
+        const pdfFinish = detectFinish(productName);
 
         let match = zohoByName.get(productName);
+        // Exact-name match still ok — but refuse if finishes disagree (e.g., glossy vs matte)
+        if (match) {
+            const mFin = detectFinish(match.name || match.zoho_item_name || '');
+            if (pdfFinish && mFin && pdfFinish !== mFin) match = null;
+        }
 
-        // Strategy 0 (NEW): SKU-structure match — abbrev + pack + optional base
+        // Strategy 0: SKU-structure match — abbrev + pack + optional base + finish
         if (!match) {
             const pdfAbbrev = extractProductAbbrev(parsed.product);
             const pdfPack = packSizeToCode(parsed.packSize);
@@ -847,13 +888,12 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                 const looseCandidates = [];
                 for (const ent of zohoBySku) {
                     if (ent.struct.packCode !== pdfPack) continue;
-                    // Abbrev must overlap: SKU abbrev starts with pdfAbbrev OR vice versa
+                    // Finish must agree when both specify it
+                    if (pdfFinish && ent.finish && pdfFinish !== ent.finish) continue;
                     const a = ent.struct.abbrev, b = pdfAbbrev;
                     const abbrevMatch = a === b || a.startsWith(b) || b.startsWith(a);
                     if (!abbrevMatch) continue;
-                    // If both sides have a base, they must match
                     if (pdfBase && ent.struct.base && pdfBase !== ent.struct.base) continue;
-                    // Strict = abbrev exact + base agrees; Loose = prefix abbrev
                     if (a === b && (!pdfBase || !ent.struct.base || pdfBase === ent.struct.base)) {
                         strictCandidates.push(ent.item);
                     } else {
@@ -861,28 +901,32 @@ function matchWithZohoItems(parsedItems, zohoItems) {
                     }
                 }
                 if (strictCandidates.length === 1) match = strictCandidates[0];
-                else if (strictCandidates.length > 1) match = strictCandidates[0]; // tie → first
+                else if (strictCandidates.length > 1) match = strictCandidates[0];
                 else if (looseCandidates.length === 1) match = looseCandidates[0];
             }
         }
 
-        // Strategy 2: fallback keyword match (existing)
+        // Strategy 2: fallback keyword match — finish enforced, minimum score raised
         if (!match) {
             const keywords = extractKeywords(productName);
             let bestScore = 0;
             let bestMatch = null;
             for (const entry of zohoByWords) {
+                // Hard-require pack size to match (not just substring anywhere)
                 const hasSize = sizePatterns.some(sp => entry.name.includes(sp));
                 if (!hasSize && sizePatterns.length > 0) continue;
+                // Finish must agree when both sides declare it
+                if (pdfFinish && entry.finish && pdfFinish !== entry.finish) continue;
                 let score = 0;
                 for (const kw of keywords) if (entry.name.includes(kw)) score++;
-                const minRequired = keywords.length <= 2 ? 1 : 2;
+                // Raise the bar: need ≥3 matching keywords (or all if name short) to avoid cross-family leaks
+                const minRequired = keywords.length <= 2 ? keywords.length : 3;
                 if (score >= minRequired && score > bestScore) {
                     bestScore = score;
                     bestMatch = entry.item;
                 }
             }
-            if (bestMatch && bestScore >= 2) match = bestMatch;
+            if (bestMatch && bestScore >= (bestMatch && keywords.length <= 2 ? keywords.length : 3)) match = bestMatch;
         }
 
         if (match) {

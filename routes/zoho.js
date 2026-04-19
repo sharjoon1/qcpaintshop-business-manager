@@ -4223,7 +4223,7 @@ router.post('/items/parse-price-list', requirePermission('zoho', 'manage'), uplo
         // If requested, match against existing Zoho items
         if (req.body.match !== 'false') {
             const [zohoItems] = await pool.query(
-                `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_rate AS rate, zoho_cf_dpl AS cf_dpl, zoho_unit AS unit
+                `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_rate AS rate, zoho_cf_dpl AS cf_dpl, zoho_unit AS unit, zoho_brand AS brand
                  FROM zoho_items_map WHERE zoho_status = 'active'`
             );
             const matchResult = priceListParser.matchWithZohoItems(result.items, zohoItems);
