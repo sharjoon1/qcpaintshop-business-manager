@@ -4252,7 +4252,6 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
     try {
         const brand = req.query.brand;
         const category = (req.query.category || '').trim();          // optional filter
-        const userCode = (req.query.code || '').trim().toUpperCase(); // explicit prefix code (e.g. "EM", "IPR")
         const hasBases = req.query.hasBases === '1' || req.query.hasBases === 'true';
         if (!brand) return res.status(400).json({ success: false, message: 'brand query param is required' });
 
@@ -4272,22 +4271,15 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
         const summary = { conformant: 0, needs_rename: 0, cannot_parse: 0 };
         const results = [];
 
-        // Validate the category code
-        if (userCode && !/^[A-Z]{2,5}$/.test(userCode)) {
-            return res.status(400).json({ success: false, message: 'code must be 2-5 uppercase letters (e.g. IPR, EM)' });
-        }
-
         for (const row of rows) {
             const rawName = String(row.name || '').trim();
             const nameUp = rawName.toUpperCase();
             const skuUp = String(row.sku || '').toUpperCase().trim();
             const brandUp = String(row.brand || '').toUpperCase().trim();
 
-            // 1. Current "name prefix" = the first token of the ITEM NAME (what the user sees)
-            //    (NOT the SKU — the user stores SKU separately as a unique-identifier string.)
+            // 1. What the user sees as prefix: first token of the NAME
             const firstToken = nameUp.split(/\s+/)[0] || '';
-            const currentNamePrefix = /^[A-Z0-9]{3,8}$/.test(firstToken) ? firstToken : null;
-            const currentStruct = priceListParser.parseSkuStructure(nameUp);
+            const currentNamePrefix = /^[A-Z0-9]{2,8}$/.test(firstToken) ? firstToken : null;
 
             // 2. Pack code from trailing pack-size in the name
             let inferPack = null;
@@ -4296,7 +4288,7 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
                 inferPack = priceListParser.packSizeToCode(packMatch[1] + packMatch[2]);
             }
 
-            // 3. Base detection — only matters if hasBases is true
+            // 3. Base detection — only when hasBases=true (emulsion)
             let inferBase = null;
             if (hasBases) {
                 const bMatch = nameUp.match(/\bBASE\s*([1-9])\b|\bB([1-9])\b/);
@@ -4304,49 +4296,69 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
                 else if (/\bWHITE\b|\bSUPER\s*WHITE\b|\bDEEP\s*WHITE\b/.test(nameUp)) inferBase = 'W';
             }
 
-            // 4. Strip known noise (old prefix, brand, pack, base) → remaining is the "middle" product name
+            // 4. Derive PRODUCT ABBREVIATION — unique per product family.
+            //    Priority:
+            //    (a) Extract letters from current SKU (e.g., "PFP01" → "PFP")
+            //    (b) Extract letters from current name first token (e.g., "EC101 EVER CLEAR ..." → "EC")
+            //    (c) Fallback: first letters of significant product words
+            let productAbbrev = null;
+
+            // (a) SKU letters
+            const skuLetters = skuUp.match(/^([A-Z]{2,5})/);
+            if (skuLetters) productAbbrev = skuLetters[1];
+
+            // (b) Name first-token letters — IF SKU didn't give us a good one
+            if (!productAbbrev) {
+                const nameLetters = firstToken.match(/^([A-Z]{2,5})/);
+                if (nameLetters) productAbbrev = nameLetters[1];
+            }
+
+            // Strip noise to isolate product-name words in the middle
             const brandTokens = new Set(brandUp.split(/\s+/).filter(w => w && w.length >= 2));
             const unitWords = new Set(['L', 'LT', 'LTR', 'ML', 'KG', 'G', 'GM', 'LITRE', 'LITER']);
-
             let middle = rawName;
-            // Drop a leading prefix-looking token (letters+digits, 3-8 chars)
-            middle = middle.replace(/^[A-Z0-9]{3,8}\s+/i, '');
-            // Drop trailing pack size
+            middle = middle.replace(/^[A-Z0-9]{2,8}\s+/i, '');
             middle = middle.replace(/\s*\b\d{1,3}(?:\.\d+)?\s*(ML|L|LT|LTR|LITRE|LITER|KG|GM?)\s*$/i, '');
-            // Drop base markers when applicable
             if (hasBases) {
                 middle = middle.replace(/\bBASE\s*[1-9]\b/gi, '');
                 middle = middle.replace(/\bB[1-9]\b/gi, '');
                 middle = middle.replace(/\b(?:SUPER\s*|DEEP\s*)?WHITE\b/gi, '');
             }
-            // Drop brand tokens from the middle
             for (const bt of brandTokens) {
                 middle = middle.replace(new RegExp('\\b' + bt + '\\b', 'gi'), '');
             }
-            // Drop unit words
             for (const uw of unitWords) {
                 middle = middle.replace(new RegExp('\\b' + uw + '\\b', 'gi'), '');
             }
             middle = middle.replace(/\s+/g, ' ').trim();
 
-            // 5. Build proposed prefix + full name + SKU using USER-SUPPLIED code
+            // (c) Fallback abbreviation from middle words
+            if (!productAbbrev && middle) {
+                const words = middle.toUpperCase()
+                    .replace(/[^A-Z ]/g, ' ')
+                    .split(/\s+/)
+                    .filter(w => w && w.length >= 2);
+                if (words.length >= 1) {
+                    productAbbrev = words.slice(0, Math.min(3, words.length))
+                        .map(w => w[0]).join('');
+                }
+            }
+
+            // 5. Build proposed prefix + full name + SKU
             let status = 'cannot_parse';
             let proposedPrefix = null;
             let proposedName = null;
             let proposedSku = null;
 
-            if (userCode && inferPack) {
+            if (productAbbrev && inferPack) {
                 const baseDigit = hasBases ? (inferBase === 'W' ? '0' : (inferBase || '')) : '';
-                proposedPrefix = userCode + baseDigit + inferPack;
-                // Full name: [PREFIX] [middle product name] [BRAND] [PACK L]
+                proposedPrefix = productAbbrev + baseDigit + inferPack;
                 const displayPack = (packMatch ? packMatch[1] + ' ' + packMatch[2].toUpperCase() : '').trim();
                 const parts = [proposedPrefix, (middle || '').toUpperCase(), brandUp, displayPack]
                     .filter(Boolean).map(s => s.trim()).filter(Boolean);
                 proposedName = parts.join(' ').replace(/\s+/g, ' ').trim();
-                // SKU: same prefix (SKU = compact unique identifier derived from prefix)
                 proposedSku = proposedPrefix;
 
-                // Already conformant? (current name starts with proposed prefix and matches exactly)
                 if (nameUp === proposedName.toUpperCase() && skuUp === proposedSku) {
                     status = 'conformant';
                     proposedName = null;
@@ -4362,8 +4374,9 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
                 current_name: row.name,
                 current_sku: row.sku,
                 current_category: row.category,
-                current_name_prefix: currentNamePrefix,     // from NAME
-                current_sku_value: row.sku || null,         // raw SKU for display
+                current_name_prefix: currentNamePrefix,
+                current_sku_value: row.sku || null,
+                product_abbrev: productAbbrev,
                 middle_name: middle || null,
                 inferred_base: inferBase,
                 inferred_pack: inferPack,

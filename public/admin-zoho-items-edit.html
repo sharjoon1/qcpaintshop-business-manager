@@ -331,11 +331,11 @@
 
             <div style="padding:16px 18px">
                 <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:0.72rem;color:#78350f">
-                    📝 <b>How it works:</b> Pick a brand + category, enter a short code (e.g. <code>IPR</code> for Interior Primer, <code>EM</code> for Emulsion), tick "Has Bases" only for emulsion. Every matching item will be renamed to <code>[CODE][BASE?][PACK] PRODUCT BRAND PACK</code>.
+                    📝 <b>How it works:</b> The product abbreviation is auto-derived from each item's existing SKU (e.g. <code>PFP01</code> → <code>PFP</code>) — so each product keeps its unique code. Pick brand + category to scope, tick "Has Bases" only for emulsion. Every item is renamed to <code>[PRODUCT_ABBREV][BASE?][PACK] PRODUCT BRAND PACK</code>.
                 </div>
 
-                <!-- Step 1: Brand -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <!-- Step 1: Brand + Category -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                     <div>
                         <label class="text-xs font-semibold text-gray-600 block mb-1">1. Brand *</label>
                         <select id="normBrand" onchange="onNormBrandChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
@@ -343,23 +343,17 @@
                         </select>
                     </div>
                     <div>
-                        <label class="text-xs font-semibold text-gray-600 block mb-1">2. Category *</label>
+                        <label class="text-xs font-semibold text-gray-600 block mb-1">2. Category (optional)</label>
                         <select id="normCategory" onchange="onNormCategoryChange()" disabled class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100">
                             <option value="">— Pick brand first —</option>
                         </select>
                     </div>
                     <div>
-                        <label class="text-xs font-semibold text-gray-600 block mb-1">3. Category Code *</label>
-                        <input type="text" id="normCode" maxlength="5" placeholder="e.g. IPR, EM, EN" oninput="this.value=this.value.toUpperCase()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono uppercase">
-                        <p class="text-[10px] text-gray-500 mt-0.5">2–5 uppercase letters</p>
-                    </div>
-                    <div>
-                        <label class="text-xs font-semibold text-gray-600 block mb-1">4. Has Bases?</label>
+                        <label class="text-xs font-semibold text-gray-600 block mb-1">3. Has Bases?</label>
                         <label class="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer text-sm">
                             <input type="checkbox" id="normHasBases" class="w-4 h-4">
                             <span>Yes — tint bases (emulsion only)</span>
                         </label>
-                        <p class="text-[10px] text-gray-500 mt-0.5">Leave unchecked for primer / enamel / etc.</p>
                     </div>
                 </div>
 
@@ -367,9 +361,6 @@
                     <button onclick="runNormalizeScan()" id="normScanBtn" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm flex items-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         Scan
-                    </button>
-                    <button onclick="rememberNormCode()" id="normRememberBtn" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg">
-                        💾 Remember code for this category
                     </button>
                 </div>
 
@@ -1750,57 +1741,28 @@
     }
 
     function onNormCategoryChange() {
+        // Pre-fill Has Bases if we saved it for this category before
         var cat = document.getElementById('normCategory').value;
         var found = normCategories.find(function(c) { return c.name === cat; });
-        if (found && found.saved_code) {
-            document.getElementById('normCode').value = found.saved_code;
-            document.getElementById('normHasBases').checked = !!found.saved_has_bases;
-        } else {
-            document.getElementById('normCode').value = '';
-            document.getElementById('normHasBases').checked = false;
-        }
-    }
-
-    async function rememberNormCode() {
-        var category = document.getElementById('normCategory').value;
-        var code = document.getElementById('normCode').value.trim().toUpperCase();
-        var hasBases = document.getElementById('normHasBases').checked;
-        if (!category || !code) { showToast('Pick category + enter code first', 'error'); return; }
-        try {
-            var resp = await fetch('/api/zoho/items/normalize/remember', {
-                method: 'POST',
-                headers: Object.assign({'Content-Type':'application/json'}, getAuthHeaders()),
-                body: JSON.stringify({ category: category, code: code, has_bases: hasBases })
-            });
-            var data = await resp.json();
-            if (!data.success) throw new Error(data.message);
-            showToast('Saved — will pre-fill next time for this category', 'success');
-            // Refresh local saved info
-            var found = normCategories.find(function(c) { return c.name === category; });
-            if (found) { found.saved_code = code; found.saved_has_bases = hasBases; }
-        } catch (err) { showToast('Save failed: ' + err.message, 'error'); }
+        document.getElementById('normHasBases').checked = !!(found && found.saved_has_bases);
     }
 
     async function runNormalizeScan() {
         var brand = document.getElementById('normBrand').value;
         var category = document.getElementById('normCategory').value;
-        var code = document.getElementById('normCode').value.trim().toUpperCase();
         var hasBases = document.getElementById('normHasBases').checked;
         if (!brand) { showToast('Select a brand', 'error'); return; }
-        if (!category) { showToast('Select a category', 'error'); return; }
-        if (!code || !/^[A-Z]{2,5}$/.test(code)) { showToast('Enter 2-5 letter category code', 'error'); return; }
         normBrand = brand;
 
         document.getElementById('normLoading').classList.remove('hidden');
-        document.getElementById('normLoadingText').textContent = 'Scanning ' + brand + ' / ' + category + '...';
+        document.getElementById('normLoadingText').textContent = 'Scanning ' + brand + (category ? ' / ' + category : '') + '...';
         document.getElementById('normResults').classList.add('hidden');
         document.getElementById('normSummary').classList.add('hidden');
         document.getElementById('normFooter').classList.add('hidden');
 
         try {
             var url = '/api/zoho/items/normalize/scan?brand=' + encodeURIComponent(brand)
-                + '&category=' + encodeURIComponent(category)
-                + '&code=' + encodeURIComponent(code)
+                + (category ? '&category=' + encodeURIComponent(category) : '')
                 + '&hasBases=' + (hasBases ? '1' : '0');
             var resp = await fetch(url, { headers: getAuthHeaders() });
             var data = await resp.json();
