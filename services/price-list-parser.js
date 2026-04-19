@@ -185,7 +185,10 @@ function parseBirlaOpus(text) {
         // Data line: "9900 - White PE White   490  1,930  4,783  9,478"
         // Or: "9901 - Pastel PE 1 104  484  1,902  4,740  9,390"
         const dataMatch = line.match(/^(\d{4})\s*-\s*(.+?)\s+(PE[A-Z]*|DE|PR|SH|EX|OT|FL|WP|WD|UC|DN|VE|SE|CE|ME|HC|HB|GP|PG|PL|SP|DS|AC|TE|EP|SG|SM|GT|ST|PU|MR|AR|BR|IR|ER|CR|LR|OR)\s*(.+)$/);
-        if (dataMatch && sizeHeaders.length > 0 && currentProduct) {
+        // Skip data rows that belong to an "Annexure" section — these contain
+        // colorant/tint prices which are not the main 1L/4L/10L/20L SKU prices.
+        const isAnnexureSection = /^ANNEXURE\b/i.test(currentProduct);
+        if (dataMatch && sizeHeaders.length > 0 && currentProduct && !isAnnexureSection) {
             const baseName = dataMatch[2].trim();
             const prodCode = dataMatch[3].trim();
             const rest = dataMatch[4].trim();
@@ -930,13 +933,26 @@ function matchWithZohoItems(parsedItems, zohoItems) {
         }
 
         if (match) {
-            matched.push({
-                ...parsed,
-                zoho_item_id: match.zoho_item_id || match.item_id,
-                zoho_item_name: match.name || match.zoho_item_name,
-                currentDpl: match.cf_dpl || match.zoho_cf_dpl,
-                currentRate: match.rate
-            });
+            // Sanity check: a DPL should be reasonably close to the painter's sales rate.
+            // If DPL is absurdly low (< 40% of rate) for a high-rate item (> ₹100),
+            // this is almost certainly a pack-size mismatch (e.g. 200ml sampler price
+            // matched to a 1L item). Reject and push to unmatched so admin can review.
+            const matchRate = parseFloat(match.rate || 0);
+            const parsedDpl = parseFloat(parsed.dpl || 0);
+            if (matchRate >= 100 && parsedDpl > 0 && parsedDpl < matchRate * 0.4) {
+                unmatched.push({
+                    ...parsed,
+                    _reject_reason: `DPL ₹${parsedDpl} is <40% of rate ₹${matchRate} — likely pack-size mismatch`
+                });
+            } else {
+                matched.push({
+                    ...parsed,
+                    zoho_item_id: match.zoho_item_id || match.item_id,
+                    zoho_item_name: match.name || match.zoho_item_name,
+                    currentDpl: match.cf_dpl || match.zoho_cf_dpl,
+                    currentRate: match.rate
+                });
+            }
         } else {
             unmatched.push(parsed);
         }
