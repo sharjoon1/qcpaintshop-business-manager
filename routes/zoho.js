@@ -4369,38 +4369,66 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
             }
 
             // 5. Build proposed prefix + full name + SKU
+            //    Emulsion (has bases):  name = [SKU/product-prefix]    [product words] [BRAND] [PACK]
+            //    Non-emulsion:          name = [category-code-prefix]  [product words] [BRAND] [PACK]
+            //                           SKU  = product-based (keeps uniqueness per product)
             let status = 'cannot_parse';
             let proposedPrefix = null;
             let proposedName = null;
             let proposedSku = null;
 
-            if (skuDerivedPrefix) {
-                // SKU already encodes everything — use it as-is.
-                proposedPrefix = skuDerivedPrefix;
-                proposedSku = skuDerivedPrefix;
-                const displayPack = (packMatch ? packMatch[1] + ' ' + packMatch[2].toUpperCase() : '').trim();
-                const parts = [proposedPrefix, (middle || '').toUpperCase(), brandUp, displayPack]
-                    .filter(Boolean).map(s => s.trim()).filter(Boolean);
-                proposedName = parts.join(' ').replace(/\s+/g, ' ').trim();
+            const displayPack = (packMatch ? packMatch[1] + ' ' + packMatch[2].toUpperCase() : '').trim();
 
-                status = (nameUp === proposedName.toUpperCase()) ? 'conformant' : 'needs_rename';
-                if (status === 'conformant') { proposedName = null; proposedSku = null; }
-            } else if (productAbbrev && inferPack) {
-                // No clean SKU → build from abbrev + inferred base + pack
-                const baseDigit = hasBases ? (inferBase === 'W' ? '0' : (inferBase || '')) : '';
-                proposedPrefix = productAbbrev + baseDigit + inferPack;
-                const displayPack = (packMatch ? packMatch[1] + ' ' + packMatch[2].toUpperCase() : '').trim();
-                const parts = [proposedPrefix, (middle || '').toUpperCase(), brandUp, displayPack]
-                    .filter(Boolean).map(s => s.trim()).filter(Boolean);
-                proposedName = parts.join(' ').replace(/\s+/g, ' ').trim();
-                proposedSku = proposedPrefix;
+            if (hasBases) {
+                // Emulsion path: SKU-based prefix drives the NAME and the SKU.
+                const emulsionPrefix = skuDerivedPrefix
+                    || (productAbbrev && inferPack
+                        ? productAbbrev + (inferBase === 'W' ? '0' : (inferBase || '')) + inferPack
+                        : null);
+                if (emulsionPrefix) {
+                    proposedPrefix = emulsionPrefix;
+                    proposedSku = emulsionPrefix;
+                    const parts = [proposedPrefix, (middle || '').toUpperCase(), brandUp, displayPack]
+                        .filter(Boolean).map(s => s.trim()).filter(Boolean);
+                    proposedName = parts.join(' ').replace(/\s+/g, ' ').trim();
+                    status = (nameUp === proposedName.toUpperCase() && skuUp === proposedSku)
+                        ? 'conformant' : 'needs_rename';
+                    if (status === 'conformant') { proposedName = null; proposedSku = null; }
+                }
+            } else {
+                // Non-emulsion path: keep the CATEGORY CODE (currentNamePrefix) at the start of NAME.
+                //                    SKU stays product-based (current SKU if well-formed, else abbrev+pack).
+                if (currentNamePrefix) {
+                    proposedPrefix = currentNamePrefix;
 
-                if (nameUp === proposedName.toUpperCase() && skuUp === proposedSku) {
-                    status = 'conformant';
-                    proposedName = null;
-                    proposedSku = null;
-                } else {
-                    status = 'needs_rename';
+                    // Product-based SKU (unique per product, not per category)
+                    proposedSku = skuDerivedPrefix
+                        || (productAbbrev && inferPack ? productAbbrev + inferPack : null)
+                        || skuUp
+                        || null;
+
+                    // Build middle by KEEPING category prefix and stripping only pack + brand + unit words
+                    // (we do NOT strip further digit-prefixes because the middle may include a product code).
+                    let middle2 = rawName.substring(currentNamePrefix.length).trim();
+                    middle2 = middle2.replace(/\s*\b\d{1,3}(?:\.\d+)?\s*(ML|L|LT|LTR|LITRE|LITER|KG|GM?)\s*$/i, '');
+                    for (const bt of brandTokens) {
+                        middle2 = middle2.replace(new RegExp('\\b' + bt + '\\b', 'gi'), '');
+                    }
+                    for (const sb of shortBrands) {
+                        if (brandUp.includes(sb)) middle2 = middle2.replace(new RegExp('\\b' + sb + '\\b', 'gi'), '');
+                    }
+                    for (const uw of unitWords) {
+                        middle2 = middle2.replace(new RegExp('\\b' + uw + '\\b', 'gi'), '');
+                    }
+                    middle2 = middle2.replace(/\s+/g, ' ').trim();
+
+                    const parts = [proposedPrefix, middle2.toUpperCase(), brandUp, displayPack]
+                        .filter(Boolean).map(s => s.trim()).filter(Boolean);
+                    proposedName = parts.join(' ').replace(/\s+/g, ' ').trim();
+
+                    status = (nameUp === proposedName.toUpperCase() && (!proposedSku || skuUp === proposedSku))
+                        ? 'conformant' : 'needs_rename';
+                    if (status === 'conformant') { proposedName = null; proposedSku = null; }
                 }
             }
 
