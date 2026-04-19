@@ -1896,7 +1896,7 @@
 
         document.getElementById('normApplyBtn').disabled = true;
         document.getElementById('normLoading').classList.remove('hidden');
-        document.getElementById('normLoadingText').textContent = 'Applying ' + simple.length + ' renames — pushing to Zoho...';
+        document.getElementById('normLoadingText').textContent = 'Queuing ' + simple.length + ' renames as a bulk job...';
 
         try {
             var resp = await fetch('/api/zoho/items/normalize/apply', {
@@ -1907,14 +1907,29 @@
             var data = await resp.json();
             if (!data.success) throw new Error(data.message);
             var r = data.data || {};
-            showToast('Renamed ' + r.success + ' of ' + r.total + ' items' + (r.fails ? ' (' + r.fails + ' failed)' : ''), r.fails ? 'info' : 'success');
-            closeNormalizeModal();
-            loadItems(); // refresh main table
+            // Replace modal body with a success panel linking to the bulk jobs page
+            document.getElementById('normResults').classList.add('hidden');
+            document.getElementById('normSummary').classList.add('hidden');
+            document.getElementById('normFooter').classList.add('hidden');
+            var loading = document.getElementById('normLoading');
+            loading.innerHTML = ''
+                + '<div style="text-align:center;padding:20px">'
+                + '  <div style="font-size:2rem;margin-bottom:8px">✓</div>'
+                + '  <h3 style="font-weight:700;font-size:1rem;margin-bottom:6px;color:#15803d">Bulk job #' + r.job_id + ' created</h3>'
+                + '  <p style="font-size:0.8rem;color:#475569;margin-bottom:16px">'
+                + '    Queued ' + r.total_items + ' items to push to Zoho. Local items are already updated.'
+                + '  </p>'
+                + '  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+                + '    <a href="/admin-zoho-bulk-jobs.html" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm">Track Progress →</a>'
+                + '    <button onclick="closeNormalizeModal();loadItems()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm">Close</button>'
+                + '  </div>'
+                + '</div>';
+            loading.classList.remove('hidden');
+            showToast('Bulk job #' + r.job_id + ' created', 'success');
         } catch (err) {
-            showToast('Apply failed: ' + err.message, 'error');
-        } finally {
             document.getElementById('normLoading').classList.add('hidden');
-            updateNormSelectedCount();
+            showToast('Apply failed: ' + err.message, 'error');
+            document.getElementById('normApplyBtn').disabled = false;
         }
     }
 

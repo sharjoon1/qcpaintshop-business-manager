@@ -4517,42 +4517,55 @@ router.post('/items/normalize/apply', requirePermission('zoho', 'manage'), async
         if (!items || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ success: false, message: 'items array required' });
         }
-
-        let okCount = 0;
-        let failCount = 0;
-        const errors = [];
-
+        // Validate shape
         for (const it of items) {
-            if (!it.zoho_item_id || !it.new_name) { failCount++; continue; }
-            try {
-                // 1. Push to Zoho
-                const payload = { name: it.new_name };
-                if (it.new_sku) payload.sku = it.new_sku;
-                await zohoAPI.updateItem(it.zoho_item_id, payload);
+            if (!it.zoho_item_id || !it.new_name) {
+                return res.status(400).json({ success: false, message: 'Each item must have zoho_item_id and new_name' });
+            }
+        }
 
-                // 2. Update local DB on Zoho success
-                if (it.new_sku) {
-                    await pool.query(
-                        `UPDATE zoho_items_map SET zoho_item_name = ?, zoho_sku = ? WHERE zoho_item_id = ?`,
-                        [it.new_name, it.new_sku, it.zoho_item_id]
-                    );
-                } else {
-                    await pool.query(
-                        `UPDATE zoho_items_map SET zoho_item_name = ? WHERE zoho_item_id = ?`,
-                        [it.new_name, it.zoho_item_id]
-                    );
-                }
-                okCount++;
-            } catch (err) {
-                failCount++;
-                errors.push({ zoho_item_id: it.zoho_item_id, error: err.message });
+        // Create bulk job so user can track at /admin-zoho-bulk-jobs.html
+        const [jobResult] = await pool.query(`
+            INSERT INTO zoho_bulk_jobs (job_type, filter_criteria, update_fields, total_items, created_by)
+            VALUES ('item_update', ?, ?, ?, ?)
+        `, [
+            JSON.stringify({ mode: 'normalize_names', item_count: items.length }),
+            JSON.stringify({ mode: 'per_item', source: 'normalize' }),
+            items.length,
+            req.user.id
+        ]);
+        const jobId = jobResult.insertId;
+
+        // Queue per-item payloads
+        for (const it of items) {
+            const payload = { name: it.new_name };
+            if (it.new_sku) payload.sku = it.new_sku;
+            await pool.query(`
+                INSERT INTO zoho_bulk_job_items (job_id, zoho_item_id, item_name, payload)
+                VALUES (?, ?, ?, ?)
+            `, [jobId, it.zoho_item_id, it.new_name, JSON.stringify(payload)]);
+        }
+
+        // Update local zoho_items_map immediately so the UI reflects changes
+        // while the background worker pushes to Zoho.
+        for (const it of items) {
+            if (it.new_sku) {
+                await pool.query(
+                    `UPDATE zoho_items_map SET zoho_item_name = ?, zoho_sku = ? WHERE zoho_item_id = ?`,
+                    [it.new_name, it.new_sku, it.zoho_item_id]
+                );
+            } else {
+                await pool.query(
+                    `UPDATE zoho_items_map SET zoho_item_name = ? WHERE zoho_item_id = ?`,
+                    [it.new_name, it.zoho_item_id]
+                );
             }
         }
 
         res.json({
             success: true,
-            data: { total: items.length, success: okCount, fails: failCount, errors },
-            message: `Renamed ${okCount} of ${items.length} items`
+            data: { job_id: jobId, total_items: items.length },
+            message: `Bulk rename job #${jobId} created with ${items.length} items — track progress on the Bulk Jobs page`
         });
     } catch (error) {
         console.error('Normalize apply error:', error);
