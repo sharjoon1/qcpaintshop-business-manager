@@ -212,13 +212,19 @@
             </div>
         </div>
 
-        <!-- Search -->
+        <!-- Search + Filters -->
         <div class="search-row bg-white rounded-lg shadow-sm p-2 mb-3 flex flex-col sm:flex-row gap-2 items-end">
-            <div class="flex-1 relative">
+            <div class="flex-1 relative min-w-[180px]">
                 <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 <input type="text" id="searchInput" onkeyup="debounceSearch()" placeholder="Search by item name or SKU..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
             </div>
-            <button onclick="clearSearch()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 text-xs font-medium text-gray-700 transition whitespace-nowrap">Clear</button>
+            <select id="brandFilter" onchange="currentPage=1;loadItems()" class="px-2 py-1.5 rounded-lg border border-gray-300 text-xs bg-white min-w-[120px]">
+                <option value="">All Brands</option>
+            </select>
+            <select id="categoryFilter" onchange="currentPage=1;loadItems()" class="px-2 py-1.5 rounded-lg border border-gray-300 text-xs bg-white min-w-[140px]">
+                <option value="">All Categories</option>
+            </select>
+            <button onclick="clearAllFilters()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 text-xs font-medium text-gray-700 transition whitespace-nowrap">Clear</button>
             <label class="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
                 <input type="checkbox" id="showInactiveToggle" onchange="currentPage=1;loadItems()" class="w-3.5 h-3.5 rounded border-gray-300 text-red-600 focus:ring-red-500">
                 <span class="text-xs text-gray-600">Show Inactive</span>
@@ -744,17 +750,28 @@
     // ============ SEARCH ============
     function debounceSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(function() { currentPage = 1; loadItems(); }, 400); }
     function clearSearch() { document.getElementById('searchInput').value = ''; currentPage = 1; loadItems(); }
+    function clearAllFilters() {
+        document.getElementById('searchInput').value = '';
+        var bf = document.getElementById('brandFilter'); if (bf) bf.value = '';
+        var cf = document.getElementById('categoryFilter'); if (cf) cf.value = '';
+        currentPage = 1;
+        loadItems();
+    }
 
     // ============ LOAD ITEMS ============
     async function loadItems() {
         var search = document.getElementById('searchInput').value.trim();
+        var brandF = (document.getElementById('brandFilter') && document.getElementById('brandFilter').value) || '';
+        var catF = (document.getElementById('categoryFilter') && document.getElementById('categoryFilter').value) || '';
         var showInactive = document.getElementById('showInactiveToggle') && document.getElementById('showInactiveToggle').checked;
-        // When searching or filtering, load ALL items (ignore per-page limit)
+        var hasAnyFilter = search || brandF || catF;
         var hasColumnFilters = Object.keys(columnFilters).length > 0;
-        var effectiveLimit = (search || hasColumnFilters) ? 10000 : PAGE_LIMIT;
-        var effectivePage = (search || hasColumnFilters) ? 1 : currentPage;
+        var effectiveLimit = (hasAnyFilter || hasColumnFilters) ? 10000 : PAGE_LIMIT;
+        var effectivePage = (hasAnyFilter || hasColumnFilters) ? 1 : currentPage;
         var url = '/api/zoho/items?page=' + effectivePage + '&limit=' + effectiveLimit;
         if (search) url += '&search=' + encodeURIComponent(search);
+        if (brandF) url += '&brand=' + encodeURIComponent(brandF);
+        if (catF) url += '&category=' + encodeURIComponent(catF);
         if (showInactive) url += '&show_inactive=1';
 
         document.getElementById('loadingState').classList.remove('hidden');
@@ -2235,7 +2252,21 @@
     }
 
     // ============ INIT ============
-    document.addEventListener('DOMContentLoaded', function() { loadItems(); updateAiScope(); });
+    async function loadFilterOptions() {
+        try {
+            var resp = await fetch('/api/zoho/items/reassign/scan?nameContains=%20', { headers: getAuthHeaders() });
+            var data = await resp.json();
+            if (!data.success) return;
+            var bsel = document.getElementById('brandFilter');
+            var csel = document.getElementById('categoryFilter');
+            if (bsel) bsel.innerHTML = '<option value="">All Brands</option>' +
+                (data.brands || []).map(function(b){ return '<option value="'+escapeHtml(b)+'">'+escapeHtml(b)+'</option>'; }).join('');
+            if (csel) csel.innerHTML = '<option value="">All Categories</option>' +
+                (data.categories || []).map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('');
+        } catch (_) { /* non-blocking */ }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() { loadItems(); loadFilterOptions(); updateAiScope(); });
     window.addEventListener('beforeunload', function(e) { if(getDirtyItemCount()>0){e.preventDefault();e.returnValue='';} });
     // Close dropdowns on outside click
     document.addEventListener('click', function(e) {
