@@ -926,7 +926,7 @@ function matchWithZohoItems(parsedItems, zohoItems) {
             if (family.length === 0) {
                 unmatched.push({
                     ...p, dpl: p._prices[0], packSize: '?',
-                    _reject_reason: `No Zoho family found for abbrev ${abbrev || '(unknown)'} base ${base || '-'}`
+                    _reject_reason: `No Zoho family found for abbrev ${abbrev || '(unknown)'}`
                 });
                 continue;
             }
