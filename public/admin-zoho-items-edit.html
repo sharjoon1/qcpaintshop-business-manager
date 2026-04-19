@@ -192,6 +192,10 @@
                     </button>
                     <div id="colDropdown" class="col-toggle-dropdown hidden"></div>
                 </div>
+                <button onclick="openReassignModal()" class="qc-mobile-btn px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-xs font-semibold text-white flex items-center gap-1.5 transition shadow-sm" title="Find items with wrong brand or category and bulk-fix them">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    Fix Brand/Category
+                </button>
                 <button onclick="openNormalizeModal()" class="qc-mobile-btn px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-xs font-semibold text-white flex items-center gap-1.5 transition shadow-sm" title="Scan a brand's items and propose canonical SKU-prefix renames">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     Normalize Names
@@ -315,6 +319,111 @@
                 <svg class="w-3.5 h-3.5" id="pushIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
                 <span id="pushBtnText">Push Changes to Zoho</span>
             </button>
+        </div>
+    </div>
+
+    <!-- Fix Brand/Category Modal -->
+    <div id="reassignOverlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;padding:16px;overflow-y:auto" onclick="if(event.target===this)closeReassignModal()">
+        <div style="background:white;border-radius:12px;max-width:1100px;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)" onclick="event.stopPropagation()">
+            <div style="padding:14px 18px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#f43f5e,#e11d48);color:white;border-radius:12px 12px 0 0">
+                <div>
+                    <h3 style="font-weight:700;font-size:1rem;margin:0">🔧 Fix Brand / Category</h3>
+                    <p style="font-size:0.75rem;opacity:0.9;margin:2px 0 0">Find items with wrong brand/category and bulk-fix them</p>
+                </div>
+                <button onclick="closeReassignModal()" style="color:white;background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px">&times;</button>
+            </div>
+
+            <div style="padding:16px 18px">
+                <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:0.72rem;color:#7f1d1d">
+                    🔍 <b>Common fixes:</b> Search for a keyword that should be in a specific brand's names (e.g. <code>OPUS</code>), filter by wrong brand if items got mis-assigned, or pick a category that has wrong items.
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                    <div>
+                        <label class="text-xs font-semibold text-gray-600 block mb-1">Name contains</label>
+                        <input type="text" id="reName" placeholder="e.g. OPUS, ENAMEL, PRIMER" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-gray-600 block mb-1">Current Brand (filter)</label>
+                        <select id="reCurrentBrand" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">— any —</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-gray-600 block mb-1">Current Category (filter)</label>
+                        <select id="reCurrentCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">— any —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 mb-3">
+                    <button onclick="runReassignScan()" class="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-lg text-sm flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        Scan Matching Items
+                    </button>
+                </div>
+
+                <!-- Bulk-set controls (appear after scan) -->
+                <div id="reBulkBox" class="hidden mb-3" style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 12px">
+                    <div class="text-xs font-semibold text-gray-700 mb-2">Set for selected items:</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                        <div>
+                            <label class="text-xs text-gray-600 block mb-0.5">New Brand</label>
+                            <select id="reNewBrand" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+                                <option value="">— don't change —</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-600 block mb-0.5">New Category</label>
+                            <select id="reNewCategory" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs">
+                                <option value="">— don't change —</option>
+                            </select>
+                        </div>
+                        <button onclick="applyBulkSetToSelected()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold">Fill into selected rows</button>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div id="reResults" class="hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <div>
+                            <button onclick="reSelectAll(true)" class="text-xs text-indigo-600 hover:underline">Select all</button>
+                            <span class="text-gray-300 mx-2">|</span>
+                            <button onclick="reSelectAll(false)" class="text-xs text-gray-500 hover:underline">Clear</button>
+                        </div>
+                        <span class="text-xs text-gray-500" id="reCount"></span>
+                    </div>
+                    <div style="max-height:50vh;overflow:auto;border:1px solid #e5e7eb;border-radius:8px">
+                        <table class="w-full text-xs">
+                            <thead style="background:#f9fafb;position:sticky;top:0;z-index:1">
+                                <tr>
+                                    <th style="padding:8px;text-align:left">✓</th>
+                                    <th style="padding:8px;text-align:left">Item Name</th>
+                                    <th style="padding:8px;text-align:left">Current Brand</th>
+                                    <th style="padding:8px;text-align:left">→ New Brand</th>
+                                    <th style="padding:8px;text-align:left">Current Category</th>
+                                    <th style="padding:8px;text-align:left">→ New Category</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="reLoading" class="hidden text-center py-8">
+                    <svg class="inline w-6 h-6 animate-spin text-rose-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <p class="text-sm text-gray-500 mt-2" id="reLoadingText">Scanning...</p>
+                </div>
+            </div>
+
+            <div id="reFooter" class="hidden" style="padding:12px 18px;border-top:1px solid #e5e7eb;background:#f9fafb;display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:0 0 12px 12px">
+                <div class="text-xs text-gray-600"><span id="reSelectedCount">0</span> selected · will push to Zoho + update locally</div>
+                <button onclick="applyReassign()" id="reApplyBtn" disabled class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg text-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3-3m0 0l3 3m-3-3v12"/></svg>
+                    Apply & Push to Zoho
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1683,6 +1792,198 @@
     }
 
     // ============ AI CHAT SIDEBAR ============
+    // ============ FIX BRAND / CATEGORY (REASSIGN) ============
+    var reItems = [];
+
+    function openReassignModal() {
+        document.getElementById('reassignOverlay').classList.remove('hidden');
+        // Populate filter dropdowns from currently loaded items
+        var brandSet = new Set();
+        var catSet = new Set();
+        items.forEach(function(it) {
+            var b = (it.brand || it.zoho_brand || '').trim();
+            var c = (it.category_name || it.zoho_category_name || it.category || '').trim();
+            if (b) brandSet.add(b);
+            if (c) catSet.add(c);
+        });
+        var brandOpts = '<option value="">— any —</option>' +
+            Array.from(brandSet).sort().map(function(b){ return '<option value="'+escapeHtml(b)+'">'+escapeHtml(b)+'</option>'; }).join('');
+        var catOpts = '<option value="">— any —</option>' +
+            Array.from(catSet).sort().map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('');
+        document.getElementById('reCurrentBrand').innerHTML = brandOpts;
+        document.getElementById('reCurrentCategory').innerHTML = catOpts;
+        // New-value dropdowns (same lists minus the "any" placeholder)
+        document.getElementById('reNewBrand').innerHTML = '<option value="">— don\'t change —</option>' +
+            Array.from(brandSet).sort().map(function(b){ return '<option value="'+escapeHtml(b)+'">'+escapeHtml(b)+'</option>'; }).join('');
+        document.getElementById('reNewCategory').innerHTML = '<option value="">— don\'t change —</option>' +
+            Array.from(catSet).sort().map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('');
+    }
+    function closeReassignModal() {
+        document.getElementById('reassignOverlay').classList.add('hidden');
+    }
+
+    async function runReassignScan() {
+        var nameContains = document.getElementById('reName').value.trim();
+        var cb = document.getElementById('reCurrentBrand').value;
+        var cc = document.getElementById('reCurrentCategory').value;
+        if (!nameContains && !cb && !cc) { showToast('Enter at least one filter', 'error'); return; }
+
+        document.getElementById('reLoading').classList.remove('hidden');
+        document.getElementById('reLoadingText').textContent = 'Scanning...';
+        document.getElementById('reResults').classList.add('hidden');
+        document.getElementById('reFooter').classList.add('hidden');
+        document.getElementById('reBulkBox').classList.add('hidden');
+
+        try {
+            var url = '/api/zoho/items/reassign/scan?nameContains=' + encodeURIComponent(nameContains)
+                + '&currentBrand=' + encodeURIComponent(cb)
+                + '&currentCategory=' + encodeURIComponent(cc);
+            var resp = await fetch(url, { headers: getAuthHeaders() });
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message);
+            reItems = (data.items || []).map(function(it) {
+                return {
+                    zoho_item_id: it.zoho_item_id,
+                    name: it.name,
+                    sku: it.sku,
+                    currentBrand: it.brand,
+                    currentCategory: it.category,
+                    newBrand: '',
+                    newCategory: ''
+                };
+            });
+            // Refresh new-value dropdowns with the complete brand/category lists
+            var brandOpts = '<option value="">— don\'t change —</option>' +
+                (data.brands || []).map(function(b){ return '<option value="'+escapeHtml(b)+'">'+escapeHtml(b)+'</option>'; }).join('');
+            var catOpts = '<option value="">— don\'t change —</option>' +
+                (data.categories || []).map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('');
+            document.getElementById('reNewBrand').innerHTML = brandOpts;
+            document.getElementById('reNewCategory').innerHTML = catOpts;
+            // Cache for per-row dropdowns
+            window._reBrandsHtml = brandOpts;
+            window._reCatsHtml = catOpts;
+
+            renderReassignTable();
+            document.getElementById('reCount').textContent = reItems.length + ' matching items';
+            document.getElementById('reResults').classList.remove('hidden');
+            document.getElementById('reFooter').classList.remove('hidden');
+            document.getElementById('reBulkBox').classList.remove('hidden');
+        } catch (err) {
+            showToast('Scan failed: ' + err.message, 'error');
+        } finally {
+            document.getElementById('reLoading').classList.add('hidden');
+        }
+    }
+
+    function renderReassignTable() {
+        var html = '';
+        reItems.forEach(function(it, idx) {
+            html += '<tr style="border-top:1px solid #e5e7eb">';
+            html += '<td style="padding:6px 8px"><input type="checkbox" onchange="updateReSelectedCount()" data-idx="'+idx+'" class="re-cb"></td>';
+            html += '<td style="padding:6px 8px;max-width:260px"><div style="font-weight:600">'+escapeHtml(it.name||'')+'</div><div style="color:#9ca3af;font-size:0.65rem;font-family:monospace">'+escapeHtml(it.sku||'—')+'</div></td>';
+            html += '<td style="padding:6px 8px;color:#6b7280">'+escapeHtml(it.currentBrand||'—')+'</td>';
+            html += '<td style="padding:6px 8px"><select onchange="reItems['+idx+'].newBrand=this.value" class="w-full px-2 py-1 border border-gray-300 rounded text-xs">'+(window._reBrandsHtml||'').replace('value=""','value="" selected')+'</select></td>';
+            html += '<td style="padding:6px 8px;color:#6b7280">'+escapeHtml(it.currentCategory||'—')+'</td>';
+            html += '<td style="padding:6px 8px"><select onchange="reItems['+idx+'].newCategory=this.value" class="w-full px-2 py-1 border border-gray-300 rounded text-xs">'+(window._reCatsHtml||'').replace('value=""','value="" selected')+'</select></td>';
+            html += '</tr>';
+        });
+        if (!html) html = '<tr><td colspan="6" style="padding:24px;text-align:center;color:#9ca3af">No items match</td></tr>';
+        document.getElementById('reTableBody').innerHTML = html;
+        updateReSelectedCount();
+    }
+
+    function reSelectAll(sel) {
+        document.querySelectorAll('.re-cb').forEach(function(b) { b.checked = !!sel; });
+        updateReSelectedCount();
+    }
+    function updateReSelectedCount() {
+        var n = document.querySelectorAll('.re-cb:checked').length;
+        document.getElementById('reSelectedCount').textContent = n;
+        document.getElementById('reApplyBtn').disabled = n === 0;
+    }
+    function applyBulkSetToSelected() {
+        var nb = document.getElementById('reNewBrand').value;
+        var nc = document.getElementById('reNewCategory').value;
+        if (!nb && !nc) { showToast('Pick new brand or new category first', 'error'); return; }
+        var sel = document.querySelectorAll('.re-cb:checked');
+        if (!sel.length) { showToast('Select rows first', 'error'); return; }
+        sel.forEach(function(b) {
+            var idx = parseInt(b.dataset.idx);
+            if (nb) reItems[idx].newBrand = nb;
+            if (nc) reItems[idx].newCategory = nc;
+        });
+        renderReassignTable();
+        // Re-check after re-render
+        setTimeout(function() {
+            sel.forEach(function(b) {
+                var idx = parseInt(b.dataset.idx);
+                var box = document.querySelector('.re-cb[data-idx="'+idx+'"]');
+                if (box) box.checked = true;
+            });
+            // Re-apply dropdown values
+            reItems.forEach(function(it, idx) {
+                if (it.newBrand) {
+                    var sels = document.querySelectorAll('#reTableBody tr:nth-child('+(idx+1)+') select');
+                    if (sels[0]) sels[0].value = it.newBrand;
+                    if (sels[1]) sels[1].value = it.newCategory;
+                }
+            });
+            updateReSelectedCount();
+        }, 50);
+        showToast('Bulk-set applied to selected rows', 'success');
+    }
+    async function applyReassign() {
+        var checked = Array.from(document.querySelectorAll('.re-cb:checked'));
+        if (!checked.length) return;
+        var payload = [];
+        checked.forEach(function(b) {
+            var idx = parseInt(b.dataset.idx);
+            var it = reItems[idx];
+            if (!it.newBrand && !it.newCategory) return; // nothing to change
+            payload.push({
+                zoho_item_id: it.zoho_item_id,
+                new_brand: it.newBrand || null,
+                new_category: it.newCategory || null
+            });
+        });
+        if (!payload.length) { showToast('No changes set on selected rows', 'error'); return; }
+        if (!confirm('Reassign brand/category for ' + payload.length + ' item(s) and push to Zoho?')) return;
+
+        document.getElementById('reApplyBtn').disabled = true;
+        document.getElementById('reLoading').classList.remove('hidden');
+        document.getElementById('reLoadingText').textContent = 'Queuing bulk job...';
+
+        try {
+            var resp = await fetch('/api/zoho/items/reassign/apply', {
+                method: 'POST',
+                headers: Object.assign({'Content-Type':'application/json'}, getAuthHeaders()),
+                body: JSON.stringify({ items: payload })
+            });
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message);
+            var r = data.data || {};
+            var loading = document.getElementById('reLoading');
+            loading.innerHTML = ''
+                + '<div style="text-align:center;padding:20px">'
+                + '  <div style="font-size:2rem;margin-bottom:8px">✓</div>'
+                + '  <h3 style="font-weight:700;font-size:1rem;margin-bottom:6px;color:#15803d">Bulk job #' + r.job_id + ' created</h3>'
+                + '  <p style="font-size:0.8rem;color:#475569;margin-bottom:16px">Reassigning brand/category for ' + r.total_items + ' items.</p>'
+                + '  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+                + '    <a href="/admin-zoho-bulk-jobs.html" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm">Track Progress →</a>'
+                + '    <button onclick="closeReassignModal();loadItems()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm">Close</button>'
+                + '  </div>'
+                + '</div>';
+            document.getElementById('reResults').classList.add('hidden');
+            document.getElementById('reFooter').classList.add('hidden');
+            document.getElementById('reBulkBox').classList.add('hidden');
+            showToast('Bulk job #' + r.job_id + ' created', 'success');
+        } catch (err) {
+            document.getElementById('reLoading').classList.add('hidden');
+            showToast('Apply failed: ' + err.message, 'error');
+            document.getElementById('reApplyBtn').disabled = false;
+        }
+    }
+
     // ============ NORMALIZE NAMES ============
     var normItems = [];   // last scan results
     var normBrand = '';

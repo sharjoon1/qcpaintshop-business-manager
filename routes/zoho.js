@@ -4467,6 +4467,138 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
 });
 
 /**
+ * GET /api/zoho/items/reassign/scan
+ * Query params: nameContains, currentBrand, currentCategory (any combo; all optional)
+ * Returns items matching the criteria so admin can bulk-fix their brand/category.
+ */
+router.get('/items/reassign/scan', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const nameContains = (req.query.nameContains || '').trim();
+        const currentBrand = (req.query.currentBrand || '').trim();
+        const currentCategory = (req.query.currentCategory || '').trim();
+
+        if (!nameContains && !currentBrand && !currentCategory) {
+            return res.status(400).json({ success: false, message: 'Provide at least one filter (nameContains / currentBrand / currentCategory)' });
+        }
+
+        const whereParts = [`zoho_status = 'active'`];
+        const params = [];
+        if (nameContains) {
+            whereParts.push('(zoho_item_name LIKE ? OR zoho_sku LIKE ?)');
+            params.push('%' + nameContains + '%', '%' + nameContains + '%');
+        }
+        if (currentBrand) {
+            whereParts.push('zoho_brand = ?');
+            params.push(currentBrand);
+        }
+        if (currentCategory) {
+            whereParts.push('zoho_category_name = ?');
+            params.push(currentCategory);
+        }
+
+        const [rows] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku,
+                    zoho_brand AS brand, zoho_category_name AS category
+             FROM zoho_items_map
+             WHERE ${whereParts.join(' AND ')}
+             ORDER BY zoho_item_name ASC
+             LIMIT 2000`,
+            params
+        );
+
+        // Also return distinct brands + categories for the dropdowns
+        const [brands] = await pool.query(`
+            SELECT DISTINCT zoho_brand AS name FROM zoho_items_map
+            WHERE zoho_status = 'active' AND zoho_brand IS NOT NULL AND zoho_brand <> ''
+            ORDER BY zoho_brand
+        `);
+        const [categories] = await pool.query(`
+            SELECT DISTINCT zoho_category_name AS name FROM zoho_items_map
+            WHERE zoho_status = 'active' AND zoho_category_name IS NOT NULL AND zoho_category_name <> ''
+            ORDER BY zoho_category_name
+        `);
+
+        res.json({
+            success: true,
+            total: rows.length,
+            items: rows,
+            brands: brands.map(b => b.name),
+            categories: categories.map(c => c.name)
+        });
+    } catch (error) {
+        console.error('Reassign scan error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * POST /api/zoho/items/reassign/apply
+ * Body: { items: [{ zoho_item_id, new_brand?, new_category? }, ...] }
+ * Creates a bulk job to push brand + category changes to Zoho, updates local DB immediately.
+ */
+router.post('/items/reassign/apply', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const { items } = req.body;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: 'items array required' });
+        }
+        for (const it of items) {
+            if (!it.zoho_item_id) return res.status(400).json({ success: false, message: 'Each item must have zoho_item_id' });
+            if (!it.new_brand && !it.new_category) {
+                return res.status(400).json({ success: false, message: 'Each item must set new_brand or new_category' });
+            }
+        }
+
+        const [jobResult] = await pool.query(`
+            INSERT INTO zoho_bulk_jobs (job_type, filter_criteria, update_fields, total_items, created_by)
+            VALUES ('item_update', ?, ?, ?, ?)
+        `, [
+            JSON.stringify({ mode: 'brand_category_reassign', item_count: items.length }),
+            JSON.stringify({ mode: 'per_item', source: 'reassign' }),
+            items.length,
+            req.user.id
+        ]);
+        const jobId = jobResult.insertId;
+
+        // Look up current item names for the bulk_job_items display field
+        const ids = items.map(i => i.zoho_item_id);
+        const [nameRows] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name FROM zoho_items_map WHERE zoho_item_id IN (${ids.map(() => '?').join(',')})`,
+            ids
+        );
+        const nameLookup = {};
+        nameRows.forEach(r => { nameLookup[r.zoho_item_id] = r.zoho_item_name; });
+
+        for (const it of items) {
+            const payload = {};
+            if (it.new_brand) payload.brand = it.new_brand;
+            if (it.new_category) payload.category_name = it.new_category;
+            await pool.query(`
+                INSERT INTO zoho_bulk_job_items (job_id, zoho_item_id, item_name, payload)
+                VALUES (?, ?, ?, ?)
+            `, [jobId, it.zoho_item_id, nameLookup[it.zoho_item_id] || '', JSON.stringify(payload)]);
+
+            // Update local DB immediately
+            const sets = [];
+            const vals = [];
+            if (it.new_brand) { sets.push('zoho_brand = ?'); vals.push(it.new_brand); }
+            if (it.new_category) { sets.push('zoho_category_name = ?'); vals.push(it.new_category); }
+            vals.push(it.zoho_item_id);
+            await pool.query(`UPDATE zoho_items_map SET ${sets.join(', ')} WHERE zoho_item_id = ?`, vals);
+        }
+
+        res.json({
+            success: true,
+            data: { job_id: jobId, total_items: items.length },
+            message: `Bulk reassign job #${jobId} created with ${items.length} items`
+        });
+    } catch (error) {
+        console.error('Reassign apply error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
  * GET /api/zoho/items/normalize/meta?brand=X
  * Returns distinct categories for the brand (for the category dropdown).
  */
