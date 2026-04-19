@@ -4244,6 +4244,189 @@ router.post('/items/parse-price-list', requirePermission('zoho', 'manage'), uplo
  * POST /api/zoho/items/apply-price-list - Apply parsed price list DPL values to items
  * Accepts array of { zoho_item_id, cf_dpl } to update in zoho_items_map
  */
+/**
+ * GET /api/zoho/items/normalize-scan?brand=X
+ * Scan all items of a brand, infer canonical SKU prefix from name, return proposed renames.
+ */
+router.get('/items/normalize-scan', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const brand = req.query.brand;
+        if (!brand) return res.status(400).json({ success: false, message: 'brand query param is required' });
+
+        const [rows] = await pool.query(
+            `SELECT zoho_item_id, zoho_item_name AS name, zoho_sku AS sku, zoho_brand AS brand, zoho_unit AS unit, zoho_cf_product_name AS cf_product_name
+             FROM zoho_items_map
+             WHERE zoho_status = 'active' AND zoho_brand = ?
+             ORDER BY zoho_item_name ASC`,
+            [brand]
+        );
+
+        const summary = { conformant: 0, needs_rename: 0, cannot_parse: 0 };
+        const results = [];
+
+        for (const row of rows) {
+            const nameUp = String(row.name || '').toUpperCase().trim();
+            const skuUp = String(row.sku || '').toUpperCase().trim();
+            const brandUp = String(row.brand || '').toUpperCase().trim();
+
+            // 1. Parse current SKU prefix (first token)
+            const currentStruct =
+                priceListParser.parseSkuStructure(skuUp) ||
+                priceListParser.parseSkuStructure(nameUp);
+
+            // 2. Infer pack code from the trailing pack-size in the name
+            let inferPack = null;
+            const packMatch = nameUp.match(/\b(\d{1,3}(?:\.\d+)?)\s*(ML|L|LT|LTR|LITRE|LITER|KG|GM?)\s*$/i);
+            if (packMatch) {
+                inferPack = priceListParser.packSizeToCode(packMatch[1] + packMatch[2]);
+            }
+
+            // 3. Infer base — "BASE N", "B N", or "WHITE"
+            let inferBase = null;
+            const bMatch = nameUp.match(/\bBASE\s*([1-9])\b|\bB([1-9])\b/);
+            if (bMatch) inferBase = bMatch[1] || bMatch[2];
+            else if (/\bWHITE\b|\bSUPER\s*WHITE\b/.test(nameUp)) inferBase = 'W';
+
+            // 4. Infer product abbreviation from remaining significant words
+            //    Strip: leading prefix (if looks like SKU), brand words, pack trailer, base markers
+            const brandTokens = new Set(brandUp.split(/\s+/).filter(w => w && w.length >= 2));
+            const stopWords = new Set(['THE', 'AND', 'OF', 'FOR', 'BASE', 'PAINT', 'PAINTS',
+                'EMULSION', 'WHITE', 'SUPER', 'DEEP', 'SHADE', 'LITRE', 'LITER']);
+            const unitWords = new Set(['L', 'LT', 'LTR', 'ML', 'KG', 'G', 'GM']);
+
+            let working = nameUp;
+            // Drop a leading prefix-looking token (letters+digits, 4-6 chars)
+            if (currentStruct) working = working.replace(/^[A-Z0-9]{4,8}\s+/, '');
+            // Drop trailing pack size
+            working = working.replace(/\b\d{1,3}(?:\.\d+)?\s*(ML|L|LT|LTR|LITRE|LITER|KG|GM?)\s*$/i, '');
+            // Drop base markers
+            working = working.replace(/\bBASE\s*[1-9]\b|\bB[1-9]\b/g, '');
+            // Drop standalone single-letter tokens & pure digits
+            const words = working
+                .replace(/[^A-Z ]/g, ' ')
+                .split(/\s+/)
+                .filter(w => w && w.length >= 2
+                    && !stopWords.has(w) && !brandTokens.has(w) && !unitWords.has(w));
+
+            let inferAbbrev = null;
+            if (words.length >= 1) {
+                inferAbbrev = words.slice(0, Math.min(3, words.length))
+                    .map(w => w[0]).join('');
+            }
+
+            // 5. Decide status + propose rename
+            let status = 'cannot_parse';
+            let proposedPrefix = null;
+            let proposedName = null;
+
+            const canProposeSku = inferAbbrev && inferPack;
+            if (canProposeSku) {
+                const baseDigit = inferBase === 'W' ? '' : (inferBase || '');
+                proposedPrefix = inferAbbrev + baseDigit + inferPack;
+
+                // Check if already conformant: SKU prefix equals proposal (fuzzy on abbrev)
+                if (currentStruct) {
+                    const ca = currentStruct.abbrev, cb = inferAbbrev;
+                    const abbrevOk = ca === cb || ca.startsWith(cb) || cb.startsWith(ca);
+                    const packOk = currentStruct.packCode === inferPack;
+                    const baseOk = !inferBase || !currentStruct.base ||
+                                    currentStruct.base === inferBase ||
+                                    (inferBase === 'W' && !currentStruct.base);
+                    if (abbrevOk && packOk && baseOk) {
+                        status = 'conformant';
+                    } else {
+                        status = 'needs_rename';
+                        // Name: replace existing prefix with proposal
+                        proposedName = proposedPrefix + ' ' + (row.name || '').replace(/^[A-Z0-9]{4,8}\s+/, '');
+                    }
+                } else {
+                    status = 'needs_rename';
+                    proposedName = proposedPrefix + ' ' + (row.name || '');
+                }
+            }
+
+            summary[status]++;
+            results.push({
+                zoho_item_id: row.zoho_item_id,
+                current_name: row.name,
+                current_sku: row.sku,
+                current_prefix: currentStruct ? currentStruct.raw : null,
+                inferred_abbrev: inferAbbrev,
+                inferred_base: inferBase,
+                inferred_pack: inferPack,
+                proposed_prefix: proposedPrefix,
+                proposed_name: proposedName,
+                status
+            });
+        }
+
+        res.json({
+            success: true,
+            brand,
+            total: rows.length,
+            summary,
+            items: results
+        });
+    } catch (error) {
+        console.error('Normalize scan error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * POST /api/zoho/items/normalize-apply
+ * Body: { items: [{ zoho_item_id, new_name, new_sku? }, ...] }
+ * Updates DB and pushes to Zoho.
+ */
+router.post('/items/normalize-apply', requirePermission('zoho', 'manage'), async (req, res) => {
+    try {
+        const { items } = req.body;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: 'items array required' });
+        }
+
+        let okCount = 0;
+        let failCount = 0;
+        const errors = [];
+
+        for (const it of items) {
+            if (!it.zoho_item_id || !it.new_name) { failCount++; continue; }
+            try {
+                // 1. Push to Zoho
+                const payload = { name: it.new_name };
+                if (it.new_sku) payload.sku = it.new_sku;
+                await zohoAPI.updateItem(it.zoho_item_id, payload);
+
+                // 2. Update local DB on Zoho success
+                if (it.new_sku) {
+                    await pool.query(
+                        `UPDATE zoho_items_map SET zoho_item_name = ?, zoho_sku = ? WHERE zoho_item_id = ?`,
+                        [it.new_name, it.new_sku, it.zoho_item_id]
+                    );
+                } else {
+                    await pool.query(
+                        `UPDATE zoho_items_map SET zoho_item_name = ? WHERE zoho_item_id = ?`,
+                        [it.new_name, it.zoho_item_id]
+                    );
+                }
+                okCount++;
+            } catch (err) {
+                failCount++;
+                errors.push({ zoho_item_id: it.zoho_item_id, error: err.message });
+            }
+        }
+
+        res.json({
+            success: true,
+            data: { total: items.length, success: okCount, fails: failCount, errors },
+            message: `Renamed ${okCount} of ${items.length} items`
+        });
+    } catch (error) {
+        console.error('Normalize apply error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 router.post('/items/apply-price-list', requirePermission('zoho', 'manage'), async (req, res) => {
     try {
         const { items } = req.body;

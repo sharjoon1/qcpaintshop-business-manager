@@ -1013,6 +1013,13 @@ module.exports = {
     parsePriceList,
     matchWithZohoItems,
     detectBrand,
+    // Helpers for SKU normalisation (reused by admin normalize-scan endpoint)
+    parseSkuStructure,
+    packSizeToCode,
+    extractProductAbbrev,
+    extractBase,
+    detectFinish,
+    normalizeBrand,
     // Export individual parsers for testing
     parseAsian,
     parseBirlaOpus,

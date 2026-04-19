@@ -192,6 +192,10 @@
                     </button>
                     <div id="colDropdown" class="col-toggle-dropdown hidden"></div>
                 </div>
+                <button onclick="openNormalizeModal()" class="qc-mobile-btn px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-xs font-semibold text-white flex items-center gap-1.5 transition shadow-sm" title="Scan a brand's items and propose canonical SKU-prefix renames">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Normalize Names
+                </button>
                 <a href="/admin-dpl.html" class="qc-mobile-btn px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-xs font-semibold text-white flex items-center gap-1.5 transition shadow-sm" title="Upload brand DPL/MRP PDF — AI matches + updates prices">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3-3m0 0l3 3m-3-3v12"></path></svg>
                     Import DPL / MRP
@@ -311,6 +315,85 @@
                 <svg class="w-3.5 h-3.5" id="pushIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
                 <span id="pushBtnText">Push Changes to Zoho</span>
             </button>
+        </div>
+    </div>
+
+    <!-- Normalize Names Modal -->
+    <div id="normOverlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:60;padding:16px;overflow-y:auto" onclick="if(event.target===this)closeNormalizeModal()">
+        <div style="background:white;border-radius:12px;max-width:1100px;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)" onclick="event.stopPropagation()">
+            <div style="padding:14px 18px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:white;border-radius:12px 12px 0 0">
+                <div>
+                    <h3 style="font-weight:700;font-size:1rem;margin:0">🔧 Normalize Item Names</h3>
+                    <p style="font-size:0.75rem;opacity:0.9;margin:2px 0 0">Scan a brand, review proposed SKU-prefix renames, push to Zoho</p>
+                </div>
+                <button onclick="closeNormalizeModal()" style="color:white;background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px">&times;</button>
+            </div>
+
+            <div style="padding:16px 18px">
+                <!-- Step 1: Brand picker -->
+                <div class="flex flex-col sm:flex-row gap-2 items-end mb-3">
+                    <div class="flex-1">
+                        <label class="text-xs font-semibold text-gray-600 block mb-1">Select Brand</label>
+                        <select id="normBrand" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">— Choose brand —</option>
+                        </select>
+                    </div>
+                    <button onclick="runNormalizeScan()" id="normScanBtn" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        Scan
+                    </button>
+                </div>
+
+                <!-- Summary -->
+                <div id="normSummary" class="hidden grid grid-cols-3 gap-2 mb-3"></div>
+
+                <!-- Results table -->
+                <div id="normResults" class="hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <div>
+                            <button onclick="selectAllNormRows(true)" class="text-xs text-indigo-600 hover:underline">Select all non-conformant</button>
+                            <span class="text-gray-300 mx-2">|</span>
+                            <button onclick="selectAllNormRows(false)" class="text-xs text-gray-500 hover:underline">Clear</button>
+                        </div>
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600">
+                            <input type="checkbox" id="normHideConformant" checked onchange="renderNormTable()">
+                            Hide conformant
+                        </label>
+                    </div>
+                    <div style="max-height:50vh;overflow:auto;border:1px solid #e5e7eb;border-radius:8px">
+                        <table class="w-full text-xs" id="normTable">
+                            <thead style="background:#f9fafb;position:sticky;top:0;z-index:1">
+                                <tr>
+                                    <th style="padding:8px;text-align:left">✓</th>
+                                    <th style="padding:8px;text-align:left">Current Name</th>
+                                    <th style="padding:8px;text-align:left">Current Prefix</th>
+                                    <th style="padding:8px;text-align:left">Proposed Prefix</th>
+                                    <th style="padding:8px;text-align:left">Proposed New Name</th>
+                                    <th style="padding:8px;text-align:left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="normTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Loading/empty states -->
+                <div id="normLoading" class="hidden text-center py-8">
+                    <svg class="inline w-6 h-6 animate-spin text-amber-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <p class="text-sm text-gray-500 mt-2" id="normLoadingText">Scanning...</p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div id="normFooter" class="hidden" style="padding:12px 18px;border-top:1px solid #e5e7eb;background:#f9fafb;display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:0 0 12px 12px">
+                <div class="text-xs text-gray-600">
+                    <span id="normSelectedCount">0</span> selected · will push to Zoho + update locally
+                </div>
+                <button onclick="applyNormalizeChanges()" id="normApplyBtn" disabled class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg text-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3-3m0 0l3 3m-3-3v12"/></svg>
+                    Apply & Push to Zoho
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1579,6 +1662,174 @@
     }
 
     // ============ AI CHAT SIDEBAR ============
+    // ============ NORMALIZE NAMES ============
+    var normItems = [];   // last scan results
+    var normBrand = '';
+
+    function openNormalizeModal() {
+        document.getElementById('normOverlay').classList.remove('hidden');
+        populateNormBrandList();
+    }
+    function closeNormalizeModal() {
+        document.getElementById('normOverlay').classList.add('hidden');
+    }
+
+    function populateNormBrandList() {
+        // Build distinct brand list from currently loaded items
+        var set = new Set();
+        items.forEach(function(it) {
+            var b = (it.brand || it.zoho_brand || '').trim();
+            if (b) set.add(b);
+        });
+        var sel = document.getElementById('normBrand');
+        var brands = Array.from(set).sort();
+        sel.innerHTML = '<option value="">— Choose brand —</option>' +
+            brands.map(function(b) { return '<option value="' + escapeHtml(b) + '">' + escapeHtml(b) + '</option>'; }).join('');
+    }
+
+    async function runNormalizeScan() {
+        var brand = document.getElementById('normBrand').value;
+        if (!brand) { showToast('Select a brand first', 'error'); return; }
+        normBrand = brand;
+
+        document.getElementById('normLoading').classList.remove('hidden');
+        document.getElementById('normLoadingText').textContent = 'Scanning ' + brand + ' items...';
+        document.getElementById('normResults').classList.add('hidden');
+        document.getElementById('normSummary').classList.add('hidden');
+        document.getElementById('normFooter').classList.add('hidden');
+
+        try {
+            var resp = await fetch('/api/zoho/items/normalize-scan?brand=' + encodeURIComponent(brand), { headers: getAuthHeaders() });
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message);
+
+            normItems = data.items || [];
+            renderNormSummary(data.summary, data.total);
+            renderNormTable();
+
+            document.getElementById('normResults').classList.remove('hidden');
+            document.getElementById('normSummary').classList.remove('hidden');
+            document.getElementById('normFooter').classList.remove('hidden');
+        } catch (err) {
+            showToast('Scan failed: ' + err.message, 'error');
+        } finally {
+            document.getElementById('normLoading').classList.add('hidden');
+        }
+    }
+
+    function renderNormSummary(s, total) {
+        var html = '';
+        html += '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;text-align:center">';
+        html += '<div style="font-size:1.25rem;font-weight:700;color:#15803d">' + (s.conformant || 0) + '</div>';
+        html += '<div style="font-size:0.7rem;color:#15803d;font-weight:600">✓ Conformant</div></div>';
+
+        html += '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;text-align:center">';
+        html += '<div style="font-size:1.25rem;font-weight:700;color:#b45309">' + (s.needs_rename || 0) + '</div>';
+        html += '<div style="font-size:0.7rem;color:#b45309;font-weight:600">⚠ Needs Rename</div></div>';
+
+        html += '<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px;text-align:center">';
+        html += '<div style="font-size:1.25rem;font-weight:700;color:#b91c1c">' + (s.cannot_parse || 0) + '</div>';
+        html += '<div style="font-size:0.7rem;color:#b91c1c;font-weight:600">❓ Cannot Parse</div></div>';
+
+        document.getElementById('normSummary').innerHTML = html;
+    }
+
+    function renderNormTable() {
+        var hideConformant = document.getElementById('normHideConformant').checked;
+        var statusBadge = {
+            conformant:   '<span style="background:#dcfce7;color:#15803d;padding:2px 6px;border-radius:4px;font-size:0.65rem;font-weight:700">✓ OK</span>',
+            needs_rename: '<span style="background:#fef3c7;color:#b45309;padding:2px 6px;border-radius:4px;font-size:0.65rem;font-weight:700">⚠ RENAME</span>',
+            cannot_parse: '<span style="background:#fecaca;color:#b91c1c;padding:2px 6px;border-radius:4px;font-size:0.65rem;font-weight:700">❓ CANT</span>'
+        };
+        var html = '';
+        normItems.forEach(function(it, idx) {
+            if (hideConformant && it.status === 'conformant') return;
+            var dis = it.status === 'cannot_parse';
+            html += '<tr style="border-top:1px solid #e5e7eb">';
+            html += '<td style="padding:6px 8px"><input type="checkbox" ' + (dis ? 'disabled' : '') + ' onchange="updateNormSelectedCount()" data-idx="' + idx + '" class="norm-cb"></td>';
+            html += '<td style="padding:6px 8px;max-width:260px"><div style="font-weight:600">' + escapeHtml(it.current_name || '') + '</div><div style="color:#9ca3af;font-size:0.65rem">' + escapeHtml(it.current_sku || '—') + '</div></td>';
+            html += '<td style="padding:6px 8px;font-family:monospace;color:#6366f1">' + escapeHtml(it.current_prefix || '—') + '</td>';
+            html += '<td style="padding:6px 8px;font-family:monospace;color:#d97706;font-weight:700">' + escapeHtml(it.proposed_prefix || '—') + '</td>';
+            html += '<td style="padding:6px 8px;max-width:300px">';
+            if (it.proposed_name) {
+                html += '<input type="text" value="' + escapeHtml(it.proposed_name) + '" onchange="normItems[' + idx + '].proposed_name=this.value" style="width:100%;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.7rem">';
+            } else {
+                html += '<span style="color:#9ca3af">—</span>';
+            }
+            html += '</td>';
+            html += '<td style="padding:6px 8px">' + (statusBadge[it.status] || it.status) + '</td>';
+            html += '</tr>';
+        });
+        if (!html) html = '<tr><td colspan="6" style="padding:24px;text-align:center;color:#9ca3af">No items match the current filter</td></tr>';
+        document.getElementById('normTableBody').innerHTML = html;
+        updateNormSelectedCount();
+    }
+
+    function selectAllNormRows(only_non_conformant) {
+        var boxes = document.querySelectorAll('.norm-cb:not(:disabled)');
+        boxes.forEach(function(b) {
+            if (only_non_conformant) {
+                var idx = parseInt(b.dataset.idx);
+                b.checked = normItems[idx] && normItems[idx].status === 'needs_rename';
+            } else {
+                b.checked = false;
+            }
+        });
+        updateNormSelectedCount();
+    }
+
+    function updateNormSelectedCount() {
+        var count = document.querySelectorAll('.norm-cb:checked').length;
+        document.getElementById('normSelectedCount').textContent = count;
+        document.getElementById('normApplyBtn').disabled = count === 0;
+    }
+
+    async function applyNormalizeChanges() {
+        var checked = Array.from(document.querySelectorAll('.norm-cb:checked'));
+        if (!checked.length) return;
+        if (!confirm('Rename ' + checked.length + ' item(s) and push to Zoho? This updates the item name in your database and in Zoho Inventory.')) return;
+
+        var payload = checked.map(function(b) {
+            var idx = parseInt(b.dataset.idx);
+            var it = normItems[idx];
+            return {
+                zoho_item_id: it.zoho_item_id,
+                new_name: it.proposed_name,
+                new_sku: it.proposed_prefix ? it.proposed_prefix + (it.current_sku && it.current_sku.replace(/^[A-Z0-9]{4,8}\s*/, ' ')) : null
+            };
+        });
+
+        // Simpler: send new_name only — Zoho item name is the primary ID we show
+        var simple = checked.map(function(b) {
+            var idx = parseInt(b.dataset.idx);
+            var it = normItems[idx];
+            return { zoho_item_id: it.zoho_item_id, new_name: it.proposed_name };
+        });
+
+        document.getElementById('normApplyBtn').disabled = true;
+        document.getElementById('normLoading').classList.remove('hidden');
+        document.getElementById('normLoadingText').textContent = 'Applying ' + simple.length + ' renames — pushing to Zoho...';
+
+        try {
+            var resp = await fetch('/api/zoho/items/normalize-apply', {
+                method: 'POST',
+                headers: Object.assign({'Content-Type':'application/json'}, getAuthHeaders()),
+                body: JSON.stringify({ items: simple })
+            });
+            var data = await resp.json();
+            if (!data.success) throw new Error(data.message);
+            var r = data.data || {};
+            showToast('Renamed ' + r.success + ' of ' + r.total + ' items' + (r.fails ? ' (' + r.fails + ' failed)' : ''), r.fails ? 'info' : 'success');
+            closeNormalizeModal();
+            loadItems(); // refresh main table
+        } catch (err) {
+            showToast('Apply failed: ' + err.message, 'error');
+        } finally {
+            document.getElementById('normLoading').classList.add('hidden');
+            updateNormSelectedCount();
+        }
+    }
+
     // ============ INIT ============
     document.addEventListener('DOMContentLoaded', function() { loadItems(); updateAiScope(); });
     window.addEventListener('beforeunload', function(e) { if(getDirtyItemCount()>0){e.preventDefault();e.returnValue='';} });
