@@ -4470,7 +4470,7 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
  * GET /api/zoho/items/filter-options
  * Returns all distinct brands + categories for dropdown filters on the items-edit page.
  */
-router.get('/items/filter-options', requirePermission('zoho', 'view'), async (req, res) => {
+router.get('/items/filters/list', requirePermission('zoho', 'view'), async (req, res) => {
     try {
         const [brands] = await pool.query(`
             SELECT DISTINCT zoho_brand AS name, COUNT(*) AS n FROM zoho_items_map

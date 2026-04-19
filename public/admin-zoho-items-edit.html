@@ -2254,7 +2254,7 @@
     // ============ INIT ============
     async function loadFilterOptions() {
         try {
-            var resp = await fetch('/api/zoho/items/filter-options', { headers: getAuthHeaders() });
+            var resp = await fetch('/api/zoho/items/filters/list', { headers: getAuthHeaders() });
             var data = await resp.json();
             if (!data.success) return;
             var bsel = document.getElementById('brandFilter');
