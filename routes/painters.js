@@ -1874,7 +1874,24 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                     INNER JOIN zoho_items_map z2 ON z2.zoho_item_id = ps2.zoho_item_id
                     WHERE ps2.product_id = p.id AND ps2.is_active = 1 AND z2.image_url IS NOT NULL
                     LIMIT 1) as image_url,
-                   MAX(ppr.regular_points_per_unit) as points_per_unit
+                   MAX(ppr.regular_points_per_unit) as points_per_unit,
+                   (SELECT CAST(zim3.zoho_label_rate AS DECIMAL(10,2))
+                    FROM pack_sizes ps3
+                    INNER JOIN zoho_items_map zim3 ON zim3.zoho_item_id = ps3.zoho_item_id
+                    LEFT JOIN painter_product_point_rates ppr3
+                        ON ppr3.item_id = zim3.zoho_item_id COLLATE utf8mb4_unicode_ci
+                    WHERE ps3.product_id = p.id AND ps3.is_active = 1
+                    ORDER BY ppr3.regular_points_per_unit DESC, zim3.zoho_label_rate DESC
+                    LIMIT 1) as mrp,
+                   (SELECT ppr4.regular_points_per_unit * COALESCE(ppr4.annual_pct, 0) / 100
+                    FROM pack_sizes ps4
+                    INNER JOIN zoho_items_map zim4 ON zim4.zoho_item_id = ps4.zoho_item_id
+                    INNER JOIN painter_product_point_rates ppr4
+                        ON ppr4.item_id = zim4.zoho_item_id COLLATE utf8mb4_unicode_ci
+                    WHERE ps4.product_id = p.id AND ps4.is_active = 1
+                        AND ppr4.annual_eligible = 1 AND ppr4.annual_pct > 0
+                    ORDER BY ppr4.regular_points_per_unit DESC
+                    LIMIT 1) as annual_points
             FROM products p
             INNER JOIN pack_sizes ps ON ps.product_id = p.id AND ps.is_active = 1
             INNER JOIN zoho_items_map zim ON zim.zoho_item_id = ps.zoho_item_id
@@ -1897,7 +1914,9 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                 ...p,
                 min_rate: p.min_rate ? parseFloat(p.min_rate) : null,
                 max_rate: p.max_rate ? parseFloat(p.max_rate) : null,
-                points_per_unit: p.points_per_unit ? parseFloat(p.points_per_unit) : null
+                points_per_unit: p.points_per_unit ? parseFloat(p.points_per_unit) : null,
+                mrp: p.mrp ? parseFloat(p.mrp) : null,
+                annual_points: p.annual_points ? Math.round(parseFloat(p.annual_points) * 100) / 100 : null
             })),
             offers: offers.map(o => ({
                 id: o.id,
