@@ -4391,7 +4391,6 @@ router.get('/items/normalize/scan', requirePermission('zoho', 'manage'), async (
             success: true,
             brand,
             category: category || null,
-            code: userCode || null,
             has_bases: hasBases,
             total: rows.length,
             summary,
