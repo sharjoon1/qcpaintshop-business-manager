@@ -433,16 +433,18 @@
                             </div>
                             <div class="form-group">
                                 <label>Offer Type</label>
-                                <select id="offerType" class="w-full">
-                                    <option value="multiplier">Points Multiplier (e.g., 2x)</option>
-                                    <option value="bonus_points">Bonus Points</option>
+                                <select id="offerType" class="w-full" onchange="onOfferTypeChange()">
+                                    <option value="bonus_pct">Bonus % of Rate (recommended — scales with pack size)</option>
+                                    <option value="multiplier">Points Multiplier (e.g., 2x regular)</option>
+                                    <option value="bonus_points">Flat Bonus Points</option>
                                     <option value="discount">Discount</option>
                                     <option value="free_product">Free Product</option>
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Multiplier / Bonus Value</label>
-                                <input type="number" id="offerValue" step="0.01" value="2.00" class="w-full">
+                                <label id="offerValueLabel">Bonus % of Rate</label>
+                                <input type="number" id="offerValue" step="0.01" value="5.00" class="w-full">
+                                <div id="offerValueHint" class="text-xs text-gray-500 mt-1">Painter earns rate × this % as offer points per unit. Example: 5% on ₹5,809 = 290 pts.</div>
                             </div>
                             <div class="form-group">
                                 <label>Applies To</label>
@@ -2840,8 +2842,12 @@
         formData.append('description', document.getElementById('offerDesc').value.trim());
         formData.append('description_ta', document.getElementById('offerDescTa').value.trim());
         formData.append('offer_type', offerType);
-        if (offerType === 'multiplier') formData.append('multiplier_value', offerVal);
-        else formData.append('bonus_points', offerVal);
+        // multiplier_value column is reused for bonus_pct (% of rate) too
+        if (offerType === 'multiplier' || offerType === 'bonus_pct') {
+            formData.append('multiplier_value', offerVal);
+        } else {
+            formData.append('bonus_points', offerVal);
+        }
         formData.append('applies_to', document.getElementById('offerAppliesTo').value);
         formData.append('target_id', document.getElementById('offerTarget').value.trim());
         formData.append('start_date', document.getElementById('offerStart').value);
@@ -2877,11 +2883,12 @@
         document.getElementById('offerTitleTa').value = offer.title_ta || '';
         document.getElementById('offerDesc').value = offer.description || '';
         document.getElementById('offerDescTa').value = offer.description_ta || '';
-        document.getElementById('offerType').value = offer.offer_type || 'multiplier';
-        document.getElementById('offerValue').value = offer.multiplier_value || offer.bonus_points || 2;
+        document.getElementById('offerType').value = offer.offer_type || 'bonus_pct';
+        document.getElementById('offerValue').value = offer.multiplier_value || offer.bonus_points || 5;
         document.getElementById('offerAppliesTo').value = offer.applies_to || 'all';
         document.getElementById('offerStart').value = offer.start_date ? offer.start_date.substring(0, 10) : '';
         document.getElementById('offerEnd').value = offer.end_date ? offer.end_date.substring(0, 10) : '';
+        onOfferTypeChange();
         toggleOfferTarget(offer.target_id);
         document.getElementById('offerFormTitle').textContent = 'Edit Offer';
         document.getElementById('offerSubmitBtn').textContent = 'Update Offer';
@@ -2912,6 +2919,24 @@
             if (!data.success) throw new Error(data.message);
             loadOffers();
         } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    function onOfferTypeChange() {
+        const type = document.getElementById('offerType').value;
+        const lbl = document.getElementById('offerValueLabel');
+        const hint = document.getElementById('offerValueHint');
+        const defaults = {
+            bonus_pct:    { label: 'Bonus % of Rate',       hint: 'Painter earns rate × this % as offer points. Example: 5% on ₹5,809 = 290 pts.', def: 5 },
+            multiplier:   { label: 'Multiplier (e.g. 2)',   hint: 'Multiplies painter\'s regular points. Example: 2x on 900 reg pts = 1800 pts.',      def: 2 },
+            bonus_points: { label: 'Flat Bonus Points',     hint: 'Same pts added regardless of pack size. Use sparingly.',                            def: 100 },
+            discount:     { label: 'Discount Value',        hint: '',                                                                                  def: 10 },
+            free_product: { label: 'Bonus Quantity',        hint: '',                                                                                  def: 1 },
+        };
+        const cfg = defaults[type] || defaults.bonus_pct;
+        lbl.textContent = cfg.label;
+        hint.textContent = cfg.hint;
+        const valEl = document.getElementById('offerValue');
+        if (!valEl.value || parseFloat(valEl.value) === 0) valEl.value = cfg.def;
     }
 
     async function toggleOfferTarget(preserveValue) {
