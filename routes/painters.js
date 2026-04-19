@@ -1085,9 +1085,10 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             const showPrices = billing_type === 'self';
             const baseReg = row.regular_points ? parseFloat(row.regular_points) : null;
             const regularPts = baseReg != null ? baseReg + (ov.bonusPts || 0) : null;
-            const annualPts = (regularPts && row.annual_eligible && row.annual_pct) ? Math.round(regularPts * parseFloat(row.annual_pct) / 100 * 100) / 100 : null;
             const baseRate = parseFloat(row.zoho_rate || row.base_price || 0);
             const adjRate = applyOverrideToRate(baseRate, ov.discountPct);
+            // Annual = effective rate × annual_pct / 100 (matches points-engine line-total formula)
+            const annualPts = (adjRate > 0 && row.annual_eligible && row.annual_pct) ? Math.round(adjRate * parseFloat(row.annual_pct) / 100 * 100) / 100 : null;
             productMap[row.id].pack_sizes.push({
                 pack_size_id: row.pack_size_id,
                 size: String(parseFloat(row.size) || row.size || ''),
@@ -1714,10 +1715,11 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                 const ov = resolveOverride(v.zoho_item_id, meta.brand, meta.category);
                 const baseReg = v.regular_points ? parseFloat(v.regular_points) : null;
                 const reg = baseReg != null ? baseReg + (ov.bonusPts || 0) : null;
-                const annualPts = (reg && v.annual_eligible && v.annual_pct)
-                    ? Math.round(reg * parseFloat(v.annual_pct) / 100 * 100) / 100
-                    : null;
                 const rate = applyOverrideToRate(parseFloat(v.rate || 0), ov.discountPct);
+                // Annual = rate × annual_pct / 100 (per unit)
+                const annualPts = (rate > 0 && v.annual_eligible && v.annual_pct)
+                    ? Math.round(rate * parseFloat(v.annual_pct) / 100 * 100) / 100
+                    : null;
                 bySize[v.product_id].push({
                     pack_size_id: v.pack_size_id,
                     size: String(parseFloat(v.size) || v.size || ''),
@@ -1790,9 +1792,10 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
         // Stock from zoho_location_stock (sum across all branches)
         const [variants] = await pool.query(`
             SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
+                   ps.id as pack_size_id,
                    ps.size as pack_size, ps.unit as pack_unit,
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
-                   zim.zoho_rate as rate,
+                   zim.zoho_rate as rate, zim.zoho_label_rate as mrp,
                    COALESCE((SELECT SUM(zls.stock_on_hand) FROM zoho_location_stock zls
                     WHERE zls.zoho_item_id = zim.zoho_item_id), 0) as stock,
                    zim.image_url,
@@ -1821,15 +1824,18 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
             const ov = resolveOverride(v.item_id, brand, category);
             const baseReg = v.points_per_unit ? parseFloat(v.points_per_unit) : 0;
             const regularPts = baseReg + (ov.bonusPts || 0);
-            const annualPts = (regularPts && v.annual_eligible && v.annual_pct)
-                ? Math.round(regularPts * parseFloat(v.annual_pct) / 100 * 100) / 100
-                : 0;
             const rate = applyOverrideToRate(parseFloat(v.rate || 0), ov.discountPct);
+            // Annual = rate × annual_pct / 100 (per unit)
+            const annualPts = (rate > 0 && v.annual_eligible && v.annual_pct)
+                ? Math.round(rate * parseFloat(v.annual_pct) / 100 * 100) / 100
+                : 0;
             return {
                 id: v.item_id,
+                pack_size_id: v.pack_size_id,
                 size: String(parseFloat(v.pack_size) || v.pack_size || ''),
                 unit: v.pack_unit || '',
                 rate,
+                mrp: parseFloat(v.mrp || v.rate || 0),
                 stock: parseFloat(v.stock || 0),
                 regular_points: regularPts,
                 annual_points: annualPts,
@@ -1958,14 +1964,14 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                     WHERE ps3.product_id = p.id AND ps3.is_active = 1
                     ORDER BY ppr3.regular_points_per_unit DESC, zim3.zoho_label_rate DESC
                     LIMIT 1) as mrp,
-                   (SELECT ppr4.regular_points_per_unit * COALESCE(ppr4.annual_pct, 0) / 100
+                   (SELECT CAST(zim4.zoho_rate AS DECIMAL(10,2)) * COALESCE(ppr4.annual_pct, 0) / 100
                     FROM pack_sizes ps4
                     INNER JOIN zoho_items_map zim4 ON zim4.zoho_item_id = ps4.zoho_item_id
                     INNER JOIN painter_product_point_rates ppr4
                         ON ppr4.item_id = zim4.zoho_item_id COLLATE utf8mb4_unicode_ci
                     WHERE ps4.product_id = p.id AND ps4.is_active = 1
                         AND ppr4.annual_eligible = 1 AND ppr4.annual_pct > 0
-                    ORDER BY ppr4.regular_points_per_unit DESC
+                    ORDER BY CAST(ps4.size AS DECIMAL(10,2)) DESC
                     LIMIT 1) as annual_points,
                    (SELECT CAST(zim5.zoho_rate AS DECIMAL(10,2)) FROM pack_sizes ps5
                     INNER JOIN zoho_items_map zim5 ON zim5.zoho_item_id = ps5.zoho_item_id
@@ -1986,8 +1992,23 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
             LIMIT 100
         `, extraParams);
 
-        // Unique brands
-        const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
+        // Unique brands, ordered by admin-configured list (fallback alphabetical for unknowns)
+        const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))];
+        let brands = uniqueBrands.sort();
+        try {
+            const [[cfg]] = await pool.query(
+                "SELECT config_value FROM ai_config WHERE config_key = 'painter_offer_brand_order'"
+            );
+            if (cfg?.config_value) {
+                const ordered = JSON.parse(cfg.config_value);
+                if (Array.isArray(ordered)) {
+                    const setOrdered = new Set(ordered);
+                    const inOrder = ordered.filter(b => uniqueBrands.includes(b));
+                    const rest = uniqueBrands.filter(b => !setOrdered.has(b)).sort();
+                    brands = [...inOrder, ...rest];
+                }
+            }
+        } catch (_) { /* ignore parse errors, keep alphabetical */ }
 
         // Apply painter-specific overrides (discount % on rate, bonus on regular points)
         const resolveOverride = await getPainterOverrideResolver(req.painter?.id);
@@ -1999,15 +2020,16 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                 const ov = resolveOverride(null, p.brand, p.category);
                 const baseRegular = p.points_per_unit ? parseFloat(p.points_per_unit) : 0;
                 const adjustedRegular = baseRegular + (ov.bonusPts || 0);
-                // Annual recompute: we preserved raw annual_points from biggest variant earlier.
-                // If a bonus is added, scale annual by same ratio.
+                const rawMaxRate = p.max_variant_rate ? parseFloat(p.max_variant_rate) : 0;
+                const maxVRate = rawMaxRate ? applyOverrideToRate(rawMaxRate, ov.discountPct) : null;
+                // Annual scales linearly with rate (formula = rate × annual_pct / 100).
+                // SQL returned raw annual (base rate × annual_pct/100). After discount, scale by rate ratio.
                 const rawAnnual = p.annual_points ? parseFloat(p.annual_points) : 0;
-                const adjustedAnnual = baseRegular > 0
-                    ? Math.round(rawAnnual * (adjustedRegular / baseRegular) * 100) / 100
+                const adjustedAnnual = rawMaxRate > 0 && maxVRate
+                    ? Math.round(rawAnnual * (maxVRate / rawMaxRate) * 100) / 100
                     : rawAnnual;
                 const minRate = p.min_rate ? applyOverrideToRate(p.min_rate, ov.discountPct) : null;
                 const maxRate = p.max_rate ? applyOverrideToRate(p.max_rate, ov.discountPct) : null;
-                const maxVRate = p.max_variant_rate ? applyOverrideToRate(p.max_variant_rate, ov.discountPct) : null;
                 return {
                     ...p,
                     min_rate: minRate,
@@ -2016,7 +2038,11 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
                     mrp: p.mrp ? parseFloat(p.mrp) : null,
                     annual_points: adjustedAnnual > 0 ? adjustedAnnual : null,
                     max_variant_rate: maxVRate,
-                    max_variant_size: p.max_variant_size ? String(p.max_variant_size).trim() : null
+                    max_variant_size: p.max_variant_size ? String(p.max_variant_size).trim() : null,
+                    // Per-unit self-bill total = annual + offer. Customer-bill total = regular + annual + offer.
+                    // We return the components; client computes both totals.
+                    max_variant_regular: adjustedRegular > 0 ? adjustedRegular : null,
+                    max_variant_annual: adjustedAnnual > 0 ? adjustedAnnual : null
                 };
             }),
             offers: offers.map(o => ({
@@ -2458,6 +2484,53 @@ router.delete('/custom-rates/:id', requirePermission('painters', 'manage'), asyn
     } catch (error) {
         console.error('Delete custom-rate error:', error);
         res.status(500).json({ success: false, message: 'Failed to delete override' });
+    }
+});
+
+// --- OFFER CAROUSEL BRAND ORDER (admin) ---
+
+router.get('/offer-carousel-order', requireAuth, async (req, res) => {
+    try {
+        const [[cfg]] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'painter_offer_brand_order'"
+        );
+        let order = [];
+        try { order = cfg?.config_value ? JSON.parse(cfg.config_value) : []; } catch (_) { order = []; }
+
+        // Also return all available brands (from active pack sizes) for admin picker
+        const [rows] = await pool.query(`
+            SELECT DISTINCT zoho_brand AS brand
+            FROM zoho_items_map
+            WHERE zoho_brand IS NOT NULL AND zoho_brand <> ''
+            ORDER BY zoho_brand ASC
+        `);
+        res.json({
+            success: true,
+            order,
+            all_brands: rows.map(r => r.brand)
+        });
+    } catch (error) {
+        console.error('Get brand order error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load brand order' });
+    }
+});
+
+router.put('/offer-carousel-order', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { order } = req.body;
+        if (!Array.isArray(order)) {
+            return res.status(400).json({ success: false, message: 'order must be an array of brand names' });
+        }
+        const value = JSON.stringify(order);
+        await pool.query(`
+            INSERT INTO ai_config (config_key, config_value)
+            VALUES ('painter_offer_brand_order', ?)
+            ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)
+        `, [value]);
+        res.json({ success: true, message: 'Brand order saved' });
+    } catch (error) {
+        console.error('Save brand order error:', error);
+        res.status(500).json({ success: false, message: 'Failed to save brand order' });
     }
 });
 

@@ -480,6 +480,25 @@
                     </form>
                 </div>
 
+                <!-- Offer Carousel Brand Order -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+                    <h3 class="text-lg font-semibold mb-2">Offer Carousel Brand Order</h3>
+                    <p class="text-sm text-gray-600 mb-3">Set which brands appear first in the painter app's offer carousel. Brands not listed here fall back to alphabetical.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-sm font-medium">Ordered brands <span class="text-xs text-gray-500">(top → bottom = first → last)</span></label>
+                            <div id="brandOrderList" class="border border-gray-300 rounded-lg p-2 min-h-[120px] bg-gray-50 space-y-1 mt-1"></div>
+                            <div class="mt-2 flex gap-2 items-center">
+                                <select id="brandOrderPicker" class="flex-1 px-2 py-1 border rounded-lg text-sm"></select>
+                                <button type="button" onclick="addBrandToOrder()" class="btn-sm btn-outline">Add</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-col justify-end">
+                            <button type="button" onclick="saveBrandOrder()" class="btn-sm btn-primary">Save Brand Order</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Offers List Table -->
                 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <div class="p-4 border-b"><h3 class="font-semibold">All Offers</h3></div>
@@ -2710,6 +2729,74 @@
         } catch (err) {
             document.getElementById('offersTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">${esc(err.message)}</td></tr>`;
         }
+        loadBrandOrder();
+    }
+
+    let brandOrderCurrent = [];
+    let brandOrderAll = [];
+
+    async function loadBrandOrder() {
+        try {
+            const res = await fetch(`${API}/offer-carousel-order`, { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) return;
+            brandOrderCurrent = data.order || [];
+            brandOrderAll = data.all_brands || [];
+            renderBrandOrder();
+        } catch (_) {}
+    }
+
+    function renderBrandOrder() {
+        const list = document.getElementById('brandOrderList');
+        const picker = document.getElementById('brandOrderPicker');
+        if (!list || !picker) return;
+        list.innerHTML = brandOrderCurrent.length
+            ? brandOrderCurrent.map((b, i) => `
+                <div class="flex items-center gap-1 bg-white border rounded px-2 py-1">
+                    <span class="flex-1 text-sm">${i + 1}. ${escHtml(b)}</span>
+                    <button type="button" onclick="moveBrand(${i}, -1)" class="text-xs px-1" title="Move up">▲</button>
+                    <button type="button" onclick="moveBrand(${i}, 1)" class="text-xs px-1" title="Move down">▼</button>
+                    <button type="button" onclick="removeBrand(${i})" class="text-xs px-1 text-red-600" title="Remove">✕</button>
+                </div>
+            `).join('')
+            : '<div class="text-xs text-gray-400 p-2">No custom order — alphabetical fallback</div>';
+        const unused = brandOrderAll.filter(b => !brandOrderCurrent.includes(b));
+        picker.innerHTML = '<option value="">— Pick brand to add —</option>' +
+            unused.map(b => `<option value="${escAttr(b)}">${escHtml(b)}</option>`).join('');
+    }
+
+    function addBrandToOrder() {
+        const picker = document.getElementById('brandOrderPicker');
+        const val = picker.value;
+        if (!val) return;
+        if (!brandOrderCurrent.includes(val)) brandOrderCurrent.push(val);
+        renderBrandOrder();
+    }
+
+    function moveBrand(idx, delta) {
+        const to = idx + delta;
+        if (to < 0 || to >= brandOrderCurrent.length) return;
+        const [item] = brandOrderCurrent.splice(idx, 1);
+        brandOrderCurrent.splice(to, 0, item);
+        renderBrandOrder();
+    }
+
+    function removeBrand(idx) {
+        brandOrderCurrent.splice(idx, 1);
+        renderBrandOrder();
+    }
+
+    async function saveBrandOrder() {
+        try {
+            const res = await fetch(`${API}/offer-carousel-order`, {
+                method: 'PUT',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order: brandOrderCurrent })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            alert('Brand order saved. Painter app will pick it up on next load.');
+        } catch (err) { alert('Error: ' + err.message); }
     }
 
     function renderOffersTable(offers) {
