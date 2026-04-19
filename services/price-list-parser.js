@@ -184,7 +184,8 @@ function parseBirlaOpus(text) {
 
         // Data line: "9900 - White PE White   490  1,930  4,783  9,478"
         // Or: "9901 - Pastel PE 1 104  484  1,902  4,740  9,390"
-        const dataMatch = line.match(/^(\d{4})\s*-\s*(.+?)\s+(PE[A-Z]*|DE|PR|SH|EX|OT|FL|WP|WD|UC|DN|VE|SE|CE|ME|HC|HB|GP|PG|PL|SP|DS|AC|TE|EP|SG|SM|GT|ST|PU|MR|AR|BR|IR|ER|CR|LR|OR)\s*(.+)$/);
+        // Or (other products): "9900 - White SDB White 490 1,930..." — allow any 2-5 uppercase code.
+        const dataMatch = line.match(/^(\d{4})\s*-\s*(.+?)\s+([A-Z]{2,5})\s+(.+)$/);
         // Skip data rows that belong to an "Annexure" section — these contain
         // colorant/tint prices which are not the main 1L/4L/10L/20L SKU prices.
         const isAnnexureSection = /^ANNEXURE\b/i.test(currentProduct);
@@ -716,6 +717,49 @@ function parseSkuStructure(skuOrName) {
     return null;
 }
 
+// Clean a Zoho item name: strip the leading SKU-like token, brand noise, pack numerals,
+// and unit tokens — leaving just the product name words for abbrev extraction.
+// "OP05 STYLE SUPER BRIGHT DISTEMPER BIRLA OPUS 05 L" → "STYLE SUPER BRIGHT DISTEMPER"
+// "OP01 ODE99 ONE DREAM EFFECT 01 L" → "ONE DREAM EFFECT"
+function cleanZohoName(name) {
+    const noiseWords = new Set([
+        'BIRLA', 'OPUS', 'ASIAN', 'PAINTS', 'PAINT', 'BERGER', 'NIPPON',
+        'GEM', 'ASTRAL', 'JSW', 'LIMITED', 'LTD', 'PRIVATE', 'PVT', 'L', 'ML', 'KG', 'GM', 'NO'
+    ]);
+    const tokens = String(name || '').toUpperCase().trim().split(/\s+/);
+    const kept = [];
+    for (let i = 0; i < tokens.length; i++) {
+        const tok = tokens[i];
+        // Drop up to first 2 leading SKU-like tokens (e.g., "OP05" or "OP01 ODE99")
+        if (kept.length === 0 && i < 2 && /^[A-Z]{1,4}\d{1,5}[A-Z]*$/.test(tok)) continue;
+        if (noiseWords.has(tok)) continue;
+        if (/^\d+(?:\.\d+)?$/.test(tok)) continue;         // pure numeric (pack sizes)
+        if (/^\d+ML$/.test(tok)) continue;                  // "200ML"
+        if (/^\d+L$/.test(tok)) continue;                   // "5L"
+        if (/^\d+KG$/.test(tok)) continue;                  // "20KG"
+        kept.push(tok);
+    }
+    return kept.join(' ');
+}
+
+// Extract a pack code from a Zoho item: try SKU parse first, then look for size tokens in name.
+function extractZohoPackCode(zi) {
+    const skuText = (zi.sku || zi.zoho_sku || '').toUpperCase();
+    const nameText = (zi.name || zi.zoho_item_name || '').toUpperCase();
+    // Try parsing all space-separated tokens of SKU+name
+    const allTokens = (skuText + ' ' + nameText).split(/\s+/);
+    for (const tok of allTokens) {
+        const s = parseSkuStructure(tok);
+        if (s && s.packCode) return s.packCode;
+    }
+    // Fallback: find explicit size in name: "... 200 ML", "... 10 L", "... 01 L"
+    const mlMatch = nameText.match(/\b(\d{2,4})\s*ML\b/);
+    if (mlMatch) return packSizeToCode(mlMatch[1] + 'ml');
+    const lMatch = nameText.match(/\b(\d{1,2}(?:\.\d+)?)\s*L\b/);
+    if (lMatch) return packSizeToCode(lMatch[1] + 'L');
+    return null;
+}
+
 // Convert a pack code like "01", "04", "20", "10M" to ml value for sorting/compare.
 // packSizeToCode encodes ml as substr(0,2)+"M" (200ml→"20M", 100ml→"10M"). Reverse: ×10.
 function packCodeToMl(pc) {
@@ -847,6 +891,23 @@ function matchWithZohoItems(parsedItems, zohoItems) {
     }
 
     // ============ GROUP EXPANSION (Birla Opus style parsers emit _prices arrays) ============
+    // Pre-build a Zoho family index keyed by PRODUCT NAME abbrev (exact). This is more
+    // reliable than SKU-first-token parsing because some Zoho SKUs have brand prefixes
+    // like "OP01" that collide across unrelated product families.
+    const zohoFamilyIndex = new Map();  // abbrev → Array<{ zi, packCode, rate, name, finish }>
+    for (const zi of scopedZoho) {
+        const nameText = (zi.name || zi.zoho_item_name || '').toUpperCase();
+        const cleaned = cleanZohoName(nameText);
+        const abbr = extractProductAbbrev(cleaned);
+        if (!abbr) continue;
+        const packCode = extractZohoPackCode(zi);
+        if (!packCode) continue;
+        const rate = parseFloat(zi.rate || 0);
+        const finish = detectFinish(nameText);
+        if (!zohoFamilyIndex.has(abbr)) zohoFamilyIndex.set(abbr, []);
+        zohoFamilyIndex.get(abbr).push({ zi, packCode, rate, name: nameText, finish });
+    }
+
     // For rows where we have multiple prices but unknown column alignment, use Zoho's
     // actual rates as ground truth. Assign each parsed price to the Zoho family member
     // whose rate is closest by ratio.
@@ -854,22 +915,13 @@ function matchWithZohoItems(parsedItems, zohoItems) {
     for (const p of parsedItems) {
         if (Array.isArray(p._prices) && p._prices.length > 0) {
             const abbrev = extractProductAbbrev(p.product);
-            const base = extractBase(p.product, p.baseCode);
             const pdfFinish = detectFinish(p.product);
-            // Find Zoho family members: same brand scope + same abbrev (strict) + same base
+            // Exact abbrev lookup in family index
+            const candidates = abbrev ? (zohoFamilyIndex.get(abbrev) || []) : [];
             const family = [];
-            for (const zi of scopedZoho) {
-                const skuText = (zi.sku || zi.zoho_sku || '').toUpperCase();
-                const nameText = (zi.name || zi.zoho_item_name || '').toUpperCase();
-                const struct = parseSkuStructure(skuText) || parseSkuStructure(nameText);
-                if (!struct || !abbrev) continue;
-                const a = struct.abbrev, b = abbrev;
-                const abbrevMatch = a === b || a.startsWith(b) || b.startsWith(a);
-                if (!abbrevMatch) continue;
-                if (base && struct.base && base !== struct.base) continue;
-                const ziFinish = detectFinish(nameText);
-                if (pdfFinish && ziFinish && pdfFinish !== ziFinish) continue;
-                family.push({ zi, struct, rate: parseFloat(zi.rate || 0) });
+            for (const ent of candidates) {
+                if (pdfFinish && ent.finish && pdfFinish !== ent.finish) continue;
+                family.push({ zi: ent.zi, struct: { packCode: ent.packCode }, rate: ent.rate });
             }
             if (family.length === 0) {
                 unmatched.push({
