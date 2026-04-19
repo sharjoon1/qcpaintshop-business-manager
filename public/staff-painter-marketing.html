@@ -116,56 +116,71 @@
 
     function openOutcome(leadId) {
         closeModal();
-        const el = document.createElement('div');
-        el.id = 'outcomeModal';
-        el.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;justify-content:center;z-index:99999';
-        el.onclick = function(e){ if(e.target===el) closeModal(); };
-        el.innerHTML = `
-            <div style="background:white;border-radius:1rem 1rem 0 0;width:100%;max-width:28rem;display:flex;flex-direction:column;overflow:hidden;margin-bottom:68px">
-                <div style="overflow-y:auto;padding:1rem;flex:1;min-height:0;max-height:60vh">
-                    <h3 style="font-weight:700;font-size:1rem;margin-bottom:0.75rem;color:#0D3D23">Log Outcome</h3>
-                    <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Channel</label>
-                    <select id="ch" onchange="toggleCallFields()" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem">
-                        <option value="call">Call</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="visit">Visited Shop</option>
-                    </select>
-                    <div id="callFields">
-                        <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Call Status</label>
-                        <select id="cs" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem">
-                            <option value="">—</option>
-                            <option value="connected">Connected</option>
-                            <option value="not_answered">Not Answered</option>
-                            <option value="wrong_number">Wrong Number</option>
-                            <option value="switched_off">Switched Off</option>
-                            <option value="busy">Busy</option>
-                        </select>
-                    </div>
-                    <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Outcome</label>
-                    <select id="oc" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem">
+
+        // Measure nav bar so we can position sheet exactly above it
+        const navEl = document.querySelector('.qc-mobile-quickbar');
+        const navH = navEl ? Math.round(navEl.getBoundingClientRect().height) : 0;
+        const sheetMaxH = Math.round(window.innerHeight * 0.75) - navH;
+
+        // Dim overlay — stops at top of nav bar so no z-index fight needed
+        const overlay = document.createElement('div');
+        overlay.id = 'outcomeModal';
+        overlay.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:${navH}px;background:rgba(0,0,0,0.5);z-index:9998`;
+        overlay.onclick = closeModal;
+        document.body.appendChild(overlay);
+
+        // Sheet — pinned exactly to the top of the nav bar
+        const sheet = document.createElement('div');
+        sheet.id = 'outcomeSheet';
+        sheet.style.cssText = `position:fixed;left:0;right:0;bottom:${navH}px;z-index:9999;background:white;border-radius:1rem 1rem 0 0;display:flex;flex-direction:column;overflow:hidden;max-height:${sheetMaxH}px`;
+        sheet.onclick = function(e){ e.stopPropagation(); };
+        sheet.innerHTML = `
+            <div style="overflow-y:auto;padding:1rem;flex:1;min-height:0">
+                <h3 style="font-weight:700;font-size:1rem;margin-bottom:0.75rem;color:#0D3D23">Log Outcome</h3>
+                <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Channel</label>
+                <select id="ch" onchange="toggleCallFields()" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem;background:white">
+                    <option value="call">Call</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="visit">Visited Shop</option>
+                </select>
+                <div id="callFields">
+                    <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Call Status</label>
+                    <select id="cs" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem;background:white">
                         <option value="">—</option>
-                        <option value="interested_in_program">Interested ⭐</option>
-                        <option value="already_aware">Already Aware</option>
-                        <option value="will_visit_shop">Will Visit Shop</option>
-                        <option value="wants_callback">Wants Callback</option>
-                        <option value="not_interested">Not Interested</option>
-                        <option value="no_answer">No Answer</option>
+                        <option value="connected">Connected</option>
+                        <option value="not_answered">Not Answered</option>
                         <option value="wrong_number">Wrong Number</option>
+                        <option value="switched_off">Switched Off</option>
+                        <option value="busy">Busy</option>
                     </select>
-                    <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Callback date</label>
-                    <input type="date" id="cd" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem">
-                    <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Notes</label>
-                    <textarea id="nt" rows="2" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;resize:none" placeholder="Optional"></textarea>
                 </div>
-                <div style="flex-shrink:0;display:flex;gap:0.5rem;justify-content:flex-end;padding:1rem;border-top:1px solid #f3f4f6;background:white">
-                    <button onclick="closeModal()" style="padding:0.5rem 1rem;font-size:0.875rem;border:1px solid #d1d5db;border-radius:0.5rem;color:#4b5563;background:white;cursor:pointer">Cancel</button>
-                    <button onclick="saveOutcome(${leadId})" style="padding:0.5rem 1rem;font-size:0.875rem;border:none;border-radius:0.5rem;color:white;background:#1B5E3B;font-weight:600;cursor:pointer">Save</button>
-                </div>
+                <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Outcome</label>
+                <select id="oc" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem;background:white">
+                    <option value="">—</option>
+                    <option value="interested_in_program">Interested ⭐</option>
+                    <option value="already_aware">Already Aware</option>
+                    <option value="will_visit_shop">Will Visit Shop</option>
+                    <option value="wants_callback">Wants Callback</option>
+                    <option value="not_interested">Not Interested</option>
+                    <option value="no_answer">No Answer</option>
+                    <option value="wrong_number">Wrong Number</option>
+                </select>
+                <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Callback date</label>
+                <input type="date" id="cd" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;margin-bottom:0.75rem">
+                <label style="display:block;font-size:0.75rem;font-weight:500;color:#4b5563;margin-bottom:0.25rem">Notes</label>
+                <textarea id="nt" rows="2" style="width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.5rem 0.75rem;font-size:0.875rem;resize:none" placeholder="Optional"></textarea>
+            </div>
+            <div style="flex-shrink:0;display:flex;gap:0.5rem;justify-content:flex-end;padding:1rem;border-top:1px solid #f3f4f6;background:white">
+                <button onclick="closeModal()" style="padding:0.5rem 1rem;font-size:0.875rem;border:1px solid #d1d5db;border-radius:0.5rem;color:#4b5563;background:white;cursor:pointer">Cancel</button>
+                <button onclick="saveOutcome(${leadId})" style="padding:0.5rem 1rem;font-size:0.875rem;border:none;border-radius:0.5rem;color:white;background:#1B5E3B;font-weight:600;cursor:pointer">Save</button>
             </div>`;
-        document.body.appendChild(el);
+        document.body.appendChild(sheet);
     }
 
-    function closeModal() { const el = document.getElementById('outcomeModal'); if(el) el.remove(); }
+    function closeModal() {
+        document.getElementById('outcomeModal')?.remove();
+        document.getElementById('outcomeSheet')?.remove();
+    }
     function toggleCallFields() {
         document.getElementById('callFields').style.display = document.getElementById('ch').value === 'call' ? 'block' : 'none';
     }
