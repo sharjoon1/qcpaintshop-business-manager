@@ -116,8 +116,8 @@
 
     function openOutcome(leadId) {
         document.getElementById('modalRoot').innerHTML = `
-        <div class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50" onclick="if(event.target===this)closeModal()">
-            <div class="bg-white rounded-t-2xl sm:rounded-2xl p-4 w-full sm:max-w-md max-h-[85vh] overflow-y-auto">
+        <div class="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[1010]" onclick="if(event.target===this)closeModal()">
+            <div class="bg-white rounded-t-2xl sm:rounded-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] w-full sm:max-w-md max-h-[85vh] overflow-y-auto">
                 <h3 class="font-bold text-base mb-3" style="color:#0D3D23">Log Outcome</h3>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Channel</label>
                 <select id="ch" onchange="toggleCallFields()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
