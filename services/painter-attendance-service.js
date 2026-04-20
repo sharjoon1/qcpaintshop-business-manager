@@ -92,9 +92,9 @@ async function recordCheckin({ painterId, branchId, lat, lng, selfiePath, distan
 
         const [result] = await conn.query(
             `INSERT INTO painter_attendance_checkins
-             (painter_id, branch_id, checkin_date, checkin_at, latitude, longitude, distance_meters, selfie_path, status, points_awarded)
-             VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, 'approved', ?)`,
-            [painterId, branchId, dateStr, lat, lng, distanceMeters, selfiePath, pointsPerDay]
+             (painter_id, branch_id, checkin_date, checkin_at, latitude, longitude, distance_meters, selfie_path, status, points_awarded, month_key)
+             VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, 'approved', ?, ?)`,
+            [painterId, branchId, dateStr, lat, lng, distanceMeters, selfiePath, pointsPerDay, monthKey]
         );
         const checkinId = result.insertId;
 

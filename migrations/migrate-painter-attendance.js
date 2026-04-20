@@ -32,7 +32,7 @@ async function migrate() {
                 rejected_reason VARCHAR(500) NULL,
                 rejected_by INT NULL,
                 points_awarded INT NOT NULL DEFAULT 100,
-                month_key CHAR(7) GENERATED ALWAYS AS (DATE_FORMAT(checkin_date, '%Y-%m')) VIRTUAL,
+                month_key CHAR(7) NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY uk_painter_day (painter_id, checkin_date),
                 INDEX idx_month (painter_id, month_key),
