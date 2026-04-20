@@ -104,6 +104,7 @@
                 <button class="tab-btn" onclick="switchTab('catalog')">Catalog</button>
                 <button class="tab-btn" onclick="switchTab('visualizations')">🎨 Visualizations</button>
                 <button class="tab-btn" onclick="switchTab('marketing')">📣 Marketing</button>
+                <button class="tab-btn" onclick="switchTab('attendance')">Attendance</button>
             </div>
 
             <!-- Tab 1: Painters -->
@@ -1013,6 +1014,62 @@
         </div>
     </div>
 
+    <!-- Tab: Attendance -->
+    <div id="tab-attendance" class="tab-content">
+        <div class="flex flex-wrap gap-2 mb-4">
+            <button class="tab-btn-sub active" onclick="switchAttTab('today', this)">Today</button>
+            <button class="tab-btn-sub" onclick="switchAttTab('monthly', this)">Monthly Summary</button>
+        </div>
+
+        <div id="att-sub-today" class="att-sub-content">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex gap-3 items-end flex-wrap">
+                <div>
+                    <label class="text-xs text-gray-600">Date</label>
+                    <input type="date" id="att-today-date" class="border rounded px-3 py-2">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-600">Branch</label>
+                    <select id="att-today-branch" class="border rounded px-3 py-2">
+                        <option value="">All branches</option>
+                    </select>
+                </div>
+                <button onclick="loadAttendanceToday()" class="bg-indigo-600 text-white px-4 py-2 rounded">Load</button>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                <table class="data-table w-full">
+                    <thead>
+                        <tr><th>Painter</th><th>Branch</th><th>Time</th><th>Distance</th><th>Selfie</th><th>Status</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="att-today-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="att-sub-monthly" class="att-sub-content hidden">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex gap-3 items-end flex-wrap">
+                <div>
+                    <label class="text-xs text-gray-600">Month</label>
+                    <input type="month" id="att-month-picker" class="border rounded px-3 py-2">
+                </div>
+                <button onclick="loadAttendanceMonthly()" class="bg-indigo-600 text-white px-4 py-2 rounded">Load</button>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                <table class="data-table w-full">
+                    <thead>
+                        <tr><th>Painter</th><th>Check-ins</th><th>AP Earned</th><th>Billed</th><th>Claim %</th><th>Claimable</th><th>Claimed</th><th>Status</th></tr>
+                    </thead>
+                    <tbody id="att-monthly-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .tab-btn-sub { padding: 6px 12px; border-radius: 6px; font-size: 0.875rem; color: #374151; }
+        .tab-btn-sub.active { background: #4f46e5; color: white; }
+        .att-sub-content.hidden { display: none; }
+    </style>
+
     <!-- Estimate Detail Modal -->
     <div id="estimateDetailModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEstimateDetail()">
         <div class="modal-content" style="max-width:720px" id="estimateDetailContent"></div>
@@ -1099,6 +1156,7 @@
         if (tab === 'catalog') loadCatalogStats();
         if (tab === 'visualizations') loadVisualizations();
         if (tab === 'marketing') initMarketingTab();
+        if (tab === 'attendance') initAttendanceTab();
     }
 
     // ═══════════════════════════════════════
@@ -4005,6 +4063,121 @@
         };
         const r = await mktFetch('/admin/config', { method: 'POST', body: JSON.stringify(payload) });
         alert(r.success ? 'Saved' : ('Failed: ' + (r.error || '')));
+    }
+
+    // ═══════════════════════════════════════
+    // ATTENDANCE TAB
+    // ═══════════════════════════════════════
+    let attendanceInit = false;
+
+    function initAttendanceTab() {
+        if (attendanceInit) return;
+        attendanceInit = true;
+        const d = new Date().toISOString().slice(0, 10);
+        const di = document.getElementById('att-today-date');
+        if (di) di.value = d;
+        const mi = document.getElementById('att-month-picker');
+        if (mi) mi.value = d.slice(0, 7);
+        fetch('/api/branches', {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('auth_token') }
+        }).then(r => r.json()).then(data => {
+            const sel = document.getElementById('att-today-branch');
+            const list = data.branches || data || [];
+            if (sel) list.forEach(b => {
+                sel.insertAdjacentHTML('beforeend', `<option value="${b.id}">${attEscapeHtml(b.name)}</option>`);
+            });
+        }).catch(() => {});
+        loadAttendanceToday();
+    }
+
+    function switchAttTab(name, btn) {
+        document.querySelectorAll('.att-sub-content').forEach(e => e.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn-sub').forEach(b => b.classList.remove('active'));
+        document.getElementById('att-sub-' + name).classList.remove('hidden');
+        if (btn) btn.classList.add('active');
+    }
+
+    function attEscapeHtml(s) {
+        if (s == null) return '';
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    async function loadAttendanceToday() {
+        const date = document.getElementById('att-today-date').value || new Date().toISOString().slice(0, 10);
+        const branchId = document.getElementById('att-today-branch').value;
+        const params = new URLSearchParams({ date });
+        if (branchId) params.set('branch_id', branchId);
+        try {
+            const r = await fetch('/api/painters/attendance/today?' + params.toString(), {
+                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('auth_token') }
+            });
+            const data = await r.json();
+            const tbody = document.getElementById('att-today-tbody');
+            if (!data.checkins || data.checkins.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">No check-ins</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.checkins.map(c => `
+                <tr>
+                    <td>${attEscapeHtml(c.painter_name)}</td>
+                    <td>${attEscapeHtml(c.branch_name)}</td>
+                    <td>${new Date(c.checkin_at).toLocaleTimeString('en-IN')}</td>
+                    <td>${c.distance_meters}m</td>
+                    <td><a href="${attEscapeHtml(c.selfie_path)}" target="_blank"><img src="${attEscapeHtml(c.selfie_path)}" class="w-12 h-12 rounded object-cover" onerror="this.style.display='none'"></a></td>
+                    <td>${c.status === 'rejected' ? '<span class="text-red-600">Rejected</span>' : '<span class="text-green-600">Approved</span>'}</td>
+                    <td>${c.status === 'approved' ? `<button onclick="rejectCheckin(${c.id})" class="text-red-600 text-sm">Reject</button>` : attEscapeHtml(c.rejected_reason || '')}</td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            console.error('loadAttendanceToday', e);
+        }
+    }
+
+    async function rejectCheckin(id) {
+        const reason = prompt('Reject reason:');
+        if (!reason || reason.trim().length < 3) return;
+        try {
+            const r = await fetch(`/api/painters/attendance/${id}/reject`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + localStorage.getItem('auth_token')
+                },
+                body: JSON.stringify({ reason: reason.trim() })
+            });
+            if (r.ok) { alert('Rejected'); loadAttendanceToday(); }
+            else { const e = await r.json(); alert('Failed: ' + (e.error || 'unknown')); }
+        } catch (e) { alert('Failed: ' + e.message); }
+    }
+
+    async function loadAttendanceMonthly() {
+        const month = document.getElementById('att-month-picker').value;
+        if (!month) { alert('Pick a month'); return; }
+        try {
+            const r = await fetch(`/api/painters/attendance/monthly?month=${month}`, {
+                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('auth_token') }
+            });
+            const data = await r.json();
+            const tbody = document.getElementById('att-monthly-tbody');
+            if (!data.rows || data.rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">No data</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.rows.map(m => `
+                <tr>
+                    <td>${attEscapeHtml(m.full_name)}</td>
+                    <td>${m.total_checkins}</td>
+                    <td>${m.total_ap_earned}</td>
+                    <td>₹${Number(m.monthly_customer_billed).toLocaleString('en-IN')}</td>
+                    <td>${m.claim_pct}%</td>
+                    <td>${m.claimable_ap}</td>
+                    <td>${m.ap_claimed}</td>
+                    <td><span class="text-xs px-2 py-1 rounded bg-gray-100">${attEscapeHtml(m.claim_status)}</span></td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            console.error('loadAttendanceMonthly', e);
+        }
     }
     </script>
 </body>
