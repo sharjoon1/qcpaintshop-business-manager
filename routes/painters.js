@@ -2407,6 +2407,80 @@ router.post('/me/attendance/checkin', requirePainterAuth, uploadPainterAttendanc
     }
 });
 
+router.get('/me/attendance/month', requirePainterAuth, async (req, res) => {
+    try {
+        const painterId = req.painter.id;
+        const monthKey = req.query.month || (() => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        })();
+
+        const cfg = await attendanceService.loadConfig();
+
+        const [checkins] = await pool.query(
+            `SELECT id, branch_id, checkin_date, checkin_at, distance_meters, selfie_path, status, points_awarded
+             FROM painter_attendance_checkins
+             WHERE painter_id=? AND month_key=? ORDER BY checkin_date`,
+            [painterId, monthKey]
+        );
+        const [monthlyRows] = await pool.query(
+            'SELECT * FROM painter_attendance_monthly WHERE painter_id=? AND month_key=?',
+            [painterId, monthKey]
+        );
+        const monthly = monthlyRows[0] || null;
+
+        const [billingRows] = await pool.query(
+            `SELECT COALESCE(SUM(total),0) AS billed
+             FROM painter_estimates
+             WHERE painter_id=? AND billing_type='customer'
+               AND status IN ('pushed_to_zoho','payment_recorded')
+               AND DATE_FORMAT(created_at, '%Y-%m')=?`,
+            [painterId, monthKey]
+        );
+        const billed = Number(billingRows[0].billed);
+        const claimPctPreview = attendanceService.computeClaimPct(billed, cfg);
+        const totalAp = monthly ? monthly.total_ap_earned : checkins.filter(c => c.status === 'approved').length * cfg.pointsPerDay;
+        const claimablePreview = attendanceService.computeClaimableAp(totalAp, claimPctPreview);
+
+        res.json({
+            month_key: monthKey,
+            checkins,
+            total_checkins: checkins.filter(c => c.status === 'approved').length,
+            total_ap_earned: totalAp,
+            monthly_customer_billed_preview: billed,
+            claim_pct_preview: claimPctPreview,
+            claimable_ap_preview: claimablePreview,
+            claim_status: monthly ? monthly.claim_status : 'pending',
+            ap_claimed: monthly ? monthly.ap_claimed : 0,
+            claim_window: monthly && monthly.claim_window_opens_at ? {
+                opens_at: monthly.claim_window_opens_at,
+                closes_at: monthly.claim_window_closes_at
+            } : null
+        });
+    } catch (err) {
+        console.error('month summary error:', err);
+        res.status(500).json({ error: 'Failed to load month summary' });
+    }
+});
+
+router.get('/me/attendance/history', requirePainterAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT month_key, total_checkins, total_ap_earned, monthly_customer_billed,
+                    claim_pct, claimable_ap, ap_claimed, claim_status, claimed_at, forfeited_at
+             FROM painter_attendance_monthly
+             WHERE painter_id=?
+             ORDER BY month_key DESC
+             LIMIT 12`,
+            [req.painter.id]
+        );
+        res.json({ history: rows });
+    } catch (err) {
+        console.error('history error:', err);
+        res.status(500).json({ error: 'Failed to load history' });
+    }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // PAINTER NOTIFICATION & FCM ENDPOINTS (/me/fcm/*, /me/notifications/*)
 // ═══════════════════════════════════════════════════════════════
