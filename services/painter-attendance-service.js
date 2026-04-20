@@ -165,4 +165,59 @@ async function claimMonth(painterId, monthKey) {
     }
 }
 
-module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig, findNearbyBranches, recordCheckin, recomputeMonthly, claimMonth };
+async function rejectCheckin(checkinId, reason, adminUserId) {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const [rows] = await conn.query(
+            'SELECT * FROM painter_attendance_checkins WHERE id=? FOR UPDATE',
+            [checkinId]
+        );
+        if (rows.length === 0) throw { status: 404, code: 'NOT_FOUND', message: 'Check-in not found' };
+        const c = rows[0];
+        if (c.status === 'rejected') throw { status: 400, code: 'ALREADY_REJECTED', message: 'Already rejected' };
+
+        await conn.query(
+            'UPDATE painter_attendance_checkins SET status=?, rejected_at=NOW(), rejected_reason=?, rejected_by=? WHERE id=?',
+            ['rejected', reason, adminUserId, checkinId]
+        );
+        await conn.query(
+            `INSERT INTO painter_attendance_ledger (painter_id, month_key, checkin_id, type, ap_delta, reason, created_by)
+             VALUES (?, ?, ?, 'clawback', ?, ?, ?)`,
+            [c.painter_id, c.month_key, checkinId, -c.points_awarded, `Rejected: ${reason}`, adminUserId]
+        );
+        await recomputeMonthly(c.painter_id, c.month_key, conn);
+
+        const [monthlyRows] = await conn.query(
+            'SELECT claim_status, ap_claimed FROM painter_attendance_monthly WHERE painter_id=? AND month_key=?',
+            [c.painter_id, c.month_key]
+        );
+        const mStatus = monthlyRows[0] && monthlyRows[0].claim_status;
+
+        await conn.commit();
+
+        if (mStatus === 'claimed') {
+            // Use points-engine's getBalance() helper (reads painters.regular_points cached column)
+            const balance = await pointsEngine.getBalance(c.painter_id);
+            const currentBal = balance ? Number(balance.regular) : 0;
+            if (currentBal >= c.points_awarded) {
+                await pointsEngine.deductPoints(
+                    c.painter_id, 'regular', c.points_awarded,
+                    'attendance_clawback', checkinId, 'attendance_checkin',
+                    `Clawback: ${reason}`, adminUserId
+                );
+            } else {
+                await pointsEngine.queueClawback(c.painter_id, c.points_awarded, `Rejected: ${reason}`);
+            }
+        }
+
+        return { checkinId, painter_id: c.painter_id, clawback: c.points_awarded };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
+module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig, findNearbyBranches, recordCheckin, recomputeMonthly, claimMonth, rejectCheckin };

@@ -3665,6 +3665,35 @@ router.get('/attendance', requireAuth, async (req, res) => {
     }
 });
 
+router.post('/attendance/:checkinId/reject', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const checkinId = parseInt(req.params.checkinId, 10);
+        const { reason } = req.body;
+        if (!reason || reason.trim().length < 3) {
+            return res.status(400).json({ error: 'reason (3+ chars) required' });
+        }
+        const result = await attendanceService.rejectCheckin(checkinId, reason.trim(), req.user.id);
+
+        try {
+            const painterNotif = require('../services/painter-notification-service');
+            await painterNotif.sendToPainter(result.painter_id, {
+                type: 'attendance_rejected',
+                title: '⚠ Check-in rejected',
+                title_ta: '⚠ சரிபார்ப்பு நிராகரிக்கப்பட்டது',
+                body: `${result.clawback} AP removed. Reason: ${reason}`,
+                body_ta: `${result.clawback} AP நீக்கப்பட்டது. காரணம்: ${reason}`,
+                data: { screen: 'attendance' }
+            });
+        } catch (e) {}
+
+        res.json(result);
+    } catch (err) {
+        if (err.status) return res.status(err.status).json({ code: err.code, error: err.message });
+        console.error('reject error:', err);
+        res.status(500).json({ error: 'Reject failed' });
+    }
+});
+
 // --- REFERRALS (ADMIN) ---
 
 router.get('/referrals', requireAuth, async (req, res) => {
