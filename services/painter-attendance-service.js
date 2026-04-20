@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('fs').promises;
+const path = require('path');
+
 const EARTH_RADIUS_M = 6371000;
 
 let pool = null;
@@ -220,4 +223,145 @@ async function rejectCheckin(checkinId, reason, adminUserId) {
     }
 }
 
-module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig, findNearbyBranches, recordCheckin, recomputeMonthly, claimMonth, rejectCheckin };
+async function openMonthlyClaim(monthKey) {
+    const cfg = await loadConfig();
+
+    const [painters] = await pool.query(
+        "SELECT DISTINCT painter_id FROM painter_attendance_monthly WHERE month_key=? AND total_ap_earned > 0 AND claim_status='pending'",
+        [monthKey]
+    );
+    let opened = 0;
+    for (const row of painters) {
+        const painterId = row.painter_id;
+        const [billingRows] = await pool.query(
+            `SELECT COALESCE(SUM(total),0) AS billed
+             FROM painter_estimates
+             WHERE painter_id=? AND billing_type='customer'
+               AND status IN ('pushed_to_zoho','payment_recorded')
+               AND DATE_FORMAT(created_at, '%Y-%m')=?`,
+            [painterId, monthKey]
+        );
+        const billed = Number(billingRows[0].billed);
+        const [m] = await pool.query(
+            'SELECT total_ap_earned FROM painter_attendance_monthly WHERE painter_id=? AND month_key=?',
+            [painterId, monthKey]
+        );
+        const totalAp = m[0].total_ap_earned;
+        const claimPct = computeClaimPct(billed, cfg);
+        const claimable = computeClaimableAp(totalAp, claimPct);
+
+        const opensAt = new Date();
+        const closesAt = new Date(opensAt);
+        closesAt.setDate(closesAt.getDate() + cfg.claimWindowDays);
+
+        await pool.query(
+            `UPDATE painter_attendance_monthly
+             SET monthly_customer_billed=?, claim_pct=?, claimable_ap=?,
+                 claim_status='available', claim_window_opens_at=?, claim_window_closes_at=?
+             WHERE painter_id=? AND month_key=?`,
+            [billed, claimPct, claimable, opensAt, closesAt, painterId, monthKey]
+        );
+        opened++;
+
+        if (claimable > 0) {
+            try {
+                const painterNotif = require('./painter-notification-service');
+                await painterNotif.sendToPainter(painterId, {
+                    type: 'attendance_claim_window_open',
+                    title: `Claim window open! ${claimable} AP available`,
+                    title_ta: `கிளைம் விண்டோ திறந்தது! ${claimable} AP கிடைக்கும்`,
+                    body: `Based on ₹${billed.toLocaleString('en-IN')} customer bills (${claimPct}%). Claim before ${closesAt.toLocaleDateString('en-IN')}.`,
+                    body_ta: `₹${billed.toLocaleString('en-IN')} கஸ்டமர் பில் அடிப்படையில் (${claimPct}%). ${closesAt.toLocaleDateString('en-IN')}-க்கு முன் கிளைம் செய்யவும்.`,
+                    data: { screen: 'attendance', month_key: monthKey }
+                });
+            } catch (e) {}
+        }
+    }
+    return { opened };
+}
+
+async function recomputeClaimable(monthKey) {
+    const cfg = await loadConfig();
+    const [rows] = await pool.query(
+        "SELECT painter_id, total_ap_earned FROM painter_attendance_monthly WHERE month_key=? AND claim_status='available'",
+        [monthKey]
+    );
+    for (const row of rows) {
+        const [billing] = await pool.query(
+            `SELECT COALESCE(SUM(total),0) AS billed FROM painter_estimates
+             WHERE painter_id=? AND billing_type='customer'
+               AND status IN ('pushed_to_zoho','payment_recorded')
+               AND DATE_FORMAT(created_at, '%Y-%m')=?`,
+            [row.painter_id, monthKey]
+        );
+        const billed = Number(billing[0].billed);
+        const claimPct = computeClaimPct(billed, cfg);
+        const claimable = computeClaimableAp(row.total_ap_earned, claimPct);
+        await pool.query(
+            'UPDATE painter_attendance_monthly SET monthly_customer_billed=?, claim_pct=?, claimable_ap=? WHERE painter_id=? AND month_key=? AND claim_status="available"',
+            [billed, claimPct, claimable, row.painter_id, monthKey]
+        );
+    }
+}
+
+async function remindUnclaimed(monthKey) {
+    const [rows] = await pool.query(
+        "SELECT painter_id, claimable_ap FROM painter_attendance_monthly WHERE month_key=? AND claim_status='available' AND claimable_ap > 0",
+        [monthKey]
+    );
+    const painterNotif = require('./painter-notification-service');
+    for (const r of rows) {
+        try {
+            await painterNotif.sendToPainter(r.painter_id, {
+                type: 'attendance_claim_reminder',
+                title: `⏰ Last day! ${r.claimable_ap} AP expires tomorrow`,
+                title_ta: `⏰ கடைசி நாள்! ${r.claimable_ap} AP நாளை காலாவதி ஆகும்`,
+                body: 'Open the app and tap Claim to convert to Regular points.',
+                body_ta: 'ஆப் திறந்து Claim button அழுத்தவும்.',
+                data: { screen: 'attendance', month_key: monthKey }
+            });
+        } catch (e) {}
+    }
+    return { reminded: rows.length };
+}
+
+async function forfeitAndPurge(monthKey, purgeMonthKey) {
+    const [unclaimed] = await pool.query(
+        "SELECT id, painter_id FROM painter_attendance_monthly WHERE month_key=? AND claim_status='available'",
+        [monthKey]
+    );
+    for (const m of unclaimed) {
+        await pool.query(
+            `UPDATE painter_attendance_monthly SET claim_status='forfeited', forfeited_at=NOW() WHERE id=?`,
+            [m.id]
+        );
+        await pool.query(
+            `INSERT INTO painter_attendance_ledger (painter_id, month_key, type, ap_delta, reason)
+             VALUES (?, ?, 'forfeit', 0, 'Claim window closed unclaimed')`,
+            [m.painter_id, monthKey]
+        );
+    }
+
+    const uploadsRoot = path.join(__dirname, '..', 'public', 'uploads', 'painter-attendance');
+    let purged = 0;
+    try {
+        const painterDirs = await fs.readdir(uploadsRoot);
+        for (const pd of painterDirs) {
+            const painterPath = path.join(uploadsRoot, pd);
+            const stat = await fs.stat(painterPath).catch(() => null);
+            if (!stat || !stat.isDirectory()) continue;
+            const files = await fs.readdir(painterPath);
+            for (const f of files) {
+                if (f.startsWith(purgeMonthKey)) {
+                    await fs.unlink(path.join(painterPath, f)).catch(() => {});
+                    purged++;
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[attendance] purge failed:', err);
+    }
+    return { forfeited: unclaimed.length, purged };
+}
+
+module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig, findNearbyBranches, recordCheckin, recomputeMonthly, claimMonth, rejectCheckin, openMonthlyClaim, recomputeClaimable, remindUnclaimed, forfeitAndPurge };

@@ -16,6 +16,7 @@ const pntrImportService = require('./pntr-import-service');
 const painterZohoSyncService = require('./painter-zoho-sync-service');
 const painterMarketingScheduler = require('./painter-marketing-scheduler');
 const painterBackfillService = require('./painter-points-backfill-service');
+const attendanceService = require('./painter-attendance-service');
 const zohoApi = require('./zoho-api');
 
 let pool = null;
@@ -25,7 +26,14 @@ const jobs = {};
 function setPool(p) {
     pool = p;
     pointsEngine.setPool(p);
+    attendanceService.setPool(p);
     painterZohoSyncService.init({ pool: p, zohoApi });
+}
+
+function prevMonthKey() {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function setAutomationRegistry(r) { registry = r; }
@@ -220,6 +228,57 @@ async function runStreakReminder() {
     }
 }
 
+// ─── Attendance Job Runners ──────────────────────────────────
+
+async function runOpenAttendanceClaim() {
+    try {
+        console.log('[attendance] opening monthly claim window...');
+        if (registry) registry.markRunning('painter-attendance-open-claim');
+        const { opened } = await attendanceService.openMonthlyClaim(prevMonthKey());
+        console.log(`[attendance] opened claim for ${opened} painter(s)`);
+        if (registry) registry.markCompleted('painter-attendance-open-claim', { recordsProcessed: opened });
+    } catch (err) {
+        console.error('[attendance] open claim failed:', err);
+        if (registry) registry.markFailed('painter-attendance-open-claim', { error: err.message });
+    }
+}
+
+async function runRecomputeClaimable() {
+    try {
+        await attendanceService.recomputeClaimable(prevMonthKey());
+    } catch (err) {
+        console.error('[attendance] recompute failed:', err);
+    }
+}
+
+async function runRemindUnclaimed() {
+    try {
+        if (registry) registry.markRunning('painter-attendance-remind');
+        const { reminded } = await attendanceService.remindUnclaimed(prevMonthKey());
+        console.log(`[attendance] reminded ${reminded} painter(s)`);
+        if (registry) registry.markCompleted('painter-attendance-remind', { recordsProcessed: reminded });
+    } catch (err) {
+        console.error('[attendance] remind failed:', err);
+        if (registry) registry.markFailed('painter-attendance-remind', { error: err.message });
+    }
+}
+
+async function runForfeitAndPurge() {
+    try {
+        if (registry) registry.markRunning('painter-attendance-forfeit');
+        // Forfeit prev month (claim window just closed) AND purge images from 2 months ago
+        const d = new Date();
+        d.setMonth(d.getMonth() - 2);
+        const purgeKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const { forfeited, purged } = await attendanceService.forfeitAndPurge(prevMonthKey(), purgeKey);
+        console.log(`[attendance] forfeited=${forfeited} purged=${purged}`);
+        if (registry) registry.markCompleted('painter-attendance-forfeit', { forfeited, purged });
+    } catch (err) {
+        console.error('[attendance] forfeit failed:', err);
+        if (registry) registry.markFailed('painter-attendance-forfeit', { error: err.message });
+    }
+}
+
 // ─── Scheduler Start/Stop ────────────────────────────────────
 
 function start() {
@@ -232,6 +291,10 @@ function start() {
         registry.register('painter-bonus-rotation', { name: 'Bonus Rotation', service: 'painter-scheduler', schedule: '5 0 * * *', description: 'Rotate daily bonus product at midnight' });
         registry.register('painter-daily-bonus-push', { name: 'Daily Bonus Push', service: 'painter-scheduler', schedule: '0 7 * * *', description: '7 AM daily bonus product notification' });
         registry.register('painter-streak-reminder', { name: 'Streak Reminder', service: 'painter-scheduler', schedule: '0 20 * * *', description: '8 PM streak-at-risk reminder' });
+        registry.register('painter-attendance-open-claim', { name: 'Attendance Open Claim', service: 'painter-scheduler', schedule: '5 0 1 * *', description: 'Open monthly attendance AP claim window on 1st of month' });
+        registry.register('painter-attendance-recompute', { name: 'Attendance Recompute Claimable', service: 'painter-scheduler', schedule: '0 */6 1-7 * *', description: 'Recompute claimable AP every 6h during claim window' });
+        registry.register('painter-attendance-remind', { name: 'Attendance Claim Reminder', service: 'painter-scheduler', schedule: '0 20 7 * *', description: '8 PM day-before reminder for unclaimed attendance AP' });
+        registry.register('painter-attendance-forfeit', { name: 'Attendance Forfeit + Purge', service: 'painter-scheduler', schedule: '0 2 8 * *', description: 'Forfeit unclaimed attendance + purge old selfie images' });
     }
 
     // Existing jobs
@@ -245,7 +308,13 @@ function start() {
     jobs.dailyBonusPush = cron.schedule('0 7 * * *', runDailyBonusPush, { timezone: 'Asia/Kolkata' });
     jobs.streakReminder = cron.schedule('0 20 * * *', runStreakReminder, { timezone: 'Asia/Kolkata' });
 
-    console.log('[Painter Scheduler] Started: monthly-slabs(1st 6AM), quarterly-slabs(Q1 6:30AM), credit-check(daily 8AM), streak-reset(midnight), bonus-rotation(00:05), daily-bonus-push(7AM), streak-reminder(8PM)');
+    // Attendance jobs
+    jobs.attendanceOpenClaim = cron.schedule('5 0 1 * *', runOpenAttendanceClaim, { timezone: 'Asia/Kolkata' });
+    jobs.attendanceRecompute = cron.schedule('0 */6 1-7 * *', runRecomputeClaimable, { timezone: 'Asia/Kolkata' });
+    jobs.attendanceRemind = cron.schedule('0 20 7 * *', runRemindUnclaimed, { timezone: 'Asia/Kolkata' });
+    jobs.attendanceForfeit = cron.schedule('0 2 8 * *', runForfeitAndPurge, { timezone: 'Asia/Kolkata' });
+
+    console.log('[Painter Scheduler] Started: monthly-slabs(1st 6AM), quarterly-slabs(Q1 6:30AM), credit-check(daily 8AM), streak-reset(midnight), bonus-rotation(00:05), daily-bonus-push(7AM), streak-reminder(8PM), attendance-open-claim(1st 00:05), attendance-recompute(every 6h days 1-7), attendance-remind(7th 8PM), attendance-forfeit(8th 2AM)');
 
     // PNTR Painter Marketing — register 4 IST crons (02:30 incremental, 03:00 retry, 03:30 backfill, 06:00 daily list)
     painterMarketingScheduler.registerCron({
@@ -273,5 +342,9 @@ module.exports = {
     runStreakReset,
     runDailyBonusRotation,
     runDailyBonusPush,
-    runStreakReminder
+    runStreakReminder,
+    runOpenAttendanceClaim,
+    runRecomputeClaimable,
+    runRemindUnclaimed,
+    runForfeitAndPurge
 };
