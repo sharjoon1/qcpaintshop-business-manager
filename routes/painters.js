@@ -1925,23 +1925,35 @@ router.get('/me/offer-products', requirePainterAuth, async (req, res) => {
             return res.json({ success: true, brands: [], products: [], offers: [] });
         }
 
-        // Build product filter based on offer targets
+        // Build product filter based on offer targets.
+        // An 'all' offer covers every active product → no extra WHERE needed.
+        // Otherwise restrict to brands / categories / specific products named by the
+        // active offers. 'product' target_id is a products.id (int).
         let extraWhere = '';
         const extraParams = [];
+        const hasAllOffer = offers.some(o => o.applies_to === 'all');
         const brandOffers = offers.filter(o => o.applies_to === 'brand' && o.target_id);
         const categoryOffers = offers.filter(o => o.applies_to === 'category' && o.target_id);
+        const productOffers = offers.filter(o => o.applies_to === 'product' && o.target_id);
 
-        if (brandOffers.length && !offers.some(o => o.applies_to === 'all')) {
-            const brandIds = brandOffers.map(o => o.target_id);
-            const catIds = categoryOffers.map(o => o.target_id);
+        if (!hasAllOffer && (brandOffers.length || categoryOffers.length || productOffers.length)) {
             const conditions = [];
-            if (brandIds.length) {
-                conditions.push(`zim.zoho_brand IN (${brandIds.map(() => '?').join(',')})`);
-                extraParams.push(...brandIds);
+            if (brandOffers.length) {
+                const ids = brandOffers.map(o => o.target_id);
+                conditions.push(`zim.zoho_brand IN (${ids.map(() => '?').join(',')})`);
+                extraParams.push(...ids);
             }
-            if (catIds.length) {
-                conditions.push(`zim.zoho_category_name IN (${catIds.map(() => '?').join(',')})`);
-                extraParams.push(...catIds);
+            if (categoryOffers.length) {
+                const ids = categoryOffers.map(o => o.target_id);
+                conditions.push(`zim.zoho_category_name IN (${ids.map(() => '?').join(',')})`);
+                extraParams.push(...ids);
+            }
+            if (productOffers.length) {
+                const ids = productOffers.map(o => parseInt(o.target_id, 10)).filter(n => !isNaN(n));
+                if (ids.length) {
+                    conditions.push(`p.id IN (${ids.map(() => '?').join(',')})`);
+                    extraParams.push(...ids);
+                }
             }
             if (conditions.length) extraWhere = ` AND (${conditions.join(' OR ')})`;
         }
