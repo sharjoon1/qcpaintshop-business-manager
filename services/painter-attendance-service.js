@@ -2,6 +2,26 @@
 
 const EARTH_RADIUS_M = 6371000;
 
+let pool = null;
+function setPool(p) { pool = p; }
+
+async function loadConfig() {
+    const [rows] = await pool.query(
+        "SELECT config_key, config_value FROM ai_config WHERE config_key LIKE 'painter_attendance_%'"
+    );
+    const map = {};
+    rows.forEach(r => { map[r.config_key] = r.config_value; });
+    return {
+        enabled: map.painter_attendance_enabled === '1',
+        pointsPerDay: parseInt(map.painter_attendance_points_per_day || '100', 10),
+        rupeesPerPct: parseInt(map.painter_attendance_claim_rupees_per_pct || '1000', 10),
+        maxPct: parseInt(map.painter_attendance_claim_max_pct || '100', 10),
+        geofenceMeters: parseInt(map.painter_attendance_geofence_meters || '300', 10),
+        claimWindowDays: parseInt(map.painter_attendance_claim_window_days || '7', 10),
+        imageRetentionDays: parseInt(map.painter_attendance_image_retention_days || '8', 10)
+    };
+}
+
 function toRad(deg) { return deg * Math.PI / 180; }
 
 function haversineMeters(lat1, lng1, lat2, lng2) {
@@ -23,4 +43,4 @@ function computeClaimableAp(totalAp, claimPct) {
     return Math.floor(totalAp * claimPct / 100);
 }
 
-module.exports = { haversineMeters, computeClaimPct, computeClaimableAp };
+module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig };
