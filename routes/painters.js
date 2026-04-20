@@ -3694,6 +3694,88 @@ router.post('/attendance/:checkinId/reject', requirePermission('painters', 'mana
     }
 });
 
+router.get('/attendance/today', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const { branch_id, date } = req.query;
+        const dateStr = date || new Date().toISOString().slice(0, 10);
+        const params = [dateStr];
+        let where = 'c.checkin_date = ?';
+        if (branch_id) { where += ' AND c.branch_id = ?'; params.push(branch_id); }
+
+        const [rows] = await pool.query(
+            `SELECT c.id, c.painter_id, p.full_name AS painter_name, p.profile_photo,
+                    c.branch_id, b.name AS branch_name,
+                    c.checkin_at, c.distance_meters, c.selfie_path,
+                    c.status, c.rejected_reason, c.points_awarded
+             FROM painter_attendance_checkins c
+             JOIN painters p ON p.id = c.painter_id
+             JOIN branches b ON b.id = c.branch_id
+             WHERE ${where}
+             ORDER BY c.checkin_at DESC`,
+            params
+        );
+        res.json({ date: dateStr, checkins: rows });
+    } catch (err) {
+        console.error('today error:', err);
+        res.status(500).json({ error: 'Failed to load today' });
+    }
+});
+
+router.get('/attendance/monthly', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const monthKey = req.query.month || (() => {
+            const d = new Date(); d.setMonth(d.getMonth() - 1);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        })();
+        const branchId = req.query.branch_id;
+        const params = [monthKey];
+        let branchFilter = '';
+        if (branchId) {
+            branchFilter = `AND p.id IN (SELECT DISTINCT painter_id FROM painter_attendance_checkins WHERE branch_id=? AND month_key=?)`;
+            params.push(branchId, monthKey);
+        }
+        const [rows] = await pool.query(
+            `SELECT m.*, p.full_name, p.profile_photo
+             FROM painter_attendance_monthly m
+             JOIN painters p ON p.id = m.painter_id
+             WHERE m.month_key=? ${branchFilter}
+             ORDER BY m.total_ap_earned DESC`,
+            params
+        );
+        res.json({ month_key: monthKey, rows });
+    } catch (err) {
+        console.error('monthly error:', err);
+        res.status(500).json({ error: 'Failed to load monthly' });
+    }
+});
+
+router.get('/:painterId/attendance/calendar', requirePermission('painters', 'manage'), async (req, res) => {
+    try {
+        const painterId = parseInt(req.params.painterId, 10);
+        const monthKey = req.query.month || (() => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        })();
+        const [checkins] = await pool.query(
+            `SELECT c.*, b.name AS branch_name, u.full_name AS rejected_by_name
+             FROM painter_attendance_checkins c
+             JOIN branches b ON b.id = c.branch_id
+             LEFT JOIN users u ON u.id = c.rejected_by
+             WHERE c.painter_id=? AND c.month_key=?
+             ORDER BY c.checkin_date`,
+            [painterId, monthKey]
+        );
+        const [monthlyRows] = await pool.query(
+            'SELECT * FROM painter_attendance_monthly WHERE painter_id=? AND month_key=?',
+            [painterId, monthKey]
+        );
+        res.json({ month_key: monthKey, checkins, monthly: monthlyRows[0] || null });
+    } catch (err) {
+        console.error('calendar error:', err);
+        res.status(500).json({ error: 'Failed to load calendar' });
+    }
+});
+
 // --- REFERRALS (ADMIN) ---
 
 router.get('/referrals', requireAuth, async (req, res) => {
