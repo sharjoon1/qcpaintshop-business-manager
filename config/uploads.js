@@ -31,7 +31,8 @@ const uploadDirs = [
     'public/uploads/painter-cards',
     'public/uploads/painter-visualizations',
     'uploads/vendor-bills',
-    'uploads/dpl-pdfs'
+    'uploads/dpl-pdfs',
+    'public/uploads/admin-notif-images'
 ];
 
 function ensureUploadDirs() {
