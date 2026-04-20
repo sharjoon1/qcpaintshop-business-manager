@@ -4387,7 +4387,7 @@ function handleAudienceTypeChange() {
 
 async function loadNotifBranches() {
     try {
-        const r = await fetch('/api/branches', { headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') } });
+        const r = await fetch('/api/branches', { headers: authHeaders() });
         const d = await r.json();
         notifBranches = d.branches || d || [];
         const container = document.getElementById('notif-branch-chips');
@@ -4414,7 +4414,7 @@ async function handleNotifImageUpload(input) {
     try {
         const r = await fetch('/api/admin-notifications/upload-image', {
             method: 'POST',
-            headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') },
+            headers: { Authorization: authHeaders().Authorization },
             body: formData,
         });
         const d = await r.json();
@@ -4517,6 +4517,10 @@ async function sendAdminNotification() {
     const offerUrl = document.getElementById('notif-offer-url').value.trim();
     const audienceType = document.getElementById('notif-audience-type').value;
     const audienceValue = getNotifAudienceValue();
+    if (audienceType !== 'all' && (!audienceValue || audienceValue.length === 0)) {
+        alert('Please select at least one option for the chosen audience type.');
+        return;
+    }
 
     if (!title) { alert('Title is required'); return; }
     if (!body) { alert('Message is required'); return; }
@@ -4530,7 +4534,7 @@ async function sendAdminNotification() {
         const countParams = new URLSearchParams({ audienceType });
         if (audienceValue) countParams.set('audienceValue', JSON.stringify(audienceValue));
         const cntR = await fetch('/api/admin-notifications/audience-count?' + countParams, {
-            headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') }
+            headers: authHeaders()
         });
         const cntD = await cntR.json();
         const count = cntD.count || 0;
@@ -4551,10 +4555,7 @@ async function sendAdminNotification() {
         btn.textContent = 'Sending...';
         const r = await fetch('/api/admin-notifications', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: 'Bearer ' + localStorage.getItem('auth_token'),
-            },
+            headers: authHeaders(),
             body: JSON.stringify({
                 title, body,
                 imageUrl: notifSelectedImageUrl || undefined,
@@ -4595,7 +4596,7 @@ async function loadNotifHistory(page = 1) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">Loading...</td></tr>';
     try {
         const r = await fetch('/api/admin-notifications?page=' + page + '&limit=20', {
-            headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') }
+            headers: authHeaders()
         });
         const d = await r.json();
         notifTotalPages = Math.ceil((d.total || 0) / 20) || 1;
@@ -4611,11 +4612,11 @@ async function loadNotifHistory(page = 1) {
         }
         tbody.innerHTML = d.notifications.map(n => `
             <tr>
-                <td style="font-size:0.8rem;white-space:nowrap;">${new Date(n.sent_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+                <td style="font-size:0.8rem;white-space:nowrap;">${new Date(n.sent_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
                 <td style="font-size:0.85rem;font-weight:500;">${esc(n.title)}</td>
-                <td><span style="padding:0.2rem 0.6rem;border-radius:999px;font-size:0.75rem;background:${n.type==='offer'?'#fef9c3':'#e0e7ff'};color:${n.type==='offer'?'#92400e':'#3730a3'};">${n.type}</span></td>
-                <td style="font-size:0.8rem;">${n.audience_type}</td>
-                <td style="font-size:0.85rem;font-weight:600;">${n.reach_count}</td>
+                <td><span style="padding:0.2rem 0.6rem;border-radius:999px;font-size:0.75rem;background:${n.type==='offer'?'#fef9c3':'#e0e7ff'};color:${n.type==='offer'?'#92400e':'#3730a3'};">${esc(n.type)}</span></td>
+                <td style="font-size:0.8rem;">${esc(n.audience_type)}</td>
+                <td style="font-size:0.85rem;font-weight:600;">${Number(n.reach_count)}</td>
                 <td><button onclick="viewNotifDetail(${n.id})" style="padding:0.25rem 0.6rem;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;font-size:0.75rem;cursor:pointer;">View</button></td>
             </tr>
         `).join('');
@@ -4630,7 +4631,7 @@ async function viewNotifDetail(id) {
     document.getElementById('notif-detail-content').innerHTML = '<div style="text-align:center;padding:2rem;color:#94a3b8;">Loading...</div>';
     try {
         const r = await fetch('/api/admin-notifications/' + id, {
-            headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') }
+            headers: authHeaders()
         });
         const d = await r.json();
         const n = d.notification;
@@ -4638,12 +4639,12 @@ async function viewNotifDetail(id) {
         document.getElementById('notif-detail-content').innerHTML = `
             <h3 style="margin:0 0 1rem;font-size:1rem;">${esc(n.title)}</h3>
             <p style="color:#475569;font-size:0.875rem;margin:0 0 1rem;">${esc(n.body)}</p>
-            ${n.image_url ? `<img src="${n.image_url}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;">` : ''}
+            ${n.image_url ? `<img src="${esc(n.image_url)}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;">` : ''}
             ${n.offer_url ? `<p style="font-size:0.8rem;"><strong>Offer URL:</strong> <a href="${esc(n.offer_url)}" target="_blank">${esc(n.offer_url)}</a></p>` : ''}
             <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;">
-                <div style="font-size:0.8rem;"><strong>Type:</strong> ${n.type}</div>
-                <div style="font-size:0.8rem;"><strong>Audience:</strong> ${n.audience_type}</div>
-                <div style="font-size:0.8rem;"><strong>Reach:</strong> ${n.reach_count} painters</div>
+                <div style="font-size:0.8rem;"><strong>Type:</strong> ${esc(n.type)}</div>
+                <div style="font-size:0.8rem;"><strong>Audience:</strong> ${esc(n.audience_type)}</div>
+                <div style="font-size:0.8rem;"><strong>Reach:</strong> ${Number(n.reach_count)} painters</div>
             </div>
             ${audience ? `<div style="font-size:0.8rem;color:#64748b;"><strong>Filter values:</strong> ${JSON.stringify(audience)}</div>` : ''}
             <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.75rem;">${new Date(n.sent_at).toLocaleString('en-IN')}</div>
