@@ -40,6 +40,30 @@ async function getBalance(painterId) {
 
 async function addPoints(painterId, pointPool, amount, source, refId, refType, description, createdBy) {
     if (amount <= 0) return;
+
+    // Net out pending clawbacks first (regular pool only)
+    if (pointPool === 'regular' && amount > 0) {
+        const [pending] = await pool.query(
+            'SELECT id, amount FROM painter_clawback_pending WHERE painter_id=? AND settled_at IS NULL ORDER BY created_at',
+            [painterId]
+        );
+        let remaining = amount;
+        for (const row of pending) {
+            if (remaining <= 0) break;
+            const deduct = Math.min(remaining, row.amount);
+            if (deduct === row.amount) {
+                await pool.query('UPDATE painter_clawback_pending SET settled_at=NOW() WHERE id=?', [row.id]);
+            } else {
+                await pool.query('UPDATE painter_clawback_pending SET amount = amount - ? WHERE id=?', [deduct, row.id]);
+            }
+            remaining -= deduct;
+        }
+        if (remaining <= 0) {
+            return 0; // entire credit absorbed by clawbacks
+        }
+        amount = remaining;
+    }
+
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
@@ -565,6 +589,13 @@ async function checkLevelUp(painterId) {
     return null;
 }
 
+async function queueClawback(painterId, amount, reason, source = 'attendance') {
+    await pool.query(
+        'INSERT INTO painter_clawback_pending (painter_id, amount, reason, source) VALUES (?, ?, ?, ?)',
+        [painterId, amount, reason, source]
+    );
+}
+
 module.exports = {
     setPool,
     getReferralTier,
@@ -582,5 +613,6 @@ module.exports = {
     generateReferralCode,
     getLevelMultiplier,
     addPointsWithMultiplier,
-    checkLevelUp
+    checkLevelUp,
+    queueClawback
 };
