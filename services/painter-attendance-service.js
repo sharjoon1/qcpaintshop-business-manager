@@ -12,4 +12,15 @@ function haversineMeters(lat1, lng1, lat2, lng2) {
     return Math.round(EARTH_RADIUS_M * c);
 }
 
-module.exports = { haversineMeters };
+function computeClaimPct(rupeesBilled, cfg) {
+    if (!rupeesBilled || rupeesBilled <= 0) return 0;
+    const raw = Math.floor(rupeesBilled / cfg.rupeesPerPct);
+    return Math.min(cfg.maxPct, raw);
+}
+
+function computeClaimableAp(totalAp, claimPct) {
+    if (!totalAp || !claimPct) return 0;
+    return Math.floor(totalAp * claimPct / 100);
+}
+
+module.exports = { haversineMeters, computeClaimPct, computeClaimableAp };
