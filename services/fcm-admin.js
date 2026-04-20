@@ -118,6 +118,11 @@ async function sendToDevices(tokens, { title, body, imageUrl, type, offerUrl }) 
         return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
 
+    if (tokens.length > 500) {
+        console.error(`[FCM Admin] sendToDevices called with ${tokens.length} tokens — FCM cap is 500. Use batches of 500.`);
+        return { successCount: 0, failureCount: tokens.length, invalidTokens: [], error: 'Token batch exceeds FCM limit of 500' };
+    }
+
     const data = {
         type: type || 'info',
         offerUrl: offerUrl || '',
