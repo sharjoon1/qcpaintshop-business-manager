@@ -1791,13 +1791,18 @@
 
     async function shareVisitingCard() {
         if (!visitingCardUrl) await loadVisitingCard();
-        const code = dashboardData?.referralCode || '';
         const name = dashboardData?.painterName || '';
-        const text = `நான் Quality Colours பதிவு செய்யப்பட்ட பெயிண்டர்.\n` +
-            `உங்கள் அனைத்து பெயிண்டிங் தேவைகளுக்கும் என்னை தொடர்பு கொள்ளுங்கள்!\n\n` +
-            `I am a Quality Colours registered painter. Contact me for all your painting needs!\n\n` +
-            `${window.location.origin}/painter-register.html?ref=${code}`;
-        await shareCardFile(visitingCardUrl, 'QC-Painter-Card.png', name || 'QC Painter', text);
+        const phone = dashboardData?.phone || '';
+        const city = dashboardData?.city || '';
+        const lines = [
+            `${name || 'Professional Painter'}`,
+            city ? `📍 ${city}` : null,
+            phone ? `📞 ${phone}` : null,
+            '',
+            'உங்கள் அனைத்து பெயிண்டிங் தேவைகளுக்கும் என்னை தொடர்பு கொள்ளுங்கள்.',
+            'Contact me for all your painting needs.'
+        ].filter(Boolean);
+        await shareCardFile(visitingCardUrl, 'Painter-Card.png', name || 'Painter Card', lines.join('\n'));
     }
 
     async function shareIdCard() {
