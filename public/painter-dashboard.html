@@ -292,6 +292,19 @@
             </div>
         </div>
 
+        <div class="mt-3 mb-4 p-3 rounded-lg bg-green-50 border border-green-200" id="attendance-hero" style="display:none">
+            <div class="flex items-center justify-between gap-2">
+                <div>
+                    <div class="text-xs text-green-800 font-medium">This Month Attendance</div>
+                    <div class="text-lg font-bold text-green-900" id="att-hero-summary">— check-ins · — AP</div>
+                    <div class="text-xs text-gray-600" id="att-hero-preview"></div>
+                </div>
+                <div class="flex gap-2 flex-shrink-0">
+                    <button id="btn-claim-ap" onclick="claimAp()" style="display:none" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-medium">Claim</button>
+                </div>
+            </div>
+        </div>
+
         <div class="grid grid-cols-2 gap-3 mb-6">
             <div class="stat-card">
                 <div class="stat-value text-lg text-green-600" id="totalEarned">0</div>
@@ -2205,12 +2218,56 @@
     loadVisitingCard();
     loadIdCard();
     loadVisualizations();
+    loadAttendanceHero();
 
     // Defer socket and FCM after page load
     window.addEventListener('load', () => {
         initSocket();
         registerFCMToken();
     });
+
+    // ═══════════════════════════════════════
+    // ATTENDANCE HERO (AP)
+    // ═══════════════════════════════════════
+    async function loadAttendanceHero() {
+        const tok = localStorage.getItem('painter_token');
+        if (!tok) return;
+        try {
+            const r = await fetch('/api/me/attendance/month', { headers: { 'X-Painter-Token': tok } });
+            if (!r.ok) return;
+            const d = await r.json();
+            const host = document.getElementById('attendance-hero');
+            if (!host) return;
+            host.style.display = '';
+            document.getElementById('att-hero-summary').textContent = `${d.total_checkins || 0} check-ins · ${d.total_ap_earned || 0} AP`;
+            const preview = d.claimable_ap_preview || 0;
+            const billed = Number(d.monthly_customer_billed_preview || 0);
+            document.getElementById('att-hero-preview').textContent = `≈ ${preview} claimable (₹${billed.toLocaleString('en-IN')} bills, ${d.claim_pct_preview || 0}%)`;
+            if (d.claim_status === 'available' && preview > 0) {
+                const btn = document.getElementById('btn-claim-ap');
+                btn.style.display = '';
+                btn.textContent = `Claim ${preview} AP`;
+                btn.dataset.month = d.month_key;
+            }
+        } catch (e) { console.warn('att hero failed', e); }
+    }
+
+    async function claimAp() {
+        const btn = document.getElementById('btn-claim-ap');
+        const month = btn.dataset.month;
+        if (!month) return;
+        if (!confirm(`Claim AP for ${month}?`)) return;
+        try {
+            const r = await fetch('/api/me/attendance/claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Painter-Token': localStorage.getItem('painter_token') },
+                body: JSON.stringify({ month_key: month })
+            });
+            const d = await r.json();
+            if (r.ok) { alert(`Claimed ${d.claimed_ap} AP`); location.reload(); }
+            else alert('Failed: ' + (d.error || 'Unknown error'));
+        } catch (e) { alert('Failed: ' + e.message); }
+    }
     </script>
 
     <!-- Streak Calendar Bottom Sheet -->
