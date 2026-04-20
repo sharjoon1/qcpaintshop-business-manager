@@ -2481,6 +2481,34 @@ router.get('/me/attendance/history', requirePainterAuth, async (req, res) => {
     }
 });
 
+router.post('/me/attendance/claim', requirePainterAuth, async (req, res) => {
+    try {
+        const monthKey = req.body.month_key;
+        if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey)) {
+            return res.status(400).json({ error: 'month_key required (YYYY-MM)' });
+        }
+        const result = await attendanceService.claimMonth(req.painter.id, monthKey);
+
+        try {
+            const painterNotif = require('../services/painter-notification-service');
+            await painterNotif.sendToPainter(req.painter.id, {
+                type: 'attendance_claimed_success',
+                title: `✓ Claimed ${result.claimed_ap} AP`,
+                title_ta: `✓ ${result.claimed_ap} AP கிளைம் ஆகிவிட்டது`,
+                body: `${result.claimed_ap} AP added to your Regular points.`,
+                body_ta: `${result.claimed_ap} AP உங்கள் Regular புள்ளிகளில் சேர்க்கப்பட்டது.`,
+                data: { screen: 'points' }
+            });
+        } catch (e) {}
+
+        res.json(result);
+    } catch (err) {
+        if (err.status) return res.status(err.status).json({ code: err.code, error: err.message });
+        console.error('claim error:', err);
+        res.status(500).json({ error: 'Claim failed' });
+    }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // PAINTER NOTIFICATION & FCM ENDPOINTS (/me/fcm/*, /me/notifications/*)
 // ═══════════════════════════════════════════════════════════════

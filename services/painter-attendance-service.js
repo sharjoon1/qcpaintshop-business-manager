@@ -112,4 +112,57 @@ async function recordCheckin({ painterId, branchId, lat, lng, selfiePath, distan
     }
 }
 
-module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig, findNearbyBranches, recordCheckin, recomputeMonthly };
+const pointsEngine = require('./painter-points-engine');
+
+async function claimMonth(painterId, monthKey) {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        const [rows] = await conn.query(
+            'SELECT * FROM painter_attendance_monthly WHERE painter_id=? AND month_key=? FOR UPDATE',
+            [painterId, monthKey]
+        );
+        if (rows.length === 0) throw { status: 400, code: 'NO_MONTH_ROW', message: 'No attendance record for that month' };
+        const m = rows[0];
+
+        if (m.claim_status !== 'available') {
+            throw { status: 400, code: 'CLAIM_NOT_AVAILABLE', message: `Claim status is ${m.claim_status}` };
+        }
+        const now = new Date();
+        if (m.claim_window_closes_at && new Date(m.claim_window_closes_at) < now) {
+            throw { status: 400, code: 'CLAIM_WINDOW_CLOSED', message: 'Claim window has closed' };
+        }
+        if (m.claimable_ap <= 0) throw { status: 400, code: 'NO_CLAIMABLE_AP', message: 'Nothing to claim' };
+
+        await conn.query(
+            `INSERT INTO painter_attendance_ledger (painter_id, month_key, type, ap_delta, reason)
+             VALUES (?, ?, 'claim', ?, 'Attendance AP claim')`,
+            [painterId, monthKey, -m.claimable_ap]
+        );
+
+        await conn.query(
+            `UPDATE painter_attendance_monthly
+             SET claim_status='claimed', ap_claimed=?, claimed_at=NOW()
+             WHERE id=?`,
+            [m.claimable_ap, m.id]
+        );
+
+        await conn.commit();
+
+        await pointsEngine.addPoints(
+            painterId, 'regular', m.claimable_ap,
+            'attendance_claim', m.id, 'attendance_monthly',
+            `Attendance claim ${monthKey}`, null
+        );
+
+        return { claimed_ap: m.claimable_ap, month_key: monthKey };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
+module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig, findNearbyBranches, recordCheckin, recomputeMonthly, claimMonth };
