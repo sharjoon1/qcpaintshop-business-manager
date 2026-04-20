@@ -59,4 +59,57 @@ async function findNearbyBranches(lat, lng, maxMeters = 1000) {
         .sort((a, b) => a.distance_meters - b.distance_meters);
 }
 
-module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig, findNearbyBranches };
+async function recomputeMonthly(painterId, monthKey, connection = null) {
+    const conn = connection || pool;
+    const [rows] = await conn.query(
+        `SELECT COUNT(*) AS cnt, COALESCE(SUM(points_awarded),0) AS ap
+         FROM painter_attendance_checkins
+         WHERE painter_id = ? AND month_key = ? AND status='approved'`,
+        [painterId, monthKey]
+    );
+    const totalCheckins = rows[0].cnt;
+    const totalAp = rows[0].ap;
+    await conn.query(
+        `INSERT INTO painter_attendance_monthly (painter_id, month_key, total_checkins, total_ap_earned)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE total_checkins = VALUES(total_checkins), total_ap_earned = VALUES(total_ap_earned)`,
+        [painterId, monthKey, totalCheckins, totalAp]
+    );
+    return { totalCheckins, totalAp };
+}
+
+async function recordCheckin({ painterId, branchId, lat, lng, selfiePath, distanceMeters, pointsPerDay }) {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        const monthKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+
+        const [result] = await conn.query(
+            `INSERT INTO painter_attendance_checkins
+             (painter_id, branch_id, checkin_date, checkin_at, latitude, longitude, distance_meters, selfie_path, status, points_awarded)
+             VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, 'approved', ?)`,
+            [painterId, branchId, dateStr, lat, lng, distanceMeters, selfiePath, pointsPerDay]
+        );
+        const checkinId = result.insertId;
+
+        await conn.query(
+            `INSERT INTO painter_attendance_ledger (painter_id, month_key, checkin_id, type, ap_delta, reason)
+             VALUES (?, ?, ?, 'earn', ?, 'Check-in')`,
+            [painterId, monthKey, checkinId, pointsPerDay]
+        );
+
+        await recomputeMonthly(painterId, monthKey, conn);
+        await conn.commit();
+        return { checkinId, monthKey };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
+module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig, findNearbyBranches, recordCheckin, recomputeMonthly };
