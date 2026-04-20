@@ -18,6 +18,7 @@ const cardGenerator = require('../services/painter-card-generator');
 const painterNotificationService = require('../services/painter-notification-service');
 const notificationService = require('../services/notification-service');
 const { generatePainterEstimatePDF } = require('./painter-estimate-pdf-generator');
+const attendanceService = require('../services/painter-attendance-service');
 
 let pool;
 let io;
@@ -27,6 +28,7 @@ function setPool(p) {
     pool = p;
     pointsEngine.setPool(p);
     zohoAPI.setPool(p);
+    attendanceService.setPool(p);
 }
 
 function setIO(ioInstance) { io = ioInstance; }
@@ -2301,6 +2303,107 @@ router.get('/me/attendance/monthly', requirePainterAuth, async (req, res) => {
     } catch (error) {
         console.error('Monthly attendance error:', error);
         res.status(500).json({ success: false, message: 'Failed to load attendance history' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PAINTER SELFIE-ATTENDANCE V2 ENDPOINTS (new system)
+// ═══════════════════════════════════════════════════════════════
+
+router.get('/me/attendance/branches-nearby', requirePainterAuth, async (req, res) => {
+    try {
+        const lat = parseFloat(req.query.lat);
+        const lng = parseFloat(req.query.lng);
+        if (!isFinite(lat) || !isFinite(lng)) {
+            return res.status(400).json({ error: 'lat and lng required' });
+        }
+        const branches = await attendanceService.findNearbyBranches(lat, lng, 1000);
+        res.json({ branches });
+    } catch (err) {
+        console.error('nearby branches error:', err);
+        res.status(500).json({ error: 'Failed to load branches' });
+    }
+});
+
+router.post('/me/attendance/checkin', requirePainterAuth, uploadPainterAttendance.single('selfie'), async (req, res) => {
+    const painterId = req.painter.id;
+    const branchId = parseInt(req.body.branch_id, 10);
+    const lat = parseFloat(req.body.latitude);
+    const lng = parseFloat(req.body.longitude);
+
+    try {
+        if (!req.file) return res.status(400).json({ code: 'SELFIE_REQUIRED', error: 'Selfie image required' });
+        if (!isFinite(lat) || !isFinite(lng) || !branchId) {
+            return res.status(400).json({ error: 'branch_id, latitude, longitude required' });
+        }
+
+        const cfg = await attendanceService.loadConfig();
+        if (!cfg.enabled) return res.status(503).json({ error: 'Attendance temporarily disabled' });
+
+        const [branchRows] = await pool.query(
+            "SELECT id, name, latitude, longitude FROM branches WHERE id=? AND status='active'",
+            [branchId]
+        );
+        if (branchRows.length === 0) return res.status(400).json({ code: 'BRANCH_INACTIVE', error: 'Branch not found or inactive' });
+        const branch = branchRows[0];
+        if (branch.latitude == null || branch.longitude == null) {
+            return res.status(400).json({ code: 'BRANCH_NO_GPS', error: 'Branch has no GPS set' });
+        }
+
+        const distance = attendanceService.haversineMeters(lat, lng, Number(branch.latitude), Number(branch.longitude));
+        if (distance > cfg.geofenceMeters) {
+            const nearby = await attendanceService.findNearbyBranches(lat, lng, 5000);
+            const closest = nearby[0] || null;
+            return res.status(400).json({
+                code: 'OUTSIDE_GEOFENCE',
+                distance_meters: distance,
+                max_meters: cfg.geofenceMeters,
+                closest_branch: closest ? { id: closest.branch_id, name: closest.name, distance_meters: closest.distance_meters } : null,
+                error: `You are ${distance}m from ${branch.name}. Must be within ${cfg.geofenceMeters}m.`
+            });
+        }
+
+        const pad = n => String(n).padStart(2, '0');
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+        const [dup] = await pool.query(
+            "SELECT id, checkin_at, branch_id FROM painter_attendance_checkins WHERE painter_id=? AND checkin_date=?",
+            [painterId, dateStr]
+        );
+        if (dup.length > 0) {
+            return res.status(409).json({
+                code: 'ALREADY_CHECKED_IN',
+                existing_checkin: dup[0],
+                error: 'Already checked in today'
+            });
+        }
+
+        const selfiePath = req.file.path.replace(/\\/g, '/').replace(/^public\//, '/');
+        const result = await attendanceService.recordCheckin({
+            painterId, branchId, lat, lng, selfiePath,
+            distanceMeters: distance, pointsPerDay: cfg.pointsPerDay
+        });
+
+        try {
+            const painterNotif = require('../services/painter-notification-service');
+            await painterNotif.sendToPainter(painterId, {
+                type: 'attendance_checkin_confirmed',
+                title: `✓ Check-in confirmed at ${branch.name}`,
+                title_ta: `✓ ${branch.name}-ல் சரிபார்ப்பு வெற்றி`,
+                body: `${cfg.pointsPerDay} AP earned for today.`,
+                body_ta: `இன்று ${cfg.pointsPerDay} AP சேர்க்கப்பட்டது.`,
+                data: { screen: 'attendance', checkin_id: String(result.checkinId) }
+            });
+        } catch (e) { console.warn('notif failed:', e.message); }
+
+        res.json({
+            checkin_id: result.checkinId,
+            ap_earned: cfg.pointsPerDay,
+            month_key: result.monthKey
+        });
+    } catch (err) {
+        console.error('checkin error:', err);
+        res.status(500).json({ error: 'Check-in failed', detail: err.message });
     }
 });
 
