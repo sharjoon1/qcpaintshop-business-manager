@@ -82,7 +82,14 @@ router.post('/upload-image', requirePermission('painters', 'manage'), upload.sin
 router.get('/audience-count', requirePermission('painters', 'manage'), async (req, res) => {
     try {
         const { audienceType = 'all' } = req.query;
-        const audienceValue = req.query.audienceValue ? JSON.parse(req.query.audienceValue) : null;
+        let audienceValue = null;
+        if (req.query.audienceValue) {
+            try {
+                audienceValue = JSON.parse(req.query.audienceValue);
+            } catch {
+                return res.status(400).json({ success: false, message: 'Invalid audienceValue JSON' });
+            }
+        }
         const tokens = await getTargetTokens(audienceType, audienceValue);
         res.json({ success: true, count: tokens.length });
     } catch (err) {
@@ -126,7 +133,6 @@ router.post('/', requirePermission('painters', 'manage'), async (req, res) => {
         const tokenRows = await getTargetTokens(audienceType, audienceValue || null);
         const allTokens = tokenRows.map(r => r.fcm_token);
 
-        let successCount = 0;
         const allInvalidTokens = [];
 
         if (allTokens.length > 0) {
@@ -141,7 +147,6 @@ router.post('/', requirePermission('painters', 'manage'), async (req, res) => {
                     type,
                     offerUrl: offerUrl || '',
                 });
-                successCount += result.successCount || 0;
                 if (result.invalidTokens?.length) allInvalidTokens.push(...result.invalidTokens);
             }
         }
@@ -174,7 +179,10 @@ router.post('/', requirePermission('painters', 'manage'), async (req, res) => {
 // GET /:id — notification detail
 router.get('/:id', requirePermission('painters', 'manage'), async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM admin_notifications WHERE id = ?', [req.params.id]);
+        const [rows] = await pool.query(
+            'SELECT id, title, body, image_url, type, offer_url, audience_type, audience_value, reach_count, sent_at, created_by FROM admin_notifications WHERE id = ?',
+            [req.params.id]
+        );
         if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
         res.json({ success: true, notification: rows[0] });
     } catch (err) {
