@@ -100,4 +100,69 @@ async function sendToDevice(fcmToken, { title, body, data, ttlSeconds }) {
     }
 }
 
-module.exports = { sendToDevice, isInitialized: () => initialized };
+/**
+ * Send a push notification to multiple devices (batch, up to 500 tokens per call)
+ * Uses FCM sendEachForMulticast for efficient batching.
+ *
+ * @param {string[]} tokens - Array of FCM tokens (max 500 per call)
+ * @param {Object} opts
+ * @param {string} opts.title
+ * @param {string} opts.body
+ * @param {string} [opts.imageUrl] - Publicly accessible HTTPS image URL (FCM big picture)
+ * @param {string} [opts.type] - 'info' | 'offer'
+ * @param {string} [opts.offerUrl] - URL to open when offer is tapped
+ * @returns {Promise<{ successCount: number, failureCount: number, invalidTokens: string[] }>}
+ */
+async function sendToDevices(tokens, { title, body, imageUrl, type, offerUrl }) {
+    if (!initialized || !tokens || tokens.length === 0) {
+        return { successCount: 0, failureCount: 0, invalidTokens: [] };
+    }
+
+    const data = {
+        type: type || 'info',
+        offerUrl: offerUrl || '',
+    };
+
+    const message = {
+        tokens,
+        notification: {
+            title,
+            body,
+            ...(imageUrl ? { imageUrl } : {}),
+        },
+        android: {
+            priority: 'high',
+            notification: {
+                channelId: 'qc_admin_channel',
+                sound: 'app_notification',
+                notificationPriority: 'PRIORITY_HIGH',
+                defaultVibrateTimings: true,
+            },
+        },
+        data,
+    };
+
+    try {
+        const result = await admin.messaging().sendEachForMulticast(message);
+        const invalidTokens = [];
+        result.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+                const code = resp.error?.code || '';
+                if (
+                    code === 'messaging/registration-token-not-registered' ||
+                    code === 'messaging/invalid-registration-token' ||
+                    code === 'messaging/invalid-argument'
+                ) {
+                    invalidTokens.push(tokens[idx]);
+                }
+            }
+        });
+        console.log(`[FCM Admin] sendToDevices: ${result.successCount}/${tokens.length} sent`);
+        return { successCount: result.successCount, failureCount: result.failureCount, invalidTokens };
+    } catch (err) {
+        console.error(`[FCM Admin] sendToDevices error: ${err.message}`);
+        return { successCount: 0, failureCount: tokens.length, invalidTokens: [], error: err.message };
+    }
+}
+
+module.exports = { sendToDevice, sendToDevices, isInitialized: () => initialized };
