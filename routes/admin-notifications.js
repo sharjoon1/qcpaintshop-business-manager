@@ -32,7 +32,7 @@ function buildAudienceQuery(audienceType, audienceValue) {
     let sql = `SELECT DISTINCT pft.fcm_token
                FROM painter_fcm_tokens pft
                JOIN painters p ON p.id = pft.painter_id
-               WHERE p.status = 'active' AND pft.is_active = 1 AND pft.fcm_token IS NOT NULL`;
+               WHERE p.status = 'approved' AND pft.is_active = 1 AND pft.fcm_token IS NOT NULL`;
     const params = [];
 
     if (audienceType === 'branch' && Array.isArray(audienceValue) && audienceValue.length) {
