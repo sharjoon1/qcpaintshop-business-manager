@@ -43,4 +43,20 @@ function computeClaimableAp(totalAp, claimPct) {
     return Math.floor(totalAp * claimPct / 100);
 }
 
-module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig };
+async function findNearbyBranches(lat, lng, maxMeters = 1000) {
+    const [rows] = await pool.query(
+        "SELECT id, name, latitude, longitude FROM branches WHERE status='active' AND latitude IS NOT NULL AND longitude IS NOT NULL"
+    );
+    return rows
+        .map(b => ({
+            branch_id: b.id,
+            name: b.name,
+            latitude: Number(b.latitude),
+            longitude: Number(b.longitude),
+            distance_meters: haversineMeters(lat, lng, Number(b.latitude), Number(b.longitude))
+        }))
+        .filter(b => b.distance_meters <= maxMeters)
+        .sort((a, b) => a.distance_meters - b.distance_meters);
+}
+
+module.exports = { haversineMeters, computeClaimPct, computeClaimableAp, setPool, loadConfig, findNearbyBranches };

@@ -39,3 +39,39 @@ describe('computeClaimableAp', () => {
     test('0 AP × 100% → 0', () => expect(computeClaimableAp(0, 100)).toBe(0));
     test('2000 AP × 100% → 2000', () => expect(computeClaimableAp(2000, 100)).toBe(2000));
 });
+
+const service = require('../../services/painter-attendance-service');
+
+describe('findNearbyBranches', () => {
+    let mockPool;
+    beforeEach(() => {
+        mockPool = {
+            query: jest.fn().mockResolvedValue([[
+                { id: 1, name: 'Chennai Main', latitude: 13.0827, longitude: 80.2707 },
+                { id: 2, name: 'T. Nagar', latitude: 13.0418, longitude: 80.2341 }
+            ]])
+        };
+        service.setPool(mockPool);
+    });
+
+    test('returns branches within 1km sorted by distance', async () => {
+        const results = await service.findNearbyBranches(13.0830, 80.2710, 1000);
+        expect(results.length).toBeGreaterThanOrEqual(1);
+        expect(results[0].branch_id).toBe(1);
+        expect(results[0].distance_meters).toBeLessThan(100);
+    });
+
+    test('excludes branches beyond max distance', async () => {
+        const results = await service.findNearbyBranches(13.0830, 80.2710, 500);
+        expect(results.every(r => r.distance_meters <= 500)).toBe(true);
+    });
+
+    test('excludes branches with null GPS', async () => {
+        mockPool.query.mockResolvedValue([[
+            { id: 1, name: 'Has GPS', latitude: 13.0827, longitude: 80.2707 },
+            { id: 2, name: 'No GPS', latitude: null, longitude: null }
+        ]]);
+        const results = await service.findNearbyBranches(13.0830, 80.2710, 5000);
+        expect(results.map(r => r.branch_id)).toEqual([1]);
+    });
+});
