@@ -1213,6 +1213,13 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="flex items-center justify-between mt-3">
+                            <button id="notif-prev-btn" onclick="loadNotifHistory(notifCurrentPage - 1)"
+                                class="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50">← Prev</button>
+                            <span id="notif-page-label" class="text-sm text-gray-500">Page 1</span>
+                            <button id="notif-next-btn" onclick="loadNotifHistory(notifCurrentPage + 1)"
+                                class="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50">Next →</button>
+                        </div>
                     </div>
 
                     <!-- Detail Modal -->
@@ -4347,6 +4354,8 @@ let notifSelectedType = 'info';
 let notifCityTags = [];
 let notifSelectedPainterIds = [];
 let notifBranches = [];
+let notifCurrentPage = 1;
+let notifTotalPages = 1;
 
 function switchNotifTab(tab) {
     document.getElementById('notif-panel-compose').style.display = tab === 'compose' ? 'block' : 'none';
@@ -4430,8 +4439,9 @@ function clearNotifImage() {
 }
 
 function handleCityTagInput(e) {
-    if (e.key !== 'Enter') return;
-    const val = e.target.value.trim();
+    if (e.key !== 'Enter' && e.key !== ',') return;
+    e.preventDefault();
+    const val = e.target.value.trim().replace(/,$/, '');
     if (!val || notifCityTags.includes(val)) { e.target.value = ''; return; }
     notifCityTags.push(val);
     e.target.value = '';
@@ -4579,14 +4589,22 @@ async function sendAdminNotification() {
     }
 }
 
-async function loadNotifHistory() {
+async function loadNotifHistory(page = 1) {
+    notifCurrentPage = page;
     const tbody = document.getElementById('notif-history-body');
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">Loading...</td></tr>';
     try {
-        const r = await fetch('/api/admin-notifications?page=1&limit=20', {
+        const r = await fetch('/api/admin-notifications?page=' + page + '&limit=20', {
             headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') }
         });
         const d = await r.json();
+        notifTotalPages = Math.ceil((d.total || 0) / 20) || 1;
+        const pageLabel = document.getElementById('notif-page-label');
+        const prevBtn = document.getElementById('notif-prev-btn');
+        const nextBtn = document.getElementById('notif-next-btn');
+        if (pageLabel) pageLabel.textContent = 'Page ' + page + ' of ' + notifTotalPages;
+        if (prevBtn) prevBtn.disabled = page <= 1;
+        if (nextBtn) nextBtn.disabled = page >= notifTotalPages;
         if (!d.notifications?.length) {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#94a3b8;">No notifications sent yet.</td></tr>';
             return;
