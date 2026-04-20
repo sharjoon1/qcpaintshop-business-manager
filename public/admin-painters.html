@@ -4465,7 +4465,7 @@ function searchPaintersForNotif(q) {
     painterSearchTimer = setTimeout(async () => {
         try {
             const r = await fetch('/api/painters?search=' + encodeURIComponent(q) + '&limit=10', {
-                headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') }
+                headers: authHeaders()
             });
             const d = await r.json();
             const painters = d.painters || d.data || [];
