@@ -2504,6 +2504,12 @@
             return u;
         }
 
+        // ── JS-string-safe escape for single-quote-delimited onclick/oninput args ────
+        function escJS(s) {
+            if (s == null) return '';
+            return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+        }
+
         // ── Client-side color extraction (mirrors services/color-extractor.js) ─────
         const CLIENT_COLOR_MAP = {
             'off white': '#FAF9F6', 'sky blue': '#7DD3FC', 'brick red': '#B22222',
@@ -2545,7 +2551,7 @@
                     <input id="assign-search-${zohoItemId.replace(/[^a-z0-9]/gi,'_')}"
                         type="text" placeholder="🔍 Search product to assign to…"
                         style="width:100%;border:1px solid #93c5fd;border-radius:6px;padding:6px 10px;font-size:0.82rem;box-sizing:border-box;outline:none;"
-                        oninput="debounceAssignSearch('${escH(zohoItemId)}', '${escH(itemName||'')}', '${escH(size)}', '${escH(unit)}', ${price}, this)"
+                        oninput="debounceAssignSearch('${escH(escJS(zohoItemId))}', '${escH(escJS(itemName||''))}', '${escH(escJS(size))}', '${escH(escJS(unit))}', ${price}, this)"
                         autocomplete="off">
                 </div>
                 <div id="assign-results-${zohoItemId.replace(/[^a-z0-9]/gi,'_')}" style="max-height:200px;overflow-y:auto;">
@@ -2616,7 +2622,7 @@
                     return;
                 }
                 resultsEl.innerHTML = items.map(p => `
-                    <div onclick="confirmAssignZohoItem('${escH(zohoItemId)}', ${p.id}, '${escH(p.name)}', '${escH(size)}', '${escH(unit)}', ${price}, ${colorName ? `'${escH(colorName)}'` : 'null'}, ${colorCode ? `'${escH(colorCode)}'` : 'null'})"
+                    <div onclick="confirmAssignZohoItem('${escH(escJS(zohoItemId))}', ${p.id}, '${escH(escJS(p.name))}', '${escH(escJS(size))}', '${escH(escJS(unit))}', ${price}, ${colorName ? `'${escH(escJS(colorName))}'` : 'null'}, ${colorCode ? `'${escH(escJS(colorCode))}'` : 'null'})"
                         style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:0.82rem;"
                         onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background=''">
                         <span style="font-weight:600;color:#1d4ed8;">${escH(p.name)}</span>
