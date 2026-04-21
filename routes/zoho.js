@@ -2664,6 +2664,13 @@ router.post('/items/bulk-edit', requirePermission('zoho', 'manage'), async (req,
                 vals.push(item.zoho_item_id);
                 await pool.query(`UPDATE zoho_items_map SET ${sets.join(', ')} WHERE zoho_item_id = ?`, vals);
             }
+            // Sync rate change → pack_sizes.base_price so admin-products.html stays in sync
+            if (Object.prototype.hasOwnProperty.call(item.changes, 'rate')) {
+                await pool.query(
+                    'UPDATE pack_sizes SET base_price = ? WHERE zoho_item_id = ? AND is_active = 1',
+                    [item.changes.rate, item.zoho_item_id]
+                );
+            }
         }
 
         res.json({
