@@ -1388,12 +1388,38 @@
     // ═══════════════════════════════════════
     // TAB MANAGEMENT
     // ═══════════════════════════════════════
+    const GROUP_TABS = {
+        painters: ['painters', 'rates', 'training', 'visualizations'],
+        finance: ['withdrawals', 'points', 'estimates'],
+        catalog: ['catalog', 'offers', 'overrides'],
+        comms: ['attendance', 'reports', 'marketing', 'notifications']
+    };
+
+    function switchGroup(group) {
+        document.querySelectorAll('.group-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('grp-' + group).classList.add('active');
+        document.querySelectorAll('.subtab-group').forEach(g => g.classList.remove('active'));
+        document.getElementById('subtabs-' + group).classList.add('active');
+        switchTab(GROUP_TABS[group][0]);
+    }
+
+    function updateFinanceBadge(count) {
+        const badge = document.getElementById('finBadge');
+        if (!badge) return;
+        if (count > 0) { badge.textContent = count; badge.classList.add('show'); }
+        else { badge.classList.remove('show'); }
+    }
+
     function switchTab(tab) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-        document.getElementById('tab-' + tab).classList.add('active');
-        event.target.classList.add('active');
-
+        const tabEl = document.getElementById('tab-' + tab);
+        if (tabEl) tabEl.classList.add('active');
+        document.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+        const stabEl = document.getElementById('stab-' + tab);
+        if (stabEl) {
+            stabEl.classList.add('active');
+            stabEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
         if (tab === 'painters') loadPainters();
         if (tab === 'points') loadPointsTab();
         if (tab === 'rates') loadRatesTab();
@@ -1407,6 +1433,7 @@
         if (tab === 'visualizations') loadVisualizations();
         if (tab === 'marketing') initMarketingTab();
         if (tab === 'attendance') initAttendanceTab();
+        // notifications tab has no lazy-load trigger
     }
 
     // ═══════════════════════════════════════
@@ -2276,14 +2303,15 @@
                 <div class="stat-card"><div class="stat-value">${s.totalPointsRedeemed.toFixed(0)}</div><div class="stat-label">Points Redeemed</div></div>
             `;
             // Badge on Painters tab
-            const badge = document.getElementById('pendingBadge');
+            const pb = document.getElementById('pendingBadge');
+            if (pb) {
+                if (s.pendingPainters > 0) { pb.textContent = s.pendingPainters; pb.style.display = 'inline'; }
+                else pb.style.display = 'none';
+            }
             if (s.pendingPainters > 0) {
-                badge.textContent = s.pendingPainters;
-                badge.style.display = 'inline';
                 const alertEl = document.getElementById('pendingAlert');
                 if (alertEl) { alertEl.style.display = 'flex'; document.getElementById('pendingAlertCount').textContent = s.pendingPainters; }
             } else {
-                badge.style.display = 'none';
                 const alertEl = document.getElementById('pendingAlert');
                 if (alertEl) alertEl.style.display = 'none';
             }
@@ -3666,27 +3694,10 @@
             document.getElementById('painterStatusFilter').value = 'pending';
         }
 
-        if (activeTab !== 'painters') {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            const tabEl = document.getElementById('tab-' + activeTab);
-            if (tabEl) tabEl.classList.add('active');
-            const btns = document.querySelectorAll('.tab-btn');
-            const idx = tabNames.indexOf(activeTab);
-            if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
-        }
-
-        // Load the active tab's data
-        if (activeTab === 'painters') loadPainters();
-        else if (activeTab === 'points') loadPointsTab();
-        else if (activeTab === 'rates') loadRatesTab();
-        else if (activeTab === 'withdrawals') loadWithdrawals();
-        else if (activeTab === 'reports') loadReportsTab();
-        else if (activeTab === 'estimates') loadEstimates();
-        else if (activeTab === 'offers') loadOffers();
-        else if (activeTab === 'training') loadTrainingContent();
-        else if (activeTab === 'catalog') loadCatalogStats();
-        else if (activeTab === 'visualizations') loadVisualizations();
+        // Activate the correct group + sub-tab via the new 2-level nav
+        const activeGroup = Object.keys(GROUP_TABS).find(g => GROUP_TABS[g].includes(activeTab)) || 'painters';
+        switchGroup(activeGroup);
+        if (activeTab !== GROUP_TABS[activeGroup][0]) switchTab(activeTab);
 
         // Initialize training fields visibility
         toggleTrainingFields();
