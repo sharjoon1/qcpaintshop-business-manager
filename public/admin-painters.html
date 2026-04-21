@@ -505,7 +505,10 @@
                         </select>
                     </div>
                 </div>
-                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <!-- Mobile estimate cards -->
+                <div id="estimatesMobileList" class="md:hidden"></div>
+                <!-- Desktop table -->
+                <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="data-table">
                             <thead>
@@ -2559,6 +2562,54 @@
     }
 
     function renderEstimatesTable(estimates) {
+        const STATUS_CTA = {
+            pending_admin: ['Review', 'btn-primary'],
+            admin_review: ['Add Markup', 'btn-primary'],
+            payment_submitted: ['Confirm Payment', 'btn-success'],
+        };
+        const estStatusColors = {
+            draft: '#f1f5f9|#475569',
+            pending_admin: '#fef3c7|#92400e',
+            admin_review: '#fef3c7|#b45309',
+            approved: '#d1fae5|#065f46',
+            sent_to_customer: '#dbeafe|#1e40af',
+            discount_requested: '#fef3c7|#92400e',
+            final_approved: '#d1fae5|#065f46',
+            payment_submitted: '#ede9fe|#5b21b6',
+            payment_recorded: '#d1fae5|#065f46',
+            pushed_to_zoho: '#f0fdf4|#166534',
+            rejected: '#fee2e2|#991b1b',
+            cancelled: '#e2e8f0|#475569',
+        };
+        const mobEl = document.getElementById('estimatesMobileList');
+        if (mobEl) {
+            if (!estimates.length) {
+                mobEl.innerHTML = '<div class="empty-state"><p>No estimates found</p></div>';
+            } else {
+                mobEl.innerHTML = estimates.map(e => {
+                    const [sbg, scolor] = (estStatusColors[e.status]||'#e2e8f0|#475569').split('|');
+                    const total = e.billing_type === 'customer' && parseFloat(e.markup_grand_total) > 0
+                        ? '₹' + parseFloat(e.markup_grand_total).toLocaleString('en-IN')
+                        : '₹' + parseFloat(e.grand_total||0).toLocaleString('en-IN');
+                    const cta = STATUS_CTA[e.status];
+                    return `
+                    <div class="painter-card" onclick="viewEstimate(${e.id})" style="cursor:pointer;">
+                        <div class="flex justify-between items-start gap-3">
+                            <div style="min-width:0;">
+                                <div style="font-weight:600;font-size:0.9375rem;">${esc(e.estimate_number)}</div>
+                                <div style="font-size:0.8rem;color:#64748b;">${esc(e.painter_name||'')} · ${new Date(e.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>
+                                <div style="font-size:0.78rem;color:#94a3b8;text-transform:capitalize;">${(e.billing_type||'').replace('_',' ')}</div>
+                            </div>
+                            <div style="text-align:right;flex-shrink:0;">
+                                <div style="font-weight:700;font-size:1rem;">${total}</div>
+                                <span class="badge mt-1" style="background:${sbg};color:${scolor};font-size:0.68rem;white-space:nowrap;">${(e.status||'').replace(/_/g,' ')}</span>
+                            </div>
+                        </div>
+                        ${cta ? `<div style="margin-top:0.625rem;"><button onclick="event.stopPropagation();viewEstimate(${e.id})" class="btn-sm ${cta[1]}" style="width:100%;min-height:40px;">${cta[0]}</button></div>` : ''}
+                    </div>`;
+                }).join('');
+            }
+        }
         const body = document.getElementById('estimatesTableBody');
         if (!estimates.length) {
             body.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-gray-400">No estimates found</td></tr>';
