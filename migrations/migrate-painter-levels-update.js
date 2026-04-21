@@ -8,10 +8,8 @@
  * - Diamond: 10,000 pts, 2.0x multiplier (annual)
  */
 
-const pool = require('../config/database');
-
-async function migrate() {
-    console.log('=== Updating painter_levels thresholds ===');
+async function up(pool) {
+    console.log('  Updating painter_levels thresholds...');
 
     await pool.query(`UPDATE painter_levels SET min_points = 0, multiplier = 1.00 WHERE level_name = 'bronze'`);
     await pool.query(`UPDATE painter_levels SET min_points = 3000, multiplier = 1.20 WHERE level_name = 'silver'`);
@@ -42,11 +40,7 @@ async function migrate() {
     }
     console.log(`  Recalculated ${updated} painter levels`);
 
-    console.log('=== Migration complete ===');
-    process.exit(0);
+    console.log('  [Migration] painter-levels-update complete');
 }
 
-migrate().catch(err => {
-    console.error('Migration failed:', err);
-    process.exit(1);
-});
+module.exports = { up };
