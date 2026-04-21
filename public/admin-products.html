@@ -2321,6 +2321,182 @@
             }
         }
 
+        // ── Size / unit helpers ──────────────────────────────────────────────
+        function extractSizeFromName(name) {
+            const m = name.match(/(\d+(?:\.\d+)?)\s*(L|KG|ltr|litre|kg|liter|Ltr|Litre)/i);
+            return m ? m[1] : '';
+        }
+        function extractUnitFromName(name) {
+            const m = name.match(/\d+(?:\.\d+)?\s*(L|KG|ltr|litre|kg|liter|Ltr|Litre)/i);
+            if (!m) return 'L';
+            const u = m[1].toUpperCase();
+            if (u === 'LTR' || u === 'LITRE' || u === 'LITER') return 'L';
+            return u;
+        }
+
+        // ── Assign-to-existing inline search ──────────────────────────────────────
+        let assignDropdownActiveId = null; // currently open dropdown's zoho_item_id
+
+        function openAssignDropdown(zohoItemId, size, unit, price, anchorEl) {
+            // Close any existing dropdown first
+            closeAssignDropdown();
+            assignDropdownActiveId = zohoItemId;
+
+            const dropdown = document.createElement('div');
+            dropdown.id = 'assign-dropdown-' + zohoItemId.replace(/[^a-z0-9]/gi, '_');
+            dropdown.className = 'assign-dropdown';
+            dropdown.innerHTML = `
+                <div style="padding:8px;border-bottom:1px solid #e2e8f0;">
+                    <input id="assign-search-${zohoItemId.replace(/[^a-z0-9]/gi,'_')}"
+                        type="text" placeholder="🔍 Search product to assign to…"
+                        style="width:100%;border:1px solid #93c5fd;border-radius:6px;padding:6px 10px;font-size:0.82rem;box-sizing:border-box;outline:none;"
+                        oninput="debounceAssignSearch('${zohoItemId}', '${escH(size)}', '${escH(unit)}', ${price}, this)"
+                        autocomplete="off">
+                </div>
+                <div id="assign-results-${zohoItemId.replace(/[^a-z0-9]/gi,'_')}" style="max-height:200px;overflow-y:auto;">
+                    <div style="padding:10px;color:#94a3b8;font-size:0.8rem;text-align:center;">Type to search…</div>
+                </div>`;
+            dropdown.style.cssText = 'position:absolute;z-index:999;background:#fff;border:1px solid #93c5fd;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);width:320px;margin-top:4px;';
+
+            // Position below the anchor button
+            const rect = anchorEl.getBoundingClientRect();
+            dropdown.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+            dropdown.style.left = Math.max(8, rect.left + window.scrollX - 160) + 'px';
+            document.body.appendChild(dropdown);
+
+            // Auto-focus
+            setTimeout(() => dropdown.querySelector('input')?.focus(), 50);
+
+            // Click outside to close
+            setTimeout(() => {
+                document.addEventListener('click', outsideAssignClick, true);
+            }, 100);
+        }
+
+        function outsideAssignClick(e) {
+            const dropdown = document.querySelector('.assign-dropdown');
+            if (dropdown && !dropdown.contains(e.target) && !e.target.closest('[data-assign-btn]')) {
+                closeAssignDropdown();
+            }
+        }
+
+        function closeAssignDropdown() {
+            document.querySelector('.assign-dropdown')?.remove();
+            document.removeEventListener('click', outsideAssignClick, true);
+            assignDropdownActiveId = null;
+        }
+
+        let assignSearchTimer = null;
+        function debounceAssignSearch(zohoItemId, size, unit, price, inputEl) {
+            clearTimeout(assignSearchTimer);
+            assignSearchTimer = setTimeout(() => doAssignSearch(zohoItemId, size, unit, price, inputEl.value.trim()), 280);
+        }
+
+        async function doAssignSearch(zohoItemId, size, unit, price, query) {
+            const safeId = zohoItemId.replace(/[^a-z0-9]/gi, '_');
+            const resultsEl = document.getElementById('assign-results-' + safeId);
+            if (!resultsEl) return;
+
+            if (!query) {
+                resultsEl.innerHTML = '<div style="padding:10px;color:#94a3b8;font-size:0.8rem;text-align:center;">Type to search…</div>';
+                return;
+            }
+            resultsEl.innerHTML = '<div style="padding:10px;color:#94a3b8;font-size:0.8rem;text-align:center;">Searching…</div>';
+
+            try {
+                const res = await fetch(`/api/products?search=${encodeURIComponent(query)}&limit=8&status=active`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                const items = data.products || data || [];
+                if (!items.length) {
+                    resultsEl.innerHTML = '<div style="padding:10px;color:#94a3b8;font-size:0.8rem;text-align:center;">No products found</div>';
+                    return;
+                }
+                resultsEl.innerHTML = items.map(p => `
+                    <div onclick="confirmAssignZohoItem('${escH(zohoItemId)}', ${p.id}, '${escH(p.name)}', '${escH(size)}', '${escH(unit)}', ${price})"
+                        style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:0.82rem;"
+                        onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background=''">
+                        <span style="font-weight:600;color:#1d4ed8;">${escH(p.name)}</span>
+                        <span style="color:#94a3b8;font-size:0.75rem;margin-left:8px;">${p.brand_name || ''}</span>
+                    </div>`).join('');
+            } catch (e) {
+                resultsEl.innerHTML = '<div style="padding:10px;color:#dc2626;font-size:0.8rem;text-align:center;">Search failed</div>';
+            }
+        }
+
+        async function confirmAssignZohoItem(zohoItemId, productId, productName, size, unit, price) {
+            closeAssignDropdown();
+            if (!confirm(`Add ${size}${unit} @ ₹${price} to "${productName}"?`)) return;
+
+            try {
+                const res = await fetch('/api/products/assign-zoho-item', {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_id: productId, zoho_item_id: zohoItemId, size, unit, price })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed');
+
+                // Update local mapped state
+                zohoMappedIds.add(zohoItemId);
+                zohoMappedInfo[zohoItemId] = { product_id: productId, product_name: productName };
+
+                // Re-render the current view
+                await loadZohoItems();
+                showToast(`✓ Assigned to "${productName}"`, 'success');
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            }
+        }
+
+        function showToast(msg, type) {
+            const t = document.createElement('div');
+            t.textContent = msg;
+            t.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:10px;font-size:0.85rem;font-weight:600;z-index:9999;color:#fff;background:${type==='success'?'#10b981':'#ef4444'};box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        async function openGroupAssignDropdown(groupItems, anchorEl) {
+            // Use first item's metadata for the anchor; will assign ALL unmapped items in group
+            const unmapped = groupItems.filter(i => !zohoMappedIds.has(i.zoho_item_id || i.item_id));
+            if (!unmapped.length) { showToast('All items in group are already mapped', 'error'); return; }
+            const first = unmapped[0];
+            const size = extractSizeFromName(first.name || first.item_name || '');
+            const unit = extractUnitFromName(first.name || first.item_name || '');
+            const price = parseFloat(first.rate) || 0;
+            // Use a composite key for dropdown ID
+            const groupKey = 'grp_' + (first.zoho_item_id || first.item_id);
+            openAssignDropdown(groupKey, size, unit, price, anchorEl);
+
+            // Override confirmAssign for this group to assign all unmapped items
+            window._pendingGroupItems = unmapped;
+            window._originalConfirm = window.confirmAssignZohoItem;
+            window.confirmAssignZohoItem = async function(_, productId, productName) {
+                closeAssignDropdown();
+                window.confirmAssignZohoItem = window._originalConfirm;
+                if (!confirm(`Assign ${unmapped.length} unmapped item(s) to "${productName}"?`)) return;
+                let ok = 0, fail = 0;
+                for (const item of unmapped) {
+                    const itemId = item.zoho_item_id || item.item_id;
+                    const sz = extractSizeFromName(item.name || item.item_name || '');
+                    const un = extractUnitFromName(item.name || item.item_name || '');
+                    const pr = parseFloat(item.rate) || 0;
+                    try {
+                        const res = await fetch('/api/products/assign-zoho-item', {
+                            method: 'POST',
+                            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ product_id: productId, zoho_item_id: itemId, size: sz, unit: un, price: pr })
+                        });
+                        const data = await res.json();
+                        if (data.success) { zohoMappedIds.add(itemId); zohoMappedInfo[itemId] = { product_id: productId, product_name: productName }; ok++; }
+                        else fail++;
+                    } catch { fail++; }
+                }
+                await loadZohoItems();
+                showToast(`✓ Assigned ${ok} item(s) to "${productName}"${fail ? ', ' + fail + ' failed' : ''}`, ok ? 'success' : 'error');
+            };
+        }
+
         // ═══════════════════════════════════════
         // INIT
         // ═══════════════════════════════════════
