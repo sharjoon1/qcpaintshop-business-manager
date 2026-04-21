@@ -5652,6 +5652,132 @@ router.put('/admin/challenges/:id', requireAuth, requirePermission('painters', '
 // ADMIN PARAMETERIZED ROUTES (/:id) — MUST be AFTER named routes
 // ═══════════════════════════════════════════════════════════════
 
+// ── Painter Location Tracking ────────────────────────────────────────────────
+
+// POST /api/painters/me/location-report — painter device reports GPS position
+router.post('/me/location-report', requirePainterAuth, async (req, res) => {
+    try {
+        const { latitude, longitude, accuracy } = req.body;
+        if (latitude == null || longitude == null) {
+            return res.status(400).json({ success: false, message: 'latitude and longitude required' });
+        }
+        const painterId = req.painter.id;
+        const now = new Date();
+
+        // Rate-limit: skip insert if last row is within 25 seconds
+        const [[last]] = await pool.query(
+            'SELECT recorded_at FROM painter_location_events WHERE painter_id = ? ORDER BY recorded_at DESC LIMIT 1',
+            [painterId]
+        );
+        if (last && (now - new Date(last.recorded_at)) < 25000) {
+            return res.json({ success: true });
+        }
+
+        await pool.query(
+            'INSERT INTO painter_location_events (painter_id, latitude, longitude, accuracy_m, recorded_at) VALUES (?, ?, ?, ?, NOW())',
+            [painterId, latitude, longitude, accuracy || null]
+        );
+
+        // Emit live update to admin map room
+        if (io) {
+            const [[painter]] = await pool.query(
+                'SELECT p.name, p.level, b.name AS branch FROM painters p LEFT JOIN branches b ON b.id = p.branch_id WHERE p.id = ?',
+                [painterId]
+            );
+            io.to('admin_painters_live').emit('painter_location_update', {
+                painterId,
+                name: painter?.name || 'Unknown',
+                level: painter?.level || 'default',
+                branch: painter?.branch || '',
+                latitude: Number(latitude),
+                longitude: Number(longitude),
+                accuracy: accuracy ? Number(accuracy) : null,
+                recordedAt: now.toISOString()
+            });
+        }
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('painter location-report error:', e.message);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// GET /api/painters/locations/live — admin fleet view (latest ping per painter)
+// IMPORTANT: must stay before router.get('/:id', ...) or 'locations' is parsed as an ID
+router.get('/locations/live', requireAuth, async (req, res) => {
+    try {
+        const [online] = await pool.query(`
+            SELECT ple.painter_id, p.name, p.level, b.name AS branch,
+                   ple.latitude, ple.longitude, ple.accuracy_m, ple.recorded_at,
+                   TIMESTAMPDIFF(SECOND, ple.recorded_at, NOW()) AS seconds_ago,
+                   'online' AS status
+            FROM painter_location_events ple
+            INNER JOIN (
+                SELECT painter_id, MAX(recorded_at) AS latest
+                FROM painter_location_events
+                WHERE recorded_at >= NOW() - INTERVAL 5 MINUTE
+                GROUP BY painter_id
+            ) latest_online ON latest_online.painter_id = ple.painter_id AND latest_online.latest = ple.recorded_at
+            JOIN painters p ON p.id = ple.painter_id
+            LEFT JOIN branches b ON b.id = p.branch_id
+            ORDER BY p.name
+        `);
+
+        const [offline] = await pool.query(`
+            SELECT ple.painter_id, p.name, p.level, b.name AS branch,
+                   ple.latitude, ple.longitude, ple.accuracy_m, ple.recorded_at,
+                   TIMESTAMPDIFF(SECOND, ple.recorded_at, NOW()) AS seconds_ago,
+                   'offline' AS status
+            FROM painter_location_events ple
+            INNER JOIN (
+                SELECT painter_id, MAX(recorded_at) AS latest
+                FROM painter_location_events
+                WHERE painter_id NOT IN (
+                    SELECT DISTINCT painter_id FROM painter_location_events
+                    WHERE recorded_at >= NOW() - INTERVAL 5 MINUTE
+                )
+                GROUP BY painter_id
+            ) latest_offline ON latest_offline.painter_id = ple.painter_id AND latest_offline.latest = ple.recorded_at
+            JOIN painters p ON p.id = ple.painter_id
+            LEFT JOIN branches b ON b.id = p.branch_id
+            ORDER BY p.name
+        `);
+
+        res.json({ success: true, locations: [...online, ...offline] });
+    } catch (e) {
+        console.error('locations/live error:', e.message);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// GET /api/painters/:id/locations/history?date=YYYY-MM-DD — admin route replay
+router.get('/:id/locations/history', requireAuth, async (req, res) => {
+    try {
+        const painterId = parseInt(req.params.id, 10);
+        let dateStr = req.query.date;
+        if (!dateStr) {
+            const now = new Date();
+            const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+            dateStr = `${ist.getFullYear()}-${String(ist.getMonth() + 1).padStart(2, '0')}-${String(ist.getDate()).padStart(2, '0')}`;
+        }
+
+        const [points] = await pool.query(
+            `SELECT latitude, longitude, accuracy_m, recorded_at
+             FROM painter_location_events
+             WHERE painter_id = ?
+               AND DATE(CONVERT_TZ(recorded_at, '+00:00', '+05:30')) = ?
+             ORDER BY recorded_at ASC`,
+            [painterId, dateStr]
+        );
+
+        res.json({ success: true, points, date: dateStr, count: points.length });
+    } catch (e) {
+        console.error('locations/history error:', e.message);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 // List all painters
 router.get('/', requireAuth, async (req, res) => {
     try {
