@@ -2581,7 +2581,9 @@ app.post('/api/products/bulk-map', requirePermission('products', 'edit'), async 
 // Assign a single Zoho item to an existing product (creates pack_size + sets zoho_item_id atomically)
 app.post('/api/products/assign-zoho-item', requirePermission('products', 'edit'), async (req, res) => {
     try {
-        const { product_id, zoho_item_id, size, unit, price } = req.body;
+        const { product_id, zoho_item_id, size, unit, price, color_name, color_code } = req.body;
+        const colorName = color_name ? String(color_name).trim().substring(0, 100) || null : null;
+        const colorCode = color_code && /^#[0-9A-Fa-f]{3,8}$/.test(String(color_code)) ? String(color_code) : null;
         if (!product_id || !zoho_item_id || !size || !unit) {
             return res.status(400).json({ success: false, error: 'product_id, zoho_item_id, size, unit are required' });
         }
@@ -2620,8 +2622,8 @@ app.post('/api/products/assign-zoho-item', requirePermission('products', 'edit')
             }
 
             const [result] = await conn.query(
-                'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
-                [product_id, parsedSize, normalizedUnit, parsedPrice, zoho_item_id]
+                'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, color_name, color_code, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+                [product_id, parsedSize, normalizedUnit, parsedPrice, zoho_item_id, colorName, colorCode]
             );
 
             await conn.commit();
