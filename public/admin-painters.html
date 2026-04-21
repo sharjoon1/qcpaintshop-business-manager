@@ -77,6 +77,56 @@
                 border-left: none !important;
             }
         }
+
+        /* ── 2-Level Nav ── */
+        .group-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; padding:0.5rem 0.25rem; border-radius:0.5rem; font-size:0.75rem; font-weight:600; color:#64748b; cursor:pointer; transition:all 0.15s; background:transparent; border:none; min-height:44px; gap:1px; }
+        .group-btn .grp-icon { font-size:1.1rem; line-height:1; }
+        .group-btn .grp-label { font-size:0.68rem; white-space:nowrap; }
+        .group-btn.active { background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; box-shadow:0 2px 8px rgba(102,126,234,0.3); }
+        .group-badge { display:none; background:#ef4444; color:#fff; border-radius:9999px; font-size:0.6rem; font-weight:700; padding:1px 5px; margin-left:2px; vertical-align:middle; }
+        .group-badge.show { display:inline; }
+
+        #groupStrip { position:sticky; top:0; z-index:40; background:#fff; padding:0.25rem; border-radius:0.75rem; border:1px solid #e8ecf1; margin-bottom:0; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+        #subTabStrip { position:sticky; top:56px; z-index:39; background:#fff; border:1px solid #e8ecf1; border-radius:0.75rem; margin-bottom:1rem; overflow-x:auto; scrollbar-width:none; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+        #subTabStrip::-webkit-scrollbar { display:none; }
+        .subtab-group { display:none; }
+        .subtab-group.active { display:flex; min-width:100%; }
+        .subtab-btn { flex:1; white-space:nowrap; padding:0.625rem 1rem; font-size:0.8125rem; font-weight:500; color:#64748b; cursor:pointer; background:transparent; border:none; border-bottom:2px solid transparent; min-height:44px; transition:all 0.15s; }
+        .subtab-btn:hover { color:#374151; background:#f8fafc; }
+        .subtab-btn.active { color:#4f46e5; border-bottom-color:#4f46e5; font-weight:600; }
+
+        /* ── Mobile painter cards ── */
+        .painter-card { background:#fff; border:1px solid #e8ecf1; border-radius:0.75rem; padding:0.875rem 1rem; margin-bottom:0.625rem; }
+        .painter-card-avatar { width:40px; height:40px; border-radius:9999px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.875rem; color:#fff; flex-shrink:0; border:2px solid; }
+        .painter-card-name { font-weight:600; font-size:0.9375rem; color:#1e293b; }
+        .painter-card-meta { font-size:0.8rem; color:#64748b; margin-top:1px; }
+        .painter-card-actions { display:flex; gap:0.5rem; margin-top:0.625rem; flex-wrap:wrap; }
+        .painter-card-actions .btn-sm { min-height:36px; flex:1; text-align:center; }
+
+        /* ── Mobile withdrawal cards ── */
+        .withdrawal-card { background:#fff; border:1px solid #e8ecf1; border-radius:0.75rem; padding:0.875rem 1rem; margin-bottom:0.625rem; }
+        .withdrawal-card-header { display:flex; justify-content:space-between; align-items:flex-start; }
+        .withdrawal-card-actions { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-top:0.75rem; }
+        .withdrawal-card-actions button { min-height:40px; }
+
+        /* ── Skeleton loader ── */
+        .skeleton { background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:0.375rem; }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        .skeleton-card { background:#fff; border:1px solid #e8ecf1; border-radius:0.75rem; padding:0.875rem; margin-bottom:0.625rem; }
+
+        /* ── Bottom-sheet modals on mobile ── */
+        @media (max-width:767px) {
+            .modal-content { border-radius:1rem 1rem 0 0 !important; position:fixed !important; bottom:0 !important; left:0 !important; right:0 !important; width:100% !important; max-width:100% !important; max-height:90vh !important; margin:0 !important; overflow-y:auto; }
+            .modal-overlay { align-items:flex-end !important; }
+        }
+
+        /* ── Summary strip ── */
+        .summary-strip { background:#f8fafc; border:1px solid #e8ecf1; border-radius:0.75rem; padding:0.625rem 1rem; margin-bottom:0.75rem; display:flex; gap:1.25rem; flex-wrap:wrap; font-size:0.8125rem; }
+        .summary-strip span { color:#64748b; }
+        .summary-strip strong { color:#1e293b; }
+
+        /* ── Touch-target helpers ── */
+        .touch-btn { min-height:44px; min-width:44px; display:inline-flex; align-items:center; justify-content:center; }
     </style>
 </head>
 <body data-page="painters">
@@ -90,22 +140,50 @@
                 </div>
             </div>
 
-            <!-- Tabs -->
-            <div class="flex flex-wrap gap-2 mb-6">
-                <button class="tab-btn active" onclick="switchTab('painters')">Painters <span id="pendingBadge" style="display:none;background:#f59e0b;color:#fff;border-radius:9999px;padding:1px 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle;font-weight:700;"></span></button>
-                <button class="tab-btn" onclick="switchTab('points')">Points & Invoices</button>
-                <button class="tab-btn" onclick="switchTab('rates')">Rates & Slabs</button>
-                <button class="tab-btn" onclick="switchTab('withdrawals')">Withdrawals</button>
-                <button class="tab-btn" onclick="switchTab('reports')">Referrals & Reports</button>
-                <button class="tab-btn" onclick="switchTab('estimates')">Estimates</button>
-                <button class="tab-btn" onclick="switchTab('offers')">🎁 Offers</button>
-                <button class="tab-btn" onclick="switchTab('overrides')">⚙️ Overrides</button>
-                <button class="tab-btn" onclick="switchTab('training')">📚 Training</button>
-                <button class="tab-btn" onclick="switchTab('catalog')">Catalog</button>
-                <button class="tab-btn" onclick="switchTab('visualizations')">🎨 Visualizations</button>
-                <button class="tab-btn" onclick="switchTab('marketing')">📣 Marketing</button>
-                <button class="tab-btn" onclick="switchTab('attendance')">Attendance</button>
-                <button class="tab-btn" onclick="switchTab('notifications')">🔔 Notifications</button>
+            <!-- Group Strip -->
+            <div id="groupStrip" class="flex gap-1 mb-1">
+                <button class="group-btn active" onclick="switchGroup('painters')" id="grp-painters">
+                    <span class="grp-icon">👥</span>
+                    <span class="grp-label">Painters</span>
+                </button>
+                <button class="group-btn" onclick="switchGroup('finance')" id="grp-finance">
+                    <span class="grp-icon">💰</span>
+                    <span class="grp-label">Finance<span class="group-badge" id="finBadge"></span></span>
+                </button>
+                <button class="group-btn" onclick="switchGroup('catalog')" id="grp-catalog">
+                    <span class="grp-icon">📦</span>
+                    <span class="grp-label">Catalog</span>
+                </button>
+                <button class="group-btn" onclick="switchGroup('comms')" id="grp-comms">
+                    <span class="grp-icon">📣</span>
+                    <span class="grp-label">Comms</span>
+                </button>
+            </div>
+
+            <!-- Sub-tab Strip -->
+            <div id="subTabStrip">
+                <div id="subtabs-painters" class="subtab-group active">
+                    <button class="subtab-btn active" onclick="switchTab('painters')" id="stab-painters">Painters</button>
+                    <button class="subtab-btn" onclick="switchTab('rates')" id="stab-rates">Levels & Slabs</button>
+                    <button class="subtab-btn" onclick="switchTab('training')" id="stab-training">Training</button>
+                    <button class="subtab-btn" onclick="switchTab('visualizations')" id="stab-visualizations">Visualizations</button>
+                </div>
+                <div id="subtabs-finance" class="subtab-group">
+                    <button class="subtab-btn" onclick="switchTab('withdrawals')" id="stab-withdrawals">Withdrawals</button>
+                    <button class="subtab-btn" onclick="switchTab('points')" id="stab-points">Billing</button>
+                    <button class="subtab-btn" onclick="switchTab('estimates')" id="stab-estimates">Estimates</button>
+                </div>
+                <div id="subtabs-catalog" class="subtab-group">
+                    <button class="subtab-btn" onclick="switchTab('catalog')" id="stab-catalog">Products</button>
+                    <button class="subtab-btn" onclick="switchTab('offers')" id="stab-offers">Offers</button>
+                    <button class="subtab-btn" onclick="switchTab('overrides')" id="stab-overrides">Points Config</button>
+                </div>
+                <div id="subtabs-comms" class="subtab-group">
+                    <button class="subtab-btn" onclick="switchTab('attendance')" id="stab-attendance">Attendance</button>
+                    <button class="subtab-btn" onclick="switchTab('reports')" id="stab-reports">Reports</button>
+                    <button class="subtab-btn" onclick="switchTab('marketing')" id="stab-marketing">Marketing</button>
+                    <button class="subtab-btn" onclick="switchTab('notifications')" id="stab-notifications">Notifications</button>
+                </div>
             </div>
 
             <!-- Tab 1: Painters -->
