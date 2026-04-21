@@ -1432,17 +1432,15 @@ router.post('/me/estimates/:estimateId/submit-to-admin', requirePainterAuth, asy
             return res.status(400).json({ success: false, message: "mode must be 'self' or 'customer'" });
         }
         const [estimates] = await pool.query(
-            "SELECT * FROM painter_estimates WHERE id = ? AND painter_id = ? AND status = 'saved_direct'",
+            "SELECT * FROM painter_estimates WHERE id = ? AND painter_id = ? AND status IN ('saved_direct', 'draft')",
             [req.params.estimateId, req.painter.id]
         );
         if (!estimates.length) {
-            return res.status(404).json({ success: false, message: 'Saved estimate not found (only saved_direct estimates can be submitted)' });
+            return res.status(404).json({ success: false, message: 'Estimate not found or cannot be submitted' });
         }
-        // Mode 'self': painter wants this billed under their own loyalty account.
-        // Keep markup_unit_price on items for painter's reference, but clear
-        // branding flag and switch billing_type. Points will compute against
-        // unit_price (base), awarding annual only.
-        const newBillingType = mode === 'self' ? 'self' : 'customer';
+        const prevStatus = estimates[0].status;
+        // For drafts, use existing billing_type; for saved_direct the mode param selects billing type
+        const newBillingType = prevStatus === 'draft' ? estimates[0].billing_type : (mode === 'self' ? 'self' : 'customer');
         await pool.query(
             `UPDATE painter_estimates
              SET status = 'pending_admin',
@@ -1452,8 +1450,8 @@ router.post('/me/estimates/:estimateId/submit-to-admin', requirePainterAuth, asy
             [newBillingType, estimates[0].id]
         );
         await logEstimateStatusChange(
-            estimates[0].id, 'saved_direct', 'pending_admin', req.painter.id,
-            `Painter converted saved estimate → admin review as ${newBillingType} billing`
+            estimates[0].id, prevStatus, 'pending_admin', req.painter.id,
+            `Painter submitted estimate → admin review as ${newBillingType} billing`
         );
         res.json({ success: true, message: `Submitted for admin review (${newBillingType} billing)` });
     } catch (error) {
@@ -1576,10 +1574,11 @@ router.get('/me/estimates/:estimateId/pdf', requirePainterAuth, async (req, res)
 // Browse product catalog — grouped by product (not individual pack sizes)
 router.get('/me/catalog', requirePainterAuth, async (req, res) => {
     try {
-        const { search, brand, category, hasPoints, inStock, page = 1, limit = 50 } = req.query;
+        const { search, brand, category, hasPoints, inStock, hasOffer, page = 1, limit = 50 } = req.query;
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const offset = (pageNum - 1) * limitNum;
+        const filterHasOffer = hasOffer === 'true' || hasOffer === '1';
 
         const joins = `
             FROM products p
@@ -1589,6 +1588,35 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         `;
         let where = "WHERE p.status = 'active'";
         const params = [];
+
+        // Pre-fetch active offers so we can add SQL filter when hasOffer=true
+        const now = new Date();
+        let activeOffers = [];
+        if (filterHasOffer) {
+            const [offerRows] = await pool.query(`
+                SELECT applies_to, target_id FROM painter_special_offers
+                WHERE is_active = 1 AND DATE(start_date) <= DATE(?) AND DATE(end_date) >= DATE(?)
+            `, [now, now]);
+            activeOffers = offerRows;
+            if (activeOffers.length > 0) {
+                const hasAllOffer = activeOffers.some(o => o.applies_to === 'all');
+                if (!hasAllOffer) {
+                    const offerBrands = activeOffers.filter(o => o.applies_to === 'brand').map(o => o.target_id);
+                    const offerCats = activeOffers.filter(o => o.applies_to === 'category').map(o => o.target_id);
+                    const clauses = [];
+                    if (offerBrands.length) clauses.push(`zim.zoho_brand IN (${offerBrands.map(() => '?').join(',')})`);
+                    if (offerCats.length) clauses.push(`zim.zoho_category_name IN (${offerCats.map(() => '?').join(',')})`);
+                    if (clauses.length) {
+                        where += ` AND (${clauses.join(' OR ')})`;
+                        params.push(...offerBrands, ...offerCats);
+                    }
+                }
+                // hasAllOffer = true means all products qualify → no extra WHERE needed
+            } else {
+                // No active offers → return empty result
+                return res.json({ success: true, products: [], total: 0, page: pageNum, limit: limitNum, hasMore: false });
+            }
+        }
 
         if (search) {
             where += ' AND (p.name LIKE ? OR zim.zoho_item_name LIKE ? OR zim.zoho_brand LIKE ?)';
@@ -1673,12 +1701,12 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         `, [...params, limitNum, offset]);
 
         // Active offers
-        const now = new Date();
-        const [offers] = await pool.query(`
+        // If hasOffer filter was applied we already have activeOffers; otherwise fetch now
+        const offers = activeOffers.length ? activeOffers : await pool.query(`
             SELECT * FROM painter_special_offers
             WHERE is_active = 1 AND DATE(start_date) <= DATE(?) AND DATE(end_date) >= DATE(?)
             ORDER BY created_at DESC
-        `, [now, now]);
+        `, [now, now]).then(([rows]) => rows);
 
         // Painter overrides (discount % / bonus regular points)
         const resolveOverride = await getPainterOverrideResolver(req.painter?.id);
