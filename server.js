@@ -2951,8 +2951,10 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
                         : /^(PC|PCS?|PIECES?)$/i.test(rawUnit) ? 'PC'
                         : 'L';
                     await pool.query(
-                        'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
-                        [req.params.id, pack.size, unit, pack.base_price || pack.price, pack.zoho_item_id || null]
+                        'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, color_name, color_code, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+                        [req.params.id, pack.size, unit, pack.base_price || pack.price, pack.zoho_item_id || null,
+                         pack.color_name ? String(pack.color_name).trim().substring(0, 100) || null : null,
+                         pack.color_code && /^#[0-9A-Fa-f]{3,8}$/.test(String(pack.color_code)) ? String(pack.color_code) : null]
                     );
                     packSizesInserted++;
                 }
