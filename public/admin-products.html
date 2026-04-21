@@ -814,7 +814,7 @@
                 return;
             }
             
-            packSizes.push({ size, unit, price, base_price: price, zoho_item_id: null, zoho_item_name: '' });
+            packSizes.push({ size, unit, price, base_price: price, zoho_item_id: null, zoho_item_name: '', color_name: null, color_code: null });
             packSizes.sort((a, b) => a.size - b.size); // Sort by size
             renderPackSizes();
             
@@ -838,9 +838,26 @@
             container.innerHTML = packSizes.map((ps, idx) => `
                 <div class="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
                     <div class="flex items-center justify-between">
-                        <span class="font-semibold text-gray-700">${ps.size} ${ps.unit || 'L'}</span>
+                        <span class="font-semibold text-gray-700" style="display:flex;align-items:center;gap:5px;">
+                            ${ps.color_code ? `<span style="width:12px;height:12px;border-radius:50%;background:${escH(ps.color_code)};border:1px solid #e2e8f0;flex-shrink:0;"></span>` : ''}
+                            ${escH(String(ps.size))} ${ps.unit || 'L'}${ps.color_name ? ' · ' + escH(ps.color_name) : ''}
+                        </span>
                         <span class="text-gray-900">₹${parseFloat(ps.price).toFixed(2)}</span>
                         <button type="button" onclick="removePackSize(${idx})" class="text-red-600 hover:text-red-800 font-semibold text-sm">Remove</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs text-gray-500 whitespace-nowrap">Color:</label>
+                        <input type="text"
+                            value="${escH(ps.color_name || '')}"
+                            oninput="packSizes[${idx}].color_name = this.value.trim() || null; packSizes[${idx}].color_code = packSizes[${idx}].color_code || null;"
+                            placeholder="e.g. White (optional)"
+                            class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:border-purple-500 focus:outline-none">
+                        <input type="color"
+                            value="${ps.color_code || '#ffffff'}"
+                            oninput="packSizes[${idx}].color_code = this.value"
+                            style="width:26px;height:26px;padding:1px;border:1px solid #d1d5db;border-radius:50%;cursor:pointer;overflow:hidden;background:none;"
+                            title="Pick swatch colour">
+                        <div style="width:14px;height:14px;border-radius:50%;background:${ps.color_code ? escH(ps.color_code) : '#e5e7eb'};border:1px solid #e2e8f0;flex-shrink:0;"></div>
                     </div>
                     <div class="flex items-center gap-2">
                         <label class="text-xs text-gray-500 whitespace-nowrap">Zoho Item:</label>
