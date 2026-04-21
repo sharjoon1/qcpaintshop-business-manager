@@ -206,6 +206,19 @@ router.post('/register', async (req, res) => {
             console.error('[painters] zoho sync module load failed', err.message);
         }
 
+        // Notify admins about new pending registration
+        try {
+            const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin','manager') AND status = 'active'");
+            for (const admin of admins) {
+                await notificationService.send(admin.id, {
+                    type: 'painter_registered',
+                    title: 'New Painter Registration',
+                    body: `${full_name}${city ? ' (' + city + ')' : ''} registered and is awaiting approval.`,
+                    data: { page: 'painters', tab: 'list', filter: 'pending' }
+                });
+            }
+        } catch (nErr) { console.error('[painters] registration notify error:', nErr.message); }
+
         res.json({ success: true, message: 'Registration submitted. Awaiting approval.', painterId: result.insertId, referralCode: myReferralCode });
     } catch (error) {
         console.error('Painter registration error:', error);
@@ -5775,6 +5788,18 @@ router.put('/:id/approve', requirePermission('painters', 'manage'), async (req, 
         if (action === 'approve') {
             await pool.query('UPDATE painter_referrals SET status = "active" WHERE referred_id = ?', [req.params.id]);
         }
+
+        // WhatsApp notification to painter
+        try {
+            const [painters] = await pool.query('SELECT full_name, phone FROM painters WHERE id = ?', [req.params.id]);
+            if (painters.length && sessionManager) {
+                const p = painters[0];
+                const msg = action === 'approve'
+                    ? `*Quality Colours Painter Program*\n\nHi ${p.full_name}! Your account has been *approved*. You can now log in to the QC Painters app using your phone number.\n\nWelcome to the Quality Colours family!`
+                    : `*Quality Colours Painter Program*\n\nHi ${p.full_name}, unfortunately your account registration was not approved at this time. Please contact us for more information.`;
+                await sessionManager.sendMessage(0, p.phone, msg, { source: 'painter_approval' });
+            }
+        } catch (waErr) { console.error('[painters] approve WhatsApp error:', waErr.message); }
 
         res.json({ success: true, message: `Painter ${status}` });
     } catch (error) {
