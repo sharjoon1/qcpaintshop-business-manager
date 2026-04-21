@@ -2350,7 +2350,7 @@
                     <input id="assign-search-${zohoItemId.replace(/[^a-z0-9]/gi,'_')}"
                         type="text" placeholder="🔍 Search product to assign to…"
                         style="width:100%;border:1px solid #93c5fd;border-radius:6px;padding:6px 10px;font-size:0.82rem;box-sizing:border-box;outline:none;"
-                        oninput="debounceAssignSearch('${zohoItemId}', '${escH(size)}', '${escH(unit)}', ${price}, this)"
+                        oninput="debounceAssignSearch('${escH(zohoItemId)}', '${escH(size)}', '${escH(unit)}', ${price}, this)"
                         autocomplete="off">
                 </div>
                 <div id="assign-results-${zohoItemId.replace(/[^a-z0-9]/gi,'_')}" style="max-height:200px;overflow-y:auto;">
@@ -2384,6 +2384,11 @@
             document.querySelector('.assign-dropdown')?.remove();
             document.removeEventListener('click', outsideAssignClick, true);
             assignDropdownActiveId = null;
+            if (window._originalConfirm) {
+                window.confirmAssignZohoItem = window._originalConfirm;
+                window._originalConfirm = null;
+                window._pendingGroupItems = null;
+            }
         }
 
         let assignSearchTimer = null;
@@ -2416,7 +2421,7 @@
                         style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:0.82rem;"
                         onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background=''">
                         <span style="font-weight:600;color:#1d4ed8;">${escH(p.name)}</span>
-                        <span style="color:#94a3b8;font-size:0.75rem;margin-left:8px;">${p.brand_name || ''}</span>
+                        <span style="color:#94a3b8;font-size:0.75rem;margin-left:8px;">${escH(p.brand_name || '')}</span>
                     </div>`).join('');
             } catch (e) {
                 resultsEl.innerHTML = '<div style="padding:10px;color:#dc2626;font-size:0.8rem;text-align:center;">Search failed</div>';
