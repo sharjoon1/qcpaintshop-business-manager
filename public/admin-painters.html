@@ -649,6 +649,8 @@
                         </table>
                     </div>
                 </div>
+                <!-- Mobile FAB to scroll to offer form -->
+                <button onclick="document.getElementById('offerFormTitle').scrollIntoView({behavior:'smooth'});document.getElementById('offerTitle').focus();" class="md:hidden" style="position:fixed;bottom:1.25rem;right:1.25rem;width:56px;height:56px;border-radius:9999px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;font-size:1.5rem;box-shadow:0 4px 16px rgba(102,126,234,0.4);cursor:pointer;z-index:30;display:flex;align-items:center;justify-content:center;" id="offerFab" aria-label="New Offer">+</button>
             </div>
 
             <!-- Tab: Per-Painter Overrides -->
@@ -1052,7 +1054,7 @@
                     <div class="mkt-sub hidden" data-pane="config">
                         <h3 class="text-lg font-semibold mb-3">Per-branch config</h3>
                         <select id="mktCfgBranch" class="px-3 py-1.5 border rounded-lg text-sm"><option value="">Choose branch…</option></select>
-                        <div id="mktCfgForm" class="hidden mt-3 grid grid-cols-2 gap-3 max-w-lg">
+                        <div id="mktCfgForm" class="hidden mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg">
                             <label class="text-sm">Daily quota<input type="number" id="mktCfgQuota" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
                             <label class="text-sm">Recycle new<input type="number" id="mktCfgNew" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
                             <label class="text-sm">Recycle callback<input type="number" id="mktCfgCallback" class="w-full px-2 py-1.5 border rounded-lg text-sm"></label>
@@ -1141,6 +1143,10 @@
 
     <!-- Tab: Attendance -->
     <div id="tab-attendance" class="tab-content">
+        <div class="summary-strip" id="attSummaryStrip" style="display:none;">
+            <span>In: <strong id="attCountIn">0</strong></span>
+            <span>Out: <strong id="attCountOut">0</strong></span>
+        </div>
         <div class="flex flex-wrap gap-2 mb-4">
             <button class="tab-btn-sub active" onclick="switchAttTab('today', this)">Today</button>
             <button class="tab-btn-sub" onclick="switchAttTab('monthly', this)">Monthly Summary</button>
@@ -1320,7 +1326,7 @@
 
                     <!-- History Panel -->
                     <div id="notif-panel-history" style="display:none;">
-                        <div style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden;">
+                        <div style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow-x:auto;">
                             <table class="data-table" id="notif-history-table">
                                 <thead>
                                     <tr>
@@ -4612,6 +4618,37 @@
                     <td>${c.status === 'approved' ? `<button onclick="rejectCheckin(${c.id})" class="text-red-600 text-sm">Reject</button>` : attEscapeHtml(c.rejected_reason || '')}</td>
                 </tr>
             `).join('');
+            // Summary strip
+            const strip = document.getElementById('attSummaryStrip');
+            if (strip) {
+                strip.style.display = 'flex';
+                const approvedCount = data.checkins.filter(c => c.status === 'approved').length;
+                const el = document.getElementById('attCountIn');
+                if (el) el.textContent = approvedCount;
+                const outEl = document.getElementById('attCountOut');
+                if (outEl) outEl.textContent = data.checkins.length - approvedCount;
+            }
+            // Mobile cards
+            let attMob = document.getElementById('attMobileList');
+            if (!attMob) {
+                attMob = document.createElement('div');
+                attMob.id = 'attMobileList';
+                attMob.className = 'md:hidden';
+                const attTable = document.querySelector('#att-sub-today .bg-white.rounded-xl.border');
+                if (attTable) attTable.parentNode.insertBefore(attMob, attTable);
+            }
+            attMob.innerHTML = data.checkins.map(c => `
+                <div class="painter-card">
+                    <div class="flex items-center gap-3">
+                        <div style="width:10px;height:10px;border-radius:50%;background:${c.status==='approved'?'#10b981':'#94a3b8'};flex-shrink:0;"></div>
+                        <div class="flex-1">
+                            <div style="font-weight:600;">${attEscapeHtml(c.painter_name||'')}</div>
+                            <div style="font-size:0.8rem;color:#64748b;">${attEscapeHtml(c.branch_name||'')} · ${new Date(c.checkin_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
+                            <div style="font-size:0.78rem;color:#94a3b8;">${c.distance_meters ? c.distance_meters + 'm from branch' : ''}</div>
+                        </div>
+                        <span class="badge" style="background:${c.status==='approved'?'#d1fae5':'#fee2e2'};color:${c.status==='approved'?'#065f46':'#991b1b'};">${c.status}</span>
+                    </div>
+                </div>`).join('');
         } catch (e) {
             console.error('loadAttendanceToday', e);
         }
