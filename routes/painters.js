@@ -5705,7 +5705,7 @@ router.post('/me/location-report', requirePainterAuth, async (req, res) => {
 
 // GET /api/painters/locations/live — admin fleet view (latest ping per painter)
 // IMPORTANT: must stay before router.get('/:id', ...) or 'locations' is parsed as an ID
-router.get('/locations/live', requireAuth, async (req, res) => {
+router.get('/locations/live', requireAuth, requirePermission('painters', 'view'), async (req, res) => {
     try {
         const [online] = await pool.query(`
             SELECT ple.painter_id, p.name, p.level, b.name AS branch,
@@ -5752,10 +5752,16 @@ router.get('/locations/live', requireAuth, async (req, res) => {
 });
 
 // GET /api/painters/:id/locations/history?date=YYYY-MM-DD — admin route replay
-router.get('/:id/locations/history', requireAuth, async (req, res) => {
+router.get('/:id/locations/history', requireAuth, requirePermission('painters', 'view'), async (req, res) => {
     try {
         const painterId = parseInt(req.params.id, 10);
+        if (isNaN(painterId) || painterId <= 0) {
+            return res.status(400).json({ success: false, message: 'Invalid painter ID' });
+        }
         let dateStr = req.query.date;
+        if (dateStr && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            return res.status(400).json({ success: false, message: 'Invalid date format, use YYYY-MM-DD' });
+        }
         if (!dateStr) {
             const now = new Date();
             const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
