@@ -232,7 +232,7 @@
             </div>
 
             <!-- Toolbar -->
-            <div class="flex items-center justify-between mb-3">
+            <div class="zoho-desktop-toolbar flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
                     <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-600">
                         <input type="checkbox" id="zohoGroupToggle" checked onchange="loadZohoItems()" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
@@ -245,6 +245,17 @@
                 </button>
             </div>
 
+            <!-- Mobile Toolbar (Zoho Import) -->
+            <div class="zoho-mobile-toolbar items-center gap-2 mb-3" style="flex-wrap:wrap;">
+                <div style="display:flex;gap:8px;flex:1;">
+                    <input type="text" id="zohoSearchMobile" placeholder="🔍 Search…"
+                        style="flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;font-size:0.85rem;"
+                        oninput="document.getElementById('zohoSearchInput').value=this.value;debounceZohoSearch();">
+                    <button onclick="openZohoFilterDrawer()" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;font-size:0.85rem;white-space:nowrap;">Filter ▾</button>
+                    <button onclick="syncZohoItems()" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:0.85rem;font-weight:600;">⟳</button>
+                </div>
+            </div>
+
             <!-- Sync Status -->
             <div id="zohoSyncStatus" class="hidden mb-4 p-3 rounded-lg text-sm">
                 <div class="flex items-center gap-2">
@@ -254,7 +265,7 @@
             </div>
 
             <!-- Zoho Items Table -->
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div class="zoho-table-wrap bg-white rounded-xl shadow-sm overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="table w-full">
                         <thead>
@@ -289,6 +300,9 @@
                 <!-- Pagination -->
                 <div id="zohoItemsPagination" class="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-500"></div>
             </div>
+
+            <!-- Mobile Zoho List -->
+            <div class="zoho-mobile-list" id="zohoMobileList"></div>
 
             <!-- Zoho Import Action Bar -->
             <div id="zohoImportActionBar" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-50">
@@ -1402,6 +1416,46 @@
                                 <td class="px-4 py-3 text-xs text-gray-500">${escH(g.hsn || '-')}</td>
                             </tr>`;
                         }).join('');
+                        // Mobile grouped render
+                        if (window.innerWidth < 768) {
+                            const ml = document.getElementById('zohoMobileList');
+                            if (ml) ml.innerHTML = (window._zohoGroupData || []).map((g, gi) => {
+                                const itemIds = g.items.map(i => i.zoho_item_id || i.item_id);
+                                const mappedProduct = g.allMapped ? zohoMappedInfo[itemIds[0]] : null;
+                                const unmappedCount = itemIds.filter(id => !zohoMappedIds.has(id)).length;
+                                return `
+                                <div style="border:1px solid ${g.allMapped?'#d1fae5':'#fde68a'};border-radius:12px;margin-bottom:8px;overflow:hidden;">
+                                    <div style="background:${g.allMapped?'#f0fdf4':'#fffbeb'};padding:10px 12px;display:flex;align-items:center;gap:8px;" onclick="toggleMobileGroup(${gi})">
+                                        ${g.allMapped
+                                            ? `<span style="background:#d1fae5;color:#065f46;border-radius:4px;padding:2px 7px;font-size:0.68rem;font-weight:600;">All mapped ✓</span>`
+                                            : `<input type="checkbox" onclick="event.stopPropagation()" onchange="toggleZohoGroupSelect([${itemIds.map(id=>"'"+id+"'").join(',')}],this.checked)" style="width:15px;height:15px;flex-shrink:0;">`
+                                        }
+                                        <div style="flex:1;min-width:0;">
+                                            <div style="font-weight:700;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(g.name)}</div>
+                                            <div style="font-size:0.68rem;color:${g.allMapped?'#065f46':'#92400e'};">${g.allMapped?'Fully mapped · '+g.items.length+' variants':unmappedCount+' unmapped · '+escH(g.brand||'')}</div>
+                                        </div>
+                                        ${g.allMapped
+                                            ? `<button onclick="event.stopPropagation();switchToProductsAndEdit(${mappedProduct?.product_id})" style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;font-size:0.7rem;color:#374151;flex-shrink:0;">Edit</button>`
+                                            : `<button data-assign-btn onclick="event.stopPropagation();openGroupAssignDropdown(window._zohoGroupData[${gi}].items,this)" style="background:#e0f2fe;border:none;border-radius:6px;padding:4px 8px;font-size:0.7rem;color:#0369a1;flex-shrink:0;font-weight:600;">Assign ▾</button>
+                                               <button onclick="event.stopPropagation();selectAndImportGroup(window._zohoGroupData[${gi}])" style="background:#10b981;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:0.7rem;flex-shrink:0;font-weight:600;">New</button>`
+                                        }
+                                        <span style="color:#94a3b8;font-size:0.8rem;flex-shrink:0;" id="mgroup-chevron-${gi}">▼</span>
+                                    </div>
+                                    <div id="mgroup-body-${gi}" style="display:none;background:#fafaf9;padding:6px 10px;border-top:1px solid ${g.allMapped?'#d1fae5':'#fde68a'};">
+                                        ${g.items.map(item => {
+                                            const iid = item.zoho_item_id || item.item_id;
+                                            const mapped = zohoMappedIds.has(iid);
+                                            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f4;">
+                                                <input type="checkbox" ${mapped?'disabled':''} ${zohoSelectedIds?.has(iid)?'checked':''} onchange="toggleZohoItemSelect('${escH(iid)}',this.checked)" style="width:13px;height:13px;">
+                                                <span style="flex:1;font-size:0.78rem;">${escH(item._sizeLabel||item.name||item.item_name||'')}</span>
+                                                <span style="color:#16a34a;font-weight:600;font-size:0.78rem;">₹${parseFloat(item.rate||0).toFixed(0)}</span>
+                                                <span style="background:${mapped?'#d1fae5':'#fef3c7'};color:${mapped?'#065f46':'#92400e'};border-radius:3px;padding:1px 5px;font-size:0.65rem;">${mapped?'Mapped':'Unmapped'}</span>
+                                            </div>`;
+                                        }).join('')}
+                                    </div>
+                                </div>`;
+                            }).join('') + `<div style="text-align:center;color:#94a3b8;font-size:0.72rem;padding:8px;">Showing ${(window._zohoGroupData||[]).length} group(s)</div>`;
+                        }
                     } else {
                         // Flat view (individual items)
                         document.getElementById('zohoItemsBody').innerHTML = items.map(item => {
@@ -1442,6 +1496,23 @@
                                 <td class="px-4 py-3 text-xs text-gray-500">${escH(item.hsn_or_sac || '-')}</td>
                             </tr>`;
                         }).join('');
+                        // Mobile flat render
+                        if (window.innerWidth < 768) {
+                            const ml = document.getElementById('zohoMobileList');
+                            if (ml) ml.innerHTML = items.map(item => {
+                                const itemId = item.zoho_item_id || item.item_id;
+                                const isMapped = zohoMappedIds.has(itemId);
+                                return `<div style="background:#fff;border:1px solid ${isMapped?'#d1fae5':'#fde68a'};border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;align-items:center;gap:8px;">
+                                    <input type="checkbox" ${isMapped?'disabled':''} ${zohoSelectedIds?.has(itemId)?'checked':''} onchange="toggleZohoItemSelect('${escH(itemId)}',this.checked)" style="width:15px;height:15px;flex-shrink:0;">
+                                    <div style="flex:1;min-width:0;">
+                                        <div style="font-weight:600;font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(item.name||item.item_name||'')}</div>
+                                        <div style="font-size:0.7rem;color:#64748b;">${escH(item.brand||'')} · ₹${parseFloat(item.rate||0).toFixed(0)}</div>
+                                    </div>
+                                    <span style="background:${isMapped?'#d1fae5':'#fef3c7'};color:${isMapped?'#065f46':'#92400e'};border-radius:4px;padding:2px 7px;font-size:0.7rem;flex-shrink:0;">${isMapped?'Mapped':'Unmapped'}</span>
+                                    ${!isMapped?`<button data-assign-btn onclick="openAssignDropdown('${escH(itemId)}','${escH(extractSizeFromName(item.name||item.item_name||''))}','${escH(extractUnitFromName(item.name||item.item_name||''))}',${parseFloat(item.rate)||0},this)" style="background:#e0f2fe;border:none;border-radius:6px;padding:4px 8px;font-size:0.7rem;color:#0369a1;flex-shrink:0;">Assign ▾</button>`:''}
+                                </div>`;
+                            }).join('');
+                        }
                     }
                     // Sync select-all checkbox state
                     const allCb = document.getElementById('zohoSelectAll');
@@ -2637,6 +2708,47 @@
             const chips = document.getElementById('mobileActiveChips');
             if (chips._clearFns?.[i]) chips._clearFns[i]();
         }
+
+        // ── Mobile Zoho Filter Drawer ─────────────────────────────────────────
+        function openZohoFilterDrawer() {
+            const bd = document.getElementById('zohoFilterBrandMobile');
+            const cd = document.getElementById('zohoFilterCategoryMobile');
+            if (bd) bd.innerHTML = document.getElementById('zohoFilterBrand').innerHTML;
+            if (cd) cd.innerHTML = document.getElementById('zohoFilterCategory').innerHTML;
+            if (bd) bd.value = document.getElementById('zohoFilterBrand').value;
+            if (cd) cd.value = document.getElementById('zohoFilterCategory').value;
+            document.getElementById('zohoFilterDrawer')?.classList.add('open');
+            document.getElementById('zohoFilterDrawerOverlay')?.classList.add('open');
+        }
+        function closeZohoFilterDrawer() {
+            document.getElementById('zohoFilterDrawer')?.classList.remove('open');
+            document.getElementById('zohoFilterDrawerOverlay')?.classList.remove('open');
+        }
+        function setZohoMobileFilter(value) {
+            const el = document.getElementById('zohoFilterMapped');
+            if (el) el.value = value;
+            if (typeof zohoCurrentPage !== 'undefined') zohoCurrentPage = 1;
+            loadZohoItems();
+        }
+
+        // ── Mobile Zoho Group toggle ──────────────────────────────────────────
+        function toggleMobileGroup(gi) {
+            const body = document.getElementById('mgroup-body-' + gi);
+            const chev = document.getElementById('mgroup-chevron-' + gi);
+            if (!body) return;
+            const open = body.style.display !== 'none';
+            body.style.display = open ? 'none' : 'block';
+            if (chev) chev.textContent = open ? '▼' : '▲';
+        }
+        function selectAndImportGroup(group) {
+            const items = group.items || [];
+            items.forEach(i => {
+                const id = i.zoho_item_id || i.item_id;
+                if (id && !zohoMappedIds.has(id)) zohoSelectedIds?.add(id);
+            });
+            if (typeof updateZohoImportBar === 'function') updateZohoImportBar();
+            if (typeof importZohoToProducts === 'function') importZohoToProducts();
+        }
     </script>
 
 <!-- Mobile Filter Drawer: Products -->
@@ -2671,6 +2783,32 @@
         </div>
     </div>
     <button onclick="closeFilterDrawer()" style="width:100%;background:#1B5E3B;color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:600;cursor:pointer;">Apply Filters</button>
+</div>
+
+<!-- Mobile Zoho Filter Drawer -->
+<div class="filter-drawer-overlay" id="zohoFilterDrawerOverlay" onclick="closeZohoFilterDrawer()"></div>
+<div class="filter-drawer" id="zohoFilterDrawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <span style="font-weight:700;font-size:1rem;">Filter Zoho Items</span>
+        <button onclick="closeZohoFilterDrawer()" style="background:none;border:none;color:#64748b;font-size:0.85rem;cursor:pointer;">Close</button>
+    </div>
+    <div style="margin-bottom:12px;">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">Brand</div>
+        <select id="zohoFilterBrandMobile" onchange="document.getElementById('zohoFilterBrand').value=this.value;zohoCurrentPage=1;loadZohoItems();" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:0.85rem;"><option value="">All Brands</option></select>
+    </div>
+    <div style="margin-bottom:12px;">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">Category</div>
+        <select id="zohoFilterCategoryMobile" onchange="document.getElementById('zohoFilterCategory').value=this.value;zohoCurrentPage=1;loadZohoItems();" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:0.85rem;"><option value="">All Categories</option></select>
+    </div>
+    <div style="margin-bottom:20px;">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">Mapped Status</div>
+        <div style="display:flex;gap:6px;">
+            <button onclick="setZohoMobileFilter('')" style="flex:1;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:8px;font-size:0.8rem;cursor:pointer;">All</button>
+            <button onclick="setZohoMobileFilter('unmapped')" style="flex:1;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;font-size:0.8rem;cursor:pointer;color:#92400e;">Unmapped</button>
+            <button onclick="setZohoMobileFilter('mapped')" style="flex:1;background:#f0fdf4;border:1px solid #d1fae5;border-radius:8px;padding:8px;font-size:0.8rem;cursor:pointer;color:#065f46;">Mapped</button>
+        </div>
+    </div>
+    <button onclick="closeZohoFilterDrawer()" style="width:100%;background:#1B5E3B;color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:600;cursor:pointer;">Apply</button>
 </div>
 </body>
 </html>
