@@ -16,6 +16,28 @@
     <link rel="stylesheet" href="/css/design-system.css">
     <script src="/js/permissions.js"></script>
     <script src="/universal-nav-loader.js"></script>
+    <style>
+/* ── Mobile: Products Tab ───────────────────────────── */
+.products-table-wrap { display: block; }
+.products-mobile-list { display: none; }
+.filter-drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 400; }
+.filter-drawer { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; z-index: 401; padding: 20px; max-height: 80vh; overflow-y: auto; box-shadow: 0 -4px 24px rgba(0,0,0,0.15); }
+.filter-drawer.open, .filter-drawer-overlay.open { display: block; }
+.products-mobile-add { display: none; }
+.zoho-mobile-list { display: none; }
+.zoho-mobile-toolbar { display: none; }
+
+@media (max-width: 767px) {
+    .products-table-wrap { display: none !important; }
+    .products-mobile-list { display: block; }
+    #headerActions { display: none; }
+    .products-mobile-add { display: flex !important; }
+    .zoho-table-wrap { display: none !important; }
+    .zoho-mobile-list { display: block; }
+    .zoho-desktop-toolbar { display: none !important; }
+    .zoho-mobile-toolbar { display: flex !important; }
+}
+    </style>
 </head>
 <body class="bg-gray-50" data-page="products">
 <!-- Page Header -->
@@ -44,6 +66,18 @@
                 <span id="resultsCount" class="text-xs text-gray-500"></span>
             </div>
 
+            <!-- Mobile Filter Bar (shown only on mobile) -->
+            <div class="block md:hidden mb-3" id="mobileProductsFilterBar">
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="filterNameMobile" placeholder="🔍 Search products…"
+                        style="flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;font-size:0.85rem;"
+                        oninput="document.getElementById('filterName').value=this.value;renderProducts();updateMobileFilterChips();">
+                    <button onclick="openFilterDrawer()" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;font-size:0.85rem;white-space:nowrap;">Filter ▾</button>
+                    <button onclick="openAddModal()" style="background:#1B5E3B;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:0.85rem;font-weight:600;" data-permission-module="products" data-permission-action="add">+ Add</button>
+                </div>
+                <div id="mobileActiveChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+            </div>
+
             <!-- Products List -->
             <div class="card">
                 <div id="loadingState" class="text-center py-8">
@@ -52,6 +86,7 @@
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                 </div>
+                <div class="products-table-wrap">
                 <div id="productsTable" class="hidden overflow-x-auto">
                     <table class="table">
                         <thead>
@@ -81,6 +116,8 @@
                         <tbody id="productsBody"></tbody>
                     </table>
                 </div>
+                </div><!-- /.products-table-wrap -->
+                <div class="products-mobile-list" id="productsMobileList"></div>
                 <div id="emptyState" class="hidden text-center py-12">
                     <svg class="mx-auto w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
@@ -682,6 +719,37 @@
                     </td>
                 </tr>
             `).join('');
+
+            // Mobile card render
+            if (window.innerWidth < 768) {
+                const mobileList = document.getElementById('productsMobileList');
+                if (!mobileList) return;
+                if (!filtered.length) {
+                    mobileList.innerHTML = `<div style="text-align:center;padding:40px;color:#94a3b8;">No products match your filters.</div>`;
+                    return;
+                }
+                mobileList.innerHTML = filtered.map(p => `
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;" onclick="editProduct(${p.id})">
+                        ${p.image_url
+                            ? `<img src="${escH(p.image_url)}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;flex-shrink:0;">`
+                            : `<div style="width:44px;height:44px;background:#f1f5f9;border-radius:8px;border:2px dashed #d1d5db;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem;">🎨</div>`
+                        }
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:700;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(p.name)}</div>
+                            <div style="font-size:0.72rem;color:#64748b;">${escH(p.brand_name||'')}&nbsp;·&nbsp;${escH(p.category_name||'')}</div>
+                            <div style="display:flex;gap:5px;margin-top:4px;align-items:center;flex-wrap:wrap;">
+                                <span style="font-weight:700;color:#16a34a;font-size:0.82rem;">₹${parseFloat(p.base_price||0).toFixed(0)}</span>
+                                <span style="background:${p.status==='active'?'#d1fae5':'#f1f5f9'};color:${p.status==='active'?'#065f46':'#64748b'};border-radius:4px;padding:1px 6px;font-size:0.68rem;">${p.status==='active'?'● Active':'○ Inactive'}</span>
+                                <span style="background:${p.product_type==='area_wise'?'#e0f2fe':'#fef3c7'};color:${p.product_type==='area_wise'?'#0369a1':'#92400e'};border-radius:4px;padding:1px 6px;font-size:0.68rem;">${p.product_type==='area_wise'?'Area':'Unit'}</span>
+                            </div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;" onclick="event.stopPropagation()">
+                            <button onclick="editProduct(${p.id})" style="background:#eff6ff;border:none;border-radius:6px;padding:5px 10px;font-size:0.72rem;color:#1d4ed8;font-weight:600;">Edit</button>
+                            <button onclick="deleteProduct(${p.id})" style="background:#fef2f2;border:none;border-radius:6px;padding:5px 10px;font-size:0.72rem;color:#dc2626;font-weight:600;">Del</button>
+                        </div>
+                    </div>
+                `).join('') + `<div style="text-align:center;color:#94a3b8;font-size:0.75rem;padding:8px;">Showing ${filtered.length} of ${products.length}</div>`;
+            }
         }
 
         // GST Breakdown Calculator (Real-time Preview)
@@ -2522,6 +2590,81 @@
             }
             loadData();
         })();
+
+        // ── Mobile Filter Drawer (Products) ────────────────────────────────────
+        function openFilterDrawer() {
+            const bd = document.getElementById('filterBrandMobile');
+            const cd = document.getElementById('filterCategoryMobile');
+            if (bd) bd.innerHTML = document.getElementById('filterBrand').innerHTML;
+            if (cd) cd.innerHTML = document.getElementById('filterCategory').innerHTML;
+            if (bd) bd.value = document.getElementById('filterBrand').value;
+            if (cd) cd.value = document.getElementById('filterCategory').value;
+            document.getElementById('filterDrawer')?.classList.add('open');
+            document.getElementById('filterDrawerOverlay')?.classList.add('open');
+        }
+        function closeFilterDrawer() {
+            document.getElementById('filterDrawer')?.classList.remove('open');
+            document.getElementById('filterDrawerOverlay')?.classList.remove('open');
+            updateMobileFilterChips();
+        }
+        function setMobileFilter(desktopId, value) {
+            const el = document.getElementById(desktopId);
+            if (el) el.value = value;
+            renderProducts();
+        }
+        function updateMobileFilterChips() {
+            const chips = document.getElementById('mobileActiveChips');
+            if (!chips) return;
+            const active = [];
+            const brand = document.getElementById('filterBrand')?.value;
+            const cat = document.getElementById('filterCategory')?.value;
+            const status = document.getElementById('filterStatus')?.value;
+            const type = document.getElementById('filterType')?.value;
+            if (brand) active.push({ label: brand, clear: () => { document.getElementById('filterBrand').value=''; renderProducts(); updateMobileFilterChips(); } });
+            if (cat) active.push({ label: cat, clear: () => { document.getElementById('filterCategory').value=''; renderProducts(); updateMobileFilterChips(); } });
+            if (status) active.push({ label: status, clear: () => { document.getElementById('filterStatus').value=''; renderProducts(); updateMobileFilterChips(); } });
+            if (type) active.push({ label: type==='area_wise'?'Area':'Unit', clear: () => { document.getElementById('filterType').value=''; renderProducts(); updateMobileFilterChips(); } });
+            chips.innerHTML = active.map((a,i) => `<span style="background:#d1fae5;color:#065f46;border-radius:99px;padding:3px 10px;font-size:0.72rem;cursor:pointer;" onclick="chipClear(${i})">${escH(a.label)} ×</span>`).join('');
+            chips._clearFns = active.map(a => a.clear);
+        }
+        function chipClear(i) {
+            const chips = document.getElementById('mobileActiveChips');
+            if (chips._clearFns?.[i]) chips._clearFns[i]();
+        }
     </script>
+
+<!-- Mobile Filter Drawer: Products -->
+<div class="filter-drawer-overlay" id="filterDrawerOverlay" onclick="closeFilterDrawer()"></div>
+<div class="filter-drawer" id="filterDrawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <span style="font-weight:700;font-size:1rem;">Filter Products</span>
+        <button onclick="clearFilters();closeFilterDrawer()" style="background:none;border:none;color:#64748b;font-size:0.85rem;cursor:pointer;">Clear all</button>
+    </div>
+    <div style="margin-bottom:12px;">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">Brand</div>
+        <select id="filterBrandMobile" onchange="document.getElementById('filterBrand').value=this.value;renderProducts();" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:0.85rem;"></select>
+    </div>
+    <div style="margin-bottom:12px;">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">Category</div>
+        <select id="filterCategoryMobile" onchange="document.getElementById('filterCategory').value=this.value;renderProducts();" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:0.85rem;"></select>
+    </div>
+    <div style="margin-bottom:12px;">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">Status</div>
+        <div style="display:flex;gap:6px;">
+            <button onclick="setMobileFilter('filterStatus','')" class="mobile-filter-btn flex-1 py-2 rounded-lg text-sm border" id="mfStatus-all">All</button>
+            <button onclick="setMobileFilter('filterStatus','active')" class="mobile-filter-btn flex-1 py-2 rounded-lg text-sm border" id="mfStatus-active">Active</button>
+            <button onclick="setMobileFilter('filterStatus','inactive')" class="mobile-filter-btn flex-1 py-2 rounded-lg text-sm border" id="mfStatus-inactive">Inactive</button>
+        </div>
+    </div>
+    <div style="margin-bottom:20px;">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">Type</div>
+        <div style="display:flex;gap:6px;">
+            <button onclick="setMobileFilter('filterType','')" class="mobile-filter-btn flex-1 py-2 rounded-lg text-sm border" id="mfType-all">All</button>
+            <button onclick="setMobileFilter('filterType','area_wise')" class="mobile-filter-btn flex-1 py-2 rounded-lg text-sm border" id="mfType-area">Area</button>
+            <button onclick="setMobileFilter('filterType','unit_wise')" class="mobile-filter-btn flex-1 py-2 rounded-lg text-sm border" id="mfType-unit">Unit</button>
+        </div>
+    </div>
+    <button onclick="closeFilterDrawer()" style="width:100%;background:#1B5E3B;color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:600;cursor:pointer;">Apply Filters</button>
+</div>
 </body>
 </html>
