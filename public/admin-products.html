@@ -1305,7 +1305,10 @@
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                             Mapped
                                         </button>`
-                                        : `<input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleZohoGroupSelect([${itemIds.map(id => '\'' + id + '\'').join(',')}], this.checked)" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">`
+                                        : `<div class="flex flex-col gap-1 items-center">
+    <input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleZohoGroupSelect([${itemIds.map(id => '\'' + id + '\'').join(',')}], this.checked)" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+    <button data-assign-btn onclick="event.stopPropagation();openGroupAssignDropdown(${JSON.stringify(g.items).replace(/"/g,'&quot;')},this)" class="text-xs px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded hover:bg-blue-100 whitespace-nowrap">Assign ▾</button>
+</div>`
                                     }
                                 </td>
                                 <td class="px-4 py-2 text-center">
@@ -1342,7 +1345,10 @@
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                             Edit
                                         </button>`
-                                        : `<input type="checkbox" value="${itemId}" ${isSelected ? 'checked' : ''} onchange="toggleZohoItemSelect('${itemId}', this.checked)" class="zoho-item-cb w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">`
+                                        : `<div class="flex flex-col gap-1">
+    <input type="checkbox" value="${itemId}" ${isSelected ? 'checked' : ''} onchange="toggleZohoItemSelect('${itemId}', this.checked)" class="zoho-item-cb w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+    <button data-assign-btn onclick="event.stopPropagation();openAssignDropdown('${escH(itemId)}','${escH(extractSizeFromName(item.name||item.item_name||''))}','${escH(extractUnitFromName(item.name||item.item_name||''))}',${parseFloat(item.rate)||0},this)" class="text-xs px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded hover:bg-blue-100 whitespace-nowrap">Assign ▾</button>
+</div>`
                                     }
                                 </td>
                                 <td class="px-4 py-2 text-center">
