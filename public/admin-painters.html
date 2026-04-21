@@ -650,7 +650,7 @@
                     </div>
                 </div>
                 <!-- Mobile FAB to scroll to offer form -->
-                <button onclick="document.getElementById('offerFormTitle').scrollIntoView({behavior:'smooth'});document.getElementById('offerTitle').focus();" class="md:hidden" style="position:fixed;bottom:1.25rem;right:1.25rem;width:56px;height:56px;border-radius:9999px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;font-size:1.5rem;box-shadow:0 4px 16px rgba(102,126,234,0.4);cursor:pointer;z-index:30;display:flex;align-items:center;justify-content:center;" id="offerFab" aria-label="New Offer">+</button>
+                <button onclick="document.getElementById('offerFormTitle').scrollIntoView({behavior:'smooth'});document.getElementById('offerTitle').focus();" class="md:hidden" style="position:fixed;bottom:1.25rem;right:1.25rem;width:56px;height:56px;border-radius:9999px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;font-size:1.5rem;box-shadow:0 4px 16px rgba(102,126,234,0.4);cursor:pointer;z-index:30;display:none;align-items:center;justify-content:center;" id="offerFab" aria-label="New Offer">+</button>
             </div>
 
             <!-- Tab: Per-Painter Overrides -->
@@ -1482,6 +1482,10 @@
         if (tab === 'marketing') initMarketingTab();
         if (tab === 'attendance') initAttendanceTab();
         // notifications tab has no lazy-load trigger
+
+        // Toggle offers FAB visibility based on active tab
+        const fab = document.getElementById('offerFab');
+        if (fab) fab.style.display = (tab === 'offers') ? 'flex' : 'none';
     }
 
     // ═══════════════════════════════════════
@@ -2344,6 +2348,7 @@
         try {
             const params = new URLSearchParams({ limit: 100 });
             if (status) params.set('status', status);
+            // TODO: backend GET /withdrawals needs 'pool' param support for this to filter
             if (poolType) params.set('pool', poolType);
             const res = await fetch(`${API}/withdrawals?${params}`, { headers: authHeaders() });
             const data = await res.json();
