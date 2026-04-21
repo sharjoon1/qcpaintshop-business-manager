@@ -1817,6 +1817,7 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
             SELECT zim.zoho_item_id as item_id, zim.zoho_item_name as name,
                    ps.id as pack_size_id,
                    ps.size as pack_size, ps.unit as pack_unit,
+                   ps.color_name, ps.color_code,
                    zim.zoho_brand as brand, zim.zoho_category_name as category,
                    zim.zoho_rate as rate, zim.zoho_label_rate as mrp,
                    COALESCE((SELECT SUM(zls.stock_on_hand) FROM zoho_location_stock zls
@@ -1863,6 +1864,8 @@ router.get('/me/catalog/:productId', requirePainterAuth, async (req, res) => {
                 regular_points: regularPts,
                 annual_points: annualPts,
                 image_url: v.image_url || null,
+                color_name: v.color_name || null,
+                color_code: v.color_code || null,
             };
         });
 
