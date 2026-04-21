@@ -1005,7 +1005,9 @@
                         price: parseFloat(ps.base_price),
                         base_price: parseFloat(ps.base_price),
                         zoho_item_id: ps.zoho_item_id || null,
-                        zoho_item_name: ps.zoho_item_name || ''
+                        zoho_item_name: ps.zoho_item_name || '',
+                        color_name: ps.color_name || null,
+                        color_code: ps.color_code || null,
                     }));
                 } else if (product.available_sizes) {
                     try {
@@ -1850,12 +1852,14 @@
             btn.disabled = true; btn.textContent = 'Saving...';
 
             try {
-                const packSizesData = p.pack_sizes.map(ps => ({
+                const packSizesData = packSizes.map(ps => ({
                     size: ps.size,
                     unit: ps.unit || 'L',
                     base_price: ps.base_price,
                     price: ps.base_price,
-                    zoho_item_id: ps.zoho_item_id || null
+                    zoho_item_id: ps.zoho_item_id || null,
+                    color_name: ps.color_name || null,
+                    color_code: ps.color_code || null,
                 }));
 
                 console.log('[saveEditReview] Saving product', p.id, 'with', packSizesData.length, 'pack sizes:', JSON.stringify(packSizesData));
