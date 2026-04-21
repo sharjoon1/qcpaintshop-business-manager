@@ -2578,6 +2578,41 @@ app.post('/api/products/bulk-map', requirePermission('products', 'edit'), async 
     }
 });
 
+// Assign a single Zoho item to an existing product (creates pack_size + sets zoho_item_id atomically)
+app.post('/api/products/assign-zoho-item', requirePermission('products', 'edit'), async (req, res) => {
+    try {
+        const { product_id, zoho_item_id, size, unit, price } = req.body;
+        if (!product_id || !zoho_item_id || !size || !unit) {
+            return res.status(400).json({ success: false, error: 'product_id, zoho_item_id, size, unit are required' });
+        }
+        const parsedSize = parseFloat(size);
+        const parsedPrice = parseFloat(price) || 0;
+        if (isNaN(parsedSize) || parsedSize <= 0) {
+            return res.status(400).json({ success: false, error: 'size must be a positive number' });
+        }
+
+        // Confirm product exists
+        const [products] = await pool.query('SELECT id FROM products WHERE id = ? AND status = "active"', [product_id]);
+        if (!products.length) return res.status(404).json({ success: false, error: 'Product not found' });
+
+        // Check zoho_item_id isn't already linked to a pack_size
+        const [existing] = await pool.query('SELECT id FROM pack_sizes WHERE zoho_item_id = ? AND is_active = 1', [zoho_item_id]);
+        if (existing.length) {
+            return res.status(409).json({ success: false, error: 'This Zoho item is already mapped to a pack size', pack_size_id: existing[0].id });
+        }
+
+        const [result] = await pool.query(
+            'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
+            [product_id, parsedSize, unit.toUpperCase(), parsedPrice, zoho_item_id]
+        );
+
+        res.json({ success: true, pack_size_id: result.insertId });
+    } catch (err) {
+        console.error('assign-zoho-item error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // Get zoho_item_ids already mapped to pack_sizes
 app.get('/api/products/mapped-zoho-ids', requireAuth, async (req, res) => {
     try {
