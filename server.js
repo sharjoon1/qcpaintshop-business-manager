@@ -3589,6 +3589,11 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // Admin painters live map room
+    socket.on('join_admin_painters_live', () => {
+        socket.join('admin_painters_live');
+    });
+
     // Join all conversations the user is part of
     try {
         const [convos] = await pool.query(

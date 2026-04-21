@@ -295,6 +295,7 @@ function start() {
         registry.register('painter-attendance-recompute', { name: 'Attendance Recompute Claimable', service: 'painter-scheduler', schedule: '0 */6 1-7 * *', description: 'Recompute claimable AP every 6h during claim window' });
         registry.register('painter-attendance-remind', { name: 'Attendance Claim Reminder', service: 'painter-scheduler', schedule: '0 20 7 * *', description: '8 PM day-before reminder for unclaimed attendance AP' });
         registry.register('painter-attendance-forfeit', { name: 'Attendance Forfeit + Purge', service: 'painter-scheduler', schedule: '0 2 8 * *', description: 'Forfeit unclaimed attendance + purge old selfie images' });
+        registry.register('painter-location-prune', { name: 'Location Events Prune', service: 'painter-scheduler', schedule: '30 2 * * *', description: 'Delete painter location events older than 30 days' });
     }
 
     // Existing jobs
@@ -313,6 +314,20 @@ function start() {
     jobs.attendanceRecompute = cron.schedule('0 */6 1-7 * *', runRecomputeClaimable, { timezone: 'Asia/Kolkata' });
     jobs.attendanceRemind = cron.schedule('0 20 7 * *', runRemindUnclaimed, { timezone: 'Asia/Kolkata' });
     jobs.attendanceForfeit = cron.schedule('0 2 8 * *', runForfeitAndPurge, { timezone: 'Asia/Kolkata' });
+
+    // Location events retention: prune rows older than 30 days at 02:30 IST daily
+    jobs.locationPrune = cron.schedule('30 2 * * *', async () => {
+        try {
+            const [result] = await pool.query(
+                'DELETE FROM painter_location_events WHERE recorded_at < NOW() - INTERVAL 30 DAY'
+            );
+            if (result.affectedRows > 0) {
+                console.log(`[Painter Scheduler] Pruned ${result.affectedRows} old location events`);
+            }
+        } catch (e) {
+            console.error('[Painter Scheduler] Location prune error:', e.message);
+        }
+    }, { timezone: 'Asia/Kolkata' });
 
     console.log('[Painter Scheduler] Started: monthly-slabs(1st 6AM), quarterly-slabs(Q1 6:30AM), credit-check(daily 8AM), streak-reset(midnight), bonus-rotation(00:05), daily-bonus-push(7AM), streak-reminder(8PM), attendance-open-claim(1st 00:05), attendance-recompute(every 6h days 1-7), attendance-remind(7th 8PM), attendance-forfeit(8th 2AM)');
 
