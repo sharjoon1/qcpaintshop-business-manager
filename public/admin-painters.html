@@ -3686,7 +3686,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const tab = urlParams.get('tab');
         const filterParam = urlParams.get('filter');
-        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports', 'estimates', 'offers', 'training', 'catalog', 'visualizations'];
+        const tabNames = ['painters', 'points', 'rates', 'withdrawals', 'reports', 'estimates', 'offers', 'overrides', 'training', 'catalog', 'visualizations', 'marketing', 'attendance', 'notifications'];
         const activeTab = tab && tabNames.includes(tab) ? tab : 'painters';
 
         // If notif deep-link sent filter=pending, pre-set the dropdown
