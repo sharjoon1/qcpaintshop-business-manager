@@ -128,6 +128,9 @@
         /* ── Touch-target helpers ── */
         .touch-btn { min-height:44px; min-width:44px; display:inline-flex; align-items:center; justify-content:center; }
     </style>
+    <!-- Leaflet for painter live location maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLcE=" crossorigin=""></script>
 </head>
 <body data-page="painters">
     <div class="min-h-screen bg-gray-50">
@@ -1150,6 +1153,7 @@
         <div class="flex flex-wrap gap-2 mb-4">
             <button class="tab-btn-sub active" onclick="switchAttTab('today', this)">Today</button>
             <button class="tab-btn-sub" onclick="switchAttTab('monthly', this)">Monthly Summary</button>
+            <button class="tab-btn-sub" onclick="switchAttTab('location', this)">Live Location</button>
         </div>
 
         <div id="att-sub-today" class="att-sub-content">
@@ -1192,6 +1196,61 @@
                     <tbody id="att-monthly-tbody"></tbody>
                 </table>
             </div>
+        </div>
+
+        <div id="att-sub-location" class="att-sub-content hidden">
+
+            <!-- Toggle pills -->
+            <div class="flex gap-2 mb-4">
+                <button id="loc-pill-fleet" class="px-4 py-2 rounded-full text-sm font-medium bg-indigo-600 text-white" onclick="switchLocationPanel('fleet')">Live Fleet Map</button>
+                <button id="loc-pill-replay" class="px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600" onclick="switchLocationPanel('replay')">Route Replay</button>
+            </div>
+
+            <!-- Live Fleet Map panel -->
+            <div id="loc-panel-fleet">
+                <div class="bg-white rounded-xl border border-gray-200 p-4 mb-3 flex flex-wrap gap-3 items-center justify-between">
+                    <div class="flex gap-2 items-center">
+                        <select id="loc-branch-filter" class="border rounded px-3 py-2 text-sm" onchange="applyFleetBranchFilter()">
+                            <option value="">All Branches</option>
+                        </select>
+                        <span class="text-xs text-gray-400" id="loc-last-updated">–</span>
+                    </div>
+                    <div class="flex gap-3 text-sm">
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span> Online</span>
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-gray-400 inline-block"></span> Offline</span>
+                    </div>
+                </div>
+                <div id="loc-fleet-map" style="height:500px;border-radius:12px;border:1px solid #e5e7eb;" class="w-full"></div>
+                <p class="text-xs text-gray-400 mt-2">Pins update in real-time via socket. Offline = no ping in last 5 min.</p>
+            </div>
+
+            <!-- Route Replay panel -->
+            <div id="loc-panel-replay" style="display:none;">
+                <div class="bg-white rounded-xl border border-gray-200 p-4 mb-3 flex flex-wrap gap-3 items-end">
+                    <div>
+                        <label class="text-xs text-gray-600 block mb-1">Painter</label>
+                        <select id="loc-replay-painter" class="border rounded px-3 py-2 text-sm" style="min-width:180px;">
+                            <option value="">Select painter…</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-600 block mb-1">Date</label>
+                        <input type="date" id="loc-replay-date" class="border rounded px-3 py-2 text-sm">
+                    </div>
+                    <button onclick="loadRouteReplay()" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm">Load Route</button>
+                </div>
+                <div id="loc-replay-map" style="height:500px;border-radius:12px;border:1px solid #e5e7eb;" class="w-full"></div>
+                <div id="loc-replay-stats" class="mt-3 flex gap-4 text-sm text-gray-600 hidden">
+                    <span>Points: <strong id="loc-stat-points">0</strong></span>
+                    <span>Distance: <strong id="loc-stat-dist">0</strong> km</span>
+                </div>
+                <div id="loc-replay-scrubber" class="mt-3 hidden">
+                    <label class="text-xs text-gray-600 block mb-1">Timeline</label>
+                    <input type="range" id="loc-timeline" min="0" value="0" class="w-full" oninput="scrubTimeline(this.value)">
+                    <p class="text-xs text-gray-400 mt-1" id="loc-timeline-label">–</p>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -4590,6 +4649,7 @@
         document.querySelectorAll('.tab-btn-sub').forEach(b => b.classList.remove('active'));
         document.getElementById('att-sub-' + name).classList.remove('hidden');
         if (btn) btn.classList.add('active');
+        if (name === 'location') onLocationTabShown();
     }
 
     function attEscapeHtml(s) {
@@ -5016,6 +5076,292 @@ function closeNotifDetail() {
     document.getElementById('notif-detail-modal').style.display = 'none';
 }
 // ===== END NOTIFICATIONS TAB =====
+
+    // ── Painter Live Location ────────────────────────────────────────────────
+
+    let fleetMap = null;
+    let fleetMarkers = {};
+    let fleetData = [];
+    let replayMap = null;
+    let replayPoints = [];
+    let replayAnimMarker = null;
+    let locSecondsSince = 0;
+    let locSecondsTick = null;
+
+    const LOC_LEVEL_COLORS = {
+        gold: '#D4A24E', silver: '#9CA3AF', bronze: '#92400E', default: '#6366F1'
+    };
+
+    function locLevelColor(level) {
+        return LOC_LEVEL_COLORS[(level || '').toLowerCase()] || LOC_LEVEL_COLORS.default;
+    }
+
+    function switchLocationPanel(panel) {
+        document.getElementById('loc-panel-fleet').style.display = panel === 'fleet' ? '' : 'none';
+        document.getElementById('loc-panel-replay').style.display = panel === 'replay' ? '' : 'none';
+        document.getElementById('loc-pill-fleet').className = panel === 'fleet'
+            ? 'px-4 py-2 rounded-full text-sm font-medium bg-indigo-600 text-white'
+            : 'px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600';
+        document.getElementById('loc-pill-replay').className = panel === 'replay'
+            ? 'px-4 py-2 rounded-full text-sm font-medium bg-indigo-600 text-white'
+            : 'px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600';
+        if (panel === 'fleet') {
+            setTimeout(() => fleetMap && fleetMap.invalidateSize(), 100);
+        } else {
+            populateReplayPainterSelect();
+            setTimeout(() => replayMap && replayMap.invalidateSize(), 100);
+        }
+    }
+
+    function initFleetMap() {
+        if (fleetMap) { fleetMap.invalidateSize(); return; }
+        fleetMap = L.map('loc-fleet-map').setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(fleetMap);
+    }
+
+    function initReplayMap() {
+        if (replayMap) { replayMap.invalidateSize(); return; }
+        replayMap = L.map('loc-replay-map').setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(replayMap);
+    }
+
+    async function loadFleetData() {
+        try {
+            const r = await fetch('/api/painters/locations/live', { headers: authHeaders() });
+            const d = await r.json();
+            if (!d.success) return;
+            fleetData = d.locations || [];
+            renderFleetMarkers(fleetData);
+            locSecondsSince = 0;
+            updateLastUpdatedLabel();
+        } catch (e) {
+            console.error('loadFleetData error', e);
+        }
+    }
+
+    function renderFleetMarkers(locations) {
+        if (!fleetMap) return;
+        const branchFilter = document.getElementById('loc-branch-filter')?.value || '';
+
+        const bf = document.getElementById('loc-branch-filter');
+        if (bf && bf.options.length === 1) {
+            const branches = [...new Set(locations.map(l => l.branch).filter(Boolean))].sort();
+            branches.forEach(b => {
+                const o = document.createElement('option');
+                o.value = b; o.textContent = b;
+                bf.appendChild(o);
+            });
+        }
+
+        locations.forEach(loc => {
+            const visible = !branchFilter || loc.branch === branchFilter;
+            const color = locLevelColor(loc.level);
+            const opacity = loc.status === 'offline' ? 0.35 : 1;
+            const lat = Number(loc.latitude);
+            const lng = Number(loc.longitude);
+
+            if (fleetMarkers[loc.painter_id]) {
+                fleetMarkers[loc.painter_id].setLatLng([lat, lng]);
+                fleetMarkers[loc.painter_id].setStyle({ color, opacity, fillOpacity: opacity * 0.6 });
+                if (!visible) fleetMarkers[loc.painter_id].remove();
+                else fleetMarkers[loc.painter_id].addTo(fleetMap);
+            } else {
+                const secsAgo = loc.seconds_ago;
+                const timeLabel = secsAgo < 60 ? secsAgo + 's ago' : Math.round(secsAgo / 60) + 'm ago';
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 9, color, weight: 2,
+                    fillColor: color, fillOpacity: opacity * 0.6, opacity
+                }).bindPopup(
+                    `<b>${esc(loc.name)}</b><br>${esc(loc.level || 'default')} · ${esc(loc.branch || '–')}<br>` +
+                    `Last seen: ${timeLabel}<br>Status: ${loc.status}`
+                );
+                fleetMarkers[loc.painter_id] = marker;
+                if (visible) marker.addTo(fleetMap);
+            }
+        });
+    }
+
+    function applyFleetBranchFilter() {
+        renderFleetMarkers(fleetData);
+    }
+
+    function updateLastUpdatedLabel() {
+        const el = document.getElementById('loc-last-updated');
+        if (el) el.textContent = `Updated ${locSecondsSince}s ago`;
+    }
+
+    function startLastUpdatedTick() {
+        clearInterval(locSecondsTick);
+        locSecondsTick = setInterval(() => {
+            locSecondsSince++;
+            updateLastUpdatedLabel();
+        }, 1000);
+    }
+
+    function subscribeFleetSocket() {
+        if (!window.qcSocket) return;
+        window.qcSocket.emit('join_admin_painters_live');
+        window.qcSocket.on('painter_location_update', (data) => {
+            const existing = fleetData.find(l => l.painter_id === data.painterId);
+            if (existing) {
+                existing.latitude = data.latitude;
+                existing.longitude = data.longitude;
+                existing.status = 'online';
+                existing.seconds_ago = 0;
+            } else {
+                fleetData.push({
+                    painter_id: data.painterId,
+                    name: data.name,
+                    level: data.level,
+                    branch: data.branch,
+                    latitude: data.latitude,
+                    longitude: data.longitude,
+                    accuracy_m: data.accuracy,
+                    status: 'online',
+                    seconds_ago: 0
+                });
+            }
+            if (fleetMap) {
+                if (fleetMarkers[data.painterId]) {
+                    fleetMarkers[data.painterId].setLatLng([data.latitude, data.longitude]);
+                    fleetMarkers[data.painterId].setStyle({ opacity: 1, fillOpacity: 0.6 });
+                } else {
+                    renderFleetMarkers(fleetData);
+                }
+            }
+            locSecondsSince = 0;
+            updateLastUpdatedLabel();
+        });
+    }
+
+    function initLiveLocationTab() {
+        initFleetMap();
+        loadFleetData();
+        subscribeFleetSocket();
+        startLastUpdatedTick();
+        const dp = document.getElementById('loc-replay-date');
+        if (dp && !dp.value) dp.value = new Date().toISOString().slice(0, 10);
+    }
+
+    let locationTabInited = false;
+    function onLocationTabShown() {
+        if (!locationTabInited) {
+            locationTabInited = true;
+            initLiveLocationTab();
+        } else {
+            if (fleetMap) fleetMap.invalidateSize();
+        }
+    }
+
+    function populateReplayPainterSelect() {
+        const sel = document.getElementById('loc-replay-painter');
+        if (!sel || sel.options.length > 1) return;
+        fetch('/api/painters?limit=500', { headers: authHeaders() })
+            .then(r => r.json())
+            .then(d => {
+                (d.painters || []).forEach(p => {
+                    const o = document.createElement('option');
+                    o.value = p.id; o.textContent = p.full_name || p.name;
+                    sel.appendChild(o);
+                });
+            })
+            .catch(() => {});
+    }
+
+    async function loadRouteReplay() {
+        const painterId = document.getElementById('loc-replay-painter')?.value;
+        const date = document.getElementById('loc-replay-date')?.value;
+        if (!painterId) return alert('Please select a painter');
+
+        initReplayMap();
+
+        try {
+            const url = `/api/painters/${painterId}/locations/history${date ? '?date=' + date : ''}`;
+            const r = await fetch(url, { headers: authHeaders() });
+            const d = await r.json();
+            if (!d.success) return alert('Failed to load route');
+
+            replayPoints = d.points || [];
+
+            replayMap.eachLayer(l => { if (!(l instanceof L.TileLayer)) replayMap.removeLayer(l); });
+            replayAnimMarker = null;
+
+            if (!replayPoints.length) {
+                document.getElementById('loc-replay-stats').classList.add('hidden');
+                document.getElementById('loc-replay-scrubber').classList.add('hidden');
+                return alert('No location data for this painter on this date');
+            }
+
+            const latlngs = replayPoints.map(p => [Number(p.latitude), Number(p.longitude)]);
+
+            L.polyline(latlngs, { color: '#6366F1', weight: 3, opacity: 0.8 }).addTo(replayMap);
+
+            L.marker(latlngs[0], {
+                icon: L.divIcon({ html: '<div style="background:#16a34a;width:14px;height:14px;border-radius:50%;border:2px solid white;"></div>', className: '' })
+            }).bindPopup('Start: ' + new Date(replayPoints[0].recorded_at).toLocaleTimeString()).addTo(replayMap);
+
+            L.marker(latlngs[latlngs.length - 1], {
+                icon: L.divIcon({ html: '<div style="background:#dc2626;width:14px;height:14px;border-radius:50%;border:2px solid white;"></div>', className: '' })
+            }).bindPopup('End: ' + new Date(replayPoints[replayPoints.length - 1].recorded_at).toLocaleTimeString()).addTo(replayMap);
+
+            for (let i = 1; i < latlngs.length - 1; i++) {
+                L.circleMarker(latlngs[i], { radius: 4, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.7, weight: 1 })
+                    .bindPopup(new Date(replayPoints[i].recorded_at).toLocaleTimeString()).addTo(replayMap);
+            }
+
+            replayMap.fitBounds(L.latLngBounds(latlngs).pad(0.1));
+
+            let totalM = 0;
+            for (let i = 1; i < latlngs.length; i++) {
+                const prev = latlngs[i - 1], curr = latlngs[i];
+                const R = 6371000, toRad = deg => deg * Math.PI / 180;
+                const dLat = toRad(curr[0] - prev[0]);
+                const dLng = toRad(curr[1] - prev[1]);
+                const a = Math.sin(dLat/2)**2 + Math.cos(toRad(prev[0])) * Math.cos(toRad(curr[0])) * Math.sin(dLng/2)**2;
+                totalM += Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+            }
+
+            document.getElementById('loc-stat-points').textContent = replayPoints.length;
+            document.getElementById('loc-stat-dist').textContent = (totalM / 1000).toFixed(2);
+            document.getElementById('loc-replay-stats').classList.remove('hidden');
+
+            const scrubber = document.getElementById('loc-timeline');
+            scrubber.max = replayPoints.length - 1;
+            scrubber.value = 0;
+            document.getElementById('loc-replay-scrubber').classList.remove('hidden');
+            scrubTimeline(0);
+
+        } catch (e) {
+            console.error('loadRouteReplay error', e);
+            alert('Error loading route');
+        }
+    }
+
+    function scrubTimeline(idx) {
+        if (!replayMap || !replayPoints.length) return;
+        const i = parseInt(idx, 10);
+        const pt = replayPoints[i];
+        if (!pt) return;
+
+        const latlng = [Number(pt.latitude), Number(pt.longitude)];
+
+        if (!replayAnimMarker) {
+            replayAnimMarker = L.circleMarker(latlng, {
+                radius: 10, color: '#f59e0b', fillColor: '#f59e0b', fillOpacity: 0.9, weight: 2
+            }).addTo(replayMap);
+        } else {
+            replayAnimMarker.setLatLng(latlng);
+        }
+
+        document.getElementById('loc-timeline-label').textContent =
+            new Date(pt.recorded_at).toLocaleTimeString() + ' — point ' + (i + 1) + ' of ' + replayPoints.length;
+    }
     </script>
 </body>
 </html>
