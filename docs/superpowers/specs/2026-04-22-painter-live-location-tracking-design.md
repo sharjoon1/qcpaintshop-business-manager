@@ -65,7 +65,9 @@ When `isPainterMode = true`:
 
 - Painter OTP login success → `startForegroundService(GeofenceLocationService)`
 - Painter logout → `stopService(GeofenceLocationService)`
-- These calls are added to the painter flavor's existing login/logout handlers
+- These calls are added to the painter flavor's existing login/logout handlers:
+  - Login: `app/src/painter/java/com/qcpaintshop/painter/ui/auth/LoginViewModel.kt` (on successful OTP verify)
+  - Logout: `app/src/painter/java/com/qcpaintshop/painter/ui/profile/ProfileScreen.kt` (on logout button tap)
 
 ### No new permissions or files
 
@@ -81,7 +83,7 @@ All new routes added to `routes/painters.js`.
 
 - Auth: `requirePainterAuth`
 - Body: `{ latitude, longitude, accuracy }`
-- Rate limit: max 1 insert per 25s per painter (rejects duplicates silently with 200 OK)
+- Rate limit: max 1 insert per 25s per painter — enforced by querying `MAX(recorded_at)` for that painter before inserting; if last row is within 25s, skip insert and return 200 OK silently
 - Action: INSERT into `painter_location_events`, then emit Socket.io event to admin room
 
 ```js
@@ -105,7 +107,7 @@ io.to('admin_painters_live').emit('painter_location_update', {
 
 ### Socket.io
 
-Admin browser joins room `admin_painters_live` when the Live Fleet Map panel is visible. Server emits `painter_location_update` on each valid POST. No polling required for live view.
+Admin browser emits `join_admin_painters_live` when the Live Fleet Map panel becomes visible (on tab switch to Attendance Live + Live Fleet Map toggle). Server handler: `socket.on('join_admin_painters_live', () => socket.join('admin_painters_live'))`. Server emits `painter_location_update` to that room on each valid POST. No polling required for live view.
 
 ---
 
