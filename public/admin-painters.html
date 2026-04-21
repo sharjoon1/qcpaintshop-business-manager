@@ -163,7 +163,7 @@
             <!-- Sub-tab Strip -->
             <div id="subTabStrip">
                 <div id="subtabs-painters" class="subtab-group active">
-                    <button class="subtab-btn active" onclick="switchTab('painters')" id="stab-painters">Painters</button>
+                    <button class="subtab-btn active" onclick="switchTab('painters')" id="stab-painters">Painters <span id="pendingBadge" style="display:none;background:#f59e0b;color:#fff;border-radius:9999px;padding:1px 6px;font-size:0.7rem;font-weight:700;vertical-align:middle;"></span></button>
                     <button class="subtab-btn" onclick="switchTab('rates')" id="stab-rates">Levels & Slabs</button>
                     <button class="subtab-btn" onclick="switchTab('training')" id="stab-training">Training</button>
                     <button class="subtab-btn" onclick="switchTab('visualizations')" id="stab-visualizations">Visualizations</button>
@@ -188,23 +188,48 @@
 
             <!-- Tab 1: Painters -->
             <div id="tab-painters" class="tab-content active">
-                <div id="pendingAlert" style="display:none;background:#fffbeb;border:1px solid #f59e0b;border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                <div id="pendingAlert" style="display:none;background:#fffbeb;border:1px solid #f59e0b;border-radius:12px;padding:12px 16px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:12px;">
                     <span style="color:#92400e;font-size:0.9rem;font-weight:600;">⚠️ <span id="pendingAlertCount"></span> painter(s) awaiting approval</span>
                     <button onclick="document.getElementById('painterStatusFilter').value='pending';loadPainters();" style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:0.82rem;font-weight:600;cursor:pointer;">Review Now</button>
                 </div>
-                <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-                    <div class="flex flex-wrap gap-3 items-center">
-                        <input type="text" id="painterSearch" placeholder="Search by name, phone, city..." class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm" oninput="debounceLoadPainters()">
-                        <select id="painterStatusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadPainters()">
+                <!-- Search + Filters -->
+                <div class="bg-white rounded-xl border border-gray-200 p-3 mb-3">
+                    <input type="text" id="painterSearch" placeholder="Search name, phone, city…" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2" oninput="debounceLoadPainters()">
+                    <div class="flex gap-2 overflow-x-auto pb-1" style="scrollbar-width:none;">
+                        <select id="painterStatusFilter" class="shrink-0 px-3 py-2 border border-gray-300 rounded-full text-sm bg-white" onchange="loadPainters()">
                             <option value="">All Status</option>
                             <option value="pending">Pending</option>
                             <option value="approved">Approved</option>
                             <option value="suspended">Suspended</option>
                             <option value="rejected">Rejected</option>
                         </select>
+                        <select id="painterLevelFilter" class="shrink-0 px-3 py-2 border border-gray-300 rounded-full text-sm bg-white" onchange="loadPainters()">
+                            <option value="">All Levels</option>
+                            <option value="bronze">Bronze</option>
+                            <option value="silver">Silver</option>
+                            <option value="gold">Gold</option>
+                            <option value="diamond">Diamond</option>
+                        </select>
+                        <select id="painterBranchFilter" class="shrink-0 px-3 py-2 border border-gray-300 rounded-full text-sm bg-white" onchange="loadPainters()">
+                            <option value="">All Branches</option>
+                        </select>
+                        <select id="painterSortFilter" class="shrink-0 px-3 py-2 border border-gray-300 rounded-full text-sm bg-white" onchange="loadPainters()">
+                            <option value=""></option>
+                            <option value="name">Name A→Z</option>
+                            <option value="regular_points">Reg Points ↓</option>
+                            <option value="annual_points">Ann Points ↓</option>
+                            <option value="joined">Joined ↓</option>
+                        </select>
                     </div>
                 </div>
-                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <!-- Mobile Cards (hidden on md+) -->
+                <div id="paintersMobileList" class="md:hidden">
+                    <div class="skeleton-card"><div class="skeleton h-4 w-3/4 mb-2"></div><div class="skeleton h-3 w-1/2"></div></div>
+                    <div class="skeleton-card"><div class="skeleton h-4 w-2/3 mb-2"></div><div class="skeleton h-3 w-1/3"></div></div>
+                    <div class="skeleton-card"><div class="skeleton h-4 w-3/4 mb-2"></div><div class="skeleton h-3 w-1/2"></div></div>
+                </div>
+                <!-- Desktop Table (hidden on mobile) -->
+                <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="data-table">
                             <thead>
@@ -222,7 +247,7 @@
                                 </tr>
                             </thead>
                             <tbody id="paintersTableBody">
-                                <tr><td colspan="10" class="text-center py-8 text-gray-400">Loading...</td></tr>
+                                <tr><td colspan="10" class="text-center py-8 text-gray-400">Loading…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1448,10 +1473,14 @@
         currentPage = page;
         const search = document.getElementById('painterSearch').value;
         const status = document.getElementById('painterStatusFilter').value;
+        const level = document.getElementById('painterLevelFilter')?.value || '';
+        const sort = document.getElementById('painterSortFilter')?.value || '';
         try {
             const params = new URLSearchParams({ page, limit: 50 });
             if (search) params.set('search', search);
             if (status) params.set('status', status);
+            if (level) params.set('level', level);
+            if (sort) params.set('sort', sort);
             const res = await fetch(`${API}?${params}`, { headers: authHeaders() });
             const data = await res.json();
             if (!data.success) throw new Error(data.message);
@@ -1459,35 +1488,90 @@
             allPainters = data.painters;
             renderPaintersTable(data.painters);
             renderPagination(data.total, data.page, data.pages);
+            const pendingCount = data.painters.filter(p => p.status === 'pending').length;
+            const pb = document.getElementById('pendingBadge');
+            if (pb) { if (pendingCount > 0) { pb.textContent = pendingCount; pb.style.display = 'inline'; } else pb.style.display = 'none'; }
         } catch (err) {
             document.getElementById('paintersTableBody').innerHTML = `<tr><td colspan="10" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
         }
     }
 
+    const LEVEL_COLORS = { bronze:'#CD7F32', silver:'#9CA3AF', gold:'#D4A24E', diamond:'#3B82F6' };
+
+    function painterInitials(name) {
+        return (name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase() || '?';
+    }
+
+    function levelColor(level) { return LEVEL_COLORS[level||'bronze'] || '#CD7F32'; }
+
     function renderPaintersTable(painters) {
+        const mobileList = document.getElementById('paintersMobileList');
+        const tableBody = document.getElementById('paintersTableBody');
+
         if (!painters.length) {
-            document.getElementById('paintersTableBody').innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No painters found</td></tr>';
+            if (mobileList) mobileList.innerHTML = '<div class="empty-state"><p>No painters found</p><button onclick="document.getElementById(\'painterStatusFilter\').value=\'\';document.getElementById(\'painterSearch\').value=\'\';loadPainters();" class="btn-sm btn-outline mt-3">Clear Filters</button></div>';
+            if (tableBody) tableBody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-400">No painters found</td></tr>';
             return;
         }
-        document.getElementById('paintersTableBody').innerHTML = painters.map(p => `
-            <tr class="cursor-pointer" onclick="showPainterDetail(${p.id})">
-                <td class="font-medium">${esc(p.full_name)}</td>
-                <td>${esc(p.phone)}</td>
-                <td>${esc(p.city || '-')}</td>
-                <td><span class="badge badge-${p.status}">${p.status}</span></td>
-                <td><span style="color:${{bronze:'#CD7F32',silver:'#9CA3AF',gold:'#D4A24E',diamond:'#3B82F6'}[p.current_level||'bronze']||'#CD7F32'};font-weight:600">${(p.current_level||'bronze').charAt(0).toUpperCase()+(p.current_level||'bronze').slice(1)}</span></td>
-                <td>${p.current_streak||0} ${(p.current_streak||0)>0?'🔥':''}</td>
-                <td>${parseFloat(p.regular_points).toFixed(2)}</td>
-                <td>${parseFloat(p.annual_points).toFixed(2)}</td>
-                <td>${p.credit_enabled ? '₹' + parseFloat(p.credit_limit).toLocaleString() : '-'}</td>
-                <td>
-                    ${p.status === 'pending' ? `
-                        <button onclick="event.stopPropagation();approvePainter(${p.id},'approve')" class="btn-sm btn-success mr-1">Approve</button>
-                        <button onclick="event.stopPropagation();approvePainter(${p.id},'reject')" class="btn-sm btn-danger">Reject</button>
-                    ` : `<button onclick="event.stopPropagation();showPainterDetail(${p.id})" class="btn-sm btn-outline">View</button>`}
-                </td>
-            </tr>
-        `).join('');
+
+        if (mobileList) {
+            mobileList.innerHTML = painters.map(p => {
+                const lc = levelColor(p.current_level);
+                const lvl = (p.current_level||'bronze');
+                const lvlLabel = lvl.charAt(0).toUpperCase()+lvl.slice(1);
+                const statusColors = { approved:'#d1fae5|#065f46', pending:'#fef3c7|#92400e', suspended:'#e2e8f0|#475569', rejected:'#fee2e2|#991b1b' };
+                const [sbg, scolor] = (statusColors[p.status]||'#e2e8f0|#475569').split('|');
+                return `
+                <div class="painter-card">
+                    <div class="flex items-start gap-3">
+                        <div class="painter-card-avatar" style="background:${lc};border-color:${lc};">${painterInitials(p.full_name)}</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="painter-card-name">${esc(p.full_name)}</span>
+                                <span class="badge" style="background:${sbg};color:${scolor};">${p.status}</span>
+                            </div>
+                            <div class="painter-card-meta">
+                                <span style="color:${lc};font-weight:600;">${lvlLabel}</span>
+                                &nbsp;·&nbsp; Reg: <strong>${parseFloat(p.regular_points||0).toFixed(0)}</strong>
+                                &nbsp;·&nbsp; Ann: <strong>${parseFloat(p.annual_points||0).toFixed(0)}</strong>
+                            </div>
+                            <div class="painter-card-meta">${esc(p.city||'')}${(p.city&&p.phone)?' · ':''}${esc(p.phone||'')}</div>
+                        </div>
+                    </div>
+                    <div class="painter-card-actions">
+                        ${p.status === 'pending' ? `
+                            <button onclick="approvePainter(${p.id},'approve')" class="btn-sm btn-success">Approve</button>
+                            <button onclick="approvePainter(${p.id},'reject')" class="btn-sm btn-danger">Reject</button>
+                        ` : `
+                            <button onclick="showPainterDetail(${p.id})" class="btn-sm btn-outline">Edit / View</button>
+                            <button onclick="showPainterDetail(${p.id})" class="btn-sm btn-primary">Points ±</button>
+                        `}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        if (tableBody) {
+            tableBody.innerHTML = painters.map(p => `
+                <tr class="cursor-pointer" onclick="showPainterDetail(${p.id})">
+                    <td class="font-medium">${esc(p.full_name)}</td>
+                    <td>${esc(p.phone)}</td>
+                    <td>${esc(p.city || '-')}</td>
+                    <td><span class="badge badge-${p.status}">${p.status}</span></td>
+                    <td><span style="color:${levelColor(p.current_level)};font-weight:600">${(p.current_level||'bronze').charAt(0).toUpperCase()+(p.current_level||'bronze').slice(1)}</span></td>
+                    <td>${p.current_streak||0} ${(p.current_streak||0)>0?'🔥':''}</td>
+                    <td>${parseFloat(p.regular_points||0).toFixed(2)}</td>
+                    <td>${parseFloat(p.annual_points||0).toFixed(2)}</td>
+                    <td>${p.credit_enabled ? '₹' + parseFloat(p.credit_limit).toLocaleString() : '-'}</td>
+                    <td>
+                        ${p.status === 'pending' ? `
+                            <button onclick="event.stopPropagation();approvePainter(${p.id},'approve')" class="btn-sm btn-success mr-1">Approve</button>
+                            <button onclick="event.stopPropagation();approvePainter(${p.id},'reject')" class="btn-sm btn-danger">Reject</button>
+                        ` : `<button onclick="event.stopPropagation();showPainterDetail(${p.id})" class="btn-sm btn-outline">View</button>`}
+                    </td>
+                </tr>
+            `).join('');
+        }
     }
 
     function renderPagination(total, page, pages) {
