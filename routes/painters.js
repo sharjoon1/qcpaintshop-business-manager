@@ -2329,7 +2329,8 @@ router.get('/me/attendance/branches-nearby', requirePainterAuth, async (req, res
         if (!isFinite(lat) || !isFinite(lng)) {
             return res.status(400).json({ error: 'lat and lng required' });
         }
-        const branches = await attendanceService.findNearbyBranches(lat, lng, 1000);
+        const radius = Math.min(parseFloat(req.query.radius) || 1000, 50000);
+        const branches = await attendanceService.findNearbyBranches(lat, lng, radius);
         res.json({ branches });
     } catch (err) {
         console.error('nearby branches error:', err);
