@@ -1491,7 +1491,7 @@
                                         </button>`
                                         : `<div class="flex flex-col gap-1">
     <input type="checkbox" value="${itemId}" ${isSelected ? 'checked' : ''} onchange="toggleZohoItemSelect('${itemId}', this.checked)" class="zoho-item-cb w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
-    <button data-assign-btn onclick="event.stopPropagation();openAssignDropdown('${escH(itemId)}','${escH(extractSizeFromName(item.name||item.item_name||''))}','${escH(extractUnitFromName(item.name||item.item_name||''))}',${parseFloat(item.rate)||0},this)" class="text-xs px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded hover:bg-blue-100 whitespace-nowrap">Assign ▾</button>
+    <button data-assign-btn onclick="event.stopPropagation();openAssignDropdown('${escH(itemId)}','${escH(item.name||item.item_name||'')}','${escH(extractSizeFromName(item.name||item.item_name||''))}','${escH(extractUnitFromName(item.name||item.item_name||''))}',${parseFloat(item.rate)||0},this)" class="text-xs px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded hover:bg-blue-100 whitespace-nowrap">Assign ▾</button>
 </div>`
                                     }
                                 </td>
@@ -1528,7 +1528,7 @@
                                         <div style="font-size:0.7rem;color:#64748b;">${escH(item.brand||'')} · ₹${parseFloat(item.rate||0).toFixed(0)}</div>
                                     </div>
                                     <span style="background:${isMapped?'#d1fae5':'#fef3c7'};color:${isMapped?'#065f46':'#92400e'};border-radius:4px;padding:2px 7px;font-size:0.7rem;flex-shrink:0;">${isMapped?'Mapped':'Unmapped'}</span>
-                                    ${!isMapped?`<button data-assign-btn onclick="openAssignDropdown('${escH(itemId)}','${escH(extractSizeFromName(item.name||item.item_name||''))}','${escH(extractUnitFromName(item.name||item.item_name||''))}',${parseFloat(item.rate)||0},this)" style="background:#e0f2fe;border:none;border-radius:6px;padding:4px 8px;font-size:0.7rem;color:#0369a1;flex-shrink:0;">Assign ▾</button>`:''}
+                                    ${!isMapped?`<button data-assign-btn onclick="openAssignDropdown('${escH(itemId)}','${escH(item.name||item.item_name||'')}','${escH(extractSizeFromName(item.name||item.item_name||''))}','${escH(extractUnitFromName(item.name||item.item_name||''))}',${parseFloat(item.rate)||0},this)" style="background:#e0f2fe;border:none;border-radius:6px;padding:4px 8px;font-size:0.7rem;color:#0369a1;flex-shrink:0;">Assign ▾</button>`:''}
                                 </div>`;
                             }).join('');
                         }
@@ -2504,10 +2504,35 @@
             return u;
         }
 
+        // ── Client-side color extraction (mirrors services/color-extractor.js) ─────
+        const CLIENT_COLOR_MAP = {
+            'off white': '#FAF9F6', 'sky blue': '#7DD3FC', 'brick red': '#B22222',
+            white: '#FFFFFF', ivory: '#F5F0E8', cream: '#FDE8CC', beige: '#E8D5B0',
+            wheat: '#D4C5A9', sand: '#C8B89A', yellow: '#FCD34D', orange: '#FB923C',
+            red: '#EF4444', maroon: '#7F1D1D', pink: '#F9A8D4', peach: '#FBBF9A',
+            brown: '#92400E', chocolate: '#78350F', green: '#22C55E', sage: '#C8D8C8',
+            teal: '#0D9488', blue: '#3B82F6', navy: '#1E3A5F', grey: '#9CA3AF',
+            gray: '#9CA3AF', silver: '#D1D5DB', black: '#111827', lilac: '#D0C0D8',
+            lavender: '#E0D7F0', terracotta: '#C1440E', rust: '#B7410E',
+        };
+        const CLIENT_COLOR_KEYS = Object.keys(CLIENT_COLOR_MAP).sort((a, b) => b.split(' ').length - a.split(' ').length);
+
+        function extractColorFromItemName(name) {
+            if (!name) return null;
+            for (const key of CLIENT_COLOR_KEYS) {
+                const pattern = new RegExp(`(?:^|\\s)${key.replace(/-/g, '[\\s-]')}(?:\\s|$)`, 'i');
+                if (pattern.test(name)) {
+                    const displayName = key.split(/[\s-]+/).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+                    return { colorName: displayName, colorCode: CLIENT_COLOR_MAP[key] };
+                }
+            }
+            return null;
+        }
+
         // ── Assign-to-existing inline search ──────────────────────────────────────
         let assignDropdownActiveId = null; // currently open dropdown's zoho_item_id
 
-        function openAssignDropdown(zohoItemId, size, unit, price, anchorEl) {
+        function openAssignDropdown(zohoItemId, itemName, size, unit, price, anchorEl) {
             // Close any existing dropdown first
             closeAssignDropdown();
             assignDropdownActiveId = zohoItemId;
@@ -2520,7 +2545,7 @@
                     <input id="assign-search-${zohoItemId.replace(/[^a-z0-9]/gi,'_')}"
                         type="text" placeholder="🔍 Search product to assign to…"
                         style="width:100%;border:1px solid #93c5fd;border-radius:6px;padding:6px 10px;font-size:0.82rem;box-sizing:border-box;outline:none;"
-                        oninput="debounceAssignSearch('${escH(zohoItemId)}', '${escH(size)}', '${escH(unit)}', ${price}, this)"
+                        oninput="debounceAssignSearch('${escH(zohoItemId)}', '${escH(itemName||'')}', '${escH(size)}', '${escH(unit)}', ${price}, this)"
                         autocomplete="off">
                 </div>
                 <div id="assign-results-${zohoItemId.replace(/[^a-z0-9]/gi,'_')}" style="max-height:200px;overflow-y:auto;">
@@ -2562,12 +2587,16 @@
         }
 
         let assignSearchTimer = null;
-        function debounceAssignSearch(zohoItemId, size, unit, price, inputEl) {
+        function debounceAssignSearch(zohoItemId, itemName, size, unit, price, inputEl) {
             clearTimeout(assignSearchTimer);
-            assignSearchTimer = setTimeout(() => doAssignSearch(zohoItemId, size, unit, price, inputEl.value.trim()), 280);
+            assignSearchTimer = setTimeout(() => doAssignSearch(zohoItemId, itemName, size, unit, price, inputEl.value.trim()), 280);
         }
 
-        async function doAssignSearch(zohoItemId, size, unit, price, query) {
+        async function doAssignSearch(zohoItemId, itemName, size, unit, price, query) {
+            const extracted = extractColorFromItemName(itemName || '');
+            const colorName = extracted ? extracted.colorName : null;
+            const colorCode = extracted ? extracted.colorCode : null;
+
             const safeId = zohoItemId.replace(/[^a-z0-9]/gi, '_');
             const resultsEl = document.getElementById('assign-results-' + safeId);
             if (!resultsEl) return;
@@ -2587,7 +2616,7 @@
                     return;
                 }
                 resultsEl.innerHTML = items.map(p => `
-                    <div onclick="confirmAssignZohoItem('${escH(zohoItemId)}', ${p.id}, '${escH(p.name)}', '${escH(size)}', '${escH(unit)}', ${price})"
+                    <div onclick="confirmAssignZohoItem('${escH(zohoItemId)}', ${p.id}, '${escH(p.name)}', '${escH(size)}', '${escH(unit)}', ${price}, ${colorName ? `'${escH(colorName)}'` : 'null'}, ${colorCode ? `'${escH(colorCode)}'` : 'null'})"
                         style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:0.82rem;"
                         onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background=''">
                         <span style="font-weight:600;color:#1d4ed8;">${escH(p.name)}</span>
@@ -2598,15 +2627,19 @@
             }
         }
 
-        async function confirmAssignZohoItem(zohoItemId, productId, productName, size, unit, price) {
+        async function confirmAssignZohoItem(zohoItemId, productId, productName, size, unit, price, colorName, colorCode) {
             closeAssignDropdown();
-            if (!confirm(`Add ${size}${unit} @ ₹${price} to "${productName}"?`)) return;
+            const colorLabel = colorName ? ` ${colorName}` : '';
+            if (!confirm(`Add ${size}${unit}${colorLabel} @ ₹${price} to "${productName}"?`)) return;
 
             try {
+                const body = { product_id: productId, zoho_item_id: zohoItemId, size, unit, price };
+                if (colorName) { body.color_name = colorName; body.color_code = colorCode || null; }
+
                 const res = await fetch('/api/products/assign-zoho-item', {
                     method: 'POST',
                     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ product_id: productId, zoho_item_id: zohoItemId, size, unit, price })
+                    body: JSON.stringify(body)
                 });
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error || 'Failed');
@@ -2641,7 +2674,7 @@
             const price = parseFloat(first.rate) || 0;
             // Use a composite key for dropdown ID
             const groupKey = 'grp_' + (first.zoho_item_id || first.item_id);
-            openAssignDropdown(groupKey, size, unit, price, anchorEl);
+            openAssignDropdown(groupKey, first.name || first.item_name || '', size, unit, price, anchorEl);
 
             // Override confirmAssign for this group to assign all unmapped items
             window._pendingGroupItems = unmapped;
