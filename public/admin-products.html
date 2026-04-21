@@ -252,7 +252,7 @@
                         style="flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;font-size:0.85rem;"
                         oninput="document.getElementById('zohoSearchInput').value=this.value;debounceZohoSearch();">
                     <button onclick="openZohoFilterDrawer()" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;font-size:0.85rem;white-space:nowrap;">Filter ▾</button>
-                    <button onclick="syncZohoItems()" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:0.85rem;font-weight:600;">⟳</button>
+                    <button id="syncZohoItemsBtnMobile" onclick="syncZohoItems()" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:0.85rem;font-weight:600;">⟳</button>
                 </div>
             </div>
 
@@ -1297,6 +1297,8 @@
 
         async function loadZohoItems(page) {
             if (page) zohoCurrentPage = page;
+            const zohoSearchMobileEl = document.getElementById('zohoSearchMobile');
+            if (zohoSearchMobileEl) zohoSearchMobileEl.value = document.getElementById('zohoSearchInput')?.value || '';
             const search = (document.getElementById('zohoSearchInput')?.value || '').trim();
             const brand = document.getElementById('zohoFilterBrand')?.value || '';
             const category = document.getElementById('zohoFilterCategory')?.value || '';
@@ -1540,11 +1542,13 @@
 
         async function syncZohoItems() {
             const btn = document.getElementById('syncZohoItemsBtn');
+            const btnMobile = document.getElementById('syncZohoItemsBtnMobile');
             const statusDiv = document.getElementById('zohoSyncStatus');
             const statusText = document.getElementById('zohoSyncText');
             const spinner = document.getElementById('zohoSyncSpinner');
 
             btn.disabled = true;
+            if (btnMobile) { btnMobile.disabled = true; btnMobile.textContent = '⏳'; }
             statusDiv.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'bg-red-50', 'text-red-700');
             statusDiv.classList.add('bg-blue-50', 'text-blue-700');
             spinner.classList.remove('hidden');
@@ -1572,6 +1576,7 @@
                 setTimeout(() => statusDiv.classList.add('hidden'), 6000);
             } finally {
                 btn.disabled = false;
+                if (btnMobile) { btnMobile.disabled = false; btnMobile.textContent = '⟳'; }
             }
         }
 
