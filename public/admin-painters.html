@@ -214,7 +214,7 @@
                             <option value="">All Branches</option>
                         </select>
                         <select id="painterSortFilter" class="shrink-0 px-3 py-2 border border-gray-300 rounded-full text-sm bg-white" onchange="loadPainters()">
-                            <option value=""></option>
+                            <option value="">Sort: Default</option>
                             <option value="name">Name A→Z</option>
                             <option value="regular_points">Reg Points ↓</option>
                             <option value="annual_points">Ann Points ↓</option>
@@ -1493,6 +1493,8 @@
             if (pb) { if (pendingCount > 0) { pb.textContent = pendingCount; pb.style.display = 'inline'; } else pb.style.display = 'none'; }
         } catch (err) {
             document.getElementById('paintersTableBody').innerHTML = `<tr><td colspan="10" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+            const ml = document.getElementById('paintersMobileList');
+            if (ml) ml.innerHTML = `<div class="painter-card" style="color:#ef4444;text-align:center;padding:1rem;">${esc(err.message)}</div>`;
         }
     }
 
@@ -2320,6 +2322,9 @@
             if (status) params.set('status', status);
             const res = await fetch(`${API}/withdrawals?${params}`, { headers: authHeaders() });
             const data = await res.json();
+
+            const pendingWdCount = (data.withdrawals || []).filter(w => w.status === 'pending').length;
+            updateFinanceBadge(pendingWdCount);
 
             if (!data.withdrawals.length) {
                 document.getElementById('withdrawalsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-400">No withdrawals found</td></tr>';
