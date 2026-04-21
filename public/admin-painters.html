@@ -420,22 +420,36 @@
 
             <!-- Tab 4: Withdrawals -->
             <div id="tab-withdrawals" class="tab-content">
-                <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-                    <select id="withdrawalStatusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="loadWithdrawals()">
+                <!-- Summary Strip -->
+                <div class="summary-strip" id="withdrawalSummaryStrip">
+                    <span>Pending: <strong id="wdPendingTotal">—</strong></span>
+                    <span>This Month Paid: <strong id="wdMonthPaid">—</strong></span>
+                </div>
+                <!-- Filters -->
+                <div class="bg-white rounded-xl border border-gray-200 p-3 mb-3 flex gap-2 overflow-x-auto" style="scrollbar-width:none;">
+                    <select id="withdrawalStatusFilter" class="shrink-0 px-3 py-2 border border-gray-300 rounded-full text-sm bg-white" onchange="loadWithdrawals()">
                         <option value="">All Status</option>
                         <option value="pending" selected>Pending</option>
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                         <option value="paid">Paid</option>
                     </select>
+                    <select id="withdrawalTypeFilter" class="shrink-0 px-3 py-2 border border-gray-300 rounded-full text-sm bg-white" onchange="loadWithdrawals()">
+                        <option value="">All Types</option>
+                        <option value="regular">Regular</option>
+                        <option value="annual">Annual</option>
+                    </select>
                 </div>
-                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <!-- Mobile Cards -->
+                <div id="withdrawalsMobileList" class="md:hidden"></div>
+                <!-- Desktop Table -->
+                <div class="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="data-table">
                             <thead>
                                 <tr><th>Painter</th><th>Phone</th><th>Pool</th><th>Amount</th><th>Status</th><th>Requested</th><th>Actions</th></tr>
                             </thead>
-                            <tbody id="withdrawalsTableBody"><tr><td colspan="7" class="text-center py-4 text-gray-400">Loading...</td></tr></tbody>
+                            <tbody id="withdrawalsTableBody"><tr><td colspan="7" class="text-center py-4 text-gray-400">Loading…</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -2317,20 +2331,69 @@
     // ═══════════════════════════════════════
     async function loadWithdrawals() {
         const status = document.getElementById('withdrawalStatusFilter').value;
+        const poolType = document.getElementById('withdrawalTypeFilter')?.value || '';
         try {
             const params = new URLSearchParams({ limit: 100 });
             if (status) params.set('status', status);
+            if (poolType) params.set('pool', poolType);
             const res = await fetch(`${API}/withdrawals?${params}`, { headers: authHeaders() });
             const data = await res.json();
+            const withdrawals = data.withdrawals || [];
 
-            const pendingWdCount = (data.withdrawals || []).filter(w => w.status === 'pending').length;
-            updateFinanceBadge(pendingWdCount);
+            // Summary strip
+            const pending = withdrawals.filter(w => w.status === 'pending');
+            const pendingTotal = pending.reduce((s,w) => s + parseFloat(w.amount||0), 0);
+            const now = new Date();
+            const monthPaid = withdrawals.filter(w => w.status === 'paid' && new Date(w.requested_at).getMonth() === now.getMonth() && new Date(w.requested_at).getFullYear() === now.getFullYear()).reduce((s,w) => s + parseFloat(w.amount||0), 0);
+            const el1 = document.getElementById('wdPendingTotal');
+            const el2 = document.getElementById('wdMonthPaid');
+            if (el1) el1.textContent = '₹' + pendingTotal.toLocaleString('en-IN');
+            if (el2) el2.textContent = '₹' + monthPaid.toLocaleString('en-IN');
+            updateFinanceBadge(pending.length);
 
-            if (!data.withdrawals.length) {
+            const statusColors = { pending:'#fef3c7|#92400e', approved:'#d1fae5|#065f46', rejected:'#fee2e2|#991b1b', paid:'#dbeafe|#1e40af' };
+
+            if (!withdrawals.length) {
+                const msg = '<div class="empty-state"><p>No withdrawals found</p></div>';
+                const mob = document.getElementById('withdrawalsMobileList');
+                if (mob) mob.innerHTML = msg;
                 document.getElementById('withdrawalsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-400">No withdrawals found</td></tr>';
                 return;
             }
-            document.getElementById('withdrawalsTableBody').innerHTML = data.withdrawals.map(w => `
+
+            // Mobile cards
+            const mobEl = document.getElementById('withdrawalsMobileList');
+            if (mobEl) {
+                mobEl.innerHTML = withdrawals.map(w => {
+                    const [sbg, scolor] = (statusColors[w.status]||'#e2e8f0|#475569').split('|');
+                    return `
+                    <div class="withdrawal-card">
+                        <div class="withdrawal-card-header">
+                            <div>
+                                <div style="font-weight:600;font-size:0.9375rem;">${esc(w.full_name)}</div>
+                                <div style="font-size:0.8rem;color:#64748b;">${esc(w.phone||'')} · ${new Date(w.requested_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+                                ${w.notes ? `<div style="font-size:0.8rem;color:#64748b;font-style:italic;margin-top:2px;">"${esc(w.notes)}"</div>` : ''}
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-weight:700;font-size:1rem;">₹${parseFloat(w.amount).toLocaleString('en-IN')}</div>
+                                <div style="font-size:0.78rem;color:#64748b;text-transform:capitalize;">${w.pool}</div>
+                                <span class="badge mt-1" style="background:${sbg};color:${scolor};">${w.status}</span>
+                            </div>
+                        </div>
+                        ${w.status === 'pending' ? `
+                        <div class="withdrawal-card-actions">
+                            <button onclick="processWithdrawal(${w.id},'reject')" class="btn-sm" style="background:#fee2e2;color:#991b1b;border:none;border-radius:0.5rem;min-height:40px;">Reject</button>
+                            <button onclick="processWithdrawal(${w.id},'approve')" class="btn-sm btn-success" style="border-radius:0.5rem;min-height:40px;">Approve</button>
+                        </div>` : w.status === 'approved' ? `
+                        <div style="margin-top:0.5rem;">
+                            <button onclick="processWithdrawal(${w.id},'paid')" class="btn-sm btn-primary" style="width:100%;min-height:40px;">Mark Paid</button>
+                        </div>` : ''}
+                    </div>`;
+                }).join('');
+            }
+
+            // Desktop table
+            document.getElementById('withdrawalsTableBody').innerHTML = withdrawals.map(w => `
                 <tr>
                     <td class="font-medium">${esc(w.full_name)}</td>
                     <td>${esc(w.phone)}</td>
@@ -2349,7 +2412,9 @@
                 </tr>
             `).join('');
         } catch (err) {
-            document.getElementById('withdrawalsTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">${err.message}</td></tr>`;
+            const errMsg = `<tr><td colspan="7" class="text-center py-4 text-red-500">${esc(err.message)}</td></tr>`;
+            const tbl = document.getElementById('withdrawalsTableBody');
+            if (tbl) tbl.innerHTML = errMsg;
         }
     }
 
