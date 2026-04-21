@@ -1709,7 +1709,7 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
         if (productIds.length) {
             const [variants] = await pool.query(`
                 SELECT ps.product_id, ps.id AS pack_size_id, ps.size, ps.unit,
-                       ps.zoho_item_id,
+                       ps.zoho_item_id, ps.color_name, ps.color_code,
                        CAST(zim.zoho_rate AS DECIMAL(10,2)) AS rate,
                        CAST(zim.zoho_label_rate AS DECIMAL(10,2)) AS mrp,
                        COALESCE((SELECT SUM(zls.stock_on_hand) FROM zoho_location_stock zls
@@ -1751,6 +1751,8 @@ router.get('/me/catalog', requirePainterAuth, async (req, res) => {
                     stock: parseFloat(v.stock || 0),
                     regular_points: reg,
                     annual_points: annualPts,
+                    color_name: v.color_name || null,
+                    color_code: v.color_code || null,
                 });
             }
             for (const p of productsWithOffers) {
