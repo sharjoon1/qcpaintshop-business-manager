@@ -1188,14 +1188,20 @@ router.post('/me/estimates', requirePainterAuth, async (req, res) => {
         packSizeRows.forEach(r => { packSizeMap[r.pack_size_id] = r; });
 
         const estimateNumber = await generateEstimateNumber();
+        // Self billing always goes to pending_admin immediately — no draft state.
         // Customer-direct estimates are the painter's private marketing tool:
         // they save to "saved_direct" so they don't clog admin's approval queue.
         // After the customer confirms, painter uses /me/estimates/:id/submit-to-admin
         // to convert to pending_admin as either self or customer billing.
         const isDirectCustomer = billing_type === 'customer' && pricingMode === 'direct';
-        const status = submit
-            ? (isDirectCustomer ? 'saved_direct' : 'pending_admin')
-            : 'draft';
+        let status;
+        if (billing_type === 'self') {
+            status = 'pending_admin';
+        } else {
+            status = submit
+                ? (isDirectCustomer ? 'saved_direct' : 'pending_admin')
+                : 'draft';
+        }
 
         let subtotal = 0;
         let markupSubtotal = 0;
