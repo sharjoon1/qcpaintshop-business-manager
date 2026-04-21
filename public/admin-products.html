@@ -867,10 +867,10 @@
                                 autocomplete="off"
                                 class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:border-purple-500 focus:outline-none"
                                 placeholder="Search Zoho item to map..."
-                                value="${ps.zoho_item_name ? ps.zoho_item_name.replace(/"/g, '&quot;') : ''}"
+                                value="${escH(ps.zoho_item_name || '')}"
                             >
                         </div>
-                        ${ps.zoho_item_id ? `<span class="text-xs text-green-600 font-medium" title="${ps.zoho_item_name ? ps.zoho_item_name.replace(/"/g, '&quot;') : ps.zoho_item_id}">&#10003; ${ps.zoho_item_name ? ps.zoho_item_name.replace(/</g, '&lt;').substring(0, 40) : 'Mapped'}</span>` : `<span class="text-xs text-orange-500 whitespace-nowrap">Not mapped</span>`}
+                        ${ps.zoho_item_id ? `<span class="text-xs text-green-600 font-medium" title="${escH(ps.zoho_item_name || ps.zoho_item_id || '')}">&#10003; ${escH((ps.zoho_item_name || 'Mapped').substring(0, 40))}</span>` : `<span class="text-xs text-orange-500 whitespace-nowrap">Not mapped</span>`}
                     </div>
                     <!-- Inline search results (renders inside card, no z-index/overflow issues) -->
                     <div id="zohoResults_${idx}" class="hidden"></div>
