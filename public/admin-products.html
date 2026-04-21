@@ -23,7 +23,8 @@
 .filter-drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 400; }
 .filter-drawer { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; z-index: 401; padding: 20px; max-height: 80vh; overflow-y: auto; box-shadow: 0 -4px 24px rgba(0,0,0,0.15); }
 .filter-drawer.open, .filter-drawer-overlay.open { display: block; }
-.products-mobile-add { display: none; }
+.mobile-filter-btn { background: #f1f5f9; color: #374151; cursor: pointer; }
+.mobile-filter-btn:active { background: #1B5E3B; color: #fff; }
 .zoho-mobile-list { display: none; }
 .zoho-mobile-toolbar { display: none; }
 
@@ -31,7 +32,6 @@
     .products-table-wrap { display: none !important; }
     .products-mobile-list { display: block; }
     #headerActions { display: none; }
-    .products-mobile-add { display: flex !important; }
     .zoho-table-wrap { display: none !important; }
     .zoho-mobile-list { display: block; }
     .zoho-desktop-toolbar { display: none !important; }
@@ -649,6 +649,8 @@
         function clearFilters() {
             const nameInput = document.getElementById('filterName');
             if (nameInput) nameInput.value = '';
+            const mobileNameInput = document.getElementById('filterNameMobile');
+            if (mobileNameInput) mobileNameInput.value = '';
             document.getElementById('filterBrand').value = '';
             document.getElementById('filterCategory').value = '';
             document.getElementById('filterType').value = '';
@@ -726,8 +728,7 @@
                 if (!mobileList) return;
                 if (!filtered.length) {
                     mobileList.innerHTML = `<div style="text-align:center;padding:40px;color:#94a3b8;">No products match your filters.</div>`;
-                    return;
-                }
+                } else {
                 mobileList.innerHTML = filtered.map(p => `
                     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;" onclick="editProduct(${p.id})">
                         ${p.image_url
@@ -749,6 +750,7 @@
                         </div>
                     </div>
                 `).join('') + `<div style="text-align:center;color:#94a3b8;font-size:0.75rem;padding:8px;">Showing ${filtered.length} of ${products.length}</div>`;
+                }
             }
         }
 
@@ -2616,12 +2618,16 @@
             const chips = document.getElementById('mobileActiveChips');
             if (!chips) return;
             const active = [];
-            const brand = document.getElementById('filterBrand')?.value;
-            const cat = document.getElementById('filterCategory')?.value;
+            const brandEl = document.getElementById('filterBrand');
+            const catEl = document.getElementById('filterCategory');
+            const brand = brandEl?.value;
+            const brandLabel = brand ? (brandEl.options[brandEl.selectedIndex]?.text || brand) : null;
+            const cat = catEl?.value;
+            const catLabel = cat ? (catEl.options[catEl.selectedIndex]?.text || cat) : null;
             const status = document.getElementById('filterStatus')?.value;
             const type = document.getElementById('filterType')?.value;
-            if (brand) active.push({ label: brand, clear: () => { document.getElementById('filterBrand').value=''; renderProducts(); updateMobileFilterChips(); } });
-            if (cat) active.push({ label: cat, clear: () => { document.getElementById('filterCategory').value=''; renderProducts(); updateMobileFilterChips(); } });
+            if (brand) active.push({ label: brandLabel, clear: () => { brandEl.value=''; renderProducts(); updateMobileFilterChips(); } });
+            if (cat) active.push({ label: catLabel, clear: () => { catEl.value=''; renderProducts(); updateMobileFilterChips(); } });
             if (status) active.push({ label: status, clear: () => { document.getElementById('filterStatus').value=''; renderProducts(); updateMobileFilterChips(); } });
             if (type) active.push({ label: type==='area_wise'?'Area':'Unit', clear: () => { document.getElementById('filterType').value=''; renderProducts(); updateMobileFilterChips(); } });
             chips.innerHTML = active.map((a,i) => `<span style="background:#d1fae5;color:#065f46;border-radius:99px;padding:3px 10px;font-size:0.72rem;cursor:pointer;" onclick="chipClear(${i})">${escH(a.label)} ×</span>`).join('');
