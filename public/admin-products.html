@@ -378,42 +378,41 @@
 
     <!-- Add/Edit Modal -->
     <div id="productModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-        <div class="bg-white w-full sm:max-w-2xl sm:mx-4 sm:rounded-2xl rounded-t-2xl flex flex-col shadow-2xl" style="max-height:min(92vh,92dvh)">
+        <div class="bg-white w-full sm:max-w-2xl sm:mx-4 sm:rounded-2xl rounded-t-2xl flex flex-col shadow-2xl" style="max-height:min(88vh,88dvh)">
+
             <!-- Sticky header -->
-            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10 flex-shrink-0">
-                <h3 class="text-lg font-bold text-gray-800" id="modalTitle">Add New Product</h3>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0 bg-white rounded-t-2xl">
+                <h3 class="text-base font-bold text-gray-800" id="modalTitle">Add New Product</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
 
             <!-- Scrollable body -->
-            <div class="overflow-y-auto flex-1 px-5 py-4">
-            <form id="productForm" onsubmit="saveProduct(event)" class="space-y-4">
+            <div class="overflow-y-auto flex-1 overscroll-contain" style="-webkit-overflow-scrolling:touch">
+            <form id="productForm" onsubmit="saveProduct(event)" class="px-4 py-3 space-y-3">
                 <input type="hidden" id="productId">
-                
-                <div class="mb-4">
+
+                <div>
                     <label class="form-label">Product Name *</label>
                     <input type="text" id="productName" required class="form-input" placeholder="e.g. All Dry Wall N Roof 10">
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="form-label">Brand *</label>
                         <select id="productBrand" required class="form-input">
-                            <option value="">-- Select Brand --</option>
+                            <option value="">-- Brand --</option>
                         </select>
                     </div>
-
                     <div>
                         <label class="form-label">Category *</label>
                         <select id="productCategory" required class="form-input">
-                            <option value="">-- Select Category --</option>
+                            <option value="">-- Category --</option>
                         </select>
                     </div>
-
                     <div>
                         <label class="form-label">Product Type *</label>
                         <select id="productType" required class="form-input" onchange="toggleAreaCoverage()">
@@ -421,43 +420,6 @@
                             <option value="area_wise">Area Wise</option>
                         </select>
                     </div>
-
-                    <div id="areaCoverageField" style="display: none;">
-                        <label class="form-label">Area Coverage (Sq Ft per Liter/KG) *</label>
-                        <input type="number" id="areaCoverage" step="0.01" class="form-input" placeholder="e.g. 140">
-                        <p class="text-xs text-gray-500 mt-1">💡 Coverage area for 1 liter or 1 kg of this product</p>
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Pack Sizes & Prices</label>
-                        <div id="packSizesList" class="space-y-2 mb-3">
-                            <!-- Pack sizes will be listed here -->
-                        </div>
-                        <div class="flex gap-2">
-                            <input type="number" id="newPackSize" placeholder="Size" step="0.01" class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
-                            <select id="newPackUnit" class="px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
-                                <option value="L">Liters (L)</option>
-                                <option value="KG">Kilograms (KG)</option>
-                                <option value="M">Meters (M)</option>
-                                <option value="PC">Pieces (PC)</option>
-                            </select>
-                            <input type="number" id="newPackPrice" placeholder="Final Price (₹)" step="0.01" class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none" oninput="showGSTBreakdown()">
-                            <button type="button" onclick="addPackSize()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition whitespace-nowrap">
-                                + Add Size
-                            </button>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-1">💡 <strong>Enter Final Price (GST Inclusive)</strong> - The price customer pays. GST breakdown will be calculated automatically.</p>
-                        <div id="gstBreakdownPreview" class="text-xs bg-blue-50 text-blue-800 p-2 rounded mt-2" style="display: none;">
-                            <!-- GST breakdown will show here -->
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="form-label">GST % (for breakdown only)</label>
-                        <input type="number" id="productGst" step="0.01" value="18" class="form-input" oninput="showGSTBreakdown()">
-                        <p class="text-xs text-gray-500 mt-1">Used only to calculate and display tax breakdown. Does NOT affect the final price.</p>
-                    </div>
-
                     <div>
                         <label class="form-label">Status</label>
                         <select id="productStatus" class="form-input">
@@ -467,21 +429,52 @@
                     </div>
                 </div>
 
-                <div class="mb-4">
+                <div id="areaCoverageField" style="display: none;">
+                    <label class="form-label">Area Coverage (Sq Ft / L or KG) *</label>
+                    <input type="number" id="areaCoverage" step="0.01" class="form-input" placeholder="e.g. 140">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Pack Sizes & Prices</label>
+                    <div id="packSizesList" class="space-y-2 mb-2"></div>
+                    <!-- 2×2 grid: Size | Unit / Price | Add -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="number" id="newPackSize" placeholder="Size (e.g. 1)" step="0.01"
+                               class="px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
+                        <select id="newPackUnit"
+                                class="px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
+                            <option value="L">Liters (L)</option>
+                            <option value="KG">KG</option>
+                            <option value="M">Meters (M)</option>
+                            <option value="PC">Pieces (PC)</option>
+                        </select>
+                        <input type="number" id="newPackPrice" placeholder="Price ₹ (incl. GST)" step="0.01"
+                               class="px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none"
+                               oninput="showGSTBreakdown()">
+                        <button type="button" onclick="addPackSize()"
+                                class="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition">
+                            + Add
+                        </button>
+                    </div>
+                    <div id="gstBreakdownPreview" class="text-xs bg-blue-50 text-blue-800 p-2 rounded mt-2" style="display:none;"></div>
+                </div>
+
+                <div>
+                    <label class="form-label">GST % <span class="text-gray-400 font-normal">(display only)</span></label>
+                    <input type="number" id="productGst" step="0.01" value="18" class="form-input" oninput="showGSTBreakdown()">
+                </div>
+
+                <div>
                     <label class="form-label">Description</label>
-                    <textarea id="productDescription" rows="3" class="form-input" placeholder="Product description..."></textarea>
+                    <textarea id="productDescription" rows="2" class="form-input" placeholder="Product description..."></textarea>
                 </div>
             </form>
             </div><!-- end scrollable body -->
 
             <!-- Sticky footer -->
-            <div class="flex gap-3 px-5 py-4 border-t border-gray-100 flex-shrink-0 bg-white rounded-b-2xl">
-                <button type="button" onclick="closeModal()" class="flex-1 btn btn-secondary">
-                    Cancel
-                </button>
-                <button type="button" onclick="document.getElementById('productForm').requestSubmit()" class="flex-1 btn btn-primary">
-                    Save Product
-                </button>
+            <div class="flex gap-3 px-4 py-3 border-t border-gray-100 flex-shrink-0 bg-white rounded-b-2xl">
+                <button type="button" onclick="closeModal()" class="flex-1 btn btn-secondary">Cancel</button>
+                <button type="button" onclick="document.getElementById('productForm').requestSubmit()" class="flex-1 btn btn-primary">Save Product</button>
             </div>
         </div>
     </div>
