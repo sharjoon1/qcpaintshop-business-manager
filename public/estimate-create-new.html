@@ -562,7 +562,7 @@
     <button onclick="openDrawer()" class="btn-primary" style="width:auto; padding:10px 16px; font-size:13px;">
         + Product
     </button>
-    <button onclick="saveEstimate()" class="btn-primary" style="width:auto; padding:10px 16px; font-size:13px;">
+    <button id="saveBtnMobile" onclick="saveEstimate()" class="btn-primary" style="width:auto; padding:10px 16px; font-size:13px;">
         &#128190; Save
     </button>
 </div>
@@ -1662,6 +1662,8 @@ async function saveEstimate() {
 
     var saveBtn = document.getElementById('saveBtn');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+    var saveBtnMobile = document.getElementById('saveBtnMobile');
+    if (saveBtnMobile) { saveBtnMobile.disabled = true; saveBtnMobile.textContent = 'Saving...'; }
 
     try {
         var res = await apiRequest('/api/estimates', {
@@ -1675,7 +1677,8 @@ async function saveEstimate() {
     } catch(e) {
         alert('Error saving estimate: ' + e.message);
     } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '&#128190; Save Estimate'; }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '&#128190; Save Estimate'; }
+        if (saveBtnMobile) { saveBtnMobile.disabled = false; saveBtnMobile.innerHTML = '&#128190; Save'; }
     }
 }
 
@@ -1683,6 +1686,7 @@ async function saveEstimate() {
 // POST-SAVE MODAL
 // ════════════════════════════════════════
 function showSaveSuccess(estimateId, estimateNumber, customer) {
+    estimateId = parseInt(estimateId, 10) || estimateId;
     var itemsTotal = estimateItems.reduce(function(s, i) { return s + (i.line_total || 0); }, 0);
     var laborTotal = laborItems.reduce(function(s, l) { return s + (parseFloat(l.amount) || 0); }, 0);
     var grand = itemsTotal + laborTotal;
