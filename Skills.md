@@ -377,6 +377,22 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 - Notes field
 - Pages: `estimates.html`, `estimate-create-new.html`, `estimate-edit.html`, `estimate-view.html`, `estimate-actions.html`, `estimate-settings.html`
 
+**Estimate Create Page — Split-Panel Redesign + Edit Mode (Apr 22)**
+- `estimate-create-new.html` fully rebuilt as split-panel: 420px left (customer + product search) + flex-1 right (live estimate items + totals)
+- **Mobile layout**: customer search + product search both inline in right panel (no drawer); filter chips + product list up to 55vh; mobile bottom bar: Grand Total + Save only
+- Auth: `requireAuth` only — works for both admin and staff (no `zoho.view` needed)
+- **3 new endpoints in `routes/estimates.js`** (inserted BEFORE `/:id` wildcard routes):
+  - `GET /api/estimates/filter-options` — distinct brands + categories from `zoho_items_map`, 5-min in-memory cache (`_filterCache`/`_filterCacheAt`)
+  - `GET /api/estimates/search-customers?q=` — merged Zoho (`zoho_customers_map`) + local (`customers`) deduped, max 10. NOTE: `zoho_customers_map` has NO `zoho_billing_address` — use `'' AS address`
+  - `GET /api/estimates/search-products?q=&brand=&category=&page=` — `zoho_items_map LEFT JOIN pack_sizes LEFT JOIN products`, **`GROUP BY zim.zoho_item_id`** required (prevents duplicate rows per pack size), `MAX(p.area_coverage)`, page capped 1–100
+- **Area calculator**: greedy `calculatePackCombo(packs, litersNeeded)` largest-first. `_recalcToken[itemId]` cancellation token prevents async race when user types fast. `_pendingAreaMeta` stores `{sqft, coats, mix_info}` between calculate and "Add".
+- **XSS-safe customer selection**: `item.dataset.customer = JSON.stringify(c)` + `addEventListener('click')` — NOT onclick attribute (single quotes in names like "O'Brien" break `onclick` attribute JSON)
+- **Save payload** (key fields server requires): `item_name`, `item_description` (NOT `description`); `num_coats` (NOT `coats`); `POST /send-whatsapp` requires `{ phone }` JSON body
+- **Post-save modal**: WhatsApp button hidden when customer has no phone number; View Estimate → `/estimate-view.html?id=X`
+- **Edit mode** (`?id=X` URL param): `estimate-edit.html` is a redirect stub → `estimate-create-new.html?id=X`. `loadEstimate(id)` populates customer card + all items. `saveEstimate()` uses `PUT /api/estimates/:id` when `isEditMode=true`. Banner shows "✏ Editing: EST-XXXX". Button reads "Update Estimate".
+- **Per-item UX**: qty stepper (−/+) in estimate item card, editable name + description fields, editable base price. `e.stopPropagation()` required on all interactive buttons inside expandable rows.
+- Unit tests: `tests/unit/estimate-search.test.js` (5 tests, `calculatePackCombo`)
+
 **PDF Generation**
 - Professional PDF output via PDFKit
 - Company branding (logo, address, phone, email, GST)
@@ -3392,6 +3408,7 @@ Surfaces color data in the Android painter app.
 
 **EstimateCreateScreen** (`ui/work/estimates/EstimateCreateScreen.kt`):
 - `CartItemRow` subtitle: color dot (10dp, `CircleShape`) + `"ColorName · 1L"` when `colorCode` / `colorName` present.
+- **Color filter strip in expanded ProductCard (Apr 22)**: same design as `ProductDetailSheet`. `selectedColor` state (`String?`, null = All). `distinctColors` derived from pack sizes. `LazyRow` below divider with "All" chip + per-color chips (dot + name). Filters `sizes` list passed to `PackSizeRow`. Only shown when `hasColors == true`. `LazyRow` import added.
 
 **CatalogViewModel**: `addToCart()` passes `colorName = packSize.colorName, colorCode = packSize.colorCode` to `CartItem`.
 
@@ -3461,5 +3478,38 @@ Full location pipeline: painter app → backend → admin fleet map.
 
 ---
 
+---
+
+### Painter Android Bug Fixes — v3.1.4 + v3.1.5 (Apr 22, 2026)
+
+#### admin-products.html null reference fix
+`addPackSize()` called `document.getElementById('newPackUnit').value = 'L'` after the chip-UI replacement removed that `<select>`. Fixed by replacing the null-reference line with `document.getElementById('gstBreakdownPreview').style.display = 'none'`.
+
+#### pack_sizes.unit ENUM→VARCHAR migration
+Production DB had `unit ENUM('L','KG','M','PC')`. Custom units like "NUMBER" caused "Data truncated for column 'unit'" error. Fix: `ALTER TABLE pack_sizes MODIFY COLUMN unit VARCHAR(20) DEFAULT 'L'`. Server code: `String(pack.unit || 'L').toUpperCase().substring(0, 10)` — no ENUM sanitization.
+
+#### zoho_item_id preservation on product save
+`PUT /api/products/:id` DELETE+reinserts all pack_sizes. Without a snapshot, re-inserted rows have `zoho_item_id = NULL`, making them invisible to painter catalog (`WHERE ps.zoho_item_id IS NOT NULL`). Fix: snapshot `{size → zoho_item_id}` before DELETE, restore on re-insert via `savedZohoMap[parseFloat(pack.size)]`.
+
+#### EstimateCreate brand/category filter (v3.1.4)
+**Problem**: Filter selected brand name string → server `WHERE b.id = 'Asian Paints'` → MySQL coerced to 0 → no matches.
+
+**Fix**: `EstimateCreateViewModel.loadProducts()` sends `brand = state.selectedBrand?.id?.toString()`. Server:
+```javascript
+const brandId = parseInt(brand, 10);
+if (!isNaN(brandId) && brandId > 0) { where += ' AND b.id = ?'; params.push(brandId); }
+else { where += ' AND b.name = ?'; params.push(brand); }
+```
+Same pattern for category. `FilterOption(id, name)` — always use ID for server queries.
+
+#### EstimateCreate color variants (v3.1.5)
+`GET /me/estimates/products` was not returning color info. Three-part fix:
+
+1. **Server** (`routes/painters.js`): Add `ps.color_name, ps.color_code` to SELECT; include in `pack_sizes.push()`.
+2. **ViewModel**: `addToCart` passes `colorCode = packSize.colorCode, colorName = packSize.colorName` to `CartItem`.
+3. **Screen**: `PackSizeRow` shows 12dp color dot + `"ColorName · 1L"` label matching Catalog style.
+
+---
+
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-04-22 | Version: 3.3.9 (Staff/Customer), 3.1.1 (Painter versionCode 13) | Maintained by: Development Team*
+*Last Updated: 2026-04-22 | Version: 3.3.9 (Staff/Customer), 3.1.5 (Painter versionCode 17) | Maintained by: Development Team*
