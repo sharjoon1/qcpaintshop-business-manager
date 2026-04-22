@@ -1567,6 +1567,155 @@ function updateTotals() {
 }
 
 // ════════════════════════════════════════
+// MOBILE DRAWER
+// ════════════════════════════════════════
+function openDrawer() {
+    document.getElementById('drawerOverlay').classList.add('open');
+    document.getElementById('productDrawer').classList.add('open');
+    setTimeout(function() {
+        var input = document.getElementById('productSearchInputMobile');
+        if (input) input.focus();
+    }, 300);
+}
+function closeDrawer() {
+    var overlay = document.getElementById('drawerOverlay');
+    var drawer = document.getElementById('productDrawer');
+    if (overlay) overlay.classList.remove('open');
+    if (drawer) drawer.classList.remove('open');
+}
+
+// Swipe-down to close drawer
+(function() {
+    var startY = 0;
+    document.addEventListener('DOMContentLoaded', function() {
+        var drawer = document.getElementById('productDrawer');
+        if (!drawer) return;
+        drawer.addEventListener('touchstart', function(e) {
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+        drawer.addEventListener('touchend', function(e) {
+            if (e.changedTouches[0].clientY - startY > 80) closeDrawer();
+        }, { passive: true });
+    });
+})();
+
+// ════════════════════════════════════════
+// SAVE ESTIMATE
+// ════════════════════════════════════════
+async function saveEstimate() {
+    if (!selectedCustomer) {
+        alert('Please select a customer first.');
+        return;
+    }
+    if (!estimateItems.length) {
+        alert('Please add at least one product.');
+        return;
+    }
+
+    var payload = {
+        customer_name: selectedCustomer.name,
+        customer_phone: selectedCustomer.phone || '',
+        customer_address: selectedCustomer.address || '',
+        estimate_date: new Date().toISOString().split('T')[0],
+        show_gst_breakdown: 0,
+        column_visibility: null,
+        show_description_only: 0,
+        notes: null,
+        admin_notes: null,
+        status: 'draft',
+        branch_id: null,
+        items: estimateItems.map(function(i) {
+            return {
+                item_type: 'product',
+                zoho_item_id: i.zoho_item_id,
+                description: i.name,
+                base_price: i.base_price,
+                unit_price: i.base_price,
+                quantity: i.quantity,
+                markup_type: i.markup_type || null,
+                markup_value: i.markup_value ? parseFloat(i.markup_value) : null,
+                discount_type: i.discount_type || null,
+                discount_value: i.discount_value ? parseFloat(i.discount_value) : null,
+                area: null,
+                coats: null,
+                mix_info: null,
+                show_description_only: 0
+            };
+        }).concat(laborItems.map(function(l) {
+            return {
+                item_type: 'labor',
+                description: l.description || 'Labor',
+                base_price: l.amount,
+                unit_price: l.amount,
+                quantity: 1,
+                markup_type: null,
+                markup_value: null,
+                discount_type: null,
+                discount_value: null,
+                area: null,
+                coats: null,
+                mix_info: null,
+                show_description_only: 0
+            };
+        }))
+    };
+
+    var saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+
+    try {
+        var res = await apiRequest('/api/estimates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+        showSaveSuccess(data.id, data.estimate_number, selectedCustomer);
+    } catch(e) {
+        alert('Error saving estimate: ' + e.message);
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '&#128190; Save Estimate'; }
+    }
+}
+
+// ════════════════════════════════════════
+// POST-SAVE MODAL
+// ════════════════════════════════════════
+function showSaveSuccess(estimateId, estimateNumber, customer) {
+    var itemsTotal = estimateItems.reduce(function(s, i) { return s + (i.line_total || 0); }, 0);
+    var laborTotal = laborItems.reduce(function(s, l) { return s + (parseFloat(l.amount) || 0); }, 0);
+    var grand = itemsTotal + laborTotal;
+
+    var titleEl = document.getElementById('saveSuccessTitle');
+    var totalEl = document.getElementById('saveSuccessTotal');
+    var waBtn   = document.getElementById('saveSuccessWA');
+    var viewBtn = document.getElementById('saveSuccessView');
+
+    if (titleEl) titleEl.textContent = (estimateNumber || 'Estimate') + ' Saved!';
+    if (totalEl) totalEl.textContent = 'Grand Total: ' + fmt(grand);
+
+    if (waBtn) {
+        waBtn.textContent = '📲 Send to ' + customer.name + ' on WhatsApp';
+        waBtn.onclick = async function() {
+            try {
+                await apiRequest('/api/estimates/' + estimateId + '/send-whatsapp', { method: 'POST' });
+                alert('WhatsApp sent successfully!');
+            } catch(e) { alert('WhatsApp send failed: ' + e.message); }
+        };
+    }
+
+    if (viewBtn) {
+        viewBtn.onclick = function() {
+            window.location.href = '/admin-estimates.html?id=' + estimateId;
+        };
+    }
+
+    var modal = document.getElementById('saveSuccessModal');
+    if (modal) modal.classList.add('open');
+}
+
+// ════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async function() {
