@@ -1228,9 +1228,10 @@ async function recalcArea(itemId, coverage, localProductId, p) {
     }
 
     var singleQty = Math.max(1, Math.ceil(liters));
+    var singleText = '→ ' + liters.toFixed(1) + 'L needed → approx ' + singleQty + ' unit(s) of this item';
     _pendingAreaCombo[itemId] = [{ zoho_item_id: p.zoho_item_id, name: p.name, size: 1, rate: p.rate, quantity: singleQty }];
-    _pendingAreaMeta[itemId] = { sqft: sqft, coats: coats, mix_info: resultEl.textContent };
-    resultEl.textContent = '→ ' + liters.toFixed(1) + 'L needed → approx ' + singleQty + ' unit(s) of this item';
+    _pendingAreaMeta[itemId] = { sqft: sqft, coats: coats, mix_info: singleText };
+    resultEl.textContent = singleText;
     resultEl.style.display = 'block';
     addBtn.style.display = 'block';
 }
