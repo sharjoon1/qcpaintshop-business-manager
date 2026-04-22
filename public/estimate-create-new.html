@@ -1055,6 +1055,30 @@ function renderProductExpand(expandEl, p) {
     stepper.appendChild(unitTotal);
     unitDiv.appendChild(stepper);
 
+    // Optional name override + description inputs
+    var safeItemId = p.zoho_item_id.replace(/[^a-z0-9]/gi, '_');
+
+    function mkField(label, id, placeholder, isTextarea) {
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'margin-bottom:6px;';
+        var lbl = document.createElement('label');
+        lbl.style.cssText = 'font-size:10px;color:#6b7280;font-weight:600;display:block;margin-bottom:2px;';
+        lbl.textContent = label;
+        var inp = isTextarea ? document.createElement('textarea') : document.createElement('input');
+        if (!isTextarea) inp.type = 'text';
+        inp.id = id;
+        inp.placeholder = placeholder;
+        inp.style.cssText = 'width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:12px;box-sizing:border-box;resize:vertical;';
+        if (isTextarea) { inp.rows = 2; }
+        inp.addEventListener('click', function(e) { e.stopPropagation(); });
+        wrap.appendChild(lbl);
+        wrap.appendChild(inp);
+        return wrap;
+    }
+
+    unitDiv.appendChild(mkField('Item Name (leave blank to use product name)', 'iname_' + safeItemId, p.name));
+    unitDiv.appendChild(mkField('Description (optional)', 'idesc_' + safeItemId, 'Add a note or description...', true));
+
     var addUnitBtn = document.createElement('button');
     addUnitBtn.className = 'btn-primary';
     addUnitBtn.type = 'button';
@@ -1252,9 +1276,13 @@ async function recalcArea(itemId, coverage, localProductId, p) {
 function addUnitToEstimate(p) {
     var qtyEl = document.getElementById('qty_' + p.zoho_item_id);
     var qty = qtyEl ? Math.max(1, parseInt(qtyEl.textContent) || 1) : 1;
+    var sid = p.zoho_item_id.replace(/[^a-z0-9]/gi, '_');
+    var nameEl = document.getElementById('iname_' + sid);
+    var descEl = document.getElementById('idesc_' + sid);
     pushEstimateItem({
         zoho_item_id: p.zoho_item_id,
-        name: p.name,
+        name: (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : p.name,
+        description: descEl ? descEl.value.trim() : '',
         brand: p.brand || '',
         base_price: p.rate,
         quantity: qty,
@@ -1287,6 +1315,7 @@ function pushEstimateItem(item) {
         item_type: 'product',
         zoho_item_id: item.zoho_item_id,
         name: item.name,
+        description: item.description || '',
         brand: item.brand || '',
         base_price: parseFloat(item.base_price) || 0,
         quantity: item.quantity || 1,
@@ -1532,7 +1561,45 @@ function renderEstimateItems() {
         priceInfo.style.cssText = 'font-size:12px;color:#374151;margin-top:4px;';
         priceInfo.innerHTML = 'Final price: <strong>' + fmt(item.final_price) + '</strong>/unit · Total: <strong>' + fmt(item.line_total) + '</strong>';
 
+        // Name edit row
+        var nameEditRow = document.createElement('div');
+        nameEditRow.className = 'md-row';
+        var nameEditLabel = document.createElement('span');
+        nameEditLabel.className = 'md-label';
+        nameEditLabel.textContent = 'Name';
+        var nameEditInput = document.createElement('input');
+        nameEditInput.type = 'text';
+        nameEditInput.value = item.name;
+        nameEditInput.style.cssText = 'flex:1;font-size:12px;border:1px solid #d1d5db;border-radius:5px;padding:4px 6px;';
+        nameEditInput.addEventListener('input', function() {
+            item.name = this.value;
+            nameDiv.textContent = this.value;
+        });
+        nameEditRow.appendChild(nameEditLabel);
+        nameEditRow.appendChild(nameEditInput);
+
+        // Description edit row
+        var descEditRow = document.createElement('div');
+        descEditRow.className = 'md-row';
+        descEditRow.style.alignItems = 'flex-start';
+        var descEditLabel = document.createElement('span');
+        descEditLabel.className = 'md-label';
+        descEditLabel.style.paddingTop = '4px';
+        descEditLabel.textContent = 'Desc';
+        var descEditInput = document.createElement('textarea');
+        descEditInput.rows = 2;
+        descEditInput.value = item.description || '';
+        descEditInput.placeholder = 'Add description...';
+        descEditInput.style.cssText = 'flex:1;font-size:12px;border:1px solid #d1d5db;border-radius:5px;padding:4px 6px;resize:vertical;';
+        descEditInput.addEventListener('input', function() {
+            item.description = this.value;
+        });
+        descEditRow.appendChild(descEditLabel);
+        descEditRow.appendChild(descEditInput);
+
         expand.appendChild(qtyRow);
+        expand.appendChild(nameEditRow);
+        expand.appendChild(descEditRow);
         expand.appendChild(priceRow);
         expand.appendChild(markupRow);
         expand.appendChild(discountRow);
@@ -1729,7 +1796,7 @@ async function saveEstimate() {
                 item_type: 'product',
                 zoho_item_id: i.zoho_item_id,
                 item_name: i.name,
-                item_description: i.name,
+                item_description: i.description || i.name,
                 base_price: i.base_price,
                 unit_price: i.base_price,
                 quantity: i.quantity,
