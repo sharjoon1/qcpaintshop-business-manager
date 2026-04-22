@@ -442,25 +442,27 @@
                 </div>
 
                 <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <label class="block text-sm font-semibold text-gray-700">Pack Sizes & Prices</label>
-                        <button type="button" onclick="openUnitsManager()" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-                            ⚙ Manage Units
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Pack Sizes & Prices</label>
+                    <div id="packSizesList" class="space-y-2 mb-2"></div>
+                    <!-- Row 1: Size + Unit(with ⚙) -->
+                    <div class="flex gap-2 mb-2">
+                        <input type="number" id="newPackSize" placeholder="Size (e.g. 1)" step="0.01"
+                               class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
+                        <select id="newPackUnit"
+                                class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
+                        </select>
+                        <button type="button" onclick="openUnitsManager()" title="Manage Units"
+                                class="px-2 py-2 border-2 border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 text-base flex-shrink-0">
+                            ⚙
                         </button>
                     </div>
-                    <div id="packSizesList" class="space-y-2 mb-2"></div>
-                    <!-- 2×2 grid: Size | Unit / Price | Add -->
-                    <div class="grid grid-cols-2 gap-2">
-                        <input type="number" id="newPackSize" placeholder="Size (e.g. 1)" step="0.01"
-                               class="px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
-                        <select id="newPackUnit"
-                                class="px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
-                        </select>
+                    <!-- Row 2: Price + Add -->
+                    <div class="flex gap-2">
                         <input type="number" id="newPackPrice" placeholder="Price ₹ (incl. GST)" step="0.01"
-                               class="px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none"
+                               class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none"
                                oninput="showGSTBreakdown()">
                         <button type="button" onclick="addPackSize()"
-                                class="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition">
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition flex-shrink-0">
                             + Add
                         </button>
                     </div>
