@@ -651,6 +651,166 @@ let _customerSearchTimer = null;
 let _productSearchTimer = null;
 
 const RECENT_CUSTOMERS_KEY = 'est_recent_customers';
+
+// ════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════
+function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmt(n) {
+    return '₹' + parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function roundUp10(n) { return Math.ceil(parseFloat(n) / 10) * 10; }
+
+// ════════════════════════════════════════
+// RECENT CUSTOMERS (localStorage)
+// ════════════════════════════════════════
+function getRecentCustomers() {
+    try { return JSON.parse(localStorage.getItem(RECENT_CUSTOMERS_KEY) || '[]'); } catch { return []; }
+}
+function saveRecentCustomer(c) {
+    const list = getRecentCustomers().filter(r => r.id !== c.id);
+    list.unshift(c);
+    localStorage.setItem(RECENT_CUSTOMERS_KEY, JSON.stringify(list.slice(0, 5)));
+}
+
+// ════════════════════════════════════════
+// CUSTOMER SEARCH
+// ════════════════════════════════════════
+function initCustomerSearch(inputId, dropdownId, cardId) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    const card = document.getElementById(cardId);
+    if (!input) return;
+
+    input.addEventListener('focus', () => {
+        const recents = getRecentCustomers();
+        if (recents.length) showCustomerResults(recents, dropdown, input, card, true);
+    });
+
+    input.addEventListener('input', () => {
+        clearTimeout(_customerSearchTimer);
+        const q = input.value.trim();
+        if (q.length < 2) {
+            const recents = getRecentCustomers();
+            if (recents.length) showCustomerResults(recents, dropdown, input, card, true);
+            else dropdown.style.display = 'none';
+            return;
+        }
+        _customerSearchTimer = setTimeout(async () => {
+            try {
+                const res = await apiRequest('/api/estimates/search-customers?q=' + encodeURIComponent(q));
+                const results = await res.json();
+                showCustomerResults(results, dropdown, input, card, false);
+            } catch(e) { console.error('Customer search error', e); }
+        }, 300);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+function showCustomerResults(results, dropdown, input, card, isRecent) {
+    if (!results.length) { dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = results.map(c => {
+        const badgeClass = c.source === 'zoho' ? 'badge-zoho' : c.source === 'both' ? 'badge-both' : 'badge-local';
+        const badgeLabel = c.source === 'zoho' ? 'Zoho' : c.source === 'both' ? 'Both' : 'Local';
+        const cJson = esc(JSON.stringify(c));
+        return '<div class="customer-item" onclick="selectCustomerFromJson(\'' + cJson + '\',\'' + input.id + '\',\'' + dropdown.id + '\',\'' + card.id + '\')">'
+            + '<div>'
+            + '<div style="font-size:13px;font-weight:700;">' + esc(c.name) + '</div>'
+            + '<div style="font-size:11px;color:#6b7280;">' + esc(c.phone) + '</div>'
+            + '</div>'
+            + '<span class="source-badge ' + badgeClass + '">' + badgeLabel + '</span>'
+            + '</div>';
+    }).join('');
+    if (isRecent) {
+        dropdown.insertAdjacentHTML('afterbegin',
+            '<div style="font-size:10px;color:#9ca3af;padding:6px 14px;font-weight:600;">RECENT</div>');
+    }
+    dropdown.style.display = 'block';
+}
+
+function selectCustomerFromJson(escapedJson, inputId, dropdownId, cardId) {
+    const c = JSON.parse(escapedJson.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"'));
+    selectCustomer(c, inputId, dropdownId, cardId);
+}
+
+function selectCustomer(c, inputId, dropdownId, cardId) {
+    selectedCustomer = c;
+    saveRecentCustomer(c);
+    document.getElementById(inputId).value = c.name;
+    document.getElementById(dropdownId).style.display = 'none';
+    const card = document.getElementById(cardId);
+    card.innerHTML = '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">' + esc(c.name) + '</div>'
+        + '<div style="font-size:12px;color:#374151;">' + esc(c.phone) + (c.email ? ' · ' + esc(c.email) : '') + '</div>'
+        + (c.address ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + esc(c.address) + '</div>' : '');
+    card.style.display = 'block';
+
+    // Sync both desktop + mobile inputs
+    ['customerSearchInput','customerSearchInputMobile'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el && el.id !== inputId) el.value = c.name;
+    });
+    ['customerCard','customerCardMobile'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el && el.id !== cardId) { el.innerHTML = card.innerHTML; el.style.display = 'block'; }
+    });
+}
+
+// ════════════════════════════════════════
+// NEW CUSTOMER MODAL
+// ════════════════════════════════════════
+function openNewCustomerModal() {
+    document.getElementById('newCustomerModal').classList.add('open');
+    loadBranches();
+}
+function closeNewCustomerModal() {
+    document.getElementById('newCustomerModal').classList.remove('open');
+}
+async function loadBranches() {
+    const sel = document.getElementById('newCustBranch');
+    if (sel.options.length > 1) return;
+    try {
+        const res = await apiRequest('/api/branches/list');
+        const data = await res.json();
+        const branches = data.data || data;
+        sel.innerHTML = '<option value="">-- Select --</option>'
+            + branches.map(function(b) { return '<option value="' + b.id + '">' + esc(b.name) + '</option>'; }).join('');
+    } catch(e) { console.error('loadBranches', e); }
+}
+async function createCustomer(e) {
+    try {
+        const payload = {
+            name: document.getElementById('newCustName').value.trim(),
+            phone: document.getElementById('newCustPhone').value.trim(),
+            email: document.getElementById('newCustEmail').value.trim() || null,
+            address: document.getElementById('newCustAddress').value.trim() || null,
+            branch_id: document.getElementById('newCustBranch').value || null
+        };
+        const res = await apiRequest('/api/customers', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        const customer = { id: String(data.id), name: payload.name, phone: payload.phone, email: payload.email || '', address: payload.address || '', source: 'local', zoho_contact_id: null, local_customer_id: data.id };
+        selectCustomer(customer, 'customerSearchInput', 'customerDropdownPanel', 'customerCard');
+        closeNewCustomerModal();
+    } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async function() {
+    initCustomerSearch('customerSearchInput', 'customerDropdownPanel', 'customerCard');
+    initCustomerSearch('customerSearchInputMobile', 'customerDropdownPanelMobile', 'customerCardMobile');
+    await loadFilterOptions();
+    initProductSearch('productSearchInput', 'productList', 'brandChips', 'categoryChips');
+    initProductSearch('productSearchInputMobile', 'productListMobile', 'brandChipsMobile', 'categoryChipsMobile');
+});
 </script>
 </body>
 </html>
