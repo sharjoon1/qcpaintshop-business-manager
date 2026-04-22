@@ -283,7 +283,8 @@ router.get('/search-products', requireAuth, async (req, res) => {
     try {
         const { q, brand, category, page = 1 } = req.query;
         const limit = 20;
-        const offset = (Math.max(1, parseInt(page)) - 1) * limit;
+        const pageNum = Math.max(1, Math.min(100, parseInt(page, 10) || 1));
+        const offset = (pageNum - 1) * limit;
         const params = [];
 
         let where = `WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)`;
@@ -300,11 +301,13 @@ router.get('/search-products', requireAuth, async (req, res) => {
                    zim.zoho_brand AS brand, zim.zoho_category_name AS category,
                    zim.zoho_rate AS rate, zim.zoho_unit AS unit,
                    zim.zoho_stock_on_hand AS stock_on_hand,
-                   p.area_coverage, p.product_type, p.id AS local_product_id
+                   MAX(p.area_coverage) AS area_coverage, MIN(p.id) AS local_product_id
             FROM zoho_items_map zim
             LEFT JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
             LEFT JOIN products p ON p.id = ps.product_id AND p.status = 'active'
             ${where}
+            GROUP BY zim.zoho_item_id, zim.zoho_item_name, zim.zoho_brand, zim.zoho_category_name,
+                     zim.zoho_rate, zim.zoho_unit, zim.zoho_stock_on_hand
             ORDER BY zim.zoho_item_name ASC
             LIMIT ? OFFSET ?
         `, [...params, limit, offset]);
