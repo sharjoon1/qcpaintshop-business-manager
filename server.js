@@ -2961,6 +2961,14 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
             [name, brand_id, category_id, product_type, description || null, gst_percentage || 18, base_price || 0, available_sizes || null, area_coverage || null, status || 'active', req.params.id]
         );
 
+        // Snapshot existing size→zoho_item_id so re-saves don't lose catalog visibility
+        const [existingPs] = await pool.query(
+            'SELECT size, zoho_item_id FROM pack_sizes WHERE product_id = ? AND is_active = 1 AND zoho_item_id IS NOT NULL',
+            [req.params.id]
+        );
+        const savedZohoMap = {};
+        for (const ps of existingPs) savedZohoMap[parseFloat(ps.size)] = ps.zoho_item_id;
+
         await pool.query('DELETE FROM pack_sizes WHERE product_id = ?', [req.params.id]);
 
         let packSizesInserted = 0;
@@ -2969,9 +2977,10 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
                 const packSizes = JSON.parse(available_sizes);
                 for (const pack of packSizes) {
                     const unit = String(pack.unit || 'L').toUpperCase().substring(0, 10);
+                    const zohoId = pack.zoho_item_id || savedZohoMap[parseFloat(pack.size)] || null;
                     await pool.query(
                         'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, color_name, color_code, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
-                        [req.params.id, pack.size, unit, pack.base_price || pack.price, pack.zoho_item_id || null,
+                        [req.params.id, pack.size, unit, pack.base_price || pack.price, zohoId,
                          pack.color_name ? String(pack.color_name).trim().substring(0, 100) || null : null,
                          pack.color_code && /^#[0-9A-Fa-f]{3,8}$/.test(String(pack.color_code)) ? String(pack.color_code) : null]
                     );
