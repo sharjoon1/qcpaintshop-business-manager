@@ -948,8 +948,8 @@
             
             // Clear inputs
             document.getElementById('newPackSize').value = '';
-            document.getElementById('newPackUnit').value = 'L';
             document.getElementById('newPackPrice').value = '';
+            document.getElementById('gstBreakdownPreview').style.display = 'none';
         }
 
         function removePackSize(index) {
@@ -1281,12 +1281,16 @@
                     closeModal();
                     loadData();
                 } else {
-                    const error = await response.json();
-                    alert('Error: ' + (error.message || 'Failed to save product'));
+                    let msg = 'Failed to save product';
+                    try {
+                        const errBody = await response.json();
+                        msg = errBody.message || errBody.error || msg;
+                    } catch (_) {}
+                    alert('Error: ' + msg);
                 }
             } catch (error) {
                 console.error('Error saving product:', error);
-                alert('Failed to save product. Please try again.');
+                alert('Failed to save product: ' + (error.message || 'Please try again'));
             }
         }
 

@@ -2623,14 +2623,9 @@ app.post('/api/products/assign-zoho-item', requirePermission('products', 'edit')
             return res.status(400).json({ success: false, error: 'size must be a positive number' });
         }
 
-        const rawUnit = unit.toUpperCase();
-        const normalizedUnit = /^(L|LTR|LTRS?|LITRES?|LITERS?)$/i.test(rawUnit) ? 'L'
-            : /^(KG|KGS?|GRAMS?|GM?)$/i.test(rawUnit) ? 'KG'
-            : /^(M|MTR|MTRS?|METRES?|METERS?)$/i.test(rawUnit) ? 'M'
-            : /^(PC|PCS?|PIECES?)$/i.test(rawUnit) ? 'PC'
-            : null;
+        const normalizedUnit = String(unit || 'L').toUpperCase().substring(0, 10);
         if (!normalizedUnit) {
-            return res.status(400).json({ success: false, error: 'Invalid unit. Must be one of: L, KG, M, PC' });
+            return res.status(400).json({ success: false, error: 'Unit is required' });
         }
 
         const conn = await pool.getConnection();
@@ -2942,7 +2937,7 @@ app.post('/api/products', requirePermission('products', 'add'), async (req, res)
                 for (const pack of packSizes) {
                     await pool.query(
                         'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
-                        [productId, pack.size, pack.unit || 'L', pack.base_price || pack.price, pack.zoho_item_id || null]
+                        [productId, pack.size, String(pack.unit || 'L').toUpperCase().substring(0, 10), pack.base_price || pack.price, pack.zoho_item_id || null]
                     );
                 }
             } catch (e) {
@@ -2973,13 +2968,7 @@ app.put('/api/products/:id', requirePermission('products', 'edit'), async (req, 
             try {
                 const packSizes = JSON.parse(available_sizes);
                 for (const pack of packSizes) {
-                    // Sanitize unit to valid ENUM values
-                    const rawUnit = (pack.unit || 'L').toUpperCase();
-                    const unit = /^(L|LTR|LTRS?|LITRES?|LITERS?)$/i.test(rawUnit) ? 'L'
-                        : /^(KG|KGS?|GRAMS?|GM?)$/i.test(rawUnit) ? 'KG'
-                        : /^(M|MTR|MTRS?|METRES?|METERS?)$/i.test(rawUnit) ? 'M'
-                        : /^(PC|PCS?|PIECES?)$/i.test(rawUnit) ? 'PC'
-                        : 'L';
+                    const unit = String(pack.unit || 'L').toUpperCase().substring(0, 10);
                     await pool.query(
                         'INSERT INTO pack_sizes (product_id, size, unit, base_price, zoho_item_id, color_name, color_code, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
                         [req.params.id, pack.size, unit, pack.base_price || pack.price, pack.zoho_item_id || null,
