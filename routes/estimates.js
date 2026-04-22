@@ -232,7 +232,7 @@ router.get('/search-customers', requireAuth, async (req, res) => {
         const [zohoRows] = await pool.query(`
             SELECT zcm.zoho_contact_id, zcm.zoho_contact_name AS name,
                    zcm.zoho_phone AS phone, zcm.zoho_email AS email,
-                   zcm.zoho_billing_address AS address, zcm.local_customer_id
+                   '' AS address, zcm.local_customer_id
             FROM zoho_customers_map zcm
             WHERE zcm.zoho_contact_name LIKE ? OR zcm.zoho_phone LIKE ? OR zcm.zoho_email LIKE ?
             ORDER BY zcm.zoho_contact_name ASC LIMIT 8

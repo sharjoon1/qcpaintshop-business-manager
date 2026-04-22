@@ -144,7 +144,17 @@
         }
 
         /* ── FILTER CHIPS ── */
-        .filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .filter-chips {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 6px;
+            margin-bottom: 8px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding-bottom: 2px;
+        }
+        .filter-chips::-webkit-scrollbar { display: none; }
         .chip {
             font-size: 11px;
             padding: 4px 10px;
@@ -722,7 +732,7 @@ document.addEventListener('click', function(e) {
 });
 
 function showCustomerResults(results, dropdown, input, card, isRecent) {
-    if (!results.length) { dropdown.style.display = 'none'; return; }
+    if (!Array.isArray(results) || !results.length) { dropdown.style.display = 'none'; return; }
     dropdown.innerHTML = '';
     if (isRecent) {
         const hdr = document.createElement('div');
@@ -1379,6 +1389,38 @@ function renderEstimateItems() {
         var expand = document.createElement('div');
         expand.className = 'est-item-expand';
 
+        // Base price edit row
+        var priceRow = document.createElement('div');
+        priceRow.className = 'md-row';
+        var priceLabel = document.createElement('span');
+        priceLabel.className = 'md-label';
+        priceLabel.style.color = '#374151';
+        priceLabel.textContent = 'Base Price';
+        var priceInput = document.createElement('input');
+        priceInput.type = 'number';
+        priceInput.className = 'md-input';
+        priceInput.min = '0';
+        priceInput.step = '0.01';
+        priceInput.value = item.base_price || '';
+        priceInput.style.width = '100px';
+        priceInput.title = 'Edit base price per unit';
+        var priceUnit = document.createElement('span');
+        priceUnit.style.cssText = 'font-size:11px;color:#6b7280;';
+        priceUnit.textContent = '/ ' + (item.unit || 'unit');
+        priceInput.addEventListener('input', function() {
+            var v = parseFloat(this.value);
+            if (!isNaN(v) && v >= 0) {
+                item.base_price = v;
+                subDiv.textContent = item.quantity + ' ' + item.unit + ' · ' + fmt(item.base_price) + '/unit';
+                recalcItem(item);
+                totalDiv.textContent = fmt(item.line_total);
+                updateTotals();
+            }
+        });
+        priceRow.appendChild(priceLabel);
+        priceRow.appendChild(priceInput);
+        priceRow.appendChild(priceUnit);
+
         // Markup row
         var markupRow = document.createElement('div');
         markupRow.className = 'md-row';
@@ -1445,6 +1487,7 @@ function renderEstimateItems() {
         priceInfo.style.cssText = 'font-size:12px;color:#374151;margin-top:4px;';
         priceInfo.innerHTML = 'Final price: <strong>' + fmt(item.final_price) + '</strong>/unit · Total: <strong>' + fmt(item.line_total) + '</strong>';
 
+        expand.appendChild(priceRow);
         expand.appendChild(markupRow);
         expand.appendChild(discountRow);
         expand.appendChild(priceInfo);
