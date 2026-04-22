@@ -1073,6 +1073,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
                    b.name as brand, b.id as brand_id,
                    c.name as category, c.id as category_id,
                    ps.id as pack_size_id, ps.size, ps.unit, ps.base_price, ps.zoho_item_id,
+                   ps.color_name, ps.color_code,
                    zim.zoho_rate, zim.zoho_label_rate, zim.zoho_stock_on_hand as stock,
                    pprs.regular_points_per_unit as regular_points,
                    pprs.annual_eligible, pprs.annual_pct
@@ -1125,7 +1126,9 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
                 zoho_item_id: row.zoho_item_id,
                 stock: parseFloat(row.stock || 0),
                 regular_points: regularPts,
-                annual_points: annualPts
+                annual_points: annualPts,
+                color_name: row.color_name || null,
+                color_code: row.color_code || null,
             });
         }
 
