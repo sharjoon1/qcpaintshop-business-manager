@@ -2478,6 +2478,36 @@ app.delete('/api/customer-types/:id', requirePermission('customers', 'delete'), 
 // PRODUCTS
 // ========================================
 
+const DEFAULT_UNITS = ['L', 'KG', 'M', 'PC'];
+
+app.get('/api/products/units', requireAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            "SELECT config_value FROM ai_config WHERE config_key = 'product_units'"
+        );
+        const units = rows.length ? JSON.parse(rows[0].config_value) : DEFAULT_UNITS;
+        res.json({ success: true, units });
+    } catch (e) {
+        res.json({ success: true, units: DEFAULT_UNITS });
+    }
+});
+
+app.post('/api/products/units', requireAuth, async (req, res) => {
+    try {
+        const { units } = req.body;
+        if (!Array.isArray(units) || units.length === 0)
+            return res.status(400).json({ success: false, message: 'units must be a non-empty array' });
+        const clean = [...new Set(units.map(u => String(u).trim().toUpperCase()).filter(Boolean))];
+        await pool.query(
+            "INSERT INTO ai_config (config_key, config_value) VALUES ('product_units', ?) ON DUPLICATE KEY UPDATE config_value = ?",
+            [JSON.stringify(clean), JSON.stringify(clean)]
+        );
+        res.json({ success: true, units: clean });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 // Search Zoho items for pack size mapping dropdown
 app.get('/api/products/zoho-items-search', requireAuth, async (req, res) => {
     try {

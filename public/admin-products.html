@@ -435,7 +435,12 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Pack Sizes & Prices</label>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-sm font-semibold text-gray-700">Pack Sizes & Prices</label>
+                        <button type="button" onclick="openUnitsManager()" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+                            ⚙ Manage Units
+                        </button>
+                    </div>
                     <div id="packSizesList" class="space-y-2 mb-2"></div>
                     <!-- 2×2 grid: Size | Unit / Price | Add -->
                     <div class="grid grid-cols-2 gap-2">
@@ -443,10 +448,6 @@
                                class="px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
                         <select id="newPackUnit"
                                 class="px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
-                            <option value="L">Liters (L)</option>
-                            <option value="KG">KG</option>
-                            <option value="M">Meters (M)</option>
-                            <option value="PC">Pieces (PC)</option>
                         </select>
                         <input type="number" id="newPackPrice" placeholder="Price ₹ (incl. GST)" step="0.01"
                                class="px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none"
@@ -479,6 +480,35 @@
         </div>
     </div>
 
+    <!-- Units Manager Sheet -->
+    <div id="unitsManagerSheet" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-[60]">
+        <div class="bg-white w-full sm:max-w-sm sm:mx-4 sm:rounded-2xl rounded-t-2xl flex flex-col shadow-2xl" style="max-height:min(70vh,70dvh)">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
+                <h3 class="text-base font-bold text-gray-800">Manage Units</h3>
+                <button onclick="closeUnitsManager()" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="overflow-y-auto flex-1 px-4 py-3">
+                <p class="text-xs text-gray-500 mb-3">These units appear in all pack size dropdowns. Existing pack sizes keep their unit even if removed here.</p>
+                <div id="unitsList" class="space-y-2 mb-4"></div>
+                <div class="flex gap-2">
+                    <input type="text" id="newUnitInput" placeholder="e.g. ML, G, SQ FT" maxlength="10"
+                           class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();addUnitToList();}">
+                    <button type="button" onclick="addUnitToList()"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">+ Add</button>
+                </div>
+            </div>
+            <div class="flex gap-3 px-4 py-3 border-t border-gray-100 flex-shrink-0">
+                <button type="button" onclick="closeUnitsManager()" class="flex-1 btn btn-secondary">Cancel</button>
+                <button type="button" onclick="saveUnits()" class="flex-1 btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let products = [];
         let brands = [];
@@ -486,6 +516,82 @@
         let editingProductId = null;
         let packSizes = []; // Array of {size, price} objects
         let zohoItemsCache = [];
+        let productUnits = ['L', 'KG', 'M', 'PC']; // loaded from API
+
+        // ── Unit Management ──────────────────────────────────
+        function populateUnitSelects() {
+            const opts = productUnits.map(u => `<option value="${u}">${u}</option>`).join('');
+            ['newPackUnit'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = opts;
+            });
+        }
+
+        async function loadUnits() {
+            try {
+                const r = await fetch('/api/products/units', { headers: getAuthHeaders() });
+                const d = await r.json();
+                if (d.success && Array.isArray(d.units)) productUnits = d.units;
+            } catch (_) {}
+            populateUnitSelects();
+        }
+
+        let _pendingUnits = [];
+
+        function openUnitsManager() {
+            _pendingUnits = [...productUnits];
+            renderUnitsList();
+            document.getElementById('unitsManagerSheet').classList.remove('hidden');
+            document.getElementById('newUnitInput').value = '';
+        }
+
+        function closeUnitsManager() {
+            document.getElementById('unitsManagerSheet').classList.add('hidden');
+        }
+
+        function renderUnitsList() {
+            const container = document.getElementById('unitsList');
+            if (_pendingUnits.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-400 italic">No units yet</p>';
+                return;
+            }
+            container.innerHTML = _pendingUnits.map((u, i) => `
+                <div class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                    <span class="font-medium text-gray-800 text-sm">${escH(u)}</span>
+                    <button type="button" onclick="_pendingUnits.splice(${i},1); renderUnitsList()"
+                            class="text-red-500 hover:text-red-700 text-lg leading-none font-bold px-1">×</button>
+                </div>
+            `).join('');
+        }
+
+        function addUnitToList() {
+            const input = document.getElementById('newUnitInput');
+            const val = input.value.trim().toUpperCase();
+            if (!val) return;
+            if (_pendingUnits.includes(val)) { input.value = ''; return; }
+            _pendingUnits.push(val);
+            renderUnitsList();
+            input.value = '';
+            input.focus();
+        }
+
+        async function saveUnits() {
+            if (_pendingUnits.length === 0) return;
+            try {
+                const r = await fetch('/api/products/units', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ units: _pendingUnits })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    productUnits = d.units;
+                    populateUnitSelects();
+                    closeUnitsManager();
+                }
+            } catch (e) { alert('Failed to save units'); }
+        }
+        // ────────────────────────────────────────────────────
 
         // Helper function for authenticated API requests
         function getAuthHeaders() {
@@ -870,7 +976,7 @@
                         <div>
                             <label class="text-xs text-gray-500 mb-1 block">Unit</label>
                             <select id="editUnit_${idx}" class="w-full px-2 py-1.5 border-2 border-blue-400 rounded text-sm focus:outline-none">
-                                ${['L','KG','M','PC'].map(u => `<option value="${u}" ${ps.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+                                ${productUnits.map(u => `<option value="${u}" ${ps.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
                             </select>
                         </div>
                         <div>
@@ -2781,6 +2887,7 @@
                 switchProductTab('bulk-map');
             }
             loadData();
+            loadUnits();
         })();
 
         // ── Mobile Filter Drawer (Products) ────────────────────────────────────
