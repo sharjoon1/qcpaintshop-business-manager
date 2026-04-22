@@ -1133,6 +1133,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
                 if (o.applies_to === 'all') return true;
                 if (o.applies_to === 'brand' && o.target_id === p.brand) return true;
                 if (o.applies_to === 'category' && o.target_id === p.category) return true;
+                if (o.applies_to === 'product' && parseInt(o.target_id, 10) === p.id) return true;
                 return false;
             });
             return { ...p, offer: matched.length > 0 ? matched[0] : null };
