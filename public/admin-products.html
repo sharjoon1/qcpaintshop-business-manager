@@ -377,17 +377,20 @@
     <input type="file" id="editReviewImageInput" accept="image/*" class="hidden" onchange="uploadEditReviewImage(event)">
 
     <!-- Add/Edit Modal -->
-    <div id="productModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="card max-w-2xl w-full max-h-[90vh] overflow-y-auto my-8">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-bold text-gray-800" id="modalTitle">Add New Product</h3>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+    <div id="productModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+        <div class="bg-white w-full sm:max-w-2xl sm:mx-4 sm:rounded-2xl rounded-t-2xl max-h-[92vh] flex flex-col shadow-2xl">
+            <!-- Sticky header -->
+            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10 flex-shrink-0">
+                <h3 class="text-lg font-bold text-gray-800" id="modalTitle">Add New Product</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
 
+            <!-- Scrollable body -->
+            <div class="overflow-y-auto flex-1 px-5 py-4">
             <form id="productForm" onsubmit="saveProduct(event)" class="space-y-4">
                 <input type="hidden" id="productId">
                 
@@ -469,7 +472,7 @@
                     <textarea id="productDescription" rows="3" class="form-input" placeholder="Product description..."></textarea>
                 </div>
 
-                <div class="flex gap-3 pt-4">
+                <div class="flex gap-3 pt-4 pb-2">
                     <button type="button" onclick="closeModal()" class="flex-1 btn btn-secondary">
                         Cancel
                     </button>
@@ -478,6 +481,7 @@
                     </button>
                 </div>
             </form>
+            </div><!-- end scrollable body -->
         </div>
     </div>
 
