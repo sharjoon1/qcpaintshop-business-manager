@@ -444,21 +444,18 @@
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Pack Sizes & Prices</label>
                     <div id="packSizesList" class="space-y-2 mb-2"></div>
-                    <!-- Row 1: Size + Unit(with ⚙) -->
-                    <div class="flex gap-2 mb-2">
-                        <input type="number" id="newPackSize" placeholder="Size (e.g. 1)" step="0.01"
-                               class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
-                        <select id="newPackUnit"
-                                class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none">
-                        </select>
+                    <!-- Unit chips row -->
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-xs text-gray-500 flex-shrink-0">Unit:</span>
+                        <div id="unitChips" class="flex gap-1 overflow-x-auto flex-1" style="scrollbar-width:none;-ms-overflow-style:none;"></div>
                         <button type="button" onclick="openUnitsManager()" title="Manage Units"
-                                class="px-2 py-2 border-2 border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 text-base flex-shrink-0">
-                            ⚙
-                        </button>
+                                class="px-2 py-1 border border-gray-300 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-400 text-sm flex-shrink-0">⚙</button>
                     </div>
-                    <!-- Row 2: Price + Add -->
+                    <!-- Size + Price + Add -->
                     <div class="flex gap-2">
-                        <input type="number" id="newPackPrice" placeholder="Price ₹ (incl. GST)" step="0.01"
+                        <input type="number" id="newPackSize" placeholder="Size" step="0.01"
+                               class="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none flex-shrink-0">
+                        <input type="number" id="newPackPrice" placeholder="Price ₹" step="0.01"
                                class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-green-600 focus:outline-none"
                                oninput="showGSTBreakdown()">
                         <button type="button" onclick="addPackSize()"
@@ -528,13 +525,27 @@
         let productUnits = ['L', 'KG', 'M', 'PC']; // loaded from API
 
         // ── Unit Management ──────────────────────────────────
+        let _selectedUnit = 'L';
+
+        function renderUnitChips(selectUnit) {
+            if (selectUnit && productUnits.includes(selectUnit)) _selectedUnit = selectUnit;
+            else if (!productUnits.includes(_selectedUnit)) _selectedUnit = productUnits[0] || 'L';
+            const container = document.getElementById('unitChips');
+            if (!container) return;
+            container.innerHTML = productUnits.map(u => {
+                const active = u === _selectedUnit;
+                return `<button type="button" onclick="selectUnit('${u}')"
+                    style="flex-shrink:0;padding:4px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;border:2px solid ${active?'#1B5E3B':'#d1d5db'};background:${active?'#1B5E3B':'#fff'};color:${active?'#fff':'#374151'};cursor:pointer;white-space:nowrap;">${u}</button>`;
+            }).join('');
+        }
+
+        function selectUnit(u) {
+            _selectedUnit = u;
+            renderUnitChips();
+        }
+
         function populateUnitSelects(selectUnit) {
-            const opts = productUnits.map(u => `<option value="${u}">${u}</option>`).join('');
-            const el = document.getElementById('newPackUnit');
-            if (!el) return;
-            const prev = selectUnit || el.value;
-            el.innerHTML = opts;
-            if (prev && productUnits.includes(prev)) el.value = prev;
+            renderUnitChips(selectUnit);
         }
 
         async function loadUnits() {
@@ -913,7 +924,7 @@
         // Pack Sizes Management
         function addPackSize() {
             const size = parseFloat(document.getElementById('newPackSize').value);
-            const unit = document.getElementById('newPackUnit').value;
+            const unit = _selectedUnit || 'L';
             const price = parseFloat(document.getElementById('newPackPrice').value);
             
             if (!size || size <= 0) {
@@ -1143,6 +1154,7 @@
             document.getElementById('productStatus').value = 'active';
             document.getElementById('productGst').value = '18';
             renderPackSizes();
+            renderUnitChips();
             toggleAreaCoverage(); // Initialize field visibility
             document.getElementById('productModal').classList.remove('hidden');
         }
@@ -1204,6 +1216,7 @@
             }
             
             renderPackSizes();
+            renderUnitChips();
             document.getElementById('productModal').classList.remove('hidden');
         }
 
