@@ -3310,6 +3310,30 @@ Full selfie-checkin + Annual Points earning system for painters. Deployed on mas
 
 ---
 
+### Admin FCM Notifications to Painters (Apr 20, 2026)
+
+Admin can broadcast rich push notifications (image + custom MP3 sound) to filtered painter audiences.
+
+**DB**: `migrations/migrate-admin-notifications.js` — `admin_notifications` table: `id, title, body, image_url, type, offer_url, audience_filter (JSON), sent_count, created_by, created_at`.
+
+**Backend** (`routes/admin-notifications.js`):
+- `POST /upload-image` — multer memory storage, saves to `public/uploads/admin-notif-images/`, returns URL.
+- `POST /audience-count` — query builder returns painter count matching filter (brand, category, level, location).
+- `GET /` — list past notifications with send stats.
+- `POST /send` — resolves audience FCM tokens, calls `sendToDevices()` in 500-token batches, records to DB.
+- `GET /:id` — get one notification detail.
+
+**FCM** (`services/fcm-admin.js`): `sendToDevices(tokens, {title, body, imageUrl, type, offerUrl})` — uses `sendEachForMulticast` with 500-token batch cap enforced. Sends to `qc_admin_channel` on Android.
+
+**Android** (painter flavor):
+- `qc_admin_channel`: `NotificationChannel` with custom MP3 sound + offer tap routing.
+- Guarded by `APP_TYPE` check so staff app doesn't register painter-only channel.
+- Offer tap: notification `data.type === 'offer'` routes to Catalog screen with offer filter.
+
+**Key gotcha**: painter `status` column is `'approved'` (NOT `'active'`). Audience query filters `WHERE p.status = 'approved'`.
+
+---
+
 ### Admin Products UX — Mobile + Assign-to-Existing (Apr 21, 2026)
 
 Two improvements to `public/admin-products.html`.
