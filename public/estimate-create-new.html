@@ -1157,7 +1157,7 @@ async function fetchSiblingPacks(localProductId) {
             .map(function(ps) {
                 return {
                     zoho_item_id: ps.zoho_item_id,
-                    name: esc(data.name) + ' ' + ps.size + (ps.unit || 'L'),
+                    name: data.name + ' ' + ps.size + (ps.unit || 'L'),
                     size: parseFloat(ps.size),
                     rate: parseFloat(ps.base_price)
                 };
@@ -1194,8 +1194,11 @@ function calculatePackCombo(litersNeeded, packSizes) {
 }
 
 var _pendingAreaCombo = {};
+var _recalcToken = {};
 
 async function recalcArea(itemId, coverage, localProductId, p) {
+    var token = (_recalcToken[itemId] = ((_recalcToken[itemId] || 0) + 1));
+    var myToken = token;
     var sqftEl = document.getElementById('sqft_' + itemId);
     var coatsEl = document.getElementById('coats_' + itemId);
     var resultEl = document.getElementById('areaResult_' + itemId);
@@ -1210,6 +1213,7 @@ async function recalcArea(itemId, coverage, localProductId, p) {
 
     if (localProductId) {
         var sibs = await fetchSiblingPacks(localProductId);
+        if (_recalcToken[itemId] !== myToken) return;
         if (sibs.length > 0) {
             var combo = calculatePackCombo(liters, sibs);
             _pendingAreaCombo[itemId] = combo;
