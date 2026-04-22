@@ -1233,6 +1233,340 @@ async function recalcArea(itemId, coverage, localProductId, p) {
 }
 
 // ════════════════════════════════════════
+// ADD TO ESTIMATE
+// ════════════════════════════════════════
+function addUnitToEstimate(p) {
+    var qtyEl = document.getElementById('qty_' + p.zoho_item_id);
+    var qty = qtyEl ? Math.max(1, parseInt(qtyEl.textContent) || 1) : 1;
+    pushEstimateItem({
+        zoho_item_id: p.zoho_item_id,
+        name: p.name,
+        brand: p.brand || '',
+        base_price: p.rate,
+        quantity: qty,
+        unit: p.unit || 'Nos'
+    });
+}
+
+function addAreaToEstimate(itemId) {
+    var combo = _pendingAreaCombo[itemId];
+    if (!combo || !combo.length) return;
+    combo.forEach(function(c) {
+        pushEstimateItem({
+            zoho_item_id: c.zoho_item_id,
+            name: c.name,
+            base_price: c.rate,
+            quantity: c.quantity,
+            unit: 'Nos'
+        });
+    });
+}
+
+function pushEstimateItem(item) {
+    var id = itemIdCounter++;
+    estimateItems.push({
+        id: id,
+        item_type: 'product',
+        zoho_item_id: item.zoho_item_id,
+        name: item.name,
+        brand: item.brand || '',
+        base_price: parseFloat(item.base_price) || 0,
+        quantity: item.quantity || 1,
+        unit: item.unit || 'Nos',
+        markup_type: '',
+        markup_value: '',
+        discount_type: '',
+        discount_value: ''
+    });
+    renderEstimateItems();
+    updateTotals();
+    if (window.innerWidth < 768) closeDrawer();
+}
+
+// ════════════════════════════════════════
+// PRICING CALCULATION
+// ════════════════════════════════════════
+function recalcItem(item) {
+    var bp = parseFloat(item.base_price) || 0;
+    var qty = parseFloat(item.quantity) || 1;
+    var markup = 0;
+    if (item.markup_type && parseFloat(item.markup_value) > 0) {
+        var mv = parseFloat(item.markup_value);
+        if (item.markup_type === 'price_pct') markup = bp * mv / 100;
+        else if (item.markup_type === 'price_value') markup = mv;
+    }
+    var afterMarkup = bp + markup;
+    var discount = 0;
+    if (item.discount_type && parseFloat(item.discount_value) > 0) {
+        var dv = parseFloat(item.discount_value);
+        if (item.discount_type === 'price_pct') discount = afterMarkup * dv / 100;
+        else if (item.discount_type === 'price_value') discount = dv;
+    }
+    item.final_price = roundUp10(afterMarkup - discount);
+    item.line_total = roundUp10(item.final_price * qty);
+}
+
+// ════════════════════════════════════════
+// ESTIMATE ITEMS RENDERING
+// ════════════════════════════════════════
+function renderEstimateItems() {
+    var container = document.getElementById('estimateItemsContainer');
+    var empty = document.getElementById('estimateEmpty');
+    if (!container) return;
+
+    container.querySelectorAll('.est-item-card').forEach(function(c) { c.remove(); });
+
+    if (!estimateItems.length) {
+        if (empty) empty.style.display = 'block';
+        return;
+    }
+    if (empty) empty.style.display = 'none';
+
+    var laborSection = container.querySelector('.panel-section.mt-3') || null;
+
+    estimateItems.forEach(function(item) {
+        recalcItem(item);
+
+        var card = document.createElement('div');
+        card.className = 'est-item-card';
+        card.id = 'eitm_' + item.id;
+
+        var header = document.createElement('div');
+        header.className = 'est-item-header';
+        header.addEventListener('click', function() { toggleItemCard(item.id); });
+
+        var headerLeft = document.createElement('div');
+        headerLeft.style.cssText = 'flex:1;min-width:0;';
+        var nameDiv = document.createElement('div');
+        nameDiv.style.cssText = 'font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        nameDiv.textContent = item.name;
+        var subDiv = document.createElement('div');
+        subDiv.style.cssText = 'font-size:11px;color:#6b7280;';
+        subDiv.textContent = item.quantity + ' ' + item.unit + ' · ' + fmt(item.base_price) + '/unit';
+        headerLeft.appendChild(nameDiv);
+        headerLeft.appendChild(subDiv);
+
+        var headerRight = document.createElement('div');
+        headerRight.style.cssText = 'text-align:right;flex-shrink:0;margin-left:8px;';
+        var totalDiv = document.createElement('div');
+        totalDiv.style.cssText = 'font-size:15px;font-weight:800;color:#1f2937;';
+        totalDiv.textContent = fmt(item.line_total);
+        var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.style.cssText = 'font-size:10px;color:#dc2626;background:none;border:none;cursor:pointer;padding:0;';
+        removeBtn.textContent = '✕ Remove';
+        removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            removeItem(item.id);
+        });
+        headerRight.appendChild(totalDiv);
+        headerRight.appendChild(removeBtn);
+
+        header.appendChild(headerLeft);
+        header.appendChild(headerRight);
+
+        var expand = document.createElement('div');
+        expand.className = 'est-item-expand';
+
+        // Markup row
+        var markupRow = document.createElement('div');
+        markupRow.className = 'md-row';
+        var markupLabel = document.createElement('span');
+        markupLabel.className = 'md-label';
+        markupLabel.style.color = '#7c3aed';
+        markupLabel.textContent = 'Markup';
+        var markupSel = document.createElement('select');
+        markupSel.className = 'md-select';
+        markupSel.innerHTML = '<option value="">None</option><option value="price_pct">%</option><option value="price_value">₹</option>';
+        markupSel.value = item.markup_type || '';
+        markupSel.addEventListener('change', function() { item.markup_type = this.value; });
+        var markupInput = document.createElement('input');
+        markupInput.type = 'number';
+        markupInput.className = 'md-input';
+        markupInput.min = '0';
+        markupInput.step = '0.01';
+        markupInput.value = item.markup_value || '';
+        markupInput.placeholder = '0';
+        markupInput.addEventListener('change', function() { item.markup_value = this.value; });
+        var markupApply = document.createElement('button');
+        markupApply.type = 'button';
+        markupApply.className = 'md-btn';
+        markupApply.style.cssText = 'background:#7c3aed;color:white;';
+        markupApply.textContent = 'Apply';
+        markupApply.addEventListener('click', function() { renderEstimateItems(); updateTotals(); });
+        markupRow.appendChild(markupLabel);
+        markupRow.appendChild(markupSel);
+        markupRow.appendChild(markupInput);
+        markupRow.appendChild(markupApply);
+
+        // Discount row
+        var discountRow = document.createElement('div');
+        discountRow.className = 'md-row';
+        var discountLabel = document.createElement('span');
+        discountLabel.className = 'md-label';
+        discountLabel.style.color = '#dc2626';
+        discountLabel.textContent = 'Discount';
+        var discountSel = document.createElement('select');
+        discountSel.className = 'md-select';
+        discountSel.innerHTML = '<option value="">None</option><option value="price_pct">%</option><option value="price_value">₹</option>';
+        discountSel.value = item.discount_type || '';
+        discountSel.addEventListener('change', function() { item.discount_type = this.value; });
+        var discountInput = document.createElement('input');
+        discountInput.type = 'number';
+        discountInput.className = 'md-input';
+        discountInput.min = '0';
+        discountInput.step = '0.01';
+        discountInput.value = item.discount_value || '';
+        discountInput.placeholder = '0';
+        discountInput.addEventListener('change', function() { item.discount_value = this.value; });
+        var discountApply = document.createElement('button');
+        discountApply.type = 'button';
+        discountApply.className = 'md-btn';
+        discountApply.style.cssText = 'background:#dc2626;color:white;';
+        discountApply.textContent = 'Apply';
+        discountApply.addEventListener('click', function() { renderEstimateItems(); updateTotals(); });
+        discountRow.appendChild(discountLabel);
+        discountRow.appendChild(discountSel);
+        discountRow.appendChild(discountInput);
+        discountRow.appendChild(discountApply);
+
+        var priceInfo = document.createElement('div');
+        priceInfo.style.cssText = 'font-size:12px;color:#374151;margin-top:4px;';
+        priceInfo.innerHTML = 'Final price: <strong>' + fmt(item.final_price) + '</strong>/unit · Total: <strong>' + fmt(item.line_total) + '</strong>';
+
+        expand.appendChild(markupRow);
+        expand.appendChild(discountRow);
+        expand.appendChild(priceInfo);
+
+        card.appendChild(header);
+        card.appendChild(expand);
+
+        container.insertBefore(card, laborSection);
+    });
+}
+
+function toggleItemCard(id) {
+    var card = document.getElementById('eitm_' + id);
+    if (card) card.classList.toggle('open');
+}
+
+function removeItem(id) {
+    estimateItems = estimateItems.filter(function(i) { return i.id !== id; });
+    renderEstimateItems();
+    updateTotals();
+}
+
+// ════════════════════════════════════════
+// OVERALL MARKUP / DISCOUNT
+// ════════════════════════════════════════
+function applyOverallMarkup() {
+    var type = document.getElementById('overallMarkupType').value;
+    var val  = document.getElementById('overallMarkupValue').value;
+    estimateItems.forEach(function(i) { i.markup_type = type; i.markup_value = val; });
+    renderEstimateItems();
+    updateTotals();
+}
+function clearOverallMarkup() {
+    document.getElementById('overallMarkupValue').value = '';
+    estimateItems.forEach(function(i) { i.markup_type = ''; i.markup_value = ''; });
+    renderEstimateItems();
+    updateTotals();
+}
+function applyOverallDiscount() {
+    var type = document.getElementById('overallDiscountType').value;
+    var val  = document.getElementById('overallDiscountValue').value;
+    estimateItems.forEach(function(i) { i.discount_type = type; i.discount_value = val; });
+    renderEstimateItems();
+    updateTotals();
+}
+function clearOverallDiscount() {
+    document.getElementById('overallDiscountValue').value = '';
+    estimateItems.forEach(function(i) { i.discount_type = ''; i.discount_value = ''; });
+    renderEstimateItems();
+    updateTotals();
+}
+
+// ════════════════════════════════════════
+// LABOR CHARGES
+// ════════════════════════════════════════
+function addLaborItem() {
+    var id = laborIdCounter++;
+    laborItems.push({ id: id, description: '', amount: 0 });
+    renderLaborItems();
+}
+
+function renderLaborItems() {
+    var container = document.getElementById('laborContainer');
+    var totalRow = document.getElementById('laborTotalRow');
+    if (!container) return;
+
+    container.innerHTML = '';
+    laborItems.forEach(function(l) {
+        var row = document.createElement('div');
+        row.id = 'labor_' + l.id;
+        row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px;';
+
+        var descInput = document.createElement('input');
+        descInput.type = 'text';
+        descInput.placeholder = 'Description (e.g. Wall Painting)';
+        descInput.value = l.description || '';
+        descInput.style.cssText = 'flex:1;padding:6px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:13px;';
+        descInput.addEventListener('change', function() { l.description = this.value; });
+
+        var amtInput = document.createElement('input');
+        amtInput.type = 'number';
+        amtInput.placeholder = '₹';
+        amtInput.value = l.amount || '';
+        amtInput.min = '0';
+        amtInput.step = '1';
+        amtInput.style.cssText = 'width:90px;padding:6px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:13px;';
+        amtInput.addEventListener('input', function() { l.amount = parseFloat(this.value) || 0; updateTotals(); });
+
+        var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.style.cssText = 'color:#dc2626;background:none;border:none;font-size:18px;cursor:pointer;line-height:1;';
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', function() { removeLabor(l.id); });
+
+        row.appendChild(descInput);
+        row.appendChild(amtInput);
+        row.appendChild(removeBtn);
+        container.appendChild(row);
+    });
+
+    if (totalRow) {
+        if (laborItems.length) totalRow.classList.remove('hidden');
+        else totalRow.classList.add('hidden');
+    }
+    updateTotals();
+}
+
+function removeLabor(id) {
+    laborItems = laborItems.filter(function(l) { return l.id !== id; });
+    renderLaborItems();
+}
+
+// ════════════════════════════════════════
+// TOTALS
+// ════════════════════════════════════════
+function updateTotals() {
+    estimateItems.forEach(recalcItem);
+    var itemsTotal = estimateItems.reduce(function(s, i) { return s + (i.line_total || 0); }, 0);
+    var laborTotal = laborItems.reduce(function(s, l) { return s + (parseFloat(l.amount) || 0); }, 0);
+    var grandTotal = itemsTotal + laborTotal;
+
+    var subtotalEl = document.getElementById('subtotalAmt');
+    var grandEl    = document.getElementById('grandTotalAmt');
+    var grandMobEl = document.getElementById('grandTotalAmtMobile');
+    var laborEl    = document.getElementById('laborTotalAmt');
+
+    if (subtotalEl) subtotalEl.textContent = fmt(itemsTotal);
+    if (grandEl)    grandEl.textContent    = fmt(grandTotal);
+    if (grandMobEl) grandMobEl.textContent = fmt(grandTotal);
+    if (laborEl)    laborEl.textContent    = fmt(laborTotal);
+}
+
+// ════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async function() {
