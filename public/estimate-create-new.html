@@ -707,37 +707,46 @@ function initCustomerSearch(inputId, dropdownId, cardId) {
         }, 300);
     });
 
-    document.addEventListener('click', (e) => {
-        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-            dropdown.style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+    ['customerDropdownPanel', 'customerDropdownPanelMobile'].forEach(function(ddId) {
+        const dd = document.getElementById(ddId);
+        if (!dd) return;
+        const inputId = ddId === 'customerDropdownPanel' ? 'customerSearchInput' : 'customerSearchInputMobile';
+        const inp = document.getElementById(inputId);
+        if (inp && !inp.contains(e.target) && !dd.contains(e.target)) {
+            dd.style.display = 'none';
         }
     });
-}
+});
 
 function showCustomerResults(results, dropdown, input, card, isRecent) {
     if (!results.length) { dropdown.style.display = 'none'; return; }
-    dropdown.innerHTML = results.map(c => {
+    dropdown.innerHTML = '';
+    if (isRecent) {
+        const hdr = document.createElement('div');
+        hdr.style.cssText = 'font-size:10px;color:#9ca3af;padding:6px 14px;font-weight:600;';
+        hdr.textContent = 'RECENT';
+        dropdown.appendChild(hdr);
+    }
+    results.forEach(function(c) {
         const badgeClass = c.source === 'zoho' ? 'badge-zoho' : c.source === 'both' ? 'badge-both' : 'badge-local';
         const badgeLabel = c.source === 'zoho' ? 'Zoho' : c.source === 'both' ? 'Both' : 'Local';
-        const cJson = esc(JSON.stringify(c));
-        return '<div class="customer-item" onclick="selectCustomerFromJson(\'' + cJson + '\',\'' + input.id + '\',\'' + dropdown.id + '\',\'' + card.id + '\')">'
-            + '<div>'
+        const item = document.createElement('div');
+        item.className = 'customer-item';
+        item.dataset.customer = JSON.stringify(c);
+        item.innerHTML = '<div>'
             + '<div style="font-size:13px;font-weight:700;">' + esc(c.name) + '</div>'
             + '<div style="font-size:11px;color:#6b7280;">' + esc(c.phone) + '</div>'
             + '</div>'
-            + '<span class="source-badge ' + badgeClass + '">' + badgeLabel + '</span>'
-            + '</div>';
-    }).join('');
-    if (isRecent) {
-        dropdown.insertAdjacentHTML('afterbegin',
-            '<div style="font-size:10px;color:#9ca3af;padding:6px 14px;font-weight:600;">RECENT</div>');
-    }
+            + '<span class="source-badge ' + badgeClass + '">' + badgeLabel + '</span>';
+        item.addEventListener('click', function() {
+            selectCustomer(c, input.id, dropdown.id, card.id);
+        });
+        dropdown.appendChild(item);
+    });
     dropdown.style.display = 'block';
-}
-
-function selectCustomerFromJson(escapedJson, inputId, dropdownId, cardId) {
-    const c = JSON.parse(escapedJson.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"'));
-    selectCustomer(c, inputId, dropdownId, cardId);
 }
 
 function selectCustomer(c, inputId, dropdownId, cardId) {
@@ -807,7 +816,7 @@ async function createCustomer(e) {
 document.addEventListener('DOMContentLoaded', async function() {
     initCustomerSearch('customerSearchInput', 'customerDropdownPanel', 'customerCard');
     initCustomerSearch('customerSearchInputMobile', 'customerDropdownPanelMobile', 'customerCardMobile');
-    await loadFilterOptions();
+    try { await loadFilterOptions(); } catch(e) { console.warn('loadFilterOptions:', e); }
     initProductSearch('productSearchInput', 'productList', 'brandChips', 'categoryChips');
     initProductSearch('productSearchInputMobile', 'productListMobile', 'brandChipsMobile', 'categoryChipsMobile');
 });
