@@ -3205,5 +3205,237 @@ Default grants: manager gets all 4, staff gets view/contact/convert. Run `node m
 ### Zoho Price-Adjust, Sidebar Accordion, Login-After-Logout fix (Apr 14, 2026)
 - **Zoho Price-Adjust**: `% Adjust` on `admin-zoho-items-edit.html` now supports source→target dropdowns (default DPL→Rate, formula `source × (1 + pct/100)`); admin sidebar converted to click-to-expand accordion with full subnav parity (Zoho/WhatsApp/Painters/System sections now list every page from their horizontal subnav); `auth-helper.js` added proactive `validateSession()` against `/api/auth/me` so stale sessions no longer leave the user on a non-functional dashboard — expired sessions redirect to `/login.html?reason=expired` with a toast. Files: `public/admin-zoho-items-edit.html`, `public/components/sidebar-complete.html`, `public/universal-nav-loader.js`, `public/js/auth-helper.js`, `public/login.html`. Spec: `docs/superpowers/specs/2026-04-14-zoho-bugs-sidebar-auth-design.md`.
 
+### Painter Native Android App v3.0.0 → v3.1.0 (Apr 17–18, 2026) — Cart + Customer Estimate + PDF
+
+**v3.0.0 data-layer completion** (Apr 17-18, branch `audit/2026-04-17`):
+- 261 compile errors → 0. `./gradlew clean :app:assemblePainterRelease` → BUILD SUCCESSFUL (8m 21s), 8.68 MB.
+- DTOs added: `BalanceData`, `ProductDetail`, `ProductVariant`, `ProductOffer`, `OfferProduct`, `ProductDetailResponse`, `OfferProductsResponse`, `CheckinDay`, `SubmitWithdrawalRequest`.
+- API methods: `getProductDetail`, `getOfferProducts`, `getCheckinHistory`, `submitWithdrawal`, `clearWithdrawalMessages`.
+- `CatalogViewModel`: full rewrite with filters, pagination, product-detail sheet, `activeFilterCount`.
+- `HomeViewModel`: injected `catalogApi + workApi`, loads offer products + recent estimates; setter-style toggle methods.
+- `Routes.kt`: restored `Notifications`, `Cards`, `Visualizations` routes; added `CustomerEstimate`, `EstimatePdfPreview`.
+- `DashboardData.referralCode` field added; `coreLibraryDesugaring` enabled for `java.time` on minSdk 24.
+- 9 new API `@Provides` in `AppModule.kt`.
+
+**v3.1.0 feature additions** (Apr 18, 7 APK builds):
+- **Multi-product Cart** (`CartStore.kt`): `@Singleton`, DataStore JSON persistence (Gson), `CartItem` DTO (productId/packSizeId/name/brand/size/unit/imageUrl/rate/mrp/regularPoints/annualPoints/qty). Methods: add/updateQty/remove/clear. `CatalogScreen`: Gold ExtendedFAB with badge (bottom=88dp), `CartBottomSheet` + `CartRow`, snackbar at bottom=160dp (above FAB). "+" on product variant → add to cart.
+- **Customer Estimate two-path flow** (`CustomerEstimateScreen.kt` + `CustomerEstimateViewModel.kt`):
+  - Tab 1 "Ask Quality Colours" (default) — submit to admin with no markup (admin sets later).
+  - Tab 2 "I'll Price It" — markup slider 0→MRP-cap per item, labour_charge field, always hide_qc_branding=true. Amber ⚠ warning when MRP not set.
+  - Success: AlertDialog with "Open" (→EstimateDetail) + "Done" (pop to Catalog).
+  - `CustomerPricingMode.ASK_QC / PRICE_MYSELF` enum.
+- **`saved_direct` workflow**: New status on `painter_estimates`. Painter creates private estimate → shares PDF with customer → taps "Submit to Quality Colours" (gold button on EstimateDetail). `showSubmitDialog` AlertDialog: Customer billing | Self billing radio → `POST /me/estimates/:id/submit-to-admin` → `pending_admin`. Migration: `migrate-painter-saved-direct.js` (adds `saved_direct` to status enum).
+- **Admin "Approve Base Only"** (`admin-painters.html`): `approveAsSelf(estId)` fn + button on `pending_admin`/`admin_review` customer estimates. `POST /estimates/:id/approve-as-self` strips markup, sets billing_type='self', status='approved' → annual points only.
+- **In-app PDF preview** (`PdfPreviewScreen.kt`): `PdfPreviewViewModel` downloads PDF → `PdfRenderer` → list of Bitmaps (2× DPI). `LazyColumn` of `Image`. Share icon in PainterTopBar. Route: `Routes.EstimatePdfPreview`.
+- **Share + Save PDF** (`EstimateDetailScreen.kt`): PDF row has Preview / Share / Save buttons. `sharePdf()` in VM: downloads to `cacheDir/shared/`, FileProvider URI, `ACTION_SEND` chooser. `inline` param on backend for in-app preview.
+- **NotoSans ₹ fix**: `public/fonts/NotoSans-Regular.ttf` + `NotoSans-Bold.ttf` (550KB each). `painter-estimate-pdf-generator.js` registers as 'Body'/'Body-Bold', uses throughout. `hasNoto` guard for missing-font safety.
+- **PDF hide_qc_branding**: When `hide_qc_branding=1`, PDF shows painter name/phone/city as header; suppresses QC logo, footer, company details. Labour charge line in summary.
+- **MRP in catalog/estimates**: Backend `GET /me/catalog` + `/me/estimates/products` return `CAST(zim.zoho_label_rate AS DECIMAL) AS mrp`. `PackSize.mrp` added to DTO. Catalog shows "MRP ₹X" badge. Markup slider capped at `(mrp - rate) / rate * 100`.
+- **Admin MRP column** (`admin-zoho-items-edit.html`): `label_rate` column (key='label_rate', zohoField='label_rate', visible=true). `routes/zoho.js` FIELD_MAP: `label_rate: 'zoho_label_rate'`.
+- **AppLink referral share**: `assetlinks.json` at `public/.well-known/` with both `com.qcpaintshop.painter` + `com.qcpaintshop.act` SHA256. `AndroidManifest.xml`: `autoVerify=true` intent-filter for `https://act.qcpaintshop.com/r/*`. Share text uses `https://act.qcpaintshop.com/r/{code}`. `server.js` GET `/r/:code` → redirect to `/painter-register.html?ref={code}`.
+- **Hero offer carousel** on Home: Reordered to Hero → Quick Actions → **Offer Carousel** → Stats. `OfferProductCard` 220dp hero, 150dp image panel, "Your price" 20sp green, ⭐ points pill.
+- **Shared PainterTopBar** (`PainterTopBar.kt`): Gradient TopAppBar (`QCGreenLight→QCGreen→QCGreenDarkest`) + 2dp QCGold accent. Used across all 20 sub-screens.
+- **Black ActionBar fix**: `android:theme="@style/Theme.QCManager"` on PainterMainActivity (was inheriting Splash theme without `installSplashScreen()`).
+- **Offer carousel date fix**: Changed `end_date >= NOW()` → `DATE(end_date) >= DATE(?)` so whole-day dates don't expire at midnight.
+- **Empty items fix**: `EstimateDetailResponse` now includes top-level `items: List<EstimateDetailItem>?`; VM merges into `estimate.items`.
+- **Camera crash fix** (`EditProfileScreen.kt`): `cameraPermissionLauncher.launch(CAMERA)` before TakePicture on Android 6+.
+- **Profile photo fix**: `ProfileUpdateResponse.photoUrl` field; VM saves to `UserPreferences` immediately after save.
+- **Backend migrations**: `migrate-painter-cart-markup.js` (adds `hide_qc_branding`, `labour_charge`, `pricing_mode` to `painter_estimates`), `migrate-painter-saved-direct.js`.
+- **`pdf-parse`** moved from devDependencies → dependencies (was causing MODULE_NOT_FOUND 502 on prod after `npm install --omit=dev`).
+- **nginx vhost note**: Actual nginx binary is `/www/server/nginx/sbin/nginx -c /www/server/nginx/conf/nginx.conf`. Config at `/www/server/nginx/conf/vhost/act.qcpaintshop.com.conf` (NOT the aaPanel path `/www/server/panel/vhost/nginx/`).
+- **Deployment**: All backend changes pushed and live at commit `8cb7524`. versionCode still 12, versionName 3.1.0 — Play Store upload pending smoke test.
+
+### Painter Attendance AP System (Apr 20, 2026)
+
+Full selfie-checkin + Annual Points earning system for painters. Deployed on master.
+
+**4 new DB tables** (`migrations/migrate-painter-attendance.js`):
+- `painter_attendance_checkins`: `painter_id, branch_id, checkin_date, checkin_at, selfie_url, lat, lng, status ENUM('pending','approved','rejected'), ap_awarded`. UNIQUE `(painter_id, checkin_date)`.
+- `painter_attendance_monthly`: `painter_id, month_key, total_checkins, customer_billed_total, claim_pct, claimable_ap, ap_claimed, claim_status ENUM('pending','available','claimed','forfeited'), claim_window_opens_at, claim_window_closes_at, claimed_at`.
+- `painter_attendance_ledger`: `painter_id, checkin_id, type ENUM('earn','claim','clawback','forfeit'), ap_delta`.
+- `painter_attendance_clawback_pending`: holds pending clawbacks when AP balance insufficient.
+
+**Service** (`services/painter-attendance-service.js`):
+- `findNearbyBranches(lat, lng)` — haversine sort, returns branches within radius (default 1km, configurable). Branches with NULL GPS logged but skipped.
+- `recordCheckin(painterId, branchId, selfieUrl, lat, lng)` — transactional: INSERT checkin, award `attendance_ap_per_checkin` AP to annual ledger, upsert monthly row. Duplicate guard via UNIQUE key.
+- `claimMonth(painterId, monthKey)` — moves `claimable_ap` → actual annual points. Sets `claim_status='claimed'`.
+- `openMonthlyClaim(monthKey)` — runs 1st of month 00:05 IST: computes `claim_pct` from customer bills, sets `claim_status='available'`, 7-day window, notifies painters.
+- `recomputeClaimable(monthKey)` — runs every 6h on days 1-7: refreshes claimable AP if new customer bills arrive.
+- `claimPct` formula: based on `customer_billed_total` tier thresholds in `ai_config` (`attendance_claim_pct_*` keys).
+
+**Crons** (`services/painter-scheduler.js`):
+- `0 5 0 1 * *` IST (00:05 on 1st): `openMonthlyClaim(prevMonth)`
+- `0 0 */6 1-7 * *` IST (every 6h, days 1-7): `recomputeClaimable(currentMonth)`
+
+**Routes** (`routes/painters.js`):
+- `GET /me/attendance/nearby-branches?lat=&lng=` — painter auth, returns sorted nearby branches with distance.
+- `POST /me/attendance/checkin` — painter auth, multipart (selfie image), lat/lng body. Calls `recordCheckin()`.
+- `GET /me/attendance/month?month=YYYY-MM` — painter auth, returns monthly summary + claimable AP.
+- `GET /me/attendance/history` — painter auth, paginated checkin history.
+- `POST /me/attendance/claim` — painter auth, calls `claimMonth()`.
+- `GET /attendance` (admin) — today's checkins with branch/date filter, reject action.
+- `GET /attendance/monthly` (admin) — monthly summary across all painters, AP earned, claim status.
+- `GET /attendance/:painterId/calendar` (admin) — monthly calendar for one painter.
+- `POST /attendance/:checkInId/reject` (admin) — reject + clawback AP with message.
+- `GET /attendance/nearby-branches?lat=&lng=&radius=` (admin, larger radius).
+
+**Admin UI** (`public/admin-painters.html` — Attendance tab):
+- Sub-tab "Today": date+branch filter, table of checkins with selfie thumbnail, approve/reject.
+- Sub-tab "Monthly Summary": AP earned per painter, claim%, claimed status.
+
+**Painter dashboard** (`public/painter-dashboard.html`):
+- AP hero card: this-month check-ins, AP earned, claim preview %. When `claim_status='available'` → Claim button → `POST /api/me/attendance/claim`.
+
+**Android** (`qcpaintshop-android`, painter flavor — `ui/attendance/`):
+- `CheckInScreen.kt`: CameraX selfie capture (front camera) + GPS branch detection. Multipart upload.
+- `AttendanceHistoryScreen.kt`: current-month card (check-ins, AP, Claim button), scrollable history rows.
+- `AttendanceViewModel.kt`: Hilt-injected, loads month summary + history via `AttendanceApi`.
+- `HomeScreen.kt` HeroCard: AP row with claim/checkin CTA. `HomeViewModel` extended.
+- `AttendanceApi.kt`: 5 new endpoints (nearby, checkin, month, history, claim), `CheckinRequest`, `MonthSummary`, `CheckinRecord` DTOs.
+- Route: `Routes.AttendanceHistory` → `AppNavigation`.
+
+**Config keys** (`ai_config`):
+- `attendance_ap_per_checkin`: AP earned per day (e.g. 100)
+- `attendance_checkin_radius_km`: GPS tolerance (default 1.0)
+- `attendance_claim_pct_tier1_bills`, `_pct1`, `_tier2_bills`, `_pct2` etc.
+- `attendance_claim_window_days`: window length (default 7)
+
+**Tests**: `tests/integration/painter-attendance-flow.test.js` — full checkin pipeline, duplicate guard, temp painter + afterAll cleanup.
+
+**Key gotchas**:
+- `DATE_FORMAT` generated column dropped for MariaDB compat — use `DATE(checkin_at)` instead.
+- `branches` table must have `lat`/`lng` columns set for nearby detection; NULL GPS branches are skipped.
+- `painter-attendance-service.setPool(p)` called in `painter-scheduler.setPool()` so pool is shared.
+- Selfie upload uses `uploadProfile` multer config (already has memory storage).
+
+---
+
+### Admin Products UX — Mobile + Assign-to-Existing (Apr 21, 2026)
+
+Two improvements to `public/admin-products.html`.
+
+**1. Inline Assign to Existing Product** (from Zoho Import tab):
+- New endpoint: `POST /api/products/assign-zoho-item` in `server.js`. Creates `pack_sizes` row + zoho mapping atomically. Validates product exists (active), zoho_item_id not already mapped. Accepts `product_id, zoho_item_id, size, unit, price` (+ `color_name, color_code` from B1 extension).
+- JS utilities: `openAssignDropdown(zohoItemId, itemName, size, unit, price, anchorEl)` — floating div with product search input. `debounceAssignSearch` → `doAssignSearch` (hits `GET /api/products?search=&limit=8&status=active`). `confirmAssignZohoItem` — confirms + calls endpoint + refreshes view.
+- `openGroupAssignDropdown(groupItems, anchorEl)` — assigns all unmapped items in a group at once.
+- `extractSizeFromName(name)` / `extractUnitFromName(name)` — regex extracts `\d+\s*(L|KG|...)` from Zoho item names.
+- Both flat view and grouped view show "Assign ▾" button on unmapped items.
+- `escJS()` helper added — escapes single-quotes in JS onclick/oninput inline strings to prevent injection.
+
+**2. Mobile-responsive layouts**:
+- **Products tab**: `@media (max-width:767px)` hides `.products-table-wrap`, shows `.products-mobile-list` (card per product). Filter bottom drawer (`#filterDrawer`). Active filter chips. Mobile search + Filter ▾ + + Add buttons.
+- **Zoho Import tab**: Hides `.zoho-table-wrap`, shows `.zoho-mobile-list`. Accordion grouped cards (yellow=unmapped, green=mapped). Collapse/expand per group. Mobile filter drawer (`#zohoFilterDrawer`). `toggleMobileGroup(gi)` + `selectAndImportGroup(ids)`.
+
+---
+
+### Color Variants B1 — Web (Apr 21, 2026)
+
+Adds color/shade support to the product catalog.
+
+**DB**: `migrations/migrate-pack-sizes-color.js` — adds `color_name VARCHAR(100) NULL` + `color_code VARCHAR(20) NULL` to `pack_sizes`.
+
+**Service** (`services/color-extractor.js`): `extractColor(itemName)` → `{colorName, colorCode}` or null. 30+ color entries in `COLOR_MAP`. Multi-word colors (e.g. "Off White", "Sky Blue") matched before single-word via length-sorted key iteration. Regex: `(?:^|\s)colorKey(?:\s|$)` case-insensitive. Tests: `tests/unit/color-extractor.test.js` (10 tests).
+
+**Backend**: `assign-zoho-item` endpoint extended to accept `color_name`, `color_code`. `PUT /api/products/:id` pack_size INSERT includes color columns. Both validate: `color_code` must match `/^#[0-9A-Fa-f]{3,8}$/`.
+
+**Admin UI** (`public/admin-products.html`):
+- Product edit modal: each pack size row shows color text input + `<input type="color">` circle picker + preview dot.
+- Zoho Import assign flow: client-side `CLIENT_COLOR_MAP` + `extractColorFromItemName()` pre-fills color when item name contains a known color word. Confirm dialog includes color name: `"Add 1L White @ ₹280 to 'Product'"`.
+- `doAssignSearch()` and `confirmAssignZohoItem()` signatures extended with `colorName`, `colorCode` params.
+
+---
+
+### Color Variants B2 — Android (Apr 21, 2026)
+
+Surfaces color data in the Android painter app.
+
+**Backend** (`routes/painters.js`): Both catalog list (`GET /me/catalog`) and product detail (`GET /me/products/:id`) now include `color_name` + `color_code` per pack size in response.
+
+**Android data models**:
+- `PackSize.colorName / colorCode` (`@SerializedName` mapped) — nullable String with default null.
+- `ProductVariant.colorName / colorCode` — same.
+- `CartItem.colorName / colorCode` — added to cart persistence model.
+
+**CatalogScreen** (`ui/catalog/CatalogScreen.kt`):
+- `parseColorSafe(hex)` — `runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(Color.LightGray)`.
+- `ProductFamilyCard`: `distinctColors` list from `allVariants`. `selectedColorName` state (persisted in ViewModel via `setProductColor()`). `variants` filtered by selected color. Color swatch strip: row of 18dp circles, up to 5 + overflow count. Tap swatch → filter variants.
+- Color state persisted in `CatalogViewModel` (`selectedColors: Map<Int, String>`) so it survives scroll-off-screen recomposition.
+- `CartRow` subtitle: color dot (10dp circle) + `"ColorName · 1L"` format when color present.
+
+**ProductDetailSheet** (`ui/catalog/ProductDetailSheet.kt`):
+- `parseColorSafe` added.
+- Color filter `LazyRow` inserted above variants table: "All" pill + one chip per color. `selectedColor` state. Filters variants list. Chip style: `Surface` with `QCGreenContainer` background when selected.
+
+**EstimateCreateScreen** (`ui/work/estimates/EstimateCreateScreen.kt`):
+- `CartItemRow` subtitle: color dot (10dp, `CircleShape`) + `"ColorName · 1L"` when `colorCode` / `colorName` present.
+
+**CatalogViewModel**: `addToCart()` passes `colorName = packSize.colorName, colorCode = packSize.colorCode` to `CartItem`.
+
+---
+
+### Android Location Tracking — Painter Mode (Apr 21–22, 2026)
+
+Extends `GeofenceLocationService` in the painter flavor to report painter GPS to the server.
+
+**Changes** (`qcpaintshop-android`, painter flavor):
+- `GeofenceLocationService`: When running as painter (detected via `APP_TYPE` or painter token presence), uses `X-Painter-Token` header and posts to `POST /api/painters/me/location-report` instead of the staff endpoint. Skips geofence enforcement (no clockout logic for painters — location only).
+- `AuthViewModel` / login flow: `startGeofenceLocationService()` called on painter OTP verify. `stopGeofenceLocationService()` on logout.
+- Service handles both staff auth (Bearer token) and painter auth (X-Painter-Token) via `APP_TYPE` check.
+
+---
+
+### Admin Painters UI/UX Redesign (Apr 21, 2026)
+
+Complete overhaul of `public/admin-painters.html` from 10 flat tabs to a 2-level group+subtab nav.
+
+**Nav architecture**: 4 group pills (People, Finance, Catalog & Comms, Location) each with 2-4 sub-tabs. `switchGroup(group)` shows/hides group pill bar and activates first tab. `switchTab(tabId)` is ID-based (no positional indexing). URL hash stores `?tab=<tabId>` for 14 tab IDs.
+
+**Mobile-first changes per group**:
+- **People → Painters tab**: Hybrid layout — mobile cards (flex, avatar initials, name/city/level badge, status chip, action button) below 768px; desktop keeps existing table. `renderPaintersMobile()` toggled by `window.innerWidth`.
+- **Finance group**: Withdrawal tab → mobile cards with amount, status badge, request date, "View" action. Summary strip: pending count + pending amount. Sort label corrected to "Sort ▾".
+- **Finance → Billing tab**: Responsive table with hidden columns on mobile (`data-mobile-hide` CSS).
+- **Finance → Estimates tab**: Mobile cards — painter name, amount, status chip, date. Desktop table unchanged.
+- **Catalog → Catalog tab**: Responsive table, horizontal scroll on mobile.
+- **Catalog → Comms tab**: Responsive table, horizontal scroll on mobile.
+- **Catalog → Offers tab**: Float-action-button (`+` FAB bottom-right) visible ONLY when offers tab is active (`tabChanged` hook shows/hides it). `#offers-fab` CSS class. Pool filter TODO noted in comment (painter_leads has no branch_id).
+- **Location → Attendance tab**: Attendance summary strip (total clockins today, avg hours). Leaflet fleet map + route replay (see Location Tracking section below).
+
+**Key learnings**:
+- `switchTab()` refactored to ID-based lookup (`document.getElementById(tabId + '-tab')`) — old positional index approach broke when tab order changed.
+- Finance badge count (`loadWithdrawals`) fixed — was referencing wrong element ID after rename.
+- Offers FAB visibility: use a `tabChanged` custom event or inline show/hide in `switchTab` based on `tabId === 'offers'`.
+
+---
+
+### Painter Live Location Tracking (Apr 21–22, 2026)
+
+Full location pipeline: painter app → backend → admin fleet map.
+
+**DB**: `migrations/migrate-painter-location.js` — `painter_location_events` table: `id, painter_id (FK painters), lat DECIMAL(10,8), lng DECIMAL(11,8), accuracy FLOAT, recorded_at DATETIME, created_at DATETIME`. Index on `(painter_id, recorded_at)`. Nightly cron deletes rows older than 30 days.
+
+**Backend** (`routes/painters.js`):
+- `POST /me/location-report` — painter auth, 25s per-painter rate-limit (prevents GPS spam), validates lat/lng/accuracy, inserts `painter_location_events`, emits `painter:location` on Socket.io `admin-location` room. Body: `{ lat, lng, accuracy }`.
+- `GET /locations/live` — admin auth (`painters.view`), returns all painters with their latest location event in the last 2 minutes (online) or last known (offline). Response: `{ online: [...], offline: [...] }`. Each entry: `id, full_name, lat, lng, accuracy, recorded_at, status`.
+- `GET /:id/locations/history` — admin auth, query params `date` (IST date string, defaults today), returns time-ordered events for route replay. Includes `totalRouteMeters` (sum of haversine distances between consecutive points).
+
+**Socket.io**: Server joins socket to `admin-location` room on `join-admin-location` event (requires valid session token check). Painter location pushes go to `admin-location` room via `io.to('admin-location').emit('painter:location', { painterId, lat, lng, accuracy, recorded_at })`.
+
+**Nightly cron** (`services/painter-scheduler.js`): `0 2 * * *` IST — `DELETE FROM painter_location_events WHERE recorded_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`.
+
+**Unit tests** (`tests/unit/painter-location.test.js`): 7 tests covering IST date helper (today/custom/format) + haversine `totalRouteMeters` (zero points, one point, two points, multi-point, null coords).
+
+**Admin UI** (`public/admin-painters.html` — Location → Attendance tab):
+- **Fleet map** (Leaflet.js CDN, `leaflet@1.9.4`): Shows all painters on map. Online painters = green marker (circle), offline = grey. Popup: name, status (XSS-escaped with `escH()`), last seen time. Auto-refresh every 30s. `initFleetMap()` / `refreshFleetMap()`.
+- **Route replay**: Date picker + painter selector dropdown (populated from `/locations/live`). "Load Route" fetches `/locations/history?date=YYYY-MM-DD`, draws polyline on map, shows distance. `loadRouteReplay()`.
+- Map div: `id="fleet-map"`, fixed height 400px, initialized lazily on tab show.
+
+**Key learnings**:
+- XSS escape `loc.status` in fleet map popup — status comes from DB but must be escaped. `escH(loc.status)` not `loc.status` directly.
+- Leaflet needs explicit height on container div, and `map.invalidateSize()` after tab becomes visible (map renders 0px otherwise).
+- Socket.io `join-admin-location` event: authenticate via session token before joining room to prevent unauthorized fleet tracking.
+- Rate-limiting painter location reports: use per-painter key (`painter:loc:<painterId>`) in the rate limiter store, not global IP — painters share IPs on mobile networks.
+
+---
+
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-04-14 | Version: 3.3.9 (Staff/Customer), 2.1.0 (Painter) | Maintained by: Development Team*
+*Last Updated: 2026-04-22 | Version: 3.3.9 (Staff/Customer), 3.1.1 (Painter versionCode 13) | Maintained by: Development Team*
