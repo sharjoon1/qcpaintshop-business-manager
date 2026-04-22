@@ -811,6 +811,162 @@ async function createCustomer(e) {
 }
 
 // ════════════════════════════════════════
+// FILTER OPTIONS + CHIPS
+// ════════════════════════════════════════
+async function loadFilterOptions() {
+    try {
+        const res = await apiRequest('/api/estimates/filter-options');
+        filterOptions = await res.json();
+        renderChips('brandChips', filterOptions.brands, 'brand');
+        renderChips('categoryChips', filterOptions.categories, 'category');
+        renderChips('brandChipsMobile', filterOptions.brands, 'brand');
+        renderChips('categoryChipsMobile', filterOptions.categories, 'category');
+    } catch(e) { console.error('loadFilterOptions', e); }
+}
+
+function renderChips(containerId, items, filterKey) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = '';
+    items.forEach(function(item) {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.dataset.key = filterKey;
+        chip.dataset.val = item;
+        chip.textContent = item;
+        chip.addEventListener('click', function() { toggleChip(chip, filterKey, item); });
+        el.appendChild(chip);
+    });
+}
+
+function toggleChip(el, key, val) {
+    var isMobile = el.closest('#productDrawer') !== null;
+    var isActive = el.classList.contains('active');
+
+    el.closest('.filter-chips').querySelectorAll('.chip').forEach(function(c) { c.classList.remove('active'); });
+
+    if (!isActive) {
+        el.classList.add('active');
+        activeFilters[key] = val;
+    } else {
+        activeFilters[key] = '';
+    }
+
+    var otherContainerId = isMobile
+        ? (key === 'brand' ? 'brandChips' : 'categoryChips')
+        : (key === 'brand' ? 'brandChipsMobile' : 'categoryChipsMobile');
+    document.querySelectorAll('#' + otherContainerId + ' .chip').forEach(function(c) {
+        c.classList.toggle('active', c.dataset.val === activeFilters[key]);
+    });
+
+    triggerProductSearch();
+}
+
+// ════════════════════════════════════════
+// PRODUCT SEARCH
+// ════════════════════════════════════════
+function initProductSearch(inputId, listId, brandChipsId, categoryChipsId) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener('input', function() {
+        clearTimeout(_productSearchTimer);
+        _productSearchTimer = setTimeout(triggerProductSearch, 400);
+    });
+}
+
+async function triggerProductSearch() {
+    var desktopInput = document.getElementById('productSearchInput');
+    var mobileInput  = document.getElementById('productSearchInputMobile');
+    var activeInput  = document.activeElement;
+    var q = '';
+    if (activeInput === desktopInput && desktopInput) q = desktopInput.value;
+    else if (activeInput === mobileInput && mobileInput) q = mobileInput.value;
+    else if (desktopInput) q = desktopInput.value;
+
+    if (desktopInput && document.activeElement !== desktopInput) desktopInput.value = q;
+    if (mobileInput  && document.activeElement !== mobileInput)  mobileInput.value  = q;
+
+    var empty = '<div class="text-center text-gray-400 text-sm py-6">Type to search products...</div>';
+    if (!q && !activeFilters.brand && !activeFilters.category) {
+        var pl = document.getElementById('productList');
+        var plm = document.getElementById('productListMobile');
+        if (pl) pl.innerHTML = empty;
+        if (plm) plm.innerHTML = empty;
+        return;
+    }
+
+    var params = new URLSearchParams({ q: q });
+    if (activeFilters.brand) params.set('brand', activeFilters.brand);
+    if (activeFilters.category) params.set('category', activeFilters.category);
+
+    try {
+        var res = await apiRequest('/api/estimates/search-products?' + params.toString());
+        var products = await res.json();
+        renderProductList(products, 'productList');
+        renderProductList(products, 'productListMobile');
+    } catch(e) { console.error('product search', e); }
+}
+
+// ════════════════════════════════════════
+// PRODUCT LIST RENDERING
+// ════════════════════════════════════════
+function renderProductList(products, containerId) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = '';
+    if (!products.length) {
+        el.innerHTML = '<div class="text-center text-gray-400 text-sm py-6">No products found</div>';
+        return;
+    }
+    products.forEach(function(p) {
+        el.appendChild(buildProductRowEl(p));
+    });
+}
+
+function buildProductRowEl(p) {
+    var stockClass = p.stock_on_hand > 0 ? 'stock-in' : 'stock-out';
+    var stockLabel = p.stock_on_hand > 0 ? 'Stock: ' + p.stock_on_hand : 'Out of stock';
+    var rowId = 'pr_' + p.zoho_item_id.replace(/[^a-z0-9]/gi, '_');
+
+    var row = document.createElement('div');
+    row.className = 'product-row';
+    row.id = rowId;
+
+    var header = document.createElement('div');
+    header.className = 'product-row-header';
+    header.innerHTML = '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.name) + '</div>'
+        + '<div style="font-size:11px;color:#6b7280;">' + esc(p.brand) + (p.category ? ' · ' + esc(p.category) : '') + ' · ' + fmt(p.rate) + '</div>'
+        + '</div>'
+        + '<span class="stock-badge ' + stockClass + ' ml-2">' + esc(stockLabel) + '</span>';
+
+    var expand = document.createElement('div');
+    expand.className = 'product-row-expand';
+    expand.id = rowId + '_expand';
+    expand.dataset.rate = p.rate;
+
+    row.appendChild(header);
+    row.appendChild(expand);
+
+    row.addEventListener('click', function() {
+        toggleProductRow(row, expand, p);
+    });
+
+    return row;
+}
+
+function toggleProductRow(row, expand, p) {
+    var isOpen = row.classList.contains('expanded');
+    document.querySelectorAll('.product-row.expanded').forEach(function(r) {
+        r.classList.remove('expanded');
+    });
+    if (!isOpen) {
+        row.classList.add('expanded');
+        renderProductExpand(expand, p);
+    }
+}
+
+// ════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async function() {
