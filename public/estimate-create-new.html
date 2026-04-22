@@ -499,6 +499,9 @@
                 </div>
             </div>
 
+            <!-- Edit mode banner -->
+            <div id="editBanner" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:13px;font-weight:700;color:#92400e;"></div>
+
             <!-- Overall markup/discount strip -->
             <div class="markup-strip">
                 <div class="flex items-center gap-2 flex-wrap mb-2">
@@ -661,6 +664,11 @@ let _customerSearchTimer = null;
 let _productSearchTimer = null;
 
 const RECENT_CUSTOMERS_KEY = 'est_recent_customers';
+
+// Edit mode state
+let isEditMode = false;
+let editEstimateId = null;
+let editEstimateNumber = null;
 
 // ════════════════════════════════════════
 // HELPERS
@@ -1835,26 +1843,32 @@ async function saveEstimate() {
     if (saveBtnMobile) { saveBtnMobile.disabled = true; saveBtnMobile.textContent = 'Saving...'; }
 
     try {
-        var res = await apiRequest('/api/estimates', {
-            method: 'POST',
+        var method = isEditMode ? 'PUT' : 'POST';
+        var url = isEditMode ? '/api/estimates/' + editEstimateId : '/api/estimates';
+        var res = await apiRequest(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Save failed');
-        showSaveSuccess(data.id, data.estimate_number, selectedCustomer);
+        if (isEditMode) {
+            showSaveSuccess(editEstimateId, editEstimateNumber, selectedCustomer, true);
+        } else {
+            showSaveSuccess(data.id, data.estimate_number, selectedCustomer, false);
+        }
     } catch(e) {
         alert('Error saving estimate: ' + e.message);
     } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '&#128190; Save Estimate'; }
-        if (saveBtnMobile) { saveBtnMobile.disabled = false; saveBtnMobile.innerHTML = '&#128190; Save'; }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = isEditMode ? '&#128190; Update Estimate' : '&#128190; Save Estimate'; }
+        if (saveBtnMobile) { saveBtnMobile.disabled = false; saveBtnMobile.innerHTML = isEditMode ? '&#128190; Update' : '&#128190; Save'; }
     }
 }
 
 // ════════════════════════════════════════
 // POST-SAVE MODAL
 // ════════════════════════════════════════
-function showSaveSuccess(estimateId, estimateNumber, customer) {
+function showSaveSuccess(estimateId, estimateNumber, customer, isEdit) {
     estimateId = parseInt(estimateId, 10) || estimateId;
     var itemsTotal = estimateItems.reduce(function(s, i) { return s + (i.line_total || 0); }, 0);
     var laborTotal = laborItems.reduce(function(s, l) { return s + (parseFloat(l.amount) || 0); }, 0);
@@ -1865,7 +1879,7 @@ function showSaveSuccess(estimateId, estimateNumber, customer) {
     var waBtn   = document.getElementById('saveSuccessWA');
     var viewBtn = document.getElementById('saveSuccessView');
 
-    if (titleEl) titleEl.textContent = (estimateNumber || 'Estimate') + ' Saved!';
+    if (titleEl) titleEl.textContent = (estimateNumber || 'Estimate') + (isEdit ? ' Updated!' : ' Saved!');
     if (totalEl) totalEl.textContent = 'Grand Total: ' + fmt(grand);
 
     if (waBtn) {
@@ -1897,6 +1911,95 @@ function showSaveSuccess(estimateId, estimateNumber, customer) {
 }
 
 // ════════════════════════════════════════
+// LOAD EXISTING ESTIMATE (EDIT MODE)
+// ════════════════════════════════════════
+async function loadEstimate(id) {
+    try {
+        var res = await apiRequest('/api/estimates/' + id);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var est = await res.json();
+        if (!est || !est.estimate_number) throw new Error('Estimate not found');
+
+        isEditMode = true;
+        editEstimateId = id;
+        editEstimateNumber = est.estimate_number;
+
+        // Populate customer
+        selectedCustomer = {
+            id: null,
+            name: est.customer_name || '',
+            phone: est.customer_phone || '',
+            email: est.customer_email || '',
+            address: est.customer_address || '',
+            source: 'local',
+            zoho_contact_id: null,
+            local_customer_id: null
+        };
+        ['customerSearchInput', 'customerSearchInputMobile'].forEach(function(elId) {
+            var el = document.getElementById(elId);
+            if (el) el.value = selectedCustomer.name;
+        });
+        var cardHtml = '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">' + esc(selectedCustomer.name) + '</div>'
+            + '<div style="font-size:12px;color:#374151;">' + esc(selectedCustomer.phone)
+            + (selectedCustomer.email ? ' · ' + esc(selectedCustomer.email) : '') + '</div>'
+            + (selectedCustomer.address ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + esc(selectedCustomer.address) + '</div>' : '');
+        ['customerCard', 'customerCardMobile'].forEach(function(elId) {
+            var el = document.getElementById(elId);
+            if (el) { el.innerHTML = cardHtml; el.style.display = 'block'; }
+        });
+
+        // Populate items
+        if (est.items && est.items.length) {
+            est.items.forEach(function(item) {
+                if (item.item_type === 'labor') {
+                    var lid = laborIdCounter++;
+                    laborItems.push({
+                        id: lid,
+                        description: item.item_name || item.item_description || '',
+                        amount: parseFloat(item.unit_price || item.base_price || 0)
+                    });
+                } else {
+                    var iid = itemIdCounter++;
+                    estimateItems.push({
+                        id: iid,
+                        item_type: 'product',
+                        zoho_item_id: item.zoho_item_id || null,
+                        name: item.item_name || item.item_description || '',
+                        description: item.item_description || '',
+                        brand: item.brand || '',
+                        base_price: parseFloat(item.base_price || item.unit_price || 0),
+                        quantity: parseFloat(item.quantity || 1),
+                        unit: item.pack_size || 'Nos',
+                        area: item.area || null,
+                        num_coats: item.num_coats || null,
+                        mix_info: item.mix_info || null,
+                        markup_type: item.markup_type || '',
+                        markup_value: item.markup_value != null ? String(item.markup_value) : '',
+                        discount_type: item.discount_type || '',
+                        discount_value: item.discount_value != null ? String(item.discount_value) : ''
+                    });
+                }
+            });
+            renderEstimateItems();
+            renderLaborItems();
+            updateTotals();
+        }
+
+        // Update UI for edit mode
+        document.title = 'Edit ' + est.estimate_number + ' - Quality Colors';
+        var banner = document.getElementById('editBanner');
+        if (banner) { banner.textContent = '✏ Editing: ' + est.estimate_number; banner.style.display = 'block'; }
+        var saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.innerHTML = '&#128190; Update Estimate';
+        var saveBtnM = document.getElementById('saveBtnMobile');
+        if (saveBtnM) saveBtnM.innerHTML = '&#128190; Update';
+
+    } catch(e) {
+        alert('Failed to load estimate: ' + e.message);
+    }
+}
+
+// ════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async function() {
@@ -1905,6 +2008,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     try { await loadFilterOptions(); } catch(e) { console.warn('loadFilterOptions:', e); }
     initProductSearch('productSearchInput', 'productList', 'brandChips', 'categoryChips');
     initProductSearch('productSearchInputMobile', 'productListMobile', 'brandChipsMobile', 'categoryChipsMobile');
+    var urlParams = new URLSearchParams(window.location.search);
+    var editId = urlParams.get('id');
+    if (editId) await loadEstimate(editId);
 });
 </script>
 </body>
