@@ -1040,13 +1040,24 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             params.push(`%${search}%`, `%${search}%`);
         }
         if (brand) {
-            // App sends brand name (string); fall back to id match for web callers
-            where += ' AND (b.name = ? OR b.id = ?)';
-            params.push(brand, brand);
+            const brandId = parseInt(brand, 10);
+            if (!isNaN(brandId) && brandId > 0) {
+                where += ' AND b.id = ?';
+                params.push(brandId);
+            } else {
+                where += ' AND b.name = ?';
+                params.push(brand);
+            }
         }
         if (category) {
-            where += ' AND (c.name = ? OR c.id = ?)';
-            params.push(category, category);
+            const catId = parseInt(category, 10);
+            if (!isNaN(catId) && catId > 0) {
+                where += ' AND c.id = ?';
+                params.push(catId);
+            } else {
+                where += ' AND c.name = ?';
+                params.push(category);
+            }
         }
         if (product_type) {
             where += ' AND p.product_type = ?';
