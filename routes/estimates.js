@@ -8,6 +8,10 @@ let pool;
 
 function setPool(p) { pool = p; }
 
+// In-memory cache for filter-options (5 min TTL)
+let _filterCache = null;
+let _filterCacheAt = 0;
+
 // ========================================
 // CALCULATION ENGINE
 // ========================================
@@ -185,6 +189,138 @@ router.get('/', requirePermission('estimates', 'view'), async (req, res) => {
         query += ' ORDER BY estimate_date DESC, id DESC';
         const [rows] = await pool.query(query, params);
         res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ========================================
+// ESTIMATE SEARCH ENDPOINTS (requireAuth only — used by both admin + staff)
+// IMPORTANT: These MUST stay above any /:id routes
+// ========================================
+
+router.get('/filter-options', requireAuth, async (req, res) => {
+    try {
+        const now = Date.now();
+        if (_filterCache && now - _filterCacheAt < 5 * 60 * 1000) {
+            return res.json(_filterCache);
+        }
+        const [brands] = await pool.query(
+            `SELECT DISTINCT zoho_brand as brand FROM zoho_items_map
+             WHERE zoho_status = 'active' AND zoho_brand IS NOT NULL AND zoho_brand != ''
+             ORDER BY zoho_brand ASC`
+        );
+        const [categories] = await pool.query(
+            `SELECT DISTINCT zoho_category_name as category FROM zoho_items_map
+             WHERE zoho_status = 'active' AND zoho_category_name IS NOT NULL AND zoho_category_name != ''
+             ORDER BY zoho_category_name ASC`
+        );
+        _filterCache = { brands: brands.map(r => r.brand), categories: categories.map(r => r.category) };
+        _filterCacheAt = now;
+        res.json(_filterCache);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/search-customers', requireAuth, async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q || q.length < 2) return res.json([]);
+        const like = `%${q}%`;
+
+        const [zohoRows] = await pool.query(`
+            SELECT zcm.zoho_contact_id, zcm.zoho_contact_name AS name,
+                   zcm.zoho_phone AS phone, zcm.zoho_email AS email,
+                   zcm.zoho_billing_address AS address, zcm.local_customer_id
+            FROM zoho_customers_map zcm
+            WHERE zcm.zoho_contact_name LIKE ? OR zcm.zoho_phone LIKE ? OR zcm.zoho_email LIKE ?
+            ORDER BY zcm.zoho_contact_name ASC LIMIT 8
+        `, [like, like, like]);
+
+        const linkedLocalIds = zohoRows.filter(r => r.local_customer_id).map(r => r.local_customer_id);
+        const excludeClause = linkedLocalIds.length
+            ? `AND c.id NOT IN (${linkedLocalIds.map(() => '?').join(',')})` : '';
+
+        const [localRows] = await pool.query(`
+            SELECT NULL AS zoho_contact_id, c.name, c.phone, c.email,
+                   c.address, c.id AS local_customer_id
+            FROM customers c
+            WHERE (c.name LIKE ? OR c.phone LIKE ? OR c.email LIKE ?) ${excludeClause}
+            ORDER BY c.name ASC LIMIT 5
+        `, [like, like, like, ...linkedLocalIds]);
+
+        const results = [
+            ...zohoRows.map(r => ({
+                id: r.zoho_contact_id,
+                name: r.name || '',
+                phone: r.phone || '',
+                email: r.email || '',
+                address: r.address || '',
+                source: r.local_customer_id ? 'both' : 'zoho',
+                zoho_contact_id: r.zoho_contact_id,
+                local_customer_id: r.local_customer_id || null
+            })),
+            ...localRows.map(r => ({
+                id: String(r.local_customer_id),
+                name: r.name || '',
+                phone: r.phone || '',
+                email: r.email || '',
+                address: r.address || '',
+                source: 'local',
+                zoho_contact_id: null,
+                local_customer_id: r.local_customer_id
+            }))
+        ].slice(0, 10);
+
+        res.json(results);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/search-products', requireAuth, async (req, res) => {
+    try {
+        const { q, brand, category, page = 1 } = req.query;
+        const limit = 20;
+        const offset = (Math.max(1, parseInt(page)) - 1) * limit;
+        const params = [];
+
+        let where = `WHERE (zim.zoho_status = 'active' OR zim.zoho_status IS NULL)`;
+        if (q && q.trim().length >= 1) {
+            where += ` AND (zim.zoho_item_name LIKE ? OR zim.zoho_sku LIKE ? OR zim.zoho_brand LIKE ? OR zim.zoho_category_name LIKE ?)`;
+            const lq = `%${q.trim()}%`;
+            params.push(lq, lq, lq, lq);
+        }
+        if (brand) { where += ` AND zim.zoho_brand = ?`; params.push(brand); }
+        if (category) { where += ` AND zim.zoho_category_name = ?`; params.push(category); }
+
+        const [rows] = await pool.query(`
+            SELECT zim.zoho_item_id, zim.zoho_item_name AS name,
+                   zim.zoho_brand AS brand, zim.zoho_category_name AS category,
+                   zim.zoho_rate AS rate, zim.zoho_unit AS unit,
+                   zim.zoho_stock_on_hand AS stock_on_hand,
+                   p.area_coverage, p.product_type, p.id AS local_product_id
+            FROM zoho_items_map zim
+            LEFT JOIN pack_sizes ps ON ps.zoho_item_id = zim.zoho_item_id AND ps.is_active = 1
+            LEFT JOIN products p ON p.id = ps.product_id AND p.status = 'active'
+            ${where}
+            ORDER BY zim.zoho_item_name ASC
+            LIMIT ? OFFSET ?
+        `, [...params, limit, offset]);
+
+        res.json(rows.map(r => ({
+            zoho_item_id: r.zoho_item_id,
+            name: r.name,
+            brand: r.brand || '',
+            category: r.category || '',
+            rate: parseFloat(r.rate) || 0,
+            unit: r.unit || 'Nos',
+            stock_on_hand: parseFloat(r.stock_on_hand) || 0,
+            area_coverage: parseFloat(r.area_coverage) || 0,
+            local_product_id: r.local_product_id || null,
+            has_area_calc: !!(r.area_coverage && parseFloat(r.area_coverage) > 0)
+        })));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
