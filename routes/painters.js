@@ -1028,7 +1028,7 @@ async function generateEstimateNumber() {
 // Product list for estimate builder
 router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
     try {
-        const { billing_type, search, brand, category, product_type, hasPoints } = req.query;
+        const { billing_type, search, brand, category, product_type, hasPoints, hasOffer } = req.query;
 
         const filterHasPoints = hasPoints === 'true' || hasPoints === '1';
 
@@ -1119,6 +1119,28 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
 
         const products = Object.values(productMap);
 
+        // Fetch active offers and attach to each product
+        const filterHasOffer = hasOffer === 'true' || hasOffer === '1';
+        const now = new Date();
+        const [offerRows] = await pool.query(
+            `SELECT * FROM painter_special_offers
+             WHERE is_active = 1 AND DATE(start_date) <= DATE(?) AND DATE(end_date) >= DATE(?)
+             ORDER BY created_at DESC`,
+            [now, now]
+        );
+        const productsWithOffers = products.map(p => {
+            const matched = offerRows.filter(o => {
+                if (o.applies_to === 'all') return true;
+                if (o.applies_to === 'brand' && o.target_id === p.brand) return true;
+                if (o.applies_to === 'category' && o.target_id === p.category) return true;
+                return false;
+            });
+            return { ...p, offer: matched.length > 0 ? matched[0] : null };
+        });
+        const finalProducts = filterHasOffer
+            ? productsWithOffers.filter(p => p.offer !== null)
+            : productsWithOffers;
+
         const [brands] = await pool.query(`
             SELECT DISTINCT b.id, b.name FROM brands b
             INNER JOIN products p ON p.brand_id = b.id AND p.status = 'active'
@@ -1134,7 +1156,7 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
 
         res.json({
             success: true,
-            products,
+            products: finalProducts,
             brands: brands.map(b => ({ id: b.id, name: b.name })),
             categories: categories.map(c => ({ id: c.id, name: c.name }))
         });
