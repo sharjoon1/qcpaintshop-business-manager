@@ -967,6 +967,268 @@ function toggleProductRow(row, expand, p) {
 }
 
 // ════════════════════════════════════════
+// PRODUCT EXPAND PANEL
+// ════════════════════════════════════════
+function renderProductExpand(expandEl, p) {
+    var hasArea = p.has_area_calc && p.area_coverage > 0;
+    expandEl.innerHTML = '';
+
+    var wrapper = document.createElement('div');
+
+    if (hasArea) {
+        var modeRow = document.createElement('div');
+        modeRow.style.cssText = 'display:flex;gap:12px;margin-bottom:10px;';
+
+        var unitLabel = document.createElement('label');
+        unitLabel.style.cssText = 'font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;';
+        var unitRadio = document.createElement('input');
+        unitRadio.type = 'radio';
+        unitRadio.name = 'mode_' + p.zoho_item_id;
+        unitRadio.value = 'unit';
+        unitRadio.checked = true;
+        unitRadio.addEventListener('change', function() { switchMode(p.zoho_item_id, 'unit'); });
+        unitLabel.appendChild(unitRadio);
+        unitLabel.appendChild(document.createTextNode(' Unit qty'));
+
+        var areaLabel = document.createElement('label');
+        areaLabel.style.cssText = 'font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;';
+        var areaRadio = document.createElement('input');
+        areaRadio.type = 'radio';
+        areaRadio.name = 'mode_' + p.zoho_item_id;
+        areaRadio.value = 'area';
+        areaRadio.addEventListener('change', function() { switchMode(p.zoho_item_id, 'area'); });
+        areaLabel.appendChild(areaRadio);
+        areaLabel.appendChild(document.createTextNode(' Area (sq.ft)'));
+
+        modeRow.appendChild(unitLabel);
+        modeRow.appendChild(areaLabel);
+        wrapper.appendChild(modeRow);
+    }
+
+    // Unit mode div
+    var unitDiv = document.createElement('div');
+    unitDiv.id = 'unitMode_' + p.zoho_item_id;
+
+    var stepper = document.createElement('div');
+    stepper.className = 'qty-stepper mb-3';
+
+    var minusBtn = document.createElement('button');
+    minusBtn.className = 'qty-btn';
+    minusBtn.type = 'button';
+    minusBtn.textContent = '−';
+    minusBtn.addEventListener('click', function() { stepQty(p.zoho_item_id, -1, p.rate); });
+
+    var qtySpan = document.createElement('span');
+    qtySpan.className = 'qty-display';
+    qtySpan.id = 'qty_' + p.zoho_item_id;
+    qtySpan.textContent = '1';
+
+    var plusBtn = document.createElement('button');
+    plusBtn.className = 'qty-btn';
+    plusBtn.type = 'button';
+    plusBtn.textContent = '+';
+    plusBtn.addEventListener('click', function() { stepQty(p.zoho_item_id, 1, p.rate); });
+
+    var unitLabel2 = document.createElement('span');
+    unitLabel2.style.cssText = 'font-size:12px;color:#6b7280;margin-left:4px;';
+    unitLabel2.textContent = p.unit || 'Nos';
+
+    var unitTotal = document.createElement('span');
+    unitTotal.id = 'unitTotal_' + p.zoho_item_id;
+    unitTotal.style.cssText = 'font-size:13px;font-weight:700;margin-left:auto;';
+    unitTotal.textContent = fmt(p.rate);
+
+    stepper.appendChild(minusBtn);
+    stepper.appendChild(qtySpan);
+    stepper.appendChild(plusBtn);
+    stepper.appendChild(unitLabel2);
+    stepper.appendChild(unitTotal);
+    unitDiv.appendChild(stepper);
+
+    var addUnitBtn = document.createElement('button');
+    addUnitBtn.className = 'btn-primary';
+    addUnitBtn.type = 'button';
+    addUnitBtn.style.padding = '8px';
+    addUnitBtn.textContent = '+ Add to Estimate';
+    addUnitBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        addUnitToEstimate(p);
+    });
+    unitDiv.appendChild(addUnitBtn);
+    wrapper.appendChild(unitDiv);
+
+    // Area mode div (only if has_area_calc)
+    if (hasArea) {
+        var areaDiv = document.createElement('div');
+        areaDiv.id = 'areaMode_' + p.zoho_item_id;
+        areaDiv.style.display = 'none';
+
+        var areaInputs = document.createElement('div');
+        areaInputs.className = 'area-inputs';
+
+        var sqftGroup = document.createElement('div');
+        sqftGroup.className = 'area-input-group';
+        var sqftLabel = document.createElement('label');
+        sqftLabel.textContent = 'Square Feet';
+        var sqftInput = document.createElement('input');
+        sqftInput.type = 'number';
+        sqftInput.id = 'sqft_' + p.zoho_item_id;
+        sqftInput.min = '1';
+        sqftInput.step = '1';
+        sqftInput.placeholder = 'e.g. 500';
+        sqftInput.addEventListener('input', function() {
+            recalcArea(p.zoho_item_id, p.area_coverage, p.local_product_id, p);
+        });
+        sqftGroup.appendChild(sqftLabel);
+        sqftGroup.appendChild(sqftInput);
+
+        var coatsGroup = document.createElement('div');
+        coatsGroup.className = 'area-input-group';
+        var coatsLabel = document.createElement('label');
+        coatsLabel.textContent = 'Coats';
+        var coatsInput = document.createElement('input');
+        coatsInput.type = 'number';
+        coatsInput.id = 'coats_' + p.zoho_item_id;
+        coatsInput.min = '1';
+        coatsInput.max = '5';
+        coatsInput.value = '2';
+        coatsInput.addEventListener('input', function() {
+            recalcArea(p.zoho_item_id, p.area_coverage, p.local_product_id, p);
+        });
+        coatsGroup.appendChild(coatsLabel);
+        coatsGroup.appendChild(coatsInput);
+
+        areaInputs.appendChild(sqftGroup);
+        areaInputs.appendChild(coatsGroup);
+        areaDiv.appendChild(areaInputs);
+
+        var areaResult = document.createElement('div');
+        areaResult.className = 'calc-result';
+        areaResult.id = 'areaResult_' + p.zoho_item_id;
+        areaResult.style.display = 'none';
+        areaDiv.appendChild(areaResult);
+
+        var addAreaBtn = document.createElement('button');
+        addAreaBtn.className = 'btn-primary mt-2';
+        addAreaBtn.type = 'button';
+        addAreaBtn.style.cssText = 'padding:8px;display:none;';
+        addAreaBtn.id = 'areaAddBtn_' + p.zoho_item_id;
+        addAreaBtn.textContent = '+ Add to Estimate';
+        addAreaBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            addAreaToEstimate(p.zoho_item_id);
+        });
+        areaDiv.appendChild(addAreaBtn);
+
+        wrapper.appendChild(areaDiv);
+    }
+
+    expandEl.appendChild(wrapper);
+}
+
+function switchMode(itemId, mode) {
+    var unitEl = document.getElementById('unitMode_' + itemId);
+    var areaEl = document.getElementById('areaMode_' + itemId);
+    if (unitEl) unitEl.style.display = mode === 'unit' ? 'block' : 'none';
+    if (areaEl) areaEl.style.display = mode === 'area' ? 'block' : 'none';
+}
+
+function stepQty(itemId, delta, rate) {
+    var el = document.getElementById('qty_' + itemId);
+    var totalEl = document.getElementById('unitTotal_' + itemId);
+    if (!el) return;
+    var qty = Math.max(1, parseInt(el.textContent) + delta);
+    el.textContent = qty;
+    if (totalEl) totalEl.textContent = fmt(rate * qty);
+}
+
+// ════════════════════════════════════════
+// AREA CALCULATOR
+// ════════════════════════════════════════
+var _areaComboCache = {};
+
+async function fetchSiblingPacks(localProductId) {
+    if (_areaComboCache[localProductId]) return _areaComboCache[localProductId];
+    try {
+        var res = await apiRequest('/api/products/' + localProductId);
+        var data = await res.json();
+        var packs = (data.pack_sizes || [])
+            .filter(function(ps) { return ps.is_active && ps.zoho_item_id; })
+            .map(function(ps) {
+                return {
+                    zoho_item_id: ps.zoho_item_id,
+                    name: esc(data.name) + ' ' + ps.size + (ps.unit || 'L'),
+                    size: parseFloat(ps.size),
+                    rate: parseFloat(ps.base_price)
+                };
+            });
+        _areaComboCache[localProductId] = packs;
+        return packs;
+    } catch(e) { return []; }
+}
+
+function calculatePackCombo(litersNeeded, packSizes) {
+    if (!packSizes || !packSizes.length) return [];
+    var sorted = packSizes.slice().sort(function(a, b) { return b.size - a.size; });
+    var result = [];
+    var remaining = litersNeeded;
+    for (var i = 0; i < sorted.length; i++) {
+        var pack = sorted[i];
+        if (remaining <= 0.001) break;
+        var count = Math.floor(remaining / pack.size);
+        if (count > 0) {
+            result.push({ zoho_item_id: pack.zoho_item_id, name: pack.name, size: pack.size, rate: pack.rate, quantity: count });
+            remaining -= count * pack.size;
+        }
+    }
+    if (remaining > 0.001) {
+        var smallest = sorted[sorted.length - 1];
+        var existing = null;
+        for (var j = 0; j < result.length; j++) {
+            if (result[j].zoho_item_id === smallest.zoho_item_id) { existing = result[j]; break; }
+        }
+        if (existing) existing.quantity += 1;
+        else result.push({ zoho_item_id: smallest.zoho_item_id, name: smallest.name, size: smallest.size, rate: smallest.rate, quantity: 1 });
+    }
+    return result;
+}
+
+var _pendingAreaCombo = {};
+
+async function recalcArea(itemId, coverage, localProductId, p) {
+    var sqftEl = document.getElementById('sqft_' + itemId);
+    var coatsEl = document.getElementById('coats_' + itemId);
+    var resultEl = document.getElementById('areaResult_' + itemId);
+    var addBtn = document.getElementById('areaAddBtn_' + itemId);
+    if (!sqftEl || !resultEl || !addBtn) return;
+
+    var sqft = parseFloat(sqftEl.value) || 0;
+    var coats = parseFloat(coatsEl ? coatsEl.value : 2) || 2;
+    if (sqft <= 0) { resultEl.style.display = 'none'; addBtn.style.display = 'none'; return; }
+
+    var liters = (sqft * coats) / coverage;
+
+    if (localProductId) {
+        var sibs = await fetchSiblingPacks(localProductId);
+        if (sibs.length > 0) {
+            var combo = calculatePackCombo(liters, sibs);
+            _pendingAreaCombo[itemId] = combo;
+            var comboStr = combo.map(function(c) { return c.quantity + '×' + c.name; }).join(' + ');
+            resultEl.textContent = '→ ' + liters.toFixed(1) + 'L needed → ' + comboStr;
+            resultEl.style.display = 'block';
+            addBtn.style.display = 'block';
+            return;
+        }
+    }
+
+    var singleQty = Math.max(1, Math.ceil(liters));
+    _pendingAreaCombo[itemId] = [{ zoho_item_id: p.zoho_item_id, name: p.name, size: 1, rate: p.rate, quantity: singleQty }];
+    resultEl.textContent = '→ ' + liters.toFixed(1) + 'L needed → approx ' + singleQty + ' unit(s) of this item';
+    resultEl.style.display = 'block';
+    addBtn.style.display = 'block';
+}
+
+// ════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async function() {
