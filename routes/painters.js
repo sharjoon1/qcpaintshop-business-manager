@@ -1040,12 +1040,13 @@ router.get('/me/estimates/products', requirePainterAuth, async (req, res) => {
             params.push(`%${search}%`, `%${search}%`);
         }
         if (brand) {
-            where += ' AND b.id = ?';
-            params.push(brand);
+            // App sends brand name (string); fall back to id match for web callers
+            where += ' AND (b.name = ? OR b.id = ?)';
+            params.push(brand, brand);
         }
         if (category) {
-            where += ' AND c.id = ?';
-            params.push(category);
+            where += ' AND (c.name = ? OR c.id = ?)';
+            params.push(category, category);
         }
         if (product_type) {
             where += ' AND p.product_type = ?';
