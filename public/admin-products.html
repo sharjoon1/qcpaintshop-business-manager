@@ -378,7 +378,7 @@
 
     <!-- Add/Edit Modal -->
     <div id="productModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-        <div class="bg-white w-full sm:max-w-2xl sm:mx-4 sm:rounded-2xl rounded-t-2xl max-h-[92vh] flex flex-col shadow-2xl">
+        <div class="bg-white w-full sm:max-w-2xl sm:mx-4 sm:rounded-2xl rounded-t-2xl flex flex-col shadow-2xl" style="max-height:min(92vh,92dvh)">
             <!-- Sticky header -->
             <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10 flex-shrink-0">
                 <h3 class="text-lg font-bold text-gray-800" id="modalTitle">Add New Product</h3>
@@ -471,17 +471,18 @@
                     <label class="form-label">Description</label>
                     <textarea id="productDescription" rows="3" class="form-input" placeholder="Product description..."></textarea>
                 </div>
-
-                <div class="flex gap-3 pt-4 pb-2">
-                    <button type="button" onclick="closeModal()" class="flex-1 btn btn-secondary">
-                        Cancel
-                    </button>
-                    <button type="submit" class="flex-1 btn btn-primary">
-                        Save Product
-                    </button>
-                </div>
             </form>
             </div><!-- end scrollable body -->
+
+            <!-- Sticky footer -->
+            <div class="flex gap-3 px-5 py-4 border-t border-gray-100 flex-shrink-0 bg-white rounded-b-2xl">
+                <button type="button" onclick="closeModal()" class="flex-1 btn btn-secondary">
+                    Cancel
+                </button>
+                <button type="button" onclick="document.getElementById('productForm').requestSubmit()" class="flex-1 btn btn-primary">
+                    Save Product
+                </button>
+            </div>
         </div>
     </div>
 
