@@ -528,12 +528,13 @@
         let productUnits = ['L', 'KG', 'M', 'PC']; // loaded from API
 
         // ── Unit Management ──────────────────────────────────
-        function populateUnitSelects() {
+        function populateUnitSelects(selectUnit) {
             const opts = productUnits.map(u => `<option value="${u}">${u}</option>`).join('');
-            ['newPackUnit'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.innerHTML = opts;
-            });
+            const el = document.getElementById('newPackUnit');
+            if (!el) return;
+            const prev = selectUnit || el.value;
+            el.innerHTML = opts;
+            if (prev && productUnits.includes(prev)) el.value = prev;
         }
 
         async function loadUnits() {
@@ -594,8 +595,11 @@
                 });
                 const d = await r.json();
                 if (d.success) {
+                    // find any unit that was newly added (not in old list)
+                    const oldUnits = [...productUnits];
                     productUnits = d.units;
-                    populateUnitSelects();
+                    const newlyAdded = d.units.find(u => !oldUnits.includes(u));
+                    populateUnitSelects(newlyAdded || undefined);
                     closeUnitsManager();
                 }
             } catch (e) { alert('Failed to save units'); }
