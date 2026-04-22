@@ -1026,7 +1026,7 @@ function renderProductExpand(expandEl, p) {
     minusBtn.className = 'qty-btn';
     minusBtn.type = 'button';
     minusBtn.textContent = '−';
-    minusBtn.addEventListener('click', function() { stepQty(p.zoho_item_id, -1, p.rate); });
+    minusBtn.addEventListener('click', function(e) { e.stopPropagation(); stepQty(p.zoho_item_id, -1, p.rate); });
 
     var qtySpan = document.createElement('span');
     qtySpan.className = 'qty-display';
@@ -1037,7 +1037,7 @@ function renderProductExpand(expandEl, p) {
     plusBtn.className = 'qty-btn';
     plusBtn.type = 'button';
     plusBtn.textContent = '+';
-    plusBtn.addEventListener('click', function() { stepQty(p.zoho_item_id, 1, p.rate); });
+    plusBtn.addEventListener('click', function(e) { e.stopPropagation(); stepQty(p.zoho_item_id, 1, p.rate); });
 
     var unitLabel2 = document.createElement('span');
     unitLabel2.style.cssText = 'font-size:12px;color:#6b7280;margin-left:4px;';
@@ -1389,6 +1389,54 @@ function renderEstimateItems() {
         var expand = document.createElement('div');
         expand.className = 'est-item-expand';
 
+        // Forward-declare priceInfo so qty/price callbacks can update it
+        var priceInfo;
+
+        // Qty stepper row
+        var qtyRow = document.createElement('div');
+        qtyRow.className = 'md-row';
+        qtyRow.style.marginBottom = '8px';
+        var qtyLabel = document.createElement('span');
+        qtyLabel.className = 'md-label';
+        qtyLabel.textContent = 'Qty';
+        var qtyMinusBtn = document.createElement('button');
+        qtyMinusBtn.type = 'button';
+        qtyMinusBtn.className = 'qty-btn';
+        qtyMinusBtn.textContent = '−';
+        var qtyDisplay = document.createElement('span');
+        qtyDisplay.className = 'qty-display';
+        qtyDisplay.textContent = item.quantity;
+        var qtyPlusBtn = document.createElement('button');
+        qtyPlusBtn.type = 'button';
+        qtyPlusBtn.className = 'qty-btn';
+        qtyPlusBtn.textContent = '+';
+        var qtyUnitSpan = document.createElement('span');
+        qtyUnitSpan.style.cssText = 'font-size:12px;color:#6b7280;margin-left:4px;';
+        qtyUnitSpan.textContent = item.unit || 'Nos';
+
+        function refreshItemDisplay() {
+            qtyDisplay.textContent = item.quantity;
+            subDiv.textContent = item.quantity + ' ' + item.unit + ' · ' + fmt(item.base_price) + '/unit';
+            recalcItem(item);
+            totalDiv.textContent = fmt(item.line_total);
+            if (priceInfo) priceInfo.innerHTML = 'Final price: <strong>' + fmt(item.final_price) + '</strong>/unit · Total: <strong>' + fmt(item.line_total) + '</strong>';
+            updateTotals();
+        }
+        qtyMinusBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (item.quantity > 1) { item.quantity--; refreshItemDisplay(); }
+        });
+        qtyPlusBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            item.quantity++;
+            refreshItemDisplay();
+        });
+        qtyRow.appendChild(qtyLabel);
+        qtyRow.appendChild(qtyMinusBtn);
+        qtyRow.appendChild(qtyDisplay);
+        qtyRow.appendChild(qtyPlusBtn);
+        qtyRow.appendChild(qtyUnitSpan);
+
         // Base price edit row
         var priceRow = document.createElement('div');
         priceRow.className = 'md-row';
@@ -1411,10 +1459,7 @@ function renderEstimateItems() {
             var v = parseFloat(this.value);
             if (!isNaN(v) && v >= 0) {
                 item.base_price = v;
-                subDiv.textContent = item.quantity + ' ' + item.unit + ' · ' + fmt(item.base_price) + '/unit';
-                recalcItem(item);
-                totalDiv.textContent = fmt(item.line_total);
-                updateTotals();
+                refreshItemDisplay();
             }
         });
         priceRow.appendChild(priceLabel);
@@ -1483,10 +1528,11 @@ function renderEstimateItems() {
         discountRow.appendChild(discountInput);
         discountRow.appendChild(discountApply);
 
-        var priceInfo = document.createElement('div');
+        priceInfo = document.createElement('div');
         priceInfo.style.cssText = 'font-size:12px;color:#374151;margin-top:4px;';
         priceInfo.innerHTML = 'Final price: <strong>' + fmt(item.final_price) + '</strong>/unit · Total: <strong>' + fmt(item.line_total) + '</strong>';
 
+        expand.appendChild(qtyRow);
         expand.appendChild(priceRow);
         expand.appendChild(markupRow);
         expand.appendChild(discountRow);
