@@ -34,3 +34,30 @@ nul
 
 # Firebase service account key (contains private key)
 google-services/firebase-service-account.json
+
+# WhatsApp cache
+.wwebjs_cache/
+.wwebjs_auth/
+
+# Temp/debug scripts
+analyze_tmp.js
+check-adj.js
+check-stock.js
+desc_update.js
+desc_zoho_push.js
+fix-staff-assignments.js
+fix-stock-items-insert.js
+insert-stock-items-fixed.js
+stock-check-progress.html
+
+# Backup files
+*.OLD
+*.backup
+*.bak
+.env.backup*
+
+# SQLite DB
+data/*.db
+
+# SSL challenge
+public/.well-known/
