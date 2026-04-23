@@ -875,7 +875,7 @@ router.get('/customers', requirePermission('zoho', 'view'), async (req, res) => 
         );
 
         const [customers] = await pool.query(`
-            SELECT zcm.*, c.full_name as local_customer_name, c.phone as local_phone
+            SELECT zcm.*, c.name as local_customer_name, c.phone as local_phone
             FROM zoho_customers_map zcm
             LEFT JOIN customers c ON zcm.local_customer_id = c.id
             ${where}

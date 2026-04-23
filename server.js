@@ -3445,6 +3445,19 @@ app.get('/', (req, res) => {
 });
 
 // ========================================
+// 404 HANDLER — serves custom 404 page for all unmatched non-API routes
+// Must be placed AFTER all real routes and BEFORE the error handler.
+// ========================================
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/') && !req.path.startsWith('/socket.io/')) {
+    res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+  } else {
+    next();
+  }
+});
+
+// ========================================
 // ERROR HANDLING
 // ========================================
 
