@@ -280,11 +280,34 @@ async function runFullCalculation(triggeredBy) {
             }
         }
     } catch (err) {
-        throw new Error('Failed to fetch sales data from Zoho: ' + err.message);
+        // If Zoho API fails, continue with empty sales data (will use category defaults for all items)
+        console.warn('[PurchaseSuggestion] Failed to fetch Zoho sales data:', err.message, '— using category defaults for all items.');
+        salesData = [];
+    }
+
+    // 2b. Augment salesData with ALL items from zoho_items_map that have stock records.
+    // Items not in Zoho sales report get quantity_sold = 0 (→ category default threshold).
+    // This ensures items with zero/low stock but no recent sales also get suggestions.
+    try {
+        const [allItems] = await pool.query(`
+            SELECT DISTINCT zim.zoho_item_id AS item_id, zim.zoho_item_name AS item_name, zim.zoho_sku AS sku
+            FROM zoho_items_map zim
+            INNER JOIN zoho_location_stock zls ON zls.zoho_item_id = zim.zoho_item_id
+        `);
+        // Build a set of item_ids already in salesData
+        const salesIds = new Set(salesData.map(s => s.item_id || s.zoho_item_id).filter(Boolean));
+        // Add missing items with 0 sales so they get category-default treatment
+        for (const row of allItems) {
+            if (!salesIds.has(row.item_id)) {
+                salesData.push({ item_id: row.item_id, item_name: row.item_name, sku: row.sku, quantity_sold: 0 });
+            }
+        }
+    } catch (augErr) {
+        console.warn('[PurchaseSuggestion] Could not augment sales data with stock items:', augErr.message);
     }
 
     if (salesData.length === 0) {
-        throw new Error('No sales data returned from Zoho for the last ' + config.days + ' days');
+        throw new Error('No items found for purchase suggestion calculation');
     }
 
     // 3. Read config data from DB
@@ -514,9 +537,9 @@ async function updateBranchAllocations(allocations) {
     for (const alloc of allocations) {
         await pool.query(`
             UPDATE zoho_branch_allocations
-            SET allocation_pct = ?, min_stock = ?
+            SET allocation_pct = ?, min_stock = ?, zoho_location_id = ?
             WHERE id = ?
-        `, [alloc.allocation_pct, alloc.min_stock || 5, alloc.id]);
+        `, [alloc.allocation_pct, alloc.min_stock || 5, alloc.zoho_location_id || null, alloc.id]);
     }
 
     return { updated: allocations.length };

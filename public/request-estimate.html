@@ -74,6 +74,10 @@
                                     class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
                             </div>
                         </div>
+                        <div style="margin-top:0.75rem;">
+                            <label style="display:block;margin-bottom:0.25rem;font-size:0.875rem;font-weight:500;">Address / Location *</label>
+                            <input type="text" id="address" placeholder="Your full address for site visit" style="width:100%;padding:0.5rem 0.75rem;border:1px solid #d1d5db;border-radius:0.5rem;font-size:0.875rem;" required>
+                        </div>
                     </div>
                 </div>
 
@@ -317,9 +321,8 @@
                 allCategories = await catRes.json();
                 allProducts = await prodRes.json();
 
-                // Populate brands that have visible products
-                const brandsWithProducts = [...new Set(allProducts.map(p => p.brand_id))];
-                const visibleBrands = allBrands.filter(b => brandsWithProducts.includes(b.id));
+                // Populate all active brands returned by the API
+                const visibleBrands = allBrands.filter(b => b.is_active !== false && b.is_active !== 0);
 
                 document.getElementById('brandSelect').innerHTML = '<option value="">-- Select Brand --</option>' +
                     visibleBrands.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
@@ -507,9 +510,15 @@
             const customerName = document.getElementById('customerName').value.trim();
             const phone = document.getElementById('phone').value.trim();
             const email = document.getElementById('email').value.trim();
+            const address = document.getElementById('address').value.trim();
             
             if (!customerName || !phone) {
                 alert('Please fill in required fields');
+                return;
+            }
+
+            if (!address) {
+                alert('Please enter your Address / Location');
                 return;
             }
             
@@ -517,6 +526,7 @@
                 customer_name: customerName,
                 phone: phone,
                 email: email || null,
+                address: address,
                 request_method: requestType === 'available' ? 'product_available' : 'product_custom',
                 source: 'website'
             };
@@ -530,7 +540,7 @@
                 requestData.products_json = JSON.stringify({ items: guestProducts });
                 requestData.project_type = 'interior'; // Default
                 requestData.property_type = 'house'; // Default
-                requestData.location = 'To be confirmed';
+                requestData.location = address;
                 requestData.area_sqft = 0;
                 requestData.additional_notes = `Product-based request with ${guestProducts.length} products`;
             } else {

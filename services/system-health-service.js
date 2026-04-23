@@ -258,17 +258,22 @@ async function checkExternalServices() {
         status: process.env.GEMINI_API_KEY ? 'healthy' : 'warning'
     });
 
+    // Claude AI - uses clawdbot (Claude Subscription via Hermes gateway) as primary,
+    // falls back to ANTHROPIC_API_KEY if set. Check clawdbot script exists.
+    const clawdbotReady = require('fs').existsSync(require('path').join(__dirname, '..', 'scripts', 'clawdbot-call.mjs'));
+    const claudeConfigured = clawdbotReady || !!process.env.ANTHROPIC_API_KEY;
     services.push({
         name: 'Claude AI',
-        configured: !!process.env.ANTHROPIC_API_KEY,
-        status: process.env.ANTHROPIC_API_KEY ? 'healthy' : 'warning'
+        configured: claudeConfigured,
+        status: claudeConfigured ? 'healthy' : 'warning',
+        note: clawdbotReady ? 'via Hermes subscription' : undefined
     });
 
-    // Email
+    // Email - app uses SMTP_HOST (not EMAIL_HOST)
     services.push({
         name: 'Email (SMTP)',
-        configured: !!process.env.EMAIL_HOST,
-        status: process.env.EMAIL_HOST ? 'healthy' : 'warning'
+        configured: !!process.env.SMTP_HOST,
+        status: process.env.SMTP_HOST ? 'healthy' : 'warning'
     });
 
     const anyDown = services.some(s => s.status === 'critical');
