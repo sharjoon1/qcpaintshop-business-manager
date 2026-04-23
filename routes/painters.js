@@ -254,7 +254,7 @@ router.post('/send-otp', async (req, res) => {
         if (!phone) return res.status(400).json({ success: false, message: 'Phone is required' });
 
         const [painters] = await pool.query('SELECT id, status, full_name FROM painters WHERE phone = ?', [phone]);
-        if (!painters.length) return res.status(404).json({ success: false, message: 'No painter found with this phone number' });
+        if (!painters.length) return res.status(404).json({ success: false, code: 'NOT_REGISTERED', message: 'No painter found with this phone number' });
 
         const painter = painters[0];
 
