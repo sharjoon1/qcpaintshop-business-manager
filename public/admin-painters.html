@@ -222,6 +222,7 @@
                             <option value="regular_points">Reg Points ↓</option>
                             <option value="annual_points">Ann Points ↓</option>
                             <option value="joined">Joined ↓</option>
+                            <option value="interest">Sort by Interest</option>
                         </select>
                     </div>
                 </div>
@@ -1592,6 +1593,23 @@
 
     function levelColor(level) { return LEVEL_COLORS[level||'bronze'] || '#CD7F32'; }
 
+    function interestBadgeColor(n) {
+        if (n >= 6) return '#dc2626';   // red — high interest
+        if (n >= 3) return '#f59e0b';   // amber
+        if (n >= 1) return '#3b82f6';   // blue
+        return '#94a3b8';                // gray
+    }
+
+    function relativeTime(iso) {
+        const now = Date.now();
+        const then = new Date(iso).getTime();
+        const diff = Math.max(0, Math.floor((now - then) / 1000));
+        if (diff < 60) return `${diff}s ago`;
+        if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+        return `${Math.floor(diff/86400)}d ago`;
+    }
+
     function renderPaintersTable(painters) {
         const mobileList = document.getElementById('paintersMobileList');
         const tableBody = document.getElementById('paintersTableBody');
@@ -1624,6 +1642,14 @@
                                 &nbsp;·&nbsp; Ann: <strong>${parseFloat(p.annual_points||0).toFixed(0)}</strong>
                             </div>
                             <div class="painter-card-meta">${esc(p.city||'')}${(p.city&&p.phone)?' · ':''}${esc(p.phone||'')}</div>
+                            ${p.status === 'pending' && (p.approval_request_count||0) > 0 ? `
+                                <div class="painter-card-meta" style="margin-top:6px;">
+                                    <span style="background:${interestBadgeColor(p.approval_request_count)};color:#fff;padding:2px 8px;border-radius:10px;font-weight:600;">
+                                        🔔 ${p.approval_request_count} request${p.approval_request_count === 1 ? '' : 's'}
+                                    </span>
+                                    ${p.last_approval_request_at ? `<span style="color:#64748b;"> · Last ${relativeTime(p.last_approval_request_at)}</span>` : ''}
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                     <div class="painter-card-actions">
@@ -1655,6 +1681,7 @@
                         ${p.status === 'pending' ? `
                             <button onclick="event.stopPropagation();approvePainter(${p.id},'approve')" class="btn-sm btn-success mr-1">Approve</button>
                             <button onclick="event.stopPropagation();approvePainter(${p.id},'reject')" class="btn-sm btn-danger">Reject</button>
+                            ${(p.approval_request_count||0) > 0 ? `<div style="margin-top:4px;font-size:11px;"><span style="background:${interestBadgeColor(p.approval_request_count)};color:#fff;padding:1px 6px;border-radius:8px;">🔔 ${p.approval_request_count}</span>${p.last_approval_request_at?` <span style="color:#64748b;">${relativeTime(p.last_approval_request_at)}</span>`:''}</div>`:''}
                         ` : `<button onclick="event.stopPropagation();showPainterDetail(${p.id})" class="btn-sm btn-outline">View</button>`}
                     </td>
                 </tr>

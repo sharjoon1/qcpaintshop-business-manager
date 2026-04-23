@@ -5960,7 +5960,12 @@ router.get('/', requireAuth, async (req, res) => {
         const [countResult] = await pool.query(countQuery, params);
         const total = countResult[0].total;
 
-        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+        const sort = req.query.sort || '';
+        if (sort === 'interest') {
+            query += ' ORDER BY approval_request_count DESC, last_approval_request_at DESC, created_at DESC LIMIT ? OFFSET ?';
+        } else {
+            query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+        }
         const offset = (parseInt(page) - 1) * parseInt(limit);
         params.push(parseInt(limit), offset);
 
