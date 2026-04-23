@@ -496,6 +496,54 @@ router.post('/me/request-approval', requirePainterSession, async (req, res) => {
     }
 });
 
+// Lightweight endpoint Android calls on app startup to determine
+// which screen to show (Home / PendingApproval / Login).
+router.get('/me/status', requirePainterSession, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT id, full_name, phone, profile_photo, level, status, referral_code,
+                    approval_request_count, last_approval_request_at
+             FROM painters WHERE id = ?`,
+            [req.painter.id]
+        );
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Painter not found' });
+
+        const p = rows[0];
+        let seconds_remaining = 0;
+        let next_available_at = null;
+        if (p.last_approval_request_at) {
+            const last = new Date(p.last_approval_request_at).getTime();
+            const elapsed = Math.floor((Date.now() - last) / 1000);
+            if (elapsed < 120) {
+                seconds_remaining = 120 - elapsed;
+                next_available_at = new Date(last + 120 * 1000).toISOString();
+            }
+        }
+
+        res.json({
+            success: true,
+            painter: {
+                id: p.id,
+                full_name: p.full_name,
+                phone: p.phone,
+                profile_photo: p.profile_photo || null,
+                level: p.level || null,
+                status: p.status,
+                referral_code: p.referral_code
+            },
+            approval: {
+                count: p.approval_request_count || 0,
+                last_request_at: p.last_approval_request_at,
+                seconds_remaining,
+                next_available_at
+            }
+        });
+    } catch (error) {
+        console.error('Get status error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch status' });
+    }
+});
+
 // Unified profile update (multipart: full_name, city, optional photo)
 // Used by painter Android EditProfileScreen — single multipart call
 router.put('/me/profile', requirePainterAuth, uploadProfile.single('photo'), async (req, res) => {
