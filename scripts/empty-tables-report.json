@@ -1,0 +1,1342 @@
+{
+  "analysis_date": "2026-03-06T11:29:33.341Z",
+  "database": "qc_business_manager",
+  "total_tables": 146,
+  "empty_tables": [
+    {
+      "table_name": "ai_suggestions",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 48,
+      "created": "2026-02-24T19:01:40.000Z",
+      "fks_from": [
+        "conversation_id -> ai_conversations.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "ai.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "credit_limit_requests",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 64,
+      "created": "2026-02-24T16:54:21.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "credit-limits.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "credit_limit_violations",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 80,
+      "created": "2026-02-25T19:08:02.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "credit-limits.js",
+          "painters.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "design_visualizations",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-13T21:00:40.000Z",
+      "fks_from": [
+        "design_request_id -> color_design_requests.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [],
+        "html": [],
+        "serverJs": true
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "discount_requests",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 64,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [
+        "estimate_id -> estimates.id",
+        "customer_id -> customers.id",
+        "approved_by -> users.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 0,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "estimate_request_photos",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 16,
+      "created": "2026-02-24T02:03:23.000Z",
+      "fks_from": [
+        "request_id -> estimate_requests.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "estimate-requests.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "estimate_request_products",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-24T02:03:23.000Z",
+      "fks_from": [
+        "request_id -> estimate_requests.id",
+        "product_id -> products.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "estimate-requests.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "estimate_settings",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 16,
+      "created": "2026-02-07T12:55:05.000Z",
+      "fks_from": [
+        "user_id -> users.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [],
+        "html": [
+          "estimate-settings.html"
+        ],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "guide_favorites",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 16,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [
+        "guide_id -> guides.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "guides.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "guide_versions",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 16,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [
+        "guide_id -> guides.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "guides.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "lead_conversion_predictions",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "leads.js"
+        ],
+        "services": [
+          "ai-lead-manager.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_attendance",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-27T21:09:39.000Z",
+      "fks_from": [
+        "painter_id -> painters.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js"
+        ],
+        "services": [
+          "painter-points-engine.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_fcm_tokens",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-27T21:09:39.000Z",
+      "fks_from": [
+        "painter_id -> painters.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js"
+        ],
+        "services": [
+          "painter-notification-service.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_invoices_processed",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js"
+        ],
+        "services": [
+          "painter-points-engine.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_notifications",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-27T21:09:39.000Z",
+      "fks_from": [
+        "painter_id -> painters.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [
+          "painter-notification-service.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_point_transactions",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 64,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [
+        "painter_id -> painters.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js"
+        ],
+        "services": [
+          "painter-points-engine.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_referrals",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [
+        "referrer_id -> painters.id",
+        "referred_id -> painters.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js"
+        ],
+        "services": [
+          "painter-points-engine.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_slab_evaluations",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 48,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [
+          "painter-points-engine.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_training_content",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 48,
+      "created": "2026-02-27T21:09:39.000Z",
+      "fks_from": [
+        "category_id -> painter_training_categories.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_value_slabs",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 16,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js"
+        ],
+        "services": [
+          "painter-points-engine.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_visualization_requests",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-28T18:12:56.000Z",
+      "fks_from": [
+        "painter_id -> painters.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "painter_withdrawals",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-24T19:01:41.000Z",
+      "fks_from": [
+        "painter_id -> painters.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js"
+        ],
+        "services": [
+          "painter-points-engine.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "salary_adjustments",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 64,
+      "created": "2026-02-08T13:07:21.000Z",
+      "fks_from": [
+        "monthly_salary_id -> monthly_salaries.id",
+        "user_id -> users.id",
+        "created_by -> users.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 0,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "salary_advances",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 128,
+      "created": "2026-02-13T21:00:38.000Z",
+      "fks_from": [
+        "user_id -> users.id",
+        "branch_id -> branches.id",
+        "approved_by -> users.id",
+        "rejected_by -> users.id",
+        "paid_by -> users.id",
+        "requested_by -> users.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "salary.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "salary_payments",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 112,
+      "created": "2026-02-23T18:36:14.000Z",
+      "fks_from": [
+        "monthly_salary_id -> monthly_salaries.id",
+        "user_id -> users.id",
+        "paid_by -> users.id",
+        "verified_by -> users.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "salary.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "share_tokens",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 80,
+      "created": "2026-02-24T02:03:23.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "share.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "staff_activities",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 48,
+      "created": "2026-02-11T19:19:26.000Z",
+      "fks_from": [
+        "user_id -> users.id",
+        "branch_id -> branches.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "activities.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "staff_leave_balance",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-08T13:07:21.000Z",
+      "fks_from": [
+        "user_id -> users.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 0,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "task_updates",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 32,
+      "created": "2026-02-24T02:03:23.000Z",
+      "fks_from": [
+        "task_id -> staff_tasks.id",
+        "user_id -> users.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "tasks.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "website_gallery",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 0,
+      "created": "2026-02-16T08:51:40.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "website.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "zoho_daily_transaction_details",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 80,
+      "created": "2026-02-23T18:36:14.000Z",
+      "fks_from": [
+        "daily_transaction_id -> zoho_daily_transactions.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "zoho.js"
+        ],
+        "services": [
+          "zoho-api.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "zoho_invoices_archive",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 96,
+      "created": "2026-02-25T19:22:08.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 0,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "zoho_payments_archive",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 80,
+      "created": "2026-02-25T19:22:08.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 0,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "zoho_purchase_suggestions",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 80,
+      "created": "2026-02-13T21:00:40.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [
+          "purchase-suggestion.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 1,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "zoho_reorder_alerts",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 128,
+      "created": "2026-02-13T21:00:39.000Z",
+      "fks_from": [
+        "reorder_config_id -> zoho_reorder_config.id",
+        "acknowledged_by -> users.id",
+        "resolved_by -> users.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "zoho.js"
+        ],
+        "services": [
+          "zoho-api.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "zoho_stock_history_archive",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 80,
+      "created": "2026-02-25T19:22:08.000Z",
+      "fks_from": [],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [],
+        "services": [],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 0,
+      "risk_level": "SAFE_TO_DROP",
+      "reason": ""
+    },
+    {
+      "table_name": "staff_incentives",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 64,
+      "created": "2026-03-02T03:11:18.000Z",
+      "fks_from": [
+        "user_id -> users.id",
+        "lead_id -> leads.id",
+        "approved_by -> users.id"
+      ],
+      "fks_to": [],
+      "code_refs": {
+        "routes": [
+          "painters.js",
+          "salary.js",
+          "staff-daily-work.js"
+        ],
+        "services": [
+          "staff-task-generator.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 4,
+      "risk_level": "NEEDS_REVIEW",
+      "reason": "Referenced in 4 code files"
+    },
+    {
+      "table_name": "staff_tasks",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 112,
+      "created": "2026-02-24T19:06:03.000Z",
+      "fks_from": [
+        "assigned_to -> users.id",
+        "assigned_by -> users.id",
+        "branch_id -> branches.id"
+      ],
+      "fks_to": [
+        "task_updates.task_id -> staff_tasks.id"
+      ],
+      "code_refs": {
+        "routes": [
+          "admin-dashboard.js",
+          "tasks.js"
+        ],
+        "services": [],
+        "html": [],
+        "serverJs": true
+      },
+      "total_code_refs": 3,
+      "risk_level": "NEEDS_REVIEW",
+      "reason": "Referenced by task_updates via FK"
+    },
+    {
+      "table_name": "zoho_reorder_config",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 80,
+      "created": "2026-02-13T21:00:39.000Z",
+      "fks_from": [
+        "created_by -> users.id"
+      ],
+      "fks_to": [
+        "zoho_reorder_alerts.reorder_config_id -> zoho_reorder_config.id"
+      ],
+      "code_refs": {
+        "routes": [
+          "zoho.js"
+        ],
+        "services": [
+          "zoho-api.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 2,
+      "risk_level": "NEEDS_REVIEW",
+      "reason": "Referenced by zoho_reorder_alerts via FK"
+    },
+    {
+      "table_name": "zoho_daily_transactions",
+      "actual_rows": 0,
+      "data_kb": 16,
+      "index_kb": 48,
+      "created": "2026-02-13T21:00:39.000Z",
+      "fks_from": [],
+      "fks_to": [
+        "zoho_daily_transaction_details.daily_transaction_id -> zoho_daily_transactions.id"
+      ],
+      "code_refs": {
+        "routes": [
+          "ai.js",
+          "monitoring.js",
+          "zoho.js"
+        ],
+        "services": [
+          "ai-analyzer.js",
+          "ai-context-builder.js",
+          "anomaly-detector.js",
+          "zoho-api.js"
+        ],
+        "html": [],
+        "serverJs": false
+      },
+      "total_code_refs": 7,
+      "risk_level": "KEEP",
+      "reason": "Heavily referenced in 7 code files - likely active feature"
+    }
+  ],
+  "non_empty_tables": [
+    {
+      "table_name": "zoho_location_stock",
+      "actual_rows": 17480
+    },
+    {
+      "table_name": "system_health_checks",
+      "actual_rows": 15485
+    },
+    {
+      "table_name": "zoho_payments",
+      "actual_rows": 13126
+    },
+    {
+      "table_name": "zoho_invoices",
+      "actual_rows": 12771
+    },
+    {
+      "table_name": "zoho_stock_history",
+      "actual_rows": 7716
+    },
+    {
+      "table_name": "stock_check_items",
+      "actual_rows": 3169
+    },
+    {
+      "table_name": "zoho_bulk_job_items",
+      "actual_rows": 2260
+    },
+    {
+      "table_name": "zoho_customers_map",
+      "actual_rows": 1972
+    },
+    {
+      "table_name": "production_health_snapshots",
+      "actual_rows": 1970
+    },
+    {
+      "table_name": "zoho_sync_log",
+      "actual_rows": 1903
+    },
+    {
+      "table_name": "zoho_items_map",
+      "actual_rows": 1836
+    },
+    {
+      "table_name": "painter_product_point_rates",
+      "actual_rows": 1822
+    },
+    {
+      "table_name": "attendance_photos",
+      "actual_rows": 492
+    },
+    {
+      "table_name": "whatsapp_messages",
+      "actual_rows": 446
+    },
+    {
+      "table_name": "ai_insights",
+      "actual_rows": 419
+    },
+    {
+      "table_name": "notifications",
+      "actual_rows": 391
+    },
+    {
+      "table_name": "fix_suggestions",
+      "actual_rows": 385
+    },
+    {
+      "table_name": "daily_task_responses",
+      "actual_rows": 227
+    },
+    {
+      "table_name": "staff_attendance",
+      "actual_rows": 215
+    },
+    {
+      "table_name": "role_permissions",
+      "actual_rows": 198
+    },
+    {
+      "table_name": "detected_anomalies",
+      "actual_rows": 143
+    },
+    {
+      "table_name": "attendance_daily_reports",
+      "actual_rows": 141
+    },
+    {
+      "table_name": "outside_work_periods",
+      "actual_rows": 115
+    },
+    {
+      "table_name": "permissions",
+      "actual_rows": 102
+    },
+    {
+      "table_name": "overtime_requests",
+      "actual_rows": 86
+    },
+    {
+      "table_name": "geofence_violations",
+      "actual_rows": 83
+    },
+    {
+      "table_name": "error_logs",
+      "actual_rows": 83
+    },
+    {
+      "table_name": "ai_analysis_runs",
+      "actual_rows": 76
+    },
+    {
+      "table_name": "ai_config",
+      "actual_rows": 72
+    },
+    {
+      "table_name": "ai_messages",
+      "actual_rows": 70
+    },
+    {
+      "table_name": "attendance_permissions",
+      "actual_rows": 63
+    },
+    {
+      "table_name": "code_quality_metrics",
+      "actual_rows": 56
+    },
+    {
+      "table_name": "prayer_periods",
+      "actual_rows": 56
+    },
+    {
+      "table_name": "shop_hours_config",
+      "actual_rows": 49
+    },
+    {
+      "table_name": "staff_activity_feed",
+      "actual_rows": 47
+    },
+    {
+      "table_name": "user_sessions",
+      "actual_rows": 43
+    },
+    {
+      "table_name": "bug_reports",
+      "actual_rows": 40
+    },
+    {
+      "table_name": "settings",
+      "actual_rows": 39
+    },
+    {
+      "table_name": "stock_check_assignments",
+      "actual_rows": 32
+    },
+    {
+      "table_name": "chat_read_receipts",
+      "actual_rows": 31
+    },
+    {
+      "table_name": "daily_task_submissions",
+      "actual_rows": 30
+    },
+    {
+      "table_name": "whatsapp_contacts",
+      "actual_rows": 29
+    },
+    {
+      "table_name": "painter_sessions",
+      "actual_rows": 28
+    },
+    {
+      "table_name": "chat_participants",
+      "actual_rows": 26
+    },
+    {
+      "table_name": "zoho_config",
+      "actual_rows": 26
+    },
+    {
+      "table_name": "otp_verifications",
+      "actual_rows": 24
+    },
+    {
+      "table_name": "products",
+      "actual_rows": 23
+    },
+    {
+      "table_name": "chat_messages",
+      "actual_rows": 22
+    },
+    {
+      "table_name": "leads",
+      "actual_rows": 21
+    },
+    {
+      "table_name": "ai_lead_scores",
+      "actual_rows": 19
+    },
+    {
+      "table_name": "user_branches",
+      "actual_rows": 16
+    },
+    {
+      "table_name": "wa_marketing_settings",
+      "actual_rows": 16
+    },
+    {
+      "table_name": "pack_sizes",
+      "actual_rows": 15
+    },
+    {
+      "table_name": "users",
+      "actual_rows": 15
+    },
+    {
+      "table_name": "zoho_category_defaults",
+      "actual_rows": 15
+    },
+    {
+      "table_name": "push_subscriptions",
+      "actual_rows": 14
+    },
+    {
+      "table_name": "staff_daily_ai_tasks",
+      "actual_rows": 14
+    },
+    {
+      "table_name": "chat_conversations",
+      "actual_rows": 13
+    },
+    {
+      "table_name": "collection_reminders",
+      "actual_rows": 13
+    },
+    {
+      "table_name": "ai_business_context",
+      "actual_rows": 12
+    },
+    {
+      "table_name": "staff_registrations",
+      "actual_rows": 12
+    },
+    {
+      "table_name": "ai_conversations",
+      "actual_rows": 12
+    },
+    {
+      "table_name": "roles",
+      "actual_rows": 12
+    },
+    {
+      "table_name": "whatsapp_followups",
+      "actual_rows": 12
+    },
+    {
+      "table_name": "staff_salary_config",
+      "actual_rows": 11
+    },
+    {
+      "table_name": "monthly_salaries",
+      "actual_rows": 11
+    },
+    {
+      "table_name": "zoho_locations_map",
+      "actual_rows": 10
+    },
+    {
+      "table_name": "daily_task_materials",
+      "actual_rows": 9
+    },
+    {
+      "table_name": "lead_followups",
+      "actual_rows": 9
+    },
+    {
+      "table_name": "brands",
+      "actual_rows": 8
+    },
+    {
+      "table_name": "customer_types",
+      "actual_rows": 8
+    },
+    {
+      "table_name": "branches",
+      "actual_rows": 7
+    },
+    {
+      "table_name": "categories",
+      "actual_rows": 6
+    },
+    {
+      "table_name": "daily_task_templates",
+      "actual_rows": 6
+    },
+    {
+      "table_name": "estimate_status_history",
+      "actual_rows": 6
+    },
+    {
+      "table_name": "guide_categories",
+      "actual_rows": 6
+    },
+    {
+      "table_name": "wa_campaign_leads",
+      "actual_rows": 6
+    },
+    {
+      "table_name": "wa_instant_messages",
+      "actual_rows": 6
+    },
+    {
+      "table_name": "estimate_request_activity",
+      "actual_rows": 5
+    },
+    {
+      "table_name": "customers",
+      "actual_rows": 5
+    },
+    {
+      "table_name": "painter_training_categories",
+      "actual_rows": 5
+    },
+    {
+      "table_name": "zoho_branch_allocations",
+      "actual_rows": 5
+    },
+    {
+      "table_name": "audit_log",
+      "actual_rows": 4
+    },
+    {
+      "table_name": "zoho_financial_reports",
+      "actual_rows": 4
+    },
+    {
+      "table_name": "estimate_requests",
+      "actual_rows": 4
+    },
+    {
+      "table_name": "painters",
+      "actual_rows": 4
+    },
+    {
+      "table_name": "painter_estimate_items",
+      "actual_rows": 4
+    },
+    {
+      "table_name": "website_features",
+      "actual_rows": 4
+    },
+    {
+      "table_name": "website_services",
+      "actual_rows": 4
+    },
+    {
+      "table_name": "zoho_bulk_jobs",
+      "actual_rows": 4
+    },
+    {
+      "table_name": "color_design_requests",
+      "actual_rows": 3
+    },
+    {
+      "table_name": "guide_views",
+      "actual_rows": 3
+    },
+    {
+      "table_name": "wa_message_templates",
+      "actual_rows": 3
+    },
+    {
+      "table_name": "painter_estimates",
+      "actual_rows": 3
+    },
+    {
+      "table_name": "wa_campaigns",
+      "actual_rows": 3
+    },
+    {
+      "table_name": "wa_sending_stats",
+      "actual_rows": 3
+    },
+    {
+      "table_name": "website_testimonials",
+      "actual_rows": 3
+    },
+    {
+      "table_name": "whatsapp_sessions",
+      "actual_rows": 3
+    },
+    {
+      "table_name": "customer_credit_history",
+      "actual_rows": 2
+    },
+    {
+      "table_name": "guides",
+      "actual_rows": 2
+    },
+    {
+      "table_name": "admin_notices",
+      "actual_rows": 1
+    },
+    {
+      "table_name": "estimate_items",
+      "actual_rows": 1
+    },
+    {
+      "table_name": "painter_special_offers",
+      "actual_rows": 1
+    },
+    {
+      "table_name": "estimates",
+      "actual_rows": 1
+    },
+    {
+      "table_name": "payment_promises",
+      "actual_rows": 1
+    },
+    {
+      "table_name": "zoho_oauth_tokens",
+      "actual_rows": 1
+    }
+  ],
+  "summary": {
+    "total_empty": 40,
+    "safe_to_drop": 36,
+    "needs_review": 3,
+    "keep": 1
+  }
+}

@@ -825,12 +825,17 @@ router.post('/my/:id/followup', requirePermission('leads', 'own.edit'), async (r
             });
         }
 
+        // Sanitize outcome — map legacy/invalid values to valid enum entries
+        const validOutcomes = ['interested', 'not_interested', 'callback', 'no_response', 'converted', 'other'];
+        const outcomeMap = { follow_up: 'callback', 'follow-up': 'callback', followup: 'callback', pending: 'callback' };
+        const safeOutcome = validOutcomes.includes(outcome) ? outcome : (outcomeMap[outcome] || 'callback');
+
         // Insert followup
         const [result] = await pool.query(
             `INSERT INTO lead_followups
              (lead_id, user_id, followup_type, notes, outcome, next_followup_date)
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [leadId, userId, followup_type, notes, outcome || 'callback', next_followup_date || null]
+            [leadId, userId, followup_type, notes, safeOutcome, next_followup_date || null]
         );
 
         // Get current lead data for status check
@@ -982,7 +987,7 @@ router.get('/my/re-engage', requirePermission('leads', 'own.view'), async (req, 
                    ) as last_activity_date
             FROM leads l
             LEFT JOIN customers c ON l.customer_id = c.id
-            LEFT JOIN painter_estimates pe ON (pe.customer_phone = l.phone OR pe.painter_phone = l.phone) AND pe.status NOT IN ('draft')
+            LEFT JOIN painter_estimates pe ON pe.customer_phone = l.phone AND pe.status NOT IN ('draft')
             LEFT JOIN zoho_invoices zi ON zi.customer_name = l.name
             WHERE l.status = 'won' AND l.customer_id IS NOT NULL AND l.assigned_to = ?
             GROUP BY l.id
@@ -1024,7 +1029,7 @@ router.post('/my/:id/re-engage', requirePermission('leads', 'own.edit'), async (
         );
         await pool.query(
             `INSERT INTO lead_followups (lead_id, user_id, followup_type, notes, outcome)
-             VALUES (?, ?, 'other', 'Lead re-engaged for follow-up (dormant customer)', 'follow_up')`,
+             VALUES (?, ?, 'other', 'Lead re-engaged for follow-up (dormant customer)', 'callback')`,
             [leadId, req.user.id]
         );
         await pool.query(
@@ -1580,7 +1585,7 @@ router.get('/re-engage', requirePermission('leads', 'view'), async (req, res) =>
             FROM leads l
             LEFT JOIN users u ON l.assigned_to = u.id
             LEFT JOIN customers c ON l.customer_id = c.id
-            LEFT JOIN painter_estimates pe ON (pe.customer_phone = l.phone OR pe.painter_phone = l.phone) AND pe.status NOT IN ('draft')
+            LEFT JOIN painter_estimates pe ON pe.customer_phone = l.phone AND pe.status NOT IN ('draft')
             LEFT JOIN zoho_invoices zi ON zi.customer_name = l.name
             WHERE l.status = 'won' AND l.customer_id IS NOT NULL
         `;
@@ -2494,7 +2499,7 @@ router.post('/:id/re-engage', requirePermission('leads', 'edit'), async (req, re
 
         await pool.query(
             `INSERT INTO lead_followups (lead_id, user_id, followup_type, notes, outcome)
-             VALUES (?, ?, 'other', 'Lead re-engaged for follow-up (dormant customer)', 'follow_up')`,
+             VALUES (?, ?, 'other', 'Lead re-engaged for follow-up (dormant customer)', 'callback')`,
             [leadId, req.user.id]
         );
 

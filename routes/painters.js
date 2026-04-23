@@ -2464,7 +2464,7 @@ router.post('/me/attendance/check-in', requirePainterAuth, uploadPainterAttendan
         // Insert attendance record
         const [result] = await pool.query(`
             INSERT INTO painter_attendance
-            (painter_id, event_type, branch_id, check_in_at, photo_url, latitude, longitude, distance_meters, points_awarded)
+            (painter_id, event_type, branch_id, check_in_at, check_in_photo_url, latitude, longitude, distance_from_shop, points_awarded)
             VALUES (?, 'store_visit', ?, NOW(), ?, ?, ?, ?, ?)
         `, [req.painter.id, nearestBranch.id, photoUrl, lat, lng, Math.round(minDistance), dailyPoints]);
 
@@ -2501,7 +2501,7 @@ router.get('/me/attendance/monthly', requirePainterAuth, async (req, res) => {
 
         const [visits] = await pool.query(`
             SELECT DATE(check_in_at) as visit_date, points_awarded, check_in_at,
-                   branch_id, distance_meters
+                   branch_id, distance_from_shop as distance_meters
             FROM painter_attendance
             WHERE painter_id = ? AND MONTH(check_in_at) = ? AND YEAR(check_in_at) = ?
             ORDER BY check_in_at ASC
@@ -5446,7 +5446,7 @@ router.post('/me/challenges/:id/claim', requirePainterAuth, async (req, res) => 
 
         // Award points to regular pool
         await pool.query(
-            `INSERT INTO painter_point_transactions (painter_id, points, pool, type, description, reference_id, created_at)
+            `INSERT INTO painter_point_transactions (painter_id, amount, pool, type, description, reference_id, created_at)
              VALUES (?, ?, 'regular', 'challenge_reward', ?, ?, NOW())`,
             [req.painter.id, challenge.reward_points, `Challenge reward: ${challenge.title}`, `challenge-${challengeId}`]
         );

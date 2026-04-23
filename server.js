@@ -3832,7 +3832,8 @@ server.listen(PORT, () => {
                 console.log(`[Geo Cron] Server auto-clockout user ${rec.user_id} — ${dist}m, 5 min expired`);
             }
         } catch (err) {
-            console.error('[Geo Cron] Error:', err.message);
+            console.error('[Geo Cron] Error:', err.message, '| SQL:', err.sql || 'N/A', '| sqlMessage:', err.sqlMessage || 'N/A', '| code:', err.code || 'N/A');
+            console.error('[Geo Cron] Full error:', JSON.stringify({code: err.code, sqlState: err.sqlState, sqlMessage: err.sqlMessage, sql: err.sql && err.sql.substring(0, 300)}));
         }
 
         // Activity tracker idle detection + max duration check

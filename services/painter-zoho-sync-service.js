@@ -58,12 +58,31 @@ async function syncPainterToZoho(painterId, ctx = {}) {
         } else {
             try {
                 const zohoName = `PNTR ${branchCode} ${painter.full_name}`;
-                const resp = await zohoApi.createContact({
-                    contact_name: zohoName,
-                    mobile: painter.phone,
-                    email: painter.email || undefined,
-                    custom_fields: [{ api_name: 'cf_painter_id', value: painter.id }]
-                });
+
+                // Try with cf_painter_id custom field first; if Zoho rejects it (field not configured),
+                // retry without custom fields so sync doesn't fail permanently.
+                let resp;
+                try {
+                    resp = await zohoApi.createContact({
+                        contact_name: zohoName,
+                        mobile: painter.phone,
+                        email: painter.email || undefined,
+                        custom_fields: [{ api_name: 'cf_painter_id', value: painter.id }]
+                    });
+                } catch (cfErr) {
+                    const isCfMissing = cfErr.message && cfErr.message.includes('cf_painter_id');
+                    if (isCfMissing) {
+                        console.warn(`[PainterZohoSync] cf_painter_id field not found in Zoho — retrying without custom field for painter ${painterId}`);
+                        resp = await zohoApi.createContact({
+                            contact_name: zohoName,
+                            mobile: painter.phone,
+                            email: painter.email || undefined
+                        });
+                    } else {
+                        throw cfErr;
+                    }
+                }
+
                 const cid = resp && resp.contact && resp.contact.contact_id;
                 if (!cid) throw new Error('Zoho createContact: no contact_id in response');
                 await pool.query(`UPDATE painters SET zoho_customer_id = ? WHERE id = ?`, [cid, painterId]);
