@@ -444,6 +444,58 @@ router.put('/me', requirePainterAuth, async (req, res) => {
     }
 });
 
+// Painter taps "Request Approval" button on pending screen.
+// Rate-limited to once per 2 minutes. Increments counter so admin
+// can gauge interest.
+router.post('/me/request-approval', requirePainterSession, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            'SELECT approval_request_count, last_approval_request_at FROM painters WHERE id = ?',
+            [req.painter.id]
+        );
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Painter not found' });
+
+        const painter = rows[0];
+        const RATE_LIMIT_SECONDS = 120;
+
+        if (painter.last_approval_request_at) {
+            const last = new Date(painter.last_approval_request_at).getTime();
+            const elapsed = Math.floor((Date.now() - last) / 1000);
+            if (elapsed < RATE_LIMIT_SECONDS) {
+                const remaining = RATE_LIMIT_SECONDS - elapsed;
+                return res.status(429).json({
+                    success: false,
+                    code: 'RATE_LIMITED',
+                    message: `Please wait ${remaining} seconds before requesting again`,
+                    seconds_remaining: remaining,
+                    next_available_at: new Date(last + RATE_LIMIT_SECONDS * 1000).toISOString(),
+                    count: painter.approval_request_count
+                });
+            }
+        }
+
+        await pool.query(
+            'UPDATE painters SET approval_request_count = approval_request_count + 1, last_approval_request_at = NOW() WHERE id = ?',
+            [req.painter.id]
+        );
+
+        const newCount = painter.approval_request_count + 1;
+        const nextAvailable = new Date(Date.now() + RATE_LIMIT_SECONDS * 1000).toISOString();
+        console.log(`[Painter Approval Request] painter_id=${req.painter.id} count=${newCount}`);
+
+        res.json({
+            success: true,
+            message: 'Approval request sent',
+            count: newCount,
+            next_available_at: nextAvailable,
+            seconds_remaining: RATE_LIMIT_SECONDS
+        });
+    } catch (error) {
+        console.error('Request approval error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send approval request' });
+    }
+});
+
 // Unified profile update (multipart: full_name, city, optional photo)
 // Used by painter Android EditProfileScreen — single multipart call
 router.put('/me/profile', requirePainterAuth, uploadProfile.single('photo'), async (req, res) => {
