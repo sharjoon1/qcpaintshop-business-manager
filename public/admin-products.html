@@ -20,8 +20,8 @@
 /* ── Mobile: Products Tab ───────────────────────────── */
 .products-table-wrap { display: block; }
 .products-mobile-list { display: none; }
-.filter-drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 400; }
-.filter-drawer { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; z-index: 401; padding: 20px; max-height: 80vh; overflow-y: auto; box-shadow: 0 -4px 24px rgba(0,0,0,0.15); }
+.filter-drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1100; }
+.filter-drawer { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; z-index: 1101; padding: 20px; padding-bottom: calc(20px + 62px + env(safe-area-inset-bottom, 0px)); max-height: 85vh; overflow-y: auto; box-shadow: 0 -4px 24px rgba(0,0,0,0.15); }
 .filter-drawer.open, .filter-drawer-overlay.open { display: block; }
 .mobile-filter-btn { background: #f1f5f9; color: #374151; cursor: pointer; }
 .mobile-filter-btn:active { background: #1B5E3B; color: #fff; }
@@ -871,27 +871,56 @@
                 if (!filtered.length) {
                     mobileList.innerHTML = `<div style="text-align:center;padding:40px;color:#94a3b8;">No products match your filters.</div>`;
                 } else {
-                mobileList.innerHTML = filtered.map(p => `
-                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;" onclick="editProduct(${p.id})">
-                        ${p.image_url
-                            ? `<img src="${escH(p.image_url)}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;flex-shrink:0;">`
-                            : `<div style="width:44px;height:44px;background:#f1f5f9;border-radius:8px;border:2px dashed #d1d5db;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem;">🎨</div>`
-                        }
-                        <div style="flex:1;min-width:0;">
-                            <div style="font-weight:700;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(p.name)}</div>
-                            <div style="font-size:0.72rem;color:#64748b;">${escH(p.brand_name||'')}&nbsp;·&nbsp;${escH(p.category_name||'')}</div>
-                            <div style="display:flex;gap:5px;margin-top:4px;align-items:center;flex-wrap:wrap;">
-                                <span style="font-weight:700;color:#16a34a;font-size:0.82rem;">₹${parseFloat(p.base_price||0).toFixed(0)}</span>
-                                <span style="background:${p.status==='active'?'#d1fae5':'#f1f5f9'};color:${p.status==='active'?'#065f46':'#64748b'};border-radius:4px;padding:1px 6px;font-size:0.68rem;">${p.status==='active'?'● Active':'○ Inactive'}</span>
-                                <span style="background:${p.product_type==='area_wise'?'#e0f2fe':'#fef3c7'};color:${p.product_type==='area_wise'?'#0369a1':'#92400e'};border-radius:4px;padding:1px 6px;font-size:0.68rem;">${p.product_type==='area_wise'?'Area':'Unit'}</span>
+                mobileList.innerHTML = filtered.map(p => {
+                    // Parse size_list and color_swatches
+                    const sizes = (p.size_list || '').split('|').filter(Boolean);
+                    const colorParts = (p.color_swatches || '').split('|').filter(Boolean);
+                    const colors = colorParts.map(c => {
+                        const [name, code] = c.split(':');
+                        return { name: name || '', code: code || '' };
+                    }).filter(c => c.name && c.name.trim());
+                    const displayColors = colors.slice(0, 8);
+                    const moreColors = colors.length > 8 ? colors.length - 8 : 0;
+
+                    return `
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:8px;" onclick="editProduct(${p.id})">
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            ${p.image_url
+                                ? `<img src="${escH(p.image_url)}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;flex-shrink:0;">`
+                                : `<div style="width:44px;height:44px;background:#f1f5f9;border-radius:8px;border:2px dashed #d1d5db;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem;">🎨</div>`
+                            }
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-weight:700;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(p.name)}</div>
+                                <div style="font-size:0.72rem;color:#64748b;">${escH(p.brand_name||'')}&nbsp;·&nbsp;${escH(p.category_name||'')}</div>
+                                <div style="display:flex;gap:5px;margin-top:4px;align-items:center;flex-wrap:wrap;">
+                                    <span style="font-weight:700;color:#16a34a;font-size:0.82rem;">₹${parseFloat(p.base_price||0).toFixed(0)}</span>
+                                    <span style="background:${p.status==='active'?'#d1fae5':'#f1f5f9'};color:${p.status==='active'?'#065f46':'#64748b'};border-radius:4px;padding:1px 6px;font-size:0.68rem;">${p.status==='active'?'● Active':'○ Inactive'}</span>
+                                    <span style="background:${p.product_type==='area_wise'?'#e0f2fe':'#fef3c7'};color:${p.product_type==='area_wise'?'#0369a1':'#92400e'};border-radius:4px;padding:1px 6px;font-size:0.68rem;">${p.product_type==='area_wise'?'Area':'Unit'}</span>
+                                </div>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;" onclick="event.stopPropagation()">
+                                <button onclick="editProduct(${p.id})" style="background:#eff6ff;border:none;border-radius:6px;padding:5px 10px;font-size:0.72rem;color:#1d4ed8;font-weight:600;">Edit</button>
+                                <button onclick="deleteProduct(${p.id})" style="background:#fef2f2;border:none;border-radius:6px;padding:5px 10px;font-size:0.72rem;color:#dc2626;font-weight:600;">Del</button>
                             </div>
                         </div>
-                        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;" onclick="event.stopPropagation()">
-                            <button onclick="editProduct(${p.id})" style="background:#eff6ff;border:none;border-radius:6px;padding:5px 10px;font-size:0.72rem;color:#1d4ed8;font-weight:600;">Edit</button>
-                            <button onclick="deleteProduct(${p.id})" style="background:#fef2f2;border:none;border-radius:6px;padding:5px 10px;font-size:0.72rem;color:#dc2626;font-weight:600;">Del</button>
-                        </div>
-                    </div>
-                `).join('') + `<div style="text-align:center;color:#94a3b8;font-size:0.75rem;padding:8px;">Showing ${filtered.length} of ${products.length}</div>`;
+                        ${sizes.length > 0 ? `
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9;">
+                            <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+                                <span style="font-size:0.65rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;">Sizes:</span>
+                                ${sizes.map(s => `<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:600;">${escH(s)}</span>`).join('')}
+                                ${p.variant_count > 0 ? `<span style="font-size:0.65rem;color:#94a3b8;margin-left:2px;">(${p.variant_count} variants)</span>` : ''}
+                            </div>
+                        </div>` : ''}
+                        ${displayColors.length > 0 ? `
+                        <div style="margin-top:5px;">
+                            <div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;">
+                                <span style="font-size:0.65rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;">Colors:</span>
+                                ${displayColors.map(c => `<span style="width:16px;height:16px;border-radius:50%;background:${escH(c.code || '#e5e7eb')};border:1.5px solid rgba(0,0,0,0.12);flex-shrink:0;display:inline-block;" title="${escH(c.name)}"></span>`).join('')}
+                                ${moreColors > 0 ? `<span style="font-size:0.62rem;color:#94a3b8;font-weight:500;">+${moreColors}</span>` : ''}
+                            </div>
+                        </div>` : ''}
+                    </div>`;
+                }).join('') + `<div style="text-align:center;color:#94a3b8;font-size:0.75rem;padding:8px;">Showing ${filtered.length} of ${products.length}</div>`;
                 }
             }
         }

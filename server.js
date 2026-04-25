@@ -2878,6 +2878,40 @@ app.get('/api/products', requireAuth, async (req, res) => {
             WHERE p.status = 'active'
             ORDER BY p.name
         `);
+
+        // Attach pack_sizes summary for each product
+        if (rows.length > 0) {
+            const productIds = rows.map(r => r.id);
+            const [packSummary] = await pool.query(`
+                SELECT product_id,
+                    COUNT(*) as variant_count,
+                    GROUP_CONCAT(DISTINCT CONCAT(size, ' ', COALESCE(unit,'L')) ORDER BY CAST(size AS DECIMAL) SEPARATOR '|') as size_list,
+                    COUNT(DISTINCT color_name) as color_count,
+                    GROUP_CONCAT(DISTINCT CONCAT(COALESCE(color_name,''), ':', COALESCE(color_code,'')) ORDER BY color_name SEPARATOR '|') as color_swatches
+                FROM pack_sizes
+                WHERE product_id IN (?) AND is_active = 1
+                GROUP BY product_id
+            `, [productIds]);
+
+            const summaryMap = {};
+            packSummary.forEach(s => { summaryMap[s.product_id] = s; });
+
+            rows.forEach(r => {
+                const s = summaryMap[r.id];
+                if (s) {
+                    r.variant_count = s.variant_count;
+                    r.size_list = s.size_list;
+                    r.color_count = s.color_count;
+                    r.color_swatches = s.color_swatches;
+                } else {
+                    r.variant_count = 0;
+                    r.size_list = '';
+                    r.color_count = 0;
+                    r.color_swatches = '';
+                }
+            });
+        }
+
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
