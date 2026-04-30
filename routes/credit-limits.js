@@ -10,10 +10,11 @@ const router = express.Router();
 const { requireAuth, requireRole, requirePermission } = require('../middleware/permissionMiddleware');
 const zohoAPI = require('../services/zoho-api');
 const notificationService = require('../services/notification-service');
+const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
 let pool = null;
 let io = null;
-function setPool(p) { pool = p; }
+function setPool(p) { pool = p; setIdempotencyPool(p); }
 function setIO(i) { io = i; }
 
 // ═══════════════════════════════════════════════════════════════
@@ -405,7 +406,7 @@ router.post('/create-customer', requirePermission('credit_limits', 'request'), a
 // ═══════════════════════════════════════════════════════════════
 
 // POST /api/credit-limits/requests — submit a credit limit request
-router.post('/requests', requirePermission('credit_limits', 'request'), async (req, res) => {
+router.post('/requests', requirePermission('credit_limits', 'request'), idempotent('credit-limit.request'), async (req, res) => {
     try {
         const { zoho_customer_map_id, requested_amount, reason } = req.body;
         if (!zoho_customer_map_id || !requested_amount || requested_amount <= 0) {

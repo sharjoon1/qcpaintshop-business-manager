@@ -3,10 +3,11 @@
 const express = require('express');
 const router = express.Router();
 const { requirePermission, requireAuth } = require('../middleware/permissionMiddleware');
+const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
 let pool;
 
-function setPool(p) { pool = p; }
+function setPool(p) { pool = p; setIdempotencyPool(p); }
 
 // In-memory cache for filter-options (5 min TTL)
 let _filterCache = null;
@@ -542,7 +543,7 @@ router.post('/:id/update-payment-ref', requireAuth, async (req, res) => {
 // ========================================
 // RECORD PAYMENT ON ESTIMATE
 // ========================================
-router.post('/:id/record-payment', requireAuth, async (req, res) => {
+router.post('/:id/record-payment', requireAuth, idempotent('estimate.record-payment'), async (req, res) => {
     try {
         const { amount, payment_method, payment_reference, send_whatsapp, phone } = req.body;
         if (!amount || amount <= 0) return res.status(400).json({ success: false, message: 'Valid amount required' });
@@ -822,7 +823,7 @@ router.get('/:id/items', requirePermission('estimates', 'view'), async (req, res
 // ========================================
 // CREATE ESTIMATE
 // ========================================
-router.post('/', requirePermission('estimates', 'add'), async (req, res) => {
+router.post('/', requirePermission('estimates', 'add'), idempotent('estimate.create'), async (req, res) => {
     try {
         const {
             customer_name, customer_phone, customer_address, estimate_date, valid_until,

@@ -17,10 +17,13 @@ let sessionManager;
 try { sessionManager = require('../services/whatsapp-session-manager'); } catch {}
 
 // Database connection (imported from main app)
+const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
+
 let pool;
 
 function setPool(dbPool) {
     pool = dbPool;
+    setIdempotencyPool(dbPool);
 }
 
 // ========================================
@@ -1236,7 +1239,7 @@ router.put('/monthly/:id/adjustments', requireAuth, requirePermission('salary', 
 /**
  * POST record salary payment
  */
-router.post('/payments', requireAuth, requirePermission('salary', 'manage'), async (req, res) => {
+router.post('/payments', requireAuth, requirePermission('salary', 'manage'), idempotent('salary.payment.create'), async (req, res) => {
     try {
         const {
             monthly_salary_id,

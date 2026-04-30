@@ -19,6 +19,7 @@ const painterNotificationService = require('../services/painter-notification-ser
 const notificationService = require('../services/notification-service');
 const { generatePainterEstimatePDF } = require('./painter-estimate-pdf-generator');
 const attendanceService = require('../services/painter-attendance-service');
+const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
 let pool;
 let io;
@@ -29,6 +30,7 @@ function setPool(p) {
     pointsEngine.setPool(p);
     zohoAPI.setPool(p);
     attendanceService.setPool(p);
+    setIdempotencyPool(p);
 }
 
 function setIO(ioInstance) { io = ioInstance; }
@@ -767,7 +769,7 @@ router.get('/me/referrals', requirePainterAuth, async (req, res) => {
     }
 });
 
-router.post('/me/withdraw', requirePainterAuth, async (req, res) => {
+router.post('/me/withdraw', requirePainterAuth, idempotent('painter.withdraw.create'), async (req, res) => {
     try {
         const { pool: pointPool, amount } = req.body;
         if (!pointPool || !amount || amount <= 0) return res.status(400).json({ success: false, message: 'Pool and positive amount are required' });
@@ -1320,7 +1322,7 @@ router.get('/me/estimates', requirePainterAuth, async (req, res) => {
 });
 
 // Create estimate
-router.post('/me/estimates', requirePainterAuth, async (req, res) => {
+router.post('/me/estimates', requirePainterAuth, idempotent('painter.estimate.create'), async (req, res) => {
     try {
         const {
             billing_type, customer_name, customer_phone, customer_address,
@@ -1645,7 +1647,7 @@ router.post('/me/estimates/:estimateId/request-discount', requirePainterAuth, as
 
 // Painter: Submit payment (pending admin confirmation)
 // Allowed from: approved (self), final_approved (customer), payment_recorded (balance payment)
-router.post('/me/estimates/:estimateId/payment', requirePainterAuth, async (req, res) => {
+router.post('/me/estimates/:estimateId/payment', requirePainterAuth, idempotent('painter.estimate.payment'), async (req, res) => {
     try {
         const { payment_method, payment_reference, payment_amount } = req.body;
         if (!payment_method) return res.status(400).json({ success: false, message: 'Payment method is required' });

@@ -13,9 +13,10 @@ const { validate, validateQuery, validateParams } = require('../middleware/valid
 const { uploadVendorBill } = require('../config/uploads');
 const vendorBillAI = require('../services/vendor-bill-ai-service');
 const zohoAPI = require('../services/zoho-api');
+const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
 let pool;
-function setPool(p) { pool = p; vendorBillAI.setPool(p); }
+function setPool(p) { pool = p; vendorBillAI.setPool(p); setIdempotencyPool(p); }
 
 // ═══════════════════════════════════════════
 // HELPERS
@@ -954,6 +955,7 @@ router.get('/payments',
 
 // Record payment
 router.post('/payments',
+    idempotent('vendor.payment.create'),
     managePerm,
     validate(recordPaymentSchema),
     async (req, res) => {

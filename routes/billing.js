@@ -12,9 +12,10 @@ const { requirePermission } = require('../middleware/permissionMiddleware');
 const { validate, validateQuery, validateParams } = require('../middleware/validate');
 const billingZohoService = require('../services/billing-zoho-service');
 const auditLog = require('../services/audit-log');
+const { idempotent, setPool: setIdempotencyPool } = require('../middleware/idempotency');
 
 let pool;
-function setPool(p) { pool = p; billingZohoService.setPool(p); auditLog.setPool(p); }
+function setPool(p) { pool = p; billingZohoService.setPool(p); auditLog.setPool(p); setIdempotencyPool(p); }
 function setPointsEngine(pe) { billingZohoService.setPointsEngine(pe); }
 
 // ═══════════════════════════════════════════
@@ -275,6 +276,7 @@ router.get('/stats',
 
 // Create estimate
 router.post('/estimates',
+    idempotent('billing.estimate.create'),
     requirePermission('billing', 'estimate'),
     validate(createEstimateSchema),
     async (req, res) => {
@@ -640,6 +642,7 @@ router.post('/estimates/:id/convert',
 
 // Create direct invoice
 router.post('/invoices',
+    idempotent('billing.invoice.create'),
     requirePermission('billing', 'invoice'),
     validate(createInvoiceSchema),
     async (req, res) => {
@@ -867,6 +870,7 @@ router.put('/invoices/:id',
 
 // Record payment against invoice
 router.post('/invoices/:id/payment',
+    idempotent('billing.payment.create'),
     requirePermission('billing', 'payment'),
     validateParams(idParamSchema),
     validate(recordPaymentSchema),
