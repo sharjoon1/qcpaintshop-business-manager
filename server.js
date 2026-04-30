@@ -73,6 +73,8 @@ const systemRoutes = require('./routes/system');
 const creditLimitRoutes = require('./routes/credit-limits');
 const errorHandlerMw = require('./middleware/errorHandler');
 const { globalLimiter, authLimiter, otpLimiter } = require('./middleware/rateLimiter');
+const customerAuthService = require('./services/customer-auth');
+const { requireCustomerAuth } = require('./middleware/customerAuth');
 const systemHealthService = require('./services/system-health-service');
 const errorAnalysisService = require('./services/error-analysis-service');
 const aiEngineForErrors = require('./services/ai-engine');
@@ -183,6 +185,7 @@ const pool = createPool();
 
 // Initialize shared pool for middleware and all route modules
 initPool(pool);
+customerAuthService.setPool(pool);
 attendanceRoutes.setPool(pool);
 attendanceRoutes.setActivityTrackerService(activityTrackerService);
 salaryRoutes.setPool(pool);
@@ -3270,15 +3273,110 @@ app.post('/api/customer/auth/verify-otp', async (req, res) => {
             }
         }
 
-        // Generate session token (no DB storage needed - customer pages use localStorage only)
-        const token = crypto.randomBytes(32).toString('hex');
+        const token = await customerAuthService.createSession({
+            customerId,
+            phone,
+            ip: req.ip,
+            userAgent: req.get('User-Agent')
+        });
 
         res.json({
             success: true,
-            data: { name: customerName, customer_id: customerId, token }
+            data: { name: customerName, customer_id: customerId, phone, token }
         });
     } catch (error) {
         console.error('Verify OTP error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/customer/auth/logout', async (req, res) => {
+    try {
+        const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+        if (token) await customerAuthService.revoke(token);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Customer logout error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.get('/api/customer/auth/me', requireCustomerAuth, async (req, res) => {
+    try {
+        let name = 'Customer';
+        if (req.customer.id) {
+            const [c] = await pool.query('SELECT name FROM customers WHERE id = ? LIMIT 1', [req.customer.id]);
+            if (c.length) name = c[0].name;
+        } else {
+            const [er] = await pool.query('SELECT customer_name FROM estimate_requests WHERE phone = ? ORDER BY id DESC LIMIT 1', [req.customer.phone]);
+            if (er.length) name = er[0].customer_name;
+        }
+        res.json({ success: true, data: { name, customer_id: req.customer.id, phone: req.customer.phone } });
+    } catch (error) {
+        console.error('Customer me error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Customer-scoped endpoints — only return rows whose phone matches the
+// authenticated customer's phone (derived from their session, never trusted
+// from query string).
+app.get('/api/customer/me/requests', requireCustomerAuth, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+        const [rows] = await pool.query(
+            `SELECT er.id, er.request_number, er.customer_name, er.phone, er.status, er.priority,
+                    er.created_at, er.updated_at, COUNT(erp.id) AS photo_count
+             FROM estimate_requests er
+             LEFT JOIN estimate_request_photos erp ON er.id = erp.request_id
+             WHERE er.phone = ?
+             GROUP BY er.id
+             ORDER BY er.created_at DESC
+             LIMIT ?`,
+            [req.customer.phone, limit]
+        );
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Customer requests error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.get('/api/customer/me/requests/:id', requireCustomerAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT er.* FROM estimate_requests er WHERE er.id = ? AND er.phone = ? LIMIT 1`,
+            [req.params.id, req.customer.phone]
+        );
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
+        const [photos] = await pool.query(
+            'SELECT id, photo_url, caption FROM estimate_request_photos WHERE request_id = ?',
+            [req.params.id]
+        );
+        res.json({ success: true, data: { ...rows[0], photos } });
+    } catch (error) {
+        console.error('Customer request detail error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.get('/api/customer/me/estimates/:id', requireCustomerAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT e.* FROM estimates e
+             LEFT JOIN customers c ON e.customer_id = c.id
+             WHERE e.id = ? AND (c.phone = ? OR e.customer_phone = ?)
+             LIMIT 1`,
+            [req.params.id, req.customer.phone, req.customer.phone]
+        );
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
+        const [items] = await pool.query(
+            'SELECT * FROM estimate_items WHERE estimate_id = ?',
+            [req.params.id]
+        );
+        res.json({ success: true, data: { ...rows[0], items } });
+    } catch (error) {
+        console.error('Customer estimate detail error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });

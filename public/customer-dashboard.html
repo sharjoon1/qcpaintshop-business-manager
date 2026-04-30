@@ -11,8 +11,8 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <title>My Dashboard - Quality Colours</title>
     <script>
-    // Customer auth check
-    if (localStorage.getItem('customer_logged_in') !== 'true') {
+    // Customer auth check — must have a server-issued token, not just the legacy boolean
+    if (!localStorage.getItem('customer_token') || localStorage.getItem('customer_logged_in') !== 'true') {
         window.location.href = '/customer-login.html';
     }
     </script>
@@ -289,16 +289,28 @@
             document.getElementById('profileInitial').textContent = customerName.charAt(0).toUpperCase();
         }
 
+        function customerHeaders() {
+            const token = localStorage.getItem('customer_token') || '';
+            return { 'Authorization': 'Bearer ' + token };
+        }
+
+        function handleAuthFailure(response) {
+            if (response.status === 401) {
+                ['customer_token', 'customer_logged_in', 'customer_phone', 'customer_name', 'customer_id']
+                    .forEach(k => localStorage.removeItem(k));
+                window.location.href = '/customer-login.html';
+                return true;
+            }
+            return false;
+        }
+
         async function loadStats() {
             try {
-                if (!customerPhone) return;
-
-                const response = await fetch(`${API_BASE}/estimate-requests?search=${customerPhone}`);
+                const response = await fetch(`${API_BASE}/customer/me/requests?limit=100`, { headers: customerHeaders() });
+                if (handleAuthFailure(response)) return;
                 const result = await response.json();
-
                 if (result.success) {
-                    const requests = result.data;
-                    
+                    const requests = result.data || [];
                     document.getElementById('statTotal').textContent = requests.length;
                     document.getElementById('statPending').textContent = requests.filter(r => r.status === 'new' || r.status === 'contacted').length;
                     document.getElementById('statQuotes').textContent = requests.filter(r => r.status === 'quote_sent').length;
@@ -325,7 +337,8 @@
                     return;
                 }
 
-                const response = await fetch(`${API_BASE}/estimate-requests?search=${customerPhone}&limit=5`);
+                const response = await fetch(`${API_BASE}/customer/me/requests?limit=5`, { headers: customerHeaders() });
+                if (handleAuthFailure(response)) return;
                 const result = await response.json();
 
                 if (!result.success || result.data.length === 0) {
