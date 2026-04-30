@@ -3734,6 +3734,50 @@ io.on('connection', async (socket) => {
     });
 });
 
+
+
+// ===== DPL MATCH REVIEW API =====
+app.get('/api/zoho/dpl-match-report', requireAuth, async (req, res) => {
+    try {
+        const [zohoItems] = await pool.query(
+            "SELECT zoho_item_id, zoho_item_name, zoho_sku, zoho_rate, zoho_cf_dpl, " +
+            "zoho_purchase_rate, zoho_brand, zoho_category_name, zoho_cf_product_name " +
+            "FROM zoho_items_map WHERE zoho_brand IN ('BIRLA OPUS', 'BERGER PAINTS') " +
+            "AND zoho_status = 'active' ORDER BY zoho_brand, zoho_item_name"
+        );
+        const [mappedPacks] = await pool.query(
+            "SELECT ps.zoho_item_id, ps.product_id, p.name as product_name " +
+            "FROM pack_sizes ps JOIN products p ON p.id = ps.product_id " +
+            "WHERE ps.zoho_item_id IS NOT NULL AND ps.zoho_item_id != '' AND ps.is_active = 1"
+        );
+        const lookup = {};
+        for (const mp of mappedPacks) lookup[mp.zoho_item_id] = { product_id: mp.product_id, product_name: mp.product_name };
+        const items = [];
+        const summary = {};
+        for (const zi of zohoItems) {
+            const brand = zi.zoho_brand || 'UNKNOWN';
+            if (!summary[brand]) summary[brand] = { total: 0, matched: 0, unmatched: 0 };
+            summary[brand].total++;
+            const m = lookup[zi.zoho_item_id];
+            if (m) summary[brand].matched++; else summary[brand].unmatched++;
+            items.push({
+                zoho_item_id: zi.zoho_item_id, zoho_item_name: zi.zoho_item_name,
+                zoho_sku: zi.zoho_sku, zoho_rate: zi.zoho_rate, zoho_cf_dpl: zi.zoho_cf_dpl,
+                zoho_purchase_rate: zi.zoho_purchase_rate, zoho_brand: zi.zoho_brand,
+                zoho_category: zi.zoho_category_name,
+                status: m ? 'matched' : 'unmatched',
+                product_name: m ? m.product_name : null,
+                product_id: m ? m.product_id : null
+            });
+        }
+        res.json({ success: true, summary, items, generated_at: new Date().toISOString() });
+    } catch (err) {
+        console.error('dpl-match-report error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+// ===== END DPL MATCH REVIEW API =====
+
 server.listen(PORT, () => {
     console.log(`QC Business Manager API v2.0.0 running on port ${PORT}`);
     console.log(`Modules loaded: auth, roles, branches, users, customers, leads, products, estimates, attendance, salary, activities, tasks, settings, zoho-books, chat, notifications, pdf, share`);

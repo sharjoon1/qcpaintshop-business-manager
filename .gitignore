@@ -23,6 +23,7 @@ public/uploads/visualizations/
 public/uploads/daily-tasks/
 public/uploads/aadhar/
 public/uploads/logos/
+public/downloads/
 
 # WhatsApp session data (Chromium profiles, auth tokens)
 whatsapp-sessions/
@@ -58,6 +59,7 @@ stock-check-progress.html
 *.OLD
 *.backup
 *.bak
+*.bak.*
 .env.backup*
 
 # SQLite DB
