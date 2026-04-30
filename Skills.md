@@ -3509,7 +3509,108 @@ Same pattern for category. `FilterOption(id, name)` — always use ID for server
 2. **ViewModel**: `addToCart` passes `colorCode = packSize.colorCode, colorName = packSize.colorName` to `CartItem`.
 3. **Screen**: `PackSizeRow` shows 12dp color dot + `"ColorName · 1L"` label matching Catalog style.
 
+### Audit-Driven Reliability & Perf Sprint (Apr 30 – May 1, 2026)
+
+Triggered by an external code-audit report covering the act.qcpaintshop.com codebase. Audit identified 4 U-CRITICAL bugs + 24 U-items (upgrades) + 12 D-items (design/UX). 11 items shipped over two days; remainder queued.
+
+#### U-CRITICAL-1: Customer auth tokens now persisted server-side (`27572ca`)
+The previous customer flow stored only `customer_logged_in=true` in localStorage, which any browser tab could fake. Replaced with proper Bearer-token sessions:
+- `migrations/migrate-customer-sessions.js` creates `customer_sessions(id, token_hash CHAR(64) UNIQUE, customer_id, phone, expires_at, revoked_at, ip_address, user_agent, created_at)` — SHA-256 hashed token, 30-day TTL.
+- `services/customer-auth.js` exports `createSession`, `resolveSession`, `revoke`, `revokeAllForPhone`.
+- `middleware/customerAuth.js`: `requireCustomerAuth` reads Bearer header, populates `req.customer = { id, phone }`.
+- `server.js`: `/api/customer/auth/verify-otp` calls `createSession` and returns the raw token; new endpoints `/api/customer/auth/logout`, `/api/customer/auth/me`, `/api/customer/me/requests`, `/api/customer/me/requests/:id`, `/api/customer/me/estimates/:id` all derive phone from session.
+- `public/customer-dashboard.html` migrated to send `Authorization: Bearer <token>` and call `/api/customer/me/*`. **Pending**: migrate `customer-requests.html`, `customer-estimate-view.html`, `customer-login.html` to the same pattern.
+
+#### U-CRITICAL-2: DPL-match endpoint moved into routes/zoho.js (`5f1dd92`)
+Previously registered at `server.js:3740` AFTER the `globalErrorHandler`, so any throw inside the handler bypassed the standard error-response shape. Moved to `routes/zoho.js` as `router.get('/dpl-match-report', requireAuth, …)` so errors flow through the global handler.
+
+#### U-CRITICAL-3: Painter points table-name collision fixed (`bf22da9`)
+`services/painter-points-backfill-service.js` had 3 raw `INSERT INTO painter_points_transactions` (plural). Actual table is `painter_point_transactions` (singular) — those INSERTs were silently failing on the production schema. Replaced all three with `pointsEngine.addPoints(painterId, 'annual', …, 'invoice_backfill', \`ZINV-…-direct\`, …)` so the canonical engine dedupes via the engine's own checks. Updated 4 jest tests to mock `painter-points-engine` and assert `addPoints.mock.calls`. All pass.
+
+#### U-CRITICAL-4: Token-based forgot-password flow (`5e283c5`)
+Previous flow overwrote the user's real password with a 4-byte hex temp value and emailed it in plaintext — anyone with email access permanently owned the account. Replaced with industry standard:
+- `migrations/migrate-password-reset-tokens.js` creates `password_reset_tokens(id, user_id, token_hash CHAR(64) UNIQUE, expires_at, used_at, requested_ip, requested_ua, created_at)`.
+- `POST /api/auth/forgot-password` issues a SHA-256 hashed token (raw token only in email link), 1h expiry, generic response (no user-existence leak).
+- `GET /api/auth/validate-reset-token?token=…` checks expiry/used_at.
+- `POST /api/auth/reset-password` is transactional: bcrypt new password, mark `used_at`, invalidate all `user_sessions` for that user.
+- `public/reset-password.html` reads `?token=` from URL, validates, then accepts new password. Existing `forgot-password.html` rewired to the new endpoint.
+
+#### U6: Tailwind JIT build pipeline (`3eae6f3`)
+Replaced the `<script src="https://cdn.tailwindcss.com">` runtime tag (CSP-hostile, slow first paint, 3+MB unminified JS) with a build-time CLI. `tailwind.config.js` content globs `./public/**/*.html`, `./public/**/*.js` plus a generous safelist regex for the dynamic class strings built in JS `innerHTML` blocks. `src/tailwind-input.css` has `@tailwind base/components/utilities`. `npm run build:css` produces `public/css/tailwind.css` (~951KB minified). `npm run watch:css` for dev. **Migrated 2 demo pages** (`forgot-password.html`, `reset-password.html`) to `<link rel="stylesheet" href="/css/tailwind.css">`. **Pending**: migrate the remaining 105 HTML pages page-by-page, then prune the safelist.
+
+#### U12: Audit log infrastructure (`4c1e3c4`, renamed `d3ef92a`)
+- `migrations/migrate-audit-log.js` creates `audit_records` table (renamed from `audit_log` to avoid colliding with a pre-existing legacy table that has 4 rows from Feb 2026 with a totally different schema; legacy untouched).
+- Schema: `id, ts, user_id, actor_type, action, entity_type, entity_id, before_json LONGTEXT, after_json LONGTEXT, ip, user_agent, request_url`.
+- `services/audit-log.js` exports `record(req, {action, entity_type, entity_id, before, after})` with `SENSITIVE_KEYS` redaction (password_hash, otp, *_token, secret, etc.) and swallow-on-error so audit failures never block the user-facing path. `query(filters)` for admin browsing.
+- `routes/billing.js` records `billing.estimate.cancel` on DELETE. `routes/system.js` exposes `GET /api/system/audit-log` (admin-only, queryable).
+- **Pending**: instrument painter withdrawal approve/reject (`routes/painters.js`), salary payments (`routes/salary.js`), credit-limit state changes, billing PUT estimate/invoice items (added in U18).
+
+#### U17: Idempotency keys on financial POSTs (`95f7234`)
+Mobile clients on flaky networks would retry POSTs and create duplicate estimates/invoices/payments. Added:
+- `migrations/migrate-idempotency.js` creates `idempotency_records(id, key_hash CHAR(64) UNIQUE, scope, user_id, actor_type, response_status, response_body LONGTEXT, request_url, created_at, expires_at)` — 24h TTL.
+- `middleware/idempotency.js` exports `idempotent(scope)` factory. Reads `Idempotency-Key` header (≤128 ASCII), stores SHA-256(scope + ':' + key) so different routes can use the same client UUID without collision. Wraps `res.json()` to capture first 2xx/4xx response. **5xx is NOT stored** so transient errors remain retriable. Backward-compatible: no header = no caching.
+- `public/js/idempotency-fetch.js` provides `qcIdempotencyKey()` UUID generator + `qcWithIdempotency(key, headers)` helper. One UUID per submit-button click; reuse on retry.
+- Wired into 11 financial POSTs:
+  - `routes/billing.js`: POST `/estimates`, `/invoices`, `/invoices/:id/payment`
+  - `routes/painters.js`: POST `/me/withdraw`, `/me/estimates`, `/me/estimates/:id/payment`
+  - `routes/estimates.js`: POST `/`, `/:id/record-payment`
+  - `routes/vendors.js`: POST `/payments`
+  - `routes/salary.js`: POST `/payments`
+  - `routes/credit-limits.js`: POST `/requests`
+- `tests/unit/idempotency.test.js`: 6 jest tests (passthrough, malformed key, replay, store on first hit, skip-on-5xx, scope isolation). All pass.
+
+#### U18: Soft-delete on financial sub-rows (`50aa975`)
+Updating an estimate or invoice used to hard-DELETE the existing line items then re-INSERT — history was destroyed irrecoverably. Now soft-delete:
+- `migrations/migrate-soft-delete-financial-items.js` adds `deleted_at TIMESTAMP NULL` + `idx_<table>_deleted_at` to `billing_estimate_items`, `billing_invoice_items`, `painter_estimate_items`, `estimate_items`. Uses `ALGORITHM=INPLACE LOCK=NONE` on MariaDB 10.11.
+- 6 write paths converted: `routes/billing.js` PUT `/estimates/:id` and PUT `/invoices/:id`, `routes/painters.js` (self-billing edit + admin markup), `routes/estimates.js` PUT `/:id` (parent DELETE handler unchanged because FK ON DELETE CASCADE handles items).
+- 22 read paths gain `WHERE deleted_at IS NULL` filter across `routes/billing.js`, `routes/painters.js`, `routes/estimates.js`, `routes/share.js`, `server.js` (customer estimate detail), `services/billing-zoho-service.js` (Zoho push).
+- Pairs with U12: billing PUT `/estimates` and PUT `/invoices` now record before/after item arrays via `auditLog.record()`. Disputes about quantities or prices are now resolvable.
+
+#### U7: Composite indexes on hot query patterns (`61341f5`)
+`migrations/fix-missing-indexes.js` (Feb 2026) added 7 single-column indexes; this adds the 12 composite indexes the audit identified as still missing. Each index matches a specific WHERE/ORDER pattern in code:
+- `staff_attendance(user_id, date)` — used everywhere
+- `painter_estimates(painter_id, status, created_at DESC)` — painter dashboard list
+- `painter_estimates(status, created_at DESC)` — admin list
+- `painter_point_transactions(painter_id, created_at DESC)` — running balance / history paging
+- `leads(branch_id, status, next_followup_date)` — followup queue
+- `leads(assigned_to, status)` — per-staff isolation
+- `zoho_invoices(local_branch_id, invoice_date)` — branch dashboard
+- `zoho_payments(local_branch_id, payment_date)` — branch dashboard (skipped on prod — `local_branch_id` column missing, schema drift)
+- `staff_tasks(assigned_to, status, due_date)` — pending/overdue widgets
+- `notifications(user_id, read_at, created_at DESC)` — unread feed
+- `ai_messages(conversation_id, created_at DESC)` — chat paging
+- `painter_attendance_checkins(painter_id, checkin_date)`
+
+Migration uses `ALGORITHM=INPLACE LOCK=NONE` with fallback to default for engines that reject it. Each index is gated on table+column existence (`INFORMATION_SCHEMA.STATISTICS`, `INFORMATION_SCHEMA.COLUMNS`) so the migration is idempotent and safe across schema drift. **Prod result: 9/12 added** (3 skipped — already present from earlier work or pre-existing schema drift). EXPLAIN confirms `painter_estimates` queries now use `idx_pe_painter_status_created` with covering index ("Using index").
+
+#### D5: Skeleton loaders + empty-state primitives (`0f82d32`)
+- `public/css/skeletons.css` — `.qc-skel-shimmer` keyframes + base classes.
+- `public/js/ui-skeletons.js` — `qcSkeletonRows(target, count)`, `qcSkeletonCards(target, count)`, `qcSkeletonStats(target, count)`, `qcEmptyState(target, {icon, title, subtitle, action})`. Designed for incremental adoption — pages can swap in skeletons with one helper call.
+
+#### D6: qc-ui primitives — toast, modal, sheet, chip (`76727c6`)
+- `public/css/qc-ui.css` — animations, brand-aware buttons.
+- `public/js/qc-ui.js` — `qcToast(msg, {type, duration})`, `qcConfirm({title, message, confirmText, danger})` (Promise-based), `qcAlert`, `qcSheet({title, contentHTML, actions})`, `qcChip(label, options)`. Replaces ad-hoc `alert()`/`confirm()` calls scattered across the codebase.
+
+#### Self-Heal db_pool_test backoff (`706dad6` — preventive, before audit)
+`services/production-monitor.js` `healDbPool()` was retrying every 60s on `Access denied`-class failures, flooding `pm2 logs`. Added `state.lastDbPoolTestFailureAt` and `lastDbPoolTestSuccessAt` with 5-min cooldown after failure + 1-min after success.
+
+#### Operational findings worth carrying forward
+- **Prod `_migrations` tracking gap**: only Apr 30+ entries logged. Older migrations physically applied but unlogged. `node migrate.js --status` shows ~80 PENDING falsely. Workaround: run new migrations via `node -e "…m.up(p)…"` then `INSERT IGNORE INTO _migrations`. **Long-term fix**: build `node migrate.js --mark-existing-from-schema` that introspects `INFORMATION_SCHEMA` and back-fills the tracker. See [reference_prod_migrations_gap.md](memory/reference_prod_migrations_gap.md).
+- **Schema drift discovered**: `zoho_payments.local_branch_id` is missing on prod (present on `zoho_invoices`). Audit assumed both have it. Worth adding for symmetric branch filtering.
+- **Pre-existing `audit_log` legacy table** has totally different schema (table_name/record_id/old_value/new_value/ip_address/timestamp from Feb 2026, 4 rows). New table renamed to `audit_records` to avoid conflict.
+
+#### Queued for next session
+
+Recommended next batch:
+- **U10** XSS hardening — replace `innerHTML` with safe DOM helpers (partial sweep already done across 10+ pages with `esc()` helper).
+- **U13** Structured logging via pino + request IDs — would massively speed up Hetzner debugging.
+- **U2** ESLint + Prettier + EditorConfig + husky pre-commit hook — DX foundation, catches bugs before commit.
+
+Other open U-items: U1 (extract 91 inline routes from server.js), U3 (consolidate session resolver), U4/U5 (slow-query log + SELECT * cleanup), U8 (catalog/brand result cache), U9 (Zod coverage), U11 (remove inline event handlers), U14 (circuit breaker), U15/U16 (DB pool backoff polish), U19 (admin TOTP 2FA), U20 (CSV/Excel export shared service), U21–U24 (UX polish + TS migration).
+
+Open D-items: D1 admin dashboard refresh, D2 mobile clock-in flow, D3 painter polish, D4 estimate-create wizard, D7 onboarding, D8 card preview, D9 sidebar, D10 dark mode, D11 saved views, D12 mobile bottom nav.
+
 ---
 
 *This document should be updated whenever new features are added or existing ones are enhanced.*
-*Last Updated: 2026-04-22 | Version: 3.3.9 (Staff/Customer), 3.1.5 (Painter versionCode 17) | Maintained by: Development Team*
+*Last Updated: 2026-05-01 | Version: 3.3.9 (Staff/Customer), 3.1.7 (Painter vc19) | Maintained by: Development Team*
