@@ -3371,7 +3371,7 @@ app.get('/api/customer/me/estimates/:id', requireCustomerAuth, async (req, res) 
         );
         if (!rows.length) return res.status(404).json({ success: false, message: 'Not found' });
         const [items] = await pool.query(
-            'SELECT * FROM estimate_items WHERE estimate_id = ?',
+            'SELECT * FROM estimate_items WHERE estimate_id = ? AND deleted_at IS NULL',
             [req.params.id]
         );
         res.json({ success: true, data: { ...rows[0], items } });

@@ -382,7 +382,7 @@ router.get('/estimates/share/:token', async (req, res) => {
 
         const estimate = estimates[0];
         const [items] = await pool.query(
-            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? ORDER BY display_order, id', [estimate.id]
+            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY display_order, id', [estimate.id]
         );
 
         // Return markup prices for customer view
@@ -1480,7 +1480,7 @@ router.get('/me/estimates/:estimateId', requirePainterAuth, async (req, res) => 
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
 
         const [items] = await pool.query(
-            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? ORDER BY display_order, id',
+            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY display_order, id',
             [estimates[0].id]
         );
 
@@ -1515,8 +1515,8 @@ router.put('/me/estimates/:estimateId', requirePainterAuth, async (req, res) => 
             const zohoMap = {};
             zohoItems.forEach(z => { zohoMap[z.zoho_item_id] = z; });
 
-            // Delete old items and re-insert
-            await pool.query('DELETE FROM painter_estimate_items WHERE estimate_id = ?', [estimates[0].id]);
+            // Soft-delete existing items (history preserved for U18 audit trail)
+            await pool.query('UPDATE painter_estimate_items SET deleted_at = NOW() WHERE estimate_id = ? AND deleted_at IS NULL', [estimates[0].id]);
 
             let subtotal = 0;
             for (let i = 0; i < items.length; i++) {
@@ -1571,7 +1571,7 @@ router.post('/me/estimates/:estimateId/submit', requirePainterAuth, async (req, 
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Draft estimate not found' });
 
         // Verify has items
-        const [items] = await pool.query('SELECT COUNT(*) as cnt FROM painter_estimate_items WHERE estimate_id = ?', [estimates[0].id]);
+        const [items] = await pool.query('SELECT COUNT(*) as cnt FROM painter_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL', [estimates[0].id]);
         if (items[0].cnt === 0) return res.status(400).json({ success: false, message: 'Add at least one item before submitting' });
 
         await pool.query("UPDATE painter_estimates SET status = 'pending_admin' WHERE id = ?", [estimates[0].id]);
@@ -1710,7 +1710,7 @@ router.get('/me/estimates/:estimateId/pdf', requirePainterAuth, async (req, res)
         if (estimates[0].status === 'draft') return res.status(400).json({ success: false, message: 'Cannot download draft estimate' });
 
         const [items] = await pool.query(
-            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? ORDER BY display_order, id',
+            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY display_order, id',
             [estimates[0].id]
         );
 
@@ -4097,7 +4097,7 @@ router.get('/estimates', requireAuth, async (req, res) => {
         if (estimates.length) {
             const ids = estimates.map(e => e.id);
             const [counts] = await pool.query(
-                'SELECT estimate_id, COUNT(*) as item_count, SUM(quantity) as total_qty FROM painter_estimate_items WHERE estimate_id IN (?) GROUP BY estimate_id',
+                'SELECT estimate_id, COUNT(*) as item_count, SUM(quantity) as total_qty FROM painter_estimate_items WHERE estimate_id IN (?) AND deleted_at IS NULL GROUP BY estimate_id',
                 [ids]
             );
             const countMap = {};
@@ -4156,7 +4156,7 @@ router.get('/estimates/:estimateId', requireAuth, async (req, res) => {
             `SELECT pei.*, zim.zoho_description, zim.zoho_item_name as zoho_display_name
              FROM painter_estimate_items pei
              LEFT JOIN zoho_items_map zim ON pei.zoho_item_id = zim.zoho_item_id COLLATE utf8mb4_unicode_ci
-             WHERE pei.estimate_id = ? ORDER BY pei.display_order, pei.id`,
+             WHERE pei.estimate_id = ? AND pei.deleted_at IS NULL ORDER BY pei.display_order, pei.id`,
             [estimates[0].id]
         );
 
@@ -4195,8 +4195,8 @@ router.put('/estimates/:estimateId/items', requirePermission('painters', 'estima
         const zohoMap = {};
         zohoItems.forEach(z => { zohoMap[z.zoho_item_id] = z; });
 
-        // Delete old items
-        await pool.query('DELETE FROM painter_estimate_items WHERE estimate_id = ?', [estimate.id]);
+        // Soft-delete existing items (history preserved for U18 audit trail)
+        await pool.query('UPDATE painter_estimate_items SET deleted_at = NOW() WHERE estimate_id = ? AND deleted_at IS NULL', [estimate.id]);
 
         // Insert new items with server-side prices
         let subtotal = 0;
@@ -4274,7 +4274,7 @@ router.get('/estimates/:estimateId/pdf', requireAuth, async (req, res) => {
         if (estimates[0].status === 'draft') return res.status(400).json({ success: false, message: 'Cannot download draft estimate' });
 
         const [items] = await pool.query(
-            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? ORDER BY display_order, id',
+            'SELECT * FROM painter_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY display_order, id',
             [estimates[0].id]
         );
 
@@ -4323,7 +4323,7 @@ router.put('/estimates/:estimateId/review', requirePermission('painters', 'estim
         } else {
             // Customer billing: check if markup prices exist
             const [markupCheck] = await pool.query(
-                'SELECT SUM(markup_unit_price) as total FROM painter_estimate_items WHERE estimate_id = ?',
+                'SELECT SUM(markup_unit_price) as total FROM painter_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL',
                 [estimate.id]
             );
             newStatus = (markupCheck[0].total > 0) ? 'approved' : 'admin_review';
@@ -4356,7 +4356,7 @@ router.post('/estimates/:estimateId/markup', requirePermission('painters', 'esti
 
         // Get all items for this estimate
         const [allItems] = await pool.query(
-            'SELECT id, unit_price, quantity FROM painter_estimate_items WHERE estimate_id = ?',
+            'SELECT id, unit_price, quantity FROM painter_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL',
             [estimates[0].id]
         );
         const bulkPct = parseFloat(markup_percentage) || 0;
@@ -4562,7 +4562,7 @@ router.post('/estimates/:estimateId/confirm-payment', requirePermission('painter
         let pointsResult = { regularPoints: 0, annualPoints: 0 };
         try {
             const [items] = await pool.query(
-                'SELECT zoho_item_id, quantity, line_total FROM painter_estimate_items WHERE estimate_id = ?',
+                'SELECT zoho_item_id, quantity, line_total FROM painter_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL',
                 [estimate.id]
             );
             const invoiceForPoints = {
@@ -4730,7 +4730,7 @@ router.post('/estimates/:estimateId/push-zoho', requirePermission('painters', 'e
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Payment-recorded estimate not found' });
 
         const estimate = estimates[0];
-        const [items] = await pool.query('SELECT * FROM painter_estimate_items WHERE estimate_id = ? ORDER BY display_order', [estimate.id]);
+        const [items] = await pool.query('SELECT * FROM painter_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY display_order', [estimate.id]);
 
         // 1. Resolve Zoho contact
         let zohoContactId;

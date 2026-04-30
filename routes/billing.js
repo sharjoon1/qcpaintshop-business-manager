@@ -414,7 +414,7 @@ router.get('/estimates/:id',
             }
 
             const [items] = await pool.query(
-                'SELECT * FROM billing_estimate_items WHERE estimate_id = ? ORDER BY id',
+                'SELECT * FROM billing_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY id',
                 [id]
             );
 
@@ -466,8 +466,14 @@ router.put('/estimates/:id',
                 ]
             );
 
-            // Replace items
-            await pool.query('DELETE FROM billing_estimate_items WHERE estimate_id = ?', [id]);
+            // Capture pre-edit items for audit trail (U18)
+            const [beforeItems] = await pool.query(
+                'SELECT * FROM billing_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY id',
+                [id]
+            );
+
+            // Soft-delete existing items (history preserved for U18 audit trail)
+            await pool.query('UPDATE billing_estimate_items SET deleted_at = NOW() WHERE estimate_id = ? AND deleted_at IS NULL', [id]);
             for (const item of data.items) {
                 const lineTotal = item.quantity * item.unit_price;
                 await pool.query(
@@ -477,6 +483,14 @@ router.put('/estimates/:id',
                     [id, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
                 );
             }
+
+            auditLog.record(req, {
+                action: 'billing.estimate.items.replace',
+                entity_type: 'billing_estimate',
+                entity_id: id,
+                before: { items: beforeItems },
+                after:  { items: data.items, grand_total: grandTotal }
+            });
 
             res.json({ success: true, message: 'Estimate updated', grand_total: grandTotal });
         } catch (error) {
@@ -606,7 +620,7 @@ router.post('/estimates/:id/convert',
 
             // Copy items
             const [estItems] = await pool.query(
-                'SELECT * FROM billing_estimate_items WHERE estimate_id = ?', [id]
+                'SELECT * FROM billing_estimate_items WHERE estimate_id = ? AND deleted_at IS NULL', [id]
             );
             for (const item of estItems) {
                 await pool.query(
@@ -779,7 +793,7 @@ router.get('/invoices/:id',
             }
 
             const [items] = await pool.query(
-                'SELECT * FROM billing_invoice_items WHERE invoice_id = ? ORDER BY id',
+                'SELECT * FROM billing_invoice_items WHERE invoice_id = ? AND deleted_at IS NULL ORDER BY id',
                 [id]
             );
 
@@ -844,8 +858,14 @@ router.put('/invoices/:id',
                 ]
             );
 
-            // Replace items
-            await pool.query('DELETE FROM billing_invoice_items WHERE invoice_id = ?', [id]);
+            // Capture pre-edit items for audit trail (U18)
+            const [beforeInvItems] = await pool.query(
+                'SELECT * FROM billing_invoice_items WHERE invoice_id = ? AND deleted_at IS NULL ORDER BY id',
+                [id]
+            );
+
+            // Soft-delete existing items (history preserved for U18 audit trail)
+            await pool.query('UPDATE billing_invoice_items SET deleted_at = NOW() WHERE invoice_id = ? AND deleted_at IS NULL', [id]);
             for (const item of data.items) {
                 const lineTotal = item.quantity * item.unit_price;
                 await pool.query(
@@ -855,6 +875,14 @@ router.put('/invoices/:id',
                     [id, item.zoho_item_id, item.item_name, item.pack_size, item.quantity, item.unit_price, lineTotal]
                 );
             }
+
+            auditLog.record(req, {
+                action: 'billing.invoice.items.replace',
+                entity_type: 'billing_invoice',
+                entity_id: id,
+                before: { items: beforeInvItems },
+                after:  { items: data.items, grand_total: grandTotal }
+            });
 
             res.json({ success: true, message: 'Invoice updated', grand_total: grandTotal });
         } catch (error) {

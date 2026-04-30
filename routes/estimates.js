@@ -578,7 +578,7 @@ router.post('/:id/record-payment', requireAuth, idempotent('estimate.record-paym
         // Auto-create billing invoice if not exists
         let invoiceId = est.billing_invoice_id;
         if (!invoiceId) {
-            const [items] = await pool.query('SELECT * FROM estimate_items WHERE estimate_id = ?', [req.params.id]);
+            const [items] = await pool.query('SELECT * FROM estimate_items WHERE estimate_id = ? AND deleted_at IS NULL', [req.params.id]);
             const [[{ cnt }]] = await pool.query("SELECT COUNT(*) as cnt FROM billing_invoices WHERE DATE(created_at) = CURDATE()");
             const invoiceNumber = `BI-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(Number(cnt) + 1).padStart(3,'0')}`;
 
@@ -677,7 +677,7 @@ router.post('/:id/create-po', requireAuth, async (req, res) => {
         if (!estimates.length) return res.status(404).json({ success: false, message: 'Estimate not found' });
         const est = estimates[0];
 
-        const [items] = await pool.query("SELECT * FROM estimate_items WHERE estimate_id = ? AND item_type = 'product'", [req.params.id]);
+        const [items] = await pool.query("SELECT * FROM estimate_items WHERE estimate_id = ? AND item_type = 'product' AND deleted_at IS NULL", [req.params.id]);
         if (!items.length) return res.status(400).json({ success: false, message: 'No product items in estimate' });
 
         const [[{ cnt }]] = await pool.query("SELECT COUNT(*) as cnt FROM vendor_purchase_orders WHERE DATE(created_at) = CURDATE()");
@@ -795,7 +795,7 @@ router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
             SELECT ei.*, p.name as product_name, p.product_type as product_type
             FROM estimate_items ei
             LEFT JOIN products p ON ei.product_id = p.id
-            WHERE ei.estimate_id = ?
+            WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL
             ORDER BY ei.display_order, ei.id
         `, [req.params.id]);
 
@@ -811,7 +811,7 @@ router.get('/:id', requirePermission('estimates', 'view'), async (req, res) => {
 router.get('/:id/items', requirePermission('estimates', 'view'), async (req, res) => {
     try {
         const [items] = await pool.query(
-            'SELECT * FROM estimate_items WHERE estimate_id = ? ORDER BY display_order',
+            'SELECT * FROM estimate_items WHERE estimate_id = ? AND deleted_at IS NULL ORDER BY display_order',
             [req.params.id]
         );
         res.json(items);
@@ -921,8 +921,8 @@ router.put('/:id', requirePermission('estimates', 'edit'), async (req, res) => {
             ]
         );
 
-        // Replace items
-        await pool.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
+        // Soft-delete existing items (history preserved for U18 audit trail)
+        await pool.query('UPDATE estimate_items SET deleted_at = NOW() WHERE estimate_id = ? AND deleted_at IS NULL', [estimateId]);
 
         if (processedItems.length > 0) {
             await pool.query(ITEM_INSERT_SQL, [buildItemValues(estimateId, processedItems)]);

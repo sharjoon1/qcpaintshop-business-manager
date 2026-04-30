@@ -181,7 +181,7 @@ router.get('/public/:token', async (req, res) => {
             const [items] = await pool.query(
                 `SELECT ei.*, p.name as product_name FROM estimate_items ei
                  LEFT JOIN products p ON ei.product_id = p.id
-                 WHERE ei.estimate_id = ? ORDER BY ei.display_order`,
+                 WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL ORDER BY ei.display_order`,
                 [shareToken.resource_id]
             );
             data.items = items;
@@ -262,7 +262,7 @@ router.get('/public/:token/pdf', async (req, res) => {
         const [items] = await pool.query(
             `SELECT ei.*, p.name as product_name FROM estimate_items ei
              LEFT JOIN products p ON ei.product_id = p.id
-             WHERE ei.estimate_id = ? ORDER BY ei.display_order`,
+             WHERE ei.estimate_id = ? AND ei.deleted_at IS NULL ORDER BY ei.display_order`,
             [shareToken.resource_id]
         );
 

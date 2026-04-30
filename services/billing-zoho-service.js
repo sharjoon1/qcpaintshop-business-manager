@@ -103,7 +103,7 @@ async function pushInvoiceToZoho(invoiceId, userId) {
 
     // 2. Load items
     const [items] = await pool.query(
-        'SELECT * FROM billing_invoice_items WHERE invoice_id = ?',
+        'SELECT * FROM billing_invoice_items WHERE invoice_id = ? AND deleted_at IS NULL',
         [invoiceId]
     );
     if (!items.length) throw new Error(`Invoice ${invoiceId} has no items`);
