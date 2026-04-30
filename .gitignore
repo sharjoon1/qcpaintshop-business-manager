@@ -30,7 +30,11 @@ whatsapp-sessions/
 # Artifacts
 cookie.txt
 nul
-.claude/settings.local.json
+test_output.txt
+
+# Local Claude Code / superpowers state
+.claude/
+.superpowers/
 
 # Firebase service account key (contains private key)
 google-services/firebase-service-account.json
