@@ -43,6 +43,8 @@ const state = {
     healingActions: [],              // { action, timestamp, result }
     alertsSent: {},                  // { key: lastAlertTimestamp }
     consecutiveDbFailures: 0,
+    lastDbPoolTestFailureAt: 0,
+    lastDbPoolTestSuccessAt: 0,
     circuitBreaker: {                // Zoho API circuit breaker
         state: 'closed',            // closed, open, half-open
         failures: 0,
@@ -181,21 +183,23 @@ async function healMemoryPressure(memMetrics) {
 
 async function healDbPool() {
     if (!canHeal()) return;
+    if (state.consecutiveDbFailures < 3) return;
 
-    if (state.consecutiveDbFailures >= 3) {
-        try {
-            // Attempt to recreate the pool
-            const { createPool } = require('../config/database');
-            const newPool = createPool();
-            await newPool.query('SELECT 1');
+    const now = Date.now();
+    if (now - state.lastDbPoolTestFailureAt < 300000) return;
+    if (now - state.lastDbPoolTestSuccessAt < 60000) return;
 
-            // If successful, we can't replace the global pool from here,
-            // but we log the action for manual intervention
-            await newPool.end();
-            recordHealingAction('db_pool_test', 'New pool connection successful - consider restart');
-        } catch (err) {
-            recordHealingAction('db_pool_test_failed', err.message);
-        }
+    try {
+        const { createPool } = require('../config/database');
+        const newPool = createPool();
+        await newPool.query('SELECT 1');
+        await newPool.end();
+        state.lastDbPoolTestSuccessAt = now;
+        state.lastDbPoolTestFailureAt = 0;
+        recordHealingAction('db_pool_test', 'New pool connection successful - consider restart');
+    } catch (err) {
+        state.lastDbPoolTestFailureAt = now;
+        recordHealingAction('db_pool_test_failed', err.message);
     }
 }
 
