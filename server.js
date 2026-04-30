@@ -569,47 +569,48 @@ app.post('/api/auth/logout', async (req, res) => {
     }
 });
 
-// Forgot Password (with proper reset token instead of overwriting password)
+// Forgot Password — issues a single-use, time-limited reset link.
+// The user's real password is NOT touched until they submit a new password
+// through the /reset-password.html form.
 app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
+    const genericResponse = {
+        success: true,
+        message: 'If an account exists with this email, a password reset link has been sent.'
+    };
+
     try {
-        const { email } = req.body;
+        const { email } = req.body || {};
+        if (!email || typeof email !== 'string') {
+            return res.status(400).json({ success: false, message: 'Email is required.' });
+        }
 
         const [users] = await pool.query(
-            'SELECT * FROM users WHERE email = ? AND status = ?',
+            'SELECT id, full_name, username, email FROM users WHERE email = ? AND status = ?',
             [email, 'active']
         );
-
-        if (users.length === 0) {
-            return res.json({
-                success: true,
-                message: 'If an account exists with this email, you will receive a password reset link shortly.'
-            });
-        }
+        if (users.length === 0) return res.json(genericResponse);
 
         const user = users[0];
 
-        // Generate temp password and store it
-        const tempPassword = crypto.randomBytes(4).toString('hex');
-        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
         await pool.query(
-            'UPDATE users SET password_hash = ? WHERE id = ?',
-            [hashedPassword, user.id]
+            `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, requested_ip, requested_ua)
+             VALUES (?, ?, ?, ?, ?)`,
+            [user.id, tokenHash, expiresAt, req.ip, (req.get('User-Agent') || '').slice(0, 255)]
         );
 
-        // Invalidate all existing sessions
-        await pool.query('DELETE FROM user_sessions WHERE user_id = ?', [user.id]);
-
-        // Send email if SMTP configured
         if (process.env.SMTP_HOST) {
+            const baseUrl = process.env.APP_PUBLIC_URL || 'https://act.qcpaintshop.com';
+            const resetLink = `${baseUrl}/reset-password.html?token=${rawToken}`;
+
             const transporter = nodemailer.createTransport({
                 host: process.env.SMTP_HOST,
                 port: parseInt(process.env.SMTP_PORT || '587'),
                 secure: parseInt(process.env.SMTP_PORT || '587') === 465 || process.env.SMTP_SECURE === 'true',
-                auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASSWORD
-                },
+                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
                 tls: { rejectUnauthorized: false }
             });
 
@@ -623,27 +624,95 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
                             <h1 style="color: white; margin: 0;">Quality Colours</h1>
                         </div>
                         <div style="background: #f9fafb; padding: 30px;">
-                            <h2 style="color: #333;">Password Reset</h2>
+                            <h2 style="color: #333;">Reset your password</h2>
                             <p>Hello <strong>${user.full_name || user.username}</strong>,</p>
-                            <p>Your temporary password is:</p>
-                            <div style="background: white; border: 2px solid #667eea; border-radius: 8px; padding: 20px; text-align: center;">
-                                <code style="font-size: 24px; font-weight: bold; color: #667eea;">${tempPassword}</code>
-                            </div>
-                            <p>Please log in and change it immediately.</p>
+                            <p>Click the button below to choose a new password. This link is valid for 1 hour and can be used only once.</p>
+                            <p style="text-align:center; margin: 28px 0;">
+                                <a href="${resetLink}" style="background: #667eea; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Reset Password</a>
+                            </p>
+                            <p style="color: #6b7280; font-size: 13px;">If the button doesn't work, copy and paste this link:</p>
+                            <p style="word-break: break-all; color: #4f46e5; font-size: 13px;">${resetLink}</p>
+                            <p style="color: #6b7280; font-size: 13px; margin-top: 24px;">If you didn't request a password reset, you can safely ignore this email — your password remains unchanged.</p>
                         </div>
                     </div>
                 `
             });
         }
 
-        res.json({
-            success: true,
-            message: 'Password reset email sent successfully.'
-        });
-
+        res.json(genericResponse);
     } catch (error) {
         console.error('Forgot password error:', error);
-        res.status(500).json({ success: false, message: 'Failed to send reset email.' });
+        res.json(genericResponse); // never leak existence/state
+    }
+});
+
+// Validate a reset token without consuming it (used by the reset page on load)
+app.get('/api/auth/validate-reset-token', async (req, res) => {
+    try {
+        const { token } = req.query;
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ success: false, message: 'Token required.' });
+        }
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const [rows] = await pool.query(
+            `SELECT id FROM password_reset_tokens
+             WHERE token_hash = ? AND used_at IS NULL AND expires_at > NOW()`,
+            [tokenHash]
+        );
+        if (rows.length === 0) {
+            return res.status(400).json({ success: false, message: 'Reset link is invalid or has expired.' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Validate reset token error:', error);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// Consume a reset token and set a new password
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+    try {
+        const { token, password } = req.body || {};
+        if (!token || !password) {
+            return res.status(400).json({ success: false, message: 'Token and new password are required.' });
+        }
+        if (typeof password !== 'string' || password.length < 8) {
+            return res.status(400).json({ success: false, message: 'Password must be at least 8 characters.' });
+        }
+
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+
+            const [rows] = await conn.query(
+                `SELECT id, user_id FROM password_reset_tokens
+                 WHERE token_hash = ? AND used_at IS NULL AND expires_at > NOW()
+                 FOR UPDATE`,
+                [tokenHash]
+            );
+            if (rows.length === 0) {
+                await conn.rollback();
+                return res.status(400).json({ success: false, message: 'Reset link is invalid or has expired.' });
+            }
+            const { id: tokenId, user_id: userId } = rows[0];
+
+            const newHash = await bcrypt.hash(password, 10);
+            await conn.query('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, userId]);
+            await conn.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?', [tokenId]);
+            await conn.query('DELETE FROM user_sessions WHERE user_id = ?', [userId]);
+
+            await conn.commit();
+            res.json({ success: true, message: 'Password reset successfully. Please log in with your new password.' });
+        } catch (err) {
+            await conn.rollback();
+            throw err;
+        } finally {
+            conn.release();
+        }
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
 
