@@ -1,4 +1,9 @@
 // tests/unit/painter-points-backfill-service.test.js
+jest.mock('../../services/painter-points-engine', () => ({
+    setPool: jest.fn(),
+    addPoints: jest.fn(async () => 0)
+}));
+const pointsEngine = require('../../services/painter-points-engine');
 const backfill = require('../../services/painter-points-backfill-service');
 
 function makePool(state) {
@@ -8,12 +13,15 @@ function makePool(state) {
             if (/FROM zoho_invoices zi/i.test(sql) && /zoho_customer_id = \?/i.test(sql)) return [state.directInvoices];
             if (/FROM zoho_invoices.*zoho_salesperson_id = \?/i.test(sql)) return [state.spInvoices];
             if (/FROM painter_invoices_processed/i.test(sql)) return [state.processed];
-            if (/INSERT INTO painter_points_transactions/i.test(sql)) { state.pointsInserts.push(params); return [{ insertId: 1 }]; }
             if (/INSERT (IGNORE )?INTO painter_invoices_processed/i.test(sql)) { state.processedInserts.push(params); return [{ insertId: 1 }]; }
             return [[]];
         })
     };
 }
+
+beforeEach(() => {
+    pointsEngine.addPoints.mockClear();
+});
 
 describe('backfillPainter', () => {
     test('skipped when painter not activated', async () => {
@@ -37,9 +45,9 @@ describe('backfillPainter', () => {
         const rates = { selfAnnual: 0.005, custRegular: 0.005, custAnnual: 0.005 };
         const res = await backfill.backfillPainter(2, '2025-12-01', { pool: makePool(state), rates });
         expect(res.direct_points_awarded).toBe(50);
-        expect(state.pointsInserts.length).toBe(1);
-        const poolVal = state.pointsInserts[0].find(p => p === 'annual');
-        expect(poolVal).toBe('annual');
+        expect(pointsEngine.addPoints).toHaveBeenCalledTimes(1);
+        const [, pool] = pointsEngine.addPoints.mock.calls[0];
+        expect(pool).toBe('annual');
     });
 
     test('salesperson billing awards regular + annual', async () => {
@@ -52,7 +60,7 @@ describe('backfillPainter', () => {
         };
         const rates = { selfAnnual: 0.005, custRegular: 0.005, custAnnual: 0.005 };
         const res = await backfill.backfillPainter(3, '2025-12-01', { pool: makePool(state), rates });
-        expect(state.pointsInserts.length).toBe(2);
+        expect(pointsEngine.addPoints).toHaveBeenCalledTimes(2);
         expect(res.salesperson_points_awarded).toBe(200);
     });
 
@@ -66,6 +74,6 @@ describe('backfillPainter', () => {
         };
         const res = await backfill.backfillPainter(4, '2025-12-01', { pool: makePool(state), rates: { selfAnnual: 0.005, custRegular: 0.005, custAnnual: 0.005 } });
         expect(res.direct_points_awarded).toBe(0);
-        expect(state.pointsInserts.length).toBe(0);
+        expect(pointsEngine.addPoints).not.toHaveBeenCalled();
     });
 });

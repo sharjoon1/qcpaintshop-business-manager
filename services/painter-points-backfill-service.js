@@ -9,6 +9,8 @@
  * Idempotent: uses INSERT IGNORE into painter_invoices_processed to prevent double-awarding.
  */
 
+const pointsEngine = require('./painter-points-engine');
+
 async function _loadRates(pool) {
     const [rows] = await pool.query(
         `SELECT config_key, config_value FROM ai_config WHERE config_key IN
@@ -57,11 +59,10 @@ async function backfillPainter(painterId, fromDate, ctx = {}) {
         for (const inv of direct) {
             const annualPts = Math.round(Number(inv.total || 0) * rates.selfAnnual);
             if (annualPts > 0) {
-                await pool.query(
-                    `INSERT INTO painter_points_transactions
-                        (painter_id, pool, points, reference, source_date, notes)
-                     VALUES (?, ?, ?, ?, ?, ?)`,
-                    [painterId, 'annual', annualPts, `ZINV-${inv.zoho_invoice_id}-direct`, inv.invoice_date, 'Backfill direct billing']
+                await pointsEngine.addPoints(
+                    painterId, 'annual', annualPts, 'invoice_backfill',
+                    `ZINV-${inv.zoho_invoice_id}-direct`, 'zoho_invoice',
+                    `Backfill direct billing (invoice ${inv.invoice_date})`, null
                 );
             }
             await pool.query(
@@ -94,17 +95,17 @@ async function backfillPainter(painterId, fromDate, ctx = {}) {
             const regularPts = Math.round(Number(inv.total || 0) * rates.custRegular);
             const annualPts = Math.round(Number(inv.total || 0) * rates.custAnnual);
             if (regularPts > 0) {
-                await pool.query(
-                    `INSERT INTO painter_points_transactions (painter_id, pool, points, reference, source_date, notes)
-                     VALUES (?, 'regular', ?, ?, ?, 'Backfill salesperson regular')`,
-                    [painterId, regularPts, `ZINV-${inv.zoho_invoice_id}-salesperson-r`, inv.invoice_date]
+                await pointsEngine.addPoints(
+                    painterId, 'regular', regularPts, 'invoice_backfill',
+                    `ZINV-${inv.zoho_invoice_id}-salesperson-r`, 'zoho_invoice',
+                    `Backfill salesperson regular (invoice ${inv.invoice_date})`, null
                 );
             }
             if (annualPts > 0) {
-                await pool.query(
-                    `INSERT INTO painter_points_transactions (painter_id, pool, points, reference, source_date, notes)
-                     VALUES (?, 'annual', ?, ?, ?, 'Backfill salesperson annual')`,
-                    [painterId, annualPts, `ZINV-${inv.zoho_invoice_id}-salesperson-a`, inv.invoice_date]
+                await pointsEngine.addPoints(
+                    painterId, 'annual', annualPts, 'invoice_backfill',
+                    `ZINV-${inv.zoho_invoice_id}-salesperson-a`, 'zoho_invoice',
+                    `Backfill salesperson annual (invoice ${inv.invoice_date})`, null
                 );
             }
             await pool.query(
