@@ -851,7 +851,7 @@ git commit -m "feat(painters-ui): Catalog+Comms responsive, offers FAB, attendan
 - [ ] **Step 1: Deploy to production server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager"
 ```
 
 Expected output: `[PM2] Restarting process...` followed by `online`.

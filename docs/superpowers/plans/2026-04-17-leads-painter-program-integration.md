@@ -52,7 +52,7 @@ run().catch(err => { console.error(err); process.exit(1); });
 - [ ] **Step 2: Run migration on server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-painter-lead-incentive.js"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-painter-lead-incentive.js"
 ```
 
 Expected output:
@@ -450,7 +450,7 @@ git push origin master
 - [ ] **Step 2: Deploy**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager && echo DEPLOYED"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager && echo DEPLOYED"
 ```
 
 - [ ] **Step 3: Smoke test checklist**
@@ -469,7 +469,7 @@ ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin 
 - [ ] **Step 4: Verify incentive on server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && node << 'SCRIPT'
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && node << 'SCRIPT'
 require('dotenv').config();
 const {createPool} = require('./config/database');
 const pool = createPool();

@@ -754,7 +754,7 @@ git commit -m "feat: staff-billing items tables overflow-x-auto in detail panels
 After all 6 tasks are committed and verified locally:
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
 ```
 
 Verify on a real mobile device:

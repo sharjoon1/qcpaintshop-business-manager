@@ -708,7 +708,7 @@ curl -s -F document=@"$APK_PATH" \
 - [ ] **Step 4: Deploy backend**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
 ```
 
 - [ ] **Step 5: Verify on device**

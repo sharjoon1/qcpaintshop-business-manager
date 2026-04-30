@@ -1466,19 +1466,19 @@ git commit -m "feat: add QC Painters Android build flavor with painter-specific 
 
 ```bash
 git checkout master && git merge development --no-edit && git push origin master
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
 ```
 
 **Step 2: Run migration on production**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-painter-app.js"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-painter-app.js"
 ```
 
 **Step 3: Create upload directories on production**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && mkdir -p public/uploads/products public/uploads/offers public/uploads/training public/uploads/painter-attendance"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && mkdir -p public/uploads/products public/uploads/offers public/uploads/training public/uploads/painter-attendance"
 ```
 
 **Step 4: Verify APIs**

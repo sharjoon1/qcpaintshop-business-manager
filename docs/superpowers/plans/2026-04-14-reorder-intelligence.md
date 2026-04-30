@@ -2483,13 +2483,13 @@ git commit -m "feat(reorder): register 3 crons (invoice-sync, compute, report)"
 
 ```bash
 git push origin master
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && node migrations/migrate-reorder-intelligence.js && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && node migrations/migrate-reorder-intelligence.js && pm2 restart business-manager"
 ```
 
 - [ ] **Step 2: Run full test suite**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && npx jest tests/unit/reorder-compute.test.js tests/unit/invoice-line-sync.test.js tests/unit/reorder-report.test.js tests/unit/brand-config.test.js"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && npx jest tests/unit/reorder-compute.test.js tests/unit/invoice-line-sync.test.js tests/unit/reorder-report.test.js tests/unit/brand-config.test.js"
 ```
 Expected: all green.
 

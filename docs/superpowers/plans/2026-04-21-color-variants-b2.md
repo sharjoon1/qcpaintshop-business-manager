@@ -172,7 +172,7 @@ git commit -m "feat(b2): product detail query returns color_name, color_code per
 
 ```bash
 git push origin master
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager && echo 'DEPLOY OK'"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager && echo 'DEPLOY OK'"
 ```
 Expected: `DEPLOY OK`
 

@@ -162,7 +162,7 @@ migrate().catch(err => {
 - [ ] **Step 2: Run migration on server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-estimate-enhancements.js"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-estimate-enhancements.js"
 ```
 
 Expected: All columns added, existing rows backfilled with `base_price = unit_price`.
@@ -1291,7 +1291,7 @@ git commit -m "feat: add global description-only toggle and update save with ful
 - [ ] **Step 1: Deploy to server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
 ```
 
 - [ ] **Step 2: Test end-to-end**

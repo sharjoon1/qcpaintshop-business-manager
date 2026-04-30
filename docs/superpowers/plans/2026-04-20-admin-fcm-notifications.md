@@ -1338,7 +1338,7 @@ git commit -m "feat(android): qc_admin_channel with custom MP3 + offer tap routi
 - [ ] **Step 1: Deploy backend to production**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
 ```
 
 Expected: `[PM2] Process business-manager restarted`
@@ -1346,7 +1346,7 @@ Expected: `[PM2] Process business-manager restarted`
 - [ ] **Step 2: Verify migration ran on production**
 
 ```bash
-ssh root@161.97.114.189 "node /www/wwwroot/act.qcpaintshop.com/migrations/migrate-admin-notifications.js"
+ssh hetzner "node /www/wwwroot/act.qcpaintshop.com/migrations/migrate-admin-notifications.js"
 ```
 
 Expected: `[migrate-admin-notifications] Done`

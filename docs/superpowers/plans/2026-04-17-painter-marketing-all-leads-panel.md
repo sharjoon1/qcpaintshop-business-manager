@@ -766,7 +766,7 @@ git push origin master
 - [ ] **Step 2: Deploy to server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager && echo DONE"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager && echo DONE"
 ```
 
 - [ ] **Step 3: Smoke test checklist**
@@ -792,5 +792,5 @@ Open `https://act.qcpaintshop.com/admin-painters.html` → Marketing tab:
 ```bash
 git add -p
 git commit -m "fix(pntr): smoke test fixes for all-leads panel"
-git push origin master && ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager"
+git push origin master && ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager"
 ```

@@ -2479,7 +2479,7 @@ git commit -am "chore(attendance): smoke test + deploy prep"
 - [ ] **Step 6: Deploy**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && node migrations/migrate-painter-attendance.js && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && node migrations/migrate-painter-attendance.js && pm2 restart business-manager"
 ```
 
 - [ ] **Step 7: Build painter APK + upload to Play Store internal track**

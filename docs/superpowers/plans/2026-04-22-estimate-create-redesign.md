@@ -1999,7 +1999,7 @@ On mobile (Chrome DevTools → responsive, 375px):
 - [ ] **Step 9.3: Deploy to production**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
 ```
 
 - [ ] **Step 9.4: Final commit with version note**

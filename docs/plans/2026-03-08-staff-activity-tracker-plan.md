@@ -84,7 +84,7 @@ require('dotenv').config();
 **Step 2: Run migration on server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-activity-tracker.js"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-activity-tracker.js"
 ```
 
 Expected: "Activity tracker migration complete!"
@@ -1391,7 +1391,7 @@ git push origin master
 **Step 2: Deploy to production**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-activity-tracker.js && npm install && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-activity-tracker.js && npm install && pm2 restart business-manager"
 ```
 
 **Step 3: Verify**

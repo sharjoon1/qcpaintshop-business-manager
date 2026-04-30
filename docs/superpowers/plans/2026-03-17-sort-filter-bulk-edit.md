@@ -692,7 +692,7 @@ git commit -m "feat: add Paste to All Rows dropdown, fix bulk edit scoping"
 
 ```bash
 git push origin master
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && pm2 restart business-manager"
 ```
 
 - [ ] **Step 2: Verify on production**

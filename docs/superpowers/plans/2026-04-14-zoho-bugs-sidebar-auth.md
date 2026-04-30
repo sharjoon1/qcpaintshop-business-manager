@@ -845,7 +845,7 @@ function requireAdminOrRedirect() {
 1. Log into the admin panel normally. Note the current `auth_token` in DevTools → Application → Local Storage.
 2. In a separate terminal, invalidate the session server-side:
    ```bash
-   ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && mysql -e \"DELETE FROM business_manager.user_sessions WHERE session_token = '<PASTE_TOKEN_HERE>';\""
+   ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && mysql -e \"DELETE FROM business_manager.user_sessions WHERE session_token = '<PASTE_TOKEN_HERE>';\""
    ```
    (Or run the equivalent DELETE against the local dev DB if testing locally.)
 3. Reload any admin page (e.g. `/dashboard.html`).

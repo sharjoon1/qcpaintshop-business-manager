@@ -347,7 +347,7 @@ migrate().catch(err => { console.error('Migration failed:', err); process.exit(1
 **Step 2: Run migration on server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-location-off.js"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-location-off.js"
 ```
 
 **Step 3: Commit**
@@ -1069,7 +1069,7 @@ cd qcpaintshop-android
 **Step 3: Deploy server changes**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-location-off.js && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-location-off.js && pm2 restart business-manager"
 ```
 
 **Step 4: Publish to Play Store**

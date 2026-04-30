@@ -30,7 +30,7 @@ Quality Colours Business Manager is a **multi-branch paint shop management platf
 | **Push Notifications** | Web Push (VAPID) + Firebase Cloud Messaging (FCM) |
 | **Mobile Apps** | Android (Kotlin, WebView hybrid, 2 flavors) |
 | **Process Manager** | PM2 |
-| **Server** | Ubuntu Linux (161.97.114.189) |
+| **Server** | Ubuntu Linux (178.104.249.206) |
 
 ### Architecture Overview
 
@@ -1867,7 +1867,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 ### Server Details
 | Field | Value |
 |-------|-------|
-| **IP** | 161.97.114.189 |
+| **IP** | 178.104.249.206 |
 | **OS** | Ubuntu Linux |
 | **Web Server** | Nginx (reverse proxy) |
 | **App Port** | 3001 |
@@ -1882,7 +1882,7 @@ Extends the error prevention system with bug tracking, AI-powered fix suggestion
 git checkout master && git merge development && git push origin master
 
 # Server: pull and restart
-ssh root@161.97.114.189
+ssh hetzner
 cd /www/wwwroot/act.qcpaintshop.com
 git pull origin master
 npm install  # if new dependencies

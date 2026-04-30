@@ -43,7 +43,7 @@ In `generateIdCard()` (ID card):
 **Step 4: Test by regenerating cards on server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && node -e \"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && node -e \"
 require('dotenv').config();
 const { createPool } = require('./config/database');
 const pool = createPool();
@@ -213,7 +213,7 @@ migrate();
 **Step 2: Run migration on server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-estimate-discount.js"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && node migrations/migrate-estimate-discount.js"
 ```
 
 **Step 3: Commit**
@@ -367,7 +367,7 @@ git commit -m "feat: admin zoho description, % markup, discount management UI"
 
 ```bash
 git push origin master
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && pm2 restart business-manager"
 ```
 
 **Step 2: Regenerate cards on server**

@@ -60,7 +60,7 @@ migrate().catch(err => {
 - [ ] **Step 2: Run migration on remote**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-estimate-columns.js"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-estimate-columns.js"
 ```
 
 Expected: "Added image_url column to estimate_items" or "image_url column already exists"
@@ -685,7 +685,7 @@ git commit -m "feat: link estimate view to new print page, add new toggle keys"
 - [ ] **Step 1: Install puppeteer-core on server**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && npm install puppeteer-core"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && npm install puppeteer-core"
 ```
 
 Also install locally for development:
@@ -864,7 +864,7 @@ git commit -m "feat: preserve new column visibility keys in estimate edit"
 - [ ] **Step 1: Deploy (migration first, then restart)**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-estimate-columns.js && npm install && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && node migrations/migrate-estimate-columns.js && npm install && pm2 restart business-manager"
 ```
 
 - [ ] **Step 3: Verify on production**

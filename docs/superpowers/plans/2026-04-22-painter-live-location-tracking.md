@@ -1117,7 +1117,7 @@ git commit -m "feat(location): admin UI — Leaflet fleet map + route replay in 
 - [ ] **Step 1: Deploy web to production**
 
 ```bash
-ssh root@161.97.114.189 "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && node migrate.js && pm2 restart business-manager"
+ssh hetzner "cd /www/wwwroot/act.qcpaintshop.com && git pull origin master && npm install && node migrate.js && pm2 restart business-manager"
 ```
 
 Expected: PM2 confirms restart, no migration errors.
