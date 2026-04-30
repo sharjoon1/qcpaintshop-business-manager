@@ -11,9 +11,10 @@ const { z } = require('zod');
 const { requirePermission } = require('../middleware/permissionMiddleware');
 const { validate, validateQuery, validateParams } = require('../middleware/validate');
 const billingZohoService = require('../services/billing-zoho-service');
+const auditLog = require('../services/audit-log');
 
 let pool;
-function setPool(p) { pool = p; billingZohoService.setPool(p); }
+function setPool(p) { pool = p; billingZohoService.setPool(p); auditLog.setPool(p); }
 function setPointsEngine(pe) { billingZohoService.setPointsEngine(pe); }
 
 // ═══════════════════════════════════════════
@@ -492,7 +493,7 @@ router.delete('/estimates/:id',
             const { id } = req.params;
 
             const [existing] = await pool.query(
-                'SELECT id, status, converted_to_invoice_id FROM billing_estimates WHERE id = ?', [id]
+                'SELECT * FROM billing_estimates WHERE id = ?', [id]
             );
             if (!existing.length) {
                 return res.status(404).json({ success: false, message: 'Estimate not found' });
@@ -508,6 +509,14 @@ router.delete('/estimates/:id',
                 "UPDATE billing_estimates SET status = 'cancelled', updated_at = NOW() WHERE id = ?",
                 [id]
             );
+
+            await auditLog.record(req, {
+                action: 'billing.estimate.cancel',
+                entity_type: 'billing_estimate',
+                entity_id: id,
+                before: existing[0],
+                after: { ...existing[0], status: 'cancelled' }
+            });
 
             res.json({ success: true, message: 'Estimate cancelled' });
         } catch (error) {

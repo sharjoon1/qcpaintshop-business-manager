@@ -11,6 +11,7 @@ const preventionService = require('../services/error-prevention-service');
 const errorAnalysisService = require('../services/error-analysis-service');
 const errorHandler = require('../middleware/errorHandler');
 const productionMonitor = require('../services/production-monitor');
+const auditLog = require('../services/audit-log');
 
 let pool = null;
 function setPool(p) {
@@ -19,7 +20,20 @@ function setPool(p) {
     preventionService.setPool(p);
     errorAnalysisService.setPool(p);
     errorHandler.setPool(p);
+    auditLog.setPool(p);
 }
+
+// GET /api/system/audit-log — admin-only, browse the audit trail
+router.get('/audit-log', requirePermission('system', 'view'), async (req, res) => {
+    try {
+        const { entity_type, entity_id, user_id, action, since, until, limit, offset } = req.query;
+        const rows = await auditLog.query({ entity_type, entity_id, user_id, action, since, until, limit, offset });
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Audit log query error:', error);
+        res.status(500).json({ success: false, message: 'Failed to query audit log' });
+    }
+});
 
 // ========================================
 // HEALTH CHECK ENDPOINTS
