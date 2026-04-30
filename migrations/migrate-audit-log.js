@@ -6,14 +6,14 @@
  * deleted?") can be answered. Stores before/after JSON snapshots.
  */
 async function up(pool) {
-    const [tables] = await pool.query("SHOW TABLES LIKE 'audit_log'");
+    const [tables] = await pool.query("SHOW TABLES LIKE 'audit_records'");
     if (tables.length) {
-        console.log('  audit_log already exists, skipping');
+        console.log('  audit_records already exists, skipping');
         return;
     }
 
     await pool.query(`
-        CREATE TABLE audit_log (
+        CREATE TABLE audit_records (
             id              BIGINT AUTO_INCREMENT PRIMARY KEY,
             ts              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             user_id         INT NULL,
@@ -32,7 +32,7 @@ async function up(pool) {
             INDEX idx_action (action, ts)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
-    console.log('  Created audit_log table');
+    console.log('  Created audit_records table');
 }
 
 module.exports = { up };

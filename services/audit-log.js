@@ -53,7 +53,7 @@ async function record(req, { action, entity_type, entity_id, before, after }) {
         const userId = req && req.user ? req.user.id : null;
         const actorType = req && req.customer ? 'customer' : (userId ? 'staff' : 'system');
         await pool.query(
-            `INSERT INTO audit_log
+            `INSERT INTO audit_records
                 (user_id, actor_type, action, entity_type, entity_id, before_json, after_json, ip, user_agent, request_url)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
@@ -89,7 +89,7 @@ async function query({ entity_type, entity_id, user_id, action, since, until, li
     const safeOffset = parseInt(offset) || 0;
     const [rows] = await pool.query(
         `SELECT id, ts, user_id, actor_type, action, entity_type, entity_id, before_json, after_json, ip, request_url
-         FROM audit_log ${where}
+         FROM audit_records ${where}
          ORDER BY ts DESC
          LIMIT ? OFFSET ?`,
         [...params, safeLimit, safeOffset]
